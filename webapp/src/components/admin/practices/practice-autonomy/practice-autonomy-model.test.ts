@@ -30,11 +30,7 @@ describe("groupPracticesByArea", () => {
 	it("keeps the server's area order and its counts", () => {
 		const groups = groupPracticesByArea(fixture.rollup, fixture.practices);
 
-		expect(groups.map((group) => group.name)).toStrictEqual([
-			"Hygiene",
-			"Testing",
-			"Not in an area",
-		]);
+		expect(groups.map((group) => group.name)).toStrictEqual(["Hygiene", "Testing", "Unassigned"]);
 		const [hygiene] = groups;
 		const [hygieneRollup] = fixture.rollup.areas;
 		assert(hygiene);

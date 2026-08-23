@@ -13,6 +13,7 @@ import {
 	mockPullRequestWorkType,
 } from "@/mocks/fixtures/practice";
 import { StatefulPatch } from "@/stories/stateful";
+import { expectNoOverflowingElement } from "@/test/reflow";
 import { OccasionLifecycle } from "./OccasionLifecycle";
 
 const meta = {
@@ -175,5 +176,12 @@ export const DraftsSwitchIsNamedByItsLabelAlone: Story = {
 		// The description is a paragraph, and it is outside the label rather than inside it.
 		await expect(hint.tagName).toBe("P");
 		await expect(hint.closest("label")).toBeNull();
+	},
+};
+
+export const NarrowViewport: Story = {
+	parameters: { viewport: { defaultViewport: "reflow" }, chromatic: { viewports: [320] } },
+	play: async ({ canvasElement }) => {
+		await expectNoOverflowingElement(canvasElement);
 	},
 };

@@ -205,7 +205,7 @@ export const AreaOverride: Story = {
 		await expect(args.onSetAreaAutonomy).toHaveBeenCalledWith("testing", "AUTOMATIC");
 
 		// The bucket for practices in no area holds no autonomy of its own — it is not a row anywhere.
-		const unassigned = canvas.getByText("Not in an area").closest('[data-slot="accordion-item"]');
+		const unassigned = canvas.getByText("Unassigned").closest('[data-slot="accordion-item"]');
 		if (!(unassigned instanceof HTMLElement)) throw new Error("No-area group not rendered");
 		await expect(within(unassigned).getByText("Follows the workspace default")).toBeVisible();
 		await expect(
@@ -268,8 +268,9 @@ export const PracticeContext: Story = {
 		const bare = canvas.getByText("Written by hand, and says nothing more").closest("li");
 		if (!(bare instanceof HTMLElement)) throw new Error("Bare row not rendered");
 		await expect(within(bare).getByText("Pull or merge request")).toBeVisible();
-		// Asserted on the element rather than by hovering and waiting for nothing, which would pass just
-		// as well if the card were merely slow.
+		// A practice with neither field renders its link bare rather than wrapped in a card that
+		// would open on hover with nothing in it. Asserted on the element, not by hovering and
+		// waiting for nothing, which passes just as well when the card is merely slow.
 		await expect(
 			within(bare).getByRole("link", { name: "Written by hand, and says nothing more" }),
 		).not.toHaveAttribute("data-slot", "hover-card-trigger");

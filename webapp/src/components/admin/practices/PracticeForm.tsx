@@ -1,5 +1,4 @@
 import { Link } from "@tanstack/react-router";
-import { ArrowLeft, ClipboardPenLine, ListPlus } from "lucide-react";
 import type {
 	CreatePracticeRequest,
 	Practice,
@@ -14,8 +13,6 @@ import {
 	type PracticeDefinitionValue,
 } from "@/components/admin/practice-catalog/PracticeDefinitionForm";
 import { PracticeAutomatedReviewValidationSummary } from "@/components/admin/practice-catalog/PracticeEvidenceSummary";
-import { PageHeader } from "@/components/core/PageHeader";
-import { PageLayout } from "@/components/core/PageLayout";
 import { buttonVariants } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
@@ -48,14 +45,13 @@ interface PracticeFormEditProps {
 	evidenceOutcome?: PracticeEvidenceOutcome;
 }
 
-export type PracticeFormProps = PracticeFormCreateProps | PracticeFormEditProps;
-
-interface PracticeFormShellProps {
-	mode: "create" | "edit";
-	workspaceSlug: string;
-	practiceName?: string;
-	children: React.ReactNode;
+/** What "leave without saving" does. The host owns it, because only the host knows where back is. */
+interface PracticeFormHostProps {
+	cancel: React.ReactNode;
 }
+
+export type PracticeFormProps = (PracticeFormCreateProps | PracticeFormEditProps) &
+	PracticeFormHostProps;
 
 function asDefinitionValue(practice: Practice): PracticeDefinitionValue {
 	return {
@@ -72,17 +68,7 @@ function asDefinitionValue(practice: Practice): PracticeDefinitionValue {
 }
 
 export function PracticeForm(props: PracticeFormProps) {
-	const { mode, workspaceSlug, areas, isPending, initialData, definitionOptions } = props;
-	const cancelAction = (
-		<Link
-			to="/w/$workspaceSlug/admin/practices"
-			params={{ workspaceSlug }}
-			search={(previous) => previous}
-			className={buttonVariants({ variant: "outline" })}
-		>
-			Cancel
-		</Link>
-	);
+	const { mode, workspaceSlug, areas, isPending, initialData, definitionOptions, cancel } = props;
 	const submit = (value: PracticeDefinitionValue) => {
 		const { areaSlug, ...definition } = value;
 		if (props.mode === "create") {
@@ -146,61 +132,26 @@ export function PracticeForm(props: PracticeFormProps) {
 			</>
 		) : undefined;
 
-	return (
-		<PracticeFormShell mode={mode} workspaceSlug={workspaceSlug} practiceName={initialData?.name}>
-			{mode === "create" ? (
-				<PracticeDefinitionForm
-					mode="create"
-					areas={areas}
-					isPending={isPending}
-					definitionOptions={definitionOptions}
-					cancelAction={cancelAction}
-					onSubmit={submit}
-				/>
-			) : (
-				<PracticeDefinitionForm
-					mode="edit"
-					initialData={asDefinitionValue(initialData)}
-					areas={areas}
-					isPending={isPending}
-					definitionOptions={definitionOptions}
-					cancelAction={cancelAction}
-					afterFields={reviewResults}
-					evidenceOutcome={props.evidenceOutcome}
-					onSubmit={submit}
-				/>
-			)}
-		</PracticeFormShell>
-	);
-}
-
-export function PracticeFormShell({
-	mode,
-	workspaceSlug,
-	practiceName,
-	children,
-}: PracticeFormShellProps) {
-	return (
-		<PageLayout>
-			<Link
-				to="/w/$workspaceSlug/admin/practices"
-				params={{ workspaceSlug }}
-				search={(previous) => previous}
-				className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "-ml-3 w-fit")}
-			>
-				<ArrowLeft className="size-4" aria-hidden />
-				Practices
-			</Link>
-			<PageHeader
-				icon={mode === "create" ? <ListPlus /> : <ClipboardPenLine />}
-				title={mode === "create" ? "Create practice" : `Edit: ${practiceName ?? "practice"}`}
-				description={
-					mode === "create"
-						? "Define a way of working and choose how it is reviewed."
-						: "Update this practice's review rules and developer guidance."
-				}
-			/>
-			{children}
-		</PageLayout>
+	return mode === "create" ? (
+		<PracticeDefinitionForm
+			mode="create"
+			areas={areas}
+			isPending={isPending}
+			definitionOptions={definitionOptions}
+			cancelAction={cancel}
+			onSubmit={submit}
+		/>
+	) : (
+		<PracticeDefinitionForm
+			mode="edit"
+			initialData={asDefinitionValue(initialData)}
+			areas={areas}
+			isPending={isPending}
+			definitionOptions={definitionOptions}
+			cancelAction={cancel}
+			afterFields={reviewResults}
+			evidenceOutcome={props.evidenceOutcome}
+			onSubmit={submit}
+		/>
 	);
 }

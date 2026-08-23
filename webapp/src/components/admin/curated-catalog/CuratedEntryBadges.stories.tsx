@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import type { CatalogEntryStatus } from "@/api/types.gen";
+import { expectNoOverflowingElement } from "@/test/reflow";
 import { CuratedEntryBadges } from "./CuratedEntryBadges";
 
 const status = (overrides: Partial<CatalogEntryStatus> = {}): CatalogEntryStatus => ({
@@ -39,4 +40,11 @@ export const RemovedFromDefaults: Story = {
 
 export const Excluded: Story = {
 	args: { status: status({ offered: false }), kind: "area" },
+};
+
+export const NarrowViewport: Story = {
+	parameters: { viewport: { defaultViewport: "reflow" }, chromatic: { viewports: [320] } },
+	play: async ({ canvasElement }) => {
+		await expectNoOverflowingElement(canvasElement);
+	},
 };

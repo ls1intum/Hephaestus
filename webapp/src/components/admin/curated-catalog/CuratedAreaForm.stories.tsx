@@ -1,8 +1,15 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { expect, fn } from "storybook/test";
+import { expect, fn, screen } from "storybook/test";
 import type { CatalogEntryStatus } from "@/api/types.gen";
-import { withStandardPage } from "@/stories/decorators";
+import { DetailDrawerStack } from "@/components/core/detail-drawer/DetailDrawerStack";
+import { LevelCancel } from "@/components/core/detail-drawer/LevelCancel";
+import { withPageBehind } from "@/stories/decorators";
+import { Stateful } from "@/stories/stateful";
+import { settledDrawerPanel } from "@/test/overlay";
+import { expectNoPanelOverflow, expectPanelContentInset } from "@/test/reflow";
 import { CuratedAreaForm } from "./CuratedAreaForm";
+import { CuratedFormLevel } from "./CuratedFormLevel";
+import { curatedAreaLevel, GUARDED_CURATED_LEVEL_KINDS } from "./curated-catalog-search";
 
 const status = (overrides: Partial<CatalogEntryStatus> = {}): CatalogEntryStatus => ({
 	etag: "tag",
@@ -21,12 +28,36 @@ const initialData = {
 	status: status(),
 };
 
+/**
+ * A level of the instance catalog's drawer stack, so the catalog stays on screen while a group is
+ * written — and so these stories exercise the surface people actually get.
+ */
 const meta = {
 	title: "Instance admin/Practice catalog/Area editor",
 	component: CuratedAreaForm,
 	parameters: { layout: "fullscreen", chromatic: { viewports: [1440] } },
-	decorators: [withStandardPage],
-	args: { isPending: false, onSubmit: fn() },
+	decorators: [withPageBehind],
+	args: { isPending: false, onSubmit: fn(), cancel: <LevelCancel /> },
+	argTypes: { cancel: { control: false } },
+	render: (args) => (
+		<Stateful
+			initial={[curatedAreaLevel(args.mode === "edit" ? args.initialData.slug : undefined)]}
+		>
+			{(stack, setStack) => (
+				<DetailDrawerStack
+					stack={stack}
+					guardedKinds={GUARDED_CURATED_LEVEL_KINDS}
+					onClose={(depth) => setStack(stack.slice(0, depth))}
+				>
+					{(entry, level) => (
+						<CuratedFormLevel kind={entry.kind} nested={level.nested}>
+							<CuratedAreaForm {...args} />
+						</CuratedFormLevel>
+					)}
+				</DetailDrawerStack>
+			)}
+		</Stateful>
+	),
 	tags: ["autodocs"],
 } satisfies Meta<typeof CuratedAreaForm>;
 
@@ -38,6 +69,11 @@ export const Create: Story = { args: { mode: "create" } };
 export const Edit: Story = { args: { mode: "edit", initialData } };
 
 export const HephaestusUpdateAvailable: Story = {
+	play: async () => {
+		// The same banner as the practice editor's, and the same way to get it wrong: rendered beside
+		// `DrawerBody` instead of inside it, it lands on the unpadded panel.
+		await expectPanelContentInset(await settledDrawerPanel());
+	},
 	args: {
 		mode: "edit",
 		initialData: {
@@ -54,7 +90,15 @@ export const StaleEdit: Story = {
 
 export const Submitting: Story = {
 	args: { mode: "edit", initialData, isPending: true },
-	play: async ({ canvas }) => {
-		await expect(canvas.getByRole("textbox", { name: /Name/ })).toBeDisabled();
+	play: async () => {
+		await expect(screen.getByRole("textbox", { name: /Name/ })).toBeDisabled();
+	},
+};
+
+export const NarrowViewport: Story = {
+	args: { mode: "create" },
+	parameters: { viewport: { defaultViewport: "reflow" }, chromatic: { viewports: [320] } },
+	play: async () => {
+		await expectNoPanelOverflow(await settledDrawerPanel());
 	},
 };

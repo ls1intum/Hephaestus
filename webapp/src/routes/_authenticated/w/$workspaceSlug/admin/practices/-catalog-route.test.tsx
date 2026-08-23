@@ -39,7 +39,7 @@ describe("practice catalog route", () => {
 
 		renderRouteAt("/w/acme/admin/practices");
 
-		await screen.findByRole("heading", { name: "Practices" }, ROUTE_RENDER_WAIT);
+		await screen.findByRole("heading", { name: "Practice setup" }, ROUTE_RENDER_WAIT);
 		expect(screen.queryByRole("button", { name: "Enable practices" })).toBeNull();
 	});
 

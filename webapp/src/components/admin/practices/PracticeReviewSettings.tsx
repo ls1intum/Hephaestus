@@ -226,7 +226,7 @@ function ReviewTimingSection({
 			<Field orientation="horizontal">
 				<FieldContent>
 					{/* One switch, four doors — and only GitLab publishes the comment command, so the copy
-						    scopes it rather than promising it to every workspace. */}
+							    scopes it rather than promising it to every workspace. */}
 					<FieldLabel htmlFor="trigger-manual">Reviews somebody asks for</FieldLabel>
 					<FieldDescription>
 						The <strong>Review this now</strong> button, a backfill of past work, a recurring check,

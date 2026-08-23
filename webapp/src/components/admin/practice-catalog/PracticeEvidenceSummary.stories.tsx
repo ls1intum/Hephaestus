@@ -6,6 +6,7 @@ import {
 	mockPullRequestPolicy,
 	mockPullRequestWorkType,
 } from "@/mocks/fixtures/practice";
+import { expectNoOverflowingElement } from "@/test/reflow";
 import { PracticeEvidenceSummary } from "./PracticeEvidenceSummary";
 
 const meta = {
@@ -37,7 +38,9 @@ type Story = StoryObj<typeof meta>;
  */
 export const AuthorDeclared: Story = {
 	play: async ({ canvas }) => {
-		await expect(canvas.getByText("Not independently validated")).toBeVisible();
+		await expect(
+			canvas.getByText(/Nobody has measured how often this practice is right/),
+		).toBeVisible();
 		await expect(canvas.getByText(/^Rules/)).toHaveTextContent(
 			"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
 		);
@@ -50,4 +53,11 @@ export const OneOccasion: Story = {
 
 export const NoOccasion: Story = {
 	args: { bindings: [] },
+};
+
+export const NarrowViewport: Story = {
+	parameters: { viewport: { defaultViewport: "reflow" }, chromatic: { viewports: [320] } },
+	play: async ({ canvasElement }) => {
+		await expectNoOverflowingElement(canvasElement);
+	},
 };

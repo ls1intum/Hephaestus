@@ -78,3 +78,20 @@ export async function settledPopup(): Promise<HTMLElement> {
 	await expectSettledVisible(popup);
 	return popup;
 }
+
+/**
+ * The drawer level nearest the page, once it has landed. A level is portalled but not positioned, so
+ * `settledPopup` above cannot see it, and it arrives over a transition rather than being simply
+ * present — a play that measures the panel has to wait for it rather than take the first query hit.
+ */
+export async function settledDrawerPanel(): Promise<HTMLElement> {
+	const panel = await waitFor(() => {
+		const open = document.querySelector<HTMLElement>('[data-slot="drawer-popup"]');
+		if (open == null) {
+			throw new Error("No drawer level is open, so there is no panel to measure.");
+		}
+		return open;
+	});
+	await expectSettledVisible(panel);
+	return panel;
+}

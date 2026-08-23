@@ -139,7 +139,7 @@ export function ObservationFilters({
 					selected={search.areaSlug ?? []}
 					onChange={(values) => onPatch({ areaSlug: nonEmpty(values) })}
 					disabled={areas.isLoading}
-					emptyLabel={areas.isError ? "Could not load areas" : "No areas available"}
+					emptyLabel={areas.isError ? "Could not load groups" : "No groups available"}
 				/>
 				<FacetMultiSelect
 					title="Practice"

@@ -104,8 +104,10 @@ export const Loading: Story = {
 		targetUsername: mockUser.name,
 	},
 	play: async ({ canvas }) => {
-		// The loading pill uses the vendored <Spinner/> (role="status"), not a bare Loader2 icon.
-		await expect(await canvas.findByRole("status", { name: "Loading" })).toBeVisible();
+		// The visible text is the announcement; the spinner beside it is decoration, so it carries no
+		// role of its own and cannot announce a second, redundant "Loading".
+		await expect(await canvas.findByText("Loading achievements…")).toBeVisible();
+		await expect(canvas.queryByRole("status")).not.toBeInTheDocument();
 	},
 };
 

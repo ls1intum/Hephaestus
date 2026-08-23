@@ -159,7 +159,7 @@ export const TheCatalogueCouldNotBeLoaded: Story = {
 	},
 	play: async ({ canvas, userEvent }) => {
 		await userEvent.click(canvas.getByRole("combobox", { name: "Area" }));
-		await screen.findByText("Could not load areas");
+		await screen.findByText("Could not load groups");
 	},
 };
 

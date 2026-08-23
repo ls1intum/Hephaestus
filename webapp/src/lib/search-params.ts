@@ -1,3 +1,4 @@
+import { useNavigate } from "@tanstack/react-router";
 import { z } from "zod";
 
 export const multiValue = z
@@ -22,4 +23,22 @@ export function narrowToEnum<T extends string>(
 	if (!values?.length) return undefined;
 	const kept = values.filter((value): value is T => (allowed as readonly string[]).includes(value));
 	return kept.length > 0 ? kept : undefined;
+}
+
+/**
+ * Writing a search param that is UI state on the page you are already on — a filter, a toggle, an
+ * open panel — rather than a navigation to somewhere else.
+ *
+ * The router resets scroll on every commit, including a search-only one
+ * ([scroll restoration](https://tanstack.com/router/v1/docs/guide/scroll-restoration)), so a filter
+ * chip halfway down a long page throws the reader back to the top. Every such control wants the same
+ * option, and the ones that forgot it are indistinguishable from the ones that meant it — so the
+ * decision lives here once.
+ */
+export function useSearchState() {
+	const navigate = useNavigate();
+	return (
+		update: (previous: Record<string, unknown>) => Record<string, unknown>,
+		state?: NonNullable<Parameters<typeof navigate>[0]>["state"],
+	) => navigate({ to: ".", search: update, state, resetScroll: false });
 }

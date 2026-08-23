@@ -45,12 +45,12 @@ export function curatedEntryCopy(
 				label:
 					status.changeKind === "WORDING"
 						? "Hephaestus update available: wording"
-						: "Hephaestus update available: review behavior",
+						: "Hephaestus update available: review rules",
 				tone: status.changeKind === "WORDING" ? "info" : "attention",
 				detail:
 					status.changeKind === "WORDING"
-						? "Applying this update would change wording or developer guidance only. Review behavior would stay the same."
-						: "Applying this update would change review behavior. Your saved version stays in place until you decide.",
+						? "Applying this update would change wording or developer guidance only. Review rules would stay the same."
+						: "Applying this update would change review rules. Your saved version stays in place until you decide.",
 			};
 		case "NO_LONGER_SHIPPED":
 			return {

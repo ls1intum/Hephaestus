@@ -66,6 +66,8 @@ tags:
   name: Admin
 - description: Current user's Slack privacy preferences
   name: Slack User Preferences
+- description: Adopt instance catalog practices into a workspace
+  name: Practice Catalog Adoption
 - description: Per-workspace Outline collection mirroring control plane
   name: Outline collections
 - description: Team management within workspace
@@ -4103,7 +4105,8 @@ paths:
       - Practice Areas
   /workspaces/{workspaceSlug}/practice-areas/{areaSlug}:
     delete:
-      description: "Moves its practices to Unassigned, then deletes the area"
+      description: Deletes the area. By default its practices move to Unassigned;
+        deletePractices=true deletes them too.
       operationId: deleteArea
       parameters:
       - description: Workspace slug
@@ -4118,6 +4121,12 @@ paths:
         required: true
         schema:
           type: string
+      - in: query
+        name: deletePractices
+        required: false
+        schema:
+          type: boolean
+          default: false
       responses:
         "204":
           description: Area deleted
@@ -4228,6 +4237,187 @@ paths:
       summary: Set how much autonomy the system has over one area
       tags:
       - Practice Areas
+  /workspaces/{workspaceSlug}/practice-catalog/adoption:
+    get:
+      operationId: listAdoptablePractices
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CatalogPracticeSummary"
+          description: Available practices returned
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: Workspace administrator access is required
+      summary: List practices available for adoption
+      tags:
+      - Practice Catalog Adoption
+  /workspaces/{workspaceSlug}/practice-catalog/adoption/areas/{slug}:
+    get:
+      operationId: previewAreaAdoption
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: slug
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CatalogAreaAdoptionPreview"
+          description: OK
+      summary: Preview adoption of a catalog area and its practices
+      tags:
+      - Practice Catalog Adoption
+    post:
+      operationId: adoptArea
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: slug
+        required: true
+        schema:
+          type: string
+      - in: header
+        name: If-Match
+        required: false
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CatalogAreaAdoptionResult"
+          description: OK
+      summary: Adopt all available practices in a catalog area
+      tags:
+      - Practice Catalog Adoption
+  /workspaces/{workspaceSlug}/practice-catalog/adoption/{slug}:
+    get:
+      operationId: previewPracticeAdoption
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: slug
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CatalogPracticePreview"
+          description: Adoption preview returned
+          headers:
+            ETag:
+              description: Strong validator for If-Match
+              style: simple
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: Workspace administrator access is required
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: Practice is not offered
+      summary: Get a practice adoption preview
+      tags:
+      - Practice Catalog Adoption
+    post:
+      operationId: adoptPractice
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: slug
+        required: true
+        schema:
+          type: string
+      - in: header
+        name: If-Match
+        required: false
+        schema:
+          type: string
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Practice"
+          description: Practice adopted
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: Workspace administrator access is required
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: The practice slug already exists in the workspace
+        "412":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: Catalog or workspace state changed since preview
+        "428":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: The If-Match preview validator is required
+      summary: Adopt a catalog practice
+      tags:
+      - Practice Catalog Adoption
   /workspaces/{workspaceSlug}/practice-catalog/practices/{slug}:
     get:
       description: The current instance-catalog definition for comparison with a workspace
@@ -7748,6 +7938,80 @@ components:
           - "null"
           description: Destination area slug; omit or set to null for Unassigned
           example: review-ready-work
+    CatalogAdoptionArea:
+      type: object
+      properties:
+        definition:
+          $ref: "#/components/schemas/CuratedAreaRequest"
+        disposition:
+          type: string
+          enum:
+          - UNASSIGNED
+          - REUSE_EXISTING_AREA
+          - CREATE_CATALOG_AREA
+        slug:
+          type: string
+      required:
+      - disposition
+    CatalogAreaAdoptionPreview:
+      type: object
+      properties:
+        actions:
+          type: array
+          items:
+            $ref: "#/components/schemas/CatalogAreaPracticeAction"
+        definition:
+          $ref: "#/components/schemas/CuratedAreaRequest"
+        disposition:
+          type: string
+          enum:
+          - UNASSIGNED
+          - REUSE_EXISTING_AREA
+          - CREATE_CATALOG_AREA
+        etag:
+          type: string
+        practices:
+          type: array
+          items:
+            $ref: "#/components/schemas/CatalogPracticePreview"
+        slug:
+          type: string
+      required:
+      - actions
+      - definition
+      - disposition
+      - etag
+      - practices
+      - slug
+    CatalogAreaAdoptionResult:
+      type: object
+      properties:
+        added:
+          type: array
+          items:
+            $ref: "#/components/schemas/Practice"
+        moved:
+          type: array
+          items:
+            $ref: "#/components/schemas/Practice"
+      required:
+      - added
+      - moved
+    CatalogAreaPracticeAction:
+      type: object
+      properties:
+        action:
+          type: string
+          enum:
+          - ADD
+          - MOVE_TO_AREA
+          - KEEP
+          - BLOCKED
+        slug:
+          type: string
+      required:
+      - action
+      - slug
     CatalogEntryStatus:
       type: object
       properties:
@@ -7797,6 +8061,68 @@ components:
       - link
       - slug
       - sourceOffered
+    CatalogPracticePreview:
+      type: object
+      properties:
+        area:
+          $ref: "#/components/schemas/CatalogAdoptionArea"
+        availability:
+          type: string
+          enum:
+          - AVAILABLE
+          - ADOPTED
+          - SLUG_CONFLICT
+        definition:
+          $ref: "#/components/schemas/CuratedPracticeDefinition"
+        etag:
+          type: string
+        initialAutonomy:
+          type: string
+          enum:
+          - "OFF"
+          - HUMAN_APPROVAL
+          - AUTOMATIC
+        slug:
+          type: string
+        sourceReviewRuleFingerprint:
+          type: string
+      required:
+      - area
+      - availability
+      - definition
+      - etag
+      - initialAutonomy
+      - slug
+      - sourceReviewRuleFingerprint
+    CatalogPracticeSummary:
+      type: object
+      properties:
+        areaName:
+          type: string
+        areaSlug:
+          type: string
+        artifactKind:
+          type: string
+        automatedReviewValidation:
+          $ref: "#/components/schemas/PracticeAutomatedReviewValidation"
+        availability:
+          type: string
+          enum:
+          - AVAILABLE
+          - ADOPTED
+          - SLUG_CONFLICT
+        name:
+          type: string
+        slug:
+          type: string
+        whyItMatters:
+          type: string
+      required:
+      - artifactKind
+      - automatedReviewValidation
+      - availability
+      - name
+      - slug
     ChatMessage:
       type: object
       description: Mentor chat message in AI SDK UIMessage shape.

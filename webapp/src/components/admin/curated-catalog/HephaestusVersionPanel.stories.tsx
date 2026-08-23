@@ -7,6 +7,7 @@ import {
 	mockPracticeDefinitionOptions,
 	mockPullRequestPolicy,
 } from "@/mocks/fixtures/practice";
+import { expectNoOverflowingElement } from "@/test/reflow";
 import { HephaestusVersionPanel } from "./HephaestusVersionPanel";
 
 const status = (overrides: Partial<CatalogEntryStatus> = {}): CatalogEntryStatus => ({
@@ -68,7 +69,7 @@ export const Customized: Story = {
 export const UpdateChangesReviewBehavior: Story = {
 	args: { status: status({ state: "UPDATE_WAITING", changeKind: "DETECTION" }), shipped },
 	play: async ({ canvas }) => {
-		await expect(canvas.getByText(/would change review behavior/)).toBeVisible();
+		await expect(canvas.getByText(/would change review rules/)).toBeVisible();
 		await userEvent.click(canvas.getByRole("button", { name: "Review Hephaestus update" }));
 		await expect(await canvas.findByText("The updated default criteria.")).toBeVisible();
 		await expect(canvas.getByText("How it is reviewed")).toBeVisible();
@@ -78,7 +79,9 @@ export const UpdateChangesReviewBehavior: Story = {
 		await expect(canvas.getAllByText("· captured whole").length).toBeGreaterThan(0);
 		await expect(canvas.getAllByText("AI-supported mentoring").length).toBeGreaterThan(0);
 		await expect(canvas.getAllByText("Pull request details").length).toBeGreaterThan(0);
-		await expect(canvas.getByText("Not independently validated")).toBeVisible();
+		await expect(
+			canvas.getByText(/Nobody has measured how often this practice is right/),
+		).toBeVisible();
 		await expect(
 			canvas.getByText("Repository evidence does not establish behavior in a deployed runtime."),
 		).toBeVisible();
@@ -91,7 +94,7 @@ export const UpdateChangesReviewBehavior: Story = {
 export const WordingOnlyUpdate: Story = {
 	args: { status: status({ state: "UPDATE_WAITING", changeKind: "WORDING" }), shipped },
 	play: async ({ canvas }) => {
-		await expect(canvas.getByText(/review behavior would stay the same/i)).toBeVisible();
+		await expect(canvas.getByText(/review rules would stay the same/i)).toBeVisible();
 	},
 };
 
@@ -143,5 +146,12 @@ export const KeepingSavedVersion: Story = {
 		status: status({ state: "UPDATE_WAITING", changeKind: "DETECTION" }),
 		shipped,
 		isKeepPending: true,
+	},
+};
+
+export const NarrowViewport: Story = {
+	parameters: { viewport: { defaultViewport: "reflow" }, chromatic: { viewports: [320] } },
+	play: async ({ canvasElement }) => {
+		await expectNoOverflowingElement(canvasElement);
 	},
 };

@@ -1,18 +1,29 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { expect, fn } from "storybook/test";
+import { expect, fn, screen, userEvent, waitFor } from "storybook/test";
+import { DetailDrawerStack } from "@/components/core/detail-drawer/DetailDrawerStack";
+import { LevelCancel } from "@/components/core/detail-drawer/LevelCancel";
 import {
 	mockConversationWorkType,
 	mockPracticeDefinitionOptions,
 	mockPullRequestWorkType,
 } from "@/mocks/fixtures/practice";
-import { withStandardPage } from "@/stories/decorators";
-import { expectNoPageOverflow } from "@/test/reflow";
+import { withPageBehind } from "@/stories/decorators";
+import { Stateful } from "@/stories/stateful";
+import { settledDrawerPanel } from "@/test/overlay";
+import { expectNoPanelOverflow } from "@/test/reflow";
 import { PracticeForm } from "./PracticeForm";
+import { PracticeFormLevel } from "./PracticeFormLevel";
+import { GUARDED_LEVEL_KINDS, practiceFormLevel } from "./practice-search";
 import { mockAreas, mockPracticeWithAllTriggers } from "./story-mock-data";
 
 const createSubmit = fn();
 const editSubmit = fn();
 
+/**
+ * The editor is a level of the practice-setup drawer stack, so the tree a practice belongs to stays
+ * on screen while it is written — and so these stories exercise the surface people actually get.
+ * The level is guarded: only Cancel and Save leave it.
+ */
 const meta = {
 	title: "Workspace admin/Practices/Practice editor",
 	component: PracticeForm,
@@ -21,7 +32,7 @@ const meta = {
 		chromatic: { viewports: [1440] },
 	},
 	tags: ["autodocs"],
-	decorators: [withStandardPage],
+	decorators: [withPageBehind],
 	args: {
 		mode: "create",
 		workspaceSlug: "demo",
@@ -29,7 +40,28 @@ const meta = {
 		definitionOptions: mockPracticeDefinitionOptions,
 		onSubmit: createSubmit,
 		isPending: false,
+		cancel: <LevelCancel />,
 	},
+	argTypes: { cancel: { control: false } },
+	render: (args) => (
+		<Stateful
+			initial={[practiceFormLevel(args.mode === "edit" ? args.initialData.slug : undefined)]}
+		>
+			{(stack, setStack) => (
+				<DetailDrawerStack
+					stack={stack}
+					guardedKinds={GUARDED_LEVEL_KINDS}
+					onClose={(depth) => setStack(stack.slice(0, depth))}
+				>
+					{(entry, level) => (
+						<PracticeFormLevel nested={level.nested} creating={entry.kind === "practice-new"}>
+							<PracticeForm {...args} />
+						</PracticeFormLevel>
+					)}
+				</DetailDrawerStack>
+			)}
+		</Stateful>
+	),
 } satisfies Meta<typeof PracticeForm>;
 
 export default meta;
@@ -41,7 +73,24 @@ export const Create: Story = {
 		chromatic: { viewports: [320, 1440] },
 	},
 	play: async () => {
-		await expectNoPageOverflow();
+		// The level is the full viewport at 320px, so the form has to fit it: 43 controls that scroll
+		// down, never across.
+		await expectNoPanelOverflow(await settledDrawerPanel());
+	},
+};
+
+export const EscapeLeavesACleanEditor: Story = {
+	parameters: { chromatic: { disableSnapshot: true } },
+	play: async () => {
+		await settledDrawerPanel();
+
+		// Nothing typed, so nothing to ask about: Escape leaves, exactly as it does on a read-only
+		// panel. An editor that swallowed the gesture instead would be indistinguishable from a
+		// broken drawer. `-adoption-route.test.tsx` owns the half where a draft exists.
+		await userEvent.keyboard("{Escape}");
+		await waitFor(() =>
+			expect(document.querySelectorAll('[data-slot="drawer-popup"]')).toHaveLength(0),
+		);
 	},
 };
 
@@ -51,8 +100,9 @@ export const EditWithAdvanced: Story = {
 
 export const Submitting: Story = {
 	args: { isPending: true, onSubmit: fn() },
-	play: async ({ canvas }) => {
-		await expect(canvas.getByRole("textbox", { name: /Name/ })).toBeDisabled();
+	play: async () => {
+		await settledDrawerPanel();
+		await expect(screen.getByRole("textbox", { name: /Name/ })).toBeDisabled();
 	},
 };
 
@@ -67,11 +117,12 @@ export const EditClearsOptionalGuidance: Story = {
 		onSubmit: editSubmit,
 	},
 	parameters: { chromatic: { disableSnapshot: true } },
-	play: async ({ canvas, userEvent }) => {
+	play: async () => {
+		await settledDrawerPanel();
 		editSubmit.mockClear();
-		await userEvent.clear(canvas.getByRole("textbox", { name: "Why it matters" }));
-		await userEvent.clear(canvas.getByRole("textbox", { name: "What good looks like" }));
-		await userEvent.click(canvas.getByRole("button", { name: "Save changes" }));
+		await userEvent.clear(screen.getByRole("textbox", { name: "Why it matters" }));
+		await userEvent.clear(screen.getByRole("textbox", { name: "What good looks like" }));
+		await userEvent.click(screen.getByRole("button", { name: "Save changes" }));
 
 		await expect(editSubmit).toHaveBeenCalledWith(
 			"commit-discipline",
@@ -85,11 +136,12 @@ export const EditClearsOptionalGuidance: Story = {
 
 export const ValidationErrors: Story = {
 	parameters: { chromatic: { viewports: [320, 1440] } },
-	play: async ({ canvas, userEvent }) => {
-		await userEvent.click(canvas.getByRole("button", { name: "Create practice" }));
-		await expect(canvas.getByText("Name must be at least 3 characters")).toBeVisible();
-		await expect(canvas.queryByText("Select at least one trigger event")).not.toBeInTheDocument();
-		await expect(canvas.getByRole("textbox", { name: /Name/ })).toHaveAttribute(
+	play: async () => {
+		await settledDrawerPanel();
+		await userEvent.click(screen.getByRole("button", { name: "Create practice" }));
+		await expect(screen.getByText("Name must be at least 3 characters")).toBeVisible();
+		await expect(screen.queryByText("Select at least one trigger event")).not.toBeInTheDocument();
+		await expect(screen.getByRole("textbox", { name: /Name/ })).toHaveAttribute(
 			"aria-invalid",
 			"true",
 		);
@@ -102,13 +154,13 @@ export const ValidationAndSubmit: Story = {
 	play: async (context) => {
 		createSubmit.mockClear();
 		await ValidationErrors.play?.(context);
-		const { canvas, userEvent } = context;
-		await userEvent.type(canvas.getByRole("textbox", { name: /Name/ }), "Clear review context");
+
+		await userEvent.type(screen.getByRole("textbox", { name: /Name/ }), "Clear review context");
 		await userEvent.type(
-			canvas.getByRole("textbox", { name: /What to look for/ }),
+			screen.getByRole("textbox", { name: /What to look for/ }),
 			"Check whether the reviewed work explains its purpose.",
 		);
-		await userEvent.click(canvas.getByRole("button", { name: "Create practice" }));
+		await userEvent.click(screen.getByRole("button", { name: "Create practice" }));
 		await expect(createSubmit).toHaveBeenCalledWith(
 			{
 				name: "Clear review context",
@@ -133,18 +185,19 @@ export const ValidationAndSubmit: Story = {
 
 export const ConversationPractice: Story = {
 	parameters: { chromatic: { disableSnapshot: true } },
-	play: async ({ canvas, userEvent }) => {
+	play: async () => {
+		await settledDrawerPanel();
 		createSubmit.mockClear();
-		await userEvent.type(canvas.getByRole("textbox", { name: /Name/ }), "Helpful discussion");
-		await userEvent.click(canvas.getByRole("radio", { name: /Conversation/ }));
+		await userEvent.type(screen.getByRole("textbox", { name: /Name/ }), "Helpful discussion");
+		await userEvent.click(screen.getByRole("radio", { name: /Conversation/ }));
 		// A conversation is settled or it is not, so its one occasion is chosen for the author rather
 		// than left as an empty list that cannot be saved.
-		await expect(canvas.getByRole("checkbox", { name: "Discussion settled" })).toBeChecked();
+		await expect(screen.getByRole("checkbox", { name: "Discussion settled" })).toBeChecked();
 		await userEvent.type(
-			canvas.getByRole("textbox", { name: /What to look for/ }),
+			screen.getByRole("textbox", { name: /What to look for/ }),
 			"Check whether the conversation stays constructive.",
 		);
-		await userEvent.click(canvas.getByRole("button", { name: "Create practice" }));
+		await userEvent.click(screen.getByRole("button", { name: "Create practice" }));
 		await expect(createSubmit).toHaveBeenCalledWith(
 			{
 				name: "Helpful discussion",

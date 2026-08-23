@@ -1,4 +1,3 @@
-import { useBlocker } from "@tanstack/react-router";
 import deepEqual from "fast-deep-equal";
 import { ChevronRight, RotateCcw } from "lucide-react";
 import { useRef, useState } from "react";
@@ -36,19 +35,11 @@ import {
 	practicePolicyError,
 	practicePolicyErrorTarget,
 } from "@/components/admin/practice-catalog/PracticeMentoringSupportEditor";
+import { type FormError, FormErrorSummary } from "@/components/common/FormErrorSummary";
 import { CodeEditor } from "@/components/shared/CodeEditor";
-import {
-	AlertDialog,
-	AlertDialogAction,
-	AlertDialogCancel,
-	AlertDialogContent,
-	AlertDialogDescription,
-	AlertDialogFooter,
-	AlertDialogHeader,
-	AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { DrawerBody, DrawerFooter } from "@/components/ui/drawer";
 import {
 	Field,
 	FieldContent,
@@ -72,6 +63,7 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
+import { useUnsavedChanges } from "@/hooks/use-unsaved-changes";
 import { artifactKindLabel } from "@/lib/artifact-kinds";
 
 const NO_AREA = "__none__";
@@ -102,6 +94,8 @@ interface PracticeDefinitionFormBaseProps {
 	isPending: boolean;
 	disabled?: boolean;
 	isSubmitDisabled?: boolean;
+	/** Sits at the top of the scrolling body, so a host's banner shares the fields' padding. */
+	beforeFields?: React.ReactNode;
 	afterFields?: React.ReactNode;
 	cancelAction: React.ReactNode;
 	/**
@@ -224,6 +218,7 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 		isPending,
 		disabled = false,
 		isSubmitDisabled,
+		beforeFields,
 		afterFields,
 		cancelAction,
 		initialData,
@@ -232,7 +227,9 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 	} = props;
 	const formDisabled = isPending || disabled;
 	const [form, setForm] = useState<FormState>(() => initialState(definitionOptions, initialData));
-	const [submitted, setSubmitted] = useState(false);
+	// Counts refused submits, not "has submitted": it re-keys the summary so a second refusal
+	// focuses it again.
+	const [refusals, setRefusals] = useState(0);
 	const [showAdvanced, setShowAdvanced] = useState(() => Boolean(initialData?.precomputeScript));
 	const workTypes = orderedWorkTypes(definitionOptions);
 	const areaItems = [
@@ -275,16 +272,9 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 			: canRunMentoring
 				? "reviewed"
 				: "human-review";
-	const isDirty = !deepEqual(form, initialState(definitionOptions, initialData));
-	// Down from the moment a save is dispatched until the caller says it failed. `isPending` drops
-	// before the caller navigates, so releasing the guard on it races that navigation.
-	const [saving, setSaving] = useState(false);
-	const guarded = isDirty && !saving;
-	const blocker = useBlocker({
-		shouldBlockFn: () => guarded,
-		enableBeforeUnload: guarded,
-		disabled: !guarded || formDisabled,
-		withResolver: true,
+	const unsavedChanges = useUnsavedChanges({
+		isDirty: !deepEqual(form, initialState(definitionOptions, initialData)),
+		disabled: formDisabled,
 	});
 
 	const handleNameChange = (name: string) => {
@@ -349,13 +339,13 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 	};
 
 	const nameError =
-		submitted && form.name.trim().length < 3 ? "Name must be at least 3 characters" : undefined;
+		refusals > 0 && form.name.trim().length < 3 ? "Name must be at least 3 characters" : undefined;
 	const slugError =
-		submitted && mode === "create" && !isValidSlug(form.slug)
+		refusals > 0 && mode === "create" && !isValidSlug(form.slug)
 			? "Use 3–64 lowercase letters, numbers, and single hyphens."
 			: undefined;
 	const criteriaError =
-		submitted && form.criteria.trim().length < 3
+		refusals > 0 && form.criteria.trim().length < 3
 			? "Criteria must be at least 3 characters"
 			: undefined;
 	const policyError = practicePolicyError(form.automatedReviewPolicy);
@@ -365,31 +355,41 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 		selectedWorkType,
 	);
 
-	const valid =
-		form.name.trim().length >= 3 &&
-		form.criteria.trim().length >= 3 &&
-		!policyError &&
-		!bindingsError &&
-		(mode === "edit" || isValidSlug(form.slug));
+	// One list, in the order the fields appear, so the summary reads down the form and the first
+	// entry is also the field to focus. Deriving both from it keeps them from disagreeing.
+	const errorSummary: FormError[] = [
+		form.name.trim().length < 3 && {
+			fieldId: "practice-name",
+			message: "Give the practice a name of at least three characters.",
+		},
+		form.criteria.trim().length < 3 && {
+			fieldId: "practice-criteria",
+			message: "Say what this practice checks, in at least three characters.",
+		},
+		policyError && {
+			fieldId: practicePolicyErrorTarget(form.automatedReviewPolicy),
+			message: policyError,
+		},
+		bindingsError && { fieldId: bindingsError.focusId, message: bindingsError.message },
+		mode === "create" &&
+			!isValidSlug(form.slug) && {
+				fieldId: "practice-slug",
+				message: "The identifier must be lowercase letters, numbers and hyphens.",
+				// Lives inside the collapsed Technical settings panel, which unmounts its contents.
+				reveal: () => setShowAdvanced(true),
+			},
+	].filter((entry): entry is FormError => Boolean(entry));
+	const valid = errorSummary.length === 0;
 
 	const handleSubmit = (event: React.SubmitEvent<HTMLFormElement>) => {
 		event.preventDefault();
-		setSubmitted(true);
 		if (!valid) {
-			const firstInvalidId =
-				form.name.trim().length < 3
-					? "practice-name"
-					: form.criteria.trim().length < 3
-						? "practice-criteria"
-						: policyError
-							? practicePolicyErrorTarget(form.automatedReviewPolicy)
-							: bindingsError
-								? bindingsError.focusId
-								: mode === "create" && !isValidSlug(form.slug)
-									? "practice-slug"
-									: "practice-name";
-			if (firstInvalidId === "practice-slug") setShowAdvanced(true);
-			requestAnimationFrame(() => document.getElementById(firstInvalidId)?.focus());
+			setRefusals((count) => count + 1);
+			const [first] = errorSummary;
+			if (first) {
+				first.reveal?.();
+				requestAnimationFrame(() => document.getElementById(first.fieldId)?.focus());
+			}
 			return;
 		}
 
@@ -408,345 +408,331 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 				: {}),
 			automatedReviewPolicy: form.automatedReviewPolicy,
 		});
-		// Only a caller that returns a promise can say the save failed, so only that caller gets the
-		// guard held down for it.
-		if (submission instanceof Promise) {
-			setSaving(true);
-			void submission.catch(() => setSaving(false));
-		}
+		// After dispatch, not before: `track` needs the promise the dispatch returns.
+		unsavedChanges.track(submission);
 	};
 
 	const slugWasEdited = mode === "create" && form.slug !== generateSlug(form.name);
 	return (
-		<form onSubmit={handleSubmit} noValidate className="flex flex-col gap-8">
-			<AlertDialog
-				open={blocker.status === "blocked"}
-				onOpenChange={(open, eventDetails) => {
-					if (!open && eventDetails.reason === "escape-key") {
-						blocker.reset?.();
-					}
-				}}
-			>
-				<AlertDialogContent>
-					<AlertDialogHeader>
-						<AlertDialogTitle>Discard unsaved changes?</AlertDialogTitle>
-						<AlertDialogDescription>
-							Your draft will be lost if you leave this page.
-						</AlertDialogDescription>
-					</AlertDialogHeader>
-					<AlertDialogFooter>
-						<AlertDialogCancel onClick={blocker.reset}>Keep editing</AlertDialogCancel>
-						<AlertDialogAction variant="destructive" onClick={blocker.proceed}>
-							Discard changes
-						</AlertDialogAction>
-					</AlertDialogFooter>
-				</AlertDialogContent>
-			</AlertDialog>
-			<fieldset disabled={formDisabled} className="contents">
-				<div className="max-w-3xl space-y-10">
-					<p className="text-sm text-muted-foreground">
-						Define one observable habit. The same definition should make sense to a developer, peer,
-						human mentor, and an automated reviewer.
-					</p>
+		<form onSubmit={handleSubmit} noValidate className="flex min-h-0 flex-1 flex-col">
+			{unsavedChanges.dialog}
+			<DrawerBody className="flex flex-col gap-8">
+				{beforeFields}
+				<FormErrorSummary key={refusals} errors={refusals > 0 ? errorSummary : []} />
+				<fieldset disabled={formDisabled} className="contents">
+					{/* The panel is the measure. Capping the controls narrower than the panel they sit in
+					    strands the footer's buttons to their right, and the drawer is already sized for
+					    this form. Prose still gets a reading width of its own. */}
+					<div className="space-y-10">
+						<p className="max-w-2xl text-sm text-muted-foreground">
+							Define one observable habit. The same definition should make sense to a developer,
+							peer, human mentor, and an automated reviewer.
+						</p>
 
-					<section className="space-y-4">
-						<div>
-							<h2 className="text-lg font-semibold">Practice</h2>
-							<p className="text-sm text-muted-foreground">
-								Name the habit and choose where it applies. Fields marked <span aria-hidden>*</span>
-								<span className="sr-only">with an asterisk</span> are required.
-							</p>
-						</div>
-						<FieldGroup className="gap-4">
-							<Field data-invalid={nameError ? "true" : undefined}>
-								<FieldLabel htmlFor="practice-name">Name *</FieldLabel>
-								<Input
-									id="practice-name"
-									value={form.name}
-									onChange={(event) => handleNameChange(event.target.value)}
-									placeholder="e.g. Explain what changed and why"
+						<section className="space-y-4">
+							<div>
+								<h2 className="text-lg font-semibold">Practice</h2>
+								<p className="text-sm text-muted-foreground">
+									Name the habit and choose where it applies. Fields marked{" "}
+									<span aria-hidden>*</span>
+									<span className="sr-only">with an asterisk</span> are required.
+								</p>
+							</div>
+							<FieldGroup className="gap-4">
+								<Field data-invalid={nameError ? "true" : undefined}>
+									<FieldLabel htmlFor="practice-name">Name *</FieldLabel>
+									<Input
+										id="practice-name"
+										value={form.name}
+										onChange={(event) => handleNameChange(event.target.value)}
+										placeholder="e.g. Explain what changed and why"
+										required
+										minLength={3}
+										maxLength={128}
+										aria-invalid={Boolean(nameError)}
+										aria-describedby={nameError ? "practice-name-error" : undefined}
+									/>
+									<FieldDescription>Use a short, action-oriented name.</FieldDescription>
+									{nameError && <FieldError id="practice-name-error">{nameError}</FieldError>}
+								</Field>
+
+								<Field>
+									<FieldLabel id="practice-area-label" htmlFor="practice-area">
+										Practice group
+									</FieldLabel>
+									<Select
+										items={areaItems}
+										value={form.areaSlug}
+										onValueChange={(value) =>
+											setForm((previous) => ({ ...previous, areaSlug: value ?? NO_AREA }))
+										}
+									>
+										<SelectTrigger id="practice-area" aria-describedby="practice-area-description">
+											<SelectValue />
+										</SelectTrigger>
+										<SelectContent aria-labelledby="practice-area-label">
+											{areaItems.map((item) => (
+												<SelectItem key={item.value} value={item.value}>
+													{item.label}
+												</SelectItem>
+											))}
+										</SelectContent>
+									</Select>
+									<FieldDescription id="practice-area-description">
+										Put this practice in a group.
+									</FieldDescription>
+								</Field>
+							</FieldGroup>
+						</section>
+
+						<Separator />
+
+						<section className="space-y-5">
+							<div>
+								<h2 className="text-lg font-semibold">Review guidance</h2>
+								<p className="text-sm text-muted-foreground">
+									Explain the habit in plain language before configuring how it is reviewed.
+								</p>
+							</div>
+							<Field data-invalid={criteriaError ? "true" : undefined}>
+								<FieldLabel htmlFor="practice-criteria">What to look for *</FieldLabel>
+								<FieldDescription id="practice-criteria-description">
+									Describe one observable habit, what demonstrates it, and when a reviewer should
+									stay silent. Do not ask the reviewer to infer intent or facts outside the selected
+									work. For example: “Look for a description that explains the behavior change and
+									why. Stay silent for automated dependency updates.” Markdown is supported.
+								</FieldDescription>
+								<Textarea
+									id="practice-criteria"
+									value={form.criteria}
+									onChange={(event) =>
+										setForm((previous) => ({ ...previous, criteria: event.target.value }))
+									}
+									placeholder="Describe the standard, signals of doing it well or poorly, and cases where it does not apply…"
+									className="min-h-56"
 									required
 									minLength={3}
-									maxLength={128}
-									aria-invalid={Boolean(nameError)}
-									aria-describedby={nameError ? "practice-name-error" : undefined}
+									maxLength={50_000}
+									aria-invalid={Boolean(criteriaError)}
+									aria-describedby={`practice-criteria-description${
+										criteriaError ? " practice-criteria-error" : ""
+									}`}
 								/>
-								<FieldDescription>Use a short, action-oriented name.</FieldDescription>
-								{nameError && <FieldError id="practice-name-error">{nameError}</FieldError>}
+								{criteriaError && (
+									<FieldError id="practice-criteria-error">{criteriaError}</FieldError>
+								)}
 							</Field>
 
 							<Field>
-								<FieldLabel id="practice-area-label" htmlFor="practice-area">
-									Practice area
-								</FieldLabel>
-								<Select
-									items={areaItems}
-									value={form.areaSlug}
-									onValueChange={(value) =>
-										setForm((previous) => ({ ...previous, areaSlug: value ?? NO_AREA }))
+								<FieldLabel htmlFor="practice-why">Why it matters</FieldLabel>
+								<Textarea
+									id="practice-why"
+									value={form.whyItMatters}
+									onChange={(event) =>
+										setForm((previous) => ({ ...previous, whyItMatters: event.target.value }))
 									}
-								>
-									<SelectTrigger id="practice-area" aria-describedby="practice-area-description">
-										<SelectValue />
-									</SelectTrigger>
-									<SelectContent aria-labelledby="practice-area-label">
-										{areaItems.map((item) => (
-											<SelectItem key={item.value} value={item.value}>
-												{item.label}
-											</SelectItem>
-										))}
-									</SelectContent>
-								</Select>
-								<FieldDescription id="practice-area-description">
-									Group this practice under an area.
-								</FieldDescription>
-							</Field>
-						</FieldGroup>
-					</section>
-
-					<Separator />
-
-					<section className="space-y-5">
-						<div>
-							<h2 className="text-lg font-semibold">Review guidance</h2>
-							<p className="text-sm text-muted-foreground">
-								Explain the habit in plain language before configuring how it is reviewed.
-							</p>
-						</div>
-						<Field data-invalid={criteriaError ? "true" : undefined}>
-							<FieldLabel htmlFor="practice-criteria">What to look for *</FieldLabel>
-							<FieldDescription id="practice-criteria-description">
-								Describe one observable habit, what demonstrates it, and when a reviewer should stay
-								silent. Do not ask the reviewer to infer intent or facts outside the selected work.
-								For example: “Look for a description that explains the behavior change and why. Stay
-								silent for automated dependency updates.” Markdown is supported.
-							</FieldDescription>
-							<Textarea
-								id="practice-criteria"
-								value={form.criteria}
-								onChange={(event) =>
-									setForm((previous) => ({ ...previous, criteria: event.target.value }))
-								}
-								placeholder="Describe the standard, signals of doing it well or poorly, and cases where it does not apply…"
-								className="min-h-56"
-								required
-								minLength={3}
-								maxLength={50_000}
-								aria-invalid={Boolean(criteriaError)}
-								aria-describedby={`practice-criteria-description${
-									criteriaError ? " practice-criteria-error" : ""
-								}`}
-							/>
-							{criteriaError && (
-								<FieldError id="practice-criteria-error">{criteriaError}</FieldError>
-							)}
-						</Field>
-
-						<Field>
-							<FieldLabel htmlFor="practice-why">Why it matters</FieldLabel>
-							<Textarea
-								id="practice-why"
-								value={form.whyItMatters}
-								onChange={(event) =>
-									setForm((previous) => ({ ...previous, whyItMatters: event.target.value }))
-								}
-								placeholder="Explain why this practice is worth caring about…"
-								className="min-h-24"
-								maxLength={2_000}
-							/>
-							<FieldDescription>
-								Shown to developers; it does not change review behavior.
-							</FieldDescription>
-						</Field>
-						<Field>
-							<FieldLabel htmlFor="practice-good">What good looks like</FieldLabel>
-							<Textarea
-								id="practice-good"
-								value={form.whatGoodLooksLike}
-								onChange={(event) =>
-									setForm((previous) => ({ ...previous, whatGoodLooksLike: event.target.value }))
-								}
-								placeholder="Describe a concrete example of doing this well…"
-								className="min-h-24"
-								maxLength={2_000}
-							/>
-							<FieldDescription>Give one concrete example a developer can act on.</FieldDescription>
-						</Field>
-					</section>
-
-					<Separator />
-
-					<PracticeMentoringSupportEditor
-						value={form.automatedReviewPolicy}
-						recommended={selectedWorkType?.recommendedPolicy ?? form.automatedReviewPolicy}
-						supportedAutomatedReviewModes={selectedWorkType?.supportedAutomatedReviewModes ?? []}
-						disabled={formDisabled}
-						onChange={updatePolicy}
-						error={submitted ? policyError : undefined}
-					/>
-
-					<Separator />
-
-					<section className="space-y-4" aria-labelledby="practice-occasions-heading">
-						<div>
-							<h2 id="practice-occasions-heading" className="text-lg font-semibold">
-								When this practice is reviewed
-							</h2>
-							<p className="text-sm text-muted-foreground">
-								A practice is reviewed on one occasion: the moments that start a review, and what
-								that review reads. A habit worth judging differently at a different moment — what is
-								in front of you when the work arrives, what was never resolved by the merge — is a
-								second practice rather than a second occasion.
-							</p>
-						</div>
-
-						<FieldSet>
-							<FieldLegend variant="label">Review this kind of work</FieldLegend>
-							<FieldDescription>
-								Changing this starts the moments and the evidence again from the recommended ones.
-							</FieldDescription>
-							<RadioGroup
-								value={artifactKind}
-								onValueChange={(value) => {
-									const next = workTypes.find((option) => option.artifactKind === value);
-									if (next) selectWorkType(next);
-								}}
-								className="gap-2"
-							>
-								{workTypes.map((option) => (
-									<FieldLabel
-										key={option.artifactKind}
-										htmlFor={`practice-artifact-${option.artifactKind}`}
-									>
-										<Field orientation="horizontal">
-											<RadioGroupItem
-												id={`practice-artifact-${option.artifactKind}`}
-												value={option.artifactKind}
-											/>
-											<FieldContent>
-												<FieldTitle>{artifactKindLabel(option.artifactKind)}</FieldTitle>
-												<FieldDescription>{workArtifactHint(option.artifactKind)}</FieldDescription>
-											</FieldContent>
-										</Field>
-									</FieldLabel>
-								))}
-							</RadioGroup>
-						</FieldSet>
-
-						{selectedWorkType ? (
-							<PracticeBindingsEditor
-								options={selectedWorkType}
-								binding={form.bindings[0]}
-								mode={occasionMode}
-								outcome={workTypeUnchanged ? evidenceOutcome : undefined}
-								disabled={formDisabled}
-								error={submitted ? bindingsError?.message : undefined}
-								errorFocusId={submitted ? bindingsError?.focusId : undefined}
-								onChange={(binding) =>
-									setForm((previous) => ({ ...previous, bindings: [binding] }))
-								}
-							/>
-						) : (
-							<p className="text-sm text-muted-foreground">
-								This practice reviews {artifactKindLabel(artifactKind)}, which this instance no
-								longer offers. Choose a kind of work above to say when it is reviewed.
-							</p>
-						)}
-					</section>
-
-					{afterFields}
-
-					<Separator />
-
-					<Collapsible open={showAdvanced} onOpenChange={setShowAdvanced}>
-						<CollapsibleTrigger
-							render={
-								<Button
-									type="button"
-									variant="ghost"
-									className="group -ml-3 h-auto items-start py-2 text-left disabled:opacity-100"
+									placeholder="Explain why this practice is worth caring about…"
+									className="min-h-24"
+									maxLength={2_000}
 								/>
-							}
-						>
-							<ChevronRight className="mt-0.5 size-4 transition-transform group-aria-expanded:rotate-90" />
-							<span>
-								<span className="block text-lg font-semibold">Technical settings</span>
-								<span className="block text-sm font-normal text-muted-foreground">
-									Identifier{canRunMentoring ? " and static analysis" : ""}
-								</span>
-							</span>
-						</CollapsibleTrigger>
-						<CollapsibleContent className="mt-4 space-y-6 rounded-lg border p-4">
-							<Field data-invalid={slugError ? "true" : undefined}>
-								<FieldLabel htmlFor="practice-slug">Identifier</FieldLabel>
-								<div className="flex items-center gap-2">
-									<Input
-										id="practice-slug"
-										value={form.slug}
-										onChange={(event) =>
-											setForm((previous) => ({ ...previous, slug: event.target.value }))
-										}
-										disabled={mode === "edit"}
-										required={mode === "create"}
-										minLength={3}
-										maxLength={64}
-										aria-invalid={Boolean(slugError)}
-										aria-describedby={
-											["practice-slug-description", slugError ? "practice-slug-error" : undefined]
-												.filter(Boolean)
-												.join(" ") || undefined
-										}
-									/>
-									{slugWasEdited && (
-										<Button
-											type="button"
-											variant="ghost"
-											size="icon-sm"
-											onClick={() =>
-												setForm((previous) => ({
-													...previous,
-													slug: generateSlug(previous.name),
-												}))
-											}
-											aria-label="Reset to generated identifier"
-										>
-											<RotateCcw className="size-3.5" aria-hidden />
-										</Button>
-									)}
-								</div>
-								<FieldDescription id="practice-slug-description">
-									Generated from the name for URLs and integrations. It cannot be changed later.
+								<FieldDescription>
+									Shown to developers; it does not change review rules.
 								</FieldDescription>
-								{slugError && <FieldError id="practice-slug-error">{slugError}</FieldError>}
 							</Field>
+							<Field>
+								<FieldLabel htmlFor="practice-good">What good looks like</FieldLabel>
+								<Textarea
+									id="practice-good"
+									value={form.whatGoodLooksLike}
+									onChange={(event) =>
+										setForm((previous) => ({ ...previous, whatGoodLooksLike: event.target.value }))
+									}
+									placeholder="Describe a concrete example of doing this well…"
+									className="min-h-24"
+									maxLength={2_000}
+								/>
+								<FieldDescription>
+									Give one concrete example a developer can act on.
+								</FieldDescription>
+							</Field>
+						</section>
 
-							{canRunMentoring && (
-								<div className="space-y-3">
-									<div>
-										<p className="font-medium">Static analysis</p>
-										<p className="text-sm text-muted-foreground">
-											Optional TypeScript that prepares structured context before a review. Most
-											practices do not need it.
-										</p>
-									</div>
-									<CodeEditor
-										value={form.precomputeScript}
-										onChange={(value) =>
-											setForm((previous) => ({ ...previous, precomputeScript: value }))
-										}
-										language="typescript"
-										ariaLabel="Precompute script"
-										className="h-[400px]"
-										readOnly={formDisabled}
-									/>
-								</div>
+						<Separator />
+
+						<PracticeMentoringSupportEditor
+							value={form.automatedReviewPolicy}
+							recommended={selectedWorkType?.recommendedPolicy ?? form.automatedReviewPolicy}
+							supportedAutomatedReviewModes={selectedWorkType?.supportedAutomatedReviewModes ?? []}
+							disabled={formDisabled}
+							onChange={updatePolicy}
+							error={refusals > 0 ? policyError : undefined}
+						/>
+
+						<Separator />
+
+						<section className="space-y-4" aria-labelledby="practice-occasions-heading">
+							<div>
+								<h2 id="practice-occasions-heading" className="text-lg font-semibold">
+									When this practice is reviewed
+								</h2>
+								<p className="text-sm text-muted-foreground">
+									A practice is reviewed on one occasion: the moments that start a review, and what
+									that review reads. A habit worth judging differently at a different moment — what
+									is in front of you when the work arrives, what was never resolved by the merge —
+									is a second practice rather than a second occasion.
+								</p>
+							</div>
+
+							<FieldSet>
+								<FieldLegend variant="label">Review this kind of work</FieldLegend>
+								<FieldDescription>
+									Changing this starts the moments and the evidence again from the recommended ones.
+								</FieldDescription>
+								<RadioGroup
+									value={artifactKind}
+									onValueChange={(value) => {
+										const next = workTypes.find((option) => option.artifactKind === value);
+										if (next) selectWorkType(next);
+									}}
+									className="gap-2"
+								>
+									{workTypes.map((option) => (
+										<FieldLabel
+											key={option.artifactKind}
+											htmlFor={`practice-artifact-${option.artifactKind}`}
+										>
+											<Field orientation="horizontal">
+												<RadioGroupItem
+													id={`practice-artifact-${option.artifactKind}`}
+													value={option.artifactKind}
+												/>
+												<FieldContent>
+													<FieldTitle>{artifactKindLabel(option.artifactKind)}</FieldTitle>
+													<FieldDescription>
+														{workArtifactHint(option.artifactKind)}
+													</FieldDescription>
+												</FieldContent>
+											</Field>
+										</FieldLabel>
+									))}
+								</RadioGroup>
+							</FieldSet>
+
+							{selectedWorkType ? (
+								<PracticeBindingsEditor
+									options={selectedWorkType}
+									binding={form.bindings[0]}
+									mode={occasionMode}
+									outcome={workTypeUnchanged ? evidenceOutcome : undefined}
+									disabled={formDisabled}
+									error={refusals > 0 ? bindingsError?.message : undefined}
+									errorFocusId={refusals > 0 ? bindingsError?.focusId : undefined}
+									onChange={(binding) =>
+										setForm((previous) => ({ ...previous, bindings: [binding] }))
+									}
+								/>
+							) : (
+								<p className="text-sm text-muted-foreground">
+									This practice reviews {artifactKindLabel(artifactKind)}, which this instance no
+									longer offers. Choose a kind of work above to say when it is reviewed.
+								</p>
 							)}
-						</CollapsibleContent>
-					</Collapsible>
-				</div>
-			</fieldset>
+						</section>
 
-			<div className="flex max-w-3xl justify-between border-t pt-4">
+						{afterFields}
+
+						<Separator />
+
+						<Collapsible open={showAdvanced} onOpenChange={setShowAdvanced}>
+							<CollapsibleTrigger
+								render={
+									<Button
+										type="button"
+										variant="ghost"
+										className="group -ml-3 h-auto items-start py-2 text-left disabled:opacity-100"
+									/>
+								}
+							>
+								<ChevronRight className="mt-0.5 size-4 transition-transform group-aria-expanded:rotate-90" />
+								<span>
+									<span className="block text-lg font-semibold">Technical settings</span>
+									<span className="block text-sm font-normal text-muted-foreground">
+										Identifier{canRunMentoring ? " and static analysis" : ""}
+									</span>
+								</span>
+							</CollapsibleTrigger>
+							<CollapsibleContent className="mt-4 space-y-6 rounded-lg border p-4">
+								<Field data-invalid={slugError ? "true" : undefined}>
+									<FieldLabel htmlFor="practice-slug">Identifier</FieldLabel>
+									<div className="flex items-center gap-2">
+										<Input
+											id="practice-slug"
+											value={form.slug}
+											onChange={(event) =>
+												setForm((previous) => ({ ...previous, slug: event.target.value }))
+											}
+											disabled={mode === "edit"}
+											required={mode === "create"}
+											minLength={3}
+											maxLength={64}
+											aria-invalid={Boolean(slugError)}
+											aria-describedby={
+												["practice-slug-description", slugError ? "practice-slug-error" : undefined]
+													.filter(Boolean)
+													.join(" ") || undefined
+											}
+										/>
+										{slugWasEdited && (
+											<Button
+												type="button"
+												variant="ghost"
+												size="icon-sm"
+												onClick={() =>
+													setForm((previous) => ({
+														...previous,
+														slug: generateSlug(previous.name),
+													}))
+												}
+												aria-label="Reset to generated identifier"
+											>
+												<RotateCcw className="size-3.5" aria-hidden />
+											</Button>
+										)}
+									</div>
+									<FieldDescription id="practice-slug-description">
+										Generated from the name for URLs and integrations. It cannot be changed later.
+									</FieldDescription>
+									{slugError && <FieldError id="practice-slug-error">{slugError}</FieldError>}
+								</Field>
+
+								{canRunMentoring && (
+									<div className="space-y-3">
+										<div>
+											<p className="font-medium">Static analysis</p>
+											<p className="text-sm text-muted-foreground">
+												Optional TypeScript that prepares structured context before a review. Most
+												practices do not need it.
+											</p>
+										</div>
+										<CodeEditor
+											value={form.precomputeScript}
+											onChange={(value) =>
+												setForm((previous) => ({ ...previous, precomputeScript: value }))
+											}
+											language="typescript"
+											ariaLabel="Precompute script"
+											className="h-[400px]"
+											readOnly={formDisabled}
+										/>
+									</div>
+								)}
+							</CollapsibleContent>
+						</Collapsible>
+					</div>
+				</fieldset>
+			</DrawerBody>
+
+			<DrawerFooter>
 				{cancelAction}
 				<Button type="submit" disabled={formDisabled || isSubmitDisabled}>
 					{isPending && <Spinner className="size-4" />}
@@ -758,7 +744,7 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 							? "Create practice"
 							: "Save changes"}
 				</Button>
-			</div>
+			</DrawerFooter>
 		</form>
 	);
 }

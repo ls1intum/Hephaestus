@@ -12,7 +12,7 @@ Hephaestus uses trunk-based continuous deployment powered by GitHub Actions. Eve
 ## 🏗️ Architecture Overview
 
 ```mermaid
-graph TD
+flowchart TD
     accTitle: Pull request delivery pipeline
     accDescr: An approved pull request merges to main, runs continuous integration and deployment, builds images, and deploys the application.
     PR[Pull Request] --> Review{Code Review}
@@ -140,7 +140,7 @@ Coolify handles PR previews:
 ### Workflow Architecture
 
 ```mermaid
-graph LR
+flowchart LR
     accTitle: Continuous integration job dependencies
     accDescr: Change detection selects quality and test jobs, whose results feed the final continuous integration status gate.
     subgraph cicd.yml

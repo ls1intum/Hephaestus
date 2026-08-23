@@ -487,16 +487,9 @@ public class PullRequestReviewHandler implements JobTypeHandler {
             throw new JobDeliveryException("Delivery failed unexpectedly: jobId=" + job.getId(), e);
         }
 
-        // Stamp each observation with the exact keys deliver() persisted, by identity, so downstream stages
-        // address the stored observation without recomputing a key that could drift.
-        Map<PracticeDetectionResultParser.ValidatedObservation, ObservationKeys> keysByObservation =
-            result.observationKeys();
-        for (int i = 0; i < scopedObservations.size(); i++) {
-            scopedObservations.set(
-                i,
-                scopedObservations.get(i).withKeys(keysByObservation.get(scopedObservations.get(i)))
-            );
-        }
+        // What deliver() persisted, carrying the keys it stored them under, so a later stage addresses the
+        // stored observation rather than recomputing a key that could drift.
+        scopedObservations = new ArrayList<>(result.delivered());
 
         if (admissionOnly) return;
 

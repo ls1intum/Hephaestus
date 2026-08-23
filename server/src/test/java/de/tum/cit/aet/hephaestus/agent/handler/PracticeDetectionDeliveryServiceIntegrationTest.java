@@ -299,7 +299,7 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
         }
 
         @Test
-        @DisplayName("returned observationKeys align exactly with the persisted recurrence_key set")
+        @DisplayName("returned delivered observations align exactly with the persisted recurrence_key set")
         void returnedFingerprintsMatchPersistedRecurrenceKeys() {
             var observations = List.of(
                 observation("pr-description-quality", Presence.PRESENT),
@@ -308,7 +308,13 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
 
             var result = deliveryService.deliver(agentJob, observations);
 
-            assertThat(result.observationKeys().values().stream().map(ObservationKeys::recurrenceKey).toList())
+            assertThat(
+                result
+                    .delivered()
+                    .stream()
+                    .map(o -> o.recurrenceKey())
+                    .toList()
+            )
                 .as("one stable key returned per delivered observation")
                 .hasSize(2)
                 .allMatch(k -> k != null && k.matches("[0-9a-f]{64}"));
@@ -321,7 +327,11 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
             assertThat(persistedKeys)
                 .as("every returned fingerprint is persisted as a recurrence_key, and vice versa")
                 .containsExactlyInAnyOrderElementsOf(
-                    result.observationKeys().values().stream().map(ObservationKeys::recurrenceKey).toList()
+                    result
+                        .delivered()
+                        .stream()
+                        .map(o -> o.recurrenceKey())
+                        .toList()
                 );
         }
 

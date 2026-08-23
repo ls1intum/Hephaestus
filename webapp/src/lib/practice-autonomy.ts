@@ -29,13 +29,23 @@ export const PRACTICE_AUTONOMY_ADDS: Record<PracticeAutonomy, string> = {
 
 export const WORKSPACE_DEFAULT_SOURCE = "the workspace default";
 
-export function inheritedAutonomySourceSentence(
+/**
+ * Where a practice's autonomy came from — a total answer, so a caller cannot invent one.
+ */
+export type AutonomySource = { kind: "inherited"; from: string } | { kind: "chosen" };
+
+export function autonomySourceOf(
 	assignment: AutonomyAssignment,
 	inheritedFrom: string | null,
-): string | null {
-	if (!assignment.inherited) return null;
-	if (assignment.source === "WORKSPACE") return `Follows ${WORKSPACE_DEFAULT_SOURCE}`;
-	return `Follows ${inheritedFrom ?? "its area"}`;
+): AutonomySource {
+	if (!assignment.inherited) return { kind: "chosen" };
+	if (assignment.source === "WORKSPACE")
+		return { kind: "inherited", from: WORKSPACE_DEFAULT_SOURCE };
+	return { kind: "inherited", from: inheritedFrom ?? "its group" };
+}
+
+export function autonomySourceSentence(source: AutonomySource): string {
+	return source.kind === "inherited" ? `Follows ${source.from}` : "Set for this practice";
 }
 
 export interface AutonomyCount {

@@ -249,8 +249,10 @@ export const OutputStillLoading: Story = {
 export const Loading: Story = {
 	args: { job: undefined, isLoading: true },
 	parameters: { chromatic: { viewports: [1440] } },
-	play: async ({ canvas }) => {
-		canvas.getByRole("status", { name: "Loading" });
+	play: async ({ canvas, canvasElement }) => {
+		await expect(canvasElement.querySelectorAll('[data-slot="skeleton"]').length).toBeGreaterThan(
+			0,
+		);
 		canvas.getByRole("link", { name: "Reviews" });
 		await expect(canvas.queryByRole("heading", { level: 2 })).not.toBeInTheDocument();
 	},

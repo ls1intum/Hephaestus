@@ -1,6 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import type { Practice, ReviewPracticeArea } from "@/api/types.gen";
-import { getAreaVisual } from "@/components/admin/practice-catalog/area-visuals";
+import { AreaPill } from "@/components/admin/practice-catalog/AreaPill";
 import { PracticeDetailHoverCard } from "@/components/admin/practice-catalog/PracticeDetailHoverCard";
 import { cn } from "@/lib/utils";
 
@@ -63,14 +63,14 @@ export function ReviewPracticeLink({
  */
 function PracticeAreaMark({ area }: { area: ReviewPracticeArea | undefined }) {
 	if (!area) return null;
-	const { Icon, pill } = getAreaVisual(area.slug, area.name, area.icon, area.color);
 	return (
-		<span
-			title={area.name}
-			className={cn("flex size-4 shrink-0 items-center justify-center rounded-sm", pill)}
-		>
-			<Icon className="size-2.5" aria-hidden />
-			<span className="sr-only">{area.name}: </span>
-		</span>
+		<AreaPill
+			size="sm"
+			slug={area.slug}
+			name={area.name}
+			icon={area.icon}
+			color={area.color}
+			srLabel
+		/>
 	);
 }

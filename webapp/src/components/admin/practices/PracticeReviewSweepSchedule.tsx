@@ -16,7 +16,13 @@ import {
 	EmptyMedia,
 	EmptyTitle,
 } from "@/components/ui/empty";
-import { Field, FieldContent, FieldDescription, FieldLabel } from "@/components/ui/field";
+import {
+	Field,
+	FieldContent,
+	FieldDescription,
+	FieldGroup,
+	FieldLabel,
+} from "@/components/ui/field";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemTitle } from "@/components/ui/item";
 import {
 	Select,
@@ -271,83 +277,88 @@ function AddScheduleForm({
 			<h3 id="sweep-add-heading" className="font-medium text-sm">
 				Add a recurring check
 			</h3>
-			<Field orientation="horizontal">
-				<FieldContent>
-					<FieldLabel id="sweep-kind-label" htmlFor="sweep-kind">
-						Kind of work
-					</FieldLabel>
-					<FieldDescription>One schedule per kind.</FieldDescription>
-				</FieldContent>
-				<Select
-					items={kindItems}
-					value={artifactKind}
-					onValueChange={(value) => setArtifactKind(value ?? artifactKind)}
-				>
-					<SelectTrigger id="sweep-kind" className="w-56">
-						<SelectValue />
-					</SelectTrigger>
-					<SelectContent aria-labelledby="sweep-kind-label">
-						{kindItems.map((kind) => (
-							<SelectItem key={kind.value} value={kind.value}>
-								{kind.label}
-							</SelectItem>
-						))}
-					</SelectContent>
-				</Select>
-			</Field>
+			{/* `FieldGroup` is what `responsive` measures: it opens the `@container/field-group` the
+			    orientation's `@md` breakpoint reads. Without it the row is horizontal at every width, and
+			    at 320px a 14rem control leaves the label about 60px. */}
+			<FieldGroup>
+				<Field orientation="responsive">
+					<FieldContent>
+						<FieldLabel id="sweep-kind-label" htmlFor="sweep-kind">
+							Kind of work
+						</FieldLabel>
+						<FieldDescription>One schedule per kind.</FieldDescription>
+					</FieldContent>
+					<Select
+						items={kindItems}
+						value={artifactKind}
+						onValueChange={(value) => setArtifactKind(value ?? artifactKind)}
+					>
+						<SelectTrigger id="sweep-kind" className="w-full @md/field-group:w-56">
+							<SelectValue />
+						</SelectTrigger>
+						<SelectContent aria-labelledby="sweep-kind-label">
+							{kindItems.map((kind) => (
+								<SelectItem key={kind.value} value={kind.value}>
+									{kind.label}
+								</SelectItem>
+							))}
+						</SelectContent>
+					</Select>
+				</Field>
 
-			<Field orientation="horizontal">
-				<FieldContent>
-					<FieldLabel id="sweep-cadence-label" htmlFor="sweep-cadence">
-						How often
-					</FieldLabel>
-					<FieldDescription>Runs on its own; there is nothing to start by hand.</FieldDescription>
-				</FieldContent>
-				<Select
-					items={CADENCES}
-					value={cadence}
-					onValueChange={(value) => changeCadence(value ?? cadence)}
-				>
-					<SelectTrigger id="sweep-cadence" className="w-56">
-						<SelectValue />
-					</SelectTrigger>
-					<SelectContent aria-labelledby="sweep-cadence-label">
-						{CADENCES.map((option) => (
-							<SelectItem key={option.value} value={option.value}>
-								{option.label}
-							</SelectItem>
-						))}
-					</SelectContent>
-				</Select>
-			</Field>
+				<Field orientation="responsive">
+					<FieldContent>
+						<FieldLabel id="sweep-cadence-label" htmlFor="sweep-cadence">
+							How often
+						</FieldLabel>
+						<FieldDescription>Runs on its own; there is nothing to start by hand.</FieldDescription>
+					</FieldContent>
+					<Select
+						items={CADENCES}
+						value={cadence}
+						onValueChange={(value) => changeCadence(value ?? cadence)}
+					>
+						<SelectTrigger id="sweep-cadence" className="w-full @md/field-group:w-56">
+							<SelectValue />
+						</SelectTrigger>
+						<SelectContent aria-labelledby="sweep-cadence-label">
+							{CADENCES.map((option) => (
+								<SelectItem key={option.value} value={option.value}>
+									{option.label}
+								</SelectItem>
+							))}
+						</SelectContent>
+					</Select>
+				</Field>
 
-			<Field orientation="horizontal">
-				<FieldContent>
-					<FieldLabel id="sweep-window-label" htmlFor="sweep-window">
-						How far back each time
-					</FieldLabel>
-					<FieldDescription>
-						Overlapping on purpose: work missed once still gets a second chance, and work already
-						reviewed is never paid for twice.
-					</FieldDescription>
-				</FieldContent>
-				<Select
-					items={windowItems}
-					value={lookbackDays}
-					onValueChange={(value) => setLookbackDays(value ?? lookbackDays)}
-				>
-					<SelectTrigger id="sweep-window" className="w-56">
-						<SelectValue />
-					</SelectTrigger>
-					<SelectContent aria-labelledby="sweep-window-label">
-						{windowItems.map((option) => (
-							<SelectItem key={option.value} value={option.value}>
-								{option.label}
-							</SelectItem>
-						))}
-					</SelectContent>
-				</Select>
-			</Field>
+				<Field orientation="responsive">
+					<FieldContent>
+						<FieldLabel id="sweep-window-label" htmlFor="sweep-window">
+							How far back each time
+						</FieldLabel>
+						<FieldDescription>
+							Overlapping on purpose: work missed once still gets a second chance, and work already
+							reviewed is never paid for twice.
+						</FieldDescription>
+					</FieldContent>
+					<Select
+						items={windowItems}
+						value={lookbackDays}
+						onValueChange={(value) => setLookbackDays(value ?? lookbackDays)}
+					>
+						<SelectTrigger id="sweep-window" className="w-full @md/field-group:w-56">
+							<SelectValue />
+						</SelectTrigger>
+						<SelectContent aria-labelledby="sweep-window-label">
+							{windowItems.map((option) => (
+								<SelectItem key={option.value} value={option.value}>
+									{option.label}
+								</SelectItem>
+							))}
+						</SelectContent>
+					</Select>
+				</Field>
+			</FieldGroup>
 
 			<div className="flex flex-wrap items-center gap-3">
 				<Button

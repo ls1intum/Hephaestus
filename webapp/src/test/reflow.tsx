@@ -89,6 +89,40 @@ export async function expectTablesScrollInPlace(
 	}
 }
 
+/**
+ * The drawer popup is `fixed`, so it never widens the document and {@link expectNoPageOverflow}
+ * cannot see it. At 320px the panel is the whole viewport, so content that overflows it is content a
+ * reader has to drag sideways to finish — SC 1.4.10 on the only box that can break here.
+ *
+ * Measured on the body rather than the popup: the popup paints a `::after` swipe bleed at
+ * `left: 100%`, and an absolutely positioned pseudo still counts toward its ancestor's
+ * `scrollWidth`. That box is `pointer-events-none`, the popup is `overflow-x: visible`, so it
+ * reaches nobody — but it makes the popup's own `scrollWidth` read one bleed too wide, every time.
+ */
+export async function expectNoPanelOverflow(panel: HTMLElement) {
+	const body = panel.querySelector<HTMLElement>('[data-slot="drawer-body"]');
+	if (body == null) {
+		throw new Error("A drawer panel with no body has no content box to measure.");
+	}
+	await expect(body.scrollWidth).toBeLessThanOrEqual(body.clientWidth + LAYOUT_SLACK_PX);
+}
+
+/**
+ * Nothing reaches past the viewport (SC 1.4.10), and the failure names the element that did rather
+ * than reporting that one number exceeds another.
+ */
+export async function expectNoOverflowingElement(root: HTMLElement = document.body) {
+	const limit = window.innerWidth + LAYOUT_SLACK_PX;
+	const offenders = Array.from(root.querySelectorAll<HTMLElement>("*"))
+		.map((element) => ({ element, rect: element.getBoundingClientRect() }))
+		.filter(({ rect }) => rect.width > 0 && (rect.right > limit || rect.left < -LAYOUT_SLACK_PX))
+		.map(
+			({ element, rect }) =>
+				`${element.tagName.toLowerCase()}.${element.className.split(" ").slice(0, 3).join(".")} [${Math.round(rect.left)}…${Math.round(rect.right)}]`,
+		);
+	await expect(offenders, `Reaches past the ${window.innerWidth}px viewport`).toEqual([]);
+}
+
 export async function expectTargetSize(control: HTMLElement) {
 	const rect = control.getBoundingClientRect();
 	await expect(rect.width).toBeGreaterThanOrEqual(MIN_TARGET_PX);
@@ -171,4 +205,30 @@ export async function expectDialogBodyScrolls(popup: HTMLElement = openDialogPop
 		LAYOUT_SLACK_PX,
 	);
 	await expectWithinViewport(heading);
+}
+
+/**
+ * Only a drawer's own regions reach its edges. Everything else is content and sits inside their
+ * padding.
+ *
+ * The failure this catches is a host rendering a banner as a sibling of `DrawerBody` rather than
+ * inside it: it lands as a direct child of the panel, which has no padding of its own, and touches
+ * both edges while every field below it is inset.
+ */
+export async function expectPanelContentInset(panel: HTMLElement) {
+	const regions = new Set(["drawer-header", "drawer-body", "drawer-footer", "drawer-content"]);
+	const box = panel.getBoundingClientRect();
+	// The panel's own border, which its regions sit inside.
+	const BORDER = 2;
+	const flush = Array.from(panel.querySelectorAll<HTMLElement>("*")).filter((element) => {
+		const slot = element.getAttribute("data-slot") ?? "";
+		if (regions.has(slot) || element.tagName === "FORM") return false;
+		const rect = element.getBoundingClientRect();
+		// Narrow elements are decoration — separators, bleeds — not content that should be inset.
+		if (rect.width < 40) return false;
+		return Math.abs(rect.left - box.left) <= BORDER || Math.abs(box.right - rect.right) <= BORDER;
+	});
+	await expect(
+		flush.map((element) => `${element.tagName.toLowerCase()}.${element.className.split(" ")[0]}`),
+	).toEqual([]);
 }
