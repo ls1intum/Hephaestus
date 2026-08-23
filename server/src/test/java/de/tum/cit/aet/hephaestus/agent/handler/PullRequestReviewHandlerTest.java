@@ -464,7 +464,9 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
                 }
                 """;
             AgentJob job = jobWithOutput(rawOutput);
-            when(deliveryService.deliver(eq(job), any())).thenReturn(new DeliveryResult(1, 0, false, Map.of()));
+            when(deliveryService.deliver(eq(job), any())).thenAnswer(inv ->
+                new DeliveryResult(1, 0, false, inv.getArgument(1))
+            );
 
             admit(job, rawOutput);
 
@@ -499,8 +501,8 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
             ArgumentCaptor<List<PracticeDetectionResultParser.ValidatedObservation>> captor = ArgumentCaptor.forClass(
                 List.class
             );
-            when(deliveryService.deliver(eq(job), captor.capture())).thenReturn(
-                new DeliveryResult(1, 0, false, Map.of())
+            when(deliveryService.deliver(eq(job), captor.capture())).thenAnswer(inv ->
+                new DeliveryResult(1, 0, false, inv.getArgument(1))
             );
 
             admit(job, rawOutput);
@@ -606,8 +608,8 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
             ArgumentCaptor<List<PracticeDetectionResultParser.ValidatedObservation>> captor = ArgumentCaptor.forClass(
                 List.class
             );
-            when(deliveryService.deliver(eq(job), captor.capture())).thenReturn(
-                new DeliveryResult(1, 0, false, Map.of())
+            when(deliveryService.deliver(eq(job), captor.capture())).thenAnswer(inv ->
+                new DeliveryResult(1, 0, false, inv.getArgument(1))
             );
 
             admit(job, rawOutput);

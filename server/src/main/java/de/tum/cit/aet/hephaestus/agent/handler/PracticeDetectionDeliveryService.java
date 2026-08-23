@@ -4,6 +4,7 @@ import de.tum.cit.aet.hephaestus.agent.context.providers.DocumentContentSource;
 import de.tum.cit.aet.hephaestus.agent.conversation.ConversationSourceLiveness;
 import de.tum.cit.aet.hephaestus.agent.documentation.DocumentProjection;
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.ValidatedObservation;
+import de.tum.cit.aet.hephaestus.agent.handler.spi.EvidenceQuoteUnverifiedException;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.runtime.ProvenanceDigest;
@@ -33,9 +34,9 @@ import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
 import de.tum.cit.aet.hephaestus.practices.observation.PracticeDetectionCompletedEvent;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -144,7 +145,15 @@ public class PracticeDetectionDeliveryService {
         }
         Target target = resolveTarget(job, metadata);
         Map<String, PracticeRevision> revisionsBySlug = admittedRevisions(job, workspaceId);
-        for (ValidatedObservation observation : validObservations) {
+        // A quote that does not verify discredits its own claim, and only EvidenceQuoteUnverifiedException
+        // means that. Every other refusal here — an unstaged source, a malformed citation, work attributed
+        // to the wrong person — impugns the run, so it stays fatal.
+        List<Integer> admittedIndexes = new ArrayList<>(validObservations.size());
+        List<ValidatedObservation> admittedObservations = new ArrayList<>(validObservations.size());
+        List<String> withheldObservations = new ArrayList<>();
+        boolean withheldNegative = false;
+        for (int submittedIndex = 0; submittedIndex < validObservations.size(); submittedIndex++) {
+            ValidatedObservation observation = validObservations.get(submittedIndex);
             PracticeRevision revision = revisionsBySlug.get(observation.practiceSlug());
             if (revision == null) {
                 throw new JobDeliveryException(
@@ -155,7 +164,42 @@ public class PracticeDetectionDeliveryService {
                 );
             }
             enforceAttribution(observation, revision, job);
-            enforceEvidenceBoundary(observation, revision, evidenceBoundary, job);
+            try {
+                enforceEvidenceBoundary(observation, revision, evidenceBoundary, job);
+                admittedIndexes.add(submittedIndex);
+                admittedObservations.add(observation);
+            } catch (EvidenceQuoteUnverifiedException ex) {
+                withheldNegative |= observation.assessment() == Assessment.BAD;
+                withheldObservations.add(observation.practiceSlug() + ": " + ex.getMessage());
+            }
+        }
+        if (!withheldObservations.isEmpty()) {
+            // Per claim, because a model that cannot quote its own evidence is a defect an otherwise
+            // successful delivery would hide.
+            log.warn(
+                "Withheld {} of {} observation(s) whose quoted evidence did not verify, delivering the rest: jobId={} withheld={}",
+                withheldObservations.size(),
+                validObservations.size(),
+                job.getId(),
+                withheldObservations
+            );
+            // Withholding the only fault leaves an all-clear standing over a defect the model did find,
+            // which is a different statement to the reader than an incomplete review.
+            if (withheldNegative && admittedObservations.stream().noneMatch(o -> o.assessment() == Assessment.BAD)) {
+                log.error(
+                    "Withheld every negative observation; the remaining claims read as an all-clear: jobId={}",
+                    job.getId()
+                );
+            }
+        }
+        // Only when there was something to admit: a review that found nothing still publishes its zero.
+        if (admittedObservations.isEmpty() && !validObservations.isEmpty()) {
+            throw new JobDeliveryException(
+                "No observation survived the evidence check, so there is nothing to deliver: jobId=" +
+                    job.getId() +
+                    ", withheld=" +
+                    withheldObservations
+            );
         }
 
         ObservationOrigin origin = originOf(metadata);
@@ -171,20 +215,22 @@ public class PracticeDetectionDeliveryService {
         boolean hasNegative = false;
         Instant observedAt = Instant.now();
 
-        // Keyed by observation identity because equal observations still represent distinct occurrences.
-        Map<ValidatedObservation, ObservationKeys> observationKeys = new IdentityHashMap<>();
+        // Carries the keys each observation was persisted under.
+        List<ValidatedObservation> deliveredObservations = new ArrayList<>(admittedObservations.size());
 
-        for (int i = 0; i < validObservations.size(); i++) {
-            ValidatedObservation observation = validObservations.get(i);
+        for (int i = 0; i < admittedObservations.size(); i++) {
+            ValidatedObservation observation = admittedObservations.get(i);
 
             PracticeRevision revision = revisionsBySlug.get(observation.practiceSlug());
             Practice practice = revision.getPractice();
 
-            // Includes the index so distinct observations for the same practice on one artifact don't collide.
+            // The position the observation was SUBMITTED at, not its position among those admitted: this key
+            // is a retry's dedup grain, so a claim withheld on one attempt and not the next must not renumber
+            // the claims after it into keys that miss what is already stored.
             String occurrenceKey =
                 observation.practiceSlug() +
                 ":" +
-                i +
+                admittedIndexes.get(i) +
                 ":" +
                 artifactKind.value() +
                 ":" +
@@ -211,7 +257,7 @@ public class PracticeDetectionDeliveryService {
                 aboutUserId,
                 firstLocationPath(observation.evidence())
             );
-            observationKeys.put(observation, new ObservationKeys(occurrenceKey, recurrenceKey));
+            deliveredObservations.add(observation.withKeys(new ObservationKeys(occurrenceKey, recurrenceKey)));
 
             Long practiceRevisionId = revision.getId();
 
@@ -274,7 +320,7 @@ public class PracticeDetectionDeliveryService {
             )
         );
 
-        return new DeliveryResult(inserted, discardedDuplicate, hasNegative, observationKeys);
+        return new DeliveryResult(inserted, discardedDuplicate, hasNegative, deliveredObservations);
     }
 
     /**
@@ -419,7 +465,7 @@ public class PracticeDetectionDeliveryService {
                 );
             String artifactContent = new String(content, StandardCharsets.UTF_8);
             if (!"scm.pull-request.diff".equals(kind.value()) && !artifactContent.contains(exactQuote)) {
-                throw new JobDeliveryException(
+                throw new EvidenceQuoteUnverifiedException(
                     "Evidence quote does not occur in the cited artifact: path=" +
                         artifactPath.asText() +
                         ", jobId=" +
@@ -445,7 +491,7 @@ public class PracticeDetectionDeliveryService {
                           exactQuote
                       ))
             ) {
-                throw new JobDeliveryException(
+                throw new EvidenceQuoteUnverifiedException(
                     "Evidence quote does not match the cited diff location: path=" +
                         path.asText() +
                         ", line=" +
@@ -996,14 +1042,11 @@ public class PracticeDetectionDeliveryService {
         return path != null && path.isString() ? path.asString() : null;
     }
 
-    /**
-     * @param observationKeys the keys persisted for each observation, by identity, so the caller stamps the same
-     *     keys onto its deliverable observations instead of recomputing them
-     */
+    /** @param delivered what this call persisted, each carrying the keys it was stored under. */
     public record DeliveryResult(
         int inserted,
         int discardedDuplicate,
         boolean hasNegative,
-        Map<ValidatedObservation, ObservationKeys> observationKeys
+        List<ValidatedObservation> delivered
     ) {}
 }

@@ -391,6 +391,64 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
         }
 
         @Test
+        @DisplayName("only the claim whose quote does not verify is withheld; the other is delivered")
+        void withholdsOnlyTheObservationWhoseQuoteDoesNotVerify() {
+            Practice second = new Practice();
+            ReflectionTestUtils.setField(second, "id", 20L);
+            second.setSlug("pr-scope");
+            second.setBindings(PracticeTestEvidence.bindings(ArtifactKinds.PULL_REQUEST));
+            second.setAutomatedReviewPolicy(PracticeTestEvidence.forArtifact(ArtifactKinds.PULL_REQUEST));
+            admit(second, 21L);
+
+            ValidatedObservation sound = validObservation("pr-description-quality", Presence.PRESENT);
+            ValidatedObservation misquoted = validObservation("pr-scope", Presence.PRESENT);
+            ((ObjectNode) misquoted.evidence().withArray("citations").get(0)).put("quote", "+ insecure();,");
+
+            var result = service.deliver(testJob, List.of(sound, misquoted));
+
+            assertThat(result.delivered())
+                .as("the claim that verified is the one persisted, and it is the only one")
+                .extracting(ValidatedObservation::practiceSlug)
+                .containsExactly("pr-description-quality");
+            assertThat(result.inserted()).isEqualTo(1);
+        }
+
+        @Test
+        @DisplayName("a citation to an unstaged source still fails the whole delivery, even beside a sound claim")
+        void anEvidenceFailureThatIsNotAQuoteMismatchStillFailsEverything() {
+            Practice second = new Practice();
+            ReflectionTestUtils.setField(second, "id", 20L);
+            second.setSlug("pr-scope");
+            second.setBindings(PracticeTestEvidence.bindings(ArtifactKinds.PULL_REQUEST));
+            second.setAutomatedReviewPolicy(PracticeTestEvidence.forArtifact(ArtifactKinds.PULL_REQUEST));
+            admit(second, 21L);
+
+            ValidatedObservation sound = validObservation("pr-description-quality", Presence.PRESENT);
+            ValidatedObservation unstaged = validObservation("pr-scope", Presence.PRESENT);
+            ObjectNode citation = (ObjectNode) unstaged.evidence().withArray("citations").get(0);
+            citation.put("sourceKind", "scm.repository.tree");
+            citation.remove("side");
+
+            assertThatThrownBy(() -> service.deliver(testJob, List.of(sound, unstaged)))
+                .as("an unstaged source impugns the run, not just the claim that cited it")
+                .isInstanceOf(JobDeliveryException.class)
+                .hasMessageContaining("misattributed evidence source");
+            verifyNoInteractions(observationRepository);
+        }
+
+        @Test
+        @DisplayName("a batch in which no quote verifies is still a failed delivery")
+        void refusesTheDeliveryWhenNoObservationSurvivesAdmission() {
+            ValidatedObservation misquoted = validObservation("pr-description-quality", Presence.PRESENT);
+            ((ObjectNode) misquoted.evidence().withArray("citations").get(0)).put("quote", "fabricated quote");
+
+            assertThatThrownBy(() -> service.deliver(testJob, List.of(misquoted)))
+                .isInstanceOf(JobDeliveryException.class)
+                .hasMessageContaining("No observation survived the evidence check");
+            verifyNoInteractions(observationRepository);
+        }
+
+        @Test
         void acceptsASecretScannerCitationWithoutPersistingTheSecret() {
             ValidatedObservation observation = validObservation("pr-description-quality", Presence.PRESENT);
             ObjectNode evidence = (ObjectNode) observation.evidence();
@@ -833,7 +891,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
             assertThat(fingerprintCaptor.getValue())
                 .as("persisted recurrence_key matches the returned findingFingerprint")
                 .matches("[0-9a-f]{64}")
-                .isEqualTo(result.observationKeys().values().iterator().next().recurrenceKey());
+                .isEqualTo(result.delivered().get(0).keys().recurrenceKey());
 
             verify(eventPublisher).publishEvent(eventCaptor.capture());
             PracticeDetectionCompletedEvent event = eventCaptor.getValue();
