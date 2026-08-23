@@ -30,7 +30,7 @@ public interface PiRunnerProfile {
         return List.of();
     }
 
-    /** Flags for the {@code bun} invocation. Bun ignores unknown flags silently, so V8 flags do nothing. */
+    /** Flags for the {@code bun} invocation. */
     List<String> runtimeFlags();
 
     /** {@code KEY=value} pairs scoped to the {@code bun} invocation only — not image-wide ENV. */

@@ -72,7 +72,7 @@ Before any release, code must pass:
 | Java lint       | PMD         | Static analysis      |
 | Webapp TypeScript | Biome (`webapp/biome.json`) + tsc | Lint + format + typecheck |
 | Agent + scripts TypeScript | Biome (`biome.jsonc`) + tsc | Lint + format + typecheck for the Bun runtime, its specs, both precompute trees and `scripts/**` |
-| Agent runtime   | Bun         | Runner and precompute specs, on the Bun the sandbox ships |
+| Agent runtime   | Bun         | Runner and precompute specs, on the Bun the sandbox ships — CI reads `ARG BUN_VERSION` out of `docker/agents/pi/Dockerfile` rather than hard-coding it, and fails closed if that line is missing |
 
 ## 🔒 Security
 

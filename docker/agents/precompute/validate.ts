@@ -59,10 +59,12 @@ const args = [
 if (values.diff) args.push("--diff", values.diff);
 if (values.metadata) args.push("--metadata", values.metadata);
 if (values.context) args.push("--context", values.context);
-const _proc = Bun.spawnSync(["bun", ...args], { stderr: "inherit" });
+const proc = Bun.spawnSync(["bun", ...args], { stderr: "inherit" });
+if (proc.exitCode !== 0) {
+	console.error(`runner exited ${proc.exitCode}; results below may be partial or absent`);
+}
 
-// Inspect results. The written {slug}.json is checked against the SAME contract the runner enforces
-// on a script's return value (lib/practice-contract.ts), so this tool cannot drift from the runner.
+// Inspect results against the same contract the runner enforces on a script's return value.
 let fail = 0;
 for (const f of new Bun.Glob("*.json").scanSync(work)) {
 	let result: PracticeResult;

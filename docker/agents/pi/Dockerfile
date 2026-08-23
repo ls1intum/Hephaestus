@@ -14,11 +14,11 @@ RUN apt-get update -qq && apt-get install -y --no-install-recommends git finduti
 # The sha256 pins below are per-version: a bump that does not refresh them fails the build.
 # ci-quality-gates.yml greps this exact `ARG BUN_VERSION=` line to pin the CI toolchain.
 # renovate: datasource=github-releases depName=oven-sh/bun extractVersion=^bun-v(?<version>.*)$
-ARG BUN_VERSION=1.3.11
+ARG BUN_VERSION=1.4.0
 RUN arch="${TARGETARCH:-$(dpkg --print-architecture)}" && \
     case "${arch}" in \
-        amd64|x86_64) bun_arch="x64"; bun_sha256="8611ba935af886f05a6f38740a15160326c15e5d5d07adef966130b4493607ed" ;; \
-        arm64|aarch64) bun_arch="aarch64"; bun_sha256="d13944da12a53ecc74bf6a720bd1d04c4555c038dfe422365356a7be47691fdf" ;; \
+        amd64|x86_64) bun_arch="x64"; bun_sha256="2d03fb5fb83ac8b567aca0a281b2ce1a1a19d488f56c2968d88c3f25e92fe452" ;; \
+        arm64|aarch64) bun_arch="aarch64"; bun_sha256="4b1a332ee861983eb93bcfe6f770fff94e3e31b2c388bdaea3c8ed35e58eed0e" ;; \
         *) echo "Unsupported TARGETARCH/architecture: ${arch}" >&2; exit 1 ;; \
     esac && \
     curl --fail --show-error --silent --location --retry 3 --retry-delay 2 \
@@ -30,8 +30,7 @@ RUN arch="${TARGETARCH:-$(dpkg --print-architecture)}" && \
     chmod +x /usr/local/bin/bun && \
     rm -rf /tmp/bun*
 
-# uid/gid 1000 came for free from the `node` user on the old base. Debian slim has no such
-# user, so create it explicitly — git and bun both want a resolvable passwd entry for $HOME.
+# Debian slim has no uid 1000; git and bun both want a resolvable passwd entry for $HOME.
 RUN groupadd --gid 1000 agent && \
     useradd --uid 1000 --gid 1000 --home-dir /home/agent --create-home --shell /bin/bash agent
 
@@ -42,7 +41,7 @@ ARG PI_VERSION=0.74.1
 # exactly ${PI_VERSION} and the layer reproducible. The runner imports by bare specifier, which
 # resolves through the symlink PiRuntimeFactory plants at /<workspace>/node_modules → here.
 #
-# Bun blocks lifecycle scripts by default and we deliberately declare no `trustedDependencies`.
+# Bun blocks lifecycle scripts by default and no `trustedDependencies` is declared.
 # Three dependencies ship one: @google/genai (preinstall `echo`), protobufjs (postinstall that
 # only ever writes a version-scheme warning to stderr) and koffi (install script that fetches a
 # prebuilt only when the tarball lacks one — it never does; koffi vendors every triplet).
@@ -84,16 +83,12 @@ RUN git config --system core.hooksPath /nonexistent && \
     git config --system core.fsmonitor false && \
     git config --system safe.directory /workspace/repo
 
-# No allocator tuning is installed. The mentor runner's jemalloc LD_PRELOAD is gone (Bun ships
-# mimalloc), PiRuntimeFactory emits no LD_PRELOAD, and SandboxEnvBlocklist strips LD_PRELOAD
-# from caller-supplied sandbox env — so libjemalloc2 could never be loaded even by accident.
-
 ENV HOME=/home/agent
 ENV GIT_PAGER=cat
 ENV GIT_TERMINAL_PROMPT=0
 ENV LANG=C.UTF-8
 
-# Hard guarantee, not a comment: this image is Bun-only. Runs last so it also catches a Node
+# This image is Bun-only. Runs last so it also catches a Node
 # smuggled in by any layer above. Checks $PATH resolution *and* the standard bin directories,
 # because an unreferenced /usr/local/bin/node would still be an executable Node.
 RUN set -eu; \
