@@ -166,9 +166,12 @@ test("a compose file that yields no services is a failure, not a pass", () => {
 });
 
 test("compose defaults resolve the way an operator who sets nothing gets them", () => {
+	// biome-ignore lint/suspicious/noTemplateCurlyInString: Compose interpolation syntax under test, not a template literal
 	assert.equal(composeDefault("${HEPHAESTUS_RUNTIME_WEBHOOK_ENABLED:-false}"), "false");
+	// biome-ignore lint/suspicious/noTemplateCurlyInString: Compose interpolation syntax under test, not a template literal
 	assert.equal(composeDefault("${HEPHAESTUS_RUNTIME_WEBHOOK_ENABLED-false}"), "false");
 	assert.equal(composeDefault('"false"'), "false");
+	// biome-ignore lint/suspicious/noTemplateCurlyInString: Compose interpolation syntax under test, not a template literal
 	assert.equal(composeDefault("${WEBHOOK_SECRET}"), "");
 });
 

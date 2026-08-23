@@ -78,6 +78,7 @@ class WebhookPropertiesTest extends BaseUnitTest {
             byStream,
             gibibytes(64),
             false,
+            Duration.ofMinutes(5),
             Duration.ofSeconds(60)
         );
     }

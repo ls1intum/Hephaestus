@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.core.webhook;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
@@ -14,6 +15,7 @@ import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import io.nats.client.Connection;
 import io.nats.client.JetStream;
 import io.nats.client.JetStreamManagement;
+import io.nats.client.JetStreamOptions;
 import io.nats.client.api.DiscardPolicy;
 import io.nats.client.api.RetentionPolicy;
 import io.nats.client.api.StorageType;
@@ -62,6 +64,8 @@ class JetStreamPublisherTopologyTest {
             when(jsm.getStreamInfo(anyString())).thenReturn(info);
             when(connection.jetStream()).thenReturn(jetStream);
             when(connection.jetStreamManagement()).thenReturn(jsm);
+            // The bootstrap takes its own handle with a longer request timeout than the probes want.
+            when(connection.jetStreamManagement(any(JetStreamOptions.class))).thenReturn(jsm);
             return connection;
         } catch (Exception e) {
             throw new IllegalStateException("failed to build NATS connection stub", e);

@@ -42,6 +42,9 @@ services:
       # Lowering a bound on a stream that has already outgrown it deletes the excess. Set true for
       # one deliberate start-up to apply it; startup otherwise logs what it would cost and declines.
       HEPHAESTUS_WEBHOOK_STREAM_ALLOW_DESTRUCTIVE_LIMIT_UPDATES: ${HEPHAESTUS_WEBHOOK_STREAM_ALLOW_DESTRUCTIVE_LIMIT_UPDATES:-false}
+      # Applying that bound sheds the excess before the broker replies, so the wait scales with the
+      # bytes deleted. Raise it on a stream large enough that 5 minutes is not enough.
+      HEPHAESTUS_WEBHOOK_STREAM_LIMIT_UPDATE_TIMEOUT: ${HEPHAESTUS_WEBHOOK_STREAM_LIMIT_UPDATE_TIMEOUT:-5m}
       # Shared webhook secret used for incoming HMAC / token verification.
       # WEBHOOK_EXTERNAL_URL is only used by auto-registration (server role) and is intentionally
       # not set on the webhook-server pod.

@@ -4,6 +4,14 @@ description: "Installs pnpm via SHA-pinned pnpm/action-setup and Node.js via SHA
 runs:
   using: "composite"
   steps:
+    # Git hooks are a developer-machine guardrail; every check they run is already a required job
+    # here. Installing them on a runner only couples workflows that push — the changesets version PR,
+    # the OpenAPI autocommit — to whatever toolchain `pnpm run check` happens to need, and a bot push
+    # then fails for a reason that has nothing to do with what it pushed.
+    - name: Disable git hooks
+      shell: bash
+      run: echo "HUSKY=0" >> "$GITHUB_ENV"
+
     - name: Setup pnpm
       uses: pnpm/action-setup@0e279bb959325dab635dd2c09392533439d90093 # v6.0.8
       with:
