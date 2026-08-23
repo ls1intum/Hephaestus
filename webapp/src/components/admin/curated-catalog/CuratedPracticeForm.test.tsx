@@ -17,7 +17,7 @@ import {
 } from "./CuratedPracticeForm";
 
 vi.mock("@/components/shared/CodeEditor", () => ({
-	CodeEditor: () => <div data-testid="code-editor" />,
+	CodeEditor: () => <div />,
 }));
 
 const initialData: CuratedPracticeFormInitialValue = {

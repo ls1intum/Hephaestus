@@ -26,6 +26,7 @@ function userPayload(expiresInSec: number) {
 		impersonating: false,
 		linkedProviders: [],
 		roles: [],
+		// oxlint-disable-next-line no-restricted-properties -- The hook schedules against the wall clock, so a fixture expiry has to be stated relative to that same clock or the renewal is due in the past.
 		accessTokenExpiresAt: Math.floor(Date.now() / 1000) + expiresInSec,
 	};
 }

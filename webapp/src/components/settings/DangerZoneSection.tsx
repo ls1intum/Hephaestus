@@ -73,13 +73,16 @@ function DataExportRow() {
 		onSuccess: (data) => {
 			if (typeof data.id === "number") {
 				setExportId(data.id);
+				// Stamped in the mutation callback, not during a render, and deliberately from the same
+				// clock TanStack Query stamps `dataUpdatedAt` with — the stall check below subtracts one
+				// from the other, so a second clock would make that difference meaningless.
+				// oxlint-disable-next-line no-restricted-properties -- Reads the clock once on an event, and must match the clock behind `dataUpdatedAt` for the elapsed-time comparison to hold.
 				setRequestedAt(Date.now());
 			} else {
 				toast.error("Export request did not return an identifier.");
 			}
 		},
-		onError: (error) => {
-			console.error("Failed to request data export:", error);
+		onError: () => {
 			toast.error("Failed to request data export. Please try again later.");
 		},
 	});
@@ -133,8 +136,7 @@ function DataExportRow() {
 			anchor.click();
 			anchor.remove();
 			URL.revokeObjectURL(url);
-		} catch (error) {
-			console.error("Failed to download data export:", error);
+		} catch {
 			toast.error("Failed to download export. Please try again later.");
 		} finally {
 			setIsDownloading(false);
@@ -199,8 +201,7 @@ function DeleteAccountRow({ onAccountDeleted }: DangerZoneSectionProps) {
 			}
 			await onAccountDeleted();
 		},
-		onError: (error) => {
-			console.error("Failed to delete account:", error);
+		onError: () => {
 			toast.error("Failed to delete account. Please try again later.");
 		},
 	});

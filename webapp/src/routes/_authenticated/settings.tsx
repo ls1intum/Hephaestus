@@ -71,11 +71,10 @@ function RouteComponent() {
 			queryClient.setQueryData(userSettingsQueryKey, variables.body);
 			return { previousSettings };
 		},
-		onError: (error, _variables, context) => {
+		onError: (_error, _variables, context) => {
 			if (context?.previousSettings) {
 				queryClient.setQueryData(userSettingsQueryKey, context.previousSettings);
 			}
-			console.error("Failed to update user settings:", error);
 			toast.error("Failed to update settings. Please try again later.");
 		},
 		onSuccess: (data) => {
@@ -120,7 +119,6 @@ function RouteComponent() {
 			toast.success("Account disconnected.");
 		},
 		onError: (error: DefaultError) => {
-			console.error("Failed to disconnect account:", error);
 			toast.error(problemDetailOf(error, "Couldn't disconnect that account. Please try again."));
 		},
 	});
@@ -152,7 +150,6 @@ function RouteComponent() {
 			);
 		},
 		onError: (error: DefaultError) => {
-			console.error("Failed to update Slack preferences:", error);
 			toast.error(problemDetailOf(error, "Couldn't update Slack preferences. Please try again."));
 		},
 	});

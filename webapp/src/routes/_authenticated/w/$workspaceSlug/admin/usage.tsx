@@ -15,6 +15,7 @@ import {
 	usageSearchSchema,
 } from "@/components/admin/usage/usage-search";
 import { canStepForwardFrom, isCurrentMonthUtc } from "@/components/admin/usage/usage-utils";
+import { useNow } from "@/components/common/use-now";
 import { workspaceAdminHead } from "@/lib/page-title";
 import { problemDetailOf } from "@/lib/problem-detail";
 
@@ -68,11 +69,13 @@ function AdminUsageContainer() {
 
 	const isCurrentMonth = isCurrentMonthUtc(month);
 	const canGoNext = canStepForwardFrom(month);
+	const now = new Date(useNow());
 
 	return (
 		<>
 			<AdminLlmUsagePage
 				month={month}
+				now={now}
 				isCurrentMonth={isCurrentMonth}
 				canGoNext={canGoNext}
 				workspaceSlug={workspaceSlug}

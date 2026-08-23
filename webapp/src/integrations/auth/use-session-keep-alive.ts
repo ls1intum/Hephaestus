@@ -57,6 +57,7 @@ export function useSessionKeepAlive() {
 
 		let lastMark = 0;
 		const markActive = () => {
+			// oxlint-disable-next-line no-restricted-properties -- Throttles the activity listeners against real elapsed time inside a pointer/key handler; the whole point is to run without waking React.
 			const now = Date.now();
 			if (now - lastMark >= ACTIVITY_THROTTLE_MS) {
 				lastMark = now;
@@ -76,6 +77,7 @@ export function useSessionKeepAlive() {
 
 		// Proactive renewal — only if the user was active during this token's life.
 		const expiresAtMs = expiresAtSec * 1000;
+		// oxlint-disable-next-line no-restricted-properties -- The delay handed to `setTimeout`, which counts against the same wall clock the cookie expires on; anything coarser would schedule the renewal after the token has lapsed.
 		const dueInMs = Math.max(0, expiresAtMs - REFRESH_SKEW_MS - Date.now());
 		const timer = window.setTimeout(() => {
 			if (activeThisCycleRef.current) {
@@ -91,6 +93,7 @@ export function useSessionKeepAlive() {
 				return;
 			}
 			activeThisCycleRef.current = true;
+			// oxlint-disable-next-line no-restricted-properties -- Runs on wake from a backgrounded tab, where every React-driven clock has been throttled along with the timers; only the wall clock knows how long the tab was away.
 			if (Date.now() >= expiresAtMs - REFRESH_SKEW_MS) {
 				void renew();
 			}

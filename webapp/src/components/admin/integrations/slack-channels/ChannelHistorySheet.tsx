@@ -103,6 +103,9 @@ export function ChannelHistorySheet({
 }
 
 function HistoryEntry({ event }: { event: SlackChannelConsentEvent }) {
+	// An unparseable timestamp leaves the line out rather than standing in the current instant for it:
+	// the transition itself is still worth showing, and a fabricated date reads as a recorded one.
+	const createdAt = asDate(event.createdAt);
 	return (
 		<Item
 			render={<li />}
@@ -119,7 +122,7 @@ function HistoryEntry({ event }: { event: SlackChannelConsentEvent }) {
 					)}
 					<ConsentStateBadge state={event.toState} />
 				</ItemTitle>
-				<ItemDescription>{format(asDate(event.createdAt) ?? new Date(), "PPpp")}</ItemDescription>
+				{createdAt && <ItemDescription>{format(createdAt, "PPpp")}</ItemDescription>}
 				{event.reason && (
 					<ItemDescription className="text-foreground">{event.reason}</ItemDescription>
 				)}

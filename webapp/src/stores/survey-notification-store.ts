@@ -26,6 +26,7 @@ export const useSurveyNotificationStore = create<SurveyNotificationState>()(
 			shouldShowSurvey: false,
 			dismissedAt: null,
 
+			// oxlint-disable-next-line no-restricted-properties -- Stamps the dismissal into localStorage, where it has to survive the page; the rehydration check below reads it back against the same clock across sessions.
 			setPendingSurvey: (survey) => set({ pendingSurvey: survey, dismissedAt: Date.now() }),
 
 			clearPendingSurvey: () =>
@@ -48,6 +49,7 @@ export const useSurveyNotificationStore = create<SurveyNotificationState>()(
 				if (
 					state?.pendingSurvey &&
 					state.dismissedAt &&
+					// oxlint-disable-next-line no-restricted-properties -- Ages a stamp written in an earlier session against this one, before any component has mounted to hold a clock.
 					Date.now() - state.dismissedAt > EXPIRY_MS
 				) {
 					state.clearPendingSurvey();

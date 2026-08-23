@@ -18,9 +18,26 @@ This file is the gotchas. Conventions that a look at the tree already tells you 
 
 ## Ask first
 
-A new UI library dependency · editing a shadcn primitive in `src/components/ui/` · a new Zustand
-store · a global style. Each of these is cheap to add and expensive to reverse, and none of them has
-a gate.
+A new UI library dependency · a new Zustand store · a global style · a change under
+`src/components/ui/` (below). Each of these is cheap to add and expensive to reverse, and none of them
+has a gate.
+
+## `src/components/ui/` is a registry install, not a directory you own
+
+`components.json` pins the shadcn style `base-nova` over Base UI, and re-running the registry
+**overwrites** the file it manages. So these files are editable — but an edit is a fork you re-apply
+every time the primitive is re-vendored, not a change that stays made. That makes the rule about
+provenance rather than permission: check a change against upstream first, and never make one in
+passing while you are there for something else.
+
+A deliberate divergence is recorded in the file it lives in, so the next re-vendor restores it instead
+of silently reverting a fix. `alert-dialog.tsx` and `dialog.tsx` head theirs with
+`⚠️ Diverges from the shadcn registry` and enumerate what re-vendoring drops; smaller ones are noted
+where they sit, like `accordion.tsx`'s header sizing or `select.tsx` requiring `items` where Base UI
+leaves it optional.
+
+The payoff is that an upstream defect gets fixed here once, with the note attached, instead of being
+worked around at every call site.
 
 ## File naming
 
@@ -45,8 +62,9 @@ excluded from linting entirely.
 
 ## Linting
 
-**oxlint lints, Biome formats.** `.oxlintrc.json` is the whole rule set, and every rule it turns off
-carries the reason beside it — read that before switching one back on.
+**oxlint lints, Biome formats.** `.oxlintrc.json` is the whole rule set, every rule it turns off
+carries the reason beside it, and every restriction states itself at the call site when it fires. None
+of that is repeated here. What follows is what the config cannot tell you.
 
 - **Run oxlint from the repo root, never from `webapp/`.** `options` — including `typeAware` — is
   declared once in the repo-root `.oxlintrc.json` and reaches this tree only when that file is the
@@ -72,22 +90,18 @@ carries the reason beside it — read that before switching one back on.
   `rules` is silent. Keep every one of them named — in `rules`, or in the `overrides` entry that
   scopes it to the files it is about.
 - **House rules live in `tools/oxlint/`**, in TypeScript, so `pnpm run typecheck` covers them, with a
-  `RuleTester` suite beside each (`oxlint/plugins-dev`). They are loaded by the Node process that
+  `RuleTester` suite beside each (`oxlint/plugins-dev`). `index.ts` is the register — read it rather
+  than a list, which goes stale the moment a rule is added. They are loaded by the Node process that
   `node_modules/.bin/oxlint` execs; run oxlint through the workspace binary, not a globally
   installed one.
 - **Re-derive an off rule's findings with `pnpm exec oxlint -D <rule>`** before trusting or changing
   the reason written beside it.
-- **`autoFocus` is a lint error** — `jsx-a11y/no-autofocus` runs with `ignoreNonDOM: false`, so it
-  sees the attribute on a component (`<Input autoFocus/>`) as well as on a DOM element. The one shape
-  that earns it is the first field of an overlay the user just opened; suppress that case inline with
-  the reason.
-- **`process.env` is a lint error under `src/**`** — Vite substitutes `import.meta.env`, never
-  `process.env`, and an unsubstituted read is not a build failure: it is `undefined` in the browser,
-  so the symptom appears wherever the value was needed. `import.meta.env` carries the build mode
-  (`DEV`); runtime configuration comes from `window.__ENV__` through `@/environment`. The Node
-  contexts in the package — `e2e/**`, `vite.config.ts`, `playwright.config.ts` — are outside the rule.
-- **These have no linter behind them and are on review**: an inline `<svg>` needs a `<title>`, an
-  `aria-label` or `aria-hidden`; non-ASCII filenames.
+- **The one exception `jsx-a11y/no-autofocus` earns** is the first field of an overlay the user just
+  opened. Suppress that case inline with the reason; everything else is the bug the rule describes.
+- **`react/forbid-dom-props` sees a DOM element and not a component.** `data-testid` on a `<div>` fails
+  the build; the same attribute handed to `<Button>` or `<Textarea>` and spread onto the DOM from
+  inside does not, so the ban has a hole the size of the component layer. Do not read that hole as
+  permission.
 
 ## Which admin console a component belongs to
 
@@ -155,11 +169,12 @@ const documentQuery = useQuery(getDocumentOptions({ path: { id } }));
 queryClient.setQueryData(getDocumentQueryKey({ path: { id } }), updated);
 ```
 
-Do not: call `fetch` · duplicate loading/error state in local state · hand-roll fetch mocks in tests.
+Do not: duplicate loading/error state in local state · hand-roll fetch mocks in tests.
 
-`no-restricted-globals` fails the build on `fetch` and `XMLHttpRequest` anywhere under `src/**`. The
-few requests that are not server data — the static legal markdown, the sign-out POST that ends in a
-full page load, the dev-server layout endpoint — are suppressed at the call site with that reason.
+`fetch` and `XMLHttpRequest` fail the build under `src/**`, because a bare request skips the CSRF
+header, the cache and the shared error handling at once. The few calls that are not server data — the
+static legal markdown, the sign-out POST that ends in a full page load, the dev-server layout endpoint
+— are suppressed at the call site with that reason.
 
 | State | Where |
 |---|---|
@@ -170,10 +185,44 @@ full page load, the dev-server layout endpoint — are suppressed at the call si
 
 ## React Compiler
 
-`vite.shared.ts` turns it on for every build of app source, so **do not add** `useMemo`,
-`useCallback` or `React.memo` to new code. Existing usages stay — removing them changes compiler
-output for no gain. Reach for manual memoization only when you need precise control over an effect's
-dependencies.
+`vite.shared.ts` turns it on for every build of app source, so `useMemo`, `useCallback` and `memo` are
+not imports you may take from `react`, and `no-restricted-imports` says so at the import line.
+`forwardRef` is banned from the same list and has no survivors anywhere in `src`: React 19 passes
+`ref` as an ordinary prop.
+
+**The handful of `useMemo` sites that remain are load-bearing, and deleting one breaks something that
+still type-checks.** Each states its reason on the suppression above the import, and there are only
+two kinds:
+
+- **The value is a dependency of an effect**, so its identity is what decides whether the effect
+  re-runs. `leaderboard/TimeframeFilter.tsx` rebuilds `schedule` from three scalars for exactly this;
+  drop the memo and the emitting effect fires every render.
+- **The component is opted out of the compiler entirely** by a library it uses, so nothing memoises for
+  it. `useReactTable` does that — `react/incompatible-library` names the same fact — and TanStack Table
+  rebuilds its column model, and every row model downstream, whenever `columns` changes identity.
+  `admin/UsersTable.tsx` and `admin/AdminAchievementsTable.tsx` are the two.
+
+## The time of day
+
+**Reading a clock during render fails the build**, because a render that reads a moving value never
+answers the same way twice: two components mounted in one commit disagree, and a story or a snapshot
+never repeats. There are two sanctioned readings, and no third:
+
+- **Component code takes the time from `useNow`** (`@/components/common/use-now`) — a ticking
+  `useSyncExternalStore` clock shared by every subscriber on the page, so a phrase derived from it ages
+  on its own instead of freezing at mount. It returns milliseconds rather than a tick count on purpose:
+  the compiler would otherwise memoise a phrase derived from it and strand it on screen.
+- **A story takes it from `STORY_NOW` and the relative helpers beside it**
+  (`@/components/common/story-clock`), read once per module load. A hard-coded literal is not the
+  alternative — it drifts into "8 months ago" as the calendar moves and puts every "expires in …"
+  branch permanently in the past.
+
+`hephaestus/no-nondeterministic-render` reports a reading at module scope or inside a component or
+hook, and deliberately says nothing about one in an event handler, an effect or a `useState`
+initializer: the AST can find the nearest enclosing function but not who calls it, and reporting those
+would be wrong about most of the readings here. `Date.now` is separately unavailable anywhere under
+`src/**`, so the two rules disagree about a handler on purpose — `new Date()` there is fine and
+`Date.now()` is not.
 
 ## Name a component for the concept, not for the wire
 
@@ -241,7 +290,8 @@ and `border-border` carry most of the tree. Read that block rather than guessing
 
 ## Testing
 
-`getByRole` > `getByLabelText` > `getByText` > `getByTestId`.
+`getByRole` > `getByLabelText` > `getByText`, and the ladder ends there: a `data-testid` skips past the
+accessible name a screen reader needs anyway.
 
 ### No jest-dom matchers in a Vitest test
 
@@ -268,6 +318,12 @@ because `@hey-api/openapi-ts` calls the TypeScript compiler API at runtime and 7
 peer range accepts 7, so nothing warns you before the generator dies. A scoped `parent>typescript`
 pnpm override does **not** help: peers resolve from this package, not the override. Collapse both
 onto 7 when `openapi-ts` stops needing the old compiler API.
+
+**A dot-directory is invisible to a `**/*` include.** `tsconfig.json`'s `**/*.ts` does not match
+`.storybook/`, so a file there is type-checked only if something names the directory explicitly —
+which `.storybook/**/*.tsx` does, and nothing does for `.ts`. So `preview.tsx` is checked while
+`main.ts`, `manager.ts` and `vitest.setup.ts` are not. Confirm with
+`tsc -p webapp/tsconfig.json --listFiles` before assuming a config file is covered.
 
 ## Generated files (do not edit)
 

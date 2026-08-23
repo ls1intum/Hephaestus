@@ -1,6 +1,6 @@
 import { Link, useLocation } from "@tanstack/react-router";
-import { useMemo } from "react";
 import type { ChatThreadSummary } from "@/api/types.gen";
+import { useNow } from "@/components/common/use-now";
 import {
 	SidebarGroup,
 	SidebarGroupContent,
@@ -30,8 +30,11 @@ type BucketName = "Today" | "Yesterday" | "Last 7 days" | "Last 30 days" | "Olde
  * within each bucket).
  *
  * The Pi mentor returns a flat list, so we bucket locally for the same UX.
+ *
+ * `now` is an argument because every bucket is relative to it: the caller supplies one instant for
+ * the whole list, which keeps the buckets consistent with each other and the grouping reproducible.
  */
-function bucketThreads(threads: ChatThreadSummary[]): ThreadGroupData[] {
+function bucketThreads(threads: ChatThreadSummary[], now: number): ThreadGroupData[] {
 	const buckets: Record<BucketName, ChatThreadSummary[]> = {
 		Today: [],
 		Yesterday: [],
@@ -40,7 +43,6 @@ function bucketThreads(threads: ChatThreadSummary[]): ThreadGroupData[] {
 		Older: [],
 	};
 
-	const now = Date.now();
 	const day = 24 * 60 * 60 * 1000;
 
 	for (const thread of threads) {
@@ -70,7 +72,8 @@ export function NavMentorThreads({
 	error,
 	workspaceSlug,
 }: NavMentorThreadsProps) {
-	const threadGroups = useMemo(() => bucketThreads(threads), [threads]);
+	const now = useNow();
+	const threadGroups = bucketThreads(threads, now);
 
 	if (isLoading) {
 		return (

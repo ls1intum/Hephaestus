@@ -417,6 +417,13 @@
 				]
 			}
 		],
+		"no-console": "error",
+		// A circular import leaves one side reading `undefined` at module-init time, and which side
+		// depends on entry order. None exist; the rule keeps it that way.
+		"import/no-cycle": "error",
+		// `AGENTS.md` § Testing states the query priority. A `data-testid` skips straight past it, and
+		// the accessible name it stands in for is the thing a screen reader needs anyway.
+		"react/forbid-dom-props": ["error", { "forbid": ["data-testid"] }],
 		// `cn()` (`src/lib/utils.ts`) is the repo's one wrapper over both — `AGENTS.md` § Styling. Calling
 		// `clsx` directly skips the `tailwind-merge` pass, so a later `p-2` loses to an earlier `p-4`
 		// instead of replacing it; calling `twMerge` directly drops conditional-class support.
@@ -428,6 +435,7 @@
 			"error",
 			{
 				"paths": [
+					{ "name": "react", "importNames": ["useMemo", "useCallback", "memo", "forwardRef"], "allowTypeImports": true, "message": "React Compiler memoises at build time; `ref` is a plain prop in React 19." },
 					{ "name": "clsx", "message": "Compose classes with `cn()` from `@/lib/utils`." },
 					{ "name": "tailwind-merge", "message": "Compose classes with `cn()` from `@/lib/utils`." }
 				]
@@ -448,7 +456,15 @@
 		// A hand-written key stops matching the generated one silently: no failure, just an
 		// invalidation that no longer invalidates.
 		"hephaestus/no-manual-query-key": "error",
-		"hephaestus/no-redundant-in-the-document": "error"
+		// Biome's `useFilenamingConvention` asked this through `requireAscii`; `unicorn/filename-case`
+		// checks a name's shape and not its alphabet, so nothing else in the migration covers it.
+		"hephaestus/no-non-ascii-filename": "error",
+		// `new Date()` is invisible to every shipped rule: oxlint has no `no-restricted-syntax`
+		// (oxc#7342, `not_planned`) and `no-restricted-properties` cannot see a constructor call.
+		"hephaestus/no-nondeterministic-render": "error",
+		"hephaestus/no-redundant-in-the-document": "error",
+		// No jsx-a11y rule asks this, and an unnamed icon is invisible to a screen reader.
+		"hephaestus/svg-needs-accessible-name": "error"
 		// The other four read a Storybook story object and are scoped to story files in `overrides`.
 	},
 
@@ -471,6 +487,7 @@
 					"error",
 					{
 						"paths": [
+							{ "name": "react", "importNames": ["useMemo", "useCallback", "memo", "forwardRef"], "allowTypeImports": true, "message": "React Compiler memoises at build time; `ref` is a plain prop in React 19." },
 							{ "name": "clsx", "message": "Compose classes with `cn()` from `@/lib/utils`." },
 							{ "name": "tailwind-merge", "message": "Compose classes with `cn()` from `@/lib/utils`." }
 						],
@@ -496,6 +513,9 @@
 				"no-restricted-imports": [
 					"error",
 					{
+						"paths": [
+							{ "name": "react", "importNames": ["useMemo", "useCallback", "memo", "forwardRef"], "allowTypeImports": true, "message": "React Compiler memoises at build time; `ref` is a plain prop in React 19." }
+						],
 						"patterns": [
 							{
 								"group": ["@/components/**"],
@@ -517,6 +537,7 @@
 					"error",
 					{
 						"paths": [
+							{ "name": "react", "importNames": ["useMemo", "useCallback", "memo", "forwardRef"], "allowTypeImports": true, "message": "React Compiler memoises at build time; `ref` is a plain prop in React 19." },
 							{ "name": "clsx", "message": "Compose classes with `cn()` from `@/lib/utils`." },
 							{ "name": "tailwind-merge", "message": "Compose classes with `cn()` from `@/lib/utils`." }
 						],
@@ -544,6 +565,7 @@
 					"error",
 					{
 						"paths": [
+							{ "name": "react", "importNames": ["useMemo", "useCallback", "memo", "forwardRef"], "allowTypeImports": true, "message": "React Compiler memoises at build time; `ref` is a plain prop in React 19." },
 							{ "name": "clsx", "message": "Compose classes with `cn()` from `@/lib/utils`." },
 							{ "name": "tailwind-merge", "message": "Compose classes with `cn()` from `@/lib/utils`." }
 						],
@@ -588,6 +610,11 @@
 						"object": "process",
 						"property": "env",
 						"message": "Not substituted in the browser bundle. Build mode is `import.meta.env`; runtime configuration is `@/environment`."
+					},
+					{
+						"object": "Date",
+						"property": "now",
+						"message": "Component code takes the time from `use-now`, a story from `story-clock`; scheduling and persistence read it directly and say so in a suppression."
 					}
 				]
 			}

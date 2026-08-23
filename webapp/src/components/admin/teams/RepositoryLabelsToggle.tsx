@@ -1,4 +1,3 @@
-import { useMemo } from "react";
 import type { LabelInfo, RepositoryInfo, TeamInfo } from "@/api/types.gen";
 import { LabelBadge } from "@/components/shared/LabelBadge";
 import { Toggle } from "@/components/ui/toggle";
@@ -18,19 +17,14 @@ export function RepositoryLabelsToggle({
 	onAddLabel,
 	onRemoveLabel,
 }: RepositoryLabelsToggleProps) {
-	const activeByName = useMemo(() => {
-		const map = new Map<string, LabelInfo>();
-		for (const l of team.labels) {
-			if (l.repository?.id !== repository.id) continue;
-			const key = l.name.toLowerCase();
-			if (key && !map.has(key)) map.set(key, l);
-		}
-		return map;
-	}, [team.labels, repository.id]);
+	const activeByName = new Map<string, LabelInfo>();
+	for (const l of team.labels) {
+		if (l.repository?.id !== repository.id) continue;
+		const key = l.name.toLowerCase();
+		if (key && !activeByName.has(key)) activeByName.set(key, l);
+	}
 
-	const shown = useMemo(() => {
-		return [...catalogLabels].sort((a, b) => a.name.localeCompare(b.name));
-	}, [catalogLabels]);
+	const shown = [...catalogLabels].sort((a, b) => a.name.localeCompare(b.name));
 
 	const handleToggle = async (label: LabelInfo) => {
 		const key = label.name.toLowerCase();

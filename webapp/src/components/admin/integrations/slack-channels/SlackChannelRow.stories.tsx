@@ -1,11 +1,10 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { expect, fn, screen, userEvent } from "storybook/test";
 import type { SlackMonitoredChannel } from "@/api/types.gen";
+import { daysBefore } from "@/components/common/story-clock";
 import { Table, TableBody, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { expectSettledVisible } from "@/test/overlay";
 import { SlackChannelRow } from "./SlackChannelRow";
-
-const iso = (days: number) => new Date(Date.now() - days * 24 * 60 * 60 * 1000);
 
 const channel: SlackMonitoredChannel = {
 	id: 1,
@@ -14,8 +13,8 @@ const channel: SlackMonitoredChannel = {
 	channelName: "team-standup",
 	consentState: "ACTIVE",
 	optedOutMemberCount: 0,
-	consentAnnouncedAt: iso(2),
-	createdAt: iso(5),
+	consentAnnouncedAt: daysBefore(2),
+	createdAt: daysBefore(5),
 };
 
 /**

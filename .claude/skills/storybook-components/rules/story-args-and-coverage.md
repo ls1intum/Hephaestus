@@ -18,7 +18,7 @@ the only form the tree uses for it — set it on the meta to cover a whole file,
 that needs it. Pair it with `chromatic: { viewports: [320] }` when the snapshot is the point.
 
 **Not a gap:** `components/ui/**` primitives with no story. They are vendored shadcn and
-`webapp/AGENTS.md` forbids editing them; a story per primitive documents upstream's API as if it were
+They are a registry install that re-vendoring overwrites; a story per primitive documents upstream's API as if it were
 ours. Do not open that as work.
 
 ## The Controls must drive the real component

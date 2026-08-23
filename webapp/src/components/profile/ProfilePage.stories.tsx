@@ -1,11 +1,12 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { endOfISOWeek, formatISO, startOfISOWeek } from "date-fns";
 import { fn } from "storybook/test";
+import { STORY_NOW } from "@/components/common/story-clock";
 import { withStandardPage } from "@/stories/decorators";
 import { expectNoPageOverflow } from "@/test/reflow";
 import { ProfilePage } from "./ProfilePage";
 
-const now = new Date();
+const now = new Date(STORY_NOW);
 const defaultAfter = formatISO(startOfISOWeek(now));
 const defaultBefore = formatISO(endOfISOWeek(now));
 

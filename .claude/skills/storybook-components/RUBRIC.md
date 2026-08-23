@@ -61,9 +61,9 @@ route's `canAdminister`, drilled through `practice-trace/TracePage.tsx` →
 - **C** — Props spread, but on an interior node with no comment saying why.
 - **B** — `ref` forwarded, **every** received prop spread on the real DOM node, exactly one root element,
   same element type the primitive expected.
-- **A** — B, and the file says which Base UI version's `render=` shape it targets. The pin in
-  `webapp/package.json` trails what base-ui.com documents, so a `render={(props, state) => …}` copied
-  from the site may not exist here. Read the pin before copying.
+- **A** — B, and the file says which Base UI version's `render=` shape it targets. base-ui.com
+  documents the latest release, not the pin, so a `render={(props, state) => …}` copied from the site
+  may not exist at the installed version. Read the pin before copying.
 - **A+** — A story proves the obligation: it queries the slotted element by **accessible name and role**
   after the slot, which fails if `aria-*` was dropped.
 
@@ -116,7 +116,8 @@ patch only the props the wrapper holds state for.
 in. A file far above the median is a maintenance question, not an achievement.
 
 **Anti-criterion — coverage percentage.** "39 of 41 `components/ui/*` primitives have no story" is not a
-gap. They are vendored shadcn and editing them is forbidden. Do not open that as work.
+gap. They are a shadcn registry install that re-vendoring overwrites, so a story per primitive
+documents upstream's API as if it were ours. Do not open that as work.
 
 ## Dimension 6 — Can the play function fail?
 
@@ -217,7 +218,7 @@ of the tree already ignored.
 | A play function on every story | Render tests are the sanctioned shape for static components. |
 | Green a11y addon | ≤57% of WCAG issues. |
 | `disableSnapshot: true` on interaction stories | Correct where it is paired with a `play`, which is nearly everywhere it appears. Not a finding either way. |
-| Story coverage % including `components/ui/**` | Vendored shadcn; editing them is forbidden. |
+| Story coverage % including `components/ui/**` | A registry install; re-vendoring invalidates the story. |
 | No `asChild` anywhere | This is Base UI. Absence is the baseline. |
 | `argTypes` on every story file | Useless for a single domain-object prop. It is a correction layer, not coverage. |
 | Long meta JSDoc | Published prose. Length is cost, not evidence. |

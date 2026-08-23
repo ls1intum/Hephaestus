@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from "@storybook/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { expect, fn } from "storybook/test";
 import type { OutlineCollection } from "@/api/types.gen";
+import { daysBefore, minutesBefore } from "@/components/common/story-clock";
 import { OutlineCollectionsSection } from "./OutlineCollectionsSection";
 
 /**
@@ -37,8 +38,6 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-const ago = (minutes: number) => new Date(Date.now() - minutes * 60 * 1000);
-
 const engineering: OutlineCollection = {
 	id: 1,
 	collectionId: "col-engineering",
@@ -48,8 +47,8 @@ const engineering: OutlineCollection = {
 	state: "ENABLED",
 	syncStatus: "COMPLETE",
 	documentCount: 87,
-	lastSyncedAt: ago(12),
-	createdAt: ago(60 * 24 * 30),
+	lastSyncedAt: minutesBefore(12),
+	createdAt: daysBefore(30),
 };
 
 const decisions: OutlineCollection = {
@@ -61,7 +60,7 @@ const decisions: OutlineCollection = {
 	state: "ENABLED",
 	syncStatus: "PENDING",
 	documentCount: 14,
-	createdAt: ago(5),
+	createdAt: minutesBefore(5),
 };
 
 /** First run — no collections yet; the empty state offers an Add affordance. */

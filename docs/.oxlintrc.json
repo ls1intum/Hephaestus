@@ -1,5 +1,8 @@
 {
 	"$schema": "../node_modules/oxlint/configuration_schema.json",
+	// Only the file-naming rule is enabled from the SPA's house plugin; the rest are about React.
+	"jsPlugins": ["../webapp/tools/oxlint/index.ts"],
+
 	"plugins": [
 		"typescript",
 		"unicorn",
@@ -171,6 +174,8 @@
 		"prefer-arrow-callback": "error",
 		// `@site/` reaches anything in the docs tree; a `../` only reaches what is above this file.
 		"import/no-relative-parent-imports": "error",
+		"hephaestus/no-non-ascii-filename": "error",
+		"import/no-cycle": "error",
 		"import/no-duplicates": "error",
 		"no-duplicate-imports": "error",
 		"import/no-mutable-exports": "error",

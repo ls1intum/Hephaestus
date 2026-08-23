@@ -1,5 +1,5 @@
 import { Users } from "lucide-react";
-import { useLayoutEffect, useMemo } from "react";
+import { useLayoutEffect } from "react";
 import type { TeamInfo } from "@/api/types.gen";
 import { PageHeader } from "@/components/core/PageHeader";
 import { PageLayout } from "@/components/core/PageLayout";
@@ -12,86 +12,92 @@ export interface TeamsPageProps {
 	isLoading: boolean;
 }
 
+/**
+ * The forest as a reader sees it. A hidden team is spliced out rather than taking its subtree with
+ * it: its children re-parent onto the nearest visible ancestor, and only a team with no visible
+ * ancestor at all becomes a root. `guard` makes a cycle in `parentId` read as "no parent" instead of
+ * hanging the render on server data nothing in the client validates.
+ */
+function buildVisibleTree(visibleTeams: TeamInfo[], allTeamsById: Map<number, TeamInfo>) {
+	const getVisibleAncestorParentId = (team: TeamInfo): number | undefined => {
+		let pid = team.parentId;
+		const guard = new Set<number>();
+		while (pid !== undefined) {
+			if (guard.has(pid)) return undefined;
+			guard.add(pid);
+			const parent = allTeamsById.get(pid);
+			if (!parent) return undefined;
+			if (!parent.hidden) return parent.id;
+			pid = parent.parentId;
+		}
+		return undefined;
+	};
+
+	const childrenMap = new Map<number, TeamInfo[]>();
+	for (const team of visibleTeams) {
+		const effectiveParentId = getVisibleAncestorParentId(team);
+		if (effectiveParentId !== undefined) {
+			const siblings = childrenMap.get(effectiveParentId) ?? [];
+			siblings.push(team);
+			childrenMap.set(effectiveParentId, siblings);
+		}
+	}
+	for (const siblings of childrenMap.values()) {
+		siblings.sort((a, b) => a.name.localeCompare(b.name));
+	}
+
+	const roots = visibleTeams
+		.filter((t) => getVisibleAncestorParentId(t) === undefined)
+		.sort((a, b) => a.name.localeCompare(b.name));
+
+	return { roots, childrenMap };
+}
+
+/**
+ * Per team, every member that already appears somewhere below it. A team card subtracts this set so
+ * a person is listed once — at the deepest team they belong to — rather than repeated up the chain.
+ */
+function collectDescendantMemberIds(
+	visibleTeams: TeamInfo[],
+	childrenMap: Map<number, TeamInfo[]>,
+	membersByTeamId: Map<number, Set<number>>,
+): Map<number, Set<number>> {
+	const memo = new Map<number, Set<number>>();
+
+	const collect = (teamId: number): Set<number> => {
+		const cached = memo.get(teamId);
+		if (cached !== undefined) return cached;
+		const children = childrenMap.get(teamId) ?? [];
+		const res = new Set<number>();
+		for (const child of children) {
+			for (const id of membersByTeamId.get(child.id) ?? []) res.add(id);
+			for (const id of collect(child.id)) res.add(id);
+		}
+		memo.set(teamId, res);
+		return res;
+	};
+
+	for (const team of visibleTeams) collect(team.id);
+	return memo;
+}
+
 export function TeamsPage({ teams, isLoading }: TeamsPageProps) {
-	const visibleTeams = useMemo(() => {
-		return [...teams].filter((t) => !t.hidden);
-	}, [teams]);
+	const visibleTeams = teams.filter((t) => !t.hidden);
 
 	const sortMembers = (team: TeamInfo) => {
 		return [...team.members].sort((a, b) => a.name.localeCompare(b.name));
 	};
 
-	const allTeamsById = useMemo(() => {
-		const map = new Map<number, TeamInfo>();
-		for (const t of teams) map.set(t.id, t);
-		return map;
-	}, [teams]);
-
-	const { roots, childrenMap } = useMemo(() => {
-		const getVisibleAncestorParentId = (team: TeamInfo): number | undefined => {
-			let pid = team.parentId;
-			const guard = new Set<number>();
-			while (pid !== undefined) {
-				if (guard.has(pid)) return undefined;
-				guard.add(pid);
-				const parent = allTeamsById.get(pid);
-				if (!parent) return undefined;
-				if (!parent.hidden) return parent.id;
-				pid = parent.parentId;
-			}
-			return undefined;
-		};
-
-		const map = new Map<number, TeamInfo[]>();
-		visibleTeams.forEach((t) => {
-			const effectiveParentId = getVisibleAncestorParentId(t);
-			if (effectiveParentId !== undefined) {
-				const arr = map.get(effectiveParentId) ?? [];
-				arr.push(t);
-				map.set(effectiveParentId, arr);
-			}
-		});
-
-		for (const [k, arr] of map.entries()) {
-			arr.sort((a, b) => a.name.localeCompare(b.name));
-			map.set(k, arr);
-		}
-
-		const rootTeams = visibleTeams
-			.filter((t) => getVisibleAncestorParentId(t) === undefined)
-			.sort((a, b) => a.name.localeCompare(b.name));
-
-		return { roots: rootTeams, childrenMap: map };
-	}, [visibleTeams, allTeamsById]);
-
-	const membersByTeamId = useMemo(() => {
-		const m = new Map<number, Set<number>>();
-		visibleTeams.forEach((t) => {
-			const ids = new Set<number>(t.members.map((mm) => mm.id));
-			m.set(t.id, ids);
-		});
-		return m;
-	}, [visibleTeams]);
-
-	const descendantMemberIdsMap = useMemo(() => {
-		const memo = new Map<number, Set<number>>();
-
-		const collect = (teamId: number): Set<number> => {
-			const cached = memo.get(teamId);
-			if (cached !== undefined) return cached;
-			const children = childrenMap.get(teamId) ?? [];
-			const res = new Set<number>();
-			for (const child of children) {
-				(membersByTeamId.get(child.id) ?? new Set<number>()).forEach((id) => res.add(id));
-				collect(child.id).forEach((id) => res.add(id));
-			}
-			memo.set(teamId, res);
-			return res;
-		};
-
-		visibleTeams.forEach((t) => collect(t.id));
-		return memo;
-	}, [childrenMap, membersByTeamId, visibleTeams]);
+	const allTeamsById = new Map(teams.map((t) => [t.id, t]));
+	const { roots, childrenMap } = buildVisibleTree(visibleTeams, allTeamsById);
+	const membersByTeamId = new Map(
+		visibleTeams.map((t) => [t.id, new Set(t.members.map((member) => member.id))]),
+	);
+	const descendantMemberIdsMap = collectDescendantMemberIds(
+		visibleTeams,
+		childrenMap,
+		membersByTeamId,
+	);
 
 	const getFilteredContributors = (team: TeamInfo): Contributor[] => {
 		const exclude = descendantMemberIdsMap.get(team.id) ?? new Set<number>();

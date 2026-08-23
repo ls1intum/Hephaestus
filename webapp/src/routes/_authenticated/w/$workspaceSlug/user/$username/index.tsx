@@ -7,6 +7,7 @@ import {
 	getWorkspaceOptions,
 } from "@/api/@tanstack/react-query.gen";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
+import { useNow } from "@/components/common/use-now";
 import { ProfilePage } from "@/components/profile/ProfilePage";
 import { useWorkspaceFeatures } from "@/hooks/use-workspace-features";
 import { useAuth } from "@/integrations/auth/AuthContext";
@@ -75,12 +76,13 @@ function UserProfile() {
 	});
 
 	const schedule = resolveLeaderboardSchedule(workspaceQuery.data);
+	const nowMs = useNow();
 
 	const getEffectiveDates = () => {
 		if (after) {
 			return { after, before };
 		}
-		const range = getDateRangeForPreset("this-week", schedule);
+		const range = getDateRangeForPreset(new Date(nowMs), "this-week", schedule);
 		return formatDateRangeForApi(range);
 	};
 	const effectiveDates = getEffectiveDates();

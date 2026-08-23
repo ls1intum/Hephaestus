@@ -11,6 +11,7 @@ import {
 	zeusThunderbolt,
 } from "@/components/achievements/story-mock-data";
 import type { UIAchievement } from "@/components/achievements/types";
+import { STORY_NOW } from "@/components/common/story-clock";
 
 /**
  * AchievementNode component for displaying achievements in the skill tree visualization.
@@ -100,7 +101,7 @@ export const Unlocked: Story = {
 								achievement: {
 									...rarityMocks[rarity],
 									status: "unlocked",
-									unlockedAt: new Date(Date.now()),
+									unlockedAt: new Date(STORY_NOW),
 									progressData: unlockedProgressData,
 								},
 								showTooltips: true,

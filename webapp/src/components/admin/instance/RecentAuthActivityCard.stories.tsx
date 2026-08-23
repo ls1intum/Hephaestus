@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { expect, fn } from "storybook/test";
 import type { AuthEventView } from "@/api/types.gen";
+import { hoursBefore, minutesBefore } from "@/components/common/story-clock";
 import { RecentAuthActivityCard } from "./RecentAuthActivityCard";
 
 const events: AuthEventView[] = [
@@ -8,7 +9,7 @@ const events: AuthEventView[] = [
 		id: 1,
 		eventType: "LOGIN",
 		result: "SUCCESS",
-		occurredAt: new Date(Date.now() - 5 * 60_000),
+		occurredAt: minutesBefore(5),
 		account: { id: 7, displayName: "Ada Lovelace" },
 		accountId: 7,
 	},
@@ -17,14 +18,14 @@ const events: AuthEventView[] = [
 		eventType: "LOGIN_FAILED",
 		result: "FAILURE",
 		failureReason: "invalid_grant",
-		occurredAt: new Date(Date.now() - 20 * 60_000),
+		occurredAt: minutesBefore(20),
 		accountId: 12,
 	},
 	{
 		id: 3,
 		eventType: "IMPERSONATION_BEGIN",
 		result: "SUCCESS",
-		occurredAt: new Date(Date.now() - 3 * 3_600_000),
+		occurredAt: hoursBefore(3),
 		account: { id: 7, displayName: "Ada Lovelace" },
 		accountId: 7,
 		actor: { id: 1, displayName: "Instance Admin" },
@@ -34,7 +35,7 @@ const events: AuthEventView[] = [
 		id: 4,
 		eventType: "APP_ROLE_CHANGED",
 		result: "SUCCESS",
-		occurredAt: new Date(Date.now() - 26 * 3_600_000),
+		occurredAt: hoursBefore(26),
 		account: { id: 12, displayName: "Grace Hopper" },
 		accountId: 12,
 	},

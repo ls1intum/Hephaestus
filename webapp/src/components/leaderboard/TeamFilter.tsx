@@ -1,4 +1,3 @@
-import { useMemo } from "react";
 import { DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { Label } from "@/components/ui/label";
 import {
@@ -21,7 +20,7 @@ export interface TeamFilterProps {
 }
 
 export function TeamFilter({ options, onTeamChange, selectedTeam = "all" }: TeamFilterProps) {
-	const items = useMemo(() => [{ value: "all", label: "All Teams" }, ...options], [options]);
+	const items = [{ value: "all", label: "All Teams" }, ...options];
 
 	return (
 		<div className="space-y-1.5">

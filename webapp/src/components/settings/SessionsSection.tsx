@@ -91,8 +91,7 @@ export function SessionsSection() {
 			void invalidateSessions();
 			toast.success("Session revoked");
 		},
-		onError: (error) => {
-			console.error("Failed to revoke session:", error);
+		onError: () => {
 			toast.error("Failed to revoke session. Please try again later.");
 		},
 	});
@@ -103,8 +102,7 @@ export function SessionsSection() {
 			void invalidateSessions();
 			toast.success("Signed out of all other sessions");
 		},
-		onError: (error) => {
-			console.error("Failed to revoke other sessions:", error);
+		onError: () => {
 			toast.error("Failed to sign out other sessions. Please try again later.");
 		},
 	});

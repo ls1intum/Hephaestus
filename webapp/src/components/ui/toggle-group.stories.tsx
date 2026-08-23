@@ -4,19 +4,15 @@ import { expect } from "storybook/test";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
 /**
- * A regression suite for one upstream defect, not a design-system entry for the primitive.
+ * A regression suite for one ARIA invariant, not a design-system entry for the primitive.
  *
- * Base UI's `ToggleGroup` renders `role="group"` and then delegates to `CompositeRoot`, whose
- * `useCompositeRoot` always contributes `aria-orientation` — the only value that suppresses it,
- * `'both'`, is unreachable from the public API. ARIA 1.2 lists `aria-orientation` as used in
- * `scrollbar`, `select`, `separator`, `slider`, `tablist` and `toolbar`; `group` is not one of them,
- * so every group the kit rendered failed axe's `aria-allowed-attr` — and Radix shipped the same bug
- * (radix-ui/primitives#964).
+ * ARIA 1.2 lists `aria-orientation` as used in `scrollbar`, `select`, `separator`, `slider`,
+ * `tablist` and `toolbar`. `group` is not one of them, so a `role="group"` carrying it fails axe's
+ * `aria-allowed-attr`. Both Base UI and Radix have shipped that combination before
+ * (radix-ui/primitives#964), and the composite behaviour these groups rely on is the same code that
+ * once emitted it — so the absence is asserted here rather than assumed to stay true.
  *
- * The wrapper passes `aria-orientation={undefined}`. These stories exist to prove that this is
- * actually enough: Base UI's `mergeProps` assigns every own key of the later object, `undefined`
- * included, rather than skipping it, and React omits an attribute whose value is `undefined`. That
- * is an implementation detail of a dependency, so it is asserted rather than assumed.
+ * The visual axis stays readable from `data-orientation`, which is what the styles key off.
  *
  * @see https://www.w3.org/TR/wai-aria-1.2/#group
  */

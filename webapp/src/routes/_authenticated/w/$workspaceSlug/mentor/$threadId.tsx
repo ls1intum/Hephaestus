@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { toast } from "sonner";
 import { Chat } from "@/components/mentor/Chat";
 import { defaultPartRenderers } from "@/components/mentor/renderers";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -11,12 +12,9 @@ export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/mentor/$t
 function ThreadContainer() {
 	const { threadId } = Route.useParams();
 
-	const mentorChat = useMentorChat({
-		threadId,
-		onError: (error: Error) => {
-			console.error("Chat error:", error);
-		},
-	});
+	// No `onError`: `Chat` reads the failure off `status` and renders it in the transcript, where the
+	// user is already looking, rather than as a notice away from the conversation that failed.
+	const mentorChat = useMentorChat({ threadId });
 
 	const handleMessageSubmit = ({ text }: { text: string }) => {
 		if (!text.trim()) return;
@@ -28,8 +26,8 @@ function ThreadContainer() {
 	};
 
 	const handleCopy = (content: string) => {
-		navigator.clipboard.writeText(content).catch((error: unknown) => {
-			console.error("Failed to copy to clipboard:", error);
+		navigator.clipboard.writeText(content).catch(() => {
+			toast.error("Couldn't copy that to the clipboard.");
 		});
 	};
 

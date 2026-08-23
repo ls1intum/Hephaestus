@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { ArrowLeftIcon, type LucideIcon, OctagonXIcon } from "lucide-react";
 import { getProvidersOptions } from "@/api/@tanstack/react-query.gen";
-import { GithubIcon, GitlabIcon } from "@/components/icons/brand";
+import { type BrandIcon, GithubIcon, GitlabIcon } from "@/components/icons/brand";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
@@ -16,7 +16,12 @@ interface Provider {
 	id: string;
 	name: string;
 	description: string;
-	icon: LucideIcon;
+	/**
+	 * Lucide glyphs and the in-house brand glyphs are separate component types, and this slot takes
+	 * either — naming only `LucideIcon` would pin `BrandIcon` to Lucide's exact shape. All the slot
+	 * asks of a glyph is that it render from `className`, which both do.
+	 */
+	icon: LucideIcon | BrandIcon;
 	to: string;
 }
 

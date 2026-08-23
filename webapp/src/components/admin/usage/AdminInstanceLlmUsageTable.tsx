@@ -28,7 +28,8 @@ export interface AdminInstanceLlmUsageTableProps {
 	rows: AdminWorkspaceLlmUsage[];
 	/** ISO `yyyy-MM`. */
 	month: string;
-	now?: Date;
+	/** The instant the projection is measured against. The caller owns it, so that rendering reads no clock. */
+	now: Date;
 	fx?: Fx;
 	/** UTC. The verdicts read *current* caps, so only the current month can show a real pause. */
 	isCurrentMonth: boolean;
@@ -89,7 +90,7 @@ function capUsage(input: {
 export function AdminInstanceLlmUsageTable({
 	rows,
 	month,
-	now = new Date(),
+	now,
 	fx,
 	isCurrentMonth,
 	isLoading,

@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from "@storybook/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { expect, fn, screen, userEvent, within } from "storybook/test";
 import type { SlackMonitoredChannel } from "@/api/types.gen";
+import { daysBefore } from "@/components/common/story-clock";
 import { AdminSlackChannelsSettings } from "./AdminSlackChannelsSettings";
 
 /**
@@ -34,8 +35,6 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-const iso = (days: number) => new Date(Date.now() - days * 24 * 60 * 60 * 1000);
-
 const pending: SlackMonitoredChannel = {
 	id: 1,
 	slackChannelId: "C01PENDING01",
@@ -43,7 +42,7 @@ const pending: SlackMonitoredChannel = {
 	channelName: "team-intro",
 	consentState: "PENDING",
 	optedOutMemberCount: 0,
-	createdAt: iso(3),
+	createdAt: daysBefore(3),
 };
 
 const active: SlackMonitoredChannel = {
@@ -53,8 +52,8 @@ const active: SlackMonitoredChannel = {
 	channelName: "team-standup",
 	consentState: "ACTIVE",
 	optedOutMemberCount: 2,
-	consentAnnouncedAt: iso(2),
-	createdAt: iso(5),
+	consentAnnouncedAt: daysBefore(2),
+	createdAt: daysBefore(5),
 };
 
 const paused: SlackMonitoredChannel = {
@@ -64,8 +63,8 @@ const paused: SlackMonitoredChannel = {
 	channelName: "team-random",
 	consentState: "PAUSED",
 	optedOutMemberCount: 0,
-	consentAnnouncedAt: iso(4),
-	createdAt: iso(6),
+	consentAnnouncedAt: daysBefore(4),
+	createdAt: daysBefore(6),
 };
 
 const revoked: SlackMonitoredChannel = {
@@ -75,8 +74,8 @@ const revoked: SlackMonitoredChannel = {
 	channelName: "team-legacy",
 	consentState: "REVOKED",
 	optedOutMemberCount: 0,
-	consentAnnouncedAt: iso(9),
-	createdAt: iso(10),
+	consentAnnouncedAt: daysBefore(9),
+	createdAt: daysBefore(10),
 };
 
 /** Mixed list — one of each active lifecycle state. */
@@ -133,8 +132,8 @@ export const NoChannelName: Story = {
 				slackTeamId: "T0000000000",
 				consentState: "ACTIVE",
 				optedOutMemberCount: 0,
-				consentAnnouncedAt: iso(1),
-				createdAt: iso(2),
+				consentAnnouncedAt: daysBefore(1),
+				createdAt: daysBefore(2),
 			},
 		],
 	},

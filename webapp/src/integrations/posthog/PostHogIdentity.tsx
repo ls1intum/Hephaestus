@@ -25,7 +25,6 @@ export function PostHogIdentity() {
 	});
 
 	const participatesInResearch = userSettings?.participateInResearch;
-	// React Compiler handles memoization automatically - no useMemo needed
 	const shouldDenyTracking = !isAuthenticated
 		? false
 		: isSettingsError

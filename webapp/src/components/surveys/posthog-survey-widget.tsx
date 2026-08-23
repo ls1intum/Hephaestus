@@ -254,6 +254,11 @@ export function PostHogSurveyWidget({
 					hasTrackedShown.current = false;
 					return;
 				} catch (error) {
+					// A survey that fails its own eligibility check is not the reader's problem — a toast about
+					// it would interrupt them over a widget they never asked for — but swallowing it silently
+					// leaves a misconfigured survey with no symptom at all. The console is the only channel
+					// that reaches whoever authored the survey without reaching the reader.
+					// oxlint-disable-next-line no-console -- Diagnostic for the survey author; the reader has nothing to act on and must not be interrupted.
 					console.error("[PostHogSurveyWidget] Error checking survey:", error);
 
 					if (!isActive() || requestId !== latestRequestId) {

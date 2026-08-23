@@ -56,12 +56,6 @@ export function ConnectGitLabStep({ instances = [] }: { instances?: GitLabInstan
 		onSuccess: (data) => {
 			dispatch({ type: "SET_PREFLIGHT_RESULT", result: data });
 		},
-		onError: (error) => {
-			console.error("GitLab preflight failed:", {
-				serverUrl: state.serverUrl,
-				message: error instanceof Error ? error.message : "Unknown error",
-			});
-		},
 	});
 
 	const handleValidate = () => {

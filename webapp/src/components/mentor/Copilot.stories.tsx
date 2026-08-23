@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { fn } from "storybook/test";
 import type { ChatMessageVote } from "@/api/types.gen";
+import { STORY_NOW } from "@/components/common/story-clock";
 import type { ChatMessage } from "@/lib/types";
 import { Chat } from "./Chat";
 import { Copilot } from "./Copilot";
@@ -96,8 +97,8 @@ P.S. Don't forget to make a special wish when you blow out your candles! 🎂✨
 ];
 
 const CONVERSATION_VOTES = [
-	{ messageId: "msg-2", isUpvoted: true, updatedAt: new Date() },
-	{ messageId: "msg-4", isUpvoted: true, updatedAt: new Date() },
+	{ messageId: "msg-2", isUpvoted: true, updatedAt: new Date(STORY_NOW) },
+	{ messageId: "msg-4", isUpvoted: true, updatedAt: new Date(STORY_NOW) },
 ] satisfies ChatMessageVote[];
 
 function CopilotPreview({

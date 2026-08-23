@@ -55,8 +55,9 @@ This kit is Base UI (`@base-ui/react`), not Radix. `<Item render={<Link to="…"
 `<PopoverTrigger render={<Button …/>} />`. Anything copied from a Radix-based registry — including
 most "shadcn Timeline" snippets — will not drop in; port the markup and rewire the slot.
 
-The repo pins `@base-ui/react` **1.4.1**; base-ui.com documents 1.7.0. A `render={(props, state) => …}`
-function form copied from the live docs may not exist here — check the installed version.
+base-ui.com documents whatever Base UI released last, which is not necessarily what is installed. A
+`render={(props, state) => …}` copied from the live docs may not exist at the pinned version — read the
+pin in `webapp/package.json`, or the installed `.d.ts`, before copying.
 
 Zero `asChild` in the tree is the baseline, not an achievement. Do not credit it in review.
 

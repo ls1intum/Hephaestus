@@ -70,7 +70,6 @@ export function MessageEditor({
 		>
 			<div className="flex-1">
 				<Textarea
-					data-testid="message-editor"
 					ref={textareaRef}
 					aria-label="Edit message"
 					className="border-0 bg-transparent outline-none overflow-hidden resize-none !text-base w-full p-0 shadow-none focus-visible:ring-0 min-h-0"
@@ -95,7 +94,6 @@ export function MessageEditor({
 					Cancel
 				</Button>
 				<Button
-					data-testid="message-editor-send-button"
 					variant="default"
 					className="rounded-full h-8 px-3"
 					disabled={!canSend}

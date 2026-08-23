@@ -123,11 +123,7 @@ export function Messages({
 						return isUser || !assistantHasVisible ? <ThinkingMessage /> : null;
 					})()}
 
-				<motion.div
-					ref={endRef}
-					className="shrink-0 min-w-[12px] min-h-[12px]"
-					data-testid="scroll-anchor"
-				/>
+				<motion.div ref={endRef} className="shrink-0 min-w-[12px] min-h-[12px]" />
 			</div>
 		</ScrollArea>
 	);

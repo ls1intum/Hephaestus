@@ -33,9 +33,11 @@ type-aware. Fix findings or suppress one inline with
 ## React, where it applies
 
 - Author components as named functions and annotate props explicitly. `React.FC` is a lint error.
-- The React Compiler runs at build time (`webapp/vite.shared.ts`), so hand-written `useMemo`,
-  `useCallback` and `React.memo` are banned in new code.
-- Keep render pure — no store mutation, navigation or DOM work during render.
+- The React Compiler runs at build time (`webapp/vite.shared.ts`), so `useMemo`, `useCallback` and
+  `memo` are not importable from `react` — nor is `forwardRef`, since React 19 passes `ref` as an
+  ordinary prop. The few memos that survive carry their reason on the suppression above the import.
+- Keep render pure — no store mutation, navigation or DOM work during render, and that includes
+  reading a clock. `webapp/AGENTS.md` § The time of day names the two sanctioned readings.
 - Routes fetch, components receive props. `scripts/check-presentational-components.ts` fails the build
   on a component that imports the query layer.
 - Compose class names with `cn()` from `@/lib/utils`. It is the repo's only wrapper over `clsx` and

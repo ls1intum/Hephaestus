@@ -1,5 +1,6 @@
 import type { AgentJob } from "@/api/types.gen";
 import { holdReasonCopy, jobWait } from "@/components/admin/ai/job-utils";
+import { useNow } from "@/components/common/use-now";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 export interface ReviewRunNoticesProps {
@@ -20,7 +21,8 @@ export interface ReviewRunNoticesProps {
  * "failed" goes looking for something to fix that is not there.
  */
 export function ReviewRunNotices({ job, outputMayBeIncomplete }: ReviewRunNoticesProps) {
-	const wait = jobWait(job);
+	const now = useNow();
+	const wait = jobWait(job, now);
 	const hold = wait?.kind === "hold" ? holdReasonCopy(wait.reason) : undefined;
 	return (
 		<>

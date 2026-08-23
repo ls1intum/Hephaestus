@@ -1,35 +1,40 @@
-import { forwardRef, type SVGProps } from "react";
+import type { ReactElement, SVGProps } from "react";
 
 // lucide-react v1 dropped brand glyphs (GitHub, GitLab, ...) for licensing reasons.
 // These thin wrappers mimic the Lucide icon API (size/className/currentColor) so
 // callsites that previously imported `GithubIcon`/`GitlabIcon` from lucide-react
 // can drop-in replace by switching the import path.
 
-export type BrandIcon = React.ForwardRefExoticComponent<
-	SVGProps<SVGSVGElement> & { size?: number | string } & React.RefAttributes<SVGSVGElement>
->;
+/** Lucide's `size` shorthand on top of the SVG props, which already carry `ref`. */
+type BrandIconProps = SVGProps<SVGSVGElement> & { size?: number | string };
+
+/**
+ * A plain component, so a slot that accepts one has to name `BrandIcon` alongside `LucideIcon`
+ * rather than relying on Lucide's `ForwardRefExoticComponent` shape.
+ */
+export type BrandIcon = {
+	(props: BrandIconProps): ReactElement;
+	displayName?: string;
+};
 
 const make = (displayName: string, viewBox: string, path: string): BrandIcon => {
-	const Icon = forwardRef<SVGSVGElement, SVGProps<SVGSVGElement> & { size?: number | string }>(
-		({ size, width, height, ...props }, ref) => {
-			const label = props["aria-label"] ?? displayName;
-			return (
-				<svg
-					ref={ref}
-					xmlns="http://www.w3.org/2000/svg"
-					viewBox={viewBox}
-					width={width ?? size ?? "1em"}
-					height={height ?? size ?? "1em"}
-					fill="currentColor"
-					role="img"
-					{...props}
-				>
-					<title>{label}</title>
-					<path d={path} />
-				</svg>
-			);
-		},
-	);
+	const Icon: BrandIcon = ({ size, width, height, ...props }: BrandIconProps) => {
+		const label = props["aria-label"] ?? displayName;
+		return (
+			<svg
+				xmlns="http://www.w3.org/2000/svg"
+				viewBox={viewBox}
+				width={width ?? size ?? "1em"}
+				height={height ?? size ?? "1em"}
+				fill="currentColor"
+				role="img"
+				{...props}
+			>
+				<title>{label}</title>
+				<path d={path} />
+			</svg>
+		);
+	};
 	Icon.displayName = displayName;
 	return Icon;
 };

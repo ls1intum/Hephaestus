@@ -17,6 +17,7 @@ import {
 	getWorkspaceOptions,
 } from "@/api/@tanstack/react-query.gen";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
+import { useNow } from "@/components/common/use-now";
 import { LeaderboardPage } from "@/components/leaderboard/LeaderboardPage";
 import type { LeaderboardSortType } from "@/components/leaderboard/SortFilter";
 import { Spinner } from "@/components/ui/spinner";
@@ -71,11 +72,17 @@ function LeaderboardContainer() {
 
 	const schedule = resolveLeaderboardSchedule(workspaceQuery.data);
 
+	/**
+	 * One reading for the whole render, from the clock the rest of the app shares. Every window
+	 * derived from it below lands on a scheduled week boundary, so the query keys it feeds only move
+	 * when the leaderboard week does — not on the tick.
+	 */
+	const now = new Date(useNow());
+
 	const getEffectiveDates = () => {
 		if (after) {
 			return { after, before };
 		}
-		const now = new Date();
 		const weekStart = getLeaderboardWeekStart(now, schedule);
 		const weekEnd = getLeaderboardWeekEnd(weekStart);
 		return formatDateRangeForApi({ after: weekStart, before: weekEnd });
@@ -102,8 +109,8 @@ function LeaderboardContainer() {
 		...getLeaderboardOptions({
 			path: { workspaceSlug: slug },
 			query: {
-				after: parsedAfter ?? new Date(),
-				before: parsedBefore ?? new Date(),
+				after: parsedAfter ?? now,
+				before: parsedBefore ?? now,
 				team,
 				sort,
 				mode,
@@ -203,7 +210,7 @@ function LeaderboardContainer() {
 		}
 	}, [mode, sort, navigate]);
 
-	const endDate = parsedBefore ? new Date(parsedBefore) : new Date();
+	const endDate = new Date(parsedBefore ?? now);
 
 	endDate.setHours(schedule.hour, schedule.minute, 0, 0);
 
@@ -213,8 +220,8 @@ function LeaderboardContainer() {
 		...computeUserLeagueStatsOptions({
 			path: { workspaceSlug: slug, login: username ?? "" },
 			query: {
-				after: parsedAfter ?? new Date(),
-				before: parsedBefore ?? new Date(),
+				after: parsedAfter ?? now,
+				before: parsedBefore ?? now,
 			},
 		}),
 		enabled: hasWorkspace && Boolean(username) && Boolean(parsedAfter) && Boolean(parsedBefore),

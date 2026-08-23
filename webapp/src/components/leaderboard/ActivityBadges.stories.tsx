@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react";
+import { STORY_NOW } from "@/components/common/story-clock";
 import { withProvider } from "@/stories/decorators";
 import { ActivityBadges } from "./ActivityBadges";
 import type { ReviewedPullRequest } from "./ReviewsPopover";
@@ -14,7 +15,7 @@ const basePullRequests: ReviewedPullRequest[] = [
 		commentsCount: 0,
 		isDraft: false,
 		isMerged: false,
-		createdAt: new Date(),
+		createdAt: new Date(STORY_NOW),
 		state: "OPEN",
 		labels: [],
 		repository: {
@@ -35,7 +36,7 @@ const basePullRequests: ReviewedPullRequest[] = [
 		commentsCount: 0,
 		isDraft: false,
 		isMerged: false,
-		createdAt: new Date(),
+		createdAt: new Date(STORY_NOW),
 		state: "OPEN",
 		labels: [],
 		repository: {

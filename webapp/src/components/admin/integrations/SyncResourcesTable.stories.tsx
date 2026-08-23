@@ -2,11 +2,9 @@ import type { Meta, StoryObj } from "@storybook/react";
 import { type ComponentProps, useState } from "react";
 import { expect, fn, screen, userEvent, within } from "storybook/test";
 import type { SyncResourceState } from "@/api/types.gen";
+import { daysBefore, minutesBefore } from "@/components/common/story-clock";
 import { expectSettledVisible } from "@/test/overlay";
 import { SCM_CLASS_KEYS, SyncResourcesTable } from "./SyncResourcesTable";
-
-const minutesAgo = (minutes: number) => new Date(Date.now() - minutes * 60_000);
-const daysAgo = (days: number) => minutesAgo(days * 60 * 24);
 
 const SYNC_INTERVAL_SECONDS = 3_600;
 
@@ -32,9 +30,9 @@ const resources: SyncResourceState[] = [
 		externalId: "ls1intum/Artemis",
 		name: "ls1intum/Artemis",
 		type: "REPOSITORY",
-		counts: scmCounts(minutesAgo(4), 3),
+		counts: scmCounts(minutesBefore(4), 3),
 		state: "SYNCED",
-		lastSyncedAt: minutesAgo(4),
+		lastSyncedAt: minutesBefore(4),
 		itemCount: (3410 + 1204) * 3,
 	},
 	{
@@ -43,15 +41,15 @@ const resources: SyncResourceState[] = [
 		name: "ls1intum/Athena",
 		type: "REPOSITORY",
 		counts: [
-			{ key: "issues", label: "Issues", count: 3410, lastSyncedAt: minutesAgo(6) },
-			{ key: "pullRequests", label: "Pull requests", count: 1204, lastSyncedAt: minutesAgo(6) },
+			{ key: "issues", label: "Issues", count: 3410, lastSyncedAt: minutesBefore(6) },
+			{ key: "pullRequests", label: "Pull requests", count: 1204, lastSyncedAt: minutesBefore(6) },
 			{ key: "issueComments", label: "Comments", count: 0, lastSyncedAt: undefined },
 			{ key: "reviews", label: "Reviews", count: 4120, lastSyncedAt: undefined },
 			{ key: "reviewComments", label: "Review comments", count: 0, lastSyncedAt: undefined },
 			{ key: "commits", label: "Commits", count: 28710, lastSyncedAt: undefined },
 		],
 		state: "SYNCED",
-		lastSyncedAt: minutesAgo(6),
+		lastSyncedAt: minutesBefore(6),
 		itemCount: 4614,
 	},
 	{
@@ -59,9 +57,9 @@ const resources: SyncResourceState[] = [
 		externalId: "ls1intum/Aeolus",
 		name: "ls1intum/Aeolus",
 		type: "REPOSITORY",
-		counts: scmCounts(minutesAgo(150)),
+		counts: scmCounts(minutesBefore(150)),
 		state: "SYNCED",
-		lastSyncedAt: minutesAgo(150),
+		lastSyncedAt: minutesBefore(150),
 		itemCount: 4614,
 		backfillPercent: 62,
 	},
@@ -78,9 +76,9 @@ const resources: SyncResourceState[] = [
 		externalId: "ls1intum/legacy-mirror",
 		name: "ls1intum/legacy-mirror",
 		type: "REPOSITORY",
-		counts: scmCounts(daysAgo(11)),
+		counts: scmCounts(daysBefore(11)),
 		state: "SYNCED",
-		lastSyncedAt: daysAgo(11),
+		lastSyncedAt: daysBefore(11),
 		itemCount: 4614,
 	},
 ];
@@ -91,9 +89,9 @@ const channels: SyncResourceState[] = [
 		externalId: "C0123ABCD",
 		name: "#engineering",
 		type: "CHANNEL",
-		counts: [{ key: "messages", label: "Messages", count: 8421, lastSyncedAt: minutesAgo(5) }],
+		counts: [{ key: "messages", label: "Messages", count: 8421, lastSyncedAt: minutesBefore(5) }],
 		state: "ACTIVE",
-		lastSyncedAt: minutesAgo(5),
+		lastSyncedAt: minutesBefore(5),
 		itemCount: 8421,
 	},
 	{
@@ -101,9 +99,9 @@ const channels: SyncResourceState[] = [
 		externalId: "C0456EFGH",
 		name: "#design",
 		type: "CHANNEL",
-		counts: [{ key: "messages", label: "Messages", count: 213, lastSyncedAt: minutesAgo(400) }],
+		counts: [{ key: "messages", label: "Messages", count: 213, lastSyncedAt: minutesBefore(400) }],
 		state: "PAUSED",
-		lastSyncedAt: minutesAgo(400),
+		lastSyncedAt: minutesBefore(400),
 		itemCount: 213,
 	},
 ];
@@ -114,9 +112,9 @@ const collections: SyncResourceState[] = [
 		externalId: "col_handbook",
 		name: "Engineering Handbook",
 		type: "COLLECTION",
-		counts: [{ key: "documents", label: "Documents", count: 342, lastSyncedAt: minutesAgo(8) }],
+		counts: [{ key: "documents", label: "Documents", count: 342, lastSyncedAt: minutesBefore(8) }],
 		state: "SYNCED",
-		lastSyncedAt: minutesAgo(8),
+		lastSyncedAt: minutesBefore(8),
 		itemCount: 342,
 		upstreamCount: 350,
 	},
@@ -125,9 +123,9 @@ const collections: SyncResourceState[] = [
 		externalId: "col_archive",
 		name: "Archived Notes",
 		type: "COLLECTION",
-		counts: [{ key: "documents", label: "Documents", count: 12, lastSyncedAt: daysAgo(9) }],
+		counts: [{ key: "documents", label: "Documents", count: 12, lastSyncedAt: daysBefore(9) }],
 		state: "SYNCED",
-		lastSyncedAt: daysAgo(9),
+		lastSyncedAt: daysBefore(9),
 		itemCount: 12,
 		upstreamCount: 40,
 		lastError: "401: the Outline API token was revoked",
@@ -141,15 +139,15 @@ const zeroCommentsFleet: SyncResourceState[] = [
 		name: "acme/api",
 		type: "REPOSITORY",
 		counts: [
-			{ key: "issues", label: "Issues", count: 2100, lastSyncedAt: minutesAgo(7) },
-			{ key: "pullRequests", label: "Pull requests", count: 860, lastSyncedAt: minutesAgo(7) },
+			{ key: "issues", label: "Issues", count: 2100, lastSyncedAt: minutesBefore(7) },
+			{ key: "pullRequests", label: "Pull requests", count: 860, lastSyncedAt: minutesBefore(7) },
 			{ key: "issueComments", label: "Comments", count: 0, lastSyncedAt: undefined },
 			{ key: "reviews", label: "Reviews", count: 940, lastSyncedAt: undefined },
 			{ key: "reviewComments", label: "Review comments", count: 0, lastSyncedAt: undefined },
 			{ key: "commits", label: "Commits", count: 15400, lastSyncedAt: undefined },
 		],
 		state: "SYNCED",
-		lastSyncedAt: minutesAgo(7),
+		lastSyncedAt: minutesBefore(7),
 		itemCount: 2960,
 	},
 	{
@@ -158,15 +156,15 @@ const zeroCommentsFleet: SyncResourceState[] = [
 		name: "acme/web",
 		type: "REPOSITORY",
 		counts: [
-			{ key: "issues", label: "Issues", count: 1330, lastSyncedAt: minutesAgo(9) },
-			{ key: "pullRequests", label: "Pull requests", count: 512, lastSyncedAt: minutesAgo(9) },
+			{ key: "issues", label: "Issues", count: 1330, lastSyncedAt: minutesBefore(9) },
+			{ key: "pullRequests", label: "Pull requests", count: 512, lastSyncedAt: minutesBefore(9) },
 			{ key: "issueComments", label: "Comments", count: 0, lastSyncedAt: undefined },
 			{ key: "reviews", label: "Reviews", count: 640, lastSyncedAt: undefined },
 			{ key: "reviewComments", label: "Review comments", count: 0, lastSyncedAt: undefined },
 			{ key: "commits", label: "Commits", count: 9800, lastSyncedAt: undefined },
 		],
 		state: "SYNCED",
-		lastSyncedAt: minutesAgo(9),
+		lastSyncedAt: minutesBefore(9),
 		itemCount: 1842,
 	},
 ];
@@ -178,15 +176,15 @@ const divergent: SyncResourceState[] = [
 		name: "ls1intum/Artemis",
 		type: "REPOSITORY",
 		counts: [
-			{ key: "issues", label: "Issues", count: 3410, lastSyncedAt: minutesAgo(4) },
-			{ key: "pullRequests", label: "Pull requests", count: 1204, lastSyncedAt: daysAgo(3) },
+			{ key: "issues", label: "Issues", count: 3410, lastSyncedAt: minutesBefore(4) },
+			{ key: "pullRequests", label: "Pull requests", count: 1204, lastSyncedAt: daysBefore(3) },
 			{ key: "issueComments", label: "Comments", count: 12882, lastSyncedAt: undefined },
 			{ key: "reviews", label: "Reviews", count: 4120, lastSyncedAt: undefined },
 			{ key: "reviewComments", label: "Review comments", count: 9004, lastSyncedAt: undefined },
 			{ key: "commits", label: "Commits", count: 28710, lastSyncedAt: undefined },
 		],
 		state: "SYNCED",
-		lastSyncedAt: minutesAgo(4),
+		lastSyncedAt: minutesBefore(4),
 		itemCount: 4614,
 	},
 ];
@@ -198,9 +196,9 @@ const manyRepos: SyncResourceState[] = Array.from({ length: 71 }, (_, index) => 
 			externalId: "ls1intum/legacy-mirror",
 			name: "ls1intum/legacy-mirror",
 			type: "REPOSITORY",
-			counts: scmCounts(daysAgo(9)),
+			counts: scmCounts(daysBefore(9)),
 			state: "SYNCED",
-			lastSyncedAt: daysAgo(9),
+			lastSyncedAt: daysBefore(9),
 			itemCount: 4614,
 		} satisfies SyncResourceState;
 	}
@@ -210,9 +208,9 @@ const manyRepos: SyncResourceState[] = Array.from({ length: 71 }, (_, index) => 
 		externalId: `ls1intum/service-${suffix}`,
 		name: `ls1intum/service-${suffix}`,
 		type: "REPOSITORY",
-		counts: scmCounts(minutesAgo(4 + index)),
+		counts: scmCounts(minutesBefore(4 + index)),
 		state: "SYNCED",
-		lastSyncedAt: minutesAgo(4 + index),
+		lastSyncedAt: minutesBefore(4 + index),
 		itemCount: 4614,
 	} satisfies SyncResourceState;
 });
@@ -224,9 +222,9 @@ const longNames: SyncResourceState[] = [
 			"a-very-long-organisation-name/an-even-longer-repository-name-that-overflows-the-column",
 		name: "a-very-long-organisation-name/an-even-longer-repository-name-that-overflows-the-column",
 		type: "REPOSITORY",
-		counts: scmCounts(minutesAgo(30)),
+		counts: scmCounts(minutesBefore(30)),
 		state: "SYNCED",
-		lastSyncedAt: minutesAgo(30),
+		lastSyncedAt: minutesBefore(30),
 		itemCount: 4614,
 	},
 ];
@@ -237,9 +235,9 @@ const facetMix: SyncResourceState[] = [
 		externalId: "acme/fresh-service",
 		name: "acme/fresh-service",
 		type: "REPOSITORY",
-		counts: scmCounts(minutesAgo(4)),
+		counts: scmCounts(minutesBefore(4)),
 		state: "SYNCED",
-		lastSyncedAt: minutesAgo(4),
+		lastSyncedAt: minutesBefore(4),
 		itemCount: 4614,
 	},
 	{
@@ -247,9 +245,9 @@ const facetMix: SyncResourceState[] = [
 		externalId: "acme/stale-service",
 		name: "acme/stale-service",
 		type: "REPOSITORY",
-		counts: scmCounts(daysAgo(11)),
+		counts: scmCounts(daysBefore(11)),
 		state: "SYNCED",
-		lastSyncedAt: daysAgo(11),
+		lastSyncedAt: daysBefore(11),
 		itemCount: 4614,
 	},
 ];
@@ -266,9 +264,9 @@ function FacetFallbackHarness(props: Omit<ComponentProps<typeof SyncResourcesTab
 			externalId: "acme/fresh-service",
 			name: "acme/fresh-service",
 			type: "REPOSITORY",
-			counts: scmCounts(minutesAgo(4)),
+			counts: scmCounts(minutesBefore(4)),
 			state: "SYNCED",
-			lastSyncedAt: minutesAgo(4),
+			lastSyncedAt: minutesBefore(4),
 			itemCount: 4614,
 		},
 		{
@@ -276,15 +274,15 @@ function FacetFallbackHarness(props: Omit<ComponentProps<typeof SyncResourcesTab
 			externalId: "acme/stale-service",
 			name: "acme/stale-service",
 			type: "REPOSITORY",
-			counts: scmCounts(daysAgo(11)),
+			counts: scmCounts(daysBefore(11)),
 			state: "SYNCED",
-			lastSyncedAt: daysAgo(11),
+			lastSyncedAt: daysBefore(11),
 			itemCount: 4614,
 		},
 	];
 	const allFresh = withAttention.map((resource) =>
 		resource.id === 61
-			? { ...resource, counts: scmCounts(minutesAgo(6)), lastSyncedAt: minutesAgo(6) }
+			? { ...resource, counts: scmCounts(minutesBefore(6)), lastSyncedAt: minutesBefore(6) }
 			: resource,
 	);
 	return (

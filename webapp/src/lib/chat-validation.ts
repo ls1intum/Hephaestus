@@ -27,14 +27,13 @@ const chatMessageSchema = z.looseObject({
 const chatMessagesArraySchema = z.array(chatMessageSchema);
 
 function isChatMessageArray(value: unknown): value is ChatMessage[] {
-	const result = chatMessagesArraySchema.safeParse(value);
-	if (!result.success) {
-		console.warn("[parseThreadMessages] Validation failed:", result.error);
-		return false;
-	}
-	return true;
+	return chatMessagesArraySchema.safeParse(value).success;
 }
 
+/**
+ * `undefined` is the whole report a rejected transcript gets: the caller is the only place that
+ * knows whether a thread that will not parse is worth telling the reader about.
+ */
 export function parseThreadMessages(messages: unknown): ChatMessage[] | undefined {
 	return isChatMessageArray(messages) ? messages : undefined;
 }
@@ -46,6 +45,10 @@ const voteSchema = z.object({
 
 const votesArraySchema = z.array(voteSchema);
 
+/**
+ * Votes are decoration on a transcript, so every shape this cannot read degrades to "no votes" —
+ * a thread still renders in full without its thumbs.
+ */
 export function extractVotesFromThreadDetail(
 	threadDetail: unknown,
 ): Array<{ messageId?: string; isUpvoted?: boolean }> {
@@ -58,10 +61,5 @@ export function extractVotesFromThreadDetail(
 	}
 
 	const result = votesArraySchema.safeParse(threadDetail.votes);
-	if (!result.success) {
-		console.warn("[extractVotesFromThreadDetail] Validation failed:", result.error);
-		return [];
-	}
-
-	return result.data;
+	return result.success ? result.data : [];
 }

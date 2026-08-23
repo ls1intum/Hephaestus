@@ -91,10 +91,12 @@ function recoverOrLogout(queryClient: QueryClient, currentPath: string): Promise
 }
 
 async function doRecoverOrLogout(queryClient: QueryClient, currentPath: string): Promise<void> {
+	// oxlint-disable-next-line no-restricted-properties -- The loop-breaker's cooldown, measured in a module-level 401 handler that no component renders; a React clock would not exist here and could not resolve a cooldown shorter than its tick.
 	const recentlyRecovered = Date.now() - lastRefreshRecoveryAt < REFRESH_RECOVERY_COOLDOWN_MS;
 	if (!recentlyRecovered && (await refreshAccessToken())) {
 		// Session restored under a fresh cookie — refetch active queries so the UI recovers in place
 		// (including the failed request's data) without a navigation.
+		// oxlint-disable-next-line no-restricted-properties -- Stamps the recovery the cooldown above is measured from, so the two must read the same clock.
 		lastRefreshRecoveryAt = Date.now();
 		void queryClient.invalidateQueries();
 		return;

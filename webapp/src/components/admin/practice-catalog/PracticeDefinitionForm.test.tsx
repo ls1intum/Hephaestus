@@ -6,7 +6,7 @@ import { renderWithRouter } from "@/test/router-harness";
 import { PracticeDefinitionForm, type PracticeDefinitionValue } from "./PracticeDefinitionForm";
 
 vi.mock("@/components/shared/CodeEditor", () => ({
-	CodeEditor: () => <div data-testid="code-editor" />,
+	CodeEditor: () => <div />,
 }));
 
 function renderCreateForm(onSubmit: (value: PracticeDefinitionValue) => void | Promise<void>) {

@@ -122,7 +122,7 @@ The same test applies to a whole component: delete it and inline it.
    (`composition-and-slots.md`), and are exempt.
 2. One caller justifies a prop when that caller *derives* the value from data rather than typing a
    literal — deleting it just moves the branch somewhere worse.
-3. **Vendored code is out of scope.** `webapp/AGENTS.md` forbids editing `src/components/ui/`, so this
+3. **Registry code is out of scope.** `src/components/ui/` is re-vendored from upstream, so this
    rule cannot fire there however many call sites a prop has. Curtis, cited for the direction,
    explicitly *retains* `state`/`appearance`/`size` as *"the component's essential, top-level API"* —
    a two-call-site test applied to `size` contradicts its own source.

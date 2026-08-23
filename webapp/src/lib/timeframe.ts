@@ -103,11 +103,13 @@ export function getLeaderboardWeekEnd(weekStart: Date): Date {
  * Returns { after, before } where before is undefined for open-ended ranges.
  */
 export function getDateRangeForPreset(
+	instant: Date,
 	preset: TimeframePreset,
 	schedule: LeaderboardSchedule = DEFAULT_SCHEDULE,
 	customRange?: { from: Date; to?: Date },
 ): { after: Date; before: Date | undefined } {
-	const now = new Date();
+	// Copied before truncating: the caller's instant is shared with everything else it renders.
+	const now = new Date(instant);
 	now.setSeconds(0, 0);
 
 	switch (preset) {
@@ -218,11 +220,10 @@ export function formatDropdownLabel(preset: TimeframePreset): string {
  * Uses natural language: "This week, since Tue Dec 3"
  */
 export function formatSelectedLabel(
+	now: Date,
 	preset: TimeframePreset,
 	schedule: LeaderboardSchedule = DEFAULT_SCHEDULE,
 ): string {
-	const now = new Date();
-
 	switch (preset) {
 		case "all-activity":
 			return "All time";
@@ -267,10 +268,10 @@ export function formatSelectedLabel(
  * @deprecated Use formatSelectedLabel for the trigger, formatDropdownLabel for dropdown items
  */
 export function formatPresetLabel(
+	now: Date,
 	preset: TimeframePreset,
 	schedule: LeaderboardSchedule = DEFAULT_SCHEDULE,
 ): string {
-	const now = new Date();
 	const weekdayName = getWeekdayName(schedule.day);
 
 	switch (preset) {
@@ -316,20 +317,19 @@ export function formatPresetLabel(
  * @deprecated Use formatDropdownLabel for dropdown items, formatSelectedLabel for trigger
  */
 export function formatPresetShortLabel(
+	now: Date,
 	preset: TimeframePreset,
 	schedule: LeaderboardSchedule = DEFAULT_SCHEDULE,
 ): string {
-	// Delegate to the new function for backwards compatibility
-	return formatSelectedLabel(preset, schedule);
+	return formatSelectedLabel(now, preset, schedule);
 }
 
 /**
  * Format a custom date range for display.
  */
-export function formatCustomRangeLabel(from?: Date, to?: Date): string {
+export function formatCustomRangeLabel(now: Date, from?: Date, to?: Date): string {
 	if (!from) return "Pick a date range";
 
-	const now = new Date();
 	const fromLabel = format(from, "LLL d");
 
 	if (!to) {
@@ -347,6 +347,7 @@ export function formatCustomRangeLabel(from?: Date, to?: Date): string {
  * Try to detect which preset matches a given date range.
  */
 export function detectPresetFromDates(
+	now: Date,
 	afterStr?: string,
 	beforeStr?: string,
 	schedule: LeaderboardSchedule = DEFAULT_SCHEDULE,
@@ -358,7 +359,6 @@ export function detectPresetFromDates(
 
 	const after = parseISO(afterStr);
 	const before = beforeStr ? parseISO(beforeStr) : undefined;
-	const now = new Date();
 
 	// Check for all-activity (epoch start)
 	if (enableAllActivity && after.getTime() <= new Date(0).getTime() + 86400000) {
@@ -414,15 +414,14 @@ export function detectPresetFromDates(
  * Format the selected value label for a compact display (like in a row).
  */
 export function formatTimeframeButtonLabel(
+	now: Date,
 	preset: TimeframePreset,
 	schedule: LeaderboardSchedule = DEFAULT_SCHEDULE,
 	customRange?: { from?: Date; to?: Date },
 ): string {
 	if (preset === "custom") {
-		return formatCustomRangeLabel(customRange?.from, customRange?.to);
+		return formatCustomRangeLabel(now, customRange?.from, customRange?.to);
 	}
-
-	const now = new Date();
 
 	switch (preset) {
 		case "all-activity":

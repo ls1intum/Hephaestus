@@ -182,15 +182,9 @@ function GitLabWizardPage() {
 
 	const stepAnnouncement = `Step ${state.step} of 3: ${STEP_META[state.step].title}`;
 
-	const listGroups = useMutation({
-		...listGitLabGroupsMutation(),
-		onError: (error) => {
-			console.error("Failed to load GitLab groups:", {
-				serverUrl: state.serverUrl,
-				message: error instanceof Error ? error.message : "Unknown error",
-			});
-		},
-	});
+	// A failure is read off `listGroups.isError` below, which renders the alert next to step 1's
+	// server URL and token — the two fields the user can act on.
+	const listGroups = useMutation(listGitLabGroupsMutation());
 
 	const createWorkspace = useMutation({
 		...createWorkspaceMutation(),
@@ -203,11 +197,6 @@ function GitLabWizardPage() {
 			});
 		},
 		onError: (error) => {
-			console.error("Workspace creation failed:", {
-				step: state.step,
-				serverUrl: state.serverUrl,
-				message: error instanceof Error ? error.message : "Unknown error",
-			});
 			const rawError = isRecord(error) ? error.error : undefined;
 			toast.error(
 				typeof rawError === "string" ? rawError : "Failed to create workspace. Please try again.",
@@ -220,7 +209,6 @@ function GitLabWizardPage() {
 
 	const canAdvanceFromStep1 = state.preflightResult?.valid === true;
 	const canAdvanceFromStep2 = state.selectedGroup !== null;
-	// React Compiler handles memoization; no manual useMemo (see webapp/AGENTS.md).
 	const canSubmit =
 		state.step === 3 &&
 		state.selectedGroup !== null &&

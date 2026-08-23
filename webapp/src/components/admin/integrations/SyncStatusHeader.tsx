@@ -3,6 +3,7 @@ import { Fragment, type ReactElement, type ReactNode } from "react";
 import type { ConnectionSyncStatus, RateLimitSnapshot } from "@/api/types.gen";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { RelativeTime } from "@/components/common/RelativeTime";
+import { useNow } from "@/components/common/use-now";
 import { Button } from "@/components/ui/button";
 import { ButtonGroup } from "@/components/ui/button-group";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -77,10 +78,13 @@ function DiagnosticItem({
  *     and since rolled over, or a vendor that never sends it). Show the ceiling — never a fabricated
  *     remaining, and never `— / N` which reads as a gauge.
  *  4. Nothing renderable → `null`.
+ *
+ * `now` decides only whether branch 1 is still live, and is passed in so the reading is a function of
+ * the snapshot and one instant the caller chose, rather than of the moment this happened to render.
  */
-function rateLimitReading(rateLimit: RateLimitSnapshot): ReactNode {
+function rateLimitReading(rateLimit: RateLimitSnapshot, now: number): ReactNode {
 	const throttledUntil = asDate(rateLimit.throttledUntil);
-	if (throttledUntil && throttledUntil.getTime() > Date.now()) {
+	if (throttledUntil && throttledUntil.getTime() > now) {
 		return <span className="text-warning">Throttled · retry {relativeTime(throttledUntil)}</span>;
 	}
 
@@ -114,6 +118,10 @@ function rateLimitReading(rateLimit: RateLimitSnapshot): ReactNode {
 }
 
 function ConnectionDiagnostics({ status }: { status: ConnectionSyncStatus }) {
+	// A live back-off lapses while the card is on screen, so the rate-limit reading is derived from the
+	// shared clock and re-renders itself out of the throttled branch when the deadline passes.
+	const now = useNow();
+
 	// A thin vertical rule separates each fact so the diagnostics scan as one grouped row. The rule is
 	// decorative, so it stays out of the assistive-tech list.
 	const diagnostics: ReactElement[] = [];
@@ -146,7 +154,7 @@ function ConnectionDiagnostics({ status }: { status: ConnectionSyncStatus }) {
 	// A snapshot exists only when the vendor was observed, but an observed snapshot can still carry
 	// nothing renderable (a lapsed throttle with no known ceiling), so the row is gated on the reading
 	// itself — not merely on the snapshot's presence — to keep the "Rate limit" label from orphaning.
-	const rateLimit = status.rateLimit ? rateLimitReading(status.rateLimit) : null;
+	const rateLimit = status.rateLimit ? rateLimitReading(status.rateLimit, now) : null;
 	if (rateLimit) {
 		diagnostics.push(
 			<DiagnosticItem key="rateLimit" icon={<GaugeIcon />} label="Rate limit">

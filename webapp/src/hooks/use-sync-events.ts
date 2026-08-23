@@ -201,11 +201,10 @@ export function useSyncEvents(workspaceSlug: string | undefined): boolean {
 		};
 
 		const handleHint = (event: MessageEvent<string>) => {
+			// A hint is only ever a nudge to refetch, so one this client cannot read costs nothing to
+			// drop: the queries it would have refreshed are still refreshed by the next readable hint.
 			const hint = parseHint(event.data);
-			if (!hint) {
-				console.debug("Ignoring malformed sync-event hint payload");
-				return;
-			}
+			if (!hint) return;
 
 			// A running job emits progress hints far faster than a human can read them; collapse each
 			// burst to one refetch per scope per connection.
@@ -251,6 +250,7 @@ export function useSyncEvents(workspaceSlug: string | undefined): boolean {
 					consecutiveFailures = 0;
 					setLivePushUnavailable(false);
 
+					// oxlint-disable-next-line no-restricted-properties -- Throttles one stream re-open against the last, inside the `open` listener; a clock that only ticks with React would let a burst of reconnects through together.
 					const now = Date.now();
 					// The first open races the page's own mount fetches, which are already loading this
 					// data — resyncing here would cancel and restart them. Record the timestamp anyway so

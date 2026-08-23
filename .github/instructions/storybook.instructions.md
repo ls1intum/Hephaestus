@@ -38,8 +38,8 @@ question, not a story's.
 Most files omit `title` and are filed by their path under `src`, which cannot go stale. Declare an
 explicit `title` when the file layout cannot express where a reader looks for the thing — a product
 surface assembled from several directories, or one an admin knows by the screen it is on. Sentence
-case, and every top-level segment must appear in `storySort.order` in `.storybook/preview.tsx` or it
-sorts to the bottom silently. `rules/story-titles.md` in the skill has the namespaces.
+case, and every top-level segment must appear in `storySort.order` in `.storybook/preview.tsx`.
+`rules/story-titles.md` in the skill has the namespaces.
 
 ## Published prose
 
@@ -63,5 +63,12 @@ opts out says why in its meta.
 - A `play` function that never reaches an assertion (`hephaestus/play-must-assert`), and
   `expect(getBy…).toBeInTheDocument()` (`hephaestus/no-redundant-in-the-document`).
 - `within(canvasElement)` when the play was handed `canvas` (`hephaestus/no-within-canvas-element`).
+- Reading the clock at module scope or during render (`hephaestus/no-nondeterministic-render`).
+  Timestamps in a story come from `STORY_NOW` and the relative helpers in
+  `@/components/common/story-clock`, so a rendered phrase is identical on every run.
 - A `<p>` tag in a comment Storybook publishes (`scripts/check-story-prose.ts`). Storybook renders
   these blocks with `markdown-to-jsx`; separate paragraphs with a blank comment line.
+- A title whose top-level segment is missing from `storySort.order`, and an `order` entry that matches
+  no story (`scripts/check-story-sort.ts`). Both directions cost the same: the first buries a tree at
+  the bottom of the sidebar looking deliberate, the second leaves a renamed segment ordering nothing.
+  The check reads `title` as a string literal, so a title assembled at runtime fails it by design.

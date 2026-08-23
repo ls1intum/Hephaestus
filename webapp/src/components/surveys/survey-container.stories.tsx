@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from "@storybook/react";
 import type * as React from "react";
 import { useState } from "react";
 import { fn } from "storybook/test";
+import { STORY_NOW } from "@/components/common/story-clock";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import type { PostHogSurvey } from "@/types/survey";
@@ -71,7 +72,7 @@ const branchingSurvey: PostHogSurvey = {
 	end_date: null,
 	enable_partial_responses: true,
 	current_iteration: 1,
-	current_iteration_start_date: new Date().toISOString(),
+	current_iteration_start_date: new Date(STORY_NOW).toISOString(),
 };
 
 const hephaestusFeedbackSurvey: PostHogSurvey = {
@@ -126,7 +127,7 @@ const hephaestusFeedbackSurvey: PostHogSurvey = {
 	end_date: null,
 	enable_partial_responses: true,
 	current_iteration: 1,
-	current_iteration_start_date: new Date().toISOString(),
+	current_iteration_start_date: new Date(STORY_NOW).toISOString(),
 };
 
 const meta = {

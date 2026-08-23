@@ -12,15 +12,22 @@ import {
 
 const recommended = mockPullRequestWorkType.recommendedPolicy;
 
+/**
+ * The editor is controlled, so what it emits is only observable through the state it writes back.
+ * These `output` probes publish that state as named readings the assertions can query the same way
+ * they query the editor itself.
+ */
 function Controlled({ initial = recommended }: { initial?: PracticeAutomatedReviewPolicy }) {
 	const [value, setValue] = useState(initial);
 	return (
 		<>
-			<output data-testid="policy">
+			<output aria-label="review rule">
 				{value.automatedReview.mode}:{value.automatedReview.evidenceSufficiency}
 			</output>
-			<output data-testid="reason">{value.insufficiencyReason ? "set" : "none"}</output>
-			<output data-testid="limitation-count">{value.knownLimitations.length}</output>
+			<output aria-label="insufficiency reason">
+				{value.insufficiencyReason ? "set" : "none"}
+			</output>
+			<output aria-label="limitation count">{value.knownLimitations.length}</output>
 			<PracticeMentoringSupportEditor
 				value={value}
 				recommended={recommended}
@@ -37,12 +44,12 @@ describe("PracticeMentoringSupportEditor", () => {
 		await renderWithRouter(<Controlled />, "/admin/practices/new");
 
 		await user.click(screen.getByRole("radio", { name: /Human review needed/ }));
-		expect(screen.getByTestId("policy").textContent).toBe(
+		expect(screen.getByLabelText("review rule").textContent).toBe(
 			"LANGUAGE_MODEL:DECLARED_EVIDENCE_INSUFFICIENT",
 		);
 
 		await user.click(screen.getByRole("radio", { name: /Guidance only/ }));
-		expect(screen.getByTestId("policy").textContent).toBe("NONE:NONE");
+		expect(screen.getByLabelText("review rule").textContent).toBe("NONE:NONE");
 	});
 
 	it("does not leave an empty human-review reason after returning to AI support", async () => {
@@ -54,13 +61,13 @@ describe("PracticeMentoringSupportEditor", () => {
 
 		await user.click(screen.getByRole("radio", { name: /Human review needed/ }));
 		screen.getByRole("textbox", { name: /Why is human review needed/ });
-		expect(screen.getByTestId("reason").textContent).toBe("set");
+		expect(screen.getByLabelText("insufficiency reason").textContent).toBe("set");
 		// The reason is not a limitation, so asking for a human adds nothing to that list.
-		expect(screen.getByTestId("limitation-count").textContent).toBe("0");
+		expect(screen.getByLabelText("limitation count").textContent).toBe("0");
 
 		await user.click(screen.getByRole("radio", { name: /AI-supported mentoring/ }));
 		expect(screen.queryByRole("textbox", { name: /Why is human review needed/ })).toBeNull();
-		expect(screen.getByTestId("reason").textContent).toBe("none");
+		expect(screen.getByLabelText("insufficiency reason").textContent).toBe("none");
 	});
 
 	it("restores the limitations an author wrote after a detour through guidance only", async () => {
@@ -92,7 +99,7 @@ describe("PracticeMentoringSupportEditor", () => {
 			});
 			return (
 				<>
-					<output data-testid="code">{value.knownLimitations[0]?.code}</output>
+					<output aria-label="limitation code">{value.knownLimitations[0]?.code}</output>
 					<PracticeMentoringSupportEditor
 						value={value}
 						recommended={recommended}
@@ -108,7 +115,9 @@ describe("PracticeMentoringSupportEditor", () => {
 
 		// A pure function of the text, so retyping the same limitation cannot look like a review-rule
 		// change to the policy digest.
-		expect(screen.getByTestId("code").textContent).toBe("RUNTIME_BEHAVIOR_NOT_OBSERVED");
+		expect(screen.getByLabelText("limitation code").textContent).toBe(
+			"RUNTIME_BEHAVIOR_NOT_OBSERVED",
+		);
 	});
 
 	it("still allows human review when AI support is unavailable", async () => {

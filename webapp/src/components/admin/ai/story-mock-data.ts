@@ -1,4 +1,5 @@
 import type { AgentJob, AvailableLlmModel, PracticeReviewSettings } from "@/api/types.gen";
+import { minutesAfter } from "@/components/common/story-clock";
 
 export const mockAvailableModels: AvailableLlmModel[] = [
 	{
@@ -41,11 +42,6 @@ export const mockPracticeReviewSettings: PracticeReviewSettings = {
 	defaultAutonomyOverride: undefined,
 };
 
-/**
- * A run waiting on the clock has to be minutes from *now* or its "due …" phrase reads as history, so
- * those fixtures are anchored to load time rather than to the otherwise fixed 2026-05-20 scene.
- */
-const MINUTE_MS = 60_000;
 const pullRequestTarget: AgentJob["target"] = {
 	id: 42,
 	type: "scm.pull_request",
@@ -131,6 +127,11 @@ export const mockJobQueued: AgentJob = {
 	retryCount: 0,
 };
 
+/**
+ * A run waiting on the clock has to be minutes from *now* or its "due …" phrase reads as history, so
+ * this fixture and the two below anchor `availableAt` to the story clock rather than to the
+ * otherwise fixed 2026-05-20 scene.
+ */
 export const mockJobHeldOnBudget: AgentJob = {
 	id: "job-held-budget-1",
 	jobType: "PULL_REQUEST_REVIEW",
@@ -140,7 +141,7 @@ export const mockJobHeldOnBudget: AgentJob = {
 	model: "gpt-5.4-nano",
 	configSnapshot: { name: "Default reviewer" },
 	createdAt: new Date("2026-05-20T12:01:00Z"),
-	availableAt: new Date(Date.now() + 5 * MINUTE_MS),
+	availableAt: minutesAfter(5),
 	holdReason: "BUDGET",
 	retryCount: 0,
 };
@@ -155,7 +156,7 @@ export const mockJobHeldForUnknownReason: AgentJob = {
 	model: "gpt-5.4-nano",
 	configSnapshot: { name: "Default reviewer" },
 	createdAt: new Date("2026-05-20T12:02:00Z"),
-	availableAt: new Date(Date.now() + 9 * MINUTE_MS),
+	availableAt: minutesAfter(9),
 	holdReason: "MODEL_UNAVAILABLE",
 	retryCount: 0,
 };
@@ -169,7 +170,7 @@ export const mockJobBackingOff: AgentJob = {
 	model: "openai/gpt-oss-20b",
 	configSnapshot: { name: "GPU gateway (OpenAI)", llmProvider: "OPENAI" },
 	createdAt: new Date("2026-05-20T11:00:00Z"),
-	availableAt: new Date(Date.now() + 3 * MINUTE_MS),
+	availableAt: minutesAfter(3),
 	errorMessage: "Runner exited with code 137 (out of memory).",
 	retryCount: 2,
 };

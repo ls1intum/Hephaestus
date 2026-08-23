@@ -53,9 +53,9 @@ comprehensive verification. A `:webapp`, `:server` or `:agents` suffix scopes an
 scopes `format` and `lint` only — the Java leg of `check` is `check:server`.
 
 **`check` is a strict superset of CI, and the difference is only ever caught locally.** PMD
-(`lint:java`), `check:diagrams` and `check:env` run in no workflow; the only thing that runs them
-before a merge is the `pre-push` hook, which `--no-verify` skips. Green CI is therefore not evidence
-that `pnpm run check` passes. Run it yourself before you claim it.
+(`lint:java`), `check:diagrams`, `check:env` and `check:story-sort` run in no workflow; the only thing
+that runs them before a merge is the `pre-push` hook, which `--no-verify` skips. Green CI is therefore
+not evidence that `pnpm run check` passes. Run it yourself before you claim it.
 
 ### Lint and format scopes
 
@@ -87,8 +87,12 @@ Type-aware rules need a project, and oxlint finds one by looking for a file name
 `tsconfig.json`. The root stub exists only so the Bun trees — configured by `tsconfig.agents.json` —
 have one; without it every ambient global resolves to an error type there.
 
-The SPA's house lint rules are oxlint JS plugins in `webapp/tools/oxlint/rules/`, each with a
-`RuleTester` suite beside it — `webapp/AGENTS.md` § Linting.
+The house lint rules are oxlint JS plugins in `webapp/tools/oxlint/rules/`, registered by
+`webapp/tools/oxlint/index.ts` and each with a `RuleTester` suite beside it. They live under `webapp/`
+but are not the SPA's alone: all three configs load that one plugin, so a rule is available to every
+tree and each config chooses which to turn on — `no-non-ascii-filename` is on in all three, the
+story-shaped ones only in the SPA. Adding a rule there does not enable it anywhere.
+`webapp/AGENTS.md` § Linting has the rest.
 
 ## Generated artefacts — never hand-edit, regenerate
 

@@ -1,9 +1,8 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { expect, fn, userEvent } from "storybook/test";
 import type { ConnectionSyncStatus, SyncJob } from "@/api/types.gen";
+import { minutesBefore } from "@/components/common/story-clock";
 import { IntegrationOverviewCard } from "./IntegrationOverviewCard";
-
-const minutesAgo = (minutes: number) => new Date(Date.now() - minutes * 60_000);
 
 const SYNC_INTERVAL_SECONDS = 3_600;
 
@@ -15,8 +14,8 @@ const status: ConnectionSyncStatus = {
 	resourceCounts: { total: 12, errored: 0, pending: 0, stale: 0 },
 	backfillSupported: true,
 	syncIntervalSeconds: SYNC_INTERVAL_SECONDS,
-	lastSuccessfulSyncAt: minutesAgo(4),
-	lastEventProcessedAt: minutesAgo(1),
+	lastSuccessfulSyncAt: minutesBefore(4),
+	lastEventProcessedAt: minutesBefore(1),
 };
 
 const runningJob: SyncJob = {
@@ -25,8 +24,8 @@ const runningJob: SyncJob = {
 	trigger: "MANUAL",
 	status: "RUNNING",
 	cancelRequested: false,
-	createdAt: minutesAgo(2),
-	startedAt: minutesAgo(2),
+	createdAt: minutesBefore(2),
+	startedAt: minutesBefore(2),
 	itemsProcessed: 5,
 	itemsTotal: 12,
 };
@@ -97,7 +96,7 @@ export const WithErroredAndStaleResources: Story = {
 };
 
 export const StaleFreshness: Story = {
-	args: { status: { ...status, lastSuccessfulSyncAt: minutesAgo(200) } },
+	args: { status: { ...status, lastSuccessfulSyncAt: minutesBefore(200) } },
 };
 
 export const UnknownCadence: Story = {
@@ -105,7 +104,7 @@ export const UnknownCadence: Story = {
 		status: {
 			...status,
 			syncIntervalSeconds: undefined,
-			lastSuccessfulSyncAt: minutesAgo(60 * 30),
+			lastSuccessfulSyncAt: minutesBefore(60 * 30),
 			lastEventProcessedAt: undefined,
 		},
 	},

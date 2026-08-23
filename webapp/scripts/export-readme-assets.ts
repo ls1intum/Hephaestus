@@ -122,6 +122,7 @@ async function capture(
 		const modeSuffix = mode === "desktop" ? "" : `${mode}-`;
 		const outputPath = resolve(outputDirectory, `${name}-${modeSuffix}${theme}.png`);
 		await exportSurface.screenshot({ path: outputPath });
+		// oxlint-disable-next-line no-console -- This is a terminal script whose product is a set of image files, and stdout is the only channel that tells its operator which paths were written.
 		console.log(`Exported ${outputPath}`);
 	} finally {
 		await page.close();

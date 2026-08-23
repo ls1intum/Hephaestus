@@ -20,6 +20,7 @@ import {
 	usageSearchSchema,
 } from "@/components/admin/usage/usage-search";
 import { canStepForwardFrom, isCurrentMonthUtc } from "@/components/admin/usage/usage-utils";
+import { useNow } from "@/components/common/use-now";
 import { PageHeader } from "@/components/core/PageHeader";
 import { PageLayout } from "@/components/core/PageLayout";
 import { instanceAdminHead } from "@/lib/page-title";
@@ -85,6 +86,7 @@ function AdminInstanceUsagePage() {
 
 	const canGoNext = canStepForwardFrom(month);
 	const isCurrentMonth = isCurrentMonthUtc(month);
+	const now = new Date(useNow());
 
 	const handleSubmitBudget = (monthlyBudgetUsd: number | null) => {
 		if (!editing) {
@@ -120,6 +122,7 @@ function AdminInstanceUsagePage() {
 			<AdminInstanceLlmUsageTable
 				rows={rows}
 				month={month}
+				now={now}
 				fx={fx}
 				isCurrentMonth={isCurrentMonth}
 				isLoading={listQuery.isLoading}

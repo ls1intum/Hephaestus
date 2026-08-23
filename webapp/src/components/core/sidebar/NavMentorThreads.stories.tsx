@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react";
+import { daysBefore, minutesBefore, STORY_NOW } from "@/components/common/story-clock";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { NavMentorThreads } from "./NavMentorThreads";
 
@@ -26,9 +27,6 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-const now = Date.now();
-const day = 24 * 60 * 60 * 1000;
-
 /**
  * Default view showing empty state.
  */
@@ -44,23 +42,23 @@ export const Default: Story = {
 export const WithMockData: Story = {
 	args: {
 		threads: [
-			{ id: "1", title: "React Hooks Best Practices", createdAt: new Date() },
-			{ id: "2", title: "TypeScript Generic Types", createdAt: new Date() },
-			{ id: "3", title: "Database Design Help", createdAt: new Date() },
+			{ id: "1", title: "React Hooks Best Practices", createdAt: new Date(STORY_NOW) },
+			{ id: "2", title: "TypeScript Generic Types", createdAt: new Date(STORY_NOW) },
+			{ id: "3", title: "Database Design Help", createdAt: new Date(STORY_NOW) },
 			{
 				id: "4",
 				title: "API Architecture Review",
-				createdAt: new Date(now - day - 60_000),
+				createdAt: minutesBefore(24 * 60 + 1),
 			},
 			{
 				id: "5",
 				title: "Frontend Performance Tips",
-				createdAt: new Date(now - day - 60_000),
+				createdAt: minutesBefore(24 * 60 + 1),
 			},
 			{
 				id: "6",
 				title: "Performance Optimization",
-				createdAt: new Date(now - 3 * day),
+				createdAt: daysBefore(3),
 			},
 		],
 	},

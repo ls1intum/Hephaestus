@@ -37,7 +37,8 @@ export interface AdminLlmUsagePageProps {
 	error: unknown;
 	onRetry?: () => void;
 	onEditOwnProviderCap: () => void;
-	now?: Date;
+	/** The instant the projection is measured against. The caller owns it, so that rendering reads no clock. */
+	now: Date;
 }
 
 export function AdminLlmUsagePage({
@@ -50,7 +51,7 @@ export function AdminLlmUsagePage({
 	error,
 	onRetry,
 	onEditOwnProviderCap,
-	now = new Date(),
+	now,
 }: AdminLlmUsagePageProps) {
 	const sharedSpend = report?.instanceTotalCostUsd ?? 0;
 	const providerSpend = report?.ownProviderTotalCostUsd ?? 0;

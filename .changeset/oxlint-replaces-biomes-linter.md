@@ -17,5 +17,15 @@ Also fixed, all found by a stricter type and lint gate over the web app:
 - A theme, a workspace role or a feature flag that the browser or server reported as something this
   build does not recognise is now ignored rather than trusted: the theme falls back to the default,
   the role is refused, and the flag reads as off.
+- The primary button gave no hover feedback. The style was written so that it only applied when the
+  button was rendered as a link, so the most-used button in the app looked inert under the cursor.
+- A mentor attachment that failed to upload disappeared with no message, leaving the sender believing
+  it was attached. The failure is now reported.
+- A disabled accordion section still opened when clicked.
+- Copying a mentor reply to the clipboard failed silently when the browser refused.
+- Countdowns now advance while the page is open: an Outline token's expiry, and the wait shown while a
+  sync is rate-limited, previously only moved when something else on the page happened to redraw.
+- Screen readers no longer hear an orientation announced on grouped toggle buttons, which is not
+  something a group can meaningfully have.
 - The achievements API described an unlock time as always present, even for an achievement nobody
   has earned. It is now reported as absent, which is what the server was already sending.

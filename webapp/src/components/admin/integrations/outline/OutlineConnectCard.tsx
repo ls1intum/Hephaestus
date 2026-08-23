@@ -8,6 +8,7 @@ import {
 	type ConnectionState,
 } from "@/components/admin/integrations/sync-format";
 import { RelativeTime } from "@/components/common/RelativeTime";
+import { useNow } from "@/components/common/use-now";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
 	AlertDialog,
@@ -248,6 +249,9 @@ interface OutlineTokenPanelProps {
  * is warn early. Rejection and imminent expiry both silently kill the mirror, so both are alerts, not muted text.
  */
 function OutlineTokenPanel({ tokenStatus, isLoading }: OutlineTokenPanelProps) {
+	// The expiry countdown has to age while the page stays open, so it comes from the shared ticking
+	// clock rather than a reading taken during this render.
+	const now = useNow();
 	if (isLoading) {
 		return <Skeleton className="h-5 w-64" />;
 	}
@@ -278,7 +282,7 @@ function OutlineTokenPanel({ tokenStatus, isLoading }: OutlineTokenPanelProps) {
 		expiresAt != null ||
 		lastActiveAt != null;
 
-	const daysLeft = expiresAt ? differenceInCalendarDays(expiresAt, new Date()) : undefined;
+	const daysLeft = expiresAt ? differenceInCalendarDays(expiresAt, new Date(now)) : undefined;
 	const expiringSoon = daysLeft != null && daysLeft <= EXPIRY_WARNING_DAYS;
 
 	return (

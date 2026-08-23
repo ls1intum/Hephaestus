@@ -7,12 +7,11 @@ import { hasText } from "@/lib/text";
  * use `viewBox="0 0 16 16"` and a single `<path>` element.
  *
  * The factory mirrors the API surface of `@primer/octicons-react`:
- * - `forwardRef` for DOM access
- * - rest-prop spreading for native SVG attributes
+ * - rest-prop spreading for native SVG attributes, `ref` among them
  * - conditional `aria-hidden` based on `aria-label` / `aria-labelledby`
  */
 
-import { forwardRef, type SVGProps } from "react";
+import type { SVGProps } from "react";
 
 export interface GitLabIconProps extends Omit<SVGProps<SVGSVGElement>, "children"> {
 	/** Icon size in pixels. Defaults to 16. */
@@ -20,13 +19,12 @@ export interface GitLabIconProps extends Omit<SVGProps<SVGSVGElement>, "children
 }
 
 function createGitLabIcon(pathData: string, displayName: string) {
-	const Icon = forwardRef<SVGSVGElement, GitLabIconProps>(({ size = 16, ...rest }, ref) => {
+	const Icon = ({ size = 16, ...rest }: GitLabIconProps) => {
 		const labelled = hasText(rest["aria-label"]) || hasText(rest["aria-labelledby"]);
 		return (
 			// Accessibility is handled conditionally below: `aria-hidden` when decorative,
 			// `role="img"` + `aria-label` when labelled. No linter checks this.
 			<svg
-				ref={ref}
 				width={size}
 				height={size}
 				viewBox="0 0 16 16"
@@ -39,7 +37,7 @@ function createGitLabIcon(pathData: string, displayName: string) {
 				<path fillRule="evenodd" clipRule="evenodd" d={pathData} />
 			</svg>
 		);
-	});
+	};
 	Icon.displayName = displayName;
 	return Icon;
 }

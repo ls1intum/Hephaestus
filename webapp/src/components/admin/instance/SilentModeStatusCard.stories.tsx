@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react";
+import { hoursBefore } from "@/components/common/story-clock";
 import { SilentModeStatusCard } from "./SilentModeStatusCard";
 
 const meta = {
@@ -20,7 +21,7 @@ export const Engaged: Story = {
 		settings: {
 			etag: '"0"',
 			silentModeEngaged: true,
-			silentModeChangedAt: new Date(Date.now() - 2 * 3_600_000),
+			silentModeChangedAt: hoursBefore(2),
 			silentModeChangedBy: "felixtjdietrich",
 		},
 	},

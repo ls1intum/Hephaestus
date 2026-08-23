@@ -141,6 +141,7 @@ describe("useSyncEvents", () => {
 		runReconnectBackoff();
 		// A re-open more than the throttle window after the first one must catch up on whatever the
 		// stream dropped while it was down.
+		// oxlint-disable-next-line no-restricted-properties -- Reads the faked clock in order to move it forward; `setSystemTime` takes an absolute instant, so the current one is the only place to measure the jump from.
 		vi.setSystemTime(Date.now() + 60_000);
 		act(() => latestSource().open());
 
@@ -401,30 +402,35 @@ describe("useSyncEvents", () => {
 	it("drops a hint whose connection id came over as a string instead of acting on half of it", () => {
 		const queryClient = new QueryClient();
 		const invalidate = vi.spyOn(queryClient, "invalidateQueries");
-		const debug = vi.spyOn(console, "debug").mockImplementation(() => {});
 		renderHook(() => useSyncEvents(WORKSPACE), { wrapper: wrapper(queryClient) });
 
 		act(() => latestSource().emitRaw(JSON.stringify({ scope: "job", connectionId: "42" })));
 		flushHintDebounce();
 
 		expect(invalidate).not.toHaveBeenCalled();
-
-		debug.mockRestore();
 	});
 
-	it("swallows a malformed hint payload without throwing or invalidating anything", () => {
+	// A hint is a nudge, so an unreadable one costs nothing as long as the stream survives it: the
+	// listener has to stay attached and the next readable hint has to land. A guard that threw would
+	// take the `sync` listener down with it and every later hint on that connection with it.
+	it("swallows a malformed hint payload and keeps acting on the next readable one", () => {
 		const queryClient = new QueryClient();
 		const invalidate = vi.spyOn(queryClient, "invalidateQueries");
-		const debug = vi.spyOn(console, "debug").mockImplementation(() => {});
 		renderHook(() => useSyncEvents(WORKSPACE), { wrapper: wrapper(queryClient) });
 
 		act(() => latestSource().emitRaw("}{ not json"));
 		flushHintDebounce();
 
-		expect(debug).toHaveBeenCalled();
 		expect(invalidate).not.toHaveBeenCalled();
 
-		debug.mockRestore();
+		act(() => latestSource().emit("activity"));
+		flushHintDebounce();
+
+		expect(invalidate).toHaveBeenCalledWith({
+			queryKey: getConnectionSyncStatusQueryKey({
+				path: { workspaceSlug: WORKSPACE, connectionId: CONNECTION_ID },
+			}),
+		});
 	});
 
 	it("closes the stream and stops reconnecting on unmount", () => {

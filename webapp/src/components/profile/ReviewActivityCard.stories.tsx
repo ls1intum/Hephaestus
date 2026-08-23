@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react";
+import { STORY_NOW } from "@/components/common/story-clock";
 import { withProvider } from "@/stories/decorators";
 import { ReviewActivityCard } from "./ReviewActivityCard";
 
@@ -61,7 +62,7 @@ export const Approved: Story = {
 	args: {
 		isLoading: false,
 		state: "APPROVED",
-		submittedAt: new Date(),
+		submittedAt: new Date(STORY_NOW),
 		htmlUrl: "https://github.com/ls1intum/Hephaestus/pull/42",
 		pullRequest: {
 			title: "Add new feature to dashboard",
@@ -82,7 +83,7 @@ export const ChangesRequested: Story = {
 	args: {
 		isLoading: false,
 		state: "CHANGES_REQUESTED",
-		submittedAt: new Date(),
+		submittedAt: new Date(STORY_NOW),
 		htmlUrl: "https://github.com/ls1intum/Artemis/pull/123",
 		pullRequest: {
 			title: "Fix bug in submission process",
@@ -103,7 +104,7 @@ export const Commented: Story = {
 	args: {
 		isLoading: false,
 		state: "COMMENTED",
-		submittedAt: new Date(),
+		submittedAt: new Date(STORY_NOW),
 		htmlUrl: "https://github.com/ls1intum/Athena/pull/56",
 		pullRequest: {
 			title: "Update documentation for API endpoints",
@@ -124,7 +125,7 @@ export const Loading: Story = {
 	args: {
 		isLoading: true,
 		state: "COMMENTED",
-		submittedAt: new Date(),
+		submittedAt: new Date(STORY_NOW),
 		htmlUrl: "https://github.com/ls1intum/Hephaestus/pull/77",
 		pullRequest: {
 			title: "Loading...",
@@ -145,7 +146,7 @@ export const Dismissed: Story = {
 	args: {
 		isLoading: false,
 		state: "DISMISSED",
-		submittedAt: new Date(),
+		submittedAt: new Date(STORY_NOW),
 		htmlUrl: "https://github.com/ls1intum/Hephaestus/pull/99",
 		pullRequest: {
 			title: "Refactor authentication system",
@@ -166,7 +167,7 @@ export const Unknown: Story = {
 	args: {
 		isLoading: false,
 		state: "UNKNOWN",
-		submittedAt: new Date(),
+		submittedAt: new Date(STORY_NOW),
 		htmlUrl: "https://github.com/ls1intum/ExampleRepo/pull/78",
 		pullRequest: {
 			title: "Initial implementation of feature X",
@@ -187,7 +188,7 @@ export const WithCodeInTitle: Story = {
 	args: {
 		isLoading: false,
 		state: "APPROVED",
-		submittedAt: new Date(),
+		submittedAt: new Date(STORY_NOW),
 		htmlUrl: "https://github.com/ls1intum/Hephaestus/pull/42",
 		pullRequest: {
 			title: "Update `LeaderboardTable` component and fix `ProfileContent` layout",

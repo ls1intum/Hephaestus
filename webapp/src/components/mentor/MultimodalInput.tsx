@@ -1,6 +1,7 @@
 import { ArrowDown, ArrowUp, Paperclip, Square } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { type ChangeEvent, type RefObject, useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 import { useWindowSize } from "usehooks-ts";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -94,8 +95,10 @@ export function MultimodalInput({
 			);
 
 			onAttachmentsChange([...attachments, ...successfullyUploadedAttachments]);
-		} catch (error) {
-			console.error("Error uploading files!", error);
+		} catch {
+			// The queue empties either way, so without this the attachments simply vanish and the sender
+			// is left believing they were attached.
+			toast.error("Could not attach those files. Please try again.");
 		} finally {
 			setUploadQueue([]);
 		}
@@ -121,7 +124,6 @@ export function MultimodalInput({
 						className="absolute left-1/2 -top-12 -translate-x-1/2 z-[95] backdrop-blur-sm rounded-full"
 					>
 						<Button
-							data-testid="scroll-to-bottom-button"
 							aria-label="Scroll to latest message"
 							className="rounded-full bg-background/80 dark:bg-background/80 border-border/50 shadow-lg hover:bg-background/90 dark:hover:bg-background/90"
 							size="icon"
@@ -150,10 +152,7 @@ export function MultimodalInput({
 			)}
 
 			{(attachments.length > 0 || uploadQueue.length > 0) && (
-				<div
-					data-testid="attachments-preview"
-					className="flex flex-row gap-2 overflow-x-scroll items-end"
-				>
+				<div className="flex flex-row gap-2 overflow-x-scroll items-end">
 					{attachments.map((attachment) => (
 						<PreviewAttachment key={attachment.url} attachment={attachment} />
 					))}
@@ -182,7 +181,6 @@ export function MultimodalInput({
 			>
 				<div className="flex-1">
 					<Textarea
-						data-testid="multimodal-input"
 						ref={textareaRef}
 						aria-label="Message"
 						placeholder={placeholder}
@@ -239,7 +237,6 @@ function AttachmentsButton({
 }) {
 	return (
 		<Button
-			data-testid="attachments-button"
 			aria-label="Attach a file"
 			className="rounded-md rounded-bl-lg p-[7px] dark:border-zinc-700 hover:dark:bg-zinc-900 hover:bg-zinc-200"
 			onClick={(event) => {
@@ -258,7 +255,6 @@ function AttachmentsButton({
 function StopButton({ onStop }: { onStop: () => void }) {
 	return (
 		<Button
-			data-testid="stop-button"
 			aria-label="Stop generating"
 			className="rounded-full p-1.5 border dark:border-zinc-600"
 			onClick={(event) => {
@@ -275,7 +271,6 @@ function StopButton({ onStop }: { onStop: () => void }) {
 function SendButton({ onSubmit, disabled }: { onSubmit: () => void; disabled: boolean }) {
 	return (
 		<Button
-			data-testid="send-button"
 			aria-label="Send message"
 			className="rounded-full p-1.5 border dark:border-zinc-600"
 			onClick={(event) => {

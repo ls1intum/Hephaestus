@@ -2,7 +2,13 @@ import { LinkIcon, type LucideIcon, Unlink } from "lucide-react";
 import { useEffect, useRef } from "react";
 import type { IdentityProviderView, IdentityView } from "@/api/types.gen";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
-import { GithubIcon, GitlabIcon, OutlineIcon, SlackIcon } from "@/components/icons/brand";
+import {
+	type BrandIcon,
+	GithubIcon,
+	GitlabIcon,
+	OutlineIcon,
+	SlackIcon,
+} from "@/components/icons/brand";
 import {
 	AlertDialog,
 	AlertDialogCancel,
@@ -37,7 +43,12 @@ import { asDate } from "@/lib/dates";
 import { getProviderLabel } from "@/lib/provider";
 import { firstNonBlank } from "@/lib/text";
 
-const PROVIDER_ICONS: Record<string, LucideIcon> = {
+/**
+ * Lucide glyphs and the in-house brand glyphs are separate component types, and this slot takes
+ * either — naming only `LucideIcon` would pin `BrandIcon` to Lucide's exact shape. All the slot asks
+ * of a glyph is that it render from `className`, which both do.
+ */
+const PROVIDER_ICONS: Record<string, LucideIcon | BrandIcon> = {
 	GITHUB: GithubIcon,
 	GITLAB: GitlabIcon,
 	SLACK: SlackIcon,
@@ -62,7 +73,7 @@ const LINK_ONLY_RATIONALE: Record<string, string> = {
  * Resolve a brand icon from a provider type (e.g. "GITHUB", "GITLAB"). Falls back
  * to a generic link icon for unknown providers so new IdPs render gracefully.
  */
-function getProviderIcon(providerType?: string): LucideIcon {
+function getProviderIcon(providerType?: string): LucideIcon | BrandIcon {
 	if (!providerType) return LinkIcon;
 	return PROVIDER_ICONS[providerType.toUpperCase()] ?? LinkIcon;
 }

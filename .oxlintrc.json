@@ -3,6 +3,9 @@
 
 	// Everything outside `webapp/` and `docs/`, both of which carry their own config. A nested config
 	// REPLACES this one for the files under it rather than merging, so each tree states its rules in full.
+	// Only the file-naming rule is enabled from the SPA's house plugin; the rest are about React.
+	"jsPlugins": ["./webapp/tools/oxlint/index.ts"],
+
 	"plugins": ["typescript", "unicorn", "oxc", "import", "promise"],
 
 	// Root-only, and global: `typeAware` governs every config in the repo, nested ones included. It
@@ -148,6 +151,8 @@
 		"prefer-exponentiation-operator": "error",
 		"prefer-arrow-callback": "error",
 		"import/no-relative-parent-imports": "error",
+		"hephaestus/no-non-ascii-filename": "error",
+		"import/no-cycle": "error",
 		"import/no-duplicates": "error",
 		"no-duplicate-imports": "error",
 		"import/no-mutable-exports": "error",

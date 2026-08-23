@@ -57,7 +57,6 @@ export function PreviewMessage({
 	return (
 		<AnimatePresence>
 			<motion.div
-				data-testid={`message-${message.role}`}
 				className={cn(
 					"w-full max-w-3xl px-4 group/message",
 					{
@@ -82,7 +81,7 @@ export function PreviewMessage({
 
 					<div className="flex flex-col gap-4 w-full">
 						{attachmentsFromMessage.length > 0 && (
-							<div data-testid="message-attachments" className="flex flex-row justify-end gap-2">
+							<div className="flex flex-row justify-end gap-2">
 								{attachmentsFromMessage.map((attachment) => (
 									<PreviewAttachment
 										key={attachment.url}
@@ -105,7 +104,6 @@ export function PreviewMessage({
 									return (
 										<div
 											key={key}
-											data-testid="message-content"
 											className={cn("flex flex-col gap-4", {
 												"self-end w-fit min-w-0 bg-primary text-primary-foreground px-3 py-2 rounded-xl ml-5":
 													message.role === "user",
@@ -184,7 +182,6 @@ export const ThinkingMessage = () => {
 
 	return (
 		<motion.div
-			data-testid="message-assistant-loading"
 			className="w-full mx-auto max-w-3xl px-4 group/message min-h-96"
 			initial={{ y: 5 }}
 			animate={{ y: 0 }}

@@ -12,6 +12,7 @@ import {
 	type VisibilityState,
 } from "@tanstack/react-table";
 import { ArrowUpDown, ChevronDown, RefreshCw, Search, Sparkles, Users } from "lucide-react";
+// oxlint-disable-next-line no-restricted-imports -- `useReactTable` below opts this component out of React Compiler entirely (`react/incompatible-library` names the same fact), so the one value TanStack Table keys its own memoisation on keeps a hand-written memo. See `columns`.
 import { useMemo, useState } from "react";
 import { TablePagination } from "@/components/common/TablePagination";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -63,6 +64,8 @@ export function AdminAchievementsTable({
 	const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
 	const [globalFilter, setGlobalFilter] = useState("");
 
+	// TanStack Table rebuilds its column model, and with it every row model downstream, whenever this
+	// array's identity changes — and nothing else memoises it here, so the memo is load-bearing.
 	const columns = useMemo<ColumnDef<ExtendedUserTeams>[]>(
 		() => [
 			{
@@ -143,10 +146,10 @@ export function AdminAchievementsTable({
 		[onRecalculate, recalculatingUsers, workspaceSlug],
 	);
 
-	const pageSizeItems = useMemo(
-		() => [10, 20, 30, 40, 50].map((size) => ({ value: `${size}`, label: `${size}` })),
-		[],
-	);
+	const pageSizeItems = [10, 20, 30, 40, 50].map((size) => ({
+		value: `${size}`,
+		label: `${size}`,
+	}));
 
 	// oxlint-disable-next-line react/incompatible-library -- TanStack Table is a deliberate dependency, and React Compiler opts this component out entirely
 	const table = useReactTable({

@@ -1,7 +1,8 @@
 import { type UseChatHelpers, useChat } from "@ai-sdk/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { DefaultChatTransport } from "ai";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 import { v4 as uuidv4 } from "uuid";
 import {
 	getThreadOptions,
@@ -70,6 +71,7 @@ export function useMentorChat({
 			hasWorkspace ? queryClient.getQueryData<ChatThreadDetail>(threadQueryKey) : undefined,
 		// A function, not a call: `Date.now()` here would run on every render, and React Compiler
 		// treats an impure call during render as a bailout.
+		// oxlint-disable-next-line no-restricted-properties -- The freshness stamp TanStack Query ages `staleTime` against has to be the same wall clock the cache itself uses; a ticking React clock would age it by whole render intervals.
 		initialDataUpdatedAt: () => Date.now(),
 		staleTime: 60_000,
 		refetchOnMount: false,
@@ -86,6 +88,7 @@ export function useMentorChat({
 		enabled: hasWorkspace,
 		initialData: () =>
 			hasWorkspace ? queryClient.getQueryData<ChatThreadSummary[]>(threadsKey) : undefined,
+		// oxlint-disable-next-line no-restricted-properties -- Same freshness stamp as the thread query above, read from the same wall clock TanStack Query compares `staleTime` against.
 		initialDataUpdatedAt: () => Date.now(),
 		staleTime: 60_000,
 		refetchOnMount: false,
@@ -115,40 +118,37 @@ export function useMentorChat({
 	}
 	Object.assign(voteState, castVotes);
 
+	// `updatedAt` is the server's stamp on a stored vote and nothing renders it, so an overlay
+	// entry — which exists precisely because the server has not recorded it yet — leaves it unset
+	// rather than inventing an instant that would differ on every render.
 	const votes: ChatMessageVote[] = Object.entries(voteState)
 		.filter((entry): entry is [string, boolean] => entry[1] !== undefined)
-		.map(([messageId, isUpvoted]) => ({
-			messageId,
-			isUpvoted,
-			updatedAt: new Date(),
-		}));
+		.map(([messageId, isUpvoted]) => ({ messageId, isUpvoted }));
 
-	// Transport must be stable across renders — `useChat` reads `transport` once on mount
-	// and again only when identity changes; a fresh `DefaultChatTransport` per render would
-	// thrash internal state. The deps reduce to per-workspace + per-thread-id.
-	const transport = useMemo(
-		() =>
-			new DefaultChatTransport<ChatMessage>({
-				api: `${environment.serverUrl}/workspaces/${slug}/mentor/chat`,
-				prepareSendMessagesRequest: ({ id, messages }) => {
-					const effectiveId = id || stableThreadId;
-					// Only send the latest message; backend reconstructs context from thread id.
-					// Parent-message linkage lives on the server via the chat_message tree, so we
-					// don't ship a `previousMessageId` (it would be a no-op the server ignores).
-					const lastMessage = messages.at(-1);
-					return {
-						body: { id: effectiveId, message: lastMessage },
-						// Cookie-session auth (ADR 0017): session cookie rides credentials:include;
-						// CSRF double-submit header for this state-changing POST.
-						credentials: "include",
-						headers: { ...csrfHeaders() },
-					};
-				},
-			}),
-		[slug, stableThreadId],
-	);
+	// `useChat` builds its `Chat` instance from these options on mount and rebuilds it only when
+	// `id` changes, so it reads the transport once and the identity of a later one is never a
+	// dependency of anything.
+	const transport = new DefaultChatTransport<ChatMessage>({
+		api: `${environment.serverUrl}/workspaces/${slug}/mentor/chat`,
+		prepareSendMessagesRequest: ({ id, messages }) => {
+			const effectiveId = id || stableThreadId;
+			// Only send the latest message; backend reconstructs context from thread id.
+			// Parent-message linkage lives on the server via the chat_message tree, so we
+			// don't ship a `previousMessageId` (it would be a no-op the server ignores).
+			const lastMessage = messages.at(-1);
+			return {
+				body: { id: effectiveId, message: lastMessage },
+				// Cookie-session auth (ADR 0017): session cookie rides credentials:include;
+				// CSRF double-submit header for this state-changing POST.
+				credentials: "include",
+				headers: { ...csrfHeaders() },
+			};
+		},
+	});
 
-	const handleFinish = useCallback(() => {
+	// `useChat` re-reads both handlers into a ref on every render and calls through that ref, so
+	// each one only has to be the current closure — never a stable reference.
+	const handleFinish = () => {
 		if (hasWorkspace) {
 			void queryClient.invalidateQueries({
 				queryKey: listThreadsQueryKey({ path: { workspaceSlug: slug } }),
@@ -162,14 +162,11 @@ export function useMentorChat({
 			});
 		}
 		onFinish?.();
-	}, [hasWorkspace, queryClient, slug, threadId, stableThreadId, onFinish]);
+	};
 
-	const handleError = useCallback(
-		(error: Error) => {
-			onError?.(error);
-		},
-		[onError],
-	);
+	const handleError = (error: Error) => {
+		onError?.(error);
+	};
 
 	const {
 		messages,
@@ -207,10 +204,14 @@ export function useMentorChat({
 		if (status === "streaming" || status === "submitted") return;
 		if (!threadDetail?.messages) return;
 
-		// Validate messages before setting state
+		// Validate messages before setting state. A thread whose stored transcript does not parse
+		// would otherwise render as an empty conversation with nothing to explain it, so say so —
+		// keyed on the thread, which keeps a re-run of this effect updating one toast, not stacking.
 		const validatedMessages = parseThreadMessages(threadDetail.messages);
 		if (!validatedMessages) {
-			console.error("[useMentorChat] Failed to validate thread messages");
+			toast.error("Couldn't load this conversation's earlier messages.", {
+				id: `mentor-thread-${threadId}`,
+			});
 			return;
 		}
 
