@@ -63,25 +63,29 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
+/** The editor is a drawer level, so it arrives over a transition rather than being simply present. */
+async function settledEditor(): Promise<HTMLElement> {
+	const [popup] = document.querySelectorAll<HTMLElement>('[data-slot="drawer-popup"]');
+	await expectSettledVisible(popup);
+	return popup;
+}
+
 export const Create: Story = {
 	parameters: {
 		viewport: { defaultViewport: "reflow" },
 		chromatic: { viewports: [320, 1440] },
 	},
 	play: async () => {
-		const [popup] = document.querySelectorAll<HTMLElement>('[data-slot="drawer-popup"]');
-		await expectSettledVisible(popup);
 		// The level is the full viewport at 320px, so the form has to fit it: 43 controls that scroll
 		// down, never across.
-		await expectNoPanelOverflow(popup);
+		await expectNoPanelOverflow(await settledEditor());
 	},
 };
 
 export const LeavingTheEditor: Story = {
 	parameters: { chromatic: { disableSnapshot: true } },
 	play: async () => {
-		const [popup] = document.querySelectorAll<HTMLElement>('[data-slot="drawer-popup"]');
-		await expectSettledVisible(popup);
+		const popup = await settledEditor();
 
 		// A draft is not discarded by a stray gesture. `DetailDrawerStack` proves the mechanism; this
 		// pins that the editor is one of the levels wired to it.
@@ -102,6 +106,7 @@ export const EditWithAdvanced: Story = {
 export const Submitting: Story = {
 	args: { isPending: true, onSubmit: fn() },
 	play: async () => {
+		await settledEditor();
 		await expect(screen.getByRole("textbox", { name: /Name/ })).toBeDisabled();
 	},
 };
@@ -118,6 +123,7 @@ export const EditClearsOptionalGuidance: Story = {
 	},
 	parameters: { chromatic: { disableSnapshot: true } },
 	play: async () => {
+		await settledEditor();
 		editSubmit.mockClear();
 		await userEvent.clear(screen.getByRole("textbox", { name: "Why it matters" }));
 		await userEvent.clear(screen.getByRole("textbox", { name: "What good looks like" }));
@@ -136,6 +142,7 @@ export const EditClearsOptionalGuidance: Story = {
 export const ValidationErrors: Story = {
 	parameters: { chromatic: { viewports: [320, 1440] } },
 	play: async () => {
+		await settledEditor();
 		await userEvent.click(screen.getByRole("button", { name: "Create practice" }));
 		await expect(screen.getByText("Name must be at least 3 characters")).toBeVisible();
 		await expect(screen.queryByText("Select at least one trigger event")).not.toBeInTheDocument();
@@ -184,6 +191,7 @@ export const ValidationAndSubmit: Story = {
 export const ConversationPractice: Story = {
 	parameters: { chromatic: { disableSnapshot: true } },
 	play: async () => {
+		await settledEditor();
 		createSubmit.mockClear();
 		await userEvent.type(screen.getByRole("textbox", { name: /Name/ }), "Helpful discussion");
 		await userEvent.click(screen.getByRole("radio", { name: /Conversation/ }));

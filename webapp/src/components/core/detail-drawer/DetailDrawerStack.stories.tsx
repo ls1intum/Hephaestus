@@ -164,6 +164,114 @@ export const GuardedLevelRefusesCasualDismissal: Story = {
 	},
 };
 
+export const ArrivesWithAnEnterTransition: Story = {
+	args: { stack: [] },
+	parameters: { chromatic: { disableSnapshot: true } },
+	render: (args) => (
+		<Stateful initial={args.stack}>
+			{(stack, setStack) => (
+				<>
+					<Button onClick={() => setStack([{ kind: "practice", id: "describe-what-and-why" }])}>
+						Open a level
+					</Button>
+					<DetailDrawerStack
+						{...args}
+						stack={stack}
+						onClose={(depth) => setStack(stack.slice(0, depth))}
+					/>
+				</>
+			)}
+		</Stateful>
+	),
+	play: async () => {
+		// Observed rather than polled: the starting style lasts one frame, which `waitFor` steps over.
+		// It is also what has to be asserted — a level mounts when its entry appears, so it mounts
+		// already open, and Base UI seeds `mounted` from `open`, which means the branch that sets
+		// `starting` never runs and the panel is simply *there*, at rest, with no transition at all.
+		let started = false;
+		const observer = new MutationObserver((records) => {
+			for (const record of records) {
+				for (const node of record.addedNodes) {
+					if (!(node instanceof HTMLElement)) continue;
+					const popup = node.matches('[data-slot="drawer-popup"]')
+						? node
+						: node.querySelector('[data-slot="drawer-popup"]');
+					if (popup?.hasAttribute("data-starting-style")) started = true;
+				}
+			}
+		});
+		observer.observe(document.body, { childList: true, subtree: true });
+
+		await userEvent.click(screen.getByRole("button", { name: "Open a level" }));
+		await expectSettledVisible(await screen.findByText("practice · describe-what-and-why"));
+		observer.disconnect();
+		await expect(started).toBe(true);
+	},
+};
+
+export const CoveredLevelKeepsAColumnReadable: Story = {
+	args: {
+		stack: [
+			{ kind: "area", id: "review-ready-work" },
+			{ kind: "practice", id: "describe-what-and-why" },
+		],
+	},
+	parameters: { chromatic: { disableSnapshot: true } },
+	play: async () => {
+		await expectSettledVisible(await screen.findByText("practice · describe-what-and-why"));
+		// The class rather than the computed value: this suite runs under `prefers-reduced-motion`,
+		// which zeroes `--peek` on purpose, so the resolved width proves nothing here. What broke was
+		// upstream of that — `cn()` dedupes an arbitrary custom property by name and keeps the last,
+		// so a `--peek` default declared after the size variant silently replaced it and the column
+		// was 1rem, narrower than the panel's own padding.
+		await expect(popups()[0].className).toContain("[--peek:4rem]");
+	},
+};
+
+export const DismissedLevelDoesNotComeBack: Story = {
+	args: {
+		stack: [
+			{ kind: "area", id: "review-ready-work" },
+			{ kind: "practice", id: "describe-what-and-why" },
+		],
+	},
+	parameters: { chromatic: { disableSnapshot: true } },
+	render: (args) => (
+		<Stateful initial={args.stack}>
+			{(stack, setStack) => (
+				<DetailDrawerStack
+					{...args}
+					stack={stack}
+					// The app's `onClose` navigates, so the stack shrinks a frame or more after the exit
+					// completes. Synchronous state hides the bug this story exists for.
+					onClose={(depth) => {
+						args.onClose(depth);
+						requestAnimationFrame(() =>
+							requestAnimationFrame(() => setStack(stack.slice(0, depth))),
+						);
+					}}
+				/>
+			)}
+		</Stateful>
+	),
+	play: async () => {
+		await expectSettledVisible(await screen.findByText("practice · describe-what-and-why"));
+		const parent = popups()[0];
+		await userEvent.click(screen.getByRole("button", { name: "Back" }));
+
+		// Watch every frame until the level is gone. Clearing the closing depth on the completion
+		// frame re-opened it while the navigation was still in flight: it popped back in, and this
+		// level snapped to its stepped-back position and animated forward a second time.
+		const nested: string[] = [];
+		for (let frame = 0; frame < 40 && popups().length > 1; frame++) {
+			await new Promise((resolve) => requestAnimationFrame(resolve));
+			nested.push(getComputedStyle(parent).getPropertyValue("--nested-drawers").trim());
+		}
+		await waitFor(() => expect(popups()).toHaveLength(1));
+		await expect(nested.indexOf("1")).toBe(-1);
+	},
+};
+
 export const Closed: Story = {
 	args: { stack: [] },
 	play: async () => {

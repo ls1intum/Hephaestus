@@ -339,6 +339,20 @@ no travelling the width of the viewport, but the fade stays so the arrival is st
 resolving to `width`/`height`/inset must be constant, or scoped to the axis where it is constant —
 a survivor's geometry must never depend on the element that is leaving.
 
+**The Storybook suite runs under `prefers-reduced-motion: reduce`** — `vitest.config.storybook.ts`
+sets it on the Playwright context so play functions are deterministic. Every `motion-reduce:` rule is
+therefore the branch under test, and no story can assert travel distance, an easing curve or a peek
+width: those are exactly the values reduced motion zeroes. A motion regression has to be pinned on
+something reduced motion leaves alone — the presence of `data-starting-style`, an attribute's
+sequence over frames, or the class list itself. Three separate drawer bugs shipped green through this
+suite before that was written down.
+
+**A drawer that mounts already open never animates in.** Base UI's `useTransitionStatus` seeds
+`mounted` from `open`, so `open && !mounted` — the branch that sets `starting` — cannot run on the
+first render, and the popup gets no `data-starting-style` frame. Anything mounted by URL state hits
+this. Mount it closed and open it a frame later (`DetailDrawerStack`'s `useArrived`); an effect is
+not enough, because a passive effect can be flushed before the browser paints the closed state.
+
 ## Search params that are UI state
 
 A filter, a toggle, an open panel on the page you are already on is not a navigation. Write it with

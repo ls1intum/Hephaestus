@@ -75,6 +75,13 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
+/** The editor is a drawer level, so it arrives over a transition rather than being simply present. */
+async function settledEditor(): Promise<HTMLElement> {
+	const [popup] = document.querySelectorAll<HTMLElement>('[data-slot="drawer-popup"]');
+	await expectSettledVisible(popup);
+	return popup;
+}
+
 export const Create: Story = {
 	args: {
 		mode: "create",
@@ -87,9 +94,7 @@ export const Create: Story = {
 		chromatic: { viewports: [320, 1440] },
 	},
 	play: async () => {
-		const [popup] = document.querySelectorAll<HTMLElement>('[data-slot="drawer-popup"]');
-		await expectSettledVisible(popup);
-		await expectNoPanelOverflow(popup);
+		await expectNoPanelOverflow(await settledEditor());
 	},
 };
 
@@ -114,6 +119,7 @@ export const StaleEdit: Story = {
 		onSubmit: fn(),
 	},
 	play: async () => {
+		await settledEditor();
 		await expect(screen.getByText("This practice changed while you were editing")).toBeVisible();
 		await expect(screen.getByRole("button", { name: "Save changes" })).toBeDisabled();
 	},
@@ -146,6 +152,7 @@ export const HephaestusUpdateAvailable: Story = {
 		onSubmit: fn(),
 	},
 	play: async () => {
+		await settledEditor();
 		// The full label, since colour alone cannot carry which kind of update it is.
 		await expect(screen.getByText("Hephaestus update available: review rules")).toBeVisible();
 		await expect(screen.getByText(/would change review rules/)).toBeVisible();
@@ -167,6 +174,7 @@ export const ValidationErrors: Story = {
 	},
 	parameters: { chromatic: { disableSnapshot: true } },
 	play: async () => {
+		await settledEditor();
 		await userEvent.click(screen.getByRole("button", { name: "Create practice" }));
 		await expect(screen.getByText("Name must be at least 3 characters")).toBeVisible();
 		await expect(screen.queryByText("Select at least one trigger event")).not.toBeInTheDocument();
@@ -186,6 +194,7 @@ export const Submitting: Story = {
 		onSubmit: fn(),
 	},
 	play: async () => {
+		await settledEditor();
 		await expect(screen.getByRole("textbox", { name: /Name/ })).toBeDisabled();
 	},
 };

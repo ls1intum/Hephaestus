@@ -94,7 +94,7 @@ const drawerContentVariants = cva("", {
 	variants: {
 		size: {
 			default:
-				"data-[swipe-axis=x]:[--drawer-content-width:75%] data-[swipe-axis=x]:sm:[--drawer-content-width:24rem]",
+				"[--peek:1rem] data-[swipe-axis=x]:[--drawer-content-width:75%] data-[swipe-axis=x]:sm:[--drawer-content-width:24rem]",
 			/**
 			 * A panel that replaces a page, so it has to hold what that page held. Full width below
 			 * `sm`, where a partial cover is unreadable. `--peek` is far above the default: the column
@@ -154,7 +154,7 @@ function DrawerContent({
 						// the step-back go to zero and the panel fades instead of travelling its own width.
 						"motion-reduce:[--stack-step:0] motion-reduce:[--peek:0px] motion-reduce:[--closed-transform:none] motion-reduce:data-ending-style:opacity-0 motion-reduce:data-starting-style:opacity-0",
 						// Stack — each nested drawer steps the ones behind it back by `--stack-step`.
-						"[--bleed:3rem] [--peek:1rem] [--stack-height:var(--drawer-frontmost-height,var(--drawer-height,0px))] [--stack-peek-offset:max(0px,calc((var(--nested-drawers)-var(--stack-progress))*var(--peek)))] [--stack-progress:clamp(0,var(--drawer-swipe-progress),1)] [--stack-scale-base:max(0,calc(1-(var(--nested-drawers)*var(--stack-step))))] [--stack-scale:clamp(0,calc(var(--stack-scale-base)+(var(--stack-step)*var(--stack-progress))),1)] [--stack-shrink:calc(1-var(--stack-scale))] [--stack-step:0.05]",
+						"[--bleed:3rem] [--stack-height:var(--drawer-frontmost-height,var(--drawer-height,0px))] [--stack-peek-offset:max(0px,calc((var(--nested-drawers)-var(--stack-progress))*var(--peek)))] [--stack-progress:clamp(0,var(--drawer-swipe-progress),1)] [--stack-scale-base:max(0,calc(1-(var(--nested-drawers)*var(--stack-step))))] [--stack-scale:clamp(0,calc(var(--stack-scale-base)+(var(--stack-step)*var(--stack-progress))),1)] [--stack-shrink:calc(1-var(--stack-scale))] [--stack-step:0.05]",
 						"[--drawer-ease:cubic-bezier(0.05,0.7,0.1,1)] [--drawer-enter:280ms] [--drawer-exit:calc(var(--drawer-swipe-strength)*200ms)] duration-(--drawer-enter)",
 						"data-ending-style:transform-(--closed-transform) data-ending-style:opacity-[0.9999] data-ending-style:duration-(--drawer-exit) data-ending-style:[--drawer-ease:cubic-bezier(0.2,0,0.38,0.9)] data-nested-drawer-swiping:duration-0 data-ending-style:data-nested-drawer-swiping:duration-(--drawer-exit) data-starting-style:transform-(--closed-transform) data-swiping:duration-0 data-ending-style:data-swiping:duration-(--drawer-exit)",
 						"data-[swipe-axis=y]:inset-x-0 data-[swipe-axis=y]:data-nested-drawer-open:h-(--stack-height)",
