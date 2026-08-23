@@ -131,3 +131,44 @@ keeps local Docker capability for mentor; dedicated workers claim queued practic
    also stops job *submission* and orphan recovery on that pod — see `docs/admin/runtime-roles.mdx`.
    A pod that must have no Docker capability at all is a different deployment shape than this ADR
    describes and needs a real server-only role, still unbuilt.
+
+## Update — 2026-08-22 (a setting must reach a container that can read it)
+
+This ADR establishes that a role decides which beans exist in a container. It says nothing about the
+configuration those beans read, and that gap has a failure mode of its own.
+
+A `@ConfigurationProperties` record read only by role-gated beans is, on a container running with
+that role off, a variable nothing binds. Compose sets it, `docker inspect` shows it, a runbook quotes
+it — and it configures nothing, with no signal anywhere. It surfaced when a disk bound for the
+webhook streams (ADR 0008) was delivered to `application-server`, which runs with
+`hephaestus.runtime.webhook.enabled=false`: the bound and its documented recovery procedure were both
+inert.
+
+**Decision.** `scripts/check-env-roles.mjs` fails the build on three shapes of the same defect:
+
+| Failure | What it catches |
+|---|---|
+| misdelivered | a service sets a variable whose owning role that same service disables |
+| undelivered | the deployment forwards it, but no container running the owning role receives it |
+| unforwarded | `application.yml` offers it as a `${VAR:default}` knob no service forwards at all |
+
+Ownership is declared per `application.yml` path, not per property record, because it is finer than a
+record: `hephaestus.webhook.secret` is read on the server role for outbound registration while
+`hephaestus.webhook.stream.*` is read on the webhook role, both out of `WebhookProperties`. A scope
+naming a path `application.yml` no longer has fails too, so a rename cannot leave an entry behind
+that silently checks nothing. A role a *profile overlay* switches off counts as off, so
+`application-worker.yml` is read alongside each service's environment.
+
+The gate runs in the `App Server` quality job, not only in the pre-push hook that `--no-verify`
+skips — a gate written for a defect that reached production has to be able to fail a required build.
+
+**Consequences.** Adding a role-gated property block now means adding a `ROLE_SCOPES` entry; leaving
+it out means the check passes by assuming the property is readable everywhere, which can miss a
+defect but never invent one. Compose is parsed directly rather than through `docker compose config`,
+so the gate needs no Docker daemon and its verdict does not depend on the ambient environment — what
+the shipped topology does with nothing set is the question.
+
+**Revisit trigger.** A deployment shape whose roles are not decided by Compose environment plus
+Spring profiles — a Kubernetes adapter with its own templating, or a BYO runner — makes reading the
+Compose files the wrong way to answer the question, and the gate has to move to whatever declares the
+topology instead.

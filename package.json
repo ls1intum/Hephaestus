@@ -71,7 +71,7 @@
 		"check:stories": "node scripts/check-story-prose.mjs",
 		"check:components": "node scripts/check-presentational-components.mjs",
 		"check:diagrams": "node scripts/check-mermaid-diagrams.mjs",
-		"check:env": "node scripts/check-env-defaults.mjs",
+		"check:env": "node scripts/check-env-defaults.mjs && node scripts/check-env-roles.mjs && node --test scripts/check-env-roles.test.mjs",
 		"check:biome-pin": "node scripts/check-biome-pin.mjs"
 	},
 	"devDependencies": {

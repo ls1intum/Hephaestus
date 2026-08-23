@@ -21,6 +21,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -79,6 +80,20 @@ public class DockerClientOperations
         } catch (Exception e) {
             log.debug("imageIsPresent check failed for {}: {}", image, e.getMessage());
             return false;
+        }
+    }
+
+    @Override
+    public Optional<Map<String, String>> imageLabels(String image) {
+        try {
+            var config = dockerClient.inspectImageCmd(image).exec().getConfig();
+            Map<String, String> labels = config == null ? null : config.getLabels();
+            return Optional.of(labels == null ? Map.of() : Map.copyOf(labels));
+        } catch (NotFoundException e) {
+            return Optional.empty();
+        } catch (Exception e) {
+            log.debug("imageLabels lookup failed for {}: {}", image, e.getMessage());
+            return Optional.empty();
         }
     }
 

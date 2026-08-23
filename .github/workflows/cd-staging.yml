@@ -35,21 +35,42 @@ jobs:
     outputs:
       image-exists: ${{ steps.check.outputs.exists }}
     steps:
-      # Every main push builds :<sha>, except when skip-duplicate-actions dedups an
-      # identical tree. Skip the deploy (instead of failing red) when that happens.
-      - name: Look up application-server image for this commit
+      # The server and the agent image are one runtime contract, so this asks about the PAIR: the
+      # server stages TypeScript runners and execs `bun` inside agent-pi, and deploying a commit
+      # whose agent image never published leaves the app resolving an unmatched one (ADR 0031).
+      #
+      # A missing image is normal, not a failure — skip rather than deploy half a pair. Both known
+      # causes are benign: skip-duplicate-actions dedups an identical tree, and a CI/CD run
+      # cancelled by a later push (merging several PRs in quick succession) leaves the earlier
+      # commit's images unpublished.
+      - name: Look up the image pair for this commit
         id: check
         env:
-          IMAGE: ghcr.io/ls1intum/hephaestus/application-server
           SHA: ${{ github.event.workflow_run.head_sha }}
           TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          set -euo pipefail
           echo "$TOKEN" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
-          if docker manifest inspect "${IMAGE}:${SHA}" >/dev/null 2>&1; then
-            echo "exists=true" >> "$GITHUB_OUTPUT"
-          else
+          missing=""
+          for img in application-server agent-pi; do
+            ref="ghcr.io/ls1intum/hephaestus/${img}:${SHA}"
+            # Presence is a bare probe on its own exit status, as in release.yml. Reading the digest
+            # in the condition instead would test `jq`'s status, and `jq` exits 0 on empty input — an
+            # absent image would then look present and the pair would go unchecked.
+            if ! docker buildx imagetools inspect "$ref" > /dev/null 2>&1; then
+              missing="${missing} ${img}"
+              continue
+            fi
+            digest=$(docker buildx imagetools inspect "$ref" --format '{{json .Manifest}}' | jq -r '.digest')
+            [[ "$digest" =~ ^sha256:[a-f0-9]{64}$ ]] || {
+              echo "::error::${img} digest at ${SHA} is malformed: ${digest:-<empty>}"; exit 1; }
+            echo "${img}: ${digest}"
+          done
+          if [ -n "$missing" ]; then
             echo "exists=false" >> "$GITHUB_OUTPUT"
-            echo "No \`application-server:${SHA}\` image (build deduplicated) — nothing to deploy." >> "$GITHUB_STEP_SUMMARY"
+            echo "No \`${missing# }\` image at \`${SHA}\` (build deduplicated or its CI run cancelled) — nothing to deploy." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "exists=true" >> "$GITHUB_OUTPUT"
           fi
 
   deploy-staging:

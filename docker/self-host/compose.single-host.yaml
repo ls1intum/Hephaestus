@@ -121,7 +121,7 @@ services:
     # The reference publishes 127.0.0.1:4222 for operator access from the host.
     # Here everything reaches NATS over the compose network, and publishing it
     # makes `up` fail outright on a host that already runs something on 4222.
-    # JetStream is sized down via NATS_JS_MAX_MEM / NATS_JS_MAX_FILE in .env.
+    # JetStream is sized down via NATS_JS_MAX_MEM / NATS_JS_MAX_FILE_BYTES in .env.
     ports: !override []
 
 networks:

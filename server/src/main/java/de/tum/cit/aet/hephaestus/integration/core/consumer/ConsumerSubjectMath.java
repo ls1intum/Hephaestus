@@ -201,13 +201,22 @@ public final class ConsumerSubjectMath {
     }
 
     /**
-     * Builds the durable consumer name for a scope. Format: {@code <base>-scope-<scopeId>}.
+     * The {@code <base>-} every durable this deployment creates starts with. Both name builders below
+     * are derived from it, so it is also what separates this deployment's durables from another's on a
+     * shared broker.
      */
-    public static String scopeConsumerName(String baseConsumerName, long scopeId) {
+    public static String durablePrefix(String baseConsumerName) {
         if (baseConsumerName == null || baseConsumerName.isBlank()) {
             throw new IllegalArgumentException("Base consumer name cannot be null or blank.");
         }
-        return baseConsumerName + "-scope-" + scopeId;
+        return baseConsumerName + "-";
+    }
+
+    /**
+     * Builds the durable consumer name for a scope. Format: {@code <base>-scope-<scopeId>}.
+     */
+    public static String scopeConsumerName(String baseConsumerName, long scopeId) {
+        return durablePrefix(baseConsumerName) + "scope-" + scopeId;
     }
 
     /**
@@ -215,9 +224,6 @@ public final class ConsumerSubjectMath {
      * {@code <base>-installation}.
      */
     public static String installationConsumerName(String baseConsumerName) {
-        if (baseConsumerName == null || baseConsumerName.isBlank()) {
-            throw new IllegalArgumentException("Base consumer name cannot be null or blank.");
-        }
-        return baseConsumerName + "-installation";
+        return durablePrefix(baseConsumerName) + "installation";
     }
 }

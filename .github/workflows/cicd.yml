@@ -67,6 +67,10 @@ jobs:
               - 'pnpm-lock.yaml'
               # check:biome-pin compares this file's $schema against the pinned version.
               - 'webapp/biome.json'
+              # check:env compares application.yml against the deployment that has to deliver it, so
+              # a change to either side has to be able to trigger the job that runs it.
+              - 'docker/compose.app.yaml'
+              - 'docker/compose.core.yaml'
             agent-images:
               - 'docker/agents/**'
             docs:
