@@ -6,7 +6,7 @@ Screen readers now announce what every dropdown list is for. The status, timefra
 rows-per-page and model pickers each opened a list of options with no name attached, so the list
 itself was announced as unlabelled.
 
-Also fixed, all found by a stricter type and lint gate over the web app:
+Also fixed, all surfaced by a stricter type and lint gate across the whole codebase:
 
 - A review schedule saved with a time that had no minutes (`9` rather than `09:00`) stored no minute
   at all instead of falling back to the hour's start.
