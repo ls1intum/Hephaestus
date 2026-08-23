@@ -55,11 +55,6 @@ class PracticeFeedbackDeliveryPolicyTest extends BaseUnitTest {
         );
     }
 
-    /**
-     * Composition runs before anything has decided which practices contribute, so the caller has no slug
-     * set to offer. Reading that as a refusal closed the in-app and conversation lanes for every
-     * workspace, and both listeners gate on this one method.
-     */
     @Test
     void compositionIsAllowedBeforeAnyPracticeSetIsKnown() {
         AgentJob job = conversationJob();
@@ -68,7 +63,6 @@ class PracticeFeedbackDeliveryPolicyTest extends BaseUnitTest {
         assertThat(policy().allowsComposition(job, DeliveryPolicySurface.CONVERSATION)).isTrue();
     }
 
-    /** The unaskable authority question is not a bypass: the instance-wide brake still stops it. */
     @Test
     void silentModeStillStopsComposition() {
         AgentJob job = conversationJob();

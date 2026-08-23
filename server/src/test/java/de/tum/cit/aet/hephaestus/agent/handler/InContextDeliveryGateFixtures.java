@@ -14,15 +14,14 @@ import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.util.Optional;
 
 /**
- * The workspace side of {@link InContextDeliveryGate}, held still, so a handler test that needs a gate
- * decides on practice autonomy and run provenance alone. A test of the rollout fence itself must build
- * its own workspace: {@link #workspacesAtRevision} takes the revision the fence compares against.
+ * Holds the workspace side of {@link InContextDeliveryGate} still, so a handler test turns on practice
+ * autonomy and run provenance alone; a test of the rollout fence itself must name its own revision with
+ * {@link #workspacesAtRevision}.
  */
 final class InContextDeliveryGateFixtures {
 
     private InContextDeliveryGateFixtures() {}
 
-    /** A real gate over the caller's mocks, for the handler tests that need one as a dependency. */
     static InContextDeliveryGate gate(
         PracticeRepository practices,
         ObservationRepository observations,
@@ -37,7 +36,7 @@ final class InContextDeliveryGateFixtures {
         return provider;
     }
 
-    /** Every workspace sits at revision 0, which is what a test {@link AgentJob} is admitted under. */
+    /** Revision 0 for every workspace: the revision a test {@link AgentJob} is admitted under. */
     static WorkspaceRepository workspaces() {
         return workspacesAtRevision(0L);
     }
@@ -55,7 +54,6 @@ final class InContextDeliveryGateFixtures {
         return repository;
     }
 
-    /** No workspace at all: the fence has no revision to match and must withhold. */
     static WorkspaceRepository noWorkspaces() {
         WorkspaceRepository repository = mock(WorkspaceRepository.class);
         lenient().when(repository.findById(anyLong())).thenReturn(Optional.empty());

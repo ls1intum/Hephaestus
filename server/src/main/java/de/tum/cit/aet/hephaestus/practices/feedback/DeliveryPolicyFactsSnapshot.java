@@ -8,7 +8,10 @@ import de.tum.cit.aet.hephaestus.workspace.settings.ReviewRepositoryMode;
 import java.util.List;
 import org.jspecify.annotations.Nullable;
 
-/** Compact immutable facts used for one delivery decision; excludes payload and personal identifiers. */
+/**
+ * The facts behind one delivery decision, persisted and served as-is: never add feedback payload or a
+ * personal identifier to it.
+ */
 public record DeliveryPolicyFactsSnapshot(
     @Nullable String artifactKind,
     @Nullable String repository,

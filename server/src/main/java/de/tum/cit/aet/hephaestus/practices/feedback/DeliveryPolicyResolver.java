@@ -5,8 +5,8 @@ import java.util.List;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Pure delivery-policy resolver. A nullable fact is not applicable at this decision point; once a
- * check denies delivery, later checks are retained as {@code NOT_REACHED} so traces remain complete.
+ * Resolves a delivery decision from facts. A null fact means the question is not applicable at this
+ * decision point, which is not a denial — pass null rather than false for a question you cannot yet ask.
  */
 public final class DeliveryPolicyResolver {
 

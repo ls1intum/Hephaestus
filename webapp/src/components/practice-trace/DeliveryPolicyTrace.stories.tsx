@@ -24,7 +24,6 @@ const allowedEvaluation: DeliveryPolicyTraceData = {
 	],
 };
 
-/** The open end of every scope axis, and a denial early enough to leave four checks unreached. */
 const openScopeEvaluation: DeliveryPolicyTraceData = {
 	...deniedEvaluation,
 	surface: "IN_APP",
@@ -100,14 +99,11 @@ export const Denied: Story = {
 		await expect(
 			canvas.getByText("Stopped here. The developer has opted out of AI feedback."),
 		).toBeVisible();
-		// The two statuses a denial produces, each in its own words. NOT_APPLICABLE is a state of the
-		// artifact rather than of the denial, so it belongs to NoScopeRecorded.
 		await expect(canvas.getByText("Denied")).toBeVisible();
 		await expect(canvas.getByText("Not reached")).toBeVisible();
 	},
 };
 
-/** Nothing stopped it, so there is no decisive reason to name. */
 export const Allowed: Story = {
 	args: { evaluations: [allowedEvaluation] },
 	play: async ({ canvas }) => {
@@ -122,8 +118,8 @@ export const Allowed: Story = {
 };
 
 /**
- * The scope axes read as words, never as the constant the wire carries: `ALL_MONITORED` reaching the
- * page as "all_monitored repositories" is the regression this story exists to catch.
+ * Every scope axis must read as words: a wire constant like `ALL_MONITORED` reaching the page
+ * verbatim is the regression this story catches.
  */
 export const OpenScope: Story = {
 	args: { evaluations: [openScopeEvaluation] },
@@ -132,14 +128,12 @@ export const OpenScope: Story = {
 		const scope = await canvas.findByText(/^Scope:/);
 		await expect(scope).toHaveTextContent("Repositories: all monitored");
 		await expect(scope).toHaveTextContent("People: all eligible");
-		await expect(scope).toHaveTextContent("Subject: author not linked");
+		await expect(scope).toHaveTextContent("Subject: author is not a workspace member");
 		await expect(scope.textContent).not.toMatch(/_/);
-		// Surface and stage are the two the other stories do not reach.
 		await expect(canvas.getByText(/^In-app feedback · Automatic authorization/)).toBeVisible();
 	},
 };
 
-/** No repository and no modes recorded: each axis says which one it has nothing to report on. */
 export const NoScopeRecorded: Story = {
 	args: { evaluations: [conversationEvaluation] },
 	play: async ({ canvas }) => {
@@ -151,7 +145,6 @@ export const NoScopeRecorded: Story = {
 	},
 };
 
-/** Every check row is a label pushed away from its badge, which is what overflows first. */
 export const Reflow: Story = {
 	args: {
 		evaluations: [

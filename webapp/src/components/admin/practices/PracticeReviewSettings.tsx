@@ -99,12 +99,6 @@ export interface PracticeReviewSettingsProps {
 	};
 }
 
-/**
- * Four sections for four questions an operator asks separately: may a review start, what starts
- * one, whose work it may open, and whether the result may leave. Coverage and delivery were one
- * section until pausing — the control reached for when something is going wrong — ended up as the
- * second-to-last switch on the page, indistinguishable from a preference.
- */
 export function PracticeReviewSettings({
 	workspaceSlug,
 	model,
@@ -348,9 +342,7 @@ function CooldownField({
 }
 
 /**
- * The two halves of one population: where the work lives and whose it is. Both must admit a piece of
- * work before a review opens, which is the fact the page has to carry — two lists side by side read
- * as "either" to everybody who has not seen the resolver.
+ * Both lists must admit a piece of work before a review opens: the two are an AND, not an either.
  *
  * Matches are exact: a wildcard language here would be a promise the gate cannot keep, since it
  * holds the pull request row and not the diff.
@@ -396,9 +388,8 @@ function ReviewedWorkSection({
 			names.some((name) => !repositoryNames.includes(name)),
 		);
 	};
-	// An empty branch list means "every base branch", so emptying one widens and every other removal
-	// narrows. Comparing lengths read both backwards: it opened the confirmation on a removal and
-	// skipped it on the addition that actually admitted new work.
+	// An empty branch list means "every base branch", so emptying one widens while every other
+	// removal narrows.
 	const widensBranches = (before: string[], after: string[]) =>
 		after.length === 0
 			? before.length > 0
@@ -408,18 +399,17 @@ function ReviewedWorkSection({
 	const coversNobody =
 		(scope.repositoryMode === "SELECTED" && scope.repositories.length === 0) ||
 		(scope.personMode === "SELECTED" && scope.personUserIds.length === 0);
-	// Counted from the scope on screen rather than read off the saved summary: the summary is a
-	// server read that lands after the write, so trusting it puts "3 of 3 covered" above a list
-	// holding one repository. Only the totals and the volume come from the server, and neither of
-	// those moves when the selection does.
-	// A repository can leave the monitored set while it is still named here, and then it quietly
-	// covers nothing. Only claimed once the list is actually known: a failed or pending load holds
-	// no repositories either, and every row saying "not monitored" over a dropped request is worse
-	// than saying nothing.
-	const monitoredNow = (nameWithOwner: string) =>
-		coverage.repositories.isLoading ||
-		coverage.repositories.isError ||
-		coverage.repositories.options.some((option) => option.value === nameWithOwner);
+	// Undefined until the monitored list is actually known, because a pending or failed load holds no
+	// repositories either and "unknown" must not be reported as "unmonitored".
+	const monitoredNames =
+		coverage.repositories.isLoading || coverage.repositories.isError
+			? undefined
+			: new Set(coverage.repositories.options.map((option) => option.value));
+	// A repository can leave the monitored set while the scope still names it, and then it covers
+	// nothing.
+	const monitoredNow = (nameWithOwner: string) => monitoredNames?.has(nameWithOwner) ?? true;
+	// Counted off the scope on screen rather than `summary.coveredRepositories`: the summary is a
+	// server read that lands after the write, so it reports the count from before the edit.
 	const coveredRepositories =
 		scope.repositoryMode === "ALL_MONITORED"
 			? summary.monitoredRepositories
@@ -440,7 +430,6 @@ function ReviewedWorkSection({
 				</p>
 			</div>
 
-			{/* One consequence, said once, rather than the same sentence under each of the two lists. */}
 			{coversNobody ? (
 				<Alert variant="warning" role="status">
 					<AlertCircle />
@@ -540,11 +529,11 @@ function ReviewedWorkSection({
 					label="People"
 					covered={coveredPeople}
 					total={summary.eligiblePeople}
-					noun="linked"
+					noun="members"
 				/>
 				<FieldDescription>
-					Somebody has to have signed in to Hephaestus at least once before their work can be
-					reviewed.
+					Only members of this workspace are reviewed. Members come from the connected organisation
+					or group, from the team graph, or from someone adding them on the Members screen.
 				</FieldDescription>
 				<RadioGroup
 					aria-labelledby="people-covered-label"
@@ -557,7 +546,7 @@ function ReviewedWorkSection({
 				>
 					<label className="flex items-center gap-2" htmlFor="people-all">
 						<RadioGroupItem id="people-all" value="ALL_ELIGIBLE" />
-						Everyone who has signed in
+						Every member of this workspace
 					</label>
 					<label className="flex items-center gap-2" htmlFor="people-selected">
 						<RadioGroupItem id="people-selected" value="SELECTED" />
@@ -579,7 +568,7 @@ function ReviewedWorkSection({
 								)
 							}
 							disabled={policy.isSaving || coverage.people.isLoading}
-							emptyLabel={coverage.people.isError ? "Members unavailable" : "No linked members"}
+							emptyLabel={coverage.people.isError ? "Members unavailable" : "No workspace members"}
 						/>
 						{scope.personUserIds.length === 0 ? (
 							<Empty className="border py-6">
@@ -592,8 +581,6 @@ function ReviewedWorkSection({
 								</EmptyHeader>
 							</Empty>
 						) : (
-							// Chips rather than the combobox trigger's "+3": during a pilot the roster is the
-							// thing being checked, and a popover you have to open to read is not a roster.
 							<ul className="flex flex-wrap gap-2">
 								{scope.personUserIds.map((userId) => (
 									<li key={userId}>
@@ -666,7 +653,7 @@ function ReviewedWorkSection({
 								{preview.proposed.monitoredRepositories}
 							</p>
 							<p>
-								Eligible linked members covered: <strong>{preview.current.coveredPeople}</strong>
+								Workspace members covered: <strong>{preview.current.coveredPeople}</strong>
 								{" → "}
 								<strong>{preview.proposed.coveredPeople}</strong> of{" "}
 								{preview.proposed.eligiblePeople}
@@ -696,11 +683,6 @@ function ReviewedWorkSection({
 	);
 }
 
-/**
- * Whether the already-composed feedback may leave Hephaestus — its own section, because it is the
- * control an operator reaches for when something is going wrong, and it answers a different question
- * from the two lists above it.
- */
 function FeedbackDeliverySection({ policy }: Pick<PracticeReviewSettingsProps, "policy">) {
 	const settings = policy.settings;
 	const paused = settings.deliveryStatus === "PAUSED";
@@ -793,11 +775,6 @@ function CoverageLabel({
 	);
 }
 
-/**
- * One covered repository. Its branch restriction is the row's own subtitle rather than a field
- * beside it: the restriction belongs to this repository, and a stack of sibling branch editors made
- * a five-repository pilot longer than the rest of the page put together.
- */
 function RepositoryScopeRow({
 	nameWithOwner,
 	baseBranches,
@@ -886,9 +863,8 @@ function BaseBranchEditor({
 
 	return (
 		<Field data-invalid={duplicate || undefined} className="border-t pt-3">
-			{/* The repository is already the row's title, so the visible label does not repeat it — but a
-			    screen reader listing the form's fields sees one of these per covered repository, and
-			    "Only these base branches" three times over names nothing. */}
+			{/* One of these editors exists per covered repository, so the sr-only suffix is what keeps
+			    them apart when a screen reader lists the form's fields out of context. */}
 			<FieldLabel htmlFor={id}>
 				Only these base branches
 				<span className="sr-only"> for {nameWithOwner}</span>
@@ -918,8 +894,8 @@ function BaseBranchEditor({
 						disabled={disabled || trimmed.length === 0 || duplicate}
 						onClick={add}
 					>
-						{/* One editor per repository, so every Add would otherwise answer to the same name; the
-						    visible word still opens the name a voice-control user says (WCAG 2.2 SC 2.5.3). */}
+						{/* Suffixed rather than replaced by an `aria-label`, so the accessible name still starts
+						    with the visible word a voice-control user says (WCAG 2.2 SC 2.5.3). */}
 						Add
 						<span className="sr-only"> to base branches for {nameWithOwner}</span>
 					</InputGroupButton>

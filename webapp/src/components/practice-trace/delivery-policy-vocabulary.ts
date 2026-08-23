@@ -78,18 +78,15 @@ export const DELIVERY_PERSON_MODE_LABELS = {
 } satisfies Record<PersonMode, string>;
 
 export const DELIVERY_SUBJECT_LABELS = {
-	RESOLVED_LINKED_HUMAN: "author linked to an account",
+	RESOLVED_LINKED_HUMAN: "author is a workspace member",
 	MISSING: "no author identified",
 	NON_HUMAN: "author is a bot",
-	UNLINKED: "author not linked",
+	UNLINKED: "author is not a workspace member",
 } satisfies Record<Subject, string>;
 
 /**
- * One vocabulary with the withheld-feedback surfaces: a decisive reason here and a feedback unit's
- * suppression reason are the same enum, and two sentences for one value is a drift.
- *
- * The annotation is the exhaustiveness check. `Reason` is generated separately from
- * `WithholdingReason`, so a reason the policy can return that the registry has no words for fails
- * `typecheck:webapp` on this line rather than rendering as a blank on the page.
+ * The explicit annotation is the exhaustiveness check: `Reason` is generated separately from
+ * `WithholdingReason`, so a policy reason the registry has no sentence for fails typechecking here
+ * instead of rendering as a blank on the page.
  */
 export const DELIVERY_REASON_SENTENCES: Record<Reason, string> = WITHHOLDING_REASON_DEFS;

@@ -165,9 +165,8 @@ class PullRequestCommentPoster {
     }
 
     /**
-     * A comment that is not the job's summary, and so must not carry the summary's marker: reconciliation
-     * looks the summary up by that marker, and would otherwise adopt this comment as the summary and edit
-     * it in place on the next review.
+     * Posts a comment that is not the job's summary. {@code marker} must not be the summary marker, or
+     * reconciliation will adopt this comment as the summary and edit it in place on the next review.
      */
     @Nullable
     String postAside(AgentJob job, String formattedBody, String marker) {
@@ -206,7 +205,6 @@ class PullRequestCommentPoster {
         return update(job, kind, buildTarget(job, kind, job.getWorkspace().getId()), externalRef, formattedBody);
     }
 
-    /** Issue counterpart of {@link #updateFormattedBody}: same contract, issue subject. */
     UpdateResult updateIssueFormattedBody(AgentJob job, String externalRef, String formattedBody) {
         IntegrationKind kind = requireIntegrationKind(job);
         return update(job, kind, buildIssueTarget(job, kind, job.getWorkspace().getId()), externalRef, formattedBody);

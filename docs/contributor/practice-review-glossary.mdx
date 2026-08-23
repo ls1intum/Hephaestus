@@ -41,7 +41,7 @@ For how the words fit together at runtime — the four stages, and the refusal v
 | **Review readiness**                | For one review, Hephaestus supports the configured mode, the declared evidence is sufficient, and every required source passes its checks.                                                                                                 | validation, activation                                            |
 | **Practice autonomy**               | Who may authorize feedback for one practice: nobody (`OFF`), a workspace owner or administrator (`HUMAN_APPROVAL`), or the system (`AUTOMATIC`). Nullable at practice and area levels, where null means “inherit”.                         | review tier, loudness tier, shadow mode, enabled                  |
 | **Effective autonomy**              | The autonomy in force after resolving practice → area → workspace. Always server-resolved and reported with its source.                                                                                                                    | autonomy override                                                 |
-| **Review coverage**                 | Which repositories and linked members' work may be reviewed. Repository and person modes are independent; effective coverage is their intersection.                                                                                        | filter, audience, pilot allowlist, review scope                   |
+| **Review coverage**                 | Which repositories' and which workspace members' work may be reviewed. Repository and person modes are independent; effective coverage is their intersection.                                                                                      | filter, audience, pilot allowlist, review scope                   |
 | **Delivery status**                 | Whether new external practice feedback may leave a workspace (`ACTIVE` or `PAUSED`). Pausing does not stop review or erase coverage.                                                                                                       | review status, practice autonomy, Silent Mode                     |
 
 A practice author defines requirements. That definition is not proof that the evidence is sufficient or that a
@@ -101,6 +101,10 @@ reader infer them:
   work type whatever state the work is in, so there is nothing for a practice to opt into;
   `PracticeDefinitionValidator` refuses a binding that names a manual-request signal. Do not present it as
   a moment an author can tick.
+- **A recurring sweep is `LIVE`, not `BACKFILL`.** `SWEEP` records how the work was *found*, and the work
+  it finds is current work that never raised an event. Its observations therefore compose and deliver
+  exactly like an event-triggered review. Only a confirmed past-work campaign carries `BACKFILL`, and only
+  `BACKFILL` is measured-and-never-delivered. A sweep is a standing authorisation to spend *and* to speak.
 
 `MANUAL` and `BACKFILL` are self-selected samples and `LIVE` is not, which is why they are held apart in
 every behavioural read. A `BACKFILL` observation is additionally entitled only to `IN_APP` — the
@@ -123,11 +127,14 @@ final egress guard still apply.
 | `AUTOMATIC`      | yes         | yes                  | the system, subject to delivery policy |
 
 `HUMAN_APPROVAL` is an operational mode, not silent observation. An in-context unit enters
-`AWAITING_APPROVAL` with its immutable content and target. A workspace owner or administrator can approve
-that exact proposal or reject it, optionally recording a structured reason. Approval moves the unit to
-`PREPARED`; release then rechecks Silent Mode, workspace availability, artifact validity, repository scope,
-recipient preference, and prior provider delivery. Rejection moves the unit to the terminal `DISCARDED`
-state.
+`AWAITING_APPROVAL` with its immutable content and target — only `IN_CONTEXT` feedback is approvable at
+all. A workspace owner or administrator can approve that exact proposal or reject it, optionally recording
+a structured reason. Approval moves the unit to `PREPARED`; rejection moves it to the terminal `DISCARDED`
+state. Release then re-verifies that the approved content still matches what is about to be sent
+(`APPROVAL_STALE`) and that every contributing practice still requires approval
+(`APPROVAL_NO_LONGER_ELIGIBLE`), walks [the delivery policy check order](#the-delivery-policy-check-order)
+again at the `APPROVED` stage, and reconciles a deterministic provider marker so a retry cannot post
+twice. An approval overrides none of those controls.
 
 Changing a practice to `AUTOMATIC` affects newly composed feedback only. Existing proposals remain explicit
 workflow items; a configuration change must never release historical proposals implicitly. `OFF` is for a
@@ -165,46 +172,95 @@ that admits review. Missing autonomy resolution fails closed for external delive
 `WorkspaceReviewScope` defines the workspace population that automatic review may admit. It has two
 independent modes:
 
-| Axis       | Broad mode                    | Narrow mode                                                              | Selected-empty means |
-| ---------- | ----------------------------- | ------------------------------------------------------------------------ | -------------------- |
-| Repository | `ALL_MONITORED`               | `SELECTED` repositories, each optionally narrowed to exact base branches | no repositories      |
-| Person     | `ALL_ELIGIBLE` linked members | `SELECTED` linked members                                                | no people            |
+| Axis       | Broad mode      | Narrow mode                                                              | Selected-empty means |
+| ---------- | --------------- | ------------------------------------------------------------------------ | -------------------- |
+| Repository | `ALL_MONITORED` | `SELECTED` repositories, each optionally narrowed to exact base branches | no repositories      |
+| Person     | `ALL_ELIGIBLE`  | `SELECTED` people                                                        | no people            |
 
 Both axes must admit an artifact; within one axis, any entry matches. An empty base-branch list on a
 selected repository means every branch in that repository. Branch restrictions apply to pull and merge
-requests; issues have no base branch and are matched by repository and person only. Names are
-exact—there are no glob or path rules. Coverage lives on the practice-review settings resource as
-`reviewScope` (`GET`/`PATCH /workspaces/{workspaceSlug}/practices/review-settings`), and a `PATCH`
-replaces it wholesale rather than merging, because the lists *are* the setting and a merge could only
-ever add.
+requests; issues have no base branch and are matched by repository and person only. Names are exact —
+there are no glob or path rules.
 
-The review subject for pull requests, merge requests, and issues is their author. A missing, ambiguous,
-unlinked, non-human, or non-member author is not expanded to all eligible people. This makes coverage an
+**`ALL_ELIGIBLE` means every human `WorkspaceMembership`, and that is the only definition.** Eligibility is
+a membership row plus `User.Type.USER`; nothing consults accounts, sign-ins or identity links, so do not
+write that a person must have signed in. Membership itself arrives from the organization or group roster
+sync, the team graph, an administrator, or workspace activity. `SELECTED` is validated against the same
+population, so a person who is not an eligible member cannot be selected.
+
+The review subject for pull requests, merge requests, and issues is their author, and
+`PracticeReviewCoverageService.SubjectStatus` records which of four things it turned out to be:
+`RESOLVED_LINKED_HUMAN`, `MISSING`, `NON_HUMAN`, or `UNLINKED`. Only the first can be matched against the
+person axis; the other three are never expanded to the whole eligible population. This makes coverage an
 operator-selected population while preserving the recipient's delivery preference as a separate veto.
 
 Coverage is returned as `reviewScope` by
-`GET /workspaces/{workspaceSlug}/practices/review-settings`. A `PATCH` replaces the complete coverage value;
-`POST /workspaces/{workspaceSlug}/practices/review-settings/coverage-preview` returns authoritative current
-and proposed repository/member counts before a widening change. Updates require the current resource ETag
-in `If-Match`.
+`GET /workspaces/{workspaceSlug}/practices/review-settings`. A `PATCH` on the same path replaces the
+complete coverage value and requires the current resource ETag in `If-Match`; that ETag is the settings'
+`configVersion`, not the rollout revision, so a write that changes nothing policy-relevant still
+invalidates a stale client. `POST /workspaces/{workspaceSlug}/practices/review-settings/coverage-preview`
+returns authoritative current and proposed repository/member counts plus whether the proposal widens.
+The two autonomy `PATCH` endpoints take no `If-Match`.
 
 `deliveryStatus` is a separate workspace brake. `PAUSED` stops external practice feedback without stopping
 review or deleting coverage. Resuming is prospective: feedback admitted under an earlier rollout revision
 is not released. Instance Silent Mode remains the stronger instance-wide egress boundary.
 
-Every composition and egress decision appends a versioned policy evaluation. It records the admitted and
-current rollout revisions, destination, stage, first decisive reason, ordered check results, and a bounded
-snapshot of the repository, branch, subject resolution, coverage modes, and contributing-practice
-autonomies that were evaluated. Check results are `PASSED`, `DENIED`, `NOT_APPLICABLE`, or `NOT_REACHED`;
-`NOT_REACHED` preserves precedence by showing which checks were skipped after the first denial. The trace
-must not persist feedback bodies or member profile data.
+Automatic admission records the current workspace `revision`. Any change to coverage, delivery status, the
+workspace default autonomy, or post-merge delivery advances it — narrowing as well as widening; the
+cooldown does not. Area and practice autonomy changes remain prospective through the proposal lifecycle
+and the practice-authority check rather than a second revision counter. An artifact refused before review
+records a typed terminal reason; changing coverage affects later work, not the refused occurrence.
 
-Automatic admission records the current workspace `revision`. Workspace coverage, delivery, and default-autonomy
-changes advance it. Area and practice autonomy changes remain prospective through the proposal lifecycle and
-the current-autonomy egress check rather than a second revision counter. Composition and egress compare the
-admitted and current workspace revisions and re-evaluate identity, coverage, autonomy, recipient preference,
-artifact validity, and egress controls. An artifact refused before review records a typed terminal reason; changing
-coverage affects later work, not the refused occurrence.
+### The delivery policy check order
+
+`DeliveryPolicyResolver` is the one place that turns facts into a delivery decision, and it walks a single
+ordered list. **The first `DENIED` decides**; every check after it is `NOT_REACHED`. A question that cannot
+be asked at this point in the pipeline is `NOT_APPLICABLE` — not a denial, and not a pass.
+
+| # | `DeliveryPolicyCheck`  | Denial records                |
+| - | ---------------------- | ----------------------------- |
+| 1 | `INSTANCE_SILENT_MODE` | `INSTANCE_SILENCED`           |
+| 2 | `WORKSPACE_ENABLED`    | `WORKSPACE_DISABLED`          |
+| 3 | `ROLLOUT_REVISION`     | `STALE_ROLLOUT_REVISION`      |
+| 4 | `WORKSPACE_DELIVERY`   | `WORKSPACE_DELIVERY_PAUSED`   |
+| 5 | `CURRENT_COVERAGE`     | `OUTSIDE_CURRENT_COVERAGE`    |
+| 6 | `PRACTICE_AUTHORITY`   | `PRACTICE_REQUIRES_APPROVAL`  |
+| 7 | `RECIPIENT_CONSENT`    | `RECIPIENT_OPTED_OUT`         |
+| 8 | `ARTIFACT_ELIGIBILITY` | the artifact's own reason     |
+
+The order is the argument. Instance-wide controls precede workspace ones, the rollout fence precedes every
+question it could make moot, and the artifact is judged last because a closed pull request is the least
+interesting thing to say about feedback that policy would have refused anyway. `ARTIFACT_ELIGIBILITY`
+records `ARTIFACT_CLOSED`, `ARTIFACT_MERGED` or, when nothing more specific is known, `ARTIFACT_GONE`.
+
+The same list runs at each `DeliveryPolicyStage` — `COMPOSITION`, `AUTOMATIC`, `APPROVED`, `EGRESS` — and
+two checks read the stage:
+
+- **`PRACTICE_AUTHORITY`** asks whether *every* contributing practice sits at the autonomy this stage
+  needs: `AUTOMATIC` when the system is releasing on its own, `HUMAN_APPROVAL` when a person's approval is
+  being honoured. There is deliberately no separate `HUMAN_APPROVAL` check — it could only ever report
+  `PASSED` or `NOT_APPLICABLE`, and approval authority is exactly what this check already resolves.
+- **At `COMPOSITION` the contributing practices are not yet known**, so `PRACTICE_AUTHORITY` is
+  `NOT_APPLICABLE` on every lane. When the review has no artifact at all — a document or a conversation —
+  coverage, recipient consent and artifact eligibility are `NOT_APPLICABLE` too, because there is no
+  repository, no author and no unsolicited destination to judge. That is not a bypass: Silent Mode,
+  workspace-enabled, the rollout fence and the workspace delivery pause are all decisive at composition,
+  so a paused or superseded workspace composes nothing.
+
+Which lanes get a second evaluation is not symmetric, and it is worth knowing before reading a trace. The
+artifact lane is evaluated again at `AUTOMATIC`, at `APPROVED` when a person released it, and at `EGRESS`
+immediately before the provider call — by which point every fact is known. The `IN_APP` and `CONVERSATION`
+surfaces are evaluated exactly once, at `COMPOSITION`; from there each lane's own router applies the
+origin-and-autonomy predicate and its per-lane rules, and those refusals are recorded as routing decisions
+rather than as policy evaluations.
+
+Each evaluation appends an immutable `delivery_policy_evaluation` row: the resolver version, the admitted
+and evaluated rollout revisions, the `surface` (`ARTIFACT`, `IN_APP`, `CONVERSATION`), the stage, whether
+delivery was allowed, the first decisive reason, the ordered check results, and a bounded fact snapshot —
+artifact kind, repository, base branch, subject resolution, both coverage modes with their three match
+flags, recipient consent, delivery status, trigger mode, and each contributing practice's effective
+autonomy. The trace must not persist feedback bodies or member profile data.
 
 ## Measurement and intervention
 
@@ -328,6 +384,13 @@ delta can say. A strength that simply was not re-observed is not `RESOLVED`.
 | Review coverage              | `reviewScope`                      | `WorkspaceReviewScope`                     | workspace coverage modes plus repository/member target tables                 |
 | Delivery status              | `deliveryStatus`                   | `PracticeDeliveryStatus`                   | `workspace.practice_delivery_status`                                          |
 | Rollout revision             | `revision`                         | `long`                                     | `workspace.practice_rollout_revision`                                         |
+| Coverage repository mode     | `repositoryMode`                   | `ReviewRepositoryMode`                     | `workspace.practice_repository_coverage_mode`                                 |
+| Coverage person mode         | `personMode`                       | `ReviewPersonMode`                         | `workspace.practice_person_coverage_mode`                                     |
+| Delivery policy evaluation   | `deliveryPolicy[]` on the trace    | `DeliveryPolicyEvaluation`                 | `delivery_policy_evaluation`                                                  |
+| Delivery policy check        | `checks[].check`                   | `DeliveryPolicyCheck`                      | inside `delivery_policy_evaluation.checks`                                    |
+| Delivery policy check status | `checks[].status`                  | `DeliveryPolicyCheckStatus`                | inside `delivery_policy_evaluation.checks`                                    |
+| Delivery policy stage        | `stage`                            | `DeliveryPolicyStage`                      | `delivery_policy_evaluation.stage`                                            |
+| Delivery policy surface      | `surface`                          | `DeliveryPolicySurface`                    | `delivery_policy_evaluation.surface`                                          |
 | Feedback channel             | `channel`                          | `FeedbackChannel`                          | `feedback.channel`                                                            |
 | Feedback suppression reason  | `suppressionReason`                | `FeedbackSuppressionReason`                | `feedback.suppression_reason`                                                 |
 | Composed feedback unit       | not on the HTTP API                | `ComposedFeedbackUnit`                     | never stored as such — parsed from `out/feedback.json`                        |
@@ -380,7 +443,7 @@ server admission.
 3. Only AI-supported mentoring can be reviewed. The other choices force the practice autonomy to `OFF` and never start an automated review.
 4. An instance operator authorizes each source and product use through a reviewed governance decision.
 5. A workspace integration makes authorized sources available.
-6. A workspace administrator sets repository and linked-member coverage, delivery status, and the workspace default autonomy, then overrides autonomy per area or practice only where the default is wrong.
+6. A workspace administrator sets repository and member coverage, delivery status, and the workspace default autonomy, then overrides autonomy per area or practice only where the default is wrong.
 7. Each review captures evidence and records explicit source states.
 8. Source readiness checks decide whether every required source meets its requirements.
 9. Hephaestus reviews the work or records that the practice was skipped.

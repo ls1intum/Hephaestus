@@ -509,7 +509,6 @@ class ConfigAuditIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     private void patchPracticeReview(Workspace workspace, Map<String, Object> body) {
         String slug = workspace.getWorkspaceSlug();
-        // The endpoint refuses a change that names no version, so each patch is built on the version it read.
         String etag = webTestClient
             .get()
             .uri("/workspaces/{slug}/practices/review-settings", slug)

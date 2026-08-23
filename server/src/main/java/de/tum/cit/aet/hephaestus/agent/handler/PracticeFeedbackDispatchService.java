@@ -123,9 +123,9 @@ class PracticeFeedbackDispatchService {
         if (dispatch.getDestination() != destination) {
             throw new JobDeliveryException("Dispatch key was reused for a different destination: " + key);
         }
-        // The row that won the insert is the body of record, and the caller's is discarded. A retry
-        // recomposes the summary from observations this run has since persisted, so the two differ by
-        // the progress footer alone — refusing the mismatch would strand the delivery permanently.
+        // The row that won the insert is the body of record and the caller's is discarded: a retry
+        // recomposes the summary and legitimately differs, so refusing a body mismatch would strand the
+        // delivery permanently.
         return dispatch;
     }
 
@@ -242,8 +242,6 @@ class PracticeFeedbackDispatchService {
             }
             return commentPoster.postApprovedProposal(job, dispatch.getFeedbackId(), dispatch.getBody());
         }
-        // Editing the summary this review supersedes comes first, for issues as much as for pull requests:
-        // an artifact reviewed five times is one evolving comment, not five.
         boolean issue = job.getMetadata() != null && job.getMetadata().has("issue_number");
         String target = dispatch.getTargetExternalRef();
         if (target != null) {

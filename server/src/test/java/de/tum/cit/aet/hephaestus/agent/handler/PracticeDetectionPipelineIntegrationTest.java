@@ -142,7 +142,6 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
     void setUp() {
         databaseTestUtils.cleanDatabase();
         releaseSilentMode();
-        // Dispatch reconciles against the provider before it writes; nothing has been posted here yet.
         when(commentPoster.findExistingSummaryComment(any())).thenReturn(ExistingDeliveryLookup.absent());
 
         workspace = WorkspaceTestFixtures.activeWorkspace("pipeline-test");
@@ -160,8 +159,7 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
 
         User developer = TestUserFactory.createUser(500L, "pipeline-author", provider);
         developer = userRepository.save(developer);
-        // The author this pull request belongs to: delivery re-checks review coverage, which admits work
-        // about linked members only.
+        // Delivery re-checks coverage, which admits work about linked members only.
         workspaceMembershipService.createMembership(
             workspace,
             developer.getId(),

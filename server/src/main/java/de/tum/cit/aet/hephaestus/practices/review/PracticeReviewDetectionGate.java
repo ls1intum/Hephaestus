@@ -170,8 +170,8 @@ public class PracticeReviewDetectionGate {
             return new GateDecision.Skip("practices disabled for workspace");
         }
 
-        // Reported after the feature flag: a workspace with practices off is off for every reason, and
-        // saying "outside coverage" there would send an admin to the wrong screen.
+        // Ordered after the feature flag: a workspace with practices off is off for every reason, and
+        // reporting "outside coverage" there sends an admin to the wrong screen.
         if (scopeSkip != null) {
             return scopeSkip;
         }

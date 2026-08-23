@@ -138,7 +138,6 @@ export const SelectedModelTurnedOff: Story = {
 	},
 	play: async ({ canvas }) => {
 		await expect(canvas.getByText("The review model is unavailable")).toBeVisible();
-		// aria-disabled alone still leaves the switch in the tab order, which is half a disabled control.
 		await expectUnavailable(canvas.getByRole("switch", { name: "Start practice reviews" }));
 	},
 };
@@ -169,11 +168,6 @@ export const ReviewsPaused: Story = {
 	args: { workspace: { ...workspace, enabled: false } },
 };
 
-/**
- * The shape a real pilot has: a handful of repositories, some of them limited to a branch, and the
- * people whose work is in scope. Every earlier story held one of each, which is the one size at
- * which a list and a stack of fields look the same.
- */
 export const PilotPopulation: Story = {
 	args: {
 		policy: {
@@ -227,8 +221,8 @@ export const PilotPopulation: Story = {
 	},
 	play: async ({ canvas }) => {
 		await expect(canvas.getByText("3 of 12 monitored")).toBeVisible();
-		await expect(canvas.getByText("5 of 24 linked")).toBeVisible();
-		// A repository that has left the monitored set is still named in the scope and covers nothing.
+		await expect(canvas.getByText("5 of 24 members")).toBeVisible();
+		// A repository the workspace stopped syncing stays named in the scope and covers nothing.
 		await expect(canvas.getByText("Not monitored")).toBeVisible();
 		await expectNoPageOverflow();
 	},
@@ -276,11 +270,7 @@ export const AddingATargetBranch: Story = {
 	},
 };
 
-/**
- * A repository already limited to one branch admits a second one: more work is in scope than was, so
- * the confirmation is owed. The predicate compared list lengths until it was measured, which read this
- * as a narrowing and saved it silently.
- */
+/** A repository already limited to one branch admits more work when a second is named. */
 export const AddingASecondBranchWidens: Story = {
 	args: {
 		policy: {
@@ -309,7 +299,6 @@ export const AddingASecondBranchWidens: Story = {
 	},
 };
 
-/** Dropping one of two named branches admits strictly less, so it saves without asking. */
 export const RemovingOneOfTwoBranchesNarrows: Story = {
 	args: {
 		policy: {
@@ -344,7 +333,7 @@ export const RemovingOneOfTwoBranchesNarrows: Story = {
 	},
 };
 
-/** Naming no branch at all means every branch, so emptying the list is the widest this axis goes. */
+/** Naming no branch means every branch, so emptying the list is the widest this axis goes. */
 export const ClearingEveryBranchWidens: Story = {
 	args: {
 		policy: {
@@ -423,17 +412,11 @@ export const SelectedEmptyMeansNobody: Story = {
 	play: async ({ canvas }) => {
 		await expect(canvas.getByText("No repositories are covered.")).toBeVisible();
 		await expect(canvas.getByText("No people are covered.")).toBeVisible();
-		// Two empty lists are one consequence, and it is the consequence — not the two lists — that
-		// tells an admin why a pilot they thought they had configured is silent.
 		await expect(canvas.getByText("Nothing is being reviewed")).toBeVisible();
 	},
 };
 
-/**
- * Pausing is the control somebody reaches for when feedback is going out that should not be. It says
- * what it did, because "sending is off" and "what was ready while it was off is now lost" are
- * different facts and only the second one is surprising.
- */
+/** Feedback composed while paused is dropped, not queued — the banner has to say so. */
 export const SendingPaused: Story = {
 	args: {
 		policy: { ...policy, settings: { ...settings, deliveryStatus: "PAUSED" } },
@@ -459,8 +442,6 @@ export const WideningRequiresConfirmation: Story = {
 				},
 			},
 		},
-		// The server answers the preview for the scope on screen, so `current` is this story's one
-		// repository. The shared fixture's three would make the before/after read 3 → 3.
 		coverage: {
 			...coverage,
 			preview: {

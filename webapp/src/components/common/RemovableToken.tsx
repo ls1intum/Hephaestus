@@ -4,16 +4,14 @@ import { ButtonGroup, ButtonGroupText } from "@/components/ui/button-group";
 import { cn } from "@/lib/utils";
 
 export interface RemovableTokenProps {
-	/** The visible text. Truncated with a `title` when it outgrows the row. */
 	label: string;
-	/** Names the token as well as the action, since a row of these is a row of identical buttons. */
+	/** Has to name the value too: a row of these is otherwise a row of identically named buttons. */
 	removeLabel: string;
 	onRemove: () => void;
 	disabled?: boolean;
 	className?: string;
 }
 
-/** A chosen value and the way back out of it, sized to sit in a wrapping row of its siblings. */
 export function RemovableToken({
 	label,
 	removeLabel,

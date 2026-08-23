@@ -96,9 +96,6 @@ describe("PracticeReviewSettings", () => {
 			},
 		});
 
-		// Both readouts, without opening either picker: a target nobody can see is a target nobody
-		// corrects, and a repository that has left the monitored set covers nothing while still
-		// looking like coverage.
 		await screen.findByText("acme/archived");
 		screen.getByText("Not monitored");
 		screen.getByTitle("Member 99 (unavailable)");
@@ -109,7 +106,7 @@ describe("PracticeReviewSettings", () => {
 
 		const change = await screen.findByRole("link", { name: "Change the review model" });
 		expect(change.getAttribute("href")).toBe("/w/acme/admin/models");
-		// Readiness is the banner's sentence; saying it again here was the same fact three times.
+		// Readiness is the page banner's sentence, so this surface deliberately does not repeat it.
 		expect(screen.queryByText("Ready to run")).toBeNull();
 	});
 

@@ -123,13 +123,11 @@ class PracticeFeedbackDispatchRecovery {
     }
 
     /**
-     * Gives up on a dispatch and says so in the ledger.
+     * Gives up on a dispatch that never began its provider write.
      *
-     * <p>Only for a dispatch that never began its provider write. Once {@code write_started} is set the
-     * comment may be live on the artifact, and the lookup that would prove it can answer {@code UNKNOWN}
-     * for reasons of its own — a rate limit, a search budget. Recording FAILED there would tell a
-     * developer their feedback was lost while it sits on their pull request, and would clear the
-     * comment id the next review needs to edit in place. Those keep retrying the lookup instead.
+     * <p>Once {@code write_started} is set the comment may already be live, and no lookup can settle that
+     * reliably; recording FAILED would tell a developer their feedback was lost while it sits on their pull
+     * request, and clear the comment id the next review has to edit in place. Those keep retrying instead.
      */
     private void terminalize(FeedbackDispatch dispatch, String error) {
         if (Boolean.TRUE.equals(dispatch.getWriteStarted())) {

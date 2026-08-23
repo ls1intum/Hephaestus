@@ -14,10 +14,9 @@ import org.jspecify.annotations.Nullable;
  * Per-workspace overrides for practice-review trigger/delivery policy. Embedded on
  * {@link de.tum.cit.aet.hephaestus.workspace.Workspace}.
  *
- * <p>Every field is nullable on purpose: {@code null} means "this workspace has not decided". Scalars
- * resolve to the fleet default ({@code hephaestus.practice-review.*}) via the {@code resolveX(fallback)}
- * accessors. Coverage targets live in relational tables; only their explicit modes and the monotonic
- * rollout revision live with this aggregate.
+ * <p>A nullable scalar means "this workspace has not decided" and resolves to the fleet default
+ * ({@code hephaestus.practice-review.*}) through its {@code resolveX(fallback)} accessor. Coverage
+ * targets live in their own tables; only the modes are here.
  *
  * <p>PATCH {@code null} means "no change"; to reset a field back to inherit, name it in the PATCH
  * {@code reset} set (see {@link #reset(java.util.Set)}).

@@ -111,11 +111,9 @@ class LiquibaseSchemaValidationIntegrationTest {
     }
 
     /**
-     * Review coverage is decided from two mode columns, and a mode the code cannot name reads as neither
-     * "all" nor "selected" — the branch every gate takes for an unrecognised mode is a guess. The column
-     * outlives every version of the code that reads it, so the CHECK constraints are what refuse the write,
-     * and only the Liquibase-built schema carries them: the shared test profile builds the schema with
-     * Hibernate {@code ddl-auto: create} and never runs a changeset.
+     * A mode the code cannot name is a mode every gate guesses at, so the CHECK constraints are what refuse
+     * the write. Only the Liquibase-built schema carries them: the shared test profile builds the schema
+     * with Hibernate {@code ddl-auto: create} and never runs a changeset.
      */
     @Test
     @DisplayName("The coverage-mode columns refuse a mode the vocabulary does not have")
@@ -163,8 +161,7 @@ class LiquibaseSchemaValidationIntegrationTest {
     }
 
     private void setCoverageMode(long workspaceId, String column, String mode) {
-        // The column name is a literal from this test, never input, so it is safe to interpolate — and it
-        // has to be, because Postgres will not take a parameter where a column name belongs.
+        // Postgres takes no parameter where a column name belongs; every caller passes a literal from here.
         jdbcTemplate.update("UPDATE workspace SET " + column + " = ? WHERE id = ?", mode, workspaceId);
     }
 

@@ -67,11 +67,6 @@ class InContextDeliveryGateTest extends BaseUnitTest {
         );
     }
 
-    /**
-     * The fence the whole rollout rests on: a job admitted under one configuration cannot post under
-     * another. Every other test here holds the revision still, so without these two the branch is
-     * unreachable and a broken fence reads as green.
-     */
     @Test
     void aJobAdmittedUnderAnOlderRolloutSaysNothingOnTheArtifact() {
         InContextDeliveryGate gate = new InContextDeliveryGate(

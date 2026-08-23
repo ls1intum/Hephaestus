@@ -101,7 +101,7 @@ public enum SignalStateReason {
             case REVIEW_MODEL_UNBOUND -> "No AI model is bound to practice review for this workspace; binding one in Administration re-offers it.";
             case PRACTICE_AUTONOMY_OFF -> "Every practice bound to this occurrence sits at Off; raising one re-offers it.";
             case BUDGET_EXHAUSTED -> "The budget funding this review was exhausted; it is re-offered when the budget refills.";
-            case SUBJECT_UNLINKED -> "Nobody this could be attributed to has linked their account; linking one re-offers it.";
+            case SUBJECT_UNLINKED -> "This work could not be attributed to anybody Hephaestus knows; resolving the author re-offers it.";
             case MODEL_UNAVAILABLE -> "The model this review is bound to left the catalog; re-pointing the binding re-offers it.";
             case PENDING_DEADLINE_EXCEEDED -> "It waited longer than the ledger keeps re-offering a signal.";
             case ARTIFACT_GONE -> "The artifact was deleted before a review could run.";

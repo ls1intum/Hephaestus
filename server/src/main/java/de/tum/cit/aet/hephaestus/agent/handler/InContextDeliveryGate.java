@@ -78,7 +78,8 @@ class InContextDeliveryGate {
         if (observations.isEmpty() || job.getWorkspace() == null || job.getWorkspace().getId() == null) {
             return observations;
         }
-        FeedbackSuppressionReason rolloutRefusal = rolloutRefusal(job);
+        long workspaceId = job.getWorkspace().getId();
+        FeedbackSuppressionReason rolloutRefusal = rolloutRefusal(job.getPracticeRolloutRevision(), workspaceId);
         if (rolloutRefusal != null) {
             recordWithheld(job, observations, rolloutRefusal);
             return List.of();
@@ -95,9 +96,9 @@ class InContextDeliveryGate {
             return List.of();
         }
 
-        WorkspaceReviewDefaults defaults = workspaceDefaults.forWorkspace(job.getWorkspace().getId());
+        WorkspaceReviewDefaults defaults = workspaceDefaults.forWorkspace(workspaceId);
         Map<String, PracticeAutonomy> autonomyBySlug = new HashMap<>();
-        for (Practice practice : practiceRepository.findByWorkspaceId(job.getWorkspace().getId())) {
+        for (Practice practice : practiceRepository.findByWorkspaceId(workspaceId)) {
             autonomyBySlug.put(
                 practice.getSlug(),
                 AutonomyResolver.effectiveAutonomyOf(practice, defaults.defaultAutonomy())
@@ -139,12 +140,13 @@ class InContextDeliveryGate {
         if (
             observations.isEmpty() || job.getWorkspace() == null || job.getWorkspace().getId() == null
         ) return List.of();
-        if (rolloutRefusal(job) != null) return List.of();
+        long workspaceId = job.getWorkspace().getId();
+        if (rolloutRefusal(job.getPracticeRolloutRevision(), workspaceId) != null) return List.of();
         ObservationOrigin origin = PracticeDetectionDeliveryService.originOf(job.getMetadata());
         if (!origin.delivers(FeedbackChannel.IN_CONTEXT)) return List.of();
-        WorkspaceReviewDefaults defaults = workspaceDefaults.forWorkspace(job.getWorkspace().getId());
+        WorkspaceReviewDefaults defaults = workspaceDefaults.forWorkspace(workspaceId);
         Map<String, PracticeAutonomy> autonomyBySlug = new HashMap<>();
-        for (Practice practice : practiceRepository.findByWorkspaceId(job.getWorkspace().getId())) {
+        for (Practice practice : practiceRepository.findByWorkspaceId(workspaceId)) {
             autonomyBySlug.put(
                 practice.getSlug(),
                 AutonomyResolver.effectiveAutonomyOf(practice, defaults.defaultAutonomy())
@@ -190,17 +192,12 @@ class InContextDeliveryGate {
     }
 
     /**
-     * The job carries the rollout revision it was admitted under; anything else in force now means the
-     * operator has changed the rollout since, and this run belongs to the old one.
-     *
-     * <p>The current revision is read by workspace id rather than through {@code job.getWorkspace()}: the
-     * job arrives from the transaction that loaded it, so its workspace is a detached proxy here. A
-     * workspace that has since disappeared has no revision to match, which withholds rather than delivers.
+     * Compares the job's admitting revision against the one in force <em>now</em>, never the one loaded
+     * with the job: a rollout the operator has since changed is exactly what this refuses to post under.
      */
-    private @Nullable FeedbackSuppressionReason rolloutRefusal(AgentJob job) {
-        Long admitted = job.getPracticeRolloutRevision();
+    private @Nullable FeedbackSuppressionReason rolloutRefusal(@Nullable Long admitted, long workspaceId) {
         Long current = workspaceRepository
-            .findById(job.getWorkspace().getId())
+            .findById(workspaceId)
             .map(workspace -> workspace.getReviewSettings().getRolloutRevision())
             .orElse(null);
         if (admitted == null || current == null || admitted.longValue() != current.longValue()) {

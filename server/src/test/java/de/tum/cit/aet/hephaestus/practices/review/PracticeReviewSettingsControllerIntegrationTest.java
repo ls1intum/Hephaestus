@@ -103,7 +103,6 @@ class PracticeReviewSettingsControllerIntegrationTest extends AbstractWorkspaceI
             .isEqualTo(false);
     }
 
-    /** A change made without saying which version it is built on is refused rather than guessed at. */
     @Test
     @WithAdminUser
     void refusesAPolicyChangeThatNamesNoVersion() {

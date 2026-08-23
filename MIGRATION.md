@@ -63,6 +63,41 @@ Before upgrading to any new `0.x.0` version:
 Entries exist only for releases that need operator action. Everything else is in the
 [release notes](https://github.com/ls1intum/Hephaestus/releases).
 
+### Next release
+
+#### 🔴 Practice reviews now run only on work whose author is a workspace member
+
+**Affected**: every workspace with practice reviews turned on, and in particular any workspace whose
+monitored repositories take pull requests from outside the organization.
+
+**Before**: a review ran on any pull request or issue in a monitored repository, whoever wrote it.
+
+**After**: coverage has two dimensions — repositories and people — and both must admit the work. The
+people dimension is workspace membership. Work whose author is not a member of the workspace is not
+reviewed and no feedback is prepared about it; the same holds when the work has no identifiable author
+or the author is a bot. This is deliberate: feedback nobody will read still costs a model run, and it
+widens the privacy radius to a person the workspace never enrolled.
+
+Membership is what the **Members** screen lists. Hephaestus fills it in from the connected GitHub
+organization or GitLab group roster and from the team graph, an admin can add or remove a member there,
+and workspace activity can add one. Signing in to Hephaestus does not by itself make somebody a member.
+
+**Migration**: nothing to change before upgrading.
+
+Afterwards, open **Practices → Review → When and where** and read the two counts under **What gets
+reviewed**. **People** is how many members are in scope and **Repositories** how many monitored
+repositories are. If **People** is lower than the set of contributors you expect to be reviewed, add the
+missing ones on the **Members** screen, or add them to the connected organization or group and let the
+next roster sync pick them up. Existing members need no action.
+
+To roll out more narrowly than everybody, switch either dimension to **Selected** and name the
+repositories, base branches and people yourself. An empty selection covers nobody, never everybody — the
+screen warns you when a selected list is empty.
+
+Every change to coverage advances the workspace's rollout revision, and that is prospective in both
+directions: feedback admitted under the previous coverage is not released afterwards, and widening
+coverage does not go back and review work that was already refused.
+
 ### v0.74.0
 
 #### 🔴 An agent image reference naming a channel tag is now refused
@@ -244,25 +279,6 @@ across an ordinary restart, which is the data loss the setting exists to avoid:
 ```
 inactive-threshold (PT30M) must be 0 to disable reaping, or at least PT1H
 ```
-#### 🔴 Practice reviews now run only on work whose author is a linked workspace member
-
-**Affected**: every workspace with practice reviews turned on. Check who is covered under
-**Practices → Review → When and where**: the coverage summary counts the eligible linked members and
-the monitored repositories in scope.
-
-**Before**: a review ran on any pull request or issue in a monitored repository, whoever wrote it.
-
-**After**: coverage is two dimensions, repositories and people, and both must admit the work. Under
-**All eligible members** that means every linked member of the workspace — an author who has never
-signed in to Hephaestus is not one of them, so their work is not reviewed and no feedback is prepared
-about them. Where the author cannot be resolved at all, or resolves to a bot, the review does not run
-either. This is deliberate: feedback that reaches nobody costs a model run and widens the privacy
-radius for a person who never opted in.
-
-**Migration**: nothing to change before upgrading. Afterwards, a contributor whose work should be
-reviewed signs in to Hephaestus once, which links their account; existing members are unaffected. To
-roll out more narrowly than "everyone linked", switch either dimension to **Selected** and choose the
-repositories, base branches and people yourself — an empty selection covers nobody, never everybody.
 
 #### 🟡 Reviewer-side practices keep the old wording until you update them
 

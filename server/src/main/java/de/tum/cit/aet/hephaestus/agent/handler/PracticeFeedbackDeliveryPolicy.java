@@ -316,9 +316,8 @@ public class PracticeFeedbackDeliveryPolicy {
             job,
             workspace,
             null,
-            // A kind without an artifact reaches nobody unsolicited: the in-app lane is the developer's
-            // own page and the conversation lane is one they opened. Recipient consent governs feedback
-            // that goes out to them, and is asked on the artifact paths that do that.
+            // Consent is not asked here: a kind without an artifact reaches nobody unsolicited, only the
+            // developer's own page or a conversation they opened.
             null,
             null,
             null,
@@ -406,9 +405,9 @@ public class PracticeFeedbackDeliveryPolicy {
                 workspace == null
                     ? null
                     : workspace.getReviewSettings().getDeliveryStatus() == PracticeDeliveryStatus.ACTIVE,
-                // Both artifact paths assess coverage whenever the workspace resolves, so a null
-                // assessment means there is no artifact to judge — the kind-generic composition entry.
-                // WORKSPACE_ENABLED has already denied the other way of getting here.
+                // No assessment means there is no artifact to judge, never an artifact left unjudged: the
+                // artifact paths assess coverage whenever the workspace resolves, and a missing workspace
+                // is already denied by WORKSPACE_ENABLED.
                 coverage == null ? null : coverage.admitted(),
                 autonomy.authorized(),
                 consent,
@@ -441,9 +440,8 @@ public class PracticeFeedbackDeliveryPolicy {
         Collection<String> contributingPracticeSlugs
     ) {
         if (workspace == null) return new AutonomyAssessment(false, List.of());
-        // Composition runs before anything knows which practices will contribute, so the caller has no
-        // slug set to offer and no feedback row to read one from. That is a question not yet askable,
-        // not a refusal: answering false here closed the in-app and conversation lanes outright.
+        // Composition runs before the contributing practices are known, so authority is not yet askable.
+        // Answering false instead of null here refuses every composition and closes the lanes outright.
         if (feedbackId == null && contributingPracticeSlugs.isEmpty()) {
             return new AutonomyAssessment(null, List.of());
         }

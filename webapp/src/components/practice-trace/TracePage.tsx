@@ -117,9 +117,8 @@ export function TracePage({
 				artifactKind={trace.artifactKind}
 			/>
 
-			{/* Check identifiers and rollout revision numbers are the workspace's own plumbing, and a
-			    member can act on none of it. The endpoint still sends it to every member, so this hides
-			    the surface rather than withholding the data. */}
+			{/* Hides the surface, not the data: the endpoint serves this trace to every member, so this
+			    gate is a relevance filter and never an authorization boundary. */}
 			{canAdminister && <DeliveryPolicyTrace evaluations={trace.deliveryPolicy} />}
 
 			<p className="flex items-center gap-1.5 text-xs text-muted-foreground">

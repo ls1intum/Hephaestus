@@ -398,8 +398,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             var body = ArgumentCaptor.forClass(String.class);
             verify(commentPoster).updateFormattedBody(eq(job), eq("IC_prior"), body.capture());
             assertThat(body.getValue()).contains("Progress since your last review").contains("Resolved");
-            // The ping carries its own marker. Under the summary's, reconciliation would find the ping,
-            // adopt it as the summary, and edit it in place on the next review.
+            // A ping under the summary's marker would be adopted as the summary and edited in place next review.
             var pingBody = ArgumentCaptor.forClass(String.class);
             var pingMarker = ArgumentCaptor.forClass(String.class);
             verify(commentPoster).postAside(eq(job), pingBody.capture(), pingMarker.capture());

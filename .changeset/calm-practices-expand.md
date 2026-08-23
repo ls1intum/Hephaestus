@@ -2,6 +2,18 @@
 "hephaestus": minor
 ---
 
-Workspace admins can limit practice reviews to selected repositories, exact base branches, and linked members, pause feedback without losing configuration, and read the effective coverage before widening it. Every delivery decision now keeps an explanation you can open from the review activity: what was checked, in what order, and which check stopped it.
+Practice reviews can now be rolled out to part of a workspace instead of all of it. Choose which
+monitored repositories are reviewed and, for each of them, which base branches; choose whether
+everybody's work is reviewed or only selected people's. Before a change widens either list, a preview
+says how many repositories and people it would cover, so a pilot can be checked before it starts.
+Sending feedback is now its own switch: pause it and reviews keep running and stay readable while
+nothing reaches anybody, and resuming does not release what was held back.
 
-**Operators:** reviews now run only on work whose author is a linked workspace member. Somebody who has never signed in to Hephaestus is no longer reviewed, and no feedback is prepared about them — see `MIGRATION.md`.
+Every delivery decision also keeps its reasoning. Open a piece of work under Review activity and you can
+see, for each attempt, which checks ran and in what order, which one stopped it, and the repository,
+branch, author and settings it was judged against.
+
+**Operators:** reviews now run only on work whose author is a member of the workspace, so a pull request
+from an outside contributor who is not on the **Members** screen is no longer reviewed and no feedback is
+prepared about them. After upgrading, read the **People** count under Practices → Review → When and
+where; `MIGRATION.md` says how to add anybody who should be covered and is not.
