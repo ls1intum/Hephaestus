@@ -182,6 +182,18 @@ public class PracticeReflectionService {
                     Collectors.mapping(Practice::getSlug, Collectors.toList())
                 )
             );
+        // Read once here so both area surfaces weigh the same practices the same way. Only eligible practices
+        // carry a weight: one that is no longer reviewed contributes nothing to its area regardless.
+        Map<String, Double> areaWeightByPractice = eligiblePractices
+            .stream()
+            .collect(
+                Collectors.toMap(
+                    Practice::getSlug,
+                    Practice::getAreaWeight,
+                    (left, ignored) -> left,
+                    LinkedHashMap::new
+                )
+            );
 
         Map<String, Integer> inapplicableByPractice = inapplicableByPractice(developerId, workspaceId, since);
         List<ReflectionPracticeDTO> cards = cards(
@@ -198,7 +210,8 @@ public class PracticeReflectionService {
             cards,
             evidenceByPractice,
             eligiblePracticesByArea,
-            standingShareByPractice
+            standingShareByPractice,
+            areaWeightByPractice
         );
     }
 
@@ -434,9 +447,17 @@ public class PracticeReflectionService {
         List<ReflectionPracticeDTO> cards,
         Map<String, List<Observation>> evidenceByPractice,
         Map<String, List<String>> eligiblePracticesByArea,
-        Map<String, Double> standingShareByPractice
+        Map<String, Double> standingShareByPractice,
+        Map<String, Double> areaWeightByPractice
     ) {
-        static final ReflectionSnapshot EMPTY = new ReflectionSnapshot(null, List.of(), Map.of(), Map.of(), Map.of());
+        static final ReflectionSnapshot EMPTY = new ReflectionSnapshot(
+            null,
+            List.of(),
+            Map.of(),
+            Map.of(),
+            Map.of(),
+            Map.of()
+        );
     }
 
     /**

@@ -65,7 +65,8 @@ public class PracticeAreaStatusService {
         Map<String, AreaSignal> signalsByArea = areaSignals(
             snapshot.evidenceByPractice(),
             practiceTrends,
-            snapshot.eligiblePracticesByArea()
+            snapshot.eligiblePracticesByArea(),
+            snapshot.areaWeightByPractice()
         );
         Map<String, AreaGuidanceProvider.AreaGuidance> guidanceByArea = aggregatedGuidance(
             workspaceId,
@@ -80,6 +81,7 @@ public class PracticeAreaStatusService {
                     area,
                     cardsByArea.getOrDefault(area.getSlug(), List.of()),
                     snapshot.standingShareByPractice(),
+                    snapshot.areaWeightByPractice(),
                     signalsByArea.getOrDefault(area.getSlug(), AreaSignal.NONE),
                     guidanceByArea.get(area.getSlug())
                 )
@@ -117,10 +119,11 @@ public class PracticeAreaStatusService {
         PracticeArea area,
         List<ReflectionPracticeDTO> cards,
         Map<String, Double> standingShareByPractice,
+        Map<String, Double> areaWeightByPractice,
         AreaSignal signal,
         AreaGuidanceProvider.@Nullable AreaGuidance aggregatedGuidance
     ) {
-        PracticeAreaStatusDTO.AreaStatus status = areaStatus(cards, standingShareByPractice);
+        PracticeAreaStatusDTO.AreaStatus status = areaStatus(cards, standingShareByPractice, areaWeightByPractice);
         boolean hasDisplayableData = PracticeAreaStatusDTO.isVerdict(status);
         // Item-level, unlike the status: the question here is which KINDS of evidence exist to show, which a
         // practice standing has already abstracted away.
@@ -181,22 +184,27 @@ public class PracticeAreaStatusService {
      */
     private static PracticeAreaStatusDTO.AreaStatus areaStatus(
         List<ReflectionPracticeDTO> cards,
-        Map<String, Double> standingShareByPractice
+        Map<String, Double> standingShareByPractice,
+        Map<String, Double> areaWeightByPractice
     ) {
         List<ReflectionPracticeDTO> verdicts = cards
             .stream()
             .filter(card -> ReflectionPracticeDTO.isVerdict(card.standing()))
+            .filter(card -> areaWeight(card, areaWeightByPractice) > 0.0)
             .toList();
         if (verdicts.isEmpty()) {
             return cards.stream().anyMatch(card -> card.standing() == ReflectionPracticeDTO.Standing.NO_OPPORTUNITY)
                 ? PracticeAreaStatusDTO.AreaStatus.NO_OPPORTUNITY
                 : PracticeAreaStatusDTO.AreaStatus.NOT_OBSERVED;
         }
-        double areaShare = verdicts
-            .stream()
-            .mapToDouble(card -> standingShareByPractice.getOrDefault(card.slug(), 0.0))
-            .average()
-            .orElseThrow();
+        double weighted = 0.0;
+        double totalWeight = 0.0;
+        for (ReflectionPracticeDTO card : verdicts) {
+            double weight = areaWeight(card, areaWeightByPractice);
+            weighted += weight * standingShareByPractice.getOrDefault(card.slug(), 0.0);
+            totalWeight += weight;
+        }
+        double areaShare = weighted / totalWeight;
         return switch (StandingScale.classify(areaShare)) {
             case STRENGTH -> PracticeAreaStatusDTO.AreaStatus.STRENGTH;
             case MIXED -> PracticeAreaStatusDTO.AreaStatus.MIXED;
@@ -205,6 +213,17 @@ public class PracticeAreaStatusService {
                 "StandingScale only classifies verdicts"
             );
         };
+    }
+
+    /**
+     * How much one practice counts toward its area, defaulting to neutral.
+     *
+     * <p>A card with no entry is a practice review is no longer admitted for — its feedback still stands on the
+     * reflection surface, but it has stopped being part of what the area currently watches, so it does not vote.
+     * A weight of zero means the same thing by explicit configuration rather than by autonomy.
+     */
+    private static double areaWeight(ReflectionPracticeDTO card, Map<String, Double> areaWeightByPractice) {
+        return areaWeightByPractice.getOrDefault(card.slug(), 0.0);
     }
 
     /**
@@ -252,7 +271,8 @@ public class PracticeAreaStatusService {
     private Map<String, AreaSignal> areaSignals(
         Map<String, List<Observation>> evidenceByPractice,
         Map<String, PracticeTrend> practiceTrends,
-        Map<String, List<String>> eligiblePracticesByArea
+        Map<String, List<String>> eligiblePracticesByArea,
+        Map<String, Double> areaWeightByPractice
     ) {
         Map<String, List<Observation>> evidenceByArea = new LinkedHashMap<>();
         Map<String, List<PracticeTrend>> trendsByArea = new LinkedHashMap<>();
@@ -282,7 +302,7 @@ public class PracticeAreaStatusService {
                 entry.getKey(),
                 eligiblePracticesByArea.getOrDefault(entry.getKey(), List.of()),
                 trendsByArea.getOrDefault(entry.getKey(), List.of()),
-                Map.of()
+                areaWeightByPractice
             );
             signals.put(
                 entry.getKey(),
@@ -300,7 +320,7 @@ public class PracticeAreaStatusService {
                 entry.getKey(),
                 entry.getValue(),
                 trendsByArea.getOrDefault(entry.getKey(), List.of()),
-                Map.of()
+                areaWeightByPractice
             );
             signals.putIfAbsent(
                 entry.getKey(),

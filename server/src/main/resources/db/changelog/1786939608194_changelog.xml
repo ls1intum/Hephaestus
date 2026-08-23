@@ -40,4 +40,22 @@
             <dropTable tableName="feedback_rating"/>
         </rollback>
     </changeSet>
+    <changeSet author="practice-area-weight" id="1786939608194-2">
+        <preConditions onFail="MARK_RAN" onFailMessage="practice.area_weight already exists">
+            <not><columnExists tableName="practice" columnName="area_weight"/></not>
+        </preConditions>
+        <comment>How much a practice counts when its area is summarised; 1.0 keeps a plain average.</comment>
+        <addColumn tableName="practice">
+            <column name="area_weight" type="DOUBLE PRECISION" defaultValueNumeric="1.0">
+                <constraints nullable="false"/>
+            </column>
+        </addColumn>
+        <sql>
+            ALTER TABLE practice
+            ADD CONSTRAINT chk_practice_area_weight CHECK (area_weight &gt;= 0);
+        </sql>
+        <rollback>
+            <dropColumn tableName="practice" columnName="area_weight"/>
+        </rollback>
+    </changeSet>
 </databaseChangeLog>
