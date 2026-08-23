@@ -7,9 +7,9 @@ story per variant and a green a11y panel scores **C**. C is the floor for compet
 criticism. B costs deliberate design. A costs a rejected alternative written down. A+ is rare by
 construction — at most one dimension per PR should reach it.
 
-Counts below are a **branch snapshot taken 2026-08-16** across 256 story files; each carries the command
-that produced it, so re-run rather than trust. They calibrate what "normal" looks like — they are not
-targets.
+Every dimension below carries the command that measures it. **Run the command; do not carry a number
+in your head.** What the tree does is calibration for what "normal" looks like, never a target — a
+ratio is evidence about a band, not a defect count.
 
 ---
 
@@ -32,9 +32,10 @@ grep -rnE "^\s+\w+\??: boolean;" webapp/src/components --include="*.tsx" | grep 
 ```
 Then ask of each hit: *how many of the 2^n combinations does the render actually distinguish?*
 
-Snapshot: 43 required + 22 optional non-story `isLoading` props. **65 hits is not 65 defects** — a list
-shell whose toolbar renders through every branch legitimately takes the triple. Exemplar:
-`components/admin/practice-reviews/ReviewOutputSections.tsx:26-30`.
+The tree carries dozens of `isLoading` props and **that is not dozens of defects** — a list shell whose
+toolbar renders through every branch legitimately takes the triple. Exemplar:
+`components/admin/practice-reviews/ReviewOutputSections.tsx`, whose `ReviewSectionState` is a
+discriminated union over the states a section can be in rather than parallel flags.
 
 ## Dimension 2 — Composition: was the cheap rung tried before the expensive one?
 
@@ -43,15 +44,16 @@ shell whose toolbar renders through every branch legitimately takes the triple. 
 - **C** — Props all the way down, including a prop drilled three levels that only the leaf reads.
 - **B** — The ladder was walked: `children` before a prop, a prop before context, and the reason the next
   rung was not taken is legible from the code.
-- **A** — B, and where composition was *rejected* the rejection is written down as the design
-  (`reflection/ReflectionMessage.tsx:160-174` enumerates what the component must make unrepresentable).
+- **A** — B, and where composition was *rejected* the rejection is written down as the design: the file
+  enumerates what the component must make unrepresentable, so the next reader does not re-open it.
 - **A+** — A compound API exists and its Storybook cost is stated in the file: subcomponents get no
   Controls and their `argTypes` cannot be overridden, so a part needing its own controls stayed a prop
   deliberately.
 
 Detection: `grep -rn "createContext" webapp/src/components` — for each, name the common ancestor. If one
-exists and renders both consumers, it is D. Snapshot: four components carry a `canAdminister` boolean
-only the leaf reads (`practice-trace/TracePage.tsx:14` → `TraceRefusalAlert.tsx` → `RefusalFixLink.tsx`).
+exists and renders both consumers, it is D. The live example of the opposite failure is the review
+route's `canAdminister`, drilled through `practice-trace/TracePage.tsx` →
+`TraceRefusalAlert.tsx` / `TraceSignalTimeline.tsx` → `RefusalFixLink.tsx` for one leaf.
 
 ## Dimension 3 — Slot obligations, when `render=` is used
 
@@ -59,9 +61,9 @@ only the leaf reads (`practice-trace/TracePage.tsx:14` → `TraceRefusalAlert.ts
 - **C** — Props spread, but on an interior node with no comment saying why.
 - **B** — `ref` forwarded, **every** received prop spread on the real DOM node, exactly one root element,
   same element type the primitive expected.
-- **A** — B, and the file says which Base UI version's `render=` shape it targets. The repo pins
-  `@base-ui/react` 1.4.1; base-ui.com documents 1.7.0, so a copied `render={(props, state) => …}` may not
-  exist here.
+- **A** — B, and the file says which Base UI version's `render=` shape it targets. The pin in
+  `webapp/package.json` trails what base-ui.com documents, so a `render={(props, state) => …}` copied
+  from the site may not exist here. Read the pin before copying.
 - **A+** — A story proves the obligation: it queries the slotted element by **accessible name and role**
   after the slot, which fails if `aria-*` was dropped.
 
@@ -82,32 +84,36 @@ is a **pass condition, not an achievement**.
   `control: false`) rather than restating what `react-docgen` already produced.
 
 ```
-grep -rn "render: () =>" webapp/src --include="*.stories.tsx"        # 44
-grep -rn "satisfies Meta$\|: Meta =" webapp/src --include="*.stories.tsx"
+grep -rn "render: () =>" webapp/src --include="*.stories.tsx"     # args-ignoring renders
+grep -rn "render: (args" webapp/src --include="*.stories.tsx"     # the shape that keeps Controls
+grep -rln "argTypes" webapp/src --include="*.stories.tsx"
 ```
-Snapshot: 44 arg-ignoring `render`s, 46 `render: (args`, 242/256 `satisfies Meta<typeof>`, 56/256 use
-`argTypes`. **56/256 is not a gap** — a component whose prop is one domain object has nothing explorable.
+Arg-ignoring `render`s and `render: (args` are roughly as common as each other; nearly every meta is
+`satisfies Meta<typeof>`; a minority of files use `argTypes`. **That minority is not a gap** — a
+component whose prop is one domain object has nothing explorable.
 
 **Anti-criterion — the swallowed spy.** A stateful wrapper that *overrides* a callback from `args` makes
 the `fn()` in `meta.args` unreachable: never assertable, Actions panel permanently empty, file looks well
 instrumented. Detection: for each `fn()` in `meta.args`, grep for a JSX attribute of the same name that
-is **not** `{...args}`. `OccasionLifecycle.stories.tsx` is the shape that survives: spread `{...args}`,
+is **not** `{...args}`. `admin/practice-catalog/OccasionLifecycle.stories.tsx` is the shape that survives: spread `{...args}`,
 patch only the props the wrapper holds state for.
 
 ## Dimension 5 — Which states does the file actually show?
 
-- **D** — One story, no play, for a component with branches (15 files today; e.g.
-  `admin/teams/TeamTree.stories.tsx`, `mentor/Greeting.stories.tsx`).
+- **D** — One story, no play, for a component with branches (`admin/teams/TeamTree.stories.tsx` and
+  `mentor/Greeting.stories.tsx` are the shape).
 - **C** — Default + each `variant` enum value.
 - **B** — C plus every branch of the component's own state union, plus the two content edges the layout
   can lose to: longest realistic string and empty collection.
-- **A** — B plus the 320px reflow viewport where the component has a horizontal axis (72 stories set one;
-  `.storybook/preview.ts` defines `reflow` and `mobile`).
+- **A** — B plus the 320px reflow viewport where the component has a horizontal axis.
+  `.storybook/preview.ts` defines `reflow` (320px) alongside `mobile`, `tablet`, `desktop` and `wide`.
 - **A+** — B/A plus **dark**. Nothing currently renders dark under test: `withThemeByClassName` defaults
   to `light`, Chromatic captures `viewports: [1440]` with no `modes`, and no story sets a dark global.
   Contrast in dark is un-asserted by construction.
 
-`grep -c "^export const .*: Story" <file>` — median is 5 across 256 files.
+`grep -c "^export const .*: Story" <file>`, against
+`grep -rc "^export const .*: Story" webapp/src --include="*.stories.tsx"` for the distribution it sits
+in. A file far above the median is a maintenance question, not an achievement.
 
 **Anti-criterion — coverage percentage.** "39 of 41 `components/ui/*` primitives have no story" is not a
 gap. They are vendored shadcn and editing them is forbidden. Do not open that as work.
@@ -123,21 +129,22 @@ gap. They are vendored shadcn and editing them is forbidden. Do not open that as
 - **A** — B, and an interaction that fires a callback asserts the spy:
   `expect(args.onX).toHaveBeenCalledWith(…)`.
 - **A+** — The assertion targets the contract a look-alike would fail — `expectGenuinelyDisabled` /
-  `expectUnavailable` (`webapp/src/test/controls.ts:22-38`) check focus behaviour, not the attribute.
+  `expectUnavailable` (`webapp/src/test/controls.ts`) check focus behaviour, not the attribute.
 
 ```
-grep -rn "userEvent\." webapp/src --include="*.stories.tsx" | cut -d: -f1 | sort -u
-grep -rn "expect(args\." webapp/src --include="*.stories.tsx"
+grep -rln "userEvent\." webapp/src --include="*.stories.tsx"     # files driving an interaction
+grep -rln "fn()" webapp/src --include="*.stories.tsx"             # files declaring a spy
+grep -rln "expect(args\." webapp/src --include="*.stories.tsx"    # files asserting one
 ```
-Snapshot: 753 play bodies across 144 of 256 files; 90 files drive an interaction with `userEvent`.
 
-**Anti-criterion — spy count.** 136 files declare an `fn()` spy; 49 assert one. That gap is **not** 87
-defects: `fn()` in `args` also drives the Actions panel. Only score D/C when the play **does** trigger it.
+**Anti-criterion — spy count.** Far more files declare an `fn()` spy than assert one, and the
+difference is **not** a defect list: `fn()` in `args` also drives the Actions panel. Only score D/C
+when the play **does** trigger the spy and then ignores it.
 
-**Anti-criterion — play-function count.** 112 of 256 files have no play at all. *"A render test is a simple
-version of an interaction test that only tests the ability of a component to render successfully in a given
-state. That works fine for relatively simple, static components like a Button."* Adding a play to a
-presentational badge is theatre. **Grade the component, not the file.**
+**Anti-criterion — play-function count.** A large minority of files have no play at all. *"A render test
+is a simple version of an interaction test that only tests the ability of a component to render
+successfully in a given state. That works fine for relatively simple, static components like a Button."*
+Adding a play to a presentational badge is theatre. **Grade the component, not the file.**
 
 ## Dimension 7 — Accessibility beyond what axe sees
 
@@ -153,9 +160,10 @@ presentational badge is theatre. **Grade the component, not the file.**
   carrying the message.
 
 **Confirmation, not a finding: this is at ceiling.** `.storybook/preview.ts` sets `a11y: { test: "error" }`
-project-wide; across 256 story files there are **zero** per-story or per-meta `todo`/`off` overrides and
-zero disabled rules. The single global exclusion (`[data-base-ui-focus-guard]`) cites the upstream bug.
-Protect this; do not propose work here.
+project-wide, and across the whole story tree there are **zero** per-story or per-meta `todo`/`off`
+overrides and zero disabled rules — `hephaestus/no-story-a11y-override` is what keeps that zero at zero.
+The single global exclusion (`[data-base-ui-focus-guard]`) cites the upstream bug. Protect this; do not
+propose work here.
 
 **Anti-criterion — "axe is green".** The addon *"automatically catches up to 57% of WCAG issues"*. A green
 panel is C, never B. Note also that requiring `aria-label` in a props type is **house policy** — the
@@ -164,8 +172,8 @@ support the mechanism.
 
 ## Dimension 8 — Is the published prose worth publishing?
 
-255 of 256 files carry `tags: ["autodocs"]`, so a JSDoc block above `meta` or above an exported story **is**
-the component's documentation page.
+Nearly every file carries `tags: ["autodocs"]`, so a JSDoc block above `meta` or above an exported story
+**is** the component's documentation page.
 
 - **D** — Prose restating the story's name (`/** Moving an area's worth in one action */` above `BulkSet`),
   or explaining how the assertion reaches the DOM — that belongs in a `//` inside the play function.
@@ -173,12 +181,12 @@ the component's documentation page.
 - **B** — Records something the reader cannot derive from the code below it: a rejected alternative, a trap,
   a why.
 - **A** — B, and the block is addressed to somebody reading the *component*, not the test.
-- **A+** — A file with no `autodocs` says in its meta why it opted out (`SortableCatalogTree.stories.tsx` —
-  the stories render a harness).
+- **A+** — A file with no `autodocs` says in its meta why it opted out
+  (`admin/practice-catalog/SortableCatalogTree.stories.tsx` — the stories render a harness).
 
 `node scripts/check-story-prose.ts` gates `<p>` only. For the D band there is no gate — it is a review
-question: *delete this block; is anything lost?* Snapshot: 106/256 files have a meta JSDoc; 657/1494 stories
-have one.
+question: *delete this block; is anything lost?* Rather less than half the files carry a meta JSDoc and
+rather less than half the stories carry one, so the absence of a block is not by itself a finding.
 
 ## Dimension 9 — Did the rule ship with its gate?
 
@@ -186,15 +194,17 @@ have one.
 - **C** — Rule in prose, no gate.
 - **B** — Rule in prose plus a mechanical check — an oxlint rule in `webapp/tools/oxlint/rules/`, or a
   node gate in `scripts/` wired into `pnpm run check`.
-- **A** — B, and the gate's own comment explains the two neighbouring shapes it deliberately does *not*
-  match, so nobody widens it into a nuisance (all three house rules do this).
+- **A** — B, and the gate's own comment explains the neighbouring shapes it deliberately does *not*
+  match, so nobody widens it into a nuisance — the house rules in `webapp/tools/oxlint/rules/` are the
+  worked examples.
 - **A+** — The gate is shrink-only: an allowlist entry that scans clean fails the build, so it cannot go
   stale (`scripts/check-presentational-components.ts`).
 
 For each rule in a guidelines diff, `grep` for the thing it forbids across `webapp/src`. **A rule with a 0%
 adoption rate is not a rule** — the `value`/`onValueChange` mandate was deleted for this reason. A rule with
 a meaningful violation rate, no gate, and no behavioural consequence should also be deleted rather than
-demoted: `use the canvas play argument` (29% violation, pure style) was cut on this test.
+demoted: `use the canvas play argument` was cut on this test, being pure style that a meaningful share
+of the tree already ignored.
 
 ---
 
@@ -202,11 +212,11 @@ demoted: `use the canvas play argument` (29% violation, pure style) was cut on t
 
 | Looks like quality | Why it is not |
 |---|---|
-| High story count per component | 1494 stories / 256 files. A fifth variant story with no new branch adds a Chromatic snapshot and a maintenance edge, nothing else. |
+| High story count per component | A variant story that reaches no new branch adds a Chromatic snapshot and a maintenance edge, nothing else. |
 | Every `on*` prop wired to `fn()` | Feeds the Actions panel; proves nothing unless the play triggers it. |
 | A play function on every story | Render tests are the sanctioned shape for static components. |
 | Green a11y addon | ≤57% of WCAG issues. |
-| `disableSnapshot: true` on interaction stories | Correct and already consistent (47 uses, all paired with `play`). Not a finding either way. |
+| `disableSnapshot: true` on interaction stories | Correct where it is paired with a `play`, which is nearly everywhere it appears. Not a finding either way. |
 | Story coverage % including `components/ui/**` | Vendored shadcn; editing them is forbidden. |
 | No `asChild` anywhere | This is Base UI. Absence is the baseline. |
 | `argTypes` on every story file | Useless for a single domain-object prop. It is a correction layer, not coverage. |

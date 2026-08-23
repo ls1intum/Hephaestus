@@ -1,11 +1,19 @@
 export type DateLike = Date | string | undefined | null;
 
 /**
- * The generated client revives every `format: date-time` response field into a real `Date`
- * (`transformer: true` in `openapi-ts.config.ts`), so this is for the payloads outside that
- * guarantee — chiefly the Mentor SSE stream, parsed by hand in `use-mentor-chat.ts` because its
- * operation is excluded from generation, whose timestamps arrive as raw strings. An unusable value
- * comes back `undefined` rather than an Invalid Date that would render as "Invalid Date".
+ * Narrow a timestamp — absent, a string, or a `Date` that may not be a usable one — to a `Date` the
+ * caller can format, or `undefined`.
+ *
+ * It exists for the two things the type `Date | undefined` cannot say, both of which reach the screen
+ * as visible nonsense if nobody handles them:
+ *
+ * - An **Invalid Date is still a `Date`**, and `.toLocaleDateString()` on one renders the literal
+ *   text "Invalid Date". Only a range check catches that, never a type.
+ * - A value that never passed through a generated response transformer — a fixture written by hand,
+ *   a cache entry set directly — is **still the ISO string** its type calls a `Date`.
+ *
+ * Both degrade to `undefined` rather than to a fabricated `now`, so the caller's own fallback shows:
+ * `asDate(value)?.toLocaleDateString() ?? "–"`.
  */
 export function asDate(value: DateLike): Date | undefined {
 	if (value == null) return undefined;

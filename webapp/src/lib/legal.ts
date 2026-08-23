@@ -56,6 +56,7 @@ function buildCandidates(page: LegalPageId, profile: string): Candidate[] {
 async function tryFetch(url: string, signal?: AbortSignal): Promise<string | null> {
 	let response: Response;
 	try {
+		// oxlint-disable-next-line no-restricted-globals -- These are static markdown files served from the SPA's own origin (`/legal/**`, `/legal-overrides/**`), not application-server data: the deployment drops them in, so no operation for them exists or could exist in `openapi.yaml`.
 		response = await fetch(url, { signal, cache: "no-cache" });
 	} catch (err) {
 		// Preserve abort semantics so the caller can distinguish teardown from

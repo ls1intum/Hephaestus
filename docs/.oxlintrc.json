@@ -46,6 +46,7 @@
 		"typescript/no-unsafe-member-access": "error",
 		"typescript/no-non-null-assertion": "error",
 		"unicorn/prefer-node-protocol": "error",
+		"unicorn/prefer-import-meta-properties": "error",
 		"oxc/no-accumulating-spread": "error",
 		"react/no-danger": "error",
 		"eqeqeq": [

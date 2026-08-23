@@ -73,6 +73,9 @@
 			{ "forbid": [{ "propName": "asChild", "message": "Base UI slots through `render={<X/>}`." }] }
 		],
 		"unicorn/prefer-node-protocol": "error",
+		// `import.meta.dirname` and `import.meta.filename` are the spelling of what
+		// `dirname(fileURLToPath(import.meta.url))` builds by hand, and they need no imports.
+		"unicorn/prefer-import-meta-properties": "error",
 		"oxc/no-accumulating-spread": "error",
 		"react/no-danger": "error",
 		// `null == x` is the idiomatic "null or undefined" check and stays allowed.
@@ -336,13 +339,17 @@
 		// `toBeTruthy()`, which also passes on `1`, `"false"` and `{}`. Both cannot be on.
 		"vitest/prefer-to-be-truthy": "off",
 		"vitest/prefer-to-be-falsy": "off",
-		// React Compiler's own effect check. The effects it reports here re-run on the dependency it
-		// calls extra on purpose, so clearing them changes when they fire.
+		// React Compiler's own effect check, and it disagrees with the effects here in both directions
+		// — extra dependencies called on purpose, and one it reads as missing. Either way, clearing what
+		// it reports changes when the effect fires.
 		"react/exhaustive-effect-dependencies": "off",
-		// shadcn primitives over Base UI set `role` themselves.
+		// The rule's tag mapping is wrong for two shapes used throughout: it wants `<output>` for
+		// `role="status"`, which carries form-association semantics a live region does not, and `<img>`
+		// for `role="img"` on an inline SVG, which is how you give one a name.
 		"jsx-a11y/prefer-tag-over-role": "off",
 		// Base UI passes the control through `render=` and keeps the label in the wrapper's children,
-		// where no jsx-a11y rule can see it. Expect this from any rule that inspects children.
+		// where no jsx-a11y rule can see it. It also does not model `<datalist>`, where a valueless
+		// `<option>` is the correct spelling. Expect this from any rule that inspects children.
 		"jsx-a11y/control-has-associated-label": "off",
 		// Same shape, plus `renderPageLink`: the `<a>`'s content comes from whoever renders it.
 		"jsx-a11y/anchor-has-content": "off",
@@ -369,17 +376,19 @@
 		// a genuinely hoistable helper.
 		"unicorn/consistent-function-scoping": "off",
 		// Server field names (`_id`), test hooks (`__resetSessionRecoveryForTests`), the runtime config
-		// global (`__ENV__`) and exhaustiveness bindings (`_exhaustive`).
+		// global (`__ENV__`), exhaustiveness bindings (`_exhaustive`) and XSS sentinels a test has to name.
 		"no-underscore-dangle": "off",
 
 		// -- Options ---------------------------------------------------------------------------------
-		"jsx-a11y/no-autofocus": ["error", { "ignoreNonDOM": true }],
+		// `ignoreNonDOM: true` would make this rule blind to every use here, all of which are spelled
+		// on a component (`<Input autoFocus/>`). The overlay-field cases are suppressed at the call site.
+		"jsx-a11y/no-autofocus": ["error", { "ignoreNonDOM": false }],
 		// TanStack Table column defs are `cell: ({ row }) => <Badge …/>` — a component passed as a prop.
 		"react/no-unstable-nested-components": ["error", { "allowAsProps": true }],
 		// `void somePromise.then(sideEffect)` is fire-and-forget; only a chain's interior needs a return.
 		"promise/always-return": ["error", { "ignoreLastCallback": true }],
-		// Vitest's `expect(actual, message)` takes a second argument; the rule is ported from Jest,
-		// where it does not.
+		// Vitest's `expect(actual, message)` takes a second argument; the rule is ported from Jest, whose
+		// default of 1 rejects it. Load-bearing — three assertions inside loops label themselves that way.
 		"vitest/valid-expect": ["error", { "maxArgs": 2 }],
 		// CSS side effects and module augmentation.
 		"import/no-unassigned-import": ["error", { "allow": ["**/*.css", "@tanstack/react-router", "react"] }],
@@ -405,6 +414,22 @@
 				]
 			}
 		],
+		// `cn()` (`src/lib/utils.ts`) is the repo's one wrapper over both — `AGENTS.md` § Styling. Calling
+		// `clsx` directly skips the `tailwind-merge` pass, so a later `p-2` loses to an earlier `p-4`
+		// instead of replacing it; calling `twMerge` directly drops conditional-class support.
+		//
+		// Every `overrides` entry below that sets `no-restricted-imports` RESTATES this pair, because a
+		// matching entry replaces this one wholesale rather than adding to it. `src/lib/utils.ts` is the
+		// one entry that leaves it out, since that file is where `cn` is defined.
+		"no-restricted-imports": [
+			"error",
+			{
+				"paths": [
+					{ "name": "clsx", "message": "Compose classes with `cn()` from `@/lib/utils`." },
+					{ "name": "tailwind-merge", "message": "Compose classes with `cn()` from `@/lib/utils`." }
+				]
+			}
+		],
 		// `varsIgnorePattern` buys less than it looks: tsc's `noUnusedLocals` (`tsconfig.json`) still
 		// fails an unused `_local`. Only the parameter and caught-error escapes hold on both sides.
 		"no-unused-vars": [
@@ -420,10 +445,8 @@
 		// A hand-written key stops matching the generated one silently: no failure, just an
 		// invalidation that no longer invalidates.
 		"hephaestus/no-manual-query-key": "error",
-		"hephaestus/no-redundant-in-the-document": "error",
-		"hephaestus/no-within-canvas-element": "error",
-		"hephaestus/typed-story-meta": "error"
-		// `play-must-assert` and `no-story-a11y-override` are scoped to story files in `overrides`.
+		"hephaestus/no-redundant-in-the-document": "error"
+		// The other four read a Storybook story object and are scoped to story files in `overrides`.
 	},
 
 	// Never configure one rule for the same file from two entries: where two overrides match a file,
@@ -431,7 +454,35 @@
 	// Entries whose globs overlap but set different rules are fine, and there are several below.
 	"overrides": [
 		{
+			// `src/lib/utils.ts` gets the entry below instead; `excludeFiles` keeps the two from colliding.
 			"files": ["src/lib/**", "src/stores/**"],
+			"excludeFiles": ["src/lib/utils.ts"],
+			"rules": {
+				"no-restricted-imports": [
+					"error",
+					{
+						"paths": [
+							{ "name": "clsx", "message": "Compose classes with `cn()` from `@/lib/utils`." },
+							{ "name": "tailwind-merge", "message": "Compose classes with `cn()` from `@/lib/utils`." }
+						],
+						"patterns": [
+							{
+								"group": ["@/components/**"],
+								"message": "Logic and state must not reach into the view layer."
+							},
+							{
+								"group": ["@/routes/**"],
+								"message": "Logic and state must not reach into the router."
+							}
+						]
+					}
+				]
+			}
+		},
+		{
+			// The definition of `cn`, and the only file allowed to reach `clsx` and `tailwind-merge`: the
+			// layering patterns still apply, the styling pair is left out on purpose.
+			"files": ["src/lib/utils.ts"],
 			"rules": {
 				"no-restricted-imports": [
 					"error",
@@ -456,6 +507,10 @@
 				"no-restricted-imports": [
 					"error",
 					{
+						"paths": [
+							{ "name": "clsx", "message": "Compose classes with `cn()` from `@/lib/utils`." },
+							{ "name": "tailwind-merge", "message": "Compose classes with `cn()` from `@/lib/utils`." }
+						],
 						"patterns": [
 							{
 								"group": ["@/routes/**"],
@@ -471,38 +526,59 @@
 			}
 		},
 		{
-			// Named one by one because a `src/components/**` glob would also match `ui/**` and replace
-			// the entry above rather than add to it.
-			"files": [
-				"src/components/achievements/**",
-				"src/components/admin/**",
-				"src/components/auth/**",
-				"src/components/common/**",
-				"src/components/consent/**",
-				"src/components/core/**",
-				"src/components/icons/**",
-				"src/components/info/**",
-				"src/components/leaderboard/**",
-				"src/components/mentor/**",
-				"src/components/practice-trace/**",
-				"src/components/practice-vocabulary/**",
-				"src/components/profile/**",
-				"src/components/settings/**",
-				"src/components/shared/**",
-				"src/components/surveys/**",
-				"src/components/teams/**",
-				"src/components/workspace/**"
-			],
+			// A UI primitive gets the stricter entry above instead; `excludeFiles` keeps the two from
+			// colliding, since a second matching override would replace its options rather than add.
+			"files": ["src/components/**"],
+			"excludeFiles": ["src/components/ui/**"],
 			"rules": {
 				"no-restricted-imports": [
 					"error",
 					{
+						"paths": [
+							{ "name": "clsx", "message": "Compose classes with `cn()` from `@/lib/utils`." },
+							{ "name": "tailwind-merge", "message": "Compose classes with `cn()` from `@/lib/utils`." }
+						],
 						"patterns": [
 							{
 								"group": ["@/routes/**"],
 								"message": "A component cannot import a route; routes compose components."
 							}
 						]
+					}
+				]
+			}
+		},
+		{
+			// SPA source only. `e2e/**` is Playwright on Node, and the config files at the package root are
+			// build tooling — both may reach for a bare global that has no business in a bundled module.
+			"files": ["src/**"],
+			"rules": {
+				// `AGENTS.md` § Data fetching: server data is the generated client plus TanStack Query, which
+				// is also what attaches the CSRF header (`applyStateChangingHeaders`). A bare request skips
+				// the header, the cache and the shared error handling at once.
+				"no-restricted-globals": [
+					"error",
+					{
+						"name": "fetch",
+						"message": "Server data goes through the generated client and TanStack Query."
+					},
+					{
+						"name": "XMLHttpRequest",
+						"message": "Server data goes through the generated client and TanStack Query."
+					}
+				],
+				// Vite substitutes `import.meta.env`, never `process.env`, and an unsubstituted
+				// `process.env.X` is not a build error — it reads as `undefined` in the browser, so the
+				// failure surfaces wherever the value was needed rather than here. The two legitimate
+				// sources are separate: `import.meta.env` carries the build-time mode flags (`DEV`), while
+				// runtime configuration reaches the bundle through `window.__ENV__`, wrapped by
+				// `@/environment` and filled in by the container entrypoint.
+				"no-restricted-properties": [
+					"error",
+					{
+						"object": "process",
+						"property": "env",
+						"message": "Not substituted in the browser bundle. Build mode is `import.meta.env`; runtime configuration is `@/environment`."
 					}
 				]
 			}
@@ -541,16 +617,21 @@
 			"rules": { "typescript/require-await": "off" }
 		},
 		{
-			// Both rules read a Storybook story object, and only a story file holds one. `parameters.a11y`
-			// is also how `.storybook/preview.ts` sets the project-wide bar these two must not lower, and
-			// a `play` property elsewhere belongs to a media element.
+			// All four read a Storybook story object, and only a story file holds one. `parameters.a11y`
+			// is also how `.storybook/preview.ts` sets the project-wide bar none of them may lower; a
+			// `play` property elsewhere belongs to a media element; `canvasElement` exists only inside a
+			// play; and a domain type named `Meta` — a pagination envelope, say — is not Storybook's.
 			"files": ["**/*.stories.tsx"],
 			"rules": {
 				// `vitest/expect-expect` cannot see these: a play is a property on a story object, not a
-				// body inside `test()`. Its `assertFunctionNames` list is mirrored in the rule.
+				// body inside `test()`. The list below is a subset of the rule's own, which adds the
+				// `expect*` and `assert*` prefixes that reach `src/test/`'s helpers; that relation — not
+				// the text, which JSON and TypeScript cannot share — is pinned by `play-must-assert.test.ts`.
 				"hephaestus/play-must-assert": "error",
 				// One story quietly exempting itself leaves the whole suite green.
-				"hephaestus/no-story-a11y-override": "error"
+				"hephaestus/no-story-a11y-override": "error",
+				"hephaestus/no-within-canvas-element": "error",
+				"hephaestus/typed-story-meta": "error"
 			}
 		},
 		{

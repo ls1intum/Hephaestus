@@ -15,11 +15,10 @@
  * shares a host — so a difference there is the point rather than a defect; those are listed, not failed.
  */
 import { readFile } from "node:fs/promises";
-import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join, resolve } from "node:path";
 
 /** Resolved from this file, so the gate answers the same whatever the working directory is. */
-const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const REPO_ROOT = resolve(import.meta.dirname, "..");
 const APPLICATION_YML = "server/src/main/resources/application.yml";
 const COMPOSE_FILES = ["docker/compose.app.yaml"];
 const DELIBERATE_OVERRIDES = ["docker/preview/compose.app.yaml"];

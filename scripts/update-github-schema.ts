@@ -8,13 +8,9 @@
  */
 
 import { renameSync, statSync, unlinkSync, writeFileSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join, resolve } from "node:path";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-
-const SCHEMA_DIR = resolve(__dirname, "../server/src/main/resources/graphql/github");
+const SCHEMA_DIR = resolve(import.meta.dirname, "../server/src/main/resources/graphql/github");
 const SCHEMA_FILE = join(SCHEMA_DIR, "schema.github.graphql");
 // Official GitHub GraphQL schema URL - this is the only trusted source
 const SCHEMA_URL = "https://docs.github.com/public/fpt/schema.docs.graphql";

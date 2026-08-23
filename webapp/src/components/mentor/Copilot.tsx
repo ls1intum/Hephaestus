@@ -1,11 +1,53 @@
 import { Sparkles, SquareArrowOutUpRight, SquarePen, X } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { type RefObject, useEffect, useRef, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { MentorIcon } from "./MentorIcon";
+
+/** The `document.body` inline styles the scroll lock overwrites, kept so it can put them back. */
+interface BodyScrollStyles {
+	overflow: string;
+	paddingRight: string;
+	touchAction: string;
+}
+
+type BodyScrollRef = RefObject<BodyScrollStyles | null>;
+
+/**
+ * Freeze the page behind the popover, compensating for the scrollbar it removes so the layout does
+ * not shift sideways. Re-entrant: a second lock while one is held is a no-op, so the styles captured
+ * are always the page's own rather than the frozen ones.
+ *
+ * Both halves touch nothing but `document.body` and the ref they are handed, which is why they sit
+ * outside the component — nothing about them varies per render.
+ */
+function lockBodyScroll(previous: BodyScrollRef): void {
+	if (previous.current) return;
+	const body = document.body;
+	previous.current = {
+		overflow: body.style.overflow,
+		paddingRight: body.style.paddingRight,
+		touchAction: body.style.touchAction,
+	};
+	const scrollBarWidth = window.innerWidth - document.documentElement.clientWidth;
+	if (scrollBarWidth > 0) body.style.paddingRight = `${scrollBarWidth}px`;
+	body.style.overflow = "hidden";
+	body.style.touchAction = "none";
+}
+
+/** Restore what {@link lockBodyScroll} captured. A no-op unless a lock is held. */
+function unlockBodyScroll(previous: BodyScrollRef): void {
+	const prev = previous.current;
+	if (!prev) return;
+	const body = document.body;
+	body.style.overflow = prev.overflow;
+	body.style.paddingRight = prev.paddingRight;
+	body.style.touchAction = prev.touchAction;
+	previous.current = null;
+}
 
 export interface CopilotProps {
 	/** Content to display in the popover (typically Chat component) */
@@ -52,37 +94,10 @@ export function Copilot({
 		setIsOpen(false);
 	};
 
-	const prevBodyStylesRef = useRef<{
-		overflow: string;
-		paddingRight: string;
-		touchAction: string;
-	} | null>(null);
-	const lockBodyScroll = () => {
-		if (prevBodyStylesRef.current) return;
-		const body = document.body;
-		prevBodyStylesRef.current = {
-			overflow: body.style.overflow,
-			paddingRight: body.style.paddingRight,
-			touchAction: body.style.touchAction,
-		};
-		const scrollBarWidth = window.innerWidth - document.documentElement.clientWidth;
-		if (scrollBarWidth > 0) body.style.paddingRight = `${scrollBarWidth}px`;
-		body.style.overflow = "hidden";
-		body.style.touchAction = "none";
-	};
-	const unlockBodyScroll = () => {
-		const prev = prevBodyStylesRef.current;
-		if (!prev) return;
-		const body = document.body;
-		body.style.overflow = prev.overflow;
-		body.style.paddingRight = prev.paddingRight;
-		body.style.touchAction = prev.touchAction;
-		prevBodyStylesRef.current = null;
-	};
-	// `unlockBodyScroll` keeps a stable identity because React Compiler memoises it.
+	const prevBodyStylesRef = useRef<BodyScrollStyles | null>(null);
 	useEffect(() => {
-		if (!isOpen) unlockBodyScroll();
-		return () => unlockBodyScroll();
+		if (!isOpen) unlockBodyScroll(prevBodyStylesRef);
+		return () => unlockBodyScroll(prevBodyStylesRef);
 	}, [isOpen]);
 
 	// Handle open change with click outside detection
@@ -116,10 +131,10 @@ export function Copilot({
 					align="end"
 					alignOffset={0}
 					sideOffset={8}
-					onPointerEnter={lockBodyScroll}
-					onPointerLeave={unlockBodyScroll}
-					onTouchStart={lockBodyScroll}
-					onTouchEnd={unlockBodyScroll}
+					onPointerEnter={() => lockBodyScroll(prevBodyStylesRef)}
+					onPointerLeave={() => unlockBodyScroll(prevBodyStylesRef)}
+					onTouchStart={() => lockBodyScroll(prevBodyStylesRef)}
+					onTouchEnd={() => unlockBodyScroll(prevBodyStylesRef)}
 					onWheelCapture={(e) => {
 						e.stopPropagation();
 					}}

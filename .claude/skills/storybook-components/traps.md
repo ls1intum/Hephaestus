@@ -14,17 +14,28 @@ matches, and forcing every duration to 1ms does not fix it. Use `expectSettledVi
 
 `AbortError`, not a resolution — and a popup that re-positions while opening replaces its own enter
 animation routinely. Any settle helper must `.catch()` the rejection and treat it as an outcome
-(`webapp/src/test/overlay.ts:60-66`). Without the catch the helper throws on the ordinary path.
+(`webapp/src/test/overlay.ts`). Without the catch the helper throws on the ordinary path.
 
-## 3. An `exhaustive-deps` suppression silently disables `set-state-in-effect` too
+## 3. `react-hooks/exhaustive-deps` in a directive turns off hook linting for the whole component
 
-oxlint runs the React hook rules as one fused pass, so `// oxlint-disable-next-line
-react-hooks/exhaustive-deps` above a dependency array turns off **every** hook rule for that
-`useEffect` — including `react/set-state-in-effect`, which reports on the `setState` line *above* the
-directive. `options.reportUnusedDisableDirectives` does not save you either — it stays silent, so
-nothing marks the directive as doing more than it says. One real finding in `TimeframeFilter.tsx` hid
-this way until the directive was removed. Fix the effect rather than reach for the directive; there
-is no hook suppression left in the tree.
+Spell a suppression the way the diagnostic prints it. oxlint reports the React hook rules as
+`react(exhaustive-effect-dependencies)` and `react(set-state-in-effect)`, and a directive naming
+either of those suppresses **only that rule, only on the line it points at** — `set-state-in-effect`
+still fails a build whose `exhaustive-effect-dependencies` was silenced.
+
+`react-hooks/exhaustive-deps` is a different, legacy name, and it does not behave that way. One
+`// oxlint-disable-next-line react-hooks/exhaustive-deps` **anywhere inside a component body**
+suppresses every React hook diagnostic in that component — both rules, every effect in it, whichever
+line the directive sits above. Neighbouring components in the same file keep reporting, so the file
+does not look disabled.
+
+`options.reportUnusedDisableDirectives` does not close this one. It catches a directive that
+suppresses nothing — including one naming a rule that does not exist, reported as
+`Unused oxlint-disable directive` and failing the build. But `react-hooks/exhaustive-deps` really
+does suppress its own warning, so it counts as used and the collateral goes unremarked. The run
+exits 0.
+
+Fix the effect rather than reach for the directive.
 
 ## 4. One story's MSW handlers answer for the whole Docs page
 
@@ -38,7 +49,7 @@ snapshot, stays green. That is not hypothetical: it is what made a screen's Docs
 ## 5. `test:storybook` does not run the README-export check — CI does, right after
 
 `.github/workflows/ci-tests.yml` runs `pnpm run export:readme-assets` after `test:storybook` and fails
-the job if `docs/images/readme` is dirty. So the storybook job can go red printing "1382 passed". If a
+the job if `docs/images/readme` is dirty. So the storybook job can go red having printed a clean pass line. If a
 change moves or renames a story that exports a README asset, run
 `pnpm --filter webapp run export:readme-assets` and commit the result.
 

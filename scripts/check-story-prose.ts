@@ -9,11 +9,10 @@
  * that share it.
  */
 import { readdir, readFile } from "node:fs/promises";
-import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join, resolve } from "node:path";
 
 /** Resolved from this file, so the gate answers the same from the repo root or from webapp/. */
-const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const REPO_ROOT = resolve(import.meta.dirname, "..");
 const STORIES = join(REPO_ROOT, "webapp/src");
 const HTML_PARAGRAPH = /<\/?p>/i;
 /** Only comment lines: inside a story's own JSX, `<p>` is an element and correct. */

@@ -52,6 +52,11 @@ Naming: `format` applies, `format:check` verifies read-only for CI, `lint` lints
 comprehensive verification. A `:webapp`, `:server` or `:agents` suffix scopes any of them; `:java`
 scopes `format` and `lint` only — the Java leg of `check` is `check:server`.
 
+**`check` is a strict superset of CI, and the difference is only ever caught locally.** PMD
+(`lint:java`), `check:diagrams` and `check:env` run in no workflow; the only thing that runs them
+before a merge is the `pre-push` hook, which `--no-verify` skips. Green CI is therefore not evidence
+that `pnpm run check` passes. Run it yourself before you claim it.
+
 ### Lint and format scopes
 
 **oxlint lints every TypeScript tree in the repo; Biome formats and sorts imports.**
@@ -59,13 +64,19 @@ scopes `format` and `lint` only — the Java leg of `check` is `check:server`.
 | Tree | oxlint config | Formatted by | Scripts |
 |---|---|---|---|
 | the SPA (`webapp/`) | `webapp/.oxlintrc.json` | Biome (`webapp/biome.jsonc`) | `format:webapp`, `lint:webapp`, `check:webapp` |
-| the docs site (`docs/`) | `docs/.oxlintrc.json` | its own tooling | `docs:lint` |
+| the docs site (`docs/`) | `docs/.oxlintrc.json` | its own tooling | linted by `lint:agents`, which passes `docs` as a path |
 | the Bun agent runtime and specs, both precompute trees, `scripts/**`, and the repo-root config files | `.oxlintrc.json` | Biome (`biome.jsonc`) | `format:agents`, `lint:agents`, `check:agents` |
 
+`docs:lint` is **not** the oxlint leg — it is the docs package's own `typecheck` plus
+`markdownlint-cli2`, and nothing in `pnpm run check` or in CI runs it. Run it by hand after editing
+`docs/`.
+
 A nested config **replaces** the root's rules for the files under it rather than merging, so each
-tree states its rule set in full. `options` — including `typeAware` — is root-only and governs every
-config in the repo. Each config carries the reasoning for its own deltas; read it before switching a
-rule either way.
+tree states its rule set in full. `options` — including `typeAware` and
+`reportUnusedDisableDirectives` — is declared only in the repo-root config and reaches a nested tree
+only while that file is the discovered root, which is why every lint script starts from the repo
+root. Each config carries the reasoning for its own deltas; read it before switching a rule either
+way.
 
 The two Biome configs run the pinned `@biomejs/biome` from the root `package.json`, and
 `webapp/biome.jsonc` declares `"root": false`. `check:agents` also runs `typecheck:agents` and
@@ -116,27 +127,22 @@ rest.
 
 ### Stacked pull requests
 
-For dependent work that is easier to review in coherent layers, follow `CONTRIBUTING.md` § Stacked Pull
-Requests. Plan the dependency order before creating layers, put foundations below their dependants,
-and do not create a layer that cannot satisfy the normal PR, release, and quality requirements on its
-own.
-
-When `gh stack` manages a stack, use `/gh-stack` instead of manually retargeting its
-branches. Restack descendants after changing a lower layer. Do not stage, commit, push, submit, or
-merge without explicit user permission.
+`CONTRIBUTING.md` § Stacked Pull Requests has the process; `/gh-stack` drives `gh stack` rather than
+retargeting branches by hand, and descendants get restacked after a lower layer changes. The one
+constraint worth stating twice: **a layer that cannot satisfy the normal PR, release and quality
+requirements on its own is not a layer.**
 
 ### Changesets (release notes)
 
 `.changeset/*.md` files that become `CHANGELOG.md` and drive the version bump. **Not** the same thing
 as a Liquibase `<changeSet>` — a schema change needs both. Full flow:
-`docs/contributor/release-management.mdx`.
+`docs/contributor/release-management.mdx`; the file's shape is in `.changeset/README.md`.
 
 - **Every PR that changes shipped code** (`server/`, `webapp/`, `docker/`, excluding tests and in-tree
-  docs) ships one. `pnpm changeset` is interactive; with no TTY, hand-write `.changeset/<slug>.md` with
-  frontmatter `"hephaestus": <bump>` and the summary as the body (shape in `.changeset/README.md`).
-  This is the one sanctioned hand-write — never hand-edit `CHANGELOG.md`. If the change is invisible to
-  operators and users, `pnpm changeset --empty` and say why in the body. CI (`verify-changesets`) fails
-  a shipped-code PR with neither.
+  docs) ships one, and `verify-changesets` fails the PR otherwise. `pnpm changeset` is interactive;
+  with no TTY, hand-writing `.changeset/<slug>.md` is the one sanctioned hand-write — never hand-edit
+  `CHANGELOG.md`. If the change is invisible to operators and users, `pnpm changeset --empty` and say
+  why in the body.
 - **The summary lands in `CHANGELOG.md` verbatim, in the operator's or user's voice.** Lead with what
   they can now do, or the symptom a fix removes. No class names, hook names or file paths. No
   co-authored-by or agent-attribution trailers.
@@ -166,5 +172,3 @@ Each of these fails *quietly* — the command reports success and leaves you wit
 - Everything `mvn`-shaped — the `quick` profile silently skipping every test, `mvn clean` wiping the
   generated GraphQL sources, two Maven runs sharing one `target/`, `server/.env` leaking into test
   JVMs — is in `server/AGENTS.md` § Build traps. Read it before your first server test run.
-
-Prefer improving the structure over ad-hoc shortcuts, and write code that reads like the code around it.

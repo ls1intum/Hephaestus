@@ -9,11 +9,10 @@
  * the tree inside a worker starves the route tests sharing it.
  */
 import { readdir, readFile } from "node:fs/promises";
-import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join, resolve } from "node:path";
 
 /** Resolved from this file, so the script runs identically from the repo root and from `webapp/`. */
-const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const REPO_ROOT = resolve(import.meta.dirname, "..");
 const COMPONENTS = "webapp/src/components";
 const WEBAPP_SRC = "webapp/src";
 

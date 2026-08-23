@@ -1,13 +1,10 @@
 import * as fs from "node:fs";
 import path, { resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 import { tanstackRouter } from "@tanstack/router-plugin/vite";
 import { defineConfig, type ViteDevServer } from "vite";
 import Terminal from "vite-plugin-terminal";
 import { configDefaults } from "vitest/config";
 import { appSourcePlugins } from "./vite.shared.ts";
-
-const __dirname = fileURLToPath(new URL(".", import.meta.url));
 
 // https://vitejs.dev/config/
 export default defineConfig(({ command }) => {
@@ -42,7 +39,7 @@ export default defineConfig(({ command }) => {
 							try {
 								JSON.parse(body);
 								const filePath = path.resolve(
-									__dirname,
+									import.meta.dirname,
 									"src/components/achievements/coordinates.json",
 								);
 								fs.writeFileSync(filePath, body);
@@ -79,14 +76,14 @@ export default defineConfig(({ command }) => {
 		},
 		resolve: {
 			alias: {
-				"@": resolve(__dirname, "./src"),
+				"@": resolve(import.meta.dirname, "./src"),
 			},
 		},
 		server: {
 			port: Number.parseInt(process.env.WEBAPP_PORT ?? "", 10) || 4200,
 			strictPort: true,
 			fs: {
-				allow: [resolve(__dirname, "..")],
+				allow: [resolve(import.meta.dirname, "..")],
 			},
 		},
 	};

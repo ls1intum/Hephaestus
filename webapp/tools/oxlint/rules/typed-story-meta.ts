@@ -1,51 +1,52 @@
 import { defineRule, type ESTree } from "@oxlint/plugins";
 import { propertyName } from "../property.ts";
 
+/**
+ * What the rule can see, and its ceiling. A JS plugin gets the syntax tree and no type information
+ * (https://oxc.rs/docs/guide/usage/linter/js-plugins), so it checks that a `Meta` names *a*
+ * component, never that it names the right one: `satisfies Meta<typeof SomeOtherThing>` passes here
+ * and only `tsc` catches it. For the same reason the named form is recognised by the identifier
+ * `meta`, which is the CSF convention rather than anything the tree states.
+ */
 export const typedStoryMeta = defineRule({
 	meta: {
 		type: "problem",
 		docs: {
 			description:
-				"A story `meta` naming a `component` is checked against it, by `satisfies Meta<typeof That>`.",
+				"A story `meta` naming a `component` is checked against it, by `satisfies Meta<typeof That>`. A gallery meta that names no component is the one case a bare `Meta` is right.",
 		},
 		messages: {
 			untyped:
-				"This `meta` names a `component` but is typed as a bare `Meta`, so its `args` are never checked against that component's props — a story can pass a prop the component does not have, and Storybook's generated controls drift with it. Type it `Meta<typeof TheComponent>`. A gallery meta that names no component is the one case `Meta` alone is right.",
+				"This `meta` names a `component` but is typed as a bare `Meta`, so its `args` are never checked against that component's props and Storybook's generated controls drift with them. Type it `Meta<typeof TheComponent>`.",
 			unchecked:
 				"This `meta` carries no type, so nothing checks its `args` against the component's props and `StoryObj<typeof meta>` infers from an object nobody constrained. End it `satisfies Meta<typeof TheComponent>`.",
 			asserted:
-				"`as` asserts where `satisfies` checks: an object asserted `as Meta<typeof X>` may carry an `arg` the component has no prop for, or omit one it requires, and TypeScript accepts both. Write `satisfies Meta<typeof X>`.",
-			anyArgument:
-				"`Meta<any>` checks nothing a bare `Meta` would not. Name the component: `satisfies Meta<typeof TheComponent>`.",
+				"`as` asserts where `satisfies` checks: an object asserted `as Meta<typeof X>` may carry an `arg` the component has no prop for, or omit one it requires. Write `satisfies Meta<typeof X>`.",
 		},
 	},
 	create(context) {
-		const asMetaReference = (type: ESTree.TSType | null | undefined) =>
-			type?.type === "TSTypeReference" &&
-			type.typeName.type === "Identifier" &&
-			type.typeName.name === "Meta"
-				? type
-				: undefined;
+		/** `Meta` and `SB.Meta` name the same type; a namespace import changes the spelling only. */
+		const asMetaReference = (type: ESTree.TSType | null | undefined) => {
+			if (type?.type !== "TSTypeReference") return undefined;
+			const { typeName } = type;
+			if (typeName.type === "Identifier" && typeName.name === "Meta") return type;
+			if (typeName.type === "TSQualifiedName" && typeName.right.name === "Meta") return type;
+			return undefined;
+		};
 
-		const namesComponent = (meta: ESTree.Expression) =>
+		const namesComponent = (meta: ESTree.Node) =>
 			meta.type === "ObjectExpression" &&
 			meta.properties.some(
 				(property) => property.type === "Property" && propertyName(property) === "component",
 			);
 
-		/** What a stated `Meta` type does and does not pin down, whichever way it is stated. */
+		/** A stated `Meta` with no type argument pins nothing about the component it names. */
 		const checkStatedType = (
 			meta: ESTree.TSTypeReference,
 			value: ESTree.Expression | null | undefined,
 		) => {
-			if (!meta.typeArguments) {
-				if (value && namesComponent(value)) context.report({ node: value, messageId: "untyped" });
-				return;
-			}
-			const [component] = meta.typeArguments.params;
-			if (component?.type === "TSAnyKeyword") {
-				context.report({ node: meta, messageId: "anyArgument" });
-			}
+			if (meta.typeArguments) return;
+			if (value && namesComponent(value)) context.report({ node: value, messageId: "untyped" });
 		};
 
 		return {
@@ -68,8 +69,14 @@ export const typedStoryMeta = defineRule({
 				if (node.id.typeAnnotation || node.id.type !== "Identifier" || node.id.name !== "meta") {
 					return;
 				}
-				if (node.init?.type === "ObjectExpression" && namesComponent(node.init)) {
+				if (node.init && namesComponent(node.init)) {
 					context.report({ node: node.init, messageId: "unchecked" });
+				}
+			},
+			// CSF3 lets the meta leave as the default export directly, under no name to recognise it by.
+			ExportDefaultDeclaration(node) {
+				if (namesComponent(node.declaration)) {
+					context.report({ node: node.declaration, messageId: "unchecked" });
 				}
 			},
 		};

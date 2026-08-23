@@ -33,12 +33,27 @@ records what this repo decided, and what it has already been burned by.
 These fail `pnpm run check`. Treat a violation as a build error, not a style opinion, and do not
 write a guideline that repeats one.
 
-- `hephaestus/typed-story-meta` (`webapp/tools/oxlint/rules/typed-story-meta.ts`) — a `meta` naming a
-  `component` must be `satisfies Meta<typeof X>`; a gallery meta naming no component may be bare `Meta`.
+The house rules are registered in `webapp/tools/oxlint/index.ts` — read it rather than trusting a
+list, since a rule can be added without this file changing. Those that reach a story file:
+
+- `hephaestus/typed-story-meta` — a `meta` naming a `component` must be `satisfies Meta<typeof X>`; a
+  gallery meta naming no component may be bare `Meta`.
+- `hephaestus/play-must-assert` — a `play` that never reaches an assertion. It reads a `getBy*` used
+  as a click target as an assertion, so it holds only the floor; whether the play checks the
+  **outcome** is still a review question.
+- `hephaestus/no-story-a11y-override` — `parameters.a11y` or `globals.a11y` on a meta or a story.
+  Either one alone takes the component out of the accessibility suite while it still reports green.
 - `hephaestus/no-redundant-in-the-document` — `expect(getBy…).toBeInTheDocument()`. A bare
   `await expect(getBy…)` is `vitest/valid-expect`, which catches it for every subject.
 - `hephaestus/no-within-canvas-element` — `within(canvasElement)` when the play function was handed
   `canvas`.
+
+The ones that only make sense in a story file are scoped to `**/*.stories.tsx` in the `overrides`
+block of `webapp/.oxlintrc.json` rather than named in its top-level `rules`. A house rule missing
+from both is simply off, and nothing reports that.
+
+Beyond oxlint:
+
 - `scripts/check-story-prose.ts` (`check:stories`) — `<p>` in a comment Storybook publishes.
 - `scripts/check-presentational-components.ts` (`check:components`) — a component importing the
   query layer, and a story installing MSW handlers. Its allowlist is shrink-only.

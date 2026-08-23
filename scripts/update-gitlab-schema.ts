@@ -8,8 +8,7 @@
  */
 
 import { mkdirSync, renameSync, statSync, unlinkSync, writeFileSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join, resolve } from "node:path";
 import {
 	buildClientSchema,
 	getIntrospectionQuery,
@@ -18,10 +17,7 @@ import {
 } from "graphql";
 import { isRecord, parseJson } from "./lib/json.ts";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-
-const SCHEMA_DIR = resolve(__dirname, "../server/src/main/resources/graphql/gitlab");
+const SCHEMA_DIR = resolve(import.meta.dirname, "../server/src/main/resources/graphql/gitlab");
 const SCHEMA_FILE = join(SCHEMA_DIR, "schema.gitlab.graphql");
 const DEFAULT_GITLAB_URL = "https://gitlab.lrz.de";
 

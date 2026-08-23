@@ -22,8 +22,13 @@ import { queryOperationId } from "@/lib/query-operation-id";
 
 /**
  * The reads a league reset moves: the board itself, and the standing computed per user beside it.
- * Read off the generated helpers, which ignore the arguments passed here, so a renamed operation
- * breaks the build rather than silently stopping the invalidation.
+ *
+ * The arguments below are placeholders required by the helpers' signatures — each builds them into
+ * the key object it returns. Only `_id`, the operation tag, is read back off that object, so the
+ * placeholder values never reach the set and the predicate below matches every cached variant of
+ * these two queries whatever its timeframe, team or sort. Taking the tag off the generated helper
+ * rather than writing the string means a renamed operation breaks the build instead of silently
+ * stopping the invalidation.
  */
 const RESET_QUERY_FAMILY_IDS: ReadonlySet<string> = new Set(
 	[

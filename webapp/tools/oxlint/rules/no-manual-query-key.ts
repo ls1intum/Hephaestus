@@ -1,18 +1,24 @@
-import { defineRule } from "@oxlint/plugins";
+import { defineRule, type ESTree } from "@oxlint/plugins";
 import { propertyName } from "../property.ts";
 
 /** The module the generated client exports its key helpers from. */
 const GENERATED = "@/api/@tanstack/react-query.gen";
 
+/** `[…] as const` and `[…] satisfies readonly unknown[]` state a type; the array is still an array. */
+const unwrapStatedType = (value: ESTree.Node): ESTree.Node =>
+	value.type === "TSAsExpression" || value.type === "TSSatisfiesExpression"
+		? unwrapStatedType(value.expression)
+		: value;
+
 export const noManualQueryKey = defineRule({
 	meta: {
 		type: "problem",
 		docs: {
-			description:
-				"A `queryKey` comes from the generated `*QueryKey()` helper, never from a hand-written array.",
+			description: `A \`queryKey\` comes from the generated \`*QueryKey()\` helper, never from a hand-written array. The helpers in \`${GENERATED}\` are regenerated from the OpenAPI spec, and a hand-built key that stops matching theirs fails nothing: the invalidation simply becomes a no-op and the UI keeps serving what it already had.`,
 		},
 		messages: {
-			handWritten: `This hand-builds the array shape \`createQueryKey\` emits in \`${GENERATED}\`, which is regenerated from the OpenAPI spec. When that shape changes nothing here fails: the key simply stops matching, so an invalidation becomes a no-op and the UI keeps serving stale data. Pass the generated key — \`getThingQueryKey({ path: … })\` — or spread the generated options.`,
+			handWritten:
+				"A hand-built key stops matching the generated one silently, and the invalidation becomes a no-op. Pass the generated key — `getThingQueryKey({ path: … })` — or spread the generated options.",
 		},
 	},
 	create(context) {
@@ -21,8 +27,9 @@ export const noManualQueryKey = defineRule({
 				if (propertyName(node) !== "queryKey") return;
 				// A shorthand, an identifier or a call is already someone else's value; only an array
 				// literal is this file claiming to know the generated shape.
-				if (node.value.type !== "ArrayExpression") return;
-				context.report({ node: node.value, messageId: "handWritten" });
+				const value = unwrapStatedType(node.value);
+				if (value.type !== "ArrayExpression") return;
+				context.report({ node: value, messageId: "handWritten" });
 			},
 		};
 	},

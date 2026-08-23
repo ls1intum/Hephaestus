@@ -2,7 +2,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
-import { fileURLToPath } from "node:url";
 import {
 	AckPolicy,
 	type ConsumerConfig,
@@ -36,9 +35,7 @@ function createLogger(level: LogLevel): Logger {
 	};
 }
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const REPO_ROOT = path.resolve(__dirname, "..");
+const REPO_ROOT = path.resolve(import.meta.dirname, "..");
 
 const DEFAULT_NATS_SERVER = process.env.NATS_URL ?? "nats://localhost:4222";
 const DEFAULT_EXAMPLES_DIR = path.join(REPO_ROOT, "server", "src", "test", "resources", "github");

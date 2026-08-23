@@ -145,6 +145,7 @@ function BudgetAmountDialogContent({
 									setDismissedServerError(serverError ?? null);
 								}}
 								disabled={isPending}
+								// oxlint-disable-next-line jsx-a11y/no-autofocus -- The budget-cap dialog opens to collect this one amount, so focus starts in the amount field rather than a tab away from it.
 								autoFocus
 							/>
 							{fxHint != null && (

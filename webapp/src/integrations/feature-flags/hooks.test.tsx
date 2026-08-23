@@ -30,6 +30,9 @@ describe("useFeatureFlags", () => {
 		});
 
 		await waitFor(() => expect(result.current.flags?.ADMIN).toBe(false));
+		// Both of the well-formed flags, so "keeps the rest of the map" covers each answer the coercion
+		// could have flattened: a `true` that survives, and a `false` the malformed one is mistaken for.
 		expect(result.current.flags?.MENTOR_ACCESS).toBe(true);
+		expect(result.current.flags?.NOTIFICATION_ACCESS).toBe(false);
 	});
 });

@@ -190,6 +190,7 @@ export function AddCollectionDialog({
 						>
 							<div ref={comboboxRef} className="rounded-lg border">
 								<ComboboxSearchInput
+									// oxlint-disable-next-line jsx-a11y/no-autofocus -- The "Add collections to mirror" dialog opens onto this search box, and narrowing the candidate list by typing is the only way through it.
 									autoFocus
 									placeholder="Search collections…"
 									disabled={submitting}

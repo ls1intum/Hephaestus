@@ -10,10 +10,8 @@
 import { spawnSync } from "node:child_process";
 import path from "node:path";
 import process from "node:process";
-import { fileURLToPath } from "node:url";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const mvnwDir = path.resolve(__dirname, "..", "server");
+const mvnwDir = path.resolve(import.meta.dirname, "..", "server");
 const isWindows = process.platform === "win32";
 
 function main(): void {

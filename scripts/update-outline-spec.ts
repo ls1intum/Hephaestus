@@ -15,13 +15,9 @@
  */
 
 import { renameSync, statSync, unlinkSync, writeFileSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join, resolve } from "node:path";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-
-const SPEC_DIR = resolve(__dirname, "../server/src/main/resources/openapi/outline");
+const SPEC_DIR = resolve(import.meta.dirname, "../server/src/main/resources/openapi/outline");
 const SPEC_FILE = join(SPEC_DIR, "spec3.yml");
 // Official Outline OpenAPI spec — the only trusted source.
 const SPEC_URL = "https://raw.githubusercontent.com/outline/openapi/main/spec3.yml";

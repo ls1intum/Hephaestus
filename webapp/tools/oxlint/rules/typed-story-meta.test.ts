@@ -16,6 +16,16 @@ ruleTester.run("typed-story-meta", typedStoryMeta, {
 		"const preset = { component: Button };",
 		"const meta = { title: 'Icons/Brand' };",
 		"const widths = [40, 80] as const;",
+		// No object literal is stated here, so there is nothing to check the type argument against.
+		"let meta: Meta;",
+		"const meta: Meta = base;",
+		"const meta = makeMeta();",
+		"const { meta } = presets;",
+		"export default meta;",
+		// A key computed from an expression names whatever that evaluates to, which is unreadable here.
+		"const meta = { [key]: Button } satisfies Meta;",
+		// `typescript/no-explicit-any` reports the `any` itself, five columns away.
+		"const meta = { component: Button } satisfies Meta<any>;",
 	],
 	invalid: [
 		{
@@ -24,6 +34,16 @@ ruleTester.run("typed-story-meta", typedStoryMeta, {
 		},
 		{
 			code: "const meta = { 'component': Button } satisfies Meta;",
+			errors: [{ messageId: "untyped" }],
+		},
+		{
+			// A key computed from a literal names exactly that literal.
+			code: "const meta = { ['component']: Button } satisfies Meta;",
+			errors: [{ messageId: "untyped" }],
+		},
+		{
+			// `import type * as SB from "@storybook/react-vite"` states the same bare `Meta`.
+			code: "const meta = { component: Button } satisfies SB.Meta;",
 			errors: [{ messageId: "untyped" }],
 		},
 		{
@@ -44,12 +64,9 @@ ruleTester.run("typed-story-meta", typedStoryMeta, {
 			errors: [{ messageId: "unchecked", line: 1, column: 14, endColumn: 35 }],
 		},
 		{
-			code: "const meta = { component: Button } satisfies Meta<any>;",
-			errors: [{ messageId: "anyArgument", line: 1, column: 46, endColumn: 55 }],
-		},
-		{
-			code: "const meta: Meta<any> = { component: Button };",
-			errors: [{ messageId: "anyArgument" }],
+			// CSF3 lets the meta go straight out of the default export, under no name at all.
+			code: "export default { component: Button };",
+			errors: [{ messageId: "unchecked", line: 1, column: 16, endColumn: 37 }],
 		},
 	],
 });

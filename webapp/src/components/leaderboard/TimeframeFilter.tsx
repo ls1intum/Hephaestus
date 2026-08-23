@@ -283,6 +283,7 @@ export function TimeframeFilter({
 							/>
 							<PopoverContent className="w-auto p-0" align="start">
 								<Calendar
+									// oxlint-disable-next-line jsx-a11y/no-autofocus -- Choosing "custom" on the leaderboard timeframe filter opens this popover for the sole purpose of picking a range, so the day grid takes focus with it.
 									autoFocus
 									mode="range"
 									defaultMonth={customRange?.from}

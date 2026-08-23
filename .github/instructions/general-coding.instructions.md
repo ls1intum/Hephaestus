@@ -6,8 +6,10 @@ applyTo: "**"
 ## Naming Conventions
 - Use PascalCase for component names, interfaces, and type aliases
 - Use camelCase for variables, functions, and methods
-- Prefix private class members with underscore (_)
 - Use ALL_CAPS for constants
+- A leading `_` marks something the language or a tool reads that way, not something private:
+  an intentionally unused binding (`no-unused-vars` ignores `^_`), a server field name (`_id`), a
+  test hook, a runtime global. Private members carry no prefix.
 
 ## Error Handling
 - Use try/catch blocks for async operations

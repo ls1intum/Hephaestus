@@ -2,14 +2,10 @@ import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 import { test } from "node:test";
-import { fileURLToPath } from "node:url";
 
-const CHECKER = join(
-	dirname(fileURLToPath(import.meta.url)),
-	"check-artifact-source-contract-immutability.ts",
-);
+const CHECKER = join(import.meta.dirname, "check-artifact-source-contract-immutability.ts");
 
 /**
  * Git hooks export GIT_DIR, GIT_INDEX_FILE and friends, which would point every command below at the

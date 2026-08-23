@@ -79,6 +79,7 @@ export function MessageEditor({
 					onChange={handleInput}
 					onKeyDown={handleKeyDown}
 					disabled={isSubmitting}
+					// oxlint-disable-next-line jsx-a11y/no-autofocus -- This box replaces a mentor message in place only once the reader presses Edit on it, so the caret belongs in the text they just asked to change.
 					autoFocus
 				/>
 			</div>

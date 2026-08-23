@@ -18,13 +18,12 @@
  */
 import { readdir, readFile } from "node:fs/promises";
 import { createRequire } from "node:module";
-import { dirname, join, resolve, sep } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join, resolve, sep } from "node:path";
 import { JSDOM } from "jsdom";
 import { asRecord, asString, readJsonFile } from "./lib/json.ts";
 
 /** Resolved from this file, so the gate answers the same whatever the working directory is. */
-const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const REPO_ROOT = resolve(import.meta.dirname, "..");
 const ROOTS = [join(REPO_ROOT, "docs")];
 
 const dom = new JSDOM("<!DOCTYPE html><body></body>", {

@@ -1,10 +1,9 @@
 import { spawn } from "node:child_process";
 import { mkdir } from "node:fs/promises";
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { resolve } from "node:path";
 import { type Browser, chromium } from "playwright";
 
-const scriptDirectory = dirname(fileURLToPath(import.meta.url));
+const scriptDirectory = import.meta.dirname;
 const webappDirectory = resolve(scriptDirectory, "..");
 const outputDirectory = resolve(webappDirectory, "../docs/images/readme");
 const port = 6106;

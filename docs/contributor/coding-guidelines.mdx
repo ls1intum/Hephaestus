@@ -32,13 +32,13 @@ These guidelines keep every service aligned. Keep changes focused. Mention any d
 
 - Create routes with `createFileRoute`. Route modules handle auth gating (see `src/routes/_authenticated.tsx`), loader logic, and orchestration.
 - Keep presentational components in `src/components/**`. They should take props, stay pure, and avoid side effects.
-- Fetch data by spreading generated `...Options()` helpers into `useQuery` or `useMutation`. The helpers provide typing, query keys, and retry defaults. `useDocumentArtifact.ts` shows the pattern.
+- Fetch data by spreading generated `...Options()` helpers into `useQuery` or `useMutation`. The helpers provide typing, query keys, and retry defaults. A hand-written query key is a lint error (`hephaestus/no-manual-query-key`), because it stops matching the generated one silently.
 - Invalidate caches with the generated `...QueryKey()` helpers or the same keys passed to `useQuery`. Use optimistic updates only when the UI must respond instantly, such as mentor chat streaming.
 - Subscribe to Zustand stores with selectors (`useDocumentsStore((state) => state.documents[id])`). Keep store actions pure.
-- Respect React Compiler requirements. No conditional hooks. No prop mutation. Check React DevTools for the `Memo ✨` badge or inspect builds for `react/compiler-runtime` when you need assurance. Use `'use no memo'` only while debugging.
-- Stay inside the Tailwind token scale. Reach for shadcn/ui primitives before adding new component libraries. Use `@apply` sparingly and only for wrapper primitives you reuse widely.
-- Co-locate `*.stories.tsx` files. Show default, loading, empty, and error states with realistic data. Run `pnpm --filter webapp run chromatic:ci` whenever stories change.
-- Push heavy routes behind `React.lazy` and Suspense. Defer analytics work to effects that run after paint.
+- Respect React Compiler requirements. No conditional hooks. No prop mutation. Because the compiler memoises for you, hand-written `useMemo`, `useCallback` and `React.memo` are banned in new code.
+- Stay inside the `--color-*` token scale declared in `src/styles.css`. Reach for shadcn/ui primitives before adding new component libraries. `@apply` lives in `styles.css` for base and wrapper rules, not in components.
+- Co-locate `*.stories.tsx` files. Show the states the component can actually reach, with realistic data. Run `pnpm --filter webapp run chromatic:ci` whenever stories change.
+- Defer analytics work to effects that run after paint.
 
 ### Quality gates
 

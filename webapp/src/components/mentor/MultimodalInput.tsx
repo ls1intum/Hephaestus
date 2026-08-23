@@ -191,6 +191,7 @@ export function MultimodalInput({
 						readOnly={readonly}
 						className="border-0 bg-transparent outline-none overflow-hidden resize-none !text-base w-full p-0 shadow-none focus-visible:ring-0 min-h-0"
 						rows={2}
+						// oxlint-disable-next-line jsx-a11y/no-autofocus -- The composer is the only writable control on the surfaces that mount it — the Copilot popover the user just opened, and the mentor thread route they navigated to in order to type. A read-only replay takes no focus.
 						autoFocus={!readonly}
 						onKeyDown={(event) => {
 							if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {

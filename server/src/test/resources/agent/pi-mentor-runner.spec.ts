@@ -20,7 +20,6 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { fileURLToPath } from "node:url";
 import {
 	JSONRPC_VERSION,
 	type JsonRpcErrorResponse,
@@ -30,9 +29,10 @@ import {
 	type MentorRequest,
 } from "../../../main/resources/agent/pi-mentor-protocol.ts";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const RUNNER = path.resolve(__dirname, "../../../main/resources/agent/pi-mentor-runner.ts");
+const RUNNER = path.resolve(
+	import.meta.dirname,
+	"../../../main/resources/agent/pi-mentor-runner.ts",
+);
 
 // Production runner targets /workspace/.sessions, which is unwritable in CI / local node test
 // runs. Spawn each runner with an isolated tmpdir to keep the smoke tests hermetic.

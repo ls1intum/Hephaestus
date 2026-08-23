@@ -6,7 +6,7 @@
 	"plugins": ["typescript", "unicorn", "oxc", "import", "promise"],
 
 	// Root-only, and global: `typeAware` governs every config in the repo, nested ones included. It
-	// needs `oxlint-tsgolint`, and without it every type-aware rule reads as enabled and checks nothing.
+	// needs `oxlint-tsgolint`; without it oxlint refuses to start rather than skipping the rules.
 	"options": { "reportUnusedDisableDirectives": "error", "typeAware": true },
 
 	"categories": {
@@ -35,6 +35,7 @@
 		"typescript/no-unsafe-member-access": "error",
 		"typescript/no-non-null-assertion": "error",
 		"unicorn/prefer-node-protocol": "error",
+		"unicorn/prefer-import-meta-properties": "error",
 		"oxc/no-accumulating-spread": "error",
 		"eqeqeq": [
 		"error",
