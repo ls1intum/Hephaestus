@@ -3,6 +3,9 @@ import { useState } from "react";
 import { Drawer, DrawerContent } from "@/components/ui/drawer";
 import { type DetailStackEntry, detailStackKey } from "./detail-stack";
 
+/** The ways a drawer is left without deciding anything. */
+const CASUAL_DISMISSALS = ["escape-key", "outside-press", "focus-out"];
+
 export interface DetailDrawerLevel {
 	depth: number;
 	/** Whether a level is covering another, which is what decides "back" against "close". */
@@ -12,6 +15,12 @@ export interface DetailDrawerLevel {
 export interface DetailDrawerStackProps<TKind extends string = string> {
 	/** The open levels, outermost first. */
 	stack: DetailStackEntry<TKind>[];
+	/**
+	 * Kinds that close only through their own controls. A level holding unsaved work cannot also be
+	 * dismissed by Escape, a press on the page or a swipe: those gestures are how a drawer is normally
+	 * left, and here they would discard the work without asking.
+	 */
+	guardedKinds?: readonly TKind[];
 	/** Called with the depth to close down to — `close(0)` dismisses the whole stack. */
 	onClose: (depth: number) => void;
 	children: (entry: DetailStackEntry<TKind>, level: DetailDrawerLevel) => ReactNode;
@@ -29,6 +38,7 @@ export interface DetailDrawerStackProps<TKind extends string = string> {
  */
 export function DetailDrawerStack<TKind extends string>({
 	stack,
+	guardedKinds,
 	onClose,
 	children,
 }: DetailDrawerStackProps<TKind>) {
@@ -37,14 +47,25 @@ export function DetailDrawerStack<TKind extends string>({
 	function renderLevel(depth: number): ReactNode {
 		const entry = stack[depth];
 		if (!entry) return null;
+		const guarded = guardedKinds?.includes(entry.kind) ?? false;
 		return (
 			<Drawer
 				key={detailStackKey(entry)}
 				// Base UI shuts a parent's children anyway; this keeps the React tree in step.
 				open={closingDepth === null || depth < closingDepth}
-				swipeDirection="right"
-				onOpenChange={(next) => {
-					if (!next) setClosingDepth(depth);
+				swipeDirection={guarded ? undefined : "right"}
+				onOpenChange={(next, details) => {
+					if (next) return;
+					if (guarded) {
+						if (CASUAL_DISMISSALS.includes(details.reason as string)) return;
+						// Straight to the URL, skipping the exit animation the other levels get. A guarded
+						// level holds a draft and `useUnsavedChanges` blocks the navigation to ask about it,
+						// so animating out first would unmount the form while the prompt is still on screen —
+						// and "Keep editing" would come back to an empty one.
+						onClose(depth);
+						return;
+					}
+					setClosingDepth(depth);
 				}}
 				onOpenChangeComplete={(next) => {
 					if (next || closingDepth !== depth) return;

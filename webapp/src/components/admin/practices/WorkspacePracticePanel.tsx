@@ -1,13 +1,14 @@
-import { Link } from "@tanstack/react-router";
 import { Pencil } from "lucide-react";
 import type { Practice, PracticeDefinitionOptions } from "@/api/types.gen";
 import { PracticeDefinitionPreview } from "@/components/admin/practice-adoption/PracticeDefinitionPreview";
 import { AreaPill } from "@/components/admin/practice-catalog/AreaPill";
 import { CatalogOriginBadge } from "@/components/admin/practices/CatalogOriginBadge";
 import { PracticeDefinitionSkeleton } from "@/components/admin/practices/PracticeSkeletons";
+import { practiceFormLevel } from "@/components/admin/practices/practice-search";
 import type { PanelState } from "@/components/common/panel-state";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { DetailDrawerHeader } from "@/components/core/detail-drawer/DetailDrawerHeader";
+import { DetailStackLink } from "@/components/core/detail-drawer/DetailStackLink";
 import { AutonomySourceNote } from "@/components/practice-vocabulary/AutonomySourceNote";
 import { AUTONOMY_DEFS } from "@/components/practice-vocabulary/autonomy-defs";
 import { StatusBadge } from "@/components/practice-vocabulary/StatusBadge";
@@ -27,7 +28,6 @@ export type WorkspacePracticeState = PanelState<{
 }>;
 
 export interface WorkspacePracticePanelProps {
-	workspaceSlug: string;
 	state: WorkspacePracticeState;
 	nested?: boolean;
 }
@@ -40,11 +40,7 @@ export interface WorkspacePracticePanelProps {
  * the catalog or in the workspace's own tree. Editing stays a route: a form that must ask before
  * discarding work is not a dismissible surface.
  */
-export function WorkspacePracticePanel({
-	workspaceSlug,
-	state,
-	nested,
-}: WorkspacePracticePanelProps) {
+export function WorkspacePracticePanel({ state, nested }: WorkspacePracticePanelProps) {
 	if (state.status !== "ready") {
 		return (
 			<>
@@ -105,16 +101,12 @@ export function WorkspacePracticePanel({
 			</DrawerBody>
 
 			<DrawerFooter>
-				<Link
-					to="/w/$workspaceSlug/admin/practices/$practiceSlug"
-					params={{ workspaceSlug, practiceSlug: practice.slug }}
-					// Keeps the stack: editing is a route because the form is seven viewport-heights at
-					// 320px, but leaving for it must not cost the reader their place.
-					search={(previous) => previous}
+				<DetailStackLink
+					entry={practiceFormLevel(practice.slug)}
 					className={cn(buttonVariants(), "w-full sm:w-auto")}
 				>
 					<Pencil /> Edit practice
-				</Link>
+				</DetailStackLink>
 			</DrawerFooter>
 		</>
 	);

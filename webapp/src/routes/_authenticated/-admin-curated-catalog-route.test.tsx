@@ -273,7 +273,7 @@ describe("instance catalog routes", () => {
 		);
 		renderRouteAt("/admin/catalog/practices/describe-what-and-why");
 
-		fireEvent.click(await screen.findByRole("link", { name: "Cancel" }, ROUTE_RENDER_WAIT));
+		fireEvent.click(await screen.findByRole("button", { name: "Cancel" }, ROUTE_RENDER_WAIT));
 		fireEvent.click(
 			await screen.findByRole(
 				"button",
@@ -440,7 +440,7 @@ describe("instance catalog routes", () => {
 		);
 		renderRouteAt("/admin/catalog/practices/describe-what-and-why");
 
-		fireEvent.click(await screen.findByRole("link", { name: "Cancel" }, ROUTE_RENDER_WAIT));
+		fireEvent.click(await screen.findByRole("button", { name: "Cancel" }, ROUTE_RENDER_WAIT));
 		fireEvent.click(
 			await screen.findByRole(
 				"switch",

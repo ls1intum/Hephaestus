@@ -1,4 +1,8 @@
 import { z } from "zod";
+import {
+	type DetailStackEntry,
+	detailStackSchema,
+} from "@/components/core/detail-drawer/detail-stack";
 import { ARTIFACT_KIND_VALUES } from "@/lib/artifact-kinds";
 
 export const CURATED_CATALOG_SEARCH_PARAMS: Array<keyof CuratedCatalogSearch> = [
@@ -8,11 +12,46 @@ export const CURATED_CATALOG_SEARCH_PARAMS: Array<keyof CuratedCatalogSearch> = 
 	"review",
 ];
 
-export const curatedCatalogSearchSchema = z.object({
+/** The levels the instance catalog can render. Anything else in the URL is dropped by the schema. */
+export const CURATED_LEVEL_KINDS = [
+	"practice-edit",
+	"practice-new",
+	"area-edit",
+	"area-new",
+] as const;
+
+export type CuratedLevelKind = (typeof CURATED_LEVEL_KINDS)[number];
+
+/**
+ * Every level here is an editor, so every level holds unsaved work: they close through Cancel or
+ * Save, not through Escape, a press on the page or a swipe.
+ */
+export const GUARDED_CURATED_LEVEL_KINDS = CURATED_LEVEL_KINDS;
+
+/** A stack id is always a slug; a practice or group that does not exist yet has none. */
+const NEW_ENTRY_ID = "draft";
+
+export function curatedPracticeLevel(slug?: string): DetailStackEntry<CuratedLevelKind> {
+	return slug === undefined
+		? { kind: "practice-new", id: NEW_ENTRY_ID }
+		: { kind: "practice-edit", id: slug };
+}
+
+export function curatedAreaLevel(slug?: string): DetailStackEntry<CuratedLevelKind> {
+	return slug === undefined
+		? { kind: "area-new", id: NEW_ENTRY_ID }
+		: { kind: "area-edit", id: slug };
+}
+
+const curatedCatalogFilterSchema = z.object({
 	q: z.string().max(200).optional().catch(undefined),
 	status: z.enum(["OFFERED", "NOT_OFFERED"]).optional().catch(undefined),
 	artifact: z.enum(ARTIFACT_KIND_VALUES).optional().catch(undefined),
 	review: z.literal(true).optional().catch(undefined),
 });
 
-export type CuratedCatalogSearch = z.infer<typeof curatedCatalogSearchSchema>;
+export const curatedCatalogSearchSchema = curatedCatalogFilterSchema.extend(
+	detailStackSchema(CURATED_LEVEL_KINDS).shape,
+);
+
+export type CuratedCatalogSearch = z.infer<typeof curatedCatalogFilterSchema>;

@@ -1,5 +1,4 @@
-import { Link } from "@tanstack/react-router";
-import { ArrowLeft, ClipboardPenLine, ListPlus, RotateCcw } from "lucide-react";
+import { RotateCcw } from "lucide-react";
 import { useState } from "react";
 import type {
 	CatalogEntryStatus,
@@ -11,8 +10,6 @@ import {
 	type PracticeDefinitionValue,
 } from "@/components/admin/practice-catalog/PracticeDefinitionForm";
 import { PracticeAutomatedReviewValidationSummary } from "@/components/admin/practice-catalog/PracticeEvidenceSummary";
-import { PageHeader } from "@/components/core/PageHeader";
-import { PageLayout } from "@/components/core/PageLayout";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
 	AlertDialog,
@@ -24,9 +21,8 @@ import {
 	AlertDialogHeader,
 	AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { cn } from "@/lib/utils";
 import { canUseHephaestusVersion } from "./curated-entry-state";
 import { HephaestusVersionPanel } from "./HephaestusVersionPanel";
 
@@ -49,6 +45,8 @@ interface CuratedPracticeFormBaseProps {
 	onUseHephaestusVersion?: () => void;
 	onKeepCurrentDefinition?: () => void;
 	definitionOptions: PracticeDefinitionOptions;
+	/** What "leave without saving" does. The host owns it, because only the host knows where back is. */
+	cancel: React.ReactNode;
 }
 
 interface CuratedPracticeFormCreateProps extends CuratedPracticeFormBaseProps {
@@ -80,6 +78,7 @@ export function CuratedPracticeForm(props: CuratedPracticeFormProps) {
 		initialData,
 		definitionOptions,
 		onKeepCurrentDefinition,
+		cancel,
 	} = props;
 	const [resetOpen, setResetOpen] = useState(false);
 	const canReset =
@@ -87,19 +86,9 @@ export function CuratedPracticeForm(props: CuratedPracticeFormProps) {
 	const updateAvailable = mode === "edit" && initialData.status.state === "UPDATE_WAITING";
 	const formDisabled = isResetPending || isKeepPending;
 	const resetLabel = updateAvailable ? "Apply Hephaestus update" : "Restore Hephaestus default";
-	const cancelAction = (
-		<Link
-			from="/admin/catalog"
-			to="/admin/catalog"
-			search={(previous) => previous}
-			className={buttonVariants({ variant: "outline" })}
-		>
-			Cancel
-		</Link>
-	);
 
 	return (
-		<PageLayout>
+		<>
 			<AlertDialog open={resetOpen} onOpenChange={setResetOpen}>
 				<AlertDialogContent>
 					<AlertDialogHeader>
@@ -125,24 +114,6 @@ export function CuratedPracticeForm(props: CuratedPracticeFormProps) {
 					</AlertDialogFooter>
 				</AlertDialogContent>
 			</AlertDialog>
-			<Link
-				from="/admin/catalog"
-				to="/admin/catalog"
-				search={(previous) => previous}
-				className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "-ml-3 w-fit")}
-			>
-				<ArrowLeft className="size-4" aria-hidden />
-				Practice library
-			</Link>
-			<PageHeader
-				icon={mode === "create" ? <ListPlus /> : <ClipboardPenLine />}
-				title={mode === "create" ? "Create practice" : `Edit: ${initialData.name}`}
-				description={
-					mode === "create"
-						? "Define a practice for the instance catalog."
-						: "Saving updates the instance catalog. Existing workspace copies will not change."
-				}
-			/>
 
 			{mode === "edit" && (
 				<HephaestusVersionPanel
@@ -184,7 +155,7 @@ export function CuratedPracticeForm(props: CuratedPracticeFormProps) {
 					isPending={isPending}
 					definitionOptions={definitionOptions}
 					disabled={formDisabled}
-					cancelAction={cancelAction}
+					cancelAction={cancel}
 					onSubmit={props.onSubmit}
 				/>
 			) : (
@@ -196,7 +167,7 @@ export function CuratedPracticeForm(props: CuratedPracticeFormProps) {
 					definitionOptions={definitionOptions}
 					disabled={formDisabled}
 					isSubmitDisabled={conflict || isResetPending || isKeepPending}
-					cancelAction={cancelAction}
+					cancelAction={cancel}
 					afterFields={
 						<>
 							<Separator />
@@ -218,6 +189,6 @@ export function CuratedPracticeForm(props: CuratedPracticeFormProps) {
 					onSubmit={props.onSubmit}
 				/>
 			)}
-		</PageLayout>
+		</>
 	);
 }

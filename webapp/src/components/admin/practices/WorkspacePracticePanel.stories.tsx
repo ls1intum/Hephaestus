@@ -27,7 +27,7 @@ const meta = {
 	component: WorkspacePracticePanel,
 	parameters: { layout: "fullscreen" },
 	decorators: [withPageBehind],
-	args: { workspaceSlug: "demo", state: ready() },
+	args: { state: ready() },
 	argTypes: { state: { control: false } },
 	render: (args) => (
 		<Stateful initial={[{ kind: "practice", id: practice.slug }]}>
@@ -48,9 +48,11 @@ export const Default: Story = {
 	play: async () => {
 		const edit = await screen.findByRole("link", { name: "Edit practice" });
 		await expectSettledVisible(edit);
-		// Editing is a route, not another drawer level, so the link is a real path.
-		// The stack rides along so returning from the editor lands on this panel, not a bare list.
-		await expect(edit.getAttribute("href")).toContain(`/w/demo/admin/practices/${practice.slug}`);
+		// Editing is another level on top of this one, so leaving the editor lands back on the panel
+		// it was opened from rather than on the bare tree.
+		await expect(edit.getAttribute("href")).toContain(
+			encodeURIComponent(`practice-edit:${practice.slug}`),
+		);
 		// Level 2 is the panel's own title; criteria headings render below it at level 4.
 		await expect(screen.getByRole("heading", { name: practice.name, level: 2 })).toBeVisible();
 	},

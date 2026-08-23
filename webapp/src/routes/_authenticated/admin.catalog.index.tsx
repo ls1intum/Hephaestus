@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, retainSearchParams, useNavigate } from "@tanstack/react-router";
 import { LibraryBig, Plus } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -27,17 +27,36 @@ import {
 	reorderCuratedAreas,
 	reorderCuratedPractices,
 } from "@/components/admin/curated-catalog/curated-catalog-cache";
+import {
+	CURATED_CATALOG_SEARCH_PARAMS,
+	type CuratedCatalogSearch,
+	type CuratedLevelKind,
+	curatedAreaLevel,
+	curatedCatalogSearchSchema,
+	curatedPracticeLevel,
+	GUARDED_CURATED_LEVEL_KINDS,
+} from "@/components/admin/curated-catalog/curated-catalog-search";
 import { PracticeTreeSkeleton } from "@/components/admin/practices/PracticeSkeletons";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
+import { DetailDrawerStack } from "@/components/core/detail-drawer/DetailDrawerStack";
+import { DetailStackLink } from "@/components/core/detail-drawer/DetailStackLink";
+import { parseDetailStack } from "@/components/core/detail-drawer/detail-stack";
+import { useDetailStack } from "@/components/core/detail-drawer/use-detail-stack";
 import { PageHeader } from "@/components/core/PageHeader";
 import { PageLayout } from "@/components/core/PageLayout";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { filedUnder, usePendingMutationIds } from "@/hooks/use-pending-mutation-ids";
 import { instanceAdminHead } from "@/lib/page-title";
 import { problemDetailOf, problemStatusOf } from "@/lib/problem-detail";
+import { CuratedAreaCreateLevel } from "./-CuratedAreaCreateLevel";
+import { CuratedAreaEditLevel } from "./-CuratedAreaEditLevel";
+import { CuratedPracticeCreateLevel } from "./-CuratedPracticeCreateLevel";
+import { CuratedPracticeEditLevel } from "./-CuratedPracticeEditLevel";
 
 export const Route = createFileRoute("/_authenticated/admin/catalog/")({
 	head: instanceAdminHead("Practice catalog"),
+	validateSearch: curatedCatalogSearchSchema,
+	search: { middlewares: [retainSearchParams(CURATED_CATALOG_SEARCH_PARAMS)] },
 	component: AdminCuratedCatalogPage,
 });
 
@@ -47,8 +66,10 @@ const STRUCTURE_SCOPE = { id: "admin-curated-catalog-structure" };
 
 function AdminCuratedCatalogPage() {
 	const navigate = useNavigate({ from: Route.fullPath });
-	const search = Route.useSearch();
+	const { detail, ...search } = Route.useSearch();
 	const queryClient = useQueryClient();
+	const detailStack = parseDetailStack<CuratedLevelKind>(detail);
+	const stackControls = useDetailStack(detailStack);
 	const catalogQuery = useQuery({ ...adminGetCuratedCatalogOptions() });
 
 	const detailKey = (kind: "practice" | "area", slug: string) =>
@@ -233,15 +254,13 @@ function AdminCuratedCatalogPage() {
 								Create group
 							</Button>
 						) : (
-							<Link
-								from={Route.fullPath}
-								to="/admin/catalog/areas/new"
-								search={(previous) => previous}
+							<DetailStackLink
+								entry={curatedAreaLevel()}
 								className={buttonVariants({ variant: "outline" })}
 							>
 								<Plus className="mr-1.5 size-4" aria-hidden />
 								Create group
-							</Link>
+							</DetailStackLink>
 						)}
 						{writePending ? (
 							<Button disabled>
@@ -249,15 +268,10 @@ function AdminCuratedCatalogPage() {
 								Create practice
 							</Button>
 						) : (
-							<Link
-								from={Route.fullPath}
-								to="/admin/catalog/practices/new"
-								search={(previous) => previous}
-								className={buttonVariants()}
-							>
+							<DetailStackLink entry={curatedPracticeLevel()} className={buttonVariants()}>
 								<Plus className="mr-1.5 size-4" aria-hidden />
 								Create practice
-							</Link>
+							</DetailStackLink>
 						)}
 					</div>
 				}
@@ -281,7 +295,9 @@ function AdminCuratedCatalogPage() {
 					pendingPracticeSlugs={pendingPracticeSlugs}
 					pendingAreaSlugs={pendingAreaSlugs}
 					writePending={writePending}
-					onSearchChange={(next) => navigate({ search: next, replace: true })}
+					onSearchChange={(next: CuratedCatalogSearch) =>
+						navigate({ search: (previous) => ({ ...previous, ...next }), replace: true })
+					}
 					onPracticeStatusChange={(practice: CuratedPracticeSummary, offered) => {
 						const parent = practice.areaSlug
 							? catalogQuery.data.areas.find((area) => area.slug === practice.areaSlug)
@@ -353,6 +369,32 @@ function AdminCuratedCatalogPage() {
 					}}
 				/>
 			)}
+
+			<DetailDrawerStack
+				stack={detailStack}
+				guardedKinds={GUARDED_CURATED_LEVEL_KINDS}
+				onClose={stackControls.close}
+			>
+				{(entry, level) => {
+					const done = () => stackControls.close(level.depth);
+					if (entry.kind === "practice-new") {
+						return <CuratedPracticeCreateLevel nested={level.nested} onDone={done} />;
+					}
+					if (entry.kind === "practice-edit") {
+						return (
+							<CuratedPracticeEditLevel
+								practiceSlug={entry.id}
+								nested={level.nested}
+								onDone={done}
+							/>
+						);
+					}
+					if (entry.kind === "area-new") {
+						return <CuratedAreaCreateLevel nested={level.nested} onDone={done} />;
+					}
+					return <CuratedAreaEditLevel areaSlug={entry.id} nested={level.nested} onDone={done} />;
+				}}
+			</DetailDrawerStack>
 		</PageLayout>
 	);
 }

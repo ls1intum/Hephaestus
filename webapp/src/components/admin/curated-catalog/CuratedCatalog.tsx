@@ -1,4 +1,3 @@
-import { Link } from "@tanstack/react-router";
 import { Plus, RotateCcw, Search, Shapes } from "lucide-react";
 import { useState } from "react";
 import type {
@@ -10,6 +9,7 @@ import {
 	WORK_ARTIFACT_FILTER_ITEMS,
 	type WorkArtifact,
 } from "@/components/admin/practice-catalog/constants";
+import { DetailStackLink } from "@/components/core/detail-drawer/DetailStackLink";
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -42,7 +42,7 @@ import { isKnownArtifactKind } from "@/lib/artifact-kinds";
 import { cn } from "@/lib/utils";
 import { CuratedCatalogSummary } from "./CuratedCatalogSummary";
 import { CuratedCatalogTree } from "./CuratedCatalogTree";
-import type { CuratedCatalogSearch } from "./curated-catalog-search";
+import { type CuratedCatalogSearch, curatedPracticeLevel } from "./curated-catalog-search";
 
 export interface CuratedCatalogProps {
 	areas: readonly CuratedArea[];
@@ -198,15 +198,10 @@ export function CuratedCatalog({
 							</EmptyDescription>
 						</EmptyHeader>
 						<EmptyContent>
-							<Link
-								from="/admin/catalog"
-								to="/admin/catalog/practices/new"
-								search={(previous) => previous}
-								className={cn(buttonVariants())}
-							>
+							<DetailStackLink entry={curatedPracticeLevel()} className={cn(buttonVariants())}>
 								<Plus className="mr-1.5 size-4" aria-hidden />
 								Create practice
-							</Link>
+							</DetailStackLink>
 						</EmptyContent>
 					</Empty>
 				) : nothingMatches ? (

@@ -1,4 +1,3 @@
-import { Link } from "@tanstack/react-router";
 import { GripVertical, MoreHorizontal } from "lucide-react";
 import type { CuratedArea, CuratedPracticeSummary } from "@/api/types.gen";
 import { AreaPill } from "@/components/admin/practice-catalog/AreaPill";
@@ -9,6 +8,7 @@ import {
 	SortableCatalogTree,
 	UNASSIGNED_CATALOG_BUCKET,
 } from "@/components/admin/practice-catalog/SortableCatalogTree";
+import { DetailStackLink } from "@/components/core/detail-drawer/DetailStackLink";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -27,6 +27,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { Switch } from "@/components/ui/switch";
 import { artifactKindLabel } from "@/lib/artifact-kinds";
 import { CuratedEntryBadges } from "./CuratedEntryBadges";
+import { curatedAreaLevel, curatedPracticeLevel } from "./curated-catalog-search";
 
 type TreeArea = CuratedArea & { displayOrder: number; name: string };
 type TreePractice = CuratedPracticeSummary & {
@@ -191,16 +192,7 @@ function AreaActions({
 					}
 				/>
 				<DropdownMenuContent align="end">
-					<DropdownMenuItem
-						render={
-							<Link
-								from="/admin/catalog"
-								to="/admin/catalog/areas/$areaSlug"
-								params={{ areaSlug: area.slug }}
-								search={(previous) => previous}
-							/>
-						}
-					>
+					<DropdownMenuItem render={<DetailStackLink entry={curatedAreaLevel(area.slug)} />}>
 						Edit area
 					</DropdownMenuItem>
 					<DropdownMenuSeparator />
@@ -236,15 +228,12 @@ function PracticeDetails({ practice }: { practice: TreePractice }) {
 	return (
 		<ItemContent className="min-w-0">
 			<ItemTitle className="w-full min-w-0 line-clamp-none">
-				<Link
-					from="/admin/catalog"
-					to="/admin/catalog/practices/$practiceSlug"
-					params={{ practiceSlug: practice.slug }}
-					search={(previous) => previous}
+				<DetailStackLink
+					entry={curatedPracticeLevel(practice.slug)}
 					className="break-words rounded-sm hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
 				>
 					{practice.name}
-				</Link>
+				</DetailStackLink>
 			</ItemTitle>
 			<ItemDescription className="flex flex-wrap items-center gap-1.5">
 				<span>{artifactKindLabel(practice.artifactKind)}</span>
@@ -329,14 +318,7 @@ function PracticeActions({
 				/>
 				<DropdownMenuContent align="end">
 					<DropdownMenuItem
-						render={
-							<Link
-								from="/admin/catalog"
-								to="/admin/catalog/practices/$practiceSlug"
-								params={{ practiceSlug: practice.slug }}
-								search={(previous) => previous}
-							/>
-						}
+						render={<DetailStackLink entry={curatedPracticeLevel(practice.slug)} />}
 					>
 						Edit practice
 					</DropdownMenuItem>

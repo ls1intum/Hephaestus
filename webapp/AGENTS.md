@@ -259,33 +259,44 @@ wiring is lost.
 
 ## Drawer or route
 
-A detail surface goes in a `DetailDrawerStack` level (`src/components/core/detail-drawer/`) only when
-**all four** hold. Fail one and it is a route.
+A detail surface goes in a `DetailDrawerStack` level (`src/components/core/detail-drawer/`) when
+**all three** hold. Fail one and it is a route.
 
 1. **Contextual** — the covered page is why the reader is here, and the column the stack leaves
-   showing is doing work.
-2. **Bounded** — fits in roughly 1.5 viewport-heights at **320 CSS px**, with no lazily-loaded
-   fixed-height widget. Drawer chrome alone costs ~125px, which at the WCAG 1.4.10 reference
-   condition (320×256) leaves ~131px of body.
-3. **Single-decision** — one primary action, reachable without scrolling to the end of the content.
-4. **Cheap to abandon** — dismissal destroys nothing that costs more than a few seconds to recreate.
-   Remember a drawer is dismissed by Escape, by a press on the page, and by a rightward swipe, and
-   that most controls (`Input`, `Textarea`, `Switch`, `Checkbox`) do not claim Escape — so Escape in
-   a text field dismisses the *drawer*.
+   showing is doing work. At 320px a drawer is full-width, so this criterion buys nothing there:
+   it has to be earned on the wide layout.
+2. **Single-decision** — one primary action, reachable without hunting. A level with two competing
+   primaries is two levels, or a page.
+3. **Reversible** — either dismissal destroys nothing, or the level is **guarded**.
 
-**The one-question tell: if Escape must ever show a confirmation, it is a route.** A surface whose
-dismissal needs permission is not a dismissible surface. `PracticeDefinitionForm` is the worked
-example: 43 controls, 4,062px at 320×568 — seven viewport-heights against the 1.5 in criterion 2 —
-and a `useBlocker` discard guard. At 320px a drawer is full-width, so the context column criterion 1
-asks for does not exist there at all.
+Length is not a criterion. `DrawerBody` scrolls, and a form that is seven viewport-heights at 320px
+is seven viewport-heights on a page too — the scroll happens either way, and the drawer keeps the
+tree the entry belongs to on screen while it happens.
 
-A route still has to keep the reader's place. The practice editor carries the `detail` stack in its
-search params (`PRACTICE_SETUP_SEARCH_PARAMS`) even though it renders no drawer, so returning lands
-on the panel it was opened from rather than a bare list.
+### Guarded levels
+
+A level whose kind is in the host's `guardedKinds` is not dismissed by Escape, by a press on the
+page or by a swipe — only by its own controls. That is what lets an editor be a level: those three
+gestures discard a draft without asking, and `Input`/`Textarea`/`Switch`/`Checkbox` do not claim
+Escape, so Escape in a text field would otherwise reach the drawer.
+
+Both editor stacks use it: `GUARDED_LEVEL_KINDS` (workspace practices) and
+`GUARDED_CURATED_LEVEL_KINDS` (instance catalog).
+
+Two rules follow, and breaking either is silent:
+
+- **Every exit is a `DrawerClose`.** Base UI reports it as `close-press`, which the guard lets
+  through; a bespoke `onClick={close}` is a fourth path that drifts from the other three.
+- **A guarded level closes straight to the URL, skipping the exit animation.** `useUnsavedChanges`
+  blocks the navigation to ask about the draft, so animating out first unmounts the form while the
+  prompt is still on screen — and "Keep editing" comes back to an empty one.
 
 Related trap: `useBlocker`'s `shouldBlockFn` sees `routeId`/`pathname`/`search`, and every drawer
 navigation on one surface shares a route. A guard written as `() => isDirty` will block navigations
 that do **not** unmount the form, so "Discard changes" discards nothing.
+
+Paths that predate a level are kept as `beforeLoad` redirects into the stack — they were linked and
+bookmarked. `admin/practices/new.tsx` is the shortest example.
 
 ## Loading and errors
 

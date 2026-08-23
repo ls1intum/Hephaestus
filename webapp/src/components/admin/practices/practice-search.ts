@@ -1,20 +1,11 @@
 import { z } from "zod";
-import { detailStackSchema } from "@/components/core/detail-drawer/detail-stack";
+import {
+	type DetailStackEntry,
+	detailStackSchema,
+} from "@/components/core/detail-drawer/detail-stack";
 import { ARTIFACT_KIND_VALUES } from "@/lib/artifact-kinds";
 
 export const PRACTICE_SEARCH_PARAMS: ("focus" | "library")[] = ["focus", "library"];
-
-/**
- * What the practice form carries so that returning from it restores the surface you left.
- *
- * `detail` is included even though the form renders no drawer — only the index route does — so the
- * param rides along inert and the stack is still open when you come back.
- */
-export const PRACTICE_SETUP_SEARCH_PARAMS: ("focus" | "library" | "detail")[] = [
-	"focus",
-	"library",
-	"detail",
-];
 
 export const practiceSearchSchema = z.object({
 	focus: z.enum(ARTIFACT_KIND_VALUES).optional().catch(undefined),
@@ -22,7 +13,28 @@ export const practiceSearchSchema = z.object({
 });
 
 /** The levels Practice setup can render. Anything else in the URL is dropped by the schema. */
-export const DETAIL_LEVEL_KINDS = ["catalog-area", "catalog-practice", "practice"] as const;
+export const DETAIL_LEVEL_KINDS = [
+	"catalog-area",
+	"catalog-practice",
+	"practice",
+	"practice-edit",
+	"practice-new",
+] as const;
+
+/** Levels holding unsaved work: they close through Cancel or Save, not through Escape or a swipe. */
+export const GUARDED_LEVEL_KINDS = ["practice-edit", "practice-new"] as const;
+
+/** A stack id is always a slug; a practice that does not exist yet has none, so it is a draft. */
+const NEW_PRACTICE_ID = "draft";
+
+/** The editor level for `practiceSlug`, or for a practice about to be written. */
+export function practiceFormLevel(
+	practiceSlug?: string,
+): DetailStackEntry<(typeof DETAIL_LEVEL_KINDS)[number]> {
+	return practiceSlug === undefined
+		? { kind: "practice-new", id: NEW_PRACTICE_ID }
+		: { kind: "practice-edit", id: practiceSlug };
+}
 
 export const practiceSetupSearchSchema = practiceSearchSchema.extend(
 	detailStackSchema(DETAIL_LEVEL_KINDS).shape,

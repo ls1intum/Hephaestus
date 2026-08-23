@@ -39,14 +39,16 @@ export interface UseUnsavedChangesOptions {
  * The latch is the subtle part: `isPending` drops before the caller navigates, so releasing on it
  * alone races the post-save navigation and asks the reader to discard work they just saved.
  *
- * Blocks every navigation, which is right only while the form owns its route. Inside a
- * search-param overlay it would offer to discard work that then stays on screen; narrowing it needs
- * both `routeId` and `params`, since two practices share one route.
+ * Blocks *every* navigation. In a guarded `DetailDrawerStack` level that is what makes Cancel work
+ * — leaving the level is a navigation — but it also catches navigations that leave the form on
+ * screen, where it would offer to discard work that then stays. Nothing reachable behind a modal
+ * level does that today; narrowing it would need both `routeId` and `params`, since two practices
+ * share one route.
  */
 export function useUnsavedChanges({
 	isDirty,
 	disabled = false,
-	description = "Your draft will be lost if you leave this page.",
+	description = "Your draft will be lost if you leave.",
 }: UseUnsavedChangesOptions): UnsavedChangesGuard {
 	const [saving, setSaving] = useState(false);
 	const guarded = isDirty && !saving;

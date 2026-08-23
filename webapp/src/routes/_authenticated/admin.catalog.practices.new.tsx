@@ -1,77 +1,21 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { toast } from "sonner";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 import {
-	adminCreateCuratedPracticeMutation,
-	adminGetCuratedCatalogOptions,
-	adminGetCuratedCatalogQueryKey,
-	adminGetPracticeDefinitionOptionsOptions,
-} from "@/api/@tanstack/react-query.gen";
-import {
-	CuratedPracticeForm,
-	type CuratedPracticeFormValue,
-} from "@/components/admin/curated-catalog/CuratedPracticeForm";
-import { PracticeDefinitionSkeleton } from "@/components/admin/practices/PracticeSkeletons";
-import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
-import { PageLayout } from "@/components/core/PageLayout";
-import { instanceAdminHead } from "@/lib/page-title";
-import { problemDetailOf } from "@/lib/problem-detail";
+	curatedCatalogSearchSchema,
+	curatedPracticeLevel,
+} from "@/components/admin/curated-catalog/curated-catalog-search";
+import { detailStackKey } from "@/components/core/detail-drawer/detail-stack";
 
+/**
+ * Instance-catalog editors are levels of the catalog's drawer stack, not pages, so the catalog stays
+ * on screen while an entry is written. This path predates that and is kept because it was linked and
+ * bookmarked.
+ */
 export const Route = createFileRoute("/_authenticated/admin/catalog/practices/new")({
-	head: instanceAdminHead("Create practice"),
-	component: NewCuratedPracticePage,
+	validateSearch: curatedCatalogSearchSchema,
+	beforeLoad: ({ search }) => {
+		throw redirect({
+			to: "/admin/catalog",
+			search: { ...search, detail: [detailStackKey(curatedPracticeLevel())] },
+		});
+	},
 });
-
-function NewCuratedPracticePage() {
-	const navigate = useNavigate({ from: Route.fullPath });
-	const queryClient = useQueryClient();
-	const catalogQuery = useQuery({ ...adminGetCuratedCatalogOptions() });
-	const definitionOptionsQuery = useQuery({ ...adminGetPracticeDefinitionOptionsOptions() });
-	const createPractice = useMutation({
-		...adminCreateCuratedPracticeMutation(),
-		onSuccess: () => {
-			void queryClient.invalidateQueries({ queryKey: adminGetCuratedCatalogQueryKey() });
-			toast.success("Practice created");
-			navigate({ to: "/admin/catalog" });
-		},
-		onError: (error) =>
-			toast.error("Couldn't create the practice", { description: problemDetailOf(error) }),
-	});
-
-	if (catalogQuery.isPending || definitionOptionsQuery.isPending) {
-		return (
-			<PageLayout>
-				<PracticeDefinitionSkeleton />
-			</PageLayout>
-		);
-	}
-	if (catalogQuery.isError || definitionOptionsQuery.isError) {
-		return (
-			<PageLayout>
-				<QueryErrorAlert
-					error={catalogQuery.error ?? definitionOptionsQuery.error}
-					title="Couldn't load the practice editor"
-					onRetry={() => {
-						catalogQuery.refetch();
-						definitionOptionsQuery.refetch();
-					}}
-				/>
-			</PageLayout>
-		);
-	}
-
-	return (
-		<CuratedPracticeForm
-			mode="create"
-			areas={catalogQuery.data.areas.map((area) => ({
-				slug: area.slug,
-				name: area.definition.name,
-			}))}
-			isPending={createPractice.isPending}
-			definitionOptions={definitionOptionsQuery.data}
-			onSubmit={({ slug, ...definition }: CuratedPracticeFormValue) =>
-				createPractice.mutate({ body: { slug, definition } })
-			}
-		/>
-	);
-}

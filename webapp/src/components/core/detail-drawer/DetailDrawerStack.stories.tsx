@@ -140,6 +140,30 @@ export const PressingThePageDismisses: Story = {
 	},
 };
 
+export const GuardedLevelRefusesCasualDismissal: Story = {
+	args: { guardedKinds: ["practice"] },
+	play: async ({ args }) => {
+		await expectSettledVisible(await screen.findByText("practice · describe-what-and-why"));
+		// The two gestures that discard without asking. `PressingThePageDismisses` is the control: the
+		// same press ends an unguarded level. `data-ending-style` rather than the popup going away,
+		// because the exit is animated — the level is still mounted for the length of it either way,
+		// and `DismissedLevelSlidesOut` is what pins that the attribute lands on the gesture itself.
+		await userEvent.keyboard("{Escape}");
+		await expect(popups()[0]).not.toHaveAttribute("data-ending-style");
+		await userEvent.pointer({
+			target: document.elementFromPoint(20, 200) as Element,
+			coords: { clientX: 20, clientY: 200 },
+			keys: "[MouseLeft]",
+		});
+		await expect(popups()[0]).not.toHaveAttribute("data-ending-style");
+		await expect(args.onClose).not.toHaveBeenCalled();
+
+		// The level's own control still works, or there would be no way out.
+		await userEvent.click(screen.getByRole("button", { name: "Close" }));
+		await waitFor(() => expect(args.onClose).toHaveBeenCalledWith(0));
+	},
+};
+
 export const Closed: Story = {
 	args: { stack: [] },
 	play: async () => {

@@ -42,6 +42,13 @@ const preview: CatalogPracticePreview = {
 const LIBRARY = "/w/acme/admin/practices?library=true";
 const REVIEWING = `${LIBRARY}&detail=catalog-practice:${preview.slug}`;
 
+const workspacePractice = {
+	...mockPractices[0],
+	slug: "already-mine",
+	name: "Already mine",
+	areaSlug: undefined,
+};
+
 describe("catalog adoption over practice setup", () => {
 	beforeEach(() => {
 		server.use(
@@ -149,12 +156,6 @@ describe("catalog adoption over practice setup", () => {
 	});
 
 	it("opens a workspace practice read-only over the tree instead of in the edit form", async () => {
-		const workspacePractice = {
-			...mockPractices[0],
-			slug: "already-mine",
-			name: "Already mine",
-			areaSlug: undefined,
-		};
 		server.use(
 			http.get("*/workspaces/:workspaceSlug/practices", () =>
 				HttpResponse.json([workspacePractice]),
@@ -172,12 +173,13 @@ describe("catalog adoption over practice setup", () => {
 		const { router } = renderRouteAtWithRouter("/w/acme/admin/practices");
 		fireEvent.click(await screen.findByRole("link", { name: "Already mine" }, ROUTE_RENDER_WAIT));
 
-		// The definition is readable, and editing is a separate, explicit act that IS a route.
+		// The definition is readable, and editing is a separate, explicit act: a level on top of it,
+		// so leaving the form lands back on the panel it was opened from rather than on the bare tree.
 		const edit = await screen.findByRole("link", { name: "Edit practice" }, ROUTE_RENDER_WAIT);
-		// The stack rides along: editing is a route because the form is seven viewport-heights at
-		// 320px, but coming back must land on the panel it was opened from.
 		expect(edit.getAttribute("href")).toBe(
-			`/w/acme/admin/practices/already-mine?detail=${encodeURIComponent('["practice:already-mine"]')}`,
+			`/w/acme/admin/practices?detail=${encodeURIComponent(
+				'["practice:already-mine","practice-edit:already-mine"]',
+			)}`,
 		);
 		expect(router.state.location.pathname).toBe("/w/acme/admin/practices");
 		expect(router.state.location.search.detail).toEqual(["practice:already-mine"]);
@@ -311,6 +313,52 @@ describe("catalog adoption over practice setup", () => {
 		const { router } = renderRouteAtWithRouter(REVIEWING);
 		fireEvent.click(await screen.findByRole("button", { name: "Add practice" }, ROUTE_RENDER_WAIT));
 
+		await waitFor(
+			() => expect(router.state.location.search.detail).toBeUndefined(),
+			ROUTE_RENDER_WAIT,
+		);
+	});
+
+	it("turns the retired editor paths into the level they became", async () => {
+		const { router } = renderRouteAtWithRouter("/w/acme/admin/practices/new");
+		await waitFor(
+			() => expect(router.state.location.pathname).toBe("/w/acme/admin/practices"),
+			ROUTE_RENDER_WAIT,
+		);
+		expect(router.state.location.search.detail).toEqual(["practice-new:draft"]);
+
+		const edited = renderRouteAtWithRouter("/w/acme/admin/practices/already-mine");
+		await waitFor(
+			() => expect(edited.router.state.location.pathname).toBe("/w/acme/admin/practices"),
+			ROUTE_RENDER_WAIT,
+		);
+		expect(edited.router.state.location.search.detail).toEqual(["practice-edit:already-mine"]);
+	});
+
+	it("creates a practice from the editor level and lands back on the tree", async () => {
+		const created = vi.fn();
+		server.use(
+			http.post("*/workspaces/:workspaceSlug/practices", async ({ request }) => {
+				created(await request.json());
+				return HttpResponse.json(workspacePractice, { status: 201 });
+			}),
+		);
+
+		const { router } = renderRouteAtWithRouter("/w/acme/admin/practices?detail=practice-new:draft");
+		fireEvent.change(await screen.findByRole("textbox", { name: /Name/ }, ROUTE_RENDER_WAIT), {
+			target: { value: "Explain the change" },
+		});
+		fireEvent.change(screen.getByRole("textbox", { name: /What to look for/ }), {
+			target: { value: "Check that the description says why." },
+		});
+		fireEvent.click(screen.getByRole("button", { name: "Create practice" }));
+
+		await waitFor(() => expect(created).toHaveBeenCalled(), ROUTE_RENDER_WAIT);
+		expect(created.mock.calls[0][0]).toMatchObject({
+			name: "Explain the change",
+			slug: "explain-the-change",
+		});
+		// The level goes; the tree it was opened over is what the reader lands on.
 		await waitFor(
 			() => expect(router.state.location.search.detail).toBeUndefined(),
 			ROUTE_RENDER_WAIT,

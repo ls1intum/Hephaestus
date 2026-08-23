@@ -22,6 +22,7 @@ import {
 	UNASSIGNED_CATALOG_BUCKET,
 } from "@/components/admin/practice-catalog/SortableCatalogTree";
 import { PracticeListSkeleton } from "@/components/admin/practices/PracticeSkeletons";
+import { practiceFormLevel } from "@/components/admin/practices/practice-search";
 import { type FilterOption, FilterToggle } from "@/components/common/FilterToggle";
 import { MetaRow } from "@/components/common/MetaRow";
 import type { PanelState } from "@/components/common/panel-state";
@@ -156,7 +157,6 @@ export function PracticeCatalog({
 	return (
 		<div className="space-y-4">
 			<CatalogToolbar
-				workspaceSlug={workspaceSlug}
 				focusFilter={focusFilter}
 				onFocusFilterChange={onFocusFilterChange}
 				onCreateArea={() => setNamingArea(null)}
@@ -336,7 +336,6 @@ export function PracticeCatalog({
 }
 
 function CatalogToolbar({
-	workspaceSlug,
 	focusFilter,
 	onFocusFilterChange,
 	onCreateArea,
@@ -344,7 +343,6 @@ function CatalogToolbar({
 	areaStructurePending,
 	library,
 }: {
-	workspaceSlug: string;
 	focusFilter: FocusFilter;
 	onFocusFilterChange: (filter: FocusFilter) => void;
 	onCreateArea: () => void;
@@ -377,14 +375,13 @@ function CatalogToolbar({
 					<Plus />
 					Create area
 				</Button>
-				<Link
-					to="/w/$workspaceSlug/admin/practices/new"
-					params={{ workspaceSlug }}
+				<DetailStackLink
+					entry={practiceFormLevel()}
 					className={cn(buttonVariants(), "w-full sm:w-auto")}
 				>
 					<Plus />
 					Create practice
-				</Link>
+				</DetailStackLink>
 			</div>
 		</div>
 	);
@@ -498,14 +495,7 @@ function PracticeActions({
 				}
 			/>
 			<DropdownMenuContent align="end">
-				<DropdownMenuItem
-					render={
-						<Link
-							to="/w/$workspaceSlug/admin/practices/$practiceSlug"
-							params={{ workspaceSlug, practiceSlug: practice.slug }}
-						/>
-					}
-				>
+				<DropdownMenuItem render={<DetailStackLink entry={practiceFormLevel(practice.slug)} />}>
 					Edit practice
 				</DropdownMenuItem>
 				<DropdownMenuSeparator />

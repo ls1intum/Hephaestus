@@ -10,6 +10,7 @@ import {
 	getPracticeOptions,
 	listAdoptablePracticesOptions,
 	listAreasOptions,
+	listPracticeEvidenceOutcomesOptions,
 	listPracticesOptions,
 	previewAreaAdoptionOptions,
 	previewPracticeAdoptionOptions,
@@ -24,9 +25,15 @@ import { AreaAdoptionPanel } from "@/components/admin/practice-adoption/AreaAdop
 import { PracticeAdoptionPanel } from "@/components/admin/practice-adoption/PracticeAdoptionPanel";
 import { generateSlug } from "@/components/admin/practice-catalog/constants";
 import { type FocusFilter, PracticeCatalog } from "@/components/admin/practices/PracticeCatalog";
-import { PracticeTreeSkeleton } from "@/components/admin/practices/PracticeSkeletons";
+import { PracticeForm } from "@/components/admin/practices/PracticeForm";
+import { PracticeFormLevel } from "@/components/admin/practices/PracticeFormLevel";
+import {
+	PracticeDefinitionSkeleton,
+	PracticeTreeSkeleton,
+} from "@/components/admin/practices/PracticeSkeletons";
 import {
 	type DETAIL_LEVEL_KINDS,
+	GUARDED_LEVEL_KINDS,
 	PRACTICE_SEARCH_PARAMS,
 	practiceSetupSearchSchema,
 } from "@/components/admin/practices/practice-search";
@@ -34,6 +41,7 @@ import { WorkspacePracticePanel } from "@/components/admin/practices/WorkspacePr
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { DetailDrawerStack } from "@/components/core/detail-drawer/DetailDrawerStack";
 import { detailStackKey, parseDetailStack } from "@/components/core/detail-drawer/detail-stack";
+import { LevelCancel } from "@/components/core/detail-drawer/LevelCancel";
 import { useDetailStack } from "@/components/core/detail-drawer/use-detail-stack";
 import { PageHeader } from "@/components/core/PageHeader";
 import { PageLayout } from "@/components/core/PageLayout";
@@ -49,6 +57,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { practiceCatalogStructureScope } from "@/hooks/practice-catalog-cache";
 import { usePracticeCatalogMutations } from "@/hooks/use-practice-catalog-mutations";
+import { usePracticeEditor } from "@/hooks/use-practice-editor";
 import { workspaceAdminHead } from "@/lib/page-title";
 import { problemStatusOf } from "@/lib/problem-detail";
 import { useSearchState } from "@/lib/search-params";
@@ -78,6 +87,7 @@ function PracticeCatalogRoute() {
 	const [deletingPractice, setDeletingPractice] = useState<Practice | null>(null);
 	const [staleLevelKey, setStaleLevelKey] = useState<string | null>(null);
 	const catalog = usePracticeCatalogMutations(workspaceSlug);
+	const editor = usePracticeEditor(workspaceSlug);
 
 	// Every open level owns its own preview query, keyed by that level's slug. Sharing one query per
 	// kind would let `?detail=practice:a&detail=practice:b` show a's definition while adding b.
@@ -92,6 +102,10 @@ function PracticeCatalogRoute() {
 	});
 	const definitionOptionsQuery = useQuery({
 		...getPracticeDefinitionOptionsOptions({ path: { workspaceSlug } }),
+	});
+	// How past reviews turned out is context beside the form, not something the editor waits for.
+	const evidenceOutcomesQuery = useQuery({
+		...listPracticeEvidenceOutcomesOptions({ path: { workspaceSlug } }),
 	});
 	const catalogQuery = useQuery({
 		...listAdoptablePracticesOptions({ path: { workspaceSlug } }),
@@ -114,12 +128,18 @@ function PracticeCatalogRoute() {
 					select: (data: CatalogPracticePreview) => ({ kind: "catalog-practice", data }) as const,
 				};
 			}
+			if (entry.kind === "practice-new") {
+				return { queryKey: ["practice-new", entry.id], queryFn: () => null, staleTime: Infinity };
+			}
 			return {
 				...getPracticeOptions({ path: { workspaceSlug, practiceSlug: entry.id } }),
 				select: (data: Practice) => ({ kind: "practice", data }) as const,
 			};
 		}),
 	});
+
+	/** The groups the editor offers. A hidden group still holds practices but is not a destination. */
+	const editableAreas = areasQuery.data?.filter((area) => area.visibleInPracticeDashboards);
 
 	/** Reads a level's payload only when it is the kind the caller is rendering. */
 	const levelData = <TKind extends DetailKind>(
@@ -314,7 +334,11 @@ function PracticeCatalogRoute() {
 				/>
 			)}
 
-			<DetailDrawerStack stack={detailStack} onClose={stackControls.close}>
+			<DetailDrawerStack
+				stack={detailStack}
+				guardedKinds={GUARDED_LEVEL_KINDS}
+				onClose={stackControls.close}
+			>
 				{(entry, level) => {
 					const query = levelQueries[level.depth];
 					if (entry.kind === "catalog-area") {
@@ -365,7 +389,6 @@ function PracticeCatalogRoute() {
 						const workspacePractice = levelData(query, "practice");
 						return (
 							<WorkspacePracticePanel
-								workspaceSlug={workspaceSlug}
 								nested={level.nested}
 								state={
 									workspacePractice === undefined ||
@@ -391,6 +414,47 @@ function PracticeCatalogRoute() {
 												}
 								}
 							/>
+						);
+					}
+					if (entry.kind === "practice-edit" || entry.kind === "practice-new") {
+						const creating = entry.kind === "practice-new";
+						const editing = creating ? undefined : levelData(query, "practice");
+						// The form saves and then leaves. It must reject on failure, or the unsaved-changes
+						// guard lifts and the draft goes with the level.
+						const saved = async (work: Promise<unknown>) => {
+							await work;
+							stackControls.close(level.depth);
+						};
+						return (
+							<PracticeFormLevel nested={level.nested} creating={creating}>
+								{editableAreas === undefined ||
+								definitionOptionsQuery.data === undefined ||
+								(!creating && editing === undefined) ? (
+									<PracticeDefinitionSkeleton />
+								) : (
+									<PracticeForm
+										{...(creating
+											? {
+													mode: "create" as const,
+													onSubmit: (data, areaSlug) => saved(editor.create(data, areaSlug)),
+												}
+											: {
+													mode: "edit" as const,
+													initialData: editing as Practice,
+													onSubmit: (slug, data, areaSlug) =>
+														saved(editor.update(slug, data, areaSlug)),
+													evidenceOutcome: evidenceOutcomesQuery.data?.find(
+														(outcome) => outcome.practiceSlug === entry.id,
+													),
+												})}
+										workspaceSlug={workspaceSlug}
+										areas={editableAreas}
+										definitionOptions={definitionOptionsQuery.data}
+										isPending={editor.isPending}
+										cancel={<LevelCancel />}
+									/>
+								)}
+							</PracticeFormLevel>
 						);
 					}
 					const catalogPreview = levelData(query, "catalog-practice");

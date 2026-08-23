@@ -1,14 +1,11 @@
-import { Link } from "@tanstack/react-router";
 import deepEqual from "fast-deep-equal";
-import { ArrowLeft, ClipboardPenLine, ListPlus, RotateCcw } from "lucide-react";
+import { RotateCcw } from "lucide-react";
 import { useState } from "react";
 import type { CatalogEntryStatus, CuratedAreaRequest } from "@/api/types.gen";
 import { AreaVisualPicker } from "@/components/admin/practice-catalog/AreaVisualPicker";
 import { generateSlug, isValidSlug } from "@/components/admin/practice-catalog/constants";
 import { FormActionBar } from "@/components/common/FormActionBar";
 import { type FormError, FormErrorSummary } from "@/components/common/FormErrorSummary";
-import { PageHeader } from "@/components/core/PageHeader";
-import { PageLayout } from "@/components/core/PageLayout";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
 	AlertDialog,
@@ -20,13 +17,12 @@ import {
 	AlertDialogHeader,
 	AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import { useUnsavedChanges } from "@/hooks/use-unsaved-changes";
-import { cn } from "@/lib/utils";
 import { canUseHephaestusVersion } from "./curated-entry-state";
 import { HephaestusVersionPanel } from "./HephaestusVersionPanel";
 
@@ -60,6 +56,8 @@ interface CuratedAreaFormBaseProps {
 	onUseHephaestusVersion?: () => void;
 	onKeepCurrentDefinition?: () => void;
 	onSubmit: (value: CuratedAreaFormValue) => void;
+	/** What "leave without saving" does. The host owns it, because only the host knows where back is. */
+	cancel: React.ReactNode;
 }
 
 export type CuratedAreaFormProps = CuratedAreaFormBaseProps &
@@ -87,6 +85,7 @@ export function CuratedAreaForm(props: CuratedAreaFormProps) {
 		isResetPending = false,
 		isKeepPending = false,
 		onUseHephaestusVersion,
+		cancel,
 		initialData,
 		onKeepCurrentDefinition,
 		onSubmit,
@@ -149,7 +148,7 @@ export function CuratedAreaForm(props: CuratedAreaFormProps) {
 	};
 
 	return (
-		<PageLayout>
+		<>
 			<AlertDialog open={resetOpen} onOpenChange={setResetOpen}>
 				<AlertDialogContent>
 					<AlertDialogHeader>
@@ -180,25 +179,6 @@ export function CuratedAreaForm(props: CuratedAreaFormProps) {
 				key={refusals}
 				errors={refusals > 0 ? errorSummary : []}
 				className="max-w-3xl"
-			/>
-
-			<Link
-				from="/admin/catalog"
-				to="/admin/catalog"
-				search={(previous) => previous}
-				className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "-ml-3 w-fit")}
-			>
-				<ArrowLeft className="size-4" aria-hidden />
-				Practice library
-			</Link>
-			<PageHeader
-				icon={mode === "create" ? <ListPlus /> : <ClipboardPenLine />}
-				title={mode === "create" ? "Create group" : `Edit: ${initialData.name}`}
-				description={
-					mode === "create"
-						? "Groups keep related practices together in the instance catalog."
-						: "Saving updates the instance catalog. Existing workspace copies will not change."
-				}
 			/>
 
 			{mode === "edit" && (
@@ -355,19 +335,7 @@ export function CuratedAreaForm(props: CuratedAreaFormProps) {
 					</div>
 				</fieldset>
 
-				<FormActionBar
-					className="max-w-3xl"
-					secondary={
-						<Link
-							from="/admin/catalog"
-							to="/admin/catalog"
-							search={(previous) => previous}
-							className={buttonVariants({ variant: "outline" })}
-						>
-							Cancel
-						</Link>
-					}
-				>
+				<FormActionBar className="max-w-3xl" secondary={cancel}>
 					<Button type="submit" disabled={formDisabled || conflict}>
 						{isPending && <Spinner className="size-4" />}
 						{isPending
@@ -380,6 +348,6 @@ export function CuratedAreaForm(props: CuratedAreaFormProps) {
 					</Button>
 				</FormActionBar>
 			</form>
-		</PageLayout>
+		</>
 	);
 }
