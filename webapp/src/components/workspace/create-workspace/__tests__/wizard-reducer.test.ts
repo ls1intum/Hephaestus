@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { GitLabGroup, GitLabPreflightResponse } from "@/api/types.gen";
-import { initialWizardState, type WizardState, wizardReducer } from "../wizard-context";
+import {
+	initialWizardState,
+	type WizardState,
+	wizardReducer,
+} from "@/components/workspace/create-workspace/wizard-context";
 
 const validPreflight: GitLabPreflightResponse = { valid: true, username: "admin" };
 const sampleGroup: GitLabGroup = {

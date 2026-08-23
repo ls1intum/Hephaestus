@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getProviderLabel } from "../provider-labels";
+import { getProviderLabel } from "@/lib/provider/provider-labels";
 
 describe("getProviderLabel", () => {
 	it("maps every provider type the server can emit to human copy", () => {

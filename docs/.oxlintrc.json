@@ -169,6 +169,8 @@
 		"prefer-numeric-literals": "error",
 		"prefer-exponentiation-operator": "error",
 		"prefer-arrow-callback": "error",
+		// `@site/` reaches anything in the docs tree; a `../` only reaches what is above this file.
+		"import/no-relative-parent-imports": "error",
 		"import/no-duplicates": "error",
 		"no-duplicate-imports": "error",
 		"import/no-mutable-exports": "error",

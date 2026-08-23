@@ -5,10 +5,10 @@ import { createRootRoute, createRouter, RouterProvider } from "@tanstack/react-r
 import { isCommonAssetRequest } from "msw";
 import { initialize, mswLoader } from "msw-storybook-addon";
 import React from "react";
-import { Toaster } from "../src/components/ui/sonner";
-import { ThemeProvider } from "../src/integrations/theme";
-import { handlers } from "../src/mocks/handlers";
-import "../src/styles.css";
+import { Toaster } from "@/components/ui/sonner";
+import { ThemeProvider } from "@/integrations/theme";
+import { handlers } from "@/mocks/handlers";
+import "@/styles.css";
 
 initialize(
 	{
@@ -38,20 +38,20 @@ const QueryDecorator: Decorator = (Story) => {
 			mutations: { retry: false },
 		},
 	});
-	return React.createElement(
-		QueryClientProvider,
-		{ client: queryClient },
-		React.createElement(Story),
+	return (
+		<QueryClientProvider client={queryClient}>
+			<Story />
+		</QueryClientProvider>
 	);
 };
 
 const RouterDecorator: Decorator = (Story) => {
 	const rootRoute = createRootRoute({
-		component: () => React.createElement(Story),
+		component: () => <Story />,
 	});
 	const routeTree = rootRoute;
 	const router = createRouter({ routeTree });
-	return React.createElement(RouterProvider, { router });
+	return <RouterProvider router={router} />;
 };
 
 /**
@@ -60,13 +60,12 @@ const RouterDecorator: Decorator = (Story) => {
  * nothing to find. Mounted here rather than per story, because the surfaces that raise a toast are
  * spread across the app and the ones that forget to mount it are exactly the ones that need it.
  */
-const ToastDecorator: Decorator = (Story) =>
-	React.createElement(
-		React.Fragment,
-		null,
-		React.createElement(Story),
-		React.createElement(Toaster),
-	);
+const ToastDecorator: Decorator = (Story) => (
+	<>
+		<Story />
+		<Toaster />
+	</>
+);
 
 const injectDocsThemeCSS = () => {
 	if (typeof document === "undefined") return;
@@ -93,7 +92,7 @@ const ThemeDecorator: Decorator = (Story) => {
 		injectDocsThemeCSS();
 	}, []);
 
-	return React.createElement(Story);
+	return <Story />;
 };
 
 const StorybookThemeProvider = ({
@@ -103,15 +102,15 @@ const StorybookThemeProvider = ({
 	theme: string;
 	children: React.ReactNode;
 }) => {
-	return React.createElement(
-		ThemeProvider,
-		{
-			key: theme,
+	return (
+		<ThemeProvider
+			key={theme}
 			// The toolbar only offers the two themes configured below; light is the default there too.
-			defaultTheme: theme === "dark" ? "dark" : "light",
-			storageKey: "storybook-theme",
-		},
-		children,
+			defaultTheme={theme === "dark" ? "dark" : "light"}
+			storageKey="storybook-theme"
+		>
+			{children}
+		</ThemeProvider>
 	);
 };
 
@@ -209,8 +208,9 @@ const preview: Preview = {
 			defaultTheme: "light",
 			// The addon types `Provider` as `any` and hands it whichever entry of `themes` above the
 			// toolbar selected, so the shape it is called with is declared here.
-			Provider: ({ theme, children }: { theme: { name: string }; children: React.ReactNode }) =>
-				React.createElement(StorybookThemeProvider, { theme: theme.name }, children),
+			Provider: ({ theme, children }: { theme: { name: string }; children: React.ReactNode }) => (
+				<StorybookThemeProvider theme={theme.name}>{children}</StorybookThemeProvider>
+			),
 		}),
 	],
 };

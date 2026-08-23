@@ -38,7 +38,7 @@ question, not a story's.
 Most files omit `title` and are filed by their path under `src`, which cannot go stale. Declare an
 explicit `title` when the file layout cannot express where a reader looks for the thing — a product
 surface assembled from several directories, or one an admin knows by the screen it is on. Sentence
-case, and every top-level segment must appear in `storySort.order` in `.storybook/preview.ts` or it
+case, and every top-level segment must appear in `storySort.order` in `.storybook/preview.tsx` or it
 sorts to the bottom silently. `rules/story-titles.md` in the skill has the namespaces.
 
 ## Published prose
@@ -58,8 +58,8 @@ opts out says why in its meta.
   every story of a file into one document over a single global worker, so the last story's handlers
   answer for the whole page.
 - `parameters.a11y` or `globals.a11y` on a meta or a story (`hephaestus/no-story-a11y-override`).
-  `.storybook/preview.ts` sets `a11y: { test: "error" }` project-wide and anything local can only
-  lower it. A genuine misfire is exempted once, in `preview.ts`, with the upstream link beside it.
+  `.storybook/preview.tsx` sets `a11y: { test: "error" }` project-wide and anything local can only
+  lower it. A genuine misfire is exempted once, in `preview.tsx`, with the upstream link beside it.
 - A `play` function that never reaches an assertion (`hephaestus/play-must-assert`), and
   `expect(getBy…).toBeInTheDocument()` (`hephaestus/no-redundant-in-the-document`).
 - `within(canvasElement)` when the play was handed `canvas` (`hephaestus/no-within-canvas-element`).

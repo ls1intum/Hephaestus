@@ -1,5 +1,8 @@
 import { assert, describe, expect, it } from "vitest";
-import { connectionSchema, workspaceDetailsSchema } from "../schemas";
+import {
+	connectionSchema,
+	workspaceDetailsSchema,
+} from "@/components/workspace/create-workspace/schemas";
 
 describe("connectionSchema", () => {
 	it("accepts valid PAT with empty server URL (defaults to gitlab.com)", () => {

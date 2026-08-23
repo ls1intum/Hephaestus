@@ -1,4 +1,7 @@
 import type { AuthEventView } from "@/api/types.gen";
+import { prettyJson } from "@/components/admin/audit-shared/pretty-json";
+import { refLabel } from "@/components/admin/audit-shared/ref-label";
+import { formatTimestamp } from "@/components/admin/audit-shared/time-format";
 import { DetailRow } from "@/components/common/DetailRow";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -8,9 +11,6 @@ import {
 	SheetHeader,
 	SheetTitle,
 } from "@/components/ui/sheet";
-import { prettyJson } from "../audit-shared/pretty-json";
-import { refLabel } from "../audit-shared/ref-label";
-import { formatTimestamp } from "../audit-shared/time-format";
 import { eventLabel, resultLabel } from "./audit-format";
 
 interface AuditEventDetailSheetProps {

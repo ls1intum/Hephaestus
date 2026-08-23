@@ -2,6 +2,11 @@ import { differenceInCalendarDays, format } from "date-fns";
 import { CheckIcon, CircleAlertIcon, KeyRoundIcon, TriangleAlertIcon } from "lucide-react";
 import { useState } from "react";
 import type { OutlineTokenStatus } from "@/api/types.gen";
+import { IntegrationCardHeading } from "@/components/admin/integrations/IntegrationCardHeading";
+import {
+	CONNECTION_STATE_LABEL,
+	type ConnectionState,
+} from "@/components/admin/integrations/sync-format";
 import { RelativeTime } from "@/components/common/RelativeTime";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
@@ -22,8 +27,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { asDate } from "@/lib/dates";
 import { hasText } from "@/lib/text";
-import { IntegrationCardHeading } from "../IntegrationCardHeading";
-import { CONNECTION_STATE_LABEL, type ConnectionState } from "../sync-format";
 
 export interface OutlineConnectInput {
 	serverUrl: string;
@@ -63,7 +66,7 @@ const EXPIRY_WARNING_DAYS = 14;
  * When disconnected it is the connect form (server URL + API token). When connected it names the
  * linked instance and shows the stored token's health plus a guarded disconnect; the connection plane
  * itself — health, freshness, webhook diagnostics, running-job progress and the Sync/Cancel controls —
- * lives in the shared {@link import("../SyncStatusHeader").SyncStatusHeader} above this card, and which
+ * lives in the shared {@link import("@/components/admin/integrations/SyncStatusHeader").SyncStatusHeader} above this card, and which
  * collections are mirrored is managed in {@link import("./OutlineCollectionsSection").OutlineCollectionsSection}
  * below it. Pure presentation.
  */

@@ -1,4 +1,5 @@
 import { ExternalLink } from "lucide-react";
+import { QuestionDescription } from "@/components/surveys/question-description";
 import { Button } from "@/components/ui/button";
 import {
 	Field,
@@ -8,7 +9,6 @@ import {
 	FieldTitle,
 } from "@/components/ui/field";
 import type { SurveyQuestion, SurveyResponse } from "@/types/survey";
-import { QuestionDescription } from "../question-description";
 
 type QuestionLinkQuestion = Pick<
 	SurveyQuestion,

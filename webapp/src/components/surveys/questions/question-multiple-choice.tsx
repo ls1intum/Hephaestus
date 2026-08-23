@@ -1,5 +1,5 @@
 import { useState } from "react";
-
+import { QuestionDescription } from "@/components/surveys/question-description";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
 	Field,
@@ -13,7 +13,6 @@ import {
 } from "@/components/ui/field";
 import { Textarea } from "@/components/ui/textarea";
 import type { SurveyQuestion, SurveyResponse } from "@/types/survey";
-import { QuestionDescription } from "../question-description";
 
 type QuestionMultipleChoiceQuestion = Pick<
 	SurveyQuestion,

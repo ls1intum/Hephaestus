@@ -1,3 +1,4 @@
+import { QuestionDescription } from "@/components/surveys/question-description";
 import { Button } from "@/components/ui/button";
 import {
 	Field,
@@ -8,7 +9,6 @@ import {
 } from "@/components/ui/field";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import type { SurveyQuestion, SurveyResponse } from "@/types/survey";
-import { QuestionDescription } from "../question-description";
 
 type QuestionRatingQuestion = Pick<
 	SurveyQuestion,

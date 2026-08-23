@@ -106,7 +106,7 @@ patch only the props the wrapper holds state for.
 - **B** — C plus every branch of the component's own state union, plus the two content edges the layout
   can lose to: longest realistic string and empty collection.
 - **A** — B plus the 320px reflow viewport where the component has a horizontal axis.
-  `.storybook/preview.ts` defines `reflow` (320px) alongside `mobile`, `tablet`, `desktop` and `wide`.
+  `.storybook/preview.tsx` defines `reflow` (320px) alongside `mobile`, `tablet`, `desktop` and `wide`.
 - **A+** — B/A plus **dark**. Nothing currently renders dark under test: `withThemeByClassName` defaults
   to `light`, Chromatic captures `viewports: [1440]` with no `modes`, and no story sets a dark global.
   Contrast in dark is un-asserted by construction.
@@ -159,7 +159,7 @@ Adding a play to a presentational badge is theatre. **Grade the component, not t
   genuinely out of the tab order, or that an error field's `aria-describedby` points at the element
   carrying the message.
 
-**Confirmation, not a finding: this is at ceiling.** `.storybook/preview.ts` sets `a11y: { test: "error" }`
+**Confirmation, not a finding: this is at ceiling.** `.storybook/preview.tsx` sets `a11y: { test: "error" }`
 project-wide, and across the whole story tree there are **zero** per-story or per-meta `todo`/`off`
 overrides and zero disabled rules — `hephaestus/no-story-a11y-override` is what keeps that zero at zero.
 The single global exclusion (`[data-base-ui-focus-guard]`) cites the upstream bug. Protect this; do not

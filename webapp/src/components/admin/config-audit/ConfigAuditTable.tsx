@@ -1,6 +1,7 @@
 import { Bot, History, UserCog } from "lucide-react";
 import { useState } from "react";
 import type { ConfigAuditEntryView } from "@/api/types.gen";
+import { FilterLink } from "@/components/admin/audit-shared/FilterLink";
 import { TableRowsSkeleton } from "@/components/admin/integrations/TableRowsSkeleton";
 import { RelativeTime } from "@/components/common/RelativeTime";
 import { Badge } from "@/components/ui/badge";
@@ -23,7 +24,6 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
-import { FilterLink } from "../audit-shared/FilterLink";
 import { ConfigAuditDetailSheet } from "./ConfigAuditDetailSheet";
 import {
 	ACTION_BADGE,

@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { getProviderSlug, getProviderTerms, type ProviderType } from "../provider-terms";
+import {
+	getProviderSlug,
+	getProviderTerms,
+	type ProviderType,
+} from "@/lib/provider/provider-terms";
 
 describe("getProviderTerms", () => {
 	it("returns GitHub terminology", () => {

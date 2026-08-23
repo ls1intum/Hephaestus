@@ -1,3 +1,6 @@
+// oxlint-disable import/no-relative-parent-imports -- The shipped legal markdown lives in
+// `public/`, which Vite serves as a static asset and no `@/` alias reaches. Asserting the real
+// files is the point of this suite; importing a copy under `src/` would test the copy.
 import { describe, expect, it } from "vitest";
 
 // Source of truth for every Markdown file we ship. Each is imported as a

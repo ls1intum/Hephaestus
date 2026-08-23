@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { QuestionDescription } from "@/components/surveys/question-description";
 import {
 	Field,
 	FieldContent,
@@ -12,7 +13,6 @@ import {
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Textarea } from "@/components/ui/textarea";
 import type { SurveyQuestion, SurveyResponse } from "@/types/survey";
-import { QuestionDescription } from "../question-description";
 
 type QuestionSingleChoiceQuestion = Pick<
 	SurveyQuestion,

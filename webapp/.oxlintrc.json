@@ -201,6 +201,9 @@
 		"prefer-arrow-callback": "error",
 		// `import/no-duplicates` accepts a type-only import standing beside a value import from the same
 		// module; `no-duplicate-imports` does not, and one import list per module is the point.
+		// `@/` is the house spelling: 2,700 aliased imports against a handful of parent-relative
+		// ones. A `../` also survives moving a file only by accident.
+		"import/no-relative-parent-imports": "error",
 		"import/no-duplicates": "error",
 		"no-duplicate-imports": "error",
 		"import/no-mutable-exports": "error",
@@ -454,6 +457,12 @@
 	// Entries whose globs overlap but set different rules are fine, and there are several below.
 	"overrides": [
 		{
+			// `@/` maps to `src/`, so nothing here can spell a sibling any other way. This is a
+			// self-contained tool, not part of the app tree.
+			"files": ["tools/**"],
+			"rules": { "import/no-relative-parent-imports": "off" }
+		},
+		{
 			// `src/lib/utils.ts` gets the entry below instead; `excludeFiles` keeps the two from colliding.
 			"files": ["src/lib/**", "src/stores/**"],
 			"excludeFiles": ["src/lib/utils.ts"],
@@ -618,7 +627,7 @@
 		},
 		{
 			// All four read a Storybook story object, and only a story file holds one. `parameters.a11y`
-			// is also how `.storybook/preview.ts` sets the project-wide bar none of them may lower; a
+			// is also how `.storybook/preview.tsx` sets the project-wide bar none of them may lower; a
 			// `play` property elsewhere belongs to a media element; `canvasElement` exists only inside a
 			// play; and a domain type named `Meta` — a pagination envelope, say — is not Storybook's.
 			"files": ["**/*.stories.tsx"],

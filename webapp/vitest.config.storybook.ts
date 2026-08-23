@@ -41,7 +41,7 @@ export default defineConfig({
 			enabled: true,
 			headless: true,
 			// Stories read the real window through useIsMobile(), so the width decides which branch
-			// they render. Matches the Chromatic viewport in .storybook/preview.ts, so a play
+			// they render. Matches the Chromatic viewport in .storybook/preview.tsx, so a play
 			// function and its snapshot are asserting about the same layout.
 			viewport: { width: 1440, height: 900 },
 			provider: playwright({

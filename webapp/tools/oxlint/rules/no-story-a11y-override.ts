@@ -23,13 +23,13 @@ export const noStoryA11yOverride = defineRule({
 		type: "problem",
 		docs: {
 			description:
-				'The accessibility check is configured once, in `.storybook/preview.ts`. It runs there at `test: "error"` for every story, so anything a story adds can only lower that bar — and it lowers it while the suite still reports green, which is how a component stops being checked without anyone noticing. Where a rule is genuinely wrong about a pattern the whole kit uses, `preview.ts` is where the exemption is visible and has to be argued for once.',
+				'The accessibility check is configured once, in `.storybook/preview.tsx`. It runs there at `test: "error"` for every story, so anything a story adds can only lower that bar — and it lowers it while the suite still reports green, which is how a component stops being checked without anyone noticing. Where a rule is genuinely wrong about a pattern the whole kit uses, `preview.tsx` is where the exemption is visible and has to be argued for once.',
 		},
 		messages: {
 			localOverride:
-				'`.storybook/preview.ts` already runs the accessibility check at `test: "error"`, so this entry can only lower that bar, silently. Fix the violation, or argue the exemption once in `preview.ts`.',
+				'`.storybook/preview.tsx` already runs the accessibility check at `test: "error"`, so this entry can only lower that bar, silently. Fix the violation, or argue the exemption once in `preview.tsx`.',
 			indirect:
-				"Written this way, what this sets cannot be read here, so it may hold an entry that lowers the bar `.storybook/preview.ts` sets and nothing would say so. Spell the entries out inline.",
+				"Written this way, what this sets cannot be read here, so it may hold an entry that lowers the bar `.storybook/preview.tsx` sets and nothing would say so. Spell the entries out inline.",
 		},
 	},
 	create(context) {

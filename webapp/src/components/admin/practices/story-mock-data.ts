@@ -182,8 +182,8 @@ export const mockPracticeWithAllTriggers: Practice = {
 	criteria:
 		"## Commit Discipline\n\nEach commit message must:\n- Start with a type prefix (feat, fix, refactor, etc.)\n- Have a descriptive subject (not just issue numbers)\n- Reference the related issue\n\n### Anti-patterns to Flag\n- `fixes #123` with no description\n- Branch-slug-format titles like `feature/ABC-123`\n- Single-word messages like `update` or `fix`",
 	precomputeScript: [
-		'import { readDiff } from "../lib/diff";',
-		'import { parseDiffFiles } from "../lib/parse";',
+		'import { readDiff } from "@/components/admin/lib/diff";',
+		'import { parseDiffFiles } from "@/components/admin/lib/parse";',
 		"",
 		"const diff = await readDiff();",
 		"const files = parseDiffFiles(diff);",

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { generateSlug } from "../slug-utils";
+import { generateSlug } from "@/components/workspace/create-workspace/slug-utils";
 
 describe("generateSlug", () => {
 	it("converts spaces to hyphens and lowercases", () => {

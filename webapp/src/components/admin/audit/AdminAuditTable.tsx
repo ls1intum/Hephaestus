@@ -1,6 +1,8 @@
 import { ScrollText } from "lucide-react";
 import { useState } from "react";
 import type { AuthEventView } from "@/api/types.gen";
+import { FilterLink } from "@/components/admin/audit-shared/FilterLink";
+import { refLabel } from "@/components/admin/audit-shared/ref-label";
 import { TableRowsSkeleton } from "@/components/admin/integrations/TableRowsSkeleton";
 import { RelativeTime } from "@/components/common/RelativeTime";
 import { Badge } from "@/components/ui/badge";
@@ -23,8 +25,6 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
-import { FilterLink } from "../audit-shared/FilterLink";
-import { refLabel } from "../audit-shared/ref-label";
 import { AuditEventDetailSheet } from "./AuditEventDetailSheet";
 import {
 	eventLabel,

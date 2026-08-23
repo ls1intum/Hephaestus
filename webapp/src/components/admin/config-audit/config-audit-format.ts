@@ -1,6 +1,6 @@
 import type { ConfigAuditEntryView } from "@/api/types.gen";
+import { refLabel } from "@/components/admin/audit-shared/ref-label";
 import { isRecord } from "@/lib/is-record";
-import { refLabel } from "../audit-shared/ref-label";
 
 type EntityType = NonNullable<ConfigAuditEntryView["entityType"]>;
 type Action = NonNullable<ConfigAuditEntryView["action"]>;

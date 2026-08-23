@@ -1,6 +1,7 @@
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { assert, describe, expect, it, vi } from "vitest";
+import { bindingsProblem } from "@/components/admin/practice-catalog/bindings";
 import {
 	mockAuthorDeclaredEvidenceValidation,
 	mockPracticeDefinitionOptions,
@@ -9,7 +10,6 @@ import {
 	mockPullRequestWorkType,
 } from "@/mocks/fixtures/practice";
 import { renderWithRouter } from "@/test/router-harness";
-import { bindingsProblem } from "../practice-catalog/bindings";
 import {
 	CuratedPracticeForm,
 	type CuratedPracticeFormInitialValue,

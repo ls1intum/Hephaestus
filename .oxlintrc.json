@@ -147,6 +147,7 @@
 		"prefer-numeric-literals": "error",
 		"prefer-exponentiation-operator": "error",
 		"prefer-arrow-callback": "error",
+		"import/no-relative-parent-imports": "error",
 		"import/no-duplicates": "error",
 		"no-duplicate-imports": "error",
 		"import/no-mutable-exports": "error",
@@ -272,6 +273,19 @@
 	},
 
 	"overrides": [
+		{
+			// Maven splits a module across `src/test/resources` and `src/main/resources`, so a spec
+			// reaches its subject across that boundary and no alias spans it.
+			"files": ["server/src/test/resources/agent/**"],
+			"rules": { "import/no-relative-parent-imports": "off" }
+		},
+		{
+			// `tsconfig.agents.json` overlays this directory with `docker/agents/precompute` through
+			// `rootDirs`, and the agent image reproduces that layout under `/opt/precompute`. `../lib/x`
+			// is the spelling both resolve; an alias would typecheck and then fail in the sandbox.
+			"files": ["server/src/main/resources/practices/precompute/**"],
+			"rules": { "import/no-relative-parent-imports": "off" }
+		},
 		{
 			// The runner and the precompute scripts execute on Bun inside the agent sandbox, and a CLI
 			// entry point ends the process rather than returning a status nobody reads.

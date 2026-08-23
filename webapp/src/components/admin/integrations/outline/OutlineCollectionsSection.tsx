@@ -1,6 +1,9 @@
 import { LibraryIcon, PlusIcon } from "lucide-react";
 import { useState } from "react";
 import type { OutlineCollection } from "@/api/types.gen";
+import { IntegrationCardHeading } from "@/components/admin/integrations/IntegrationCardHeading";
+import { swallow } from "@/components/admin/integrations/swallow";
+import { TableRowsSkeleton } from "@/components/admin/integrations/TableRowsSkeleton";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { Button } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
@@ -13,9 +16,6 @@ import {
 	EmptyTitle,
 } from "@/components/ui/empty";
 import { Table, TableBody, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { IntegrationCardHeading } from "../IntegrationCardHeading";
-import { swallow } from "../swallow";
-import { TableRowsSkeleton } from "../TableRowsSkeleton";
 import { AddCollectionDialog } from "./AddCollectionDialog";
 import { OutlineCollectionRow, type OutlineMirrorState } from "./OutlineCollectionRow";
 import { RemoveCollectionAlertDialog } from "./RemoveCollectionAlertDialog";

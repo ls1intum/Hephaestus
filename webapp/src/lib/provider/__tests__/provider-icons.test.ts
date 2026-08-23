@@ -10,8 +10,8 @@ import {
 	GitLabMergeRequestClosedIcon,
 	GitLabMergeRequestDraftIcon,
 	GitLabMergeRequestIcon,
-} from "../gitlab-icons";
-import { getPullRequestStateIcon, type PullRequestState } from "../provider-icons";
+} from "@/lib/provider/gitlab-icons";
+import { getPullRequestStateIcon, type PullRequestState } from "@/lib/provider/provider-icons";
 
 const ALL_STATES: PullRequestState[] = ["OPEN", "CLOSED", "MERGED"];
 

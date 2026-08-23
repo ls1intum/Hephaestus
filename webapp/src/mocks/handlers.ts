@@ -1,6 +1,6 @@
 // MSW request handlers for the native-auth endpoints (ADR 0017). These back the
 // Storybook browser worker (initialized via `initialize(...)` + `mswLoader` in
-// `.storybook/preview.ts`) so query-driven components render without hitting a real
+// `.storybook/preview.tsx`) so query-driven components render without hitting a real
 // backend.
 //
 // URL patterns use the `*/path` wildcard so they match regardless of the API

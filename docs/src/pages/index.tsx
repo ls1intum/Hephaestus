@@ -3,9 +3,9 @@ import Link from '@docusaurus/Link';
 import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
 import Layout from '@theme/Layout';
 import Heading from '@theme/Heading';
-import feedbackPreviewDark from '../../images/readme/landing-feedback-preview-dark.png';
-import feedbackPreviewLight from '../../images/readme/landing-feedback-preview-light.png';
-import HomepageFeatures from '../components/HomepageFeatures';
+import feedbackPreviewDark from '@site/images/readme/landing-feedback-preview-dark.png';
+import feedbackPreviewLight from '@site/images/readme/landing-feedback-preview-light.png';
+import HomepageFeatures from '@site/src/components/HomepageFeatures';
 
 import styles from './index.module.css';
 

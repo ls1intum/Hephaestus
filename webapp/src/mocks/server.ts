@@ -1,5 +1,5 @@
 // MSW server for Node environments (Vitest jsdom). The same request handlers back the
-// Storybook browser worker (see `.storybook/preview.ts`), so mocked auth behaviour is
+// Storybook browser worker (see `.storybook/preview.tsx`), so mocked auth behaviour is
 // identical across stories and unit tests.
 //
 // Wired into Vitest via `src/test/setup-msw.ts` (registered as a `setupFiles` entry in
