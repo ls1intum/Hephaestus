@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.core.webhook;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
@@ -16,6 +17,7 @@ import io.nats.client.Connection;
 import io.nats.client.JetStream;
 import io.nats.client.JetStreamApiException;
 import io.nats.client.JetStreamManagement;
+import io.nats.client.JetStreamOptions;
 import java.io.IOException;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
@@ -79,6 +81,8 @@ class WebhookProducerWiringTest extends BaseUnitTest {
             Connection connection = mock(Connection.class);
             // Lenient throughout: the role-off case builds the same connection and touches none of it.
             lenient().when(connection.jetStreamManagement()).thenReturn(jsm);
+            // The bootstrap takes its own handle with a longer request timeout than the probes want.
+            lenient().when(connection.jetStreamManagement(any(JetStreamOptions.class))).thenReturn(jsm);
             lenient().when(connection.jetStream()).thenReturn(mock(JetStream.class));
             lenient().when(connection.getMaxPayload()).thenReturn(26_214_400L);
             return connection;

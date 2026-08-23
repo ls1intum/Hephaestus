@@ -9,9 +9,11 @@ import io.micrometer.core.instrument.MeterRegistry;
 import io.nats.client.Connection;
 import io.nats.client.JetStream;
 import io.nats.client.JetStreamManagement;
+import io.nats.client.JetStreamOptions;
 import java.io.IOException;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Primary;
 
 /**
  * The NATS <em>producer</em> cluster contributed by {@link WebhookConfiguration} on the
@@ -34,9 +36,28 @@ class WebhookProducerBeans {
     }
 
     @Bean
+    @Primary
     JetStreamManagement webhookJetStreamManagement(@Qualifier("natsConnection") Connection natsConnection)
         throws IOException {
         return natsConnection.jetStreamManagement();
+    }
+
+    /**
+     * The handle {@link WebhookJetStreamBootstrap} applies limit changes through. Separate from
+     * {@link #webhookJetStreamManagement} because the two want opposite timeouts: the health
+     * indicator and the monitor share that one and need it to fail fast, while bounding a stream
+     * that has outgrown its new limit sheds the excess before the broker answers and takes as long
+     * as the bytes require. Sharing one handle means either readiness waits on a delete or the
+     * delete reports a failure the broker is still completing.
+     */
+    @Bean
+    JetStreamManagement webhookAdminJetStreamManagement(
+        @Qualifier("natsConnection") Connection natsConnection,
+        WebhookProperties properties
+    ) throws IOException {
+        return natsConnection.jetStreamManagement(
+            JetStreamOptions.builder().requestTimeout(properties.stream().limitUpdateTimeout()).build()
+        );
     }
 
     @Bean
@@ -63,7 +84,10 @@ class WebhookProducerBeans {
     }
 
     @Bean
-    WebhookJetStreamBootstrap webhookJetStreamBootstrap(JetStreamManagement jsm, WebhookProperties properties) {
+    WebhookJetStreamBootstrap webhookJetStreamBootstrap(
+        @Qualifier("webhookAdminJetStreamManagement") JetStreamManagement jsm,
+        WebhookProperties properties
+    ) {
         return new WebhookJetStreamBootstrap(jsm, properties);
     }
 

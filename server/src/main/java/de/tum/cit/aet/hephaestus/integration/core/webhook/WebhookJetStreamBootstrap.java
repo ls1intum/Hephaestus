@@ -248,14 +248,36 @@ public class WebhookJetStreamBootstrap {
             }
             return true;
         } catch (JetStreamApiException | IOException ex) {
-            // The stream exists and publishes still land at its live limits, so this is not worth
-            // failing a deploy over — the receiver stays up and the operator gets a loud record.
+            // A timeout here says the broker did not answer in time, not that it did nothing: shedding
+            // the excess a new bound deletes happens before the reply, so the update can land while the
+            // client gives up. Report the limits the stream actually has rather than assert an outcome.
             log.error(
-                "Failed to reconcile JetStream stream limits: name={} — stream left at its live configuration",
+                "Failed to reconcile JetStream stream limits: name={} changed={} — live configuration is now {}",
                 name,
+                plan.applied,
+                describeLiveLimits(name),
                 ex
             );
             return false;
+        }
+    }
+
+    /**
+     * The stream's limits as the broker reports them right now, for a failure that cannot say whether
+     * its own update landed. Never throws: it runs on a path that is already handling a failure, and
+     * an unreadable broker is itself the answer.
+     */
+    private String describeLiveLimits(String name) {
+        try {
+            StreamConfiguration live = jsm.getStreamInfo(name).getConfiguration();
+            return String.format(
+                "maxAge=%s maxBytes=%d maxMessages=%d",
+                live.getMaxAge(),
+                live.getMaxBytes(),
+                live.getMaxMsgs()
+            );
+        } catch (JetStreamApiException | IOException | RuntimeException ex) {
+            return "unreadable (" + ex.getClass().getSimpleName() + ") — check the broker directly";
         }
     }
 

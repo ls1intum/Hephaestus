@@ -612,6 +612,10 @@ hephaestus:
             # messages the stream already holds is withheld and logged rather than applied. Set this
             # once, deliberately, to let that through.
             allow-destructive-limit-updates: ${HEPHAESTUS_WEBHOOK_STREAM_ALLOW_DESTRUCTIVE_LIMIT_UPDATES:false}
+            # A bound that sheds messages deletes them before the broker replies, so the wait scales
+            # with the bytes shed, not with the request. Startup-only, and deliberately not the
+            # timeout the health probes use — those have to fail fast to be worth alerting on.
+            limit-update-timeout: ${HEPHAESTUS_WEBHOOK_STREAM_LIMIT_UPDATE_TIMEOUT:5m}
             monitor-interval: 60s
         shutdown:
             # Drain budget for in-flight publishes after HTTP closes. Docker stop_grace_period

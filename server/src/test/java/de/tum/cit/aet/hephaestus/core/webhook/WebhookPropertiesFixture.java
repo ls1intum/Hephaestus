@@ -25,6 +25,7 @@ public final class WebhookPropertiesFixture {
             Map.of(),
             gibibytes(12),
             false,
+            Duration.ofMinutes(5),
             Duration.ofSeconds(60)
         );
     }

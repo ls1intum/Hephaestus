@@ -96,6 +96,7 @@ class WebhookJetStreamBootstrapTest extends BaseUnitTest {
                 Map.of("github", gibibytes(8)),
                 gibibytes(12),
                 false,
+                Duration.ofMinutes(5),
                 Duration.ofSeconds(60)
             )
         );
@@ -135,6 +136,7 @@ class WebhookJetStreamBootstrapTest extends BaseUnitTest {
                 // Four streams at 4 GiB need 16, and the broker is told it may hold 8.
                 gibibytes(8),
                 false,
+                Duration.ofMinutes(5),
                 Duration.ofSeconds(60)
             )
         );
@@ -157,6 +159,7 @@ class WebhookJetStreamBootstrapTest extends BaseUnitTest {
                 Map.of(),
                 gibibytes(8),
                 false,
+                Duration.ofMinutes(5),
                 Duration.ofSeconds(60)
             )
         );
@@ -437,6 +440,46 @@ class WebhookJetStreamBootstrapTest extends BaseUnitTest {
             .hasMessageContaining("Failed to inspect JetStream stream");
     }
 
+    @Test
+    void aTimedOutUpdateReportsTheLimitsTheStreamActuallyHasRatherThanAssertingItChangedNothing(CapturedOutput output)
+        throws Exception {
+        // Shedding what a new bound deletes happens before the broker replies, so a client timeout
+        // and a successful update look identical from here. Staging showed exactly that: the update
+        // landed, the client gave up, and the old message told the operator nothing had happened.
+        StreamInfo before = countBoundOnly(state(GIBIBYTE / 2, 10, 1));
+        StreamInfo after = existing(builder -> builder.maxBytes(4_294_967_296L).maxMessages(-1), state(0, 0, 1));
+        JetStreamManagement jsm = mock(JetStreamManagement.class);
+        when(jsm.getStreamInfo(anyString())).thenReturn(before, after);
+        when(jsm.updateStream(any())).thenThrow(new IOException("Timeout or no response waiting for NATS"));
+
+        new WebhookJetStreamBootstrap(jsm, allowingDestructiveUpdates()).bootstrap();
+
+        assertThat(output.getAll())
+            .as("the operator needs the broker's answer, not the client's assumption")
+            .contains("live configuration is now")
+            .contains("maxBytes=4294967296")
+            .doesNotContain("stream left at its live configuration");
+    }
+
+    @Test
+    void aTimedOutUpdateAgainstAnUnreadableBrokerSaysSoInsteadOfGuessing(CapturedOutput output) throws Exception {
+        // The re-read runs on a path that is already failing; if it fails too, silence would be the
+        // one outcome worse than either error.
+        StreamInfo before = countBoundOnly(state(GIBIBYTE / 2, 10, 1));
+        JetStreamManagement jsm = mock(JetStreamManagement.class);
+        // Bootstrap walks every stream: the first pair of calls is the one under test — read, then the
+        // re-read that fails. Later streams read normally so the loop reaches its end.
+        when(jsm.getStreamInfo(anyString()))
+            .thenReturn(before)
+            .thenThrow(new IOException("broker gone"))
+            .thenReturn(before);
+        when(jsm.updateStream(any())).thenThrow(new IOException("Timeout or no response waiting for NATS"));
+
+        new WebhookJetStreamBootstrap(jsm, allowingDestructiveUpdates()).bootstrap();
+
+        assertThat(output.getAll()).contains("unreadable").contains("check the broker directly");
+    }
+
     private WebhookProperties allowingDestructiveUpdates() {
         WebhookProperties.Stream s = properties.stream();
         return WebhookPropertiesFixture.with(
@@ -448,6 +491,7 @@ class WebhookJetStreamBootstrapTest extends BaseUnitTest {
                 Map.of(),
                 s.storageBudget(),
                 true,
+                s.limitUpdateTimeout(),
                 s.monitorInterval()
             )
         );
