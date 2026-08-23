@@ -159,7 +159,10 @@ jobs:
         id: retag
         env:
           VERSION: ${{ needs.release.outputs.version }}
-          CHANNEL: ${{ needs.release.outputs.major }}.${{ needs.release.outputs.minor }}
+          # The `major.minor` series tag: it moves onto every patch release in the line, exactly as
+          # `latest` moves onto every release. Both are channel tags; only the spelling differs, and
+          # naming this one `CHANNEL` made them look like different things. ADR 0031.
+          SERIES: ${{ needs.release.outputs.major }}.${{ needs.release.outputs.minor }}
           SHA: ${{ needs.release.outputs.sha }}
         run: |
           set -euo pipefail
@@ -195,11 +198,11 @@ jobs:
 
             docker buildx imagetools create \
               -t "$FULL_IMAGE:$VERSION" \
-              -t "$FULL_IMAGE:$CHANNEL" \
+              -t "$FULL_IMAGE:$SERIES" \
               -t "$FULL_IMAGE:latest" \
               "$FULL_IMAGE:$SHA"
 
-            for tag in "$VERSION" "$CHANNEL" "latest"; do
+            for tag in "$VERSION" "$SERIES" "latest"; do
               DST_DIGEST=$(manifest_digest "$FULL_IMAGE:$tag")
               if [[ "$SRC_DIGEST" != "$DST_DIGEST" ]]; then
                 echo "::error::Retag changed the digest for $img:$tag — refusing to publish."
@@ -214,13 +217,33 @@ jobs:
             echo "::endgroup::"
           done
 
+      - name: Check out the released tree
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: ${{ needs.release.outputs.sha }}
+          fetch-depth: 1
+
+      # The pin asset below tells every production deploy to run THIS agent image, so this is the
+      # last point at which an image the released server cannot drive is still catchable. The
+      # sandbox is Bun-only (ADR 0030), so `node` must be absent, not present.
       - name: Smoke-test agent-pi
         env:
           IMAGE: ghcr.io/ls1intum/hephaestus/agent-pi@${{ steps.retag.outputs.agent-pi-digest }}
+          LAYOUT: server/src/main/java/de/tum/cit/aet/hephaestus/agent/runtime/SandboxLayout.java
         run: |
           set -euo pipefail
           docker pull "$IMAGE"
-          docker run --rm --entrypoint /bin/sh "$IMAGE" -c 'bun --version && node --version'
+          docker run --rm --entrypoint /bin/sh "$IMAGE" -c \
+            'bun --version && ! command -v node >/dev/null 2>&1'
+
+          expected=$(grep -oE 'RUNTIME_CONTRACT_VERSION = [0-9]+' "$LAYOUT" | grep -oE '[0-9]+$')
+          [ -n "$expected" ] || { echo "::error::Could not read RUNTIME_CONTRACT_VERSION from $LAYOUT"; exit 1; }
+          declared=$(docker inspect --format '{{index .Config.Labels "hephaestus.agent.runtime-contract"}}' "$IMAGE")
+          if [ "$declared" != "$expected" ]; then
+            echo "::error::agent-pi implements runtime contract '${declared:-<none>}' but the released server stages for v${expected} — refusing to publish a pin for an unmatched pair."
+            exit 1
+          fi
+          echo "agent-pi implements runtime contract v${expected}"
 
       - name: Write release pin asset
         id: pin

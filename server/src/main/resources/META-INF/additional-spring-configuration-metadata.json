@@ -202,8 +202,8 @@
       "name": "hephaestus.agent.image.reference",
       "values": [
         {
-          "value": "ghcr.io/ls1intum/hephaestus/agent-pi:latest",
-          "description": "Dev/local — tag-based, mutable"
+          "value": "ghcr.io/ls1intum/hephaestus/agent-pi:${spring.application.version}",
+          "description": "Default — follows this deployment's own image tag, so the pair always matches."
         },
         {
           "value": "ghcr.io/ls1intum/hephaestus/agent-pi@sha256:0000000000000000000000000000000000000000000000000000000000000000",

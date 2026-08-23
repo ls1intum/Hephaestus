@@ -25,15 +25,18 @@ public class AgentImagePullBootstrapper {
     private final DockerImageOperations imageOps;
     private final AgentImageProperties properties;
     private final MeterRegistry meterRegistry;
+    private final AgentImageContractVerifier contractVerifier;
 
     public AgentImagePullBootstrapper(
         DockerImageOperations imageOps,
         AgentImageProperties properties,
-        MeterRegistry meterRegistry
+        MeterRegistry meterRegistry,
+        AgentImageContractVerifier contractVerifier
     ) {
         this.imageOps = imageOps;
         this.properties = properties;
         this.meterRegistry = meterRegistry;
+        this.contractVerifier = contractVerifier;
     }
 
     @EventListener(ApplicationReadyEvent.class)
@@ -47,5 +50,6 @@ public class AgentImagePullBootstrapper {
             meterRegistry,
             log
         );
+        contractVerifier.verify(properties.reference());
     }
 }

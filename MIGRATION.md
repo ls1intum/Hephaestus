@@ -65,6 +65,64 @@ Entries exist only for releases that need operator action. Everything else is in
 
 ### Next release
 
+#### 🔴 An agent image reference naming a channel tag is now refused
+
+**Affected**, and either one is enough:
+
+- `HEPHAESTUS_AGENT_IMAGE_REFERENCE` set to a channel tag — `:latest`, `:stable`, `:edge`, `:main`,
+  or a partial version such as `:0.73`, which we retag onto every patch release in that line — or to
+  a reference with no tag at all.
+- **`IMAGE_TAG=latest`** — which earlier versions of `docker/.env.example` shipped as the default —
+  or **`IMAGE_TAG=0.73`**. The reference now derives from `IMAGE_TAG`, so such a deployment resolves
+  `agent-pi:latest` or `agent-pi:0.73` without ever naming it, and the refusal applies just the same.
+
+Check both with `grep -E 'IMAGE_TAG|HEPHAESTUS_AGENT_IMAGE_REFERENCE'` over your deployment
+configuration before you upgrade. `AGENT_ENABLED=false` does **not** exempt you: the check runs at
+startup, whether or not the sandbox is ever used. A release deploy that leaves both alone takes the
+signed digest pin and is unaffected.
+
+The boot fails with one of:
+
+```
+hephaestus.agent.image.reference must not be a channel tag
+hephaestus.agent.image.reference names a version series rather than one release
+```
+
+**Before**: the agent sandbox image fell back to `ghcr.io/ls1intum/hephaestus/agent-pi:latest` when
+nothing else supplied a reference. `latest` tracks the newest **release**, so a deployment tracking
+`main` ran its application server against an agent image built from a different commit. Nothing
+reported it: practice reviews and mentor sessions simply failed inside the container.
+
+**After**: the reference follows your deployment's own `IMAGE_TAG`, so the sandbox image is the one
+built from the same commit as the application server. A channel tag is refused at startup with a
+message naming the fix, because it can only ever name a pairing no release produced.
+
+**Action**: set `IMAGE_TAG` to a full release version (`0.74.0`) or to a full commit SHA — never
+`latest`, and never the `0.74` series. Then, if you also set the reference override, remove it or
+replace it with a digest:
+
+```bash
+# either: remove the HEPHAESTUS_AGENT_IMAGE_REFERENCE line entirely (recommended) — do not
+# leave it present and empty, which binds an empty reference and fails the boot for a second reason
+#
+# or: pin the exact image you mean
+HEPHAESTUS_AGENT_IMAGE_REFERENCE=ghcr.io/ls1intum/hephaestus/agent-pi@sha256:<digest>
+```
+
+A deployment tracking `main` keeps `HEPHAESTUS_RELEASE_PIN_SKIP=true` and
+`HEPHAESTUS_AGENT_IMAGE_REQUIRE_DIGEST=false`; the derived reference is a matched tag, not a digest.
+See [Agent image digests](https://ls1intum.github.io/Hephaestus/admin/agent-image-digests).
+
+#### 🟡 Preview deployments name their own agent image
+
+**Affected**: preview stacks (`docker/preview/`) that run practice reviews or the mentor from a pull
+request which does not touch `docker/agents/**`.
+
+A preview now derives its agent image from its own commit, and CI publishes one at that commit only
+when the pull request changed the agent tree or a workflow. Previously such a preview silently used
+the last release's image. Set `HEPHAESTUS_AGENT_IMAGE_REFERENCE` in the preview's `.env` to the agent
+image you want it to exercise — `docker/preview/.env.example` shows the line.
+
 #### 🟡 Reviewer-side practices keep the old wording until you update them
 
 **Affected**: workspaces created before this release that use the shipped practices

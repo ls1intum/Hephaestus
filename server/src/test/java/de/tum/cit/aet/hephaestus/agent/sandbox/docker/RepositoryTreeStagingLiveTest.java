@@ -50,8 +50,12 @@ class RepositoryTreeStagingLiveTest {
     /** One blob far past anything a heap-bound stager could hold. */
     private static final int LARGE_FILE_MB = 64;
 
-    /** The staging target must own {@code /workspace}: {@code docker cp} cannot create the root itself. */
-    private static final String AGENT_IMAGE = "ghcr.io/ls1intum/hephaestus/agent-pi:latest";
+    /** The image under test. A release-channel tag would test some other release's image (ADR 0031);
+     * point this at a locally built agent image, or export the reference a deployment would use. */
+    private static final String AGENT_IMAGE = System.getenv().getOrDefault(
+        "HEPHAESTUS_AGENT_IMAGE_REFERENCE",
+        "ghcr.io/ls1intum/hephaestus/agent-pi:dev"
+    );
 
     /** A tree large enough that any per-file ceiling would have to reject it. */
     private static final int TREE_FILE_COUNT = 25_000;

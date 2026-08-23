@@ -135,6 +135,44 @@ public final class SandboxLayout {
     /** Exit code emitted by the Pi runner on envelope/image drift (unsupported {@code schemaVersion} or {@code kind}). */
     public static final int EXIT_ENVELOPE_MISMATCH = 42;
 
+    /**
+     * OCI label the agent image carries to declare which runtime contract it implements — the
+     * interpreter that runs the staged runners, the SDK they import, and this layout.
+     *
+     * <p>The image proves that contract at build time; the label is the only part of that proof a
+     * server can read before it commits work to a container. An image without it predates the
+     * contract entirely, which is the decisive signal: it cannot have been built to satisfy one.
+     */
+    public static final String RUNTIME_CONTRACT_LABEL = "hephaestus.agent.runtime-contract";
+
+    /**
+     * Runtime contract this server stages for. Bump on both sides — here and in
+     * {@code docker/agents/pi/Dockerfile} — whenever an older image could no longer run these
+     * runners: a Bun major, a Pi SDK major, or a breaking change to the layout above.
+     * {@code AgentImageContractSyncTest} fails if the two ever disagree.
+     */
+    public static final int RUNTIME_CONTRACT_VERSION = 1;
+
+    /**
+     * Interpreter major the staged runners are written against.
+     *
+     * <p>Pinned to the image's {@code ARG BUN_VERSION} by {@code AgentImageContractSyncTest} because
+     * that ARG is Renovate-managed: without the pin a major bump lands green and unattended, and the
+     * image keeps declaring a contract version it no longer implements. The pin cannot decide whether
+     * the major broke anything — it only forces someone to.
+     */
+    public static final int BUN_MAJOR = 1;
+
+    /**
+     * Pi SDK major the runners import against, pinned the same way and for the same reason.
+     *
+     * <p>The SDK is pre-1.0, where the breaking boundary is the minor rather than the major, so this
+     * catches only 0.x → 1.x. Pinning the minor instead would fail on every routine SDK bump, which
+     * trains people to edit the constant without reading the diff — the failure mode the pin exists
+     * to prevent.
+     */
+    public static final int PI_SDK_MAJOR = 0;
+
     /** Practice slug pattern enforced at the handler boundary as defense-in-depth against FS-path injection. */
     public static final Pattern PRACTICE_SLUG = Pattern.compile("[a-z0-9][a-z0-9-]{0,63}");
 
