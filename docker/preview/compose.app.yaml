@@ -238,8 +238,15 @@ services:
       # built as http://. An unescaped '.' matches any character, which is harmless for an IP range:
       # 172.(1[6-9]|2[0-9]|3[01]).[0-9]{1,3}.[0-9]{1,3}
       HEPHAESTUS_TRUSTED_PROXIES: ${HEPHAESTUS_TRUSTED_PROXIES}
+      # Matches the application-server tag above, so the agent image reference derives from the same
+      # commit this preview is built from. CI publishes agent-pi at that tag only when the pull
+      # request touched docker/agents/** or a workflow; otherwise set HEPHAESTUS_AGENT_IMAGE_REFERENCE
+      # to the agent image the preview should exercise (docker/preview/.env.example). ADR 0031.
+      APP_VERSION: ${IMAGE_TAG:-${SOURCE_COMMIT:-}}
       # Previews run non-release images with no release-pin, so don't require a digest-pinned agent image.
       HEPHAESTUS_AGENT_IMAGE_REQUIRE_DIGEST: ${HEPHAESTUS_AGENT_IMAGE_REQUIRE_DIGEST:-false}
+      # The override the comment above points at. Valueless, as in docker/compose.app.yaml.
+      HEPHAESTUS_AGENT_IMAGE_REFERENCE:
       # The SPA's origin, not this server's: it feeds hephaestus.cors.allowed-origins,
       # hephaestus.webapp.url and the links the app hands to users.
       APPLICATION_HOST_URL: https://${SERVICE_FQDN_WEBAPP}

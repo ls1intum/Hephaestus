@@ -370,6 +370,22 @@ jobs:
             echo "::error::Legacy agent image is removed in issue #1076; relocate any new references to MIGRATION.md."
             exit 1
           fi
+      # The defect ADR 0031 removed: a reference that floats on the release channel resolves to
+      # whatever released most recently, which is a pair no release ever built. The reference is
+      # derived from the deployment's own image tag now, so nothing may name a channel again.
+      # Needle built at runtime so this guard file doesn't self-match.
+      - name: Assert no release-channel agent image references
+        run: |
+          set -euo pipefail
+          NEEDLE="agent-pi:$(printf 'lat\x65st')"
+          if grep -rEnI "$NEEDLE" \
+                --exclude-dir=node_modules --exclude-dir=target --exclude-dir=.git \
+                . \
+              | grep -vE '^\./(MIGRATION\.md|docs/admin/agent-image-digests\.md|docs/decisions/0031-.*\.md|server/src/test/java/de/tum/cit/aet/hephaestus/agent/sandbox/AgentImageReferenceGuardTest\.java):' ; then
+            echo "::error::A release-channel agent image tag resolves to another release's image (ADR 0031). Leave the reference unset so it follows this deployment's image tag, or pin a digest."
+            exit 1
+          fi
+
       - name: Assert no legacy agent-image-pin.env references
         run: |
           set -euo pipefail

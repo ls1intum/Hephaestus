@@ -18,7 +18,7 @@ class AgentImagePinGuardTest extends BaseUnitTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = { "ghcr.io/x/agent-pi:latest", "ghcr.io/x/agent-pi@sha256:abc123" })
+    @ValueSource(strings = { "ghcr.io/x/agent-pi:0.73.2", "ghcr.io/x/agent-pi@sha256:abc123" })
     void shouldFailFastWhenReferenceIsNotDigestPinned(String reference) {
         var props = new AgentImageProperties(reference, ImagePullPolicy.ALWAYS);
         assertThatThrownBy(() -> new AgentImagePinGuard(props))
@@ -26,5 +26,14 @@ class AgentImagePinGuardTest extends BaseUnitTest {
             .hasMessageContaining(reference)
             .hasMessageContaining("hephaestus.agent.image.require-digest")
             .hasMessageContaining("docs/admin/agent-image-digests.md");
+    }
+
+    /** The reference carries no compiled-in default, so an unresolved one reaches this guard as null. */
+    @Test
+    void shouldFailFastWhenNoReferenceResolved() {
+        var props = new AgentImageProperties(null, ImagePullPolicy.ALWAYS);
+        assertThatThrownBy(() -> new AgentImagePinGuard(props))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("<not set>");
     }
 }

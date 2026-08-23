@@ -8,9 +8,12 @@ import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.runtime.AgentImageProperties;
+import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
 import de.tum.cit.aet.hephaestus.agent.sandbox.ImagePullPolicy;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import java.util.Map;
+import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -19,13 +22,18 @@ import org.mockito.Mockito;
 
 class AgentImagePullBootstrapperTest extends BaseUnitTest {
 
-    private static final String IMAGE = "ghcr.io/ls1intum/hephaestus/agent-pi:latest";
+    private static final String IMAGE = "ghcr.io/ls1intum/hephaestus/agent-pi:0.73.2";
 
     @Mock
     private DockerImageOperations imageOps;
 
     private AgentImagePullBootstrapper bootstrapperWith(ImagePullPolicy policy, SimpleMeterRegistry registry) {
-        return new AgentImagePullBootstrapper(imageOps, new AgentImageProperties(IMAGE, policy), registry);
+        return new AgentImagePullBootstrapper(
+            imageOps,
+            new AgentImageProperties(IMAGE, policy),
+            registry,
+            new AgentImageContractVerifier(imageOps, registry)
+        );
     }
 
     @Test
@@ -36,6 +44,7 @@ class AgentImagePullBootstrapperTest extends BaseUnitTest {
         bootstrapperWith(ImagePullPolicy.ALWAYS, registry).pullOnStartup();
 
         verify(imageOps).ping();
+        verify(imageOps).imageLabels(IMAGE);
         verifyNoMoreInteractions(imageOps);
         assertThat(registry.counter("agent.image.pull.skipped", "reason", "docker_unreachable").count()).isEqualTo(1d);
     }
@@ -75,10 +84,26 @@ class AgentImagePullBootstrapperTest extends BaseUnitTest {
     }
 
     @Test
+    void shouldReportTheImagesRuntimeContractOnStartup() {
+        var registry = new SimpleMeterRegistry();
+        when(imageOps.imageIsPresent(IMAGE)).thenReturn(true);
+        when(imageOps.imageLabels(IMAGE)).thenReturn(
+            Optional.of(
+                Map.of(SandboxLayout.RUNTIME_CONTRACT_LABEL, Integer.toString(SandboxLayout.RUNTIME_CONTRACT_VERSION))
+            )
+        );
+
+        bootstrapperWith(ImagePullPolicy.IF_NOT_PRESENT, registry).pullOnStartup();
+
+        assertThat(registry.counter("agent.image.contract", "outcome", "verified").count()).isEqualTo(1d);
+    }
+
+    @Test
     void shouldOnlyProbePresenceWhenPolicyIsNever() {
         bootstrapperWith(ImagePullPolicy.NEVER, new SimpleMeterRegistry()).pullOnStartup();
 
         verify(imageOps).imageIsPresent(any());
+        verify(imageOps).imageLabels(IMAGE);
         verifyNoMoreInteractions(imageOps);
     }
 }

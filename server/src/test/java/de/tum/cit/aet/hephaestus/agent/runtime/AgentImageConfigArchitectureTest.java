@@ -15,16 +15,16 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
 class AgentImageConfigArchitectureTest extends HephaestusArchitectureTest {
 
     @Test
-    void onlyAgentImagePropertiesMayHardCodeARegistryReference() {
+    void noConfigurationDefaultMayHardCodeARegistryReference() {
         constructors()
             .that()
             .areDeclaredInClassesThat()
             .areAnnotatedWith(ConfigurationProperties.class)
-            .and()
-            .areDeclaredInClassesThat()
-            .doNotHaveFullyQualifiedName(AgentImageProperties.class.getName())
             .should(new RegistryReferenceCondition())
-            .because("issue #1076 — image config has exactly one home (AgentImageProperties)")
+            .because(
+                "ADR 0031 — a compiled-in image reference cannot know which build the deployment is running, " +
+                    "so the only correct value follows the deployment's own image tag from application.yml"
+            )
             .check(classes);
     }
 

@@ -6,6 +6,7 @@
 #  and can be added to the global gitignore or merged into this file.  For a more nuclear
 application-live-local.yml
 application-local.yml
+application-local.yaml
 **/atlassian-ide-plugin.xml
 # auto-import.
 # Beads (AI agent issue tracker) - local-only files
