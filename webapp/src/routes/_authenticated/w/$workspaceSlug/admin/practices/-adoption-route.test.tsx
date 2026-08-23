@@ -114,15 +114,13 @@ describe("catalog adoption over practice setup", () => {
 
 		await screen.findByRole("heading", { name: "Instance catalog" }, ROUTE_RENDER_WAIT);
 		expect(screen.queryByText("Available")).toBeNull();
-		expect(await screen.findByText("Name unavailable")).not.toBeNull();
+		await screen.findByText("Name unavailable");
 		// The row's accessible name is its own visible text plus the registry's action phrase, not an
 		// `aria-label` that would have replaced the work type and area for a screen reader.
-		expect(screen.getByRole("link", { name: /Describe what changed and why/ })).not.toBeNull();
-		expect(
-			screen.getByRole("link", {
-				name: /Include enough issue context, see why it cannot be added/,
-			}),
-		).not.toBeNull();
+		screen.getByRole("link", { name: /Describe what changed and why/ });
+		screen.getByRole("link", {
+			name: /Include enough issue context, see why it cannot be added/,
+		});
 	});
 
 	it("reviews a practice over the catalog instead of leaving the page", async () => {
@@ -256,7 +254,7 @@ describe("catalog adoption over practice setup", () => {
 		// The rule is what a 412 is about, so open the disclosure that holds it and check the panel
 		// is showing the refetched one rather than the plan that was just rejected.
 		fireEvent.click(await screen.findByRole("button", { name: "How it decides" }));
-		expect(await screen.findByText("Updated review rule that must be reviewed.")).not.toBeNull();
+		await screen.findByText("Updated review rule that must be reviewed.");
 	});
 
 	it("does not claim the latest preview is shown when refreshing after a 412 fails", async () => {
@@ -289,7 +287,7 @@ describe("catalog adoption over practice setup", () => {
 		expect(screen.queryByText("The catalog changed while you were reading")).toBeNull();
 	});
 
-	it("recovers a concurrent adoption by closing the drawer", async () => {
+	it("says a practice was already added and returns to the catalog", async () => {
 		server.use(
 			http.get("*/workspaces/:workspaceSlug/practice-catalog/adoption", () =>
 				HttpResponse.json([]),
@@ -313,6 +311,8 @@ describe("catalog adoption over practice setup", () => {
 		const { router } = renderRouteAtWithRouter(REVIEWING);
 		fireEvent.click(await screen.findByRole("button", { name: "Add practice" }, ROUTE_RENDER_WAIT));
 
+		// Both halves: closing on its own is what a route that swallowed every failure would also do.
+		await screen.findByText("This practice is already in the workspace", {}, ROUTE_RENDER_WAIT);
 		await waitFor(
 			() => expect(router.state.location.search.detail).toBeUndefined(),
 			ROUTE_RENDER_WAIT,

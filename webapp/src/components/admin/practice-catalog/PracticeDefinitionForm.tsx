@@ -409,8 +409,6 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 
 	const slugWasEdited = mode === "create" && form.slug !== generateSlug(form.name);
 	return (
-		// The form is the level below its header: it owns the scrolling region and the footer, so the
-		// actions sit on the panel's own edge rather than floating inside a padded, scrolling box.
 		<form onSubmit={handleSubmit} noValidate className="flex min-h-0 flex-1 flex-col">
 			{unsavedChanges.dialog}
 			<DrawerBody className="flex flex-col gap-8">

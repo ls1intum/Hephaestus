@@ -25,18 +25,10 @@ const TITLES: Record<CuratedLevelKind, { title: string; description: string }> =
 export interface CuratedFormLevelProps {
 	kind: CuratedLevelKind;
 	nested?: boolean;
-	/** The editor, which supplies the level's own `DrawerBody` and `DrawerFooter`. */
 	children: ReactNode;
 }
 
-/**
- * An instance-catalog editor as a drawer level, so the catalog it belongs to stays on screen while
- * an entry is written.
- *
- * Every level here is guarded (`GUARDED_CURATED_LEVEL_KINDS`): Escape, a press on the page and a
- * swipe do not reach it, because a form carries work those gestures would discard without asking.
- * The header's control and Cancel are both `DrawerClose`, which does close it.
- */
+/** An instance-catalog editor as a drawer level. Guarded — `webapp/AGENTS.md` § Guarded levels. */
 export function CuratedFormLevel({ kind, nested, children }: CuratedFormLevelProps) {
 	const { title, description } = TITLES[kind];
 	return (

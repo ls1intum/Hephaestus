@@ -200,11 +200,6 @@ export const WithInstanceCatalog: Story = {
 	},
 };
 
-/**
- * The move menu lists every area in the workspace, so it is the one control whose height grows with
- * the catalogue rather than with the row it belongs to — which is what the narrow viewport here is
- * watching.
- */
 /** The library is a section of this page, so its failure must not take the tree down with it. */
 export const InstanceCatalogFailed: Story = {
 	args: {
@@ -253,6 +248,10 @@ export const FilteredToNothing: Story = {
 	},
 };
 
+/**
+ * The move menu lists every area in the workspace, so it is the one control whose height grows with
+ * the catalogue rather than with the row it belongs to.
+ */
 export const AtScale: Story = {
 	args: { areas: scaleAreas, practices: scalePractices },
 	parameters: { chromatic: { viewports: [320, 1440] } },

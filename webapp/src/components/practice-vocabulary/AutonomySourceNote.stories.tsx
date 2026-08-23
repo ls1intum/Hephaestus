@@ -2,7 +2,6 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect } from "storybook/test";
 import { AutonomySourceNote } from "./AutonomySourceNote";
 
-/** Where a practice's autonomy came from. Both states are named; neither is silence. */
 const meta = {
 	title: "Shared/Practice vocabulary/Autonomy source",
 	component: AutonomySourceNote,

@@ -176,8 +176,6 @@ export function CuratedAreaForm(props: CuratedAreaFormProps) {
 
 			{unsavedChanges.dialog}
 
-			{/* The form is the level below its header: it owns the scrolling region and the footer, so
-			    the actions sit on the panel's own edge rather than floating inside a padded box. */}
 			<form onSubmit={submit} className="flex min-h-0 flex-1 flex-col" noValidate>
 				<DrawerBody className="flex flex-col gap-8">
 					<FormErrorSummary key={refusals} errors={refusals > 0 ? errorSummary : []} />

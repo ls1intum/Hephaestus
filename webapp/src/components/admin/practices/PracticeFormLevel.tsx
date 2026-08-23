@@ -5,18 +5,10 @@ import { DrawerDescription, DrawerTitle } from "@/components/ui/drawer";
 export interface PracticeFormLevelProps {
 	creating: boolean;
 	nested?: boolean;
-	/** The editor, which supplies the level's own `DrawerBody` and `DrawerFooter`. */
 	children: ReactNode;
 }
 
-/**
- * The practice editor as a drawer level, so changing a practice keeps the tree it belongs to on
- * screen.
- *
- * The level is guarded (`GUARDED_LEVEL_KINDS`): Escape, a press on the page and a swipe do not
- * reach it, because a form carries work those gestures would discard without asking. The header's
- * control and Cancel are both `DrawerClose`, which reports `close-press` and does close it.
- */
+/** The practice editor as a drawer level. Guarded — `webapp/AGENTS.md` § Guarded levels. */
 export function PracticeFormLevel({ creating, nested, children }: PracticeFormLevelProps) {
 	return (
 		<>

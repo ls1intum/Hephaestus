@@ -5,10 +5,7 @@ import {
 } from "@/components/admin/practices/practice-search";
 import { detailStackKey } from "@/components/core/detail-drawer/detail-stack";
 
-/**
- * See `new.tsx`: editing is a drawer level. This path is kept because it was linked and bookmarked,
- * and because a review or an autonomy row still points a reader at one practice by slug.
- */
+/** Kept so a bookmarked link lands on practice setup with that practice's editor level open. */
 export const Route = createFileRoute(
 	"/_authenticated/w/$workspaceSlug/admin/practices/$practiceSlug",
 )({

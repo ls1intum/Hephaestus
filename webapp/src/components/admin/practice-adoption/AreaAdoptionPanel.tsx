@@ -32,7 +32,6 @@ export type AreaAdoptionState = PanelState<{
 export interface AreaAdoptionPanelProps {
 	state: AreaAdoptionState;
 	onConfirm: () => void;
-	/** Opens one practice as a level on top of this one. */
 	onOpenPractice: (catalogSlug: string) => void;
 	nested?: boolean;
 }

@@ -10,7 +10,6 @@ const OPTIONS = [
 	{ value: "docs.document", label: "Documents" },
 ] as const;
 
-/** One filter, as a select on a narrow viewport and a toggle row on a wide one. */
 const meta = {
 	title: "Common/Filter toggle",
 	component: FilterToggle,

@@ -27,7 +27,6 @@ export interface UnsavedChangesGuard {
 }
 
 export interface UseUnsavedChangesOptions {
-	/** Whether the form holds work the reader has not saved. */
 	isDirty: boolean;
 	/** Suppress the guard entirely — while a mutation is in flight, or on a read-only form. */
 	disabled?: boolean;

@@ -1,4 +1,5 @@
-import { useNavigate, useRouter } from "@tanstack/react-router";
+import { useRouter } from "@tanstack/react-router";
+import { useSearchState } from "@/lib/search-params";
 import { type DetailStackEntry, encodeDetailStack } from "./detail-stack";
 
 /** `HistoryState` lives in `@tanstack/history`, which this workspace cannot name in a `declare module`. */
@@ -19,21 +20,14 @@ export interface DetailStackControls {
  * stack has nothing behind it, and going back would leave the app.
  */
 export function useDetailStack(stack: DetailStackEntry[]): DetailStackControls {
-	const navigate = useNavigate();
+	const setSearch = useSearchState();
 	const router = useRouter();
 
 	const goToStack = (next: DetailStackEntry[], detailPush: boolean) => {
-		navigate({
-			to: ".",
-			search: (previous: Record<string, unknown>) => ({
-				...previous,
-				detail: encodeDetailStack(next),
-			}),
-			state: (previous) => ({ ...previous, detailPush }),
-			// The stack is UI state on the same page. Without this the router treats a search-only push
-			// as a new location and scrolls to the top, so opening a panel from row 40 loses your place.
-			resetScroll: false,
-		});
+		setSearch(
+			(previous) => ({ ...previous, detail: encodeDetailStack(next) }),
+			(previous) => ({ ...previous, detailPush }),
+		);
 	};
 
 	return {

@@ -19,7 +19,6 @@ import { problemDetailOf } from "@/lib/problem-detail";
 
 export interface CuratedPracticeCreateLevelProps {
 	nested?: boolean;
-	/** Leaves the level once the practice exists. */
 	onDone: () => void;
 }
 

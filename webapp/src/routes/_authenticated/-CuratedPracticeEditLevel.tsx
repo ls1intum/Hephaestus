@@ -27,7 +27,6 @@ import { problemDetailOf, problemStatusOf } from "@/lib/problem-detail";
 export interface CuratedPracticeEditLevelProps {
 	practiceSlug: string;
 	nested?: boolean;
-	/** Leaves the level once the practice is saved. */
 	onDone: () => void;
 }
 

@@ -38,8 +38,8 @@ export interface AreaDetailsDialogProps {
  * Which of the two it is comes from `area` rather than a second `mode` prop, so the title, the
  * button and the request cannot disagree.
  *
- * No unsaved-changes guard: this is seconds to retype, which is the line the drawer rule in
- * `webapp/AGENTS.md` draws between a dismissible surface and a route.
+ * Unguarded, unlike the practice editors: a name, an icon and a colour are seconds to retype, so a
+ * confirmation on dismissal would cost more than it saves.
  */
 export function AreaDetailsDialog({
 	area,

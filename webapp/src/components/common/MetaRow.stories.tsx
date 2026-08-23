@@ -3,7 +3,6 @@ import { expect } from "storybook/test";
 import { Badge } from "@/components/ui/badge";
 import { MetaRow } from "./MetaRow";
 
-/** Captions and chips, told apart by separators and rhythm rather than by wording. */
 const meta = {
 	title: "Common/Meta row",
 	component: MetaRow,

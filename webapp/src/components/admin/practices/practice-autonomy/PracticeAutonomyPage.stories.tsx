@@ -268,11 +268,12 @@ export const PracticeContext: Story = {
 		const bare = canvas.getByText("Written by hand, and says nothing more").closest("li");
 		if (!(bare instanceof HTMLElement)) throw new Error("Bare row not rendered");
 		await expect(within(bare).getByText("Pull or merge request")).toBeVisible();
-		// Asserted on the element rather than by hovering and waiting for nothing, which would pass just
-		// as well if the card were merely slow.
+		// A practice with neither field renders its link bare rather than wrapped in a card that
+		// would open on hover with nothing in it. Asserted on the element, not by hovering and
+		// waiting for nothing, which passes just as well when the card is merely slow.
 		await expect(
 			within(bare).getByRole("link", { name: "Written by hand, and says nothing more" }),
-		).toBeVisible();
+		).not.toHaveAttribute("data-slot", "hover-card-trigger");
 		await expectNoPageOverflow();
 	},
 };

@@ -21,7 +21,6 @@ import { problemDetailOf, problemStatusOf } from "@/lib/problem-detail";
 export interface CuratedAreaEditLevelProps {
 	areaSlug: string;
 	nested?: boolean;
-	/** Leaves the level once the group is saved. */
 	onDone: () => void;
 }
 

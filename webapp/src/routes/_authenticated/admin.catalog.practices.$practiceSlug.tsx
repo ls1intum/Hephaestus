@@ -5,11 +5,7 @@ import {
 } from "@/components/admin/curated-catalog/curated-catalog-search";
 import { detailStackKey } from "@/components/core/detail-drawer/detail-stack";
 
-/**
- * Instance-catalog editors are levels of the catalog's drawer stack, not pages, so the catalog stays
- * on screen while an entry is written. This path predates that and is kept because it was linked and
- * bookmarked.
- */
+/** Kept so a bookmarked link lands on the catalog with that practice's editor level open. */
 export const Route = createFileRoute("/_authenticated/admin/catalog/practices/$practiceSlug")({
 	validateSearch: curatedCatalogSearchSchema,
 	beforeLoad: ({ params, search }) => {

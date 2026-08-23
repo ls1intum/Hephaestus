@@ -4,9 +4,9 @@ import { Drawer, DrawerContent } from "@/components/ui/drawer";
 import { type DetailStackEntry, detailStackKey } from "./detail-stack";
 
 /**
- * The ways a drawer is left without deciding anything. `swipe` is one of them, and it is the reason
- * a guarded level cannot simply drop `swipeDirection`: that prop is not a swipe toggle, it is which
- * edge the drawer belongs to, and omitting it defaults to `down` — a bottom sheet.
+ * The ways a drawer is left without deciding anything. `swipeDirection` is not a swipe toggle — it
+ * is the edge the drawer belongs to, and omitting it defaults to `down`, a bottom sheet — so a
+ * guarded level refuses the gesture by reason instead.
  */
 const CASUAL_DISMISSALS = ["escape-key", "outside-press", "focus-out", "swipe"];
 
@@ -108,7 +108,12 @@ function DetailDrawerLevelView<TKind extends string>({
 			onOpenChange={(next, details) => {
 				if (next) return;
 				if (guarded) {
-					if (CASUAL_DISMISSALS.includes(details.reason as string)) return;
+					if (CASUAL_DISMISSALS.includes(details.reason as string)) {
+						// `cancel()` rather than an early return: a swipe Base UI believes was accepted
+						// plays the dismiss animation optimistically and never resets the gesture.
+						details.cancel();
+						return;
+					}
 					// Straight to the URL, skipping the exit animation the other levels get. A guarded
 					// level holds a draft and `useUnsavedChanges` blocks the navigation to ask about it,
 					// so animating out first would unmount the form while the prompt is still on screen —

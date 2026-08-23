@@ -11,7 +11,6 @@ import { problemDetailOf } from "@/lib/problem-detail";
 
 export interface CuratedAreaCreateLevelProps {
 	nested?: boolean;
-	/** Leaves the level once the group exists. */
 	onDone: () => void;
 }
 

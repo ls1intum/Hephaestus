@@ -19,9 +19,7 @@ export interface DetailDrawerHeaderProps {
  * The dismiss is a `DrawerClose`, so it closes through the same path as Escape, an outside press and
  * a swipe rather than a fourth one that can drift.
  *
- * The content row wraps. A drawer is the full viewport at 320px and the dismiss, the padding and a
- * leading chip already spend 40% of it, so a third item beside the title leaves it a column too
- * narrow to read — put anything that is itself text below the title rather than next to it.
+ * The content row wraps as a backstop; two columns is the rule — `webapp/AGENTS.md` § Panel regions.
  */
 export function DetailDrawerHeader({
 	nested = false,

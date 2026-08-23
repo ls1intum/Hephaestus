@@ -11,7 +11,6 @@ import { DetailDrawerStack } from "./DetailDrawerStack";
 const popups = () =>
 	Array.from(document.querySelectorAll<HTMLElement>('[data-slot="drawer-popup"]'));
 
-/** The app-wide alternative to sending someone to another page to look at one row. */
 const meta = {
 	component: DetailDrawerStack,
 	parameters: { layout: "fullscreen" },
@@ -209,7 +208,7 @@ export const ArrivesWithAnEnterTransition: Story = {
 	},
 };
 
-export const CoveredLevelKeepsAColumnReadable: Story = {
+export const DetailSizeKeepsItsPeek: Story = {
 	args: {
 		stack: [
 			{ kind: "area", id: "review-ready-work" },
@@ -219,11 +218,10 @@ export const CoveredLevelKeepsAColumnReadable: Story = {
 	parameters: { chromatic: { disableSnapshot: true } },
 	play: async () => {
 		await expectSettledVisible(await screen.findByText("practice · describe-what-and-why"));
-		// The class rather than the computed value: this suite runs under `prefers-reduced-motion`,
-		// which zeroes `--peek` on purpose, so the resolved width proves nothing here. What broke was
-		// upstream of that — `cn()` dedupes an arbitrary custom property by name and keeps the last,
-		// so a `--peek` default declared after the size variant silently replaced it and the column
-		// was 1rem, narrower than the panel's own padding.
+		// The class, not the resolved width: `motion-reduce:[--peek:0px]` wins under this suite's
+		// forced `prefers-reduced-motion`, so the computed value proves nothing. The bug was upstream
+		// of the cascade anyway — `cn()` dedupes an arbitrary custom property by name and keeps the
+		// last, so a `--peek` default declared after the size variant silently replaced it.
 		await expect(popups()[0].className).toContain("[--peek:4rem]");
 	},
 };
@@ -305,13 +303,19 @@ export const RegionsReachThePanelEdges: Story = {
 		const region = (slot: string) =>
 			popup.querySelector<HTMLElement>(`[data-slot="${slot}"]`)?.getBoundingClientRect();
 
-		const insets = ["drawer-header", "drawer-body", "drawer-footer"].map((slot) => {
+		// `abs`, and a tolerance only for the panel's own border: a region that hangs *outside* the
+		// panel is the same defect as one that stops short of it, and a one-sided check passes it.
+		const BORDER = 2;
+		const flush = (value: number) => Math.abs(value) <= BORDER;
+		for (const slot of ["drawer-header", "drawer-body", "drawer-footer"]) {
 			const box = region(slot);
-			// The 1px left is the panel's own border, which every region sits inside.
-			return `${slot} ${Math.round((box?.left ?? 0) - panel.left)}/${Math.round(panel.right - (box?.right ?? 0))}`;
-		});
-		await expect(insets).toEqual(["drawer-header 1/0", "drawer-body 1/0", "drawer-footer 1/0"]);
-		await expect(Math.round(panel.bottom - (region("drawer-footer")?.bottom ?? 0))).toBe(0);
+			await expect({
+				slot,
+				left: flush((box?.left ?? 0) - panel.left),
+				right: flush(panel.right - (box?.right ?? 0)),
+			}).toEqual({ slot, left: true, right: true });
+		}
+		await expect(flush(panel.bottom - (region("drawer-footer")?.bottom ?? 0))).toBe(true);
 
 		// A form disables every control while it submits, and then nothing inside the scrolling
 		// region is focusable — so the region itself has to be.
