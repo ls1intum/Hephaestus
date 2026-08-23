@@ -5,8 +5,16 @@ const sidebars: SidebarsConfig = {
     {type: 'doc', id: 'install', label: 'Install (Self-Hosted)'},
     {type: 'doc', id: 'github-integration', label: 'GitHub Integration'},
     {type: 'doc', id: 'ai-providers', label: 'Connect an AI Provider'},
-    {type: 'doc', id: 'practice-review', label: 'Practice Review'},
-    {type: 'doc', id: 'practice-review-operations', label: 'Practice Review Operations'},
+    {
+      type: 'category',
+      label: 'Practices',
+      collapsed: false,
+      items: [
+        {type: 'doc', id: 'practice-catalog', label: 'Practice Catalog'},
+        {type: 'doc', id: 'practice-review', label: 'Practice Review'},
+        {type: 'doc', id: 'practice-review-operations', label: 'Practice Review Operations'},
+      ],
+    },
     {type: 'doc', id: 'webhook-ingestion-operations', label: 'Webhook Ingestion Operations'},
     {type: 'doc', id: 'backup-restore', label: 'Backup & Restore'},
     {type: 'doc', id: 'production-setup', label: 'Integrations & Reference Deployment'},

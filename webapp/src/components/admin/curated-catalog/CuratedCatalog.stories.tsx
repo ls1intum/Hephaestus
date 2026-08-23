@@ -169,7 +169,7 @@ export const OnlyIncluded: Story = { args: { search: { status: "OFFERED" } } };
 export const APracticeWhoseAreaIsGone: Story = {
 	play: async ({ args, canvas }) => {
 		await canvas.findByText("Outlived the area it was filed under");
-		await canvas.findByText("Area no longer exists");
+		await canvas.findByText("Group no longer exists");
 		await expect(
 			canvas.getByRole("switch", {
 				name: "Outlived the area it was filed under cannot be included until it is moved out of the missing area",
@@ -182,7 +182,7 @@ export const APracticeWhoseAreaIsGone: Story = {
 		);
 		await expect(
 			await screen.findByRole("menuitem", {
-				name: "Move to Unassigned or an included area first",
+				name: "Move to Unassigned or an included group first",
 			}),
 		).toHaveAttribute("aria-disabled", "true");
 		await userEvent.keyboard("{Escape}");
@@ -257,11 +257,11 @@ export const ExcludingAnAreaListsItsPractices: Story = {
 	play: async ({ canvas }) => {
 		await userEvent.click(
 			await canvas.findByRole("switch", {
-				name: "Include Packaging work for review in new workspaces",
+				name: "Offer Packaging work for review to workspaces",
 			}),
 		);
 		const dialog = await screen.findByRole("alertdialog");
-		await within(dialog).findByText(/also excludes 3 currently included practices/);
+		await within(dialog).findByText(/also stops offering 3 currently offered practices/);
 		await within(dialog).findByText("Say what changed and why");
 	},
 };
@@ -290,7 +290,7 @@ export const PracticeInsideExcludedArea: Story = {
 		await expect(inheritedSwitch).not.toBeChecked();
 		await expect(inheritedSwitch).toHaveAttribute("aria-disabled", "true");
 		const directlyExcludedSwitch = await canvas.findByRole("switch", {
-			name: "Say what changed and why is excluded from new workspaces",
+			name: "Say what changed and why is not offered to workspaces",
 		});
 		await expect(directlyExcludedSwitch).not.toBeChecked();
 		await expect(directlyExcludedSwitch).toHaveAttribute("aria-disabled", "true");
@@ -313,11 +313,11 @@ export const ExcludingAnAreaCountsOnlyIncludedPractices: Story = {
 	play: async ({ canvas }) => {
 		await userEvent.click(
 			await canvas.findByRole("switch", {
-				name: "Include Packaging work for review in new workspaces",
+				name: "Offer Packaging work for review to workspaces",
 			}),
 		);
 		const dialog = await screen.findByRole("alertdialog");
-		await within(dialog).findByText(/also excludes 1 currently included practice/);
+		await within(dialog).findByText(/also stops offering 1 currently offered practice/);
 		await within(dialog).findByText("Keep a change to one concern");
 		await expect(within(dialog).queryByText("Say what changed and why")).not.toBeInTheDocument();
 	},
@@ -346,10 +346,10 @@ export const ExcludingAnAreaDoesNotRecountExcludedPractices: Story = {
 	play: async ({ canvas }) => {
 		await userEvent.click(
 			await canvas.findByRole("switch", {
-				name: "Include Packaging work for review in new workspaces",
+				name: "Offer Packaging work for review to workspaces",
 			}),
 		);
-		await screen.findByText(/No additional practices will be excluded/);
+		await screen.findByText(/No additional practices are affected/);
 	},
 };
 

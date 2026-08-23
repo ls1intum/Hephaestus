@@ -1,6 +1,8 @@
+import { Link } from "@tanstack/react-router";
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
+import { buttonVariants } from "@/components/ui/button";
 import {
 	mockAuthorDeclaredEvidenceValidation,
 	mockPracticeDefinitionOptions,
@@ -10,6 +12,16 @@ import {
 import { renderWithRouter } from "@/test/router-harness";
 import { bindingsProblem } from "../practice-catalog/bindings";
 import { CuratedPracticeForm, type CuratedPracticeFormInitialValue } from "./CuratedPracticeForm";
+
+/**
+ * A cancel that navigates, which is what `useUnsavedChanges` guards. In the app it is a
+ * `DrawerClose` whose close ends in the same place — a router navigation off the level.
+ */
+const cancel = (
+	<Link to="/admin/catalog" className={buttonVariants({ variant: "outline" })}>
+		Cancel
+	</Link>
+);
 
 vi.mock("@/components/shared/CodeEditor", () => ({
 	CodeEditor: () => <div data-testid="code-editor" />,
@@ -34,6 +46,7 @@ function renderForm(overrides: Partial<CuratedPracticeFormInitialValue> = {}, on
 	return renderWithRouter(
 		<CuratedPracticeForm
 			mode="edit"
+			cancel={cancel}
 			areas={[]}
 			definitionOptions={mockPracticeDefinitionOptions}
 			initialData={{ ...initialData, ...overrides }}
@@ -65,6 +78,7 @@ describe("CuratedPracticeForm", () => {
 		await renderWithRouter(
 			<CuratedPracticeForm
 				mode="create"
+				cancel={cancel}
 				areas={[]}
 				definitionOptions={mockPracticeDefinitionOptions}
 				isPending={false}
@@ -86,6 +100,7 @@ describe("CuratedPracticeForm", () => {
 		await renderWithRouter(
 			<CuratedPracticeForm
 				mode="create"
+				cancel={cancel}
 				areas={[]}
 				definitionOptions={mockPracticeDefinitionOptions}
 				isPending={false}
@@ -109,6 +124,7 @@ describe("CuratedPracticeForm", () => {
 		await renderWithRouter(
 			<CuratedPracticeForm
 				mode="create"
+				cancel={cancel}
 				areas={[]}
 				definitionOptions={mockPracticeDefinitionOptions}
 				isPending={false}
@@ -143,6 +159,7 @@ describe("CuratedPracticeForm", () => {
 		await renderWithRouter(
 			<CuratedPracticeForm
 				mode="create"
+				cancel={cancel}
 				areas={[]}
 				definitionOptions={mockPracticeDefinitionOptions}
 				isPending={false}
@@ -167,6 +184,7 @@ describe("CuratedPracticeForm", () => {
 		await renderWithRouter(
 			<CuratedPracticeForm
 				mode="edit"
+				cancel={cancel}
 				areas={[]}
 				definitionOptions={mockPracticeDefinitionOptions}
 				initialData={initialData}
@@ -218,7 +236,14 @@ describe("CuratedPracticeForm", () => {
 		await user.click(screen.getByRole("button", { name: "Save changes" }));
 
 		expect(onSubmit).not.toHaveBeenCalled();
-		expect(screen.getByRole("alert").textContent).toBe("Choose when this practice is reviewed.");
+		// Two alerts now: the summary at the top of the form listing every refusal, and this one at
+		// the field it is about. The inline one is what this test is for — a summary alone would put
+		// the message a screenful away from the control that fixes it.
+		expect(
+			screen
+				.getAllByRole("alert")
+				.some((alert) => alert.textContent === "Choose when this practice is reviewed."),
+		).toBe(true);
 		// The strip stays on screen with nothing ticked, rather than taking the kind of work — and the
 		// only way to tick one again — with it. A message at the bottom of a long form is not the fix.
 		expect(occasion().getAllByRole("checkbox")).toHaveLength(6);

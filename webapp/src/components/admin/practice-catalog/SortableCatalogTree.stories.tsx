@@ -8,6 +8,7 @@ import {
 	DropdownMenuItem,
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { expectNoOverflowingElement } from "@/test/reflow";
 import {
 	type SortableCatalogArea,
 	type SortableCatalogEntry,
@@ -409,5 +410,12 @@ export const DraggingARowPastTheNextRowsMidpoint: Story = {
 		);
 
 		await expect(args.onPlaceEntry).toHaveBeenCalledWith("small-changes", "delivery", 1);
+	},
+};
+
+export const NarrowViewport: Story = {
+	parameters: { viewport: { defaultViewport: "reflow" }, chromatic: { viewports: [320] } },
+	play: async ({ canvasElement }) => {
+		await expectNoOverflowingElement(canvasElement);
 	},
 };

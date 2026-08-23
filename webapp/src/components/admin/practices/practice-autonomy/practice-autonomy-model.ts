@@ -54,7 +54,7 @@ export function groupPracticesByArea(
 		groups.push({
 			key,
 			areaSlug: area.areaSlug ?? null,
-			name: area.areaName ?? "Not in an area",
+			name: area.areaName ?? "Unassigned",
 			autonomy: area.autonomy,
 			counts: area.counts,
 			overriddenCount: area.overriddenCount,
@@ -67,7 +67,7 @@ export function groupPracticesByArea(
 		groups.push({
 			key,
 			areaSlug: key === UNASSIGNED_AREA_KEY ? null : key,
-			name: key === UNASSIGNED_AREA_KEY ? "Not in an area" : key,
+			name: key === UNASSIGNED_AREA_KEY ? "Unassigned" : key,
 			autonomy: rollup.workspaceDefault,
 			counts: countByAutonomy(owned),
 			overriddenCount: owned.filter((practice) => isOverridden(practice.autonomy)).length,

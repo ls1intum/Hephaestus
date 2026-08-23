@@ -1,27 +1,41 @@
 import { Link } from "@tanstack/react-router";
-import { GripVertical, MoreHorizontal, Plus } from "lucide-react";
+import { GripVertical, Library, ListChecks, MoreHorizontal, Plus } from "lucide-react";
 import { type ReactNode, useState } from "react";
-import type { Practice, PracticeArea, PracticeDefinitionOptions } from "@/api/types.gen";
+import type {
+	CatalogPracticeSummary,
+	Practice,
+	PracticeArea,
+	PracticeDefinitionOptions,
+} from "@/api/types.gen";
+import { AvailablePracticeList } from "@/components/admin/practice-adoption/AvailablePracticeList";
+import {
+	type AreaDetails,
+	AreaDetailsDialog,
+} from "@/components/admin/practice-catalog/AreaDetailsDialog";
 import { AreaVisualPicker } from "@/components/admin/practice-catalog/AreaVisualPicker";
-import { WORK_ARTIFACT_FILTER_ITEMS } from "@/components/admin/practice-catalog/constants";
+import { WORK_TYPE_FILTER_OPTIONS } from "@/components/admin/practice-catalog/constants";
 import { automatedReviewUnavailableLabel } from "@/components/admin/practice-catalog/evidence-presentation";
-import { PracticeDetailHoverCard } from "@/components/admin/practice-catalog/PracticeDetailHoverCard";
 import {
 	type CatalogEntryMoveActions,
 	type CatalogMoveActions,
 	SortableCatalogTree,
 	UNASSIGNED_CATALOG_BUCKET,
 } from "@/components/admin/practice-catalog/SortableCatalogTree";
+import { PracticeListSkeleton } from "@/components/admin/practices/PracticeSkeletons";
+import { practiceFormLevel } from "@/components/admin/practices/practice-search";
+import { type FilterOption, FilterToggle } from "@/components/common/FilterToggle";
+import { MetaRow } from "@/components/common/MetaRow";
+import type { PanelState } from "@/components/common/panel-state";
+import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
+import { DetailStackLink } from "@/components/core/detail-drawer/DetailStackLink";
+import { Section } from "@/components/core/Section";
 import { AutonomyBadge } from "@/components/practice-vocabulary/AutonomyBadge";
+import { AutonomySourceNote } from "@/components/practice-vocabulary/AutonomySourceNote";
+import { DASHBOARD_VISIBILITY_DEFS } from "@/components/practice-vocabulary/dashboard-visibility-defs";
+import { StatusBadge } from "@/components/practice-vocabulary/StatusBadge";
+import { WorkTypeLabel } from "@/components/practice-vocabulary/WorkTypeLabel";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
-import {
-	Dialog,
-	DialogContent,
-	DialogFooter,
-	DialogHeader,
-	DialogTitle,
-} from "@/components/ui/dialog";
 import {
 	DropdownMenu,
 	DropdownMenuContent,
@@ -33,21 +47,19 @@ import {
 	DropdownMenuSeparator,
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
-import { Input } from "@/components/ui/input";
-import { Item, ItemContent, ItemDescription, ItemTitle } from "@/components/ui/item";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
-	Select,
-	SelectContent,
-	SelectItem,
-	SelectTrigger,
-	SelectValue,
-} from "@/components/ui/select";
+	Empty,
+	EmptyContent,
+	EmptyDescription,
+	EmptyHeader,
+	EmptyMedia,
+	EmptyTitle,
+} from "@/components/ui/empty";
+import { Item, ItemContent, ItemDescription, ItemTitle } from "@/components/ui/item";
 import { Switch } from "@/components/ui/switch";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { ARTIFACT_KIND, artifactKindLabel, type KnownArtifactKind } from "@/lib/artifact-kinds";
-import { inheritedAutonomySourceSentence } from "@/lib/practice-autonomy";
+import { Toggle } from "@/components/ui/toggle";
+import { artifactKindPluralLabel, type KnownArtifactKind } from "@/lib/artifact-kinds";
+import { autonomySourceOf } from "@/lib/practice-autonomy";
 import { cn } from "@/lib/utils";
 import { CatalogOriginBadge } from "./CatalogOriginBadge";
 
@@ -62,6 +74,20 @@ export interface PracticeCatalogPendingState {
 	creatingArea: boolean;
 }
 
+/** The catalog section's own state, independent of the tree beside it. */
+export type LibraryState = PanelState<{ practices: CatalogPracticeSummary[] }>;
+
+/**
+ * One prop, because `open` without a `state` was representable and rendered a loading block that
+ * never resolved — indistinguishable from a real fetch. Absent means the surface offers no library
+ * at all, which is a third thing again.
+ */
+export interface PracticeLibrary {
+	open: boolean;
+	onOpenChange: (open: boolean) => void;
+	state: LibraryState;
+}
+
 export interface PracticeCatalogProps {
 	workspaceSlug: string;
 	areas: PracticeArea[];
@@ -70,14 +96,15 @@ export interface PracticeCatalogProps {
 	pending: PracticeCatalogPendingState;
 	focusFilter: FocusFilter;
 	onFocusFilterChange: (f: FocusFilter) => void;
-	onCreateArea: (name: string) => Promise<boolean>;
-	onRenameArea: (slug: string, name: string) => Promise<boolean>;
+	onCreateArea: (details: AreaDetails) => Promise<boolean>;
+	onUpdateArea: (slug: string, details: AreaDetails) => Promise<boolean>;
 	onSetAreaDashboardVisibility: (slug: string, visibleInPracticeDashboards: boolean) => void;
 	onDeleteArea: (slug: string) => void;
 	onReorderAreas: (orderedSlugs: string[]) => void;
 	onSetAreaVisual: (slug: string, patch: { icon?: string; color?: string }) => void;
 	onDeletePractice: (practice: Practice) => void;
 	onPlacePractice: (practiceSlug: string, areaSlug: string | null, position: number) => void;
+	library?: PracticeLibrary;
 }
 
 export function PracticeCatalog({
@@ -89,20 +116,28 @@ export function PracticeCatalog({
 	focusFilter,
 	onFocusFilterChange,
 	onCreateArea,
-	onRenameArea,
+	onUpdateArea,
 	onSetAreaDashboardVisibility,
 	onDeleteArea,
 	onReorderAreas,
 	onSetAreaVisual,
 	onDeletePractice,
 	onPlacePractice,
+	library,
 }: PracticeCatalogProps) {
-	const [renamingArea, setRenamingArea] = useState<PracticeArea | null>(null);
+	// `null` while creating, an area while renaming; `namingArea !== undefined` is "open".
+	const [namingArea, setNamingArea] = useState<PracticeArea | null | undefined>(undefined);
 	const visiblePracticeSlugs = new Set(
 		practices
 			.filter((practice) => focusFilter === "ALL" || practice.artifactKind === focusFilter)
 			.map((practice) => practice.slug),
 	);
+	const visibleCatalogPractices =
+		library?.state.status === "ready"
+			? library.state.practices.filter(
+					(practice) => focusFilter === "ALL" || practice.artifactKind === focusFilter,
+				)
+			: undefined;
 	const forceOpenAreaSlugs =
 		focusFilter === "ALL"
 			? undefined
@@ -122,13 +157,39 @@ export function PracticeCatalog({
 	return (
 		<div className="space-y-4">
 			<CatalogToolbar
-				workspaceSlug={workspaceSlug}
 				focusFilter={focusFilter}
 				onFocusFilterChange={onFocusFilterChange}
-				onCreateArea={onCreateArea}
+				onCreateArea={() => setNamingArea(null)}
 				creatingArea={pending.creatingArea}
 				areaStructurePending={pending.areaStructure}
+				library={library}
 			/>
+			{library?.open && (
+				<Section
+					size="sm"
+					title="Instance catalog"
+					description="Practices this instance includes. Adding one gives you a copy you own — later catalog changes never reach it."
+					// Arrives rather than appears: the toggle is above it, so a section that simply exists
+					// on the next frame gives no clue where it came from. Short, and off under
+					// `prefers-reduced-motion`, where the arrival is the information and the travel is not.
+					className="rounded-lg border bg-muted/20 p-4 motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-top-2 motion-safe:duration-200"
+				>
+					{library.state.status === "error" ? (
+						<QueryErrorAlert
+							error={library.state.error}
+							title="Couldn't load the catalog"
+							onRetry={library.state.onRetry}
+						/>
+					) : visibleCatalogPractices ? (
+						<AvailablePracticeList
+							practices={visibleCatalogPractices}
+							existingAreaSlugs={new Set(areas.map((area) => area.slug))}
+						/>
+					) : (
+						<PracticeListSkeleton rows={4} />
+					)}
+				</Section>
+			)}
 			{focusFilter !== "ALL" && (
 				<p className="text-muted-foreground text-sm">Clear the filter to reorder practices.</p>
 			)}
@@ -158,8 +219,10 @@ export function PracticeCatalog({
 				)}
 				renderAreaMeta={(area) => (
 					<>
+						{/* Only the exception is shown: a badge on every area would be noise, and "on the
+						    dashboards" is what an area does unless someone changed it. */}
 						{!area.visibleInPracticeDashboards && (
-							<Badge variant="outline">Hidden from practice dashboards</Badge>
+							<StatusBadge def={DASHBOARD_VISIBILITY_DEFS.HIDDEN} />
 						)}
 						<CatalogOriginBadge origin={area.catalogOrigin} kind="area" />
 					</>
@@ -170,7 +233,7 @@ export function PracticeCatalog({
 						move={move}
 						pending={pending.areaSlugs.has(area.slug)}
 						structurePending={pending.areaStructure}
-						onRename={() => setRenamingArea(area)}
+						onRename={() => setNamingArea(area)}
 						onSetDashboardVisibility={onSetAreaDashboardVisibility}
 						onDelete={onDeleteArea}
 					/>
@@ -181,15 +244,13 @@ export function PracticeCatalog({
 						supportedModes={supportedModesFor(practice)}
 						inheritedFrom={inheritedFromFor(practice)}
 						title={
-							<PracticeDetailHoverCard practice={practice}>
-								<Link
-									to="/w/$workspaceSlug/admin/practices/$practiceSlug"
-									params={{ workspaceSlug, practiceSlug: practice.slug }}
-									className="break-words rounded-sm hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-								>
-									{practice.name}
-								</Link>
-							</PracticeDetailHoverCard>
+							// Opens the practice read-only over this tree: reading is not the same act as editing.
+							<DetailStackLink
+								entry={{ kind: "practice", id: practice.slug }}
+								className="break-words rounded-sm hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+							>
+								{practice.name}
+							</DetailStackLink>
 						}
 					/>
 				)}
@@ -212,112 +273,115 @@ export function PracticeCatalog({
 				)}
 				getEmptyLabel={(areaSlug, total) => {
 					if (total > 0) return "No matching practices.";
-					return areaSlug === null ? "No unassigned practices." : "No practices in this area.";
+					return areaSlug === null ? "Nothing unassigned." : "No practices here.";
 				}}
 			/>
 
-			{areas.length === 0 && practices.length === 0 && (
-				<Empty className="border">
+			{areas.length === 0 && practices.length === 0 ? (
+				<Empty className="min-h-56 border">
 					<EmptyHeader>
+						<EmptyMedia variant="icon">
+							<ListChecks aria-hidden />
+						</EmptyMedia>
 						<EmptyTitle>No practices yet</EmptyTitle>
 						<EmptyDescription>
-							Create a practice, then group related practices into areas.
+							Add one from the instance catalog, or write your own.
 						</EmptyDescription>
 					</EmptyHeader>
+					<EmptyContent>
+						<Button onClick={() => library?.onOpenChange(true)} disabled={!library}>
+							<Library className="mr-1.5 size-4" aria-hidden />
+							Show catalog
+						</Button>
+					</EmptyContent>
 				</Empty>
+			) : (
+				focusFilter !== "ALL" &&
+				visiblePracticeSlugs.size === 0 && (
+					// Without a way out, the reader is left with per-group "No matching practices." strings
+					// and a banner telling them to clear a filter, and no control that clears it.
+					<Empty className="min-h-56 border">
+						<EmptyHeader>
+							<EmptyMedia variant="icon">
+								<ListChecks aria-hidden />
+							</EmptyMedia>
+							<EmptyTitle>No practices match this filter</EmptyTitle>
+							<EmptyDescription>
+								Nothing in this workspace reviews{" "}
+								{artifactKindPluralLabel(focusFilter).toLowerCase()}.
+							</EmptyDescription>
+						</EmptyHeader>
+						<EmptyContent>
+							<Button variant="outline" onClick={() => onFocusFilterChange("ALL")}>
+								Clear the filter
+							</Button>
+						</EmptyContent>
+					</Empty>
+				)
 			)}
 
-			<RenameAreaDialog
-				area={renamingArea}
-				onClose={() => setRenamingArea(null)}
-				onRename={onRenameArea}
-				pending={renamingArea ? pending.areaSlugs.has(renamingArea.slug) : false}
+			<AreaDetailsDialog
+				area={namingArea ?? null}
+				open={namingArea !== undefined}
+				pending={namingArea ? pending.areaSlugs.has(namingArea.slug) : pending.creatingArea}
+				onOpenChange={(open) => {
+					if (!open) setNamingArea(undefined);
+				}}
+				onSubmit={(details) =>
+					namingArea ? onUpdateArea(namingArea.slug, details) : onCreateArea(details)
+				}
 			/>
 		</div>
 	);
 }
 
 function CatalogToolbar({
-	workspaceSlug,
 	focusFilter,
 	onFocusFilterChange,
 	onCreateArea,
 	creatingArea,
 	areaStructurePending,
+	library,
 }: {
-	workspaceSlug: string;
 	focusFilter: FocusFilter;
 	onFocusFilterChange: (filter: FocusFilter) => void;
-	onCreateArea: (name: string) => Promise<boolean>;
+	onCreateArea: () => void;
 	creatingArea: boolean;
 	areaStructurePending: boolean;
+	library?: PracticeLibrary;
 }) {
 	return (
 		<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-			<Select
-				items={WORK_ARTIFACT_FILTER_ITEMS}
+			<FilterToggle
+				label="Filter by work type"
+				options={WORK_TYPE_FILTER_OPTIONS as FilterOption<FocusFilter>[]}
 				value={focusFilter}
-				onValueChange={(value) => value && onFocusFilterChange(value as FocusFilter)}
-			>
-				<SelectTrigger className="w-full sm:hidden" aria-label="Filter by work type">
-					<SelectValue />
-				</SelectTrigger>
-				<SelectContent>
-					{WORK_ARTIFACT_FILTER_ITEMS.map((filter) => (
-						<SelectItem key={filter.value} value={filter.value}>
-							{filter.label}
-						</SelectItem>
-					))}
-				</SelectContent>
-			</Select>
-			{/* `toolbar`, not the default `group`: Base UI gives the group a roving tabindex, and
-			    `toolbar` is the role that contract belongs to. `radiogroup` would be worse — the items
-			    are `aria-pressed`, not radios. */}
-			<ToggleGroup
-				role="toolbar"
-				value={[focusFilter]}
-				onValueChange={(value) => value[0] && onFocusFilterChange(value[0] as FocusFilter)}
-				variant="outline"
-				size="sm"
-				aria-label="Filter by work type"
-				className="hidden sm:flex"
-			>
-				{WORK_ARTIFACT_FILTER_ITEMS.map((filter) => (
-					<ToggleGroupItem
-						key={filter.value}
-						value={filter.value}
-						className={cn(
-							"min-w-0",
-							filter.value === ARTIFACT_KIND.pullRequest &&
-								"h-auto min-h-7 whitespace-normal py-1 sm:whitespace-nowrap",
-						)}
-					>
-						{/* Shortened on screen to fit the row; the accessible name still contains the visible
-						    text and names the filter in full (WCAG 2.2 SC 2.5.3). */}
-						{filter.value === "ALL" ? (
-							<>
-								All<span className="sr-only"> work types</span>
-							</>
-						) : (
-							filter.label
-						)}
-					</ToggleGroupItem>
-				))}
-			</ToggleGroup>
-			<div className="grid grid-cols-2 gap-2 sm:flex">
-				<CreateAreaButton
-					onCreate={onCreateArea}
-					pending={creatingArea}
+				onChange={onFocusFilterChange}
+			/>
+			<div className="grid gap-2 sm:flex">
+				<Toggle
+					variant="outline"
+					pressed={library?.open ?? false}
+					onPressedChange={(pressed) => library?.onOpenChange(pressed)}
+				>
+					<Library />
+					Show catalog
+				</Toggle>
+				<Button
+					variant="outline"
+					onClick={onCreateArea}
 					disabled={areaStructurePending && !creatingArea}
-				/>
-				<Link
-					to="/w/$workspaceSlug/admin/practices/new"
-					params={{ workspaceSlug }}
+				>
+					<Plus />
+					Create area
+				</Button>
+				<DetailStackLink
+					entry={practiceFormLevel()}
 					className={cn(buttonVariants(), "w-full sm:w-auto")}
 				>
-					<Plus className="mr-1.5 size-4" />
+					<Plus />
 					Create practice
-				</Link>
+				</DetailStackLink>
 			</div>
 		</div>
 	);
@@ -431,14 +495,7 @@ function PracticeActions({
 				}
 			/>
 			<DropdownMenuContent align="end">
-				<DropdownMenuItem
-					render={
-						<Link
-							to="/w/$workspaceSlug/admin/practices/$practiceSlug"
-							params={{ workspaceSlug, practiceSlug: practice.slug }}
-						/>
-					}
-				>
+				<DropdownMenuItem render={<DetailStackLink entry={practiceFormLevel(practice.slug)} />}>
 					Edit practice
 				</DropdownMenuItem>
 				<DropdownMenuSeparator />
@@ -504,60 +561,6 @@ function PracticeActions({
 	);
 }
 
-function RenameAreaDialog({
-	area,
-	onClose,
-	onRename,
-	pending,
-}: {
-	area: PracticeArea | null;
-	onClose: () => void;
-	onRename: (slug: string, name: string) => Promise<boolean>;
-	pending: boolean;
-}) {
-	return (
-		<Dialog open={area !== null} onOpenChange={(open) => !open && onClose()}>
-			<DialogContent className="sm:max-w-sm">
-				<DialogHeader>
-					<DialogTitle>Rename area</DialogTitle>
-				</DialogHeader>
-				<form
-					onSubmit={async (event) => {
-						event.preventDefault();
-						// `namedItem` answers with a RadioNodeList when a name is shared, so narrow rather
-						// than cast.
-						const input = event.currentTarget.elements.namedItem("areaName");
-						if (!(input instanceof HTMLInputElement)) return;
-						const name = input.value.trim();
-						if (!area || !name || name === area.name) {
-							onClose();
-							return;
-						}
-						if (await onRename(area.slug, name)) onClose();
-					}}
-					className="space-y-4"
-				>
-					<Input
-						name="areaName"
-						defaultValue={area?.name ?? ""}
-						aria-label="Area name"
-						autoComplete="off"
-						disabled={pending}
-					/>
-					<DialogFooter>
-						<Button type="button" variant="outline" onClick={onClose} disabled={pending}>
-							Cancel
-						</Button>
-						<Button type="submit" className="min-w-20" disabled={pending}>
-							{pending ? "Saving…" : "Save"}
-						</Button>
-					</DialogFooter>
-				</form>
-			</DialogContent>
-		</Dialog>
-	);
-}
-
 function PracticeRowDetails({
 	practice,
 	title,
@@ -574,16 +577,24 @@ function PracticeRowDetails({
 		practice.automatedReviewPolicy,
 		supportedModes,
 	);
-	const follows = inheritedAutonomySourceSentence(practice.autonomy, inheritedFrom);
+	const autonomySource = autonomySourceOf(practice.autonomy, inheritedFrom);
 	return (
 		<ItemContent className="min-w-0">
 			<ItemTitle className="w-full min-w-0 line-clamp-none">{title}</ItemTitle>
-			<ItemDescription className="flex flex-wrap items-center gap-1.5">
-				<span>{artifactKindLabel(practice.artifactKind)}</span>
-				<AutonomyBadge autonomy={practice.autonomy.effective} />
-				<span>{follows ?? "Set for this practice"}</span>
-				{unavailableLabel && <Badge variant="warning">{unavailableLabel}</Badge>}
-				<CatalogOriginBadge origin={practice.catalogOrigin} kind="practice" />
+			<ItemDescription>
+				<MetaRow
+					captions={[
+						<WorkTypeLabel key="work" artifactKind={practice.artifactKind} />,
+						<AutonomySourceNote key="source" source={autonomySource} />,
+					]}
+					badges={
+						<>
+							<AutonomyBadge autonomy={practice.autonomy.effective} />
+							{unavailableLabel && <Badge variant="warning">{unavailableLabel}</Badge>}
+							<CatalogOriginBadge origin={practice.catalogOrigin} kind="practice" />
+						</>
+					}
+				/>
 			</ItemDescription>
 		</ItemContent>
 	);
@@ -615,52 +626,5 @@ function PracticeDragPreview({
 				title={<span className="break-words">{practice.name}</span>}
 			/>
 		</Item>
-	);
-}
-
-function CreateAreaButton({
-	onCreate,
-	pending,
-	disabled,
-}: {
-	onCreate: (name: string) => Promise<boolean>;
-	pending: boolean;
-	disabled: boolean;
-}) {
-	const [open, setOpen] = useState(false);
-	return (
-		<Popover open={open} onOpenChange={setOpen}>
-			<PopoverTrigger
-				render={
-					<Button variant="outline" disabled={disabled}>
-						<Plus className="mr-1.5 size-4" />
-						Create area
-					</Button>
-				}
-			/>
-			<PopoverContent align="end" className="w-72">
-				<form
-					onSubmit={async (event) => {
-						event.preventDefault();
-						const input = event.currentTarget.elements.namedItem("areaName");
-						if (!(input instanceof HTMLInputElement)) return;
-						const name = input.value.trim();
-						if (name && (await onCreate(name))) setOpen(false);
-					}}
-					className="flex items-center gap-2"
-				>
-					<Input
-						name="areaName"
-						placeholder="New area name…"
-						aria-label="New area name"
-						autoComplete="off"
-						disabled={pending}
-					/>
-					<Button type="submit" size="sm" className="min-w-16" disabled={pending}>
-						{pending ? "Creating…" : "Create"}
-					</Button>
-				</form>
-			</PopoverContent>
-		</Popover>
 	);
 }

@@ -6,7 +6,6 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.inOrder;
-import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -31,10 +30,9 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 import org.mockito.Mock;
-import org.springframework.core.task.AsyncTaskExecutor;
 import org.springframework.transaction.support.TransactionOperations;
 
-class DefaultPracticeCatalogSeederTest extends BaseUnitTest {
+class PracticeCatalogInstallationManagerTest extends BaseUnitTest {
 
     @Mock
     private PracticeAreaService areaService;
@@ -60,11 +58,9 @@ class DefaultPracticeCatalogSeederTest extends BaseUnitTest {
     @Mock
     private WorkspaceRepository workspaceRepository;
 
-    private final AsyncTaskExecutor directExecutor = Runnable::run;
-
     @Test
     void doesNothingWhenDisabled() {
-        seeder(false, directExecutor).seed();
+        manager(false).repairIncompleteInstallations();
 
         verifyNoInteractions(workspaceRepository, catalogService, installationRepository);
     }
@@ -75,7 +71,7 @@ class DefaultPracticeCatalogSeederTest extends BaseUnitTest {
         when(catalogService.catalog()).thenReturn(catalog());
         when(areaService.createAreaFromCatalog(any(), any(), any(), anyInt())).thenReturn(new PracticeArea());
 
-        seeder(true, directExecutor).seed();
+        manager(true).repairIncompleteInstallations();
 
         verify(areaService).createAreaFromCatalog(any(), eq("packaging"), any(), eq(0));
         ArgumentCaptor<PracticeDefinition> definition = ArgumentCaptor.forClass(PracticeDefinition.class);
@@ -93,7 +89,7 @@ class DefaultPracticeCatalogSeederTest extends BaseUnitTest {
         when(workspaceRepository.findAll()).thenReturn(List.of(workspace(1L)));
         when(installationRepository.existsById(1L)).thenReturn(true);
 
-        seeder(true, directExecutor).seed();
+        manager(true).repairIncompleteInstallations();
 
         verifyNoInteractions(catalogService, practiceService);
         verify(installationRepository, never()).save(any());
@@ -106,22 +102,25 @@ class DefaultPracticeCatalogSeederTest extends BaseUnitTest {
         when(areaService.createAreaFromCatalog(any(), any(), any(), anyInt())).thenReturn(new PracticeArea());
         when(practiceService.createPracticeFromCatalog(any(), any(), any())).thenThrow(new RuntimeException("nope"));
 
-        assertThatCode(() -> seeder(true, directExecutor).seed()).doesNotThrowAnyException();
+        assertThatCode(() -> manager(true).repairIncompleteInstallations()).doesNotThrowAnyException();
 
         verify(installationRepository, never()).save(any());
     }
 
     @Test
-    void givesANewWorkspaceTheCatalogWithoutBlockingItsCreation() {
-        AsyncTaskExecutor executor = mock(AsyncTaskExecutor.class);
-        when(workspaceRepository.findById(7L)).thenReturn(Optional.of(workspace(7L)));
-        when(catalogService.catalog()).thenReturn(new EffectiveCatalog(List.of(), List.of()));
+    void shouldMarkWorkspaceWhenCreated() {
+        manager(true).onWorkspaceCreated(new WorkspaceCreatedEvent(7L, IntegrationKind.GITLAB));
 
-        seeder(true, executor).onWorkspaceCreated(new WorkspaceCreatedEvent(7L, IntegrationKind.GITLAB));
+        verify(installationRepository).save(any());
+        verifyNoInteractions(catalogService, practiceService, areaService);
+    }
 
-        ArgumentCaptor<Runnable> task = ArgumentCaptor.forClass(Runnable.class);
-        verify(executor).execute(task.capture());
-        task.getValue().run();
+    @Test
+    void shouldMarkWorkspaceWhenLegacyRepairIsDisabled() {
+        when(workspaceRepository.findByIdForUpdate(7L)).thenReturn(Optional.of(workspace(7L)));
+
+        manager(false).onWorkspaceCreated(new WorkspaceCreatedEvent(7L, IntegrationKind.GITLAB));
+
         verify(installationRepository).save(any());
     }
 
@@ -143,13 +142,13 @@ class DefaultPracticeCatalogSeederTest extends BaseUnitTest {
         );
     }
 
-    private DefaultPracticeCatalogSeeder seeder(boolean enabled, AsyncTaskExecutor executor) {
+    private PracticeCatalogInstallationManager manager(boolean enabled) {
         if (enabled) {
             when(workspaceRepository.findByIdForUpdate(any())).thenAnswer(invocation ->
                 Optional.of(workspace(invocation.getArgument(0)))
             );
         }
-        return new DefaultPracticeCatalogSeeder(
+        return new PracticeCatalogInstallationManager(
             enabled,
             areaService,
             practiceService,
@@ -159,7 +158,6 @@ class DefaultPracticeCatalogSeederTest extends BaseUnitTest {
             catalogLock,
             installationRepository,
             workspaceRepository,
-            executor,
             TransactionOperations.withoutTransaction(),
             Clock.systemUTC()
         );

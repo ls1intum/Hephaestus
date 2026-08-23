@@ -6,10 +6,12 @@ import {
 	deleteAreaMutation,
 	deletePracticeMutation,
 	getPracticeQueryKey,
+	listAdoptablePracticesQueryKey,
 	listAreasQueryKey,
 	listPracticesOptions,
 	listPracticesQueryKey,
 	placePracticeMutation,
+	previewAreaAdoptionQueryKey,
 	reorderAreasMutation,
 	updateAreaMutation,
 } from "@/api/@tanstack/react-query.gen";
@@ -35,6 +37,7 @@ export function usePracticeCatalogMutations(workspaceSlug: string) {
 	const queryClient = useQueryClient();
 	const areasQueryKey = listAreasQueryKey({ path: { workspaceSlug } });
 	const practicesQueryKey = listPracticesQueryKey({ path: { workspaceSlug } });
+	const adoptionCatalogQueryKey = listAdoptablePracticesQueryKey({ path: { workspaceSlug } });
 	const areaMutationKey = ["practice-catalog", workspaceSlug, "areas"] as const;
 	const practiceMutationKey = ["practice-catalog", workspaceSlug, "practices"] as const;
 	const structuralScope = practiceCatalogStructureScope(workspaceSlug);
@@ -89,12 +92,12 @@ export function usePracticeCatalogMutations(workspaceSlug: string) {
 			queryClient.setQueryData<PracticeArea[]>(areasQueryKey, (areas) =>
 				areas ? upsertArea(areas, created) : areas,
 			);
-			toast.success("Area created");
+			toast.success("Group created");
 		},
 		onError: (error) => {
 			const status = problemStatusOf(error);
 			toast.error(
-				status === 409 ? "An area with that name already exists" : "Couldn't create the area",
+				status === 409 ? "An area with that name already exists" : "Couldn't create the group",
 			);
 		},
 		onSettled: invalidateAreasAfterLastWrite,
@@ -120,7 +123,7 @@ export function usePracticeCatalogMutations(workspaceSlug: string) {
 					patchArea(areas, previous.slug, selectAreaPatch(previous, variables.body)),
 				);
 			}
-			toast.error("Couldn't update the area");
+			toast.error("Couldn't update the group");
 		},
 		onSuccess: (updated, variables) => {
 			queryClient.setQueryData<PracticeArea[]>(areasQueryKey, (areas = []) =>
@@ -144,17 +147,35 @@ export function usePracticeCatalogMutations(workspaceSlug: string) {
 			queryClient.setQueryData<PracticeArea[]>(areasQueryKey, (areas = []) =>
 				removeArea(areas, slug),
 			);
-			const updated = unassignPractices(
-				queryClient.getQueryData<Practice[]>(practicesQueryKey) ?? [],
-				slug,
-			);
-			applyPlacementCaches(
-				updated.map(({ areaSlug, displayOrder, slug: practiceSlug }) => ({
-					areaSlug,
-					displayOrder,
-					slug: practiceSlug,
-				})),
-			);
+			const practices = queryClient.getQueryData<Practice[]>(practicesQueryKey) ?? [];
+			if (variables.query?.deletePractices) {
+				const deleted = practices.filter((practice) => practice.areaSlug === slug);
+				queryClient.setQueryData<Practice[]>(
+					practicesQueryKey,
+					practices.filter((practice) => practice.areaSlug !== slug),
+				);
+				for (const practice of deleted) {
+					queryClient.removeQueries({
+						queryKey: getPracticeQueryKey({
+							path: { workspaceSlug, practiceSlug: practice.slug },
+						}),
+						exact: true,
+					});
+				}
+				void queryClient.invalidateQueries({ queryKey: adoptionCatalogQueryKey });
+			} else {
+				const updated = unassignPractices(practices, slug);
+				applyPlacementCaches(
+					updated.map(({ areaSlug, displayOrder, slug: practiceSlug }) => ({
+						areaSlug,
+						displayOrder,
+						slug: practiceSlug,
+					})),
+				);
+			}
+			void queryClient.invalidateQueries({
+				queryKey: previewAreaAdoptionQueryKey({ path: { workspaceSlug, slug } }),
+			});
 			toast.success("Area deleted");
 		},
 		onError: () => toast.error("Couldn't delete the area"),
@@ -273,6 +294,7 @@ export function usePracticeCatalogMutations(workspaceSlug: string) {
 				}),
 				exact: true,
 			});
+			void queryClient.invalidateQueries({ queryKey: adoptionCatalogQueryKey });
 			toast.success("Practice deleted");
 		},
 		onError: () => toast.error("Couldn't delete the practice"),

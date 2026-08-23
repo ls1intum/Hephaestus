@@ -1,8 +1,11 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn, screen, waitFor, within } from "storybook/test";
-import { mockPracticeDefinitionOptions } from "@/mocks/fixtures/practice";
+import { AUTONOMY_DEFS } from "@/components/practice-vocabulary/autonomy-defs";
+import {
+	mockAuthorDeclaredEvidenceValidation,
+	mockPracticeDefinitionOptions,
+} from "@/mocks/fixtures/practice";
 import { StatefulPatch } from "@/stories/stateful";
-import { expectSettledVisible } from "@/test/overlay";
 import { expectNoPageOverflow } from "@/test/reflow";
 import { PracticeCatalog } from "./PracticeCatalog";
 import {
@@ -41,7 +44,7 @@ const practices = [
 	},
 ];
 
-/** The size a workspace installs the shipped catalogue at. */
+// The size a workspace installs the shipped catalogue at.
 const scaleAreas = [
 	"Submitting review-ready work",
 	"Writing issues a maintainer can act on",
@@ -101,7 +104,7 @@ const meta = {
 		focusFilter: "ALL",
 		onFocusFilterChange: fn(),
 		onCreateArea: fn(async () => true),
-		onRenameArea: fn(async () => true),
+		onUpdateArea: fn(async () => true),
 		onSetAreaDashboardVisibility: fn(),
 		onDeleteArea: fn(),
 		onReorderAreas: fn(),
@@ -157,10 +160,97 @@ export const Populated: Story = {
 	},
 };
 
+export const WithInstanceCatalog: Story = {
+	args: {
+		library: {
+			open: true,
+			onOpenChange: fn(),
+			state: {
+				status: "ready",
+				practices: [
+					{
+						slug: "explain-change",
+						name: "Explain what changed and why",
+						artifactKind: "scm.pull_request",
+						whyItMatters:
+							"A reviewer who has to reconstruct intent from the diff reviews the code and not the decision.",
+						areaSlug: "review-ready-work",
+						areaName: "Review-ready work",
+						availability: "AVAILABLE",
+						automatedReviewValidation: mockAuthorDeclaredEvidenceValidation,
+					},
+					{
+						slug: practices[0].slug,
+						name: practices[0].name,
+						artifactKind: practices[0].artifactKind,
+						areaSlug: practices[0].areaSlug,
+						areaName: areas[0].name,
+						availability: "ADOPTED",
+						automatedReviewValidation: mockAuthorDeclaredEvidenceValidation,
+					},
+				],
+			},
+		},
+	},
+	play: async ({ canvas }) => {
+		canvas.getByRole("heading", { name: "Instance catalog" });
+		await expect(
+			canvas.getAllByRole("link", { name: /Explain what changed and why/ }),
+		).toHaveLength(1);
+	},
+};
+
+/** The library is a section of this page, so its failure must not take the tree down with it. */
+export const InstanceCatalogFailed: Story = {
+	args: {
+		library: {
+			open: true,
+			onOpenChange: fn(),
+			state: {
+				status: "error",
+				// 5xx is the classifier's retryable branch; a bare Error renders no Retry button.
+				error: { status: 503, detail: "Catalog service unavailable" },
+				onRetry: fn(),
+			},
+		},
+	},
+	play: async ({ args, canvas, userEvent }) => {
+		// The workspace's own practices are still readable beside the failed library.
+		await expect(canvas.getByRole("link", { name: practices[0].name })).toBeVisible();
+		await userEvent.click(canvas.getByRole("button", { name: "Retry" }));
+		const state = args.library?.state;
+		await expect(state?.status === "error" && state.onRetry).toHaveBeenCalledOnce();
+	},
+};
+
+export const InstanceCatalogLoading: Story = {
+	args: {
+		library: { open: true, onOpenChange: fn(), state: { status: "loading" } },
+	},
+	play: async ({ canvas }) => {
+		const library = within(canvas.getByRole("region", { name: "Instance catalog" }));
+		await expect(library.queryByRole("status")).not.toBeInTheDocument();
+		await expect(
+			canvas
+				.getByRole("region", { name: "Instance catalog" })
+				.querySelectorAll('[data-slot="skeleton"]').length,
+		).toBeGreaterThan(0);
+	},
+};
+
+/** Filtering to zero must offer the control that clears the filter. */
+export const FilteredToNothing: Story = {
+	args: { focusFilter: "docs.document" },
+	play: async ({ args, canvas, userEvent }) => {
+		await expect(canvas.getByText("No practices match this filter")).toBeVisible();
+		await userEvent.click(canvas.getByRole("button", { name: "Clear the filter" }));
+		await expect(args.onFocusFilterChange).toHaveBeenCalledWith("ALL");
+	},
+};
+
 /**
  * The move menu lists every area in the workspace, so it is the one control whose height grows with
- * the catalogue rather than with the row it belongs to — which is what the narrow viewport here is
- * watching.
+ * the catalogue rather than with the row it belongs to.
  */
 export const AtScale: Story = {
 	args: { areas: scaleAreas, practices: scalePractices },
@@ -171,11 +261,7 @@ export const AtScale: Story = {
 	},
 };
 
-/**
- * A locally written practice usually carries no prose, and a popup that appears empty under the
- * pointer is worse than no popup.
- */
-export const PracticeDetailOnHover: Story = {
+export const PracticeNameOpensTheDetailLevel: Story = {
 	args: {
 		practices: [
 			{ ...mockPractices[0], areaSlug: areas[0].slug, displayOrder: 0 },
@@ -183,20 +269,11 @@ export const PracticeDetailOnHover: Story = {
 		],
 	},
 	parameters: { chromatic: { disableSnapshot: true } },
-	play: async ({ canvas, userEvent }) => {
-		await expect(screen.queryByText(/reverse-engineering the diff/)).not.toBeInTheDocument();
-
-		// Asserted on the element rather than by hovering and waiting for nothing, which would pass just
-		// as well if the card were merely slow.
+	play: async ({ canvas }) => {
+		const link = canvas.getByRole("link", { name: mockPractices[0].name });
 		await expect(
-			canvas.getByRole("link", { name: mockUnassignedPractice.name }),
-		).not.toHaveAttribute("data-slot", "hover-card-trigger");
-
-		const trigger = canvas.getByRole("link", { name: mockPractices[0].name });
-		await expect(trigger).toHaveAttribute("data-slot", "hover-card-trigger");
-		await userEvent.hover(trigger);
-		await expectSettledVisible(await screen.findByText(/reverse-engineering the diff/));
-		await expect(screen.getByText(/lists the exact steps a reviewer ran/)).toBeVisible();
+			new URL(link.getAttribute("href") ?? "", "https://example.test").searchParams.get("detail"),
+		).toBe('["practice:pr-description-quality"]');
 	},
 };
 
@@ -205,7 +282,12 @@ export const Filtered: Story = {
 	parameters: { chromatic: { viewports: [1440] } },
 	play: async ({ canvas }) => {
 		await expect(canvas.getByText("Clear the filter to reorder practices.")).toBeVisible();
-		await expect(canvas.queryByRole("button", { name: /Move practice/ })).not.toBeInTheDocument();
+		// The row the filter keeps loses its handle; the group's own handle stays, because only entry
+		// handles are gated on the filter.
+		await expect(
+			canvas.queryByRole("button", { name: `Reorder ${practices[2].name}` }),
+		).not.toBeInTheDocument();
+		await expect(canvas.getByRole("button", { name: `Reorder ${areas[0].name}` })).toBeVisible();
 	},
 };
 
@@ -313,7 +395,11 @@ export const DeletingArea: Story = {
 };
 
 export const Empty: Story = {
-	args: { areas: [], practices: [] },
+	args: {
+		areas: [],
+		practices: [],
+		library: { open: false, onOpenChange: fn(), state: { status: "loading" } },
+	},
 	parameters: { chromatic: { viewports: [1440] } },
 };
 
@@ -326,9 +412,9 @@ export const EmptyDestinations: Story = {
 		for (const area of mockAreas) {
 			const areaSection = canvas.getByText(area.name).closest('[data-slot="accordion-item"]');
 			if (!(areaSection instanceof HTMLElement)) throw new Error(`Area ${area.name} not rendered`);
-			await expect(within(areaSection).getByText("No practices in this area.")).toBeVisible();
+			await expect(within(areaSection).getByText("No practices here.")).toBeVisible();
 		}
-		await expect(canvas.getByText("No unassigned practices.")).toBeVisible();
+		await expect(canvas.getByText("Nothing unassigned.")).toBeVisible();
 		await expectNoPageOverflow();
 	},
 };
@@ -346,7 +432,7 @@ export const CrossAreaDrag: Story = {
 			.getByText(mockAreas[1].name)
 			.closest('[data-slot="accordion-item"]');
 		if (!(destinationArea instanceof HTMLElement)) throw new Error("Destination area not rendered");
-		const destination = within(destinationArea).getByText("No practices in this area.");
+		const destination = within(destinationArea).getByText("No practices here.");
 		const sourceRow = handle.closest('[data-slot="item"]');
 		if (!(sourceRow instanceof HTMLElement)) throw new Error("Practice row not rendered");
 		const start = handle.getBoundingClientRect();
@@ -444,7 +530,7 @@ export const BlockedDestinationDrag: Story = {
 			.getByText(mockAreas[1].name)
 			.closest<HTMLElement>('[data-slot="accordion-item"]');
 		if (!destinationArea) throw new Error("Blocked destination area not rendered");
-		const destination = within(destinationArea).getByText("No practices in this area.");
+		const destination = within(destinationArea).getByText("No practices here.");
 		const start = handle.getBoundingClientRect();
 		const end = destination.getBoundingClientRect();
 
@@ -533,14 +619,17 @@ export const AutonomyIsReadOnlyHere: Story = {
 		viewport: { defaultViewport: "desktop" },
 	},
 	play: async ({ canvas, userEvent }) => {
-		await expect(canvas.queryByRole("radiogroup")).not.toBeInTheDocument();
-
 		await userEvent.click(canvas.getByRole("button", { name: "More actions for Set here" }));
 		const menu = within(await screen.findByRole("menu"));
 		await expect(menu.getByRole("menuitem", { name: "Change on Review" })).toHaveAttribute(
 			"href",
 			"/w/demo/admin/practices/review",
 		);
-		await expect(menu.queryByRole("menuitem", { name: "Use the default" })).not.toBeInTheDocument();
+		// The menuitemradios in this menu are the "Move to" area picker. Autonomy is set on Review,
+		// so none of its levels may appear as a choice here.
+		for (const { label } of Object.values(AUTONOMY_DEFS)) {
+			await expect(menu.queryByRole("menuitemradio", { name: label })).not.toBeInTheDocument();
+			await expect(menu.queryByRole("menuitem", { name: label })).not.toBeInTheDocument();
+		}
 	},
 };

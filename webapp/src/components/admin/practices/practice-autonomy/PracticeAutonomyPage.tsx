@@ -4,6 +4,7 @@ import type { AutonomyRollup, Practice, PracticeReviewSettings } from "@/api/typ
 import { automatedReviewLimitationLabel } from "@/components/admin/practice-catalog/evidence-presentation";
 import { PracticeDetailHoverCard } from "@/components/admin/practice-catalog/PracticeDetailHoverCard";
 import { AUTONOMY_DEFS } from "@/components/practice-vocabulary/autonomy-defs";
+import { WorkTypeLabel } from "@/components/practice-vocabulary/WorkTypeLabel";
 import {
 	Accordion,
 	AccordionContent,
@@ -35,10 +36,10 @@ import {
 	ItemTitle,
 } from "@/components/ui/item";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { artifactKindLabel } from "@/lib/artifact-kinds";
 import {
 	autonomyDistributionSentence,
-	inheritedAutonomySourceSentence,
+	autonomySourceOf,
+	autonomySourceSentence,
 	PRACTICE_AUTONOMY_LABELS,
 	PRACTICE_AUTONOMY_ORDER,
 	type PracticeAutonomy,
@@ -154,7 +155,7 @@ export function PracticeAutonomyPage({
 						</EmptyTitle>
 						<EmptyDescription>
 							{overridesOnly
-								? "Every area and practice follows the workspace default above. Switch the filter off to see them."
+								? "Every group and practice follows the workspace default above. Switch the filter off to see them."
 								: "Add practices in Practice setup, then decide how far reviews go on them."}
 						</EmptyDescription>
 					</EmptyHeader>
@@ -411,7 +412,7 @@ function AreaGroup({
 							onChange={(autonomy) => onSetAreaAutonomy(areaSlug, autonomy)}
 						/>
 						<DecisionNote
-							follows={inheritedAutonomySourceSentence(group.autonomy, WORKSPACE_DEFAULT_SOURCE)}
+							follows={inheritedSentenceOrNull(group.autonomy, WORKSPACE_DEFAULT_SOURCE)}
 							resetLabel={`Use the default for ${group.name}`}
 							disabled={areaPending}
 							onClear={() => onClearAreaAutonomy(areaSlug)}
@@ -423,7 +424,7 @@ function AreaGroup({
 				{group.practices.length === 0 ? (
 					<p className="py-2 text-muted-foreground text-sm">
 						{group.totalPractices === 0
-							? "No practices in this area."
+							? "No practices here."
 							: "No practices here were set by hand."}
 					</p>
 				) : (
@@ -510,7 +511,7 @@ function PracticeAutonomyRow({
 					</PracticeDetailHoverCard>
 				</ItemTitle>
 				<ItemDescription className="flex flex-wrap items-center gap-1.5">
-					<span>{artifactKindLabel(practice.artifactKind)}</span>
+					<WorkTypeLabel artifactKind={practice.artifactKind} />
 					{limitation && <Badge variant="warning">{limitation}</Badge>}
 				</ItemDescription>
 			</ItemContent>
@@ -529,7 +530,7 @@ function PracticeAutonomyRow({
 				/>
 				{reviewable ? (
 					<DecisionNote
-						follows={inheritedAutonomySourceSentence(
+						follows={inheritedSentenceOrNull(
 							practice.autonomy,
 							areaName ?? WORKSPACE_DEFAULT_SOURCE,
 						)}
@@ -552,6 +553,15 @@ export interface DecisionNoteProps {
 	resetLabel: string;
 	disabled: boolean;
 	onClear: () => void;
+}
+
+/** `DecisionNote` reads `null` as "chosen here, so offer the reset" — narrowed once, not per site. */
+function inheritedSentenceOrNull(
+	assignment: Parameters<typeof autonomySourceOf>[0],
+	inheritedFrom: string,
+): string | null {
+	const source = autonomySourceOf(assignment, inheritedFrom);
+	return source.kind === "inherited" ? autonomySourceSentence(source) : null;
 }
 
 function DecisionNote({ follows, resetLabel, disabled, onClear }: DecisionNoteProps) {

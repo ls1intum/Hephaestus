@@ -12,6 +12,7 @@ import {
 	mockPullRequestWorkType,
 } from "@/mocks/fixtures/practice";
 import { Stateful } from "@/stories/stateful";
+import { expectNoOverflowingElement } from "@/test/reflow";
 import { PracticeBindingsEditor, type PracticeOccasionMode } from "./PracticeBindingsEditor";
 import { outcome } from "./story-mock-data";
 
@@ -235,5 +236,12 @@ export const ChoosingAMoment: Story = {
 			],
 			needs: mockPullRequestBinding.needs,
 		});
+	},
+};
+
+export const NarrowViewport: Story = {
+	parameters: { viewport: { defaultViewport: "reflow" }, chromatic: { viewports: [320] } },
+	play: async ({ canvasElement }) => {
+		await expectNoOverflowingElement(canvasElement);
 	},
 };

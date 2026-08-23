@@ -27,7 +27,7 @@ export function mentoringSupportOf(policy: PracticeAutomatedReviewPolicy): Mento
 
 /**
  * Derived from the text, never random: the server digests code and description together, and that
- * digest decides whether a curated update changed review behaviour. Retyping the same sentence must
+ * digest decides whether a curated update changed review rules. Retyping the same sentence must
  * yield the same code.
  */
 export function limitationCodeFor(description: string) {

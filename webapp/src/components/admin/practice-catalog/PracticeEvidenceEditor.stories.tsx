@@ -10,6 +10,7 @@ import {
 	mockPullRequestBinding,
 	mockPullRequestWorkType,
 } from "@/mocks/fixtures/practice";
+import { expectNoOverflowingElement } from "@/test/reflow";
 import { PracticeEvidenceEditor } from "./PracticeEvidenceEditor";
 
 function ControlledEvidence(args: React.ComponentProps<typeof PracticeEvidenceEditor>) {
@@ -201,4 +202,11 @@ export const SubmittingRevealsTheSources: Story = {
 
 export const Disabled: Story = {
 	args: { disabled: true },
+};
+
+export const NarrowViewport: Story = {
+	parameters: { viewport: { defaultViewport: "reflow" }, chromatic: { viewports: [320] } },
+	play: async ({ canvasElement }) => {
+		await expectNoOverflowingElement(canvasElement);
+	},
 };

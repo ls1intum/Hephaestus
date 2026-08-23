@@ -1,38 +1,17 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { toast } from "sonner";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 import {
-	adminCreateCuratedAreaMutation,
-	adminGetCuratedCatalogQueryKey,
-} from "@/api/@tanstack/react-query.gen";
-import { CuratedAreaForm } from "@/components/admin/curated-catalog/CuratedAreaForm";
-import { instanceAdminHead } from "@/lib/page-title";
-import { problemDetailOf } from "@/lib/problem-detail";
+	curatedAreaLevel,
+	curatedCatalogSearchSchema,
+} from "@/components/admin/curated-catalog/curated-catalog-search";
+import { detailStackKey } from "@/components/core/detail-drawer/detail-stack";
 
+/** Kept so a bookmarked link lands on the catalog with the new-group level open. */
 export const Route = createFileRoute("/_authenticated/admin/catalog/areas/new")({
-	head: instanceAdminHead("Create area"),
-	component: NewCuratedAreaPage,
+	validateSearch: curatedCatalogSearchSchema,
+	beforeLoad: ({ search }) => {
+		throw redirect({
+			to: "/admin/catalog",
+			search: { ...search, detail: [detailStackKey(curatedAreaLevel())] },
+		});
+	},
 });
-
-function NewCuratedAreaPage() {
-	const navigate = useNavigate({ from: Route.fullPath });
-	const queryClient = useQueryClient();
-	const createArea = useMutation({
-		...adminCreateCuratedAreaMutation(),
-		onSuccess: () => {
-			void queryClient.invalidateQueries({ queryKey: adminGetCuratedCatalogQueryKey() });
-			toast.success("Area created");
-			navigate({ to: "/admin/catalog" });
-		},
-		onError: (error) =>
-			toast.error("Couldn't create the area", { description: problemDetailOf(error) }),
-	});
-
-	return (
-		<CuratedAreaForm
-			mode="create"
-			isPending={createArea.isPending}
-			onSubmit={({ slug, ...definition }) => createArea.mutate({ body: { slug, definition } })}
-		/>
-	);
-}

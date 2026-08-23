@@ -76,11 +76,11 @@ public class PracticePiAdapter {
             "(mkdir -p " +
             precomputeOut +
             "/practices" +
-            " && cp " +
+            " && find " +
             precomputeIn +
-            "/*.ts " +
+            " -maxdepth 1 -type f -name '*.ts' -exec cp {} " +
             precomputeOut +
-            "/practices/" +
+            "/practices/ \\;" +
             " && ln -sf /opt/precompute/lib " +
             precomputeOut +
             "/lib" +

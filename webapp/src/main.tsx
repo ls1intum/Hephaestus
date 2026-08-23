@@ -65,6 +65,9 @@ const router = createRouter({
 	},
 	defaultPreload: "intent",
 	scrollRestoration: true,
+	// `index.html` sets `scroll-smooth`, so an unspecified behaviour resolves to `auto` and CSSOM-View
+	// makes every restore an *animated* scroll — one that a second write can abort halfway.
+	scrollRestorationBehavior: "instant",
 	defaultStructuralSharing: true,
 	defaultPreloadStaleTime: 0,
 });

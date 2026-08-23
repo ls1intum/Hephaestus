@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn } from "storybook/test";
+import { expectNoOverflowingElement } from "@/test/reflow";
 import { CuratedCatalogSummary } from "./CuratedCatalogSummary";
 
 const meta = {
@@ -41,9 +42,9 @@ export const UpdatesWaiting: Story = {
 		},
 	},
 	play: async ({ canvas }) => {
-		await expect(canvas.getByText("2 updates would change review behavior")).toBeVisible();
+		await expect(canvas.getByText("2 updates would change review rules")).toBeVisible();
 		await expect(canvas.getByText("5 updates would change wording or guidance")).toBeVisible();
-		await expect(canvas.getByText("1 update would change area appearance")).toBeVisible();
+		await expect(canvas.getByText("1 update would change group appearance")).toBeVisible();
 		await expect(canvas.getByText("8 Hephaestus changes need review")).toBeVisible();
 		await expect(canvas.getByRole("button", { name: "Review changes" })).toBeVisible();
 	},
@@ -73,5 +74,13 @@ export const ReviewingChanges: Story = {
 	args: { ...UpdatesWaiting.args, reviewing: true },
 	play: async ({ canvas }) => {
 		await expect(canvas.queryByRole("button", { name: "Review changes" })).not.toBeInTheDocument();
+	},
+};
+
+export const NarrowViewport: Story = {
+	args: UpdatesWaiting.args,
+	parameters: { viewport: { defaultViewport: "reflow" }, chromatic: { viewports: [320] } },
+	play: async ({ canvasElement }) => {
+		await expectNoOverflowingElement(canvasElement);
 	},
 };

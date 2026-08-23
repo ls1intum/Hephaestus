@@ -81,7 +81,7 @@ function displayValue(
 		return artifactKindLabel(String(value));
 	}
 	if (field === "areaSlug" && typeof value === "string") {
-		return areaNames[value] ?? "Area no longer exists";
+		return areaNames[value] ?? "Group no longer exists";
 	}
 	if ((field === "icon" || field === "color") && typeof value === "string")
 		return humanizeToken(value);
@@ -123,7 +123,7 @@ export function HephaestusVersionPanel(props: HephaestusVersionPanelProps) {
 		<section
 			aria-labelledby={headingId}
 			className={cn(
-				"max-w-3xl rounded-lg border p-4 text-sm",
+				"rounded-lg border p-4 text-sm",
 				copy.tone === "attention" ? "border-warning/50 bg-warning/5" : "bg-card",
 			)}
 		>

@@ -256,3 +256,167 @@ wiring is lost.
 | `/composition-patterns` | Compound components, render props, React 19 API shape |
 | `/web-design-guidelines` | UI accessibility review, UX patterns |
 | `/react-best-practices` | Performance (~40% Next.js-specific — check applicability) |
+
+## Drawer or route
+
+A detail surface goes in a `DetailDrawerStack` level (`src/components/core/detail-drawer/`) when
+**all three** hold. Fail one and it is a route.
+
+1. **Contextual** — the covered page is why the reader is here, and the column the stack leaves
+   showing is doing work. At 320px a drawer is full-width, so this criterion buys nothing there:
+   it has to be earned on the wide layout.
+2. **Single-decision** — one primary action, reachable without hunting. A level with two competing
+   primaries is two levels, or a page.
+3. **Reversible** — either dismissal destroys nothing, or the level is **guarded**.
+
+Length is not a criterion. `DrawerBody` scrolls, and a form that is seven viewport-heights at 320px
+is seven viewport-heights on a page too — the scroll happens either way, and the drawer keeps the
+tree the entry belongs to on screen while it happens.
+
+### Panel regions
+
+A drawer level is three regions and nothing else: `DrawerHeader`, `DrawerBody`, `DrawerFooter`. Each
+reaches both edges of the panel; only `DrawerBody` scrolls.
+
+- **A form's actions are the level's `DrawerFooter`,** which means the `<form>` is the level: `flex
+  min-h-0 flex-1 flex-col`, wrapping its own `DrawerBody` and `DrawerFooter`. A sticky bar written
+  inside the body instead inherits that body's padding — it floats short of both edges and leaves a
+  strip of dead space beneath it at the end of the scroll. Negative margins to cancel the padding are
+  the same bug with a longer fuse.
+- **The panel is the measure.** A `max-w-*` on the controls is a page-era habit; inside a panel sized
+  for the form it only strands the footer's buttons to the right of the fields. Cap *prose* instead,
+  which is what `PracticeDefinitionPreview` does.
+- **The header content row is two columns at most**, and the second is the title block. A drawer is
+  the full viewport at 320px and the dismiss, the padding and a leading chip already spend 40% of it.
+  Anything that is itself text — a badge, a status, provenance — goes *below* the title, inside that
+  block. The row wraps as a backstop, but a third column is a design mistake, not a wrap case.
+
+### Guarded levels
+
+A level whose kind is in the host's `guardedKinds` closes **straight to the URL, without the exit
+animation** the other levels get. Both editor stacks use it: `GUARDED_LEVEL_KINDS` (workspace
+practices) and `GUARDED_CURATED_LEVEL_KINDS` (instance catalog).
+
+That is the whole of it, and the reason is narrow: `useUnsavedChanges` blocks the *navigation* to ask
+about the draft, so animating out first unmounts the form while the prompt is still on screen, and a
+refused navigation then leaves the level shut with the URL still holding it open.
+
+**A guarded level is not a level that refuses to be dismissed.** Escape, a press on the page, a swipe
+and its own controls all close it, exactly like every other level — refusing a gesture silently is
+indistinguishable from a broken drawer, and the reader has no way to learn the rule. What protects a
+draft is the prompt, which appears on all four paths and on none of them when there is nothing to
+lose.
+
+Related trap: `useBlocker`'s `shouldBlockFn` sees `routeId`/`pathname`/`search`, and every drawer
+navigation on one surface shares a route. A guard written as `() => isDirty` will block navigations
+that do **not** unmount the form, so "Discard changes" discards nothing.
+
+Paths that predate a level are kept as `beforeLoad` redirects into the stack — they were linked and
+bookmarked. `admin/practices/new.tsx` is the shortest example.
+
+## Loading and errors
+
+Choose by **region**, not by feel.
+
+| The thing that is loading | Show |
+|---|---|
+| A region whose shape you know at author time — list, table, card grid, form, page body, drawer body | A skeleton mirroring that shape, inside the region's real container |
+| A control the reader just activated — button, switch, row action | `<Spinner />` inside the control, with the label changing ("Saving…") |
+| Anything under ~1s | Nothing. Gate it — [`spin-delay`](https://www.npmjs.com/package/spin-delay) is the shape to copy or install; do not hand-roll the timer, its state machine has to be discrete or the effect re-arms |
+| A whole route transition | The router's `pendingComponent`; it already delays 1000ms with a 500ms floor |
+
+Below 1s a reader perceives the result as immediate and
+[needs no feedback at all](https://www.nngroup.com/articles/response-times-3-important-limits/) — a
+state that appears and vanishes inside that window reads as a fault.
+[Polaris](https://polaris.shopify.com/components/feedback-indicators/spinner) restricts spinners to
+"content that can't be represented with skeleton loading components".
+
+**Never** — a bare centred spinner standing in for a region · `min-h-*` on a loading wrapper (that
+guarantees the jump the skeleton exists to prevent — take a row count from the caller instead, see
+`PracticeSkeletons.tsx`) · `role="status"` on a container that mounts with its text already inside
+([ARIA22](https://www.w3.org/WAI/WCAG22/Techniques/aria/ARIA22) needs the role to exist *before* the
+message) · `role` or `aria-label` on a `<Spinner>` inside a control, where a live region corrupts
+the button's own accessible name. A spinner standing alone for a region opts in with those same
+plain attributes; `Spinner` hides itself only when neither is present.
+
+## Motion
+
+280ms in, 200ms out. Enter is the longer half — it is the reader orienting; exit is getting out of
+the way ([Material](https://m2.material.io/design/motion/speed.html): 225/195 and "transitions that
+exceed 400ms may feel too slow"). Split the curve by direction: decelerate in
+(`cubic-bezier(0.05,0.7,0.1,1)`), standard out (`cubic-bezier(0.2,0,0.38,0.9)`). A dismissible side
+panel takes standard out, not accelerate — it can come back.
+
+Under `prefers-reduced-motion`, cut what triggers symptoms and keep what carries meaning: no scaling,
+no travelling the width of the viewport, but the fade stays so the arrival is still legible. Scope it
+(`motion-reduce:` / a media block on the component); never `* { transition: none }`.
+
+**Only `transform`, `opacity` and `filter` may appear in a `transition-*` on an overlay.** Anything
+resolving to `width`/`height`/inset must be constant, or scoped to the axis where it is constant —
+a survivor's geometry must never depend on the element that is leaving.
+
+**The Storybook suite runs under `prefers-reduced-motion: reduce`** — `vitest.config.storybook.ts`
+sets it on the Playwright context so play functions are deterministic. Every `motion-reduce:` rule is
+therefore the branch under test, and no story can assert travel distance, an easing curve or a peek
+width: those are exactly the values reduced motion zeroes. A motion regression has to be pinned on
+something reduced motion leaves alone — the presence of `data-starting-style`, an attribute's
+sequence over frames, or the class list itself. Three separate drawer bugs shipped green through this
+suite before that was written down.
+
+**A drawer that mounts already open never animates in.** Base UI's `useTransitionStatus` seeds
+`mounted` from `open`, so `open && !mounted` — the branch that sets `starting` — cannot run on the
+first render, and the popup gets no `data-starting-style` frame. Anything mounted by URL state hits
+this. Mount it closed and open it a frame later (`DetailDrawerStack`'s `useArrived`); an effect is
+not enough, because a passive effect can be flushed before the browser paints the closed state.
+
+## Search params that are UI state
+
+A filter, a toggle, an open panel on the page you are already on is not a navigation. Write it with
+`useSearchState` (`lib/search-params.ts`), which passes `resetScroll: false` — the router resets
+scroll on **every** commit, including a search-only one, so without it a control halfway down a long
+page throws the reader back to the top.
+
+## Vocabulary
+
+`docs/contributor/practice-feedback-language.md` is normative. The rulings this branch settled:
+
+| Concept | The word | Not |
+|---|---|---|
+| What an instance offers | **catalog** / instance catalog | library |
+| Availability to workspaces | **include / exclude** | offer, retire |
+| A grouping of practices | **group** (user-facing); `area` stays in code, types and the API | area, section |
+| A practice with no group | **Unassigned** | No area, Not in an area, Belong to no area |
+| Inputs and criteria | **review rules** | review behavior, detection config |
+
+Prefer dropping the class noun where the thing's own name is already on screen: "No practices here",
+not "No practices in this area".
+
+## Status vocabularies
+
+Every enum a practice surface renders goes in `components/practice-vocabulary/` as `StatusDefs` and
+renders through `StatusBadge`. The icon is required and unique within its enum because badge variants
+collapse, and colour alone fails WCAG 2.2 SC 1.4.1. **Nothing else may hold words, a colour or an
+icon for an enum value** — a bare `<Badge>` next to a registry badge reads as the same family and is
+how a *setting* came to look identical to a *provenance state*.
+
+A registry entry that would be identical for every value is not information. Say what to do about it
+in a sentence instead.
+
+## Field orientation
+
+`Field` ships three orientations and the choice is about **the control's width**, not about taste:
+
+| Control | Orientation |
+|---|---|
+| Switch, checkbox, radio — a fixed ~32px box | `horizontal`. It fits beside its label at 320px. |
+| Select, input, anything with a `w-*` — a real column | `responsive`, inside a `FieldGroup`, and size it `w-full @md/field-group:w-56` |
+| Textarea, editor, anything full-bleed | the default vertical |
+
+`responsive` reads `@md/field-group`, and **only `FieldGroup` opens that container** — a `responsive`
+field with no `FieldGroup` ancestor is stacked at every width, which looks fine on a phone and wrong
+on a desktop. A `horizontal` field with a 14rem control is the opposite mistake: at 320px it leaves
+the label about 60px and the row squashes.
+
+Fixed widths on a control inside a responsive field must be breakpoint-scoped for the same reason —
+`w-56` alone cannot stack.
+

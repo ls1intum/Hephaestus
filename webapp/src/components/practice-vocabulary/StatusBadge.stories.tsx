@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { ASSESSMENT_DEFS } from "./assessment-defs";
+import { DASHBOARD_VISIBILITY_DEFS } from "./dashboard-visibility-defs";
 import { DELIVERY_STATE_DEFS } from "./delivery-outcome-defs";
 import { DELIVERY_PLACE_DEFS } from "./delivery-place-defs";
 import { PRESENCE_DEFS } from "./presence-defs";
@@ -60,6 +61,7 @@ export const EveryRegistry: Story = {
 		<div className="space-y-6">
 			<Gallery heading="Delivery outcome" defs={DELIVERY_STATE_DEFS} />
 			<Gallery heading="Delivery place" defs={DELIVERY_PLACE_DEFS} />
+			<Gallery heading="Dashboard visibility" defs={DASHBOARD_VISIBILITY_DEFS} />
 			<Gallery heading="Why withheld" defs={WITHHOLDING_FAMILY_DEFS} />
 			<Gallery heading="Result" defs={ASSESSMENT_DEFS} />
 			<Gallery heading="Severity" defs={SEVERITY_DEFS} />

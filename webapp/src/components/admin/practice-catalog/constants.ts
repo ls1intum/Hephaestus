@@ -33,6 +33,20 @@ export const WORK_ARTIFACT_FILTER_ITEMS: {
 	label: string;
 }[] = [{ value: "ALL", label: "All work types" }, ...WORK_ARTIFACT_FILTER_OPTIONS];
 
+/**
+ * The same list for {@link FilterToggle}. "All" is shortened on screen to fit the row, so the full
+ * name is restored for a screen reader (WCAG 2.2 SC 2.5.3).
+ */
+export const WORK_TYPE_FILTER_OPTIONS: {
+	value: "ALL" | ArtifactKindId;
+	label: string;
+	shortLabel?: string;
+	srSuffix?: string;
+}[] = [
+	{ value: "ALL", label: "All work types", shortLabel: "All", srSuffix: "work types" },
+	...WORK_ARTIFACT_FILTER_OPTIONS,
+];
+
 export function generateSlug(name: string): string {
 	return name
 		.toLowerCase()
