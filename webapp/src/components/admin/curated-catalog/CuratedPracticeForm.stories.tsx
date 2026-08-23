@@ -11,7 +11,7 @@ import {
 import { withPageBehind } from "@/stories/decorators";
 import { Stateful } from "@/stories/stateful";
 import { expectSettledVisible } from "@/test/overlay";
-import { expectNoPanelOverflow } from "@/test/reflow";
+import { expectNoPanelOverflow, expectPanelContentInset } from "@/test/reflow";
 import { CuratedFormLevel } from "./CuratedFormLevel";
 import { CuratedPracticeForm, type CuratedPracticeFormInitialValue } from "./CuratedPracticeForm";
 import { curatedPracticeLevel, GUARDED_CURATED_LEVEL_KINDS } from "./curated-catalog-search";
@@ -152,7 +152,10 @@ export const HephaestusUpdateAvailable: Story = {
 		onSubmit: fn(),
 	},
 	play: async () => {
-		await settledEditor();
+		const popup = await settledEditor();
+		// The version banner is the host's, not the form's: rendered as a sibling of `DrawerBody` it
+		// lands directly on the panel, which has no padding, and touches both edges.
+		await expectPanelContentInset(popup);
 		// The full label, since colour alone cannot carry which kind of update it is.
 		await expect(screen.getByText("Hephaestus update available: review rules")).toBeVisible();
 		await expect(screen.getByText(/would change review rules/)).toBeVisible();

@@ -6,7 +6,7 @@ import { LevelCancel } from "@/components/core/detail-drawer/LevelCancel";
 import { withPageBehind } from "@/stories/decorators";
 import { Stateful } from "@/stories/stateful";
 import { expectSettledVisible } from "@/test/overlay";
-import { expectNoPanelOverflow } from "@/test/reflow";
+import { expectNoPanelOverflow, expectPanelContentInset } from "@/test/reflow";
 import { CuratedAreaForm } from "./CuratedAreaForm";
 import { CuratedFormLevel } from "./CuratedFormLevel";
 import { curatedAreaLevel, GUARDED_CURATED_LEVEL_KINDS } from "./curated-catalog-search";
@@ -61,6 +61,13 @@ const meta = {
 	tags: ["autodocs"],
 } satisfies Meta<typeof CuratedAreaForm>;
 
+/** The editor is a drawer level, so it arrives over a transition rather than being simply present. */
+async function settledEditor(): Promise<HTMLElement> {
+	const [popup] = document.querySelectorAll<HTMLElement>('[data-slot="drawer-popup"]');
+	await expectSettledVisible(popup);
+	return popup;
+}
+
 export default meta;
 type Story = StoryObj<typeof meta>;
 
@@ -69,6 +76,11 @@ export const Create: Story = { args: { mode: "create" } };
 export const Edit: Story = { args: { mode: "edit", initialData } };
 
 export const HephaestusUpdateAvailable: Story = {
+	play: async () => {
+		// The same banner as the practice editor's, and the same way to get it wrong: rendered beside
+		// `DrawerBody` instead of inside it, it lands on the unpadded panel.
+		await expectPanelContentInset(await settledEditor());
+	},
 	args: {
 		mode: "edit",
 		initialData: {

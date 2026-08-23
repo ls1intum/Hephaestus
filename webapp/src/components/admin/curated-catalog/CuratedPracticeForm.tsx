@@ -85,6 +85,44 @@ export function CuratedPracticeForm(props: CuratedPracticeFormProps) {
 		mode === "edit" && canUseHephaestusVersion(initialData.status) && onUseHephaestusVersion;
 	const updateAvailable = mode === "edit" && initialData.status.state === "UPDATE_WAITING";
 	const formDisabled = isResetPending || isKeepPending;
+	/** The host's own banners, handed to the form so they land inside its padded, scrolling body. */
+	const banners = (
+		<>
+			{mode === "edit" && (
+				<HephaestusVersionPanel
+					status={initialData.status}
+					kind="practice"
+					shipped={initialData.shipped}
+					definitionOptions={definitionOptions}
+					areaNames={Object.fromEntries(areas.map((area) => [area.slug, area.name]))}
+					isResetPending={isResetPending}
+					isKeepPending={isKeepPending}
+					disabled={conflict ?? false}
+					onUseHephaestusVersion={canReset ? () => setResetOpen(true) : undefined}
+					onKeepCurrentDefinition={onKeepCurrentDefinition}
+				/>
+			)}
+
+			{conflict && (
+				<div className="space-y-2">
+					<Alert variant="warning" role="alert">
+						<RotateCcw />
+						<AlertTitle>This practice changed while you were editing</AlertTitle>
+						<AlertDescription>
+							Your draft is safe. Continue with it and save to replace the latest changes, or leave
+							this page and reopen the practice to see them.
+						</AlertDescription>
+					</Alert>
+					{onContinueWithDraft && (
+						<Button type="button" variant="outline" size="sm" onClick={onContinueWithDraft}>
+							Continue with my draft
+						</Button>
+					)}
+				</div>
+			)}
+		</>
+	);
+
 	const resetLabel = updateAvailable ? "Apply Hephaestus update" : "Restore Hephaestus default";
 
 	return (
@@ -115,42 +153,10 @@ export function CuratedPracticeForm(props: CuratedPracticeFormProps) {
 				</AlertDialogContent>
 			</AlertDialog>
 
-			{mode === "edit" && (
-				<HephaestusVersionPanel
-					status={initialData.status}
-					kind="practice"
-					shipped={initialData.shipped}
-					definitionOptions={definitionOptions}
-					areaNames={Object.fromEntries(areas.map((area) => [area.slug, area.name]))}
-					isResetPending={isResetPending}
-					isKeepPending={isKeepPending}
-					disabled={conflict ?? false}
-					onUseHephaestusVersion={canReset ? () => setResetOpen(true) : undefined}
-					onKeepCurrentDefinition={onKeepCurrentDefinition}
-				/>
-			)}
-
-			{conflict && (
-				<div className="max-w-3xl space-y-2">
-					<Alert variant="warning" role="alert">
-						<RotateCcw />
-						<AlertTitle>This practice changed while you were editing</AlertTitle>
-						<AlertDescription>
-							Your draft is safe. Continue with it and save to replace the latest changes, or leave
-							this page and reopen the practice to see them.
-						</AlertDescription>
-					</Alert>
-					{onContinueWithDraft && (
-						<Button type="button" variant="outline" size="sm" onClick={onContinueWithDraft}>
-							Continue with my draft
-						</Button>
-					)}
-				</div>
-			)}
-
 			{mode === "create" ? (
 				<PracticeDefinitionForm
 					mode="create"
+					beforeFields={banners}
 					areas={areas}
 					isPending={isPending}
 					definitionOptions={definitionOptions}
@@ -161,6 +167,7 @@ export function CuratedPracticeForm(props: CuratedPracticeFormProps) {
 			) : (
 				<PracticeDefinitionForm
 					mode="edit"
+					beforeFields={banners}
 					initialData={initialData}
 					areas={areas}
 					isPending={isPending}

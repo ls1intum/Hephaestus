@@ -123,7 +123,7 @@ export function HephaestusVersionPanel(props: HephaestusVersionPanelProps) {
 		<section
 			aria-labelledby={headingId}
 			className={cn(
-				"max-w-3xl rounded-lg border p-4 text-sm",
+				"rounded-lg border p-4 text-sm",
 				copy.tone === "attention" ? "border-warning/50 bg-warning/5" : "bg-card",
 			)}
 		>

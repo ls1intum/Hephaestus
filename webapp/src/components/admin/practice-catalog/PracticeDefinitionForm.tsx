@@ -94,6 +94,8 @@ interface PracticeDefinitionFormBaseProps {
 	isPending: boolean;
 	disabled?: boolean;
 	isSubmitDisabled?: boolean;
+	/** Sits at the top of the scrolling body, so a host's banner shares the fields' padding. */
+	beforeFields?: React.ReactNode;
 	afterFields?: React.ReactNode;
 	cancelAction: React.ReactNode;
 	/**
@@ -216,6 +218,7 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 		isPending,
 		disabled = false,
 		isSubmitDisabled,
+		beforeFields,
 		afterFields,
 		cancelAction,
 		initialData,
@@ -412,6 +415,7 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 		<form onSubmit={handleSubmit} noValidate className="flex min-h-0 flex-1 flex-col">
 			{unsavedChanges.dialog}
 			<DrawerBody className="flex flex-col gap-8">
+				{beforeFields}
 				<FormErrorSummary key={refusals} errors={refusals > 0 ? errorSummary : []} />
 				<fieldset disabled={formDisabled} className="contents">
 					{/* The panel is the measure. Capping the controls narrower than the panel they sit in

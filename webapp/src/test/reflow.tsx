@@ -201,3 +201,31 @@ export async function expectDialogBodyScrolls(popup: HTMLElement = openDialogPop
 	);
 	await expectWithinViewport(heading);
 }
+
+/**
+ * Only a drawer's own regions reach its edges. Everything else is content and sits inside their
+ * padding.
+ *
+ * The failure this catches is a host rendering a banner as a sibling of `DrawerBody` rather than
+ * inside it: it lands as a direct child of the panel, which has no padding of its own, and touches
+ * both edges while every field below it is inset.
+ */
+export async function expectPanelContentInset(panel: HTMLElement) {
+	const regions = new Set(["drawer-header", "drawer-body", "drawer-footer", "drawer-content"]);
+	const box = panel.getBoundingClientRect();
+	// The panel's own border, which its regions sit inside.
+	const BORDER = 2;
+	const flush = Array.from(panel.querySelectorAll<HTMLElement>("*")).filter((element) => {
+		const slot = element.getAttribute("data-slot") ?? "";
+		if (regions.has(slot) || element.tagName === "FORM") return false;
+		const rect = element.getBoundingClientRect();
+		// Narrow elements are decoration — separators, bleeds — not content that should be inset.
+		if (rect.width < 40) return false;
+		return Math.abs(rect.left - box.left) <= BORDER || Math.abs(box.right - rect.right) <= BORDER;
+	});
+	expect(
+		flush.map(
+			(element) => `${element.tagName.toLowerCase()}.${element.className.toString().split(" ")[0]}`,
+		),
+	).toEqual([]);
+}
