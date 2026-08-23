@@ -28,7 +28,10 @@ import {
 	type PracticeReviewWorkspaceUpdate,
 } from "@/components/admin/practices/PracticeReviewSettings";
 import { PracticeReviewSweepSchedule } from "@/components/admin/practices/PracticeReviewSweepSchedule";
-import { PracticeDefinitionSkeleton } from "@/components/admin/practices/PracticeSkeletons";
+import {
+	PracticeDefinitionSkeleton,
+	ReviewSettingsSkeleton,
+} from "@/components/admin/practices/PracticeSkeletons";
 import { PracticeAutonomyPage } from "@/components/admin/practices/practice-autonomy/PracticeAutonomyPage";
 import { ReviewPage } from "@/components/admin/practices/review/ReviewPage";
 import type { ReviewRunningState } from "@/components/admin/practices/review/review-readiness";
@@ -38,7 +41,6 @@ import {
 } from "@/components/admin/practices/review/review-sections";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Spinner } from "@/components/ui/spinner";
 import environment from "@/environment";
 import { usePracticeAutonomyMutations } from "@/hooks/use-practice-autonomy-mutations";
 import { usePracticeReviewSettingsMutation } from "@/hooks/use-practice-review-settings";
@@ -249,9 +251,7 @@ function WhenAndWhereSection({ workspaceSlug }: { workspaceSlug: string }) {
 				</Alert>
 			)}
 			{isLoading ? (
-				<div className="flex h-40 items-center justify-center">
-					<Spinner className="size-6" />
-				</div>
+				<ReviewSettingsSkeleton />
 			) : error || !reviewSettingsQuery.data || !workspaceQuery.data ? (
 				<QueryErrorAlert
 					error={error}

@@ -6,8 +6,6 @@ import de.tum.cit.aet.hephaestus.practices.curated.CuratedPreconditionRequiredEx
 import de.tum.cit.aet.hephaestus.practices.curated.StaleCuratedEntryException;
 import de.tum.cit.aet.hephaestus.practices.curated.adoption.CatalogAdoptionPreconditionRequiredException;
 import de.tum.cit.aet.hephaestus.practices.curated.adoption.StaleCatalogAdoptionPlanException;
-    }
-
 import de.tum.cit.aet.hephaestus.practices.review.InvalidReviewCoverageException;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewPreconditionRequiredException;
 import de.tum.cit.aet.hephaestus.practices.review.StalePracticeReviewSettingsException;

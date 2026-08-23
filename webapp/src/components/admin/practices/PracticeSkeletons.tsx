@@ -70,3 +70,25 @@ export function PracticeDefinitionSkeleton() {
 		</div>
 	);
 }
+
+/**
+ * The review settings form: a section heading over switch rows, three times. Sized to the real
+ * sections so the page does not jump when the two queries behind them land.
+ */
+export function ReviewSettingsSkeleton() {
+	return (
+		<div className="space-y-8" aria-hidden>
+			{Array.from({ length: 3 }, (_, section) => (
+				<div key={section} className="space-y-4">
+					<div className="space-y-2">
+						<Skeleton className="h-6 w-48" />
+						<Skeleton className="h-4 w-full max-w-lg" />
+					</div>
+					{Array.from({ length: 2 }, (_, row) => (
+						<Skeleton key={row} className="h-10 w-full" />
+					))}
+				</div>
+			))}
+		</div>
+	);
+}
