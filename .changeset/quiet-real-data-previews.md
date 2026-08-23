@@ -2,6 +2,6 @@
 "hephaestus": minor
 ---
 
-Preview deployments can reuse staging data and NATS while starting with practice reviews paused in every workspace, and instance administrators can enter a workspace directly through audited owner impersonation.
+An instance administrator can now enter a workspace directly through owner impersonation, and every such entry is recorded in the audit trail.
 
-**Operators:** The optional `PREVIEW_SEED_SOURCE_CONTAINER`, `PREVIEW_SEED_SOURCE_USERNAME`, and `PREVIEW_SEED_SOURCE_DATABASE` variables override the staging PostgreSQL source when its Compose names differ from the defaults.
+**Operators:** if you run this project's pull request preview stacks, the optional `PREVIEW_SEED_SOURCE_CONTAINER`, `PREVIEW_SEED_SOURCE_USERNAME` and `PREVIEW_SEED_SOURCE_DATABASE` variables override the PostgreSQL source when its Compose names differ from the defaults.

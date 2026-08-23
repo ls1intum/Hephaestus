@@ -63,7 +63,7 @@ Before upgrading to any new `0.x.0` version:
 Entries exist only for releases that need operator action. Everything else is in the
 [release notes](https://github.com/ls1intum/Hephaestus/releases).
 
-### Next release
+### v0.74.0
 
 #### 🔴 An agent image reference naming a channel tag is now refused
 
@@ -579,7 +579,7 @@ A deployment that runs the application without the shipped Compose files was alr
 #### 🔴 An agent heartbeat slower than 30 seconds now refuses to start
 
 **Affected**: deployments that override `hephaestus.agent.heartbeat-interval`. There is no environment
-variable for it, so that means an `application-local.yaml` or another `spring.config.import` source,
+variable for it, so that means an `application-local.yml` or another `spring.config.import` source,
 or the relaxed-binding form `HEPHAESTUS_AGENT_HEARTBEATINTERVAL`. The shipped default is `25s` and is
 valid; if you have not set this, there is nothing to do.
 
@@ -688,7 +688,7 @@ action:
 **Migration**:
 
 1. Deploy host must reach `github.com`, `fulcio.sigstore.dev`, `rekor.sigstore.dev`, and `tuf-repo-cdn.sigstore.dev` over HTTPS.
-2. Remove `docker/agent-image-pin.local.env`. Use `application-local.yaml` or a shell env var instead — see [Agent image digests](https://github.com/ls1intum/Hephaestus/blob/main/docs/admin/agent-image-digests.md).
+2. Remove `docker/agent-image-pin.local.env`. Use `application-local.yml` or a shell env var instead — see [Agent image digests](https://github.com/ls1intum/Hephaestus/blob/main/docs/admin/agent-image-digests.md).
 3. Confirm `HEPHAESTUS_AGENT_IMAGE_REFERENCE` is not pre-set in your deploy substrate; an unintended value shadows the verified pin.
 4. Rolling back to a pre-v0.69.0 release: set `HEPHAESTUS_RELEASE_PIN_SKIP=true` plus an explicit `HEPHAESTUS_AGENT_IMAGE_REFERENCE=...@sha256:<digest>` env override on the init service.
 
