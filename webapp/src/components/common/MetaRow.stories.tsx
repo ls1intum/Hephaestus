@@ -3,11 +3,7 @@ import { expect } from "storybook/test";
 import { Badge } from "@/components/ui/badge";
 import { MetaRow } from "./MetaRow";
 
-/**
- * Captions and chips are two kinds of thing. Rendered as one flat run at one gap they arrive as a
- * single run-on sentence — "Pull or merge request ⏺Send automatically Follows the workspace
- * default" — which is what this row used to say.
- */
+/** Captions and chips, told apart by separators and rhythm rather than by wording. */
 const meta = {
 	title: "Common/Meta row",
 	component: MetaRow,

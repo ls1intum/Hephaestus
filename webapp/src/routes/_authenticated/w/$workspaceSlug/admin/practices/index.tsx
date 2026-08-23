@@ -97,10 +97,9 @@ function PracticeCatalogRoute() {
 		...listAdoptablePracticesOptions({ path: { workspaceSlug } }),
 		enabled: library === true,
 	});
-	// `select` tags each payload with the kind that asked for it. `useQueries` cannot correlate a
-	// result with the entry that produced it, so without the tag every read of `query.data` is a
-	// union and each panel needs a cast — and a mis-ordered stack becomes a runtime `undefined.name`
-	// instead of a type error.
+	// `useQueries` cannot correlate a result with the entry that produced it, so each payload is
+	// tagged: without it every read is a union, and a mis-ordered stack is a runtime `undefined.name`
+	// rather than a type error.
 	const levelQueries = useQueries({
 		queries: detailStack.map((entry) => {
 			if (entry.kind === "catalog-area") {
@@ -159,8 +158,7 @@ function PracticeCatalogRoute() {
 		scope: practiceCatalogStructureScope(workspaceSlug),
 	});
 
-	// Adding closes only the practice level, so an administrator lands back in the library they were
-	// working through rather than in an edit form they did not ask for.
+	// Closes only the practice level, so the reader lands back in the catalog they were working through.
 	const adoptReviewedPractice = async (depth: number) => {
 		const entry = detailStack[depth];
 		const query = levelQueries[depth];
@@ -353,8 +351,7 @@ function PracticeCatalogRoute() {
 											headers: { "If-Match": preview.etag },
 										});
 									} catch (error) {
-										// Same failure as a practice's, so the same recovery: refresh the plan in
-										// place rather than closing the panel and asking for it back in a toast.
+										// Same failure as a practice's, so the same recovery: refresh in place.
 										if (problemStatusOf(error) !== 412) return;
 										const refreshed = await query.refetch();
 										if (refreshed.isSuccess) setStaleLevelKey(detailStackKey(entry));

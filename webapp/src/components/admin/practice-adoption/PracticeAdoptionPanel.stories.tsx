@@ -51,8 +51,7 @@ const ready = (over: Partial<ReadyState> = {}): ReadyState => ({
 });
 
 /**
- * The panel has no page of its own — the route it used to occupy redirects here with the drawer
- * already open — so every story mounts a real drawer over a real page.
+ * The panel has no page of its own, so every story mounts a real drawer over a real page.
  */
 const meta = {
 	title: "Workspace admin/Practice adoption/Practice panel",
@@ -113,7 +112,7 @@ export const AlreadyAdded: Story = {
 		await expectSettledVisible(open);
 		await expect(screen.queryByRole("button", { name: "Add practice" })).not.toBeInTheDocument();
 		// The workspace copy opens as another level rather than a page, so the reader never leaves
-		// the library to look at what is already in it.
+		// the catalog to look at what is already in it.
 		await expect(
 			new URL(open.getAttribute("href") ?? "", "https://example.test").searchParams.get("detail"),
 		).toContain("practice:describe-what-and-why");

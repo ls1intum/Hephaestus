@@ -3,10 +3,7 @@ import { expect } from "storybook/test";
 import { ARTIFACT_KIND_VALUES } from "@/lib/artifact-kinds";
 import { WorkTypeLabel } from "./WorkTypeLabel";
 
-/**
- * The kind of work a practice reviews. One glyph, one phrase, one gap — the practice surfaces used
- * to assemble this themselves and disagreed on all three.
- */
+/** The kind of work a practice reviews: one glyph, one phrase, one gap. */
 const meta = {
 	title: "Shared/Practice vocabulary/Work type",
 	component: WorkTypeLabel,

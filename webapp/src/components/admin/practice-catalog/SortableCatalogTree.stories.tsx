@@ -413,7 +413,6 @@ export const DraggingARowPastTheNextRowsMidpoint: Story = {
 	},
 };
 
-/** Everything here has to fit the WCAG 1.4.10 reference width without a sideways drag. */
 export const NarrowViewport: Story = {
 	parameters: { viewport: { defaultViewport: "reflow" }, chromatic: { viewports: [320] } },
 	play: async ({ canvasElement }) => {

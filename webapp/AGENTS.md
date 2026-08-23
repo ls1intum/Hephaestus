@@ -274,9 +274,14 @@ A detail surface goes in a `DetailDrawerStack` level (`src/components/core/detai
    a text field dismisses the *drawer*.
 
 **The one-question tell: if Escape must ever show a confirmation, it is a route.** A surface whose
-dismissal needs permission is not a dismissible surface. That is why `PracticeDefinitionForm` — ~68
-controls, >=816px of fixed-minimum field height, and a `useBlocker` discard guard — is a route and
-must stay one.
+dismissal needs permission is not a dismissible surface. `PracticeDefinitionForm` is the worked
+example: 43 controls, 4,062px at 320×568 — seven viewport-heights against the 1.5 in criterion 2 —
+and a `useBlocker` discard guard. At 320px a drawer is full-width, so the context column criterion 1
+asks for does not exist there at all.
+
+A route still has to keep the reader's place. The practice editor carries the `detail` stack in its
+search params (`PRACTICE_SETUP_SEARCH_PARAMS`) even though it renders no drawer, so returning lands
+on the panel it was opened from rather than a bare list.
 
 Related trap: `useBlocker`'s `shouldBlockFn` sees `routeId`/`pathname`/`search`, and every drawer
 navigation on one surface shares a route. A guard written as `() => isDirty` will block navigations
@@ -290,7 +295,7 @@ Choose by **region**, not by feel.
 |---|---|
 | A region whose shape you know at author time — list, table, card grid, form, page body, drawer body | A skeleton mirroring that shape, inside the region's real container |
 | A control the reader just activated — button, switch, row action | `<Spinner />` inside the control, with the label changing ("Saving…") |
-| Anything under ~1s | Nothing. Gate it: `useSpinDelay(query.isPending)` |
+| Anything under ~1s | Nothing. Gate it — [`spin-delay`](https://www.npmjs.com/package/spin-delay) is the shape to copy or install; do not hand-roll the timer, its state machine has to be discrete or the effect re-arms |
 | A whole route transition | The router's `pendingComponent`; it already delays 1000ms with a 500ms floor |
 
 Below 1s a reader perceives the result as immediate and
@@ -303,8 +308,9 @@ state that appears and vanishes inside that window reads as a fault.
 guarantees the jump the skeleton exists to prevent — take a row count from the caller instead, see
 `PracticeSkeletons.tsx`) · `role="status"` on a container that mounts with its text already inside
 ([ARIA22](https://www.w3.org/WAI/WCAG22/Techniques/aria/ARIA22) needs the role to exist *before* the
-message) · `role` or `aria-label` on `<Spinner>` — pass `label` if it genuinely needs announcing, and
-never inside a control, where a live region corrupts the button's own accessible name.
+message) · `role` or `aria-label` on a `<Spinner>` inside a control, where a live region corrupts
+the button's own accessible name. A spinner standing alone for a region opts in with those same
+plain attributes; `Spinner` hides itself only when neither is present.
 
 ## Motion
 
@@ -373,13 +379,3 @@ the label about 60px and the row squashes.
 Fixed widths on a control inside a responsive field must be breakpoint-scoped for the same reason —
 `w-56` alone cannot stack.
 
-## Drawer or route, continued
-
-The measurement, so the next person does not have to redo it: `PracticeDefinitionForm` renders
-**3,019px on a 1200×900 desktop and 4,062px at 320×568** — seven viewport-heights — with 43 controls.
-It fails criterion 2 by nearly 5×, and at 320px a drawer is full-width, so the context column that
-justifies the pattern does not exist there at all.
-
-What a route must still do is keep the reader's place: the practice editor carries the `detail` stack
-in its search params (`PRACTICE_SETUP_SEARCH_PARAMS`) even though it renders no drawer, so returning
-lands on the panel it was opened from rather than a bare list.

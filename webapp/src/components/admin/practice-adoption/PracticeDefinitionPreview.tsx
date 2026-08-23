@@ -24,8 +24,7 @@ export interface PracticeDefinitionPreviewProps {
  * answer the question being asked — is this a habit we want. `criteria` answers a different one, how
  * the model judges, and it is not written to this reader: it addresses the model in the second
  * person and spends its length on `PRESENT`/`ABSENT`/`MAJOR` and abstention rules. It is also long —
- * a median of 8,722 characters once the server composes its work-type preamble in, and 20 of the 37
- * bundled practices open with the same 5,426-character block.
+ * a median of 8,722 characters once the server composes its work-type preamble in.
  *
  * So it stays available — adopting an automated critic without being able to read its rule is worse
  * — but behind a disclosure, next to the precompute script, which is the same kind of artefact.

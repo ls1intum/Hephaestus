@@ -27,8 +27,8 @@ import {
 export interface AvailablePracticeListProps {
 	practices: CatalogPracticeSummary[];
 	/**
-	 * The areas the workspace already has. An area missing from this set is one the library can
-	 * offer back, which is why its practices stay listed even after they have been added.
+	 * The areas the workspace already has. An area missing from this set is one the catalog can
+	 * put back, which is why its practices stay listed even after they have been added.
 	 */
 	existingAreaSlugs: ReadonlySet<string>;
 }
@@ -36,7 +36,7 @@ export interface AvailablePracticeListProps {
 /**
  * What the instance catalog still has to offer this workspace, grouped by the area each entry would
  * land in. A practice already added into an area the workspace still has is not offered again; one
- * whose area was deleted stays, because the area is what the library can put back.
+ * whose group was deleted stays, because the group is what the catalog can put back.
  */
 export function AvailablePracticeList({
 	practices,
@@ -130,8 +130,7 @@ function countLabel(count: number): string {
 
 function PracticeRow({ practice }: { practice: CatalogPracticeSummary }) {
 	const def = CATALOG_AVAILABILITY_DEFS[practice.availability];
-	// An added practice opens the workspace copy, everything else the catalog preview — but both
-	// open as a drawer level, so the library never has to be left to look at something in it.
+	// Both open as a drawer level, so the catalog never has to be left to look at something in it.
 	const link =
 		practice.availability === "ADOPTED" ? (
 			<DetailStackLink entry={{ kind: "practice", id: practice.slug }} />
@@ -140,10 +139,8 @@ function PracticeRow({ practice }: { practice: CatalogPracticeSummary }) {
 		);
 
 	return (
-		// No `aria-label` on the row: one would replace everything below for a screen reader, taking
-		// the work type and the area with it. The visible text is the accessible name, and the
-		// registry's second grammatical form is appended for the part a sighted reader gets from
-		// the chevron.
+		// No `aria-label`: it would replace the work type and group below it for a screen reader. The
+		// visible text is the name; the registry's verb phrase stands in for the chevron.
 		<Item variant="outline" render={link}>
 			<ItemMedia variant="icon" className="bg-transparent">
 				<AreaPill size="md" slug={practice.areaSlug} name={practice.areaName} />

@@ -40,7 +40,7 @@ export interface AreaAdoptionPanelProps {
 /**
  * A whole catalog area, with every practice it would touch. Each practice opens *on top of* this
  * panel rather than expanding inside it, so one definition looks the same whether it was reached
- * from the library list or from its area.
+ * from the catalog list or from its area.
  */
 export function AreaAdoptionPanel({
 	state,

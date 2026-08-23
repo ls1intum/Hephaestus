@@ -103,7 +103,6 @@ type Story = StoryObj<typeof meta>;
 
 export const MixedOutcomes: Story = {
 	play: async ({ args }) => {
-		// Only ADD and MOVE_TO_AREA are changes, so three practices produce one.
 		const confirm = await screen.findByRole("button", { name: "Add 1 practice" });
 		await expectSettledVisible(confirm);
 		await expect(screen.getByText("Adds")).toBeVisible();
@@ -126,11 +125,9 @@ export const RestoreDeletedArea: Story = {
 		}),
 	},
 	play: async ({ args }) => {
-		// Nothing is created, so the action is a restore rather than an add.
 		const confirm = await screen.findByRole("button", { name: "Restore group" });
 		await expectSettledVisible(confirm);
 		await expect(screen.getAllByText("Moves back")).toHaveLength(2);
-		// The panel's primary action, which no story reached before.
 		await userEvent.click(confirm);
 		await expect(args.onConfirm).toHaveBeenCalledOnce();
 	},
@@ -170,17 +167,13 @@ export const FailedToLoad: Story = {
 	},
 };
 
-/**
- * The same recovery a single practice gets: the panel stays open with the refreshed plan, rather
- * than closing and asking the reader to find their way back from a toast.
- */
+/** The panel stays open with the refreshed plan rather than closing. */
 export const PlanWentStale: Story = {
 	args: { state: ready({}, "stale") },
 	play: async () => {
 		const alert = await screen.findByRole("alert");
 		await expectSettledVisible(alert);
 		await expect(alert.textContent).toContain("The catalog changed while you were reading");
-		// Still actionable: the refreshed plan is on screen and can be applied as it now stands.
 		await expect(screen.getByRole("button", { name: "Add 1 practice" })).toBeEnabled();
 	},
 };

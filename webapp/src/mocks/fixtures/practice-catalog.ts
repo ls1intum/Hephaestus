@@ -9,10 +9,7 @@ import {
  * A real bundled practice, copied verbatim from `default-catalog.json` — the one whose
  * `whyItMatters` is the longest of the 37.
  *
- * The invented copy the stories used before was 74 characters of `whyItMatters` against a measured
- * median of 222 and this maximum of 511, and 69 characters of `criteria` against a composed
- * median of 8,722. Every layout and reading-order claim was therefore made about a panel a fraction
- * of its real height. Design against this one.
+ * Design layout against this one: it is the widest the real data gets.
  *
  * `criteria` carries the work-type preamble the server composes in at load, because that is what the
  * API returns and so what the panel actually has to render.

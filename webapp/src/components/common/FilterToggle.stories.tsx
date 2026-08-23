@@ -10,10 +10,7 @@ const OPTIONS = [
 	{ value: "docs.document", label: "Documents" },
 ] as const;
 
-/**
- * One filter with two shapes. Both halves used to be written out at each call site, taking the
- * `role="toolbar"` override and the shortened-label rule with them.
- */
+/** One filter, as a select on a narrow viewport and a toggle row on a wide one. */
 const meta = {
 	title: "Common/Filter toggle",
 	component: FilterToggle,

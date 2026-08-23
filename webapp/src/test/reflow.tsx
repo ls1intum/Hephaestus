@@ -108,10 +108,8 @@ export async function expectNoPanelOverflow(panel: HTMLElement) {
 }
 
 /**
- * Nothing in the story reaches past the viewport, and the failure names the element that did.
- *
- * `expectNoPageOverflow` compares two numbers and tells you only that one is bigger, which on a
- * component with a hundred nodes is the start of a search rather than the end of one.
+ * Nothing reaches past the viewport (SC 1.4.10), and the failure names the element that did rather
+ * than reporting that one number exceeds another.
  */
 export async function expectNoOverflowingElement(root: HTMLElement = document.body) {
 	const limit = window.innerWidth + LAYOUT_SLACK_PX;

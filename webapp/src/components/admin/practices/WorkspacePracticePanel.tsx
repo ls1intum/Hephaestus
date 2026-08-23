@@ -37,7 +37,7 @@ export interface WorkspacePracticePanelProps {
  *
  * Renders the same {@link PracticeDefinitionPreview} the catalog drawer uses — `Practice` is
  * structurally a `CuratedPracticeDefinition` — so a practice reads identically whether it was met in
- * the library or in the workspace's own tree. Editing stays a route: a form that must ask before
+ * the catalog or in the workspace's own tree. Editing stays a route: a form that must ask before
  * discarding work is not a dismissible surface.
  */
 export function WorkspacePracticePanel({

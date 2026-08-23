@@ -1,6 +1,6 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
 
-/** Retired. The library is a section of Practice setup, not a page of its own. */
+/** Kept so a bookmarked link lands on Practice setup with the catalog shown. */
 export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/practices/available/")(
 	{
 		beforeLoad: ({ params }) => {

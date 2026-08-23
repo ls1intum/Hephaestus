@@ -2,7 +2,6 @@ import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
 export interface MetaRowProps {
-	/** Caption-weight facts, joined by separators. */
 	captions?: ReactNode[];
 	/** Chips reporting a state. Rendered after the captions, at their own rhythm. */
 	badges?: ReactNode;
@@ -12,10 +11,9 @@ export interface MetaRowProps {
 /**
  * The line of facts under a row's title.
  *
- * Captions and badges are two different kinds of thing and were rendered as one flat run at one gap,
- * so "Pull or merge request", a chip, and "Follows the workspace default" arrived as a single
- * run-on sentence. Separators between the captions and a wider gap before the chips say which is
- * which without adding a word.
+ * Rendered as one flat run at one gap, captions and chips read as a single run-on sentence.
+ * Separators between the captions and a wider gap before the chips say which is which without
+ * adding a word.
  */
 export function MetaRow({ captions = [], badges, className }: MetaRowProps) {
 	const shown = captions.filter(Boolean);

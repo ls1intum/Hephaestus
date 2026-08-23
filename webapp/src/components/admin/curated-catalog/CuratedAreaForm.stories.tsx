@@ -60,7 +60,6 @@ export const Submitting: Story = {
 	},
 };
 
-/** Everything here has to fit the WCAG 1.4.10 reference width without a sideways drag. */
 export const NarrowViewport: Story = {
 	args: { mode: "create" },
 	parameters: { viewport: { defaultViewport: "reflow" }, chromatic: { viewports: [320] } },

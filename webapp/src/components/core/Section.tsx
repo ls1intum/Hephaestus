@@ -19,7 +19,6 @@ export interface SectionProps
 		VariantProps<typeof sectionTitleVariants> {
 	title: ReactNode;
 	description?: ReactNode;
-	/** Controls that belong to the section rather than to any one row in it. */
 	actions?: ReactNode;
 	/** `h3` when the section sits inside another one, so the outline stays truthful. */
 	level?: 2 | 3;

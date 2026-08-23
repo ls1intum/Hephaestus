@@ -57,13 +57,9 @@ type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {
 	play: async ({ canvas }) => {
-		// The ordinary case carries no chip, so the two exceptions are the only colour in the list.
 		await expect(canvas.queryByText("Available")).not.toBeInTheDocument();
 		await expect(canvas.getByText("Name unavailable")).toBeVisible();
-		// An adopted practice inside an area the workspace still has is not offered again.
 		await expect(canvas.queryByText("Keep pull requests focused")).not.toBeInTheDocument();
-		// An adoptable row stays on the route and only pushes a `detail` level, which is what makes
-		// it open a drawer instead of replacing the page.
 		await expect(
 			detailParamOf(canvas.getByRole("link", { name: /Describe what changed and why/ })),
 		).toBe('["catalog-practice:describe-what-and-why"]');
@@ -76,11 +72,7 @@ export const Default: Story = {
 export const DeletedAreaStillHasSomethingToAdd: Story = {
 	args: { existingAreaSlugs: new Set() },
 	play: async ({ canvas }) => {
-		// The area is gone, so its adopted practice is listed again — but one entry is still available,
-		// so the area is offered as a review rather than a pure restore.
 		await expect(canvas.getByRole("link", { name: /Review group · 1 practice/ })).toBeVisible();
-		// An added practice opens the workspace copy as a drawer level too, so nothing in the library
-		// navigates away from the library.
 		await expect(
 			detailParamOf(canvas.getByRole("link", { name: /Keep pull requests focused/ })),
 		).toBe('["practice:review-scope"]');
@@ -90,7 +82,6 @@ export const DeletedAreaStillHasSomethingToAdd: Story = {
 export const DeletedAreaCanOnlyBeRestored: Story = {
 	args: { practices: [practices[1]], existingAreaSlugs: new Set() },
 	play: async ({ canvas }) => {
-		// Nothing left to add, so putting the area back is the only thing on offer.
 		await expect(canvas.getByRole("link", { name: /Restore group · 1 practice/ })).toBeVisible();
 	},
 };

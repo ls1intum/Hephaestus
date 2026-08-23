@@ -84,10 +84,15 @@ export const DisabledWhileOpen: Story = {
 	},
 };
 
-/** Everything here has to fit the WCAG 1.4.10 reference width without a sideways drag. */
 export const NarrowViewport: Story = {
 	parameters: { viewport: { defaultViewport: "reflow" }, chromatic: { viewports: [320] } },
-	play: async ({ canvasElement }) => {
-		await expectNoOverflowingElement(canvasElement);
+	play: async ({ canvas, userEvent }) => {
+		// The seven-column icon grid is the only thing here that can outgrow 320px, and it is
+		// portalled, so the assertion has to look at the document rather than the canvas.
+		await userEvent.click(
+			canvas.getByRole("button", { name: "Edit the icon and color for Code quality" }),
+		);
+		await screen.findByRole("textbox", { name: "Search icons" });
+		await expectNoOverflowingElement(document.body);
 	},
 };

@@ -2,7 +2,6 @@ import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
 export interface FormActionBarProps {
-	/** Usually a Cancel link. */
 	secondary?: ReactNode;
 	children: ReactNode;
 	className?: string;

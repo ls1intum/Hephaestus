@@ -24,7 +24,6 @@ export interface AreaDetails {
 }
 
 export interface AreaDetailsDialogProps {
-	/** The area being edited, or `null` when the dialog is describing a new one. */
 	area: PracticeArea | null;
 	open: boolean;
 	pending: boolean;

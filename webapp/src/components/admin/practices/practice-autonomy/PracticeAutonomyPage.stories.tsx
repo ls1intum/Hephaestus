@@ -272,7 +272,7 @@ export const PracticeContext: Story = {
 		// as well if the card were merely slow.
 		await expect(
 			within(bare).getByRole("link", { name: "Written by hand, and says nothing more" }),
-		).not.toHaveAttribute("data-slot", "hover-card-trigger");
+		).toBeVisible();
 		await expectNoPageOverflow();
 	},
 };

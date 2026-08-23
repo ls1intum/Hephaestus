@@ -28,10 +28,6 @@ export interface FilterToggleProps<TValue extends string> {
 /**
  * One filter, as a select on a narrow viewport and a toggle row on a wide one.
  *
- * Both halves were written out at each of three call sites, and with them the `role="toolbar"`
- * override and the shortened-label rule — so the same control disagreed with itself about gaps and
- * about which labels were abbreviated.
- *
  * `role="toolbar"` rather than Base UI's default `group`: the group ships a roving tabindex, and
  * `toolbar` is the role that contract belongs to. `radiogroup` would be worse — the items are
  * `aria-pressed`, not radios.

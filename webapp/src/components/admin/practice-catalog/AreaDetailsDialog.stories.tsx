@@ -58,7 +58,6 @@ export const UnchangedDetailsJustClose: Story = {
 	play: async ({ args }) => {
 		await expectSettledVisible(await screen.findByLabelText("Name"));
 		await userEvent.click(screen.getByRole("button", { name: "Save" }));
-		// No request for details that did not change.
 		await expect(args.onSubmit).not.toHaveBeenCalled();
 		await expect(args.onOpenChange).toHaveBeenCalledWith(false);
 	},

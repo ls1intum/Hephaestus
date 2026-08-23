@@ -28,19 +28,13 @@ const meta = {
 	title: "Workspace admin/Practice adoption/Definition preview",
 	component: PracticeDefinitionPreview,
 	parameters: { layout: "padded", chromatic: { viewports: [320, 1440] } },
-	// The real thing by default: a 511-character rationale and a 5,049-character composed rule. The
-	// short invented copy is kept as `Minimal`, because it is the case, not the norm.
+	// A real bundled practice, not invented copy: the layout claims below are about its size.
 	args: { definition: realPracticeDefinition, options: mockPracticeDefinitionOptions },
 	tags: ["autodocs"],
 } satisfies Meta<typeof PracticeDefinitionPreview>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
-
-/** The short end of the range — the shape still has to hold when a practice says little. */
-export const Minimal: Story = {
-	args: { definition },
-};
 
 export const Complete: Story = {
 	args: { definition },
@@ -98,13 +92,11 @@ export const CriteriaIsMarkdown: Story = {
 	},
 	play: async ({ canvas, userEvent }) => {
 		await userEvent.click(canvas.getByRole("button", { name: "How it decides" }));
-		// Demoted to h4 by UntrustedMarkdown, so a practice cannot outrank the section it sits in.
 		const standard = await canvas.findByRole("heading", { name: "The standard", level: 4 });
 		await expect(standard).toBeVisible();
 		await expect(canvas.getByRole("list")).toBeVisible();
 		await expect(canvas.getAllByRole("listitem")).toHaveLength(2);
 		await expect(canvas.getByText("end to end").tagName).toBe("EM");
-		// The literal syntax is gone, which is the whole point.
 		await expect(canvas.queryByText(/^## /)).not.toBeInTheDocument();
 	},
 };
@@ -118,9 +110,10 @@ export const RationaleLeadsTheRuleFollows: Story = {
 	play: async ({ canvas }) => {
 		const rationale = canvas.getByText(realPracticeDefinition.whyItMatters as string);
 		await expect(rationale).toBeVisible();
-		// Collapsed, so none of the rule's text is in the accessible tree until it is asked for.
-		await expect(canvas.queryByText(/## The standard/)).not.toBeInTheDocument();
-		// ...and the rationale precedes every disclosure in document order.
+		// Collapsed, so none of the rule is in the accessible tree until it is asked for.
+		await expect(
+			canvas.queryByRole("heading", { name: "The standard", level: 4 }),
+		).not.toBeInTheDocument();
 		const rule = canvas.getByRole("button", { name: "How it decides" });
 		await expect(
 			rationale.compareDocumentPosition(rule) & Node.DOCUMENT_POSITION_FOLLOWING,
@@ -149,7 +142,6 @@ export const UnknownWorkType: Story = {
 	},
 };
 
-/** Everything here has to fit the WCAG 1.4.10 reference width without a sideways drag. */
 export const NarrowViewport: Story = {
 	parameters: { viewport: { defaultViewport: "reflow" }, chromatic: { viewports: [320] } },
 	play: async ({ canvasElement }) => {

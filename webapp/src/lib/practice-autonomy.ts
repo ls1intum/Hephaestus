@@ -31,10 +31,6 @@ export const WORKSPACE_DEFAULT_SOURCE = "the workspace default";
 
 /**
  * Where a practice's autonomy came from — a total answer, so a caller cannot invent one.
- *
- * The sentence form returned `null` for the overridden case, and each of its three callers filled
- * that hole differently: one printed "Set for this practice", one printed nothing at all, one passed
- * the null straight through. Same state, three answers.
  */
 export type AutonomySource = { kind: "inherited"; from: string } | { kind: "chosen" };
 

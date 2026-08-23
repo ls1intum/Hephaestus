@@ -3,23 +3,13 @@ import { Skeleton } from "@/components/ui/skeleton";
 /**
  * The shapes the practice surfaces resolve into, drawn before the data arrives.
  *
- * A skeleton earns its place by holding the space the real content will take, so the page does not
- * jump when it arrives — [eBay](https://playbook.ebay.com/design-system/components/loading-skeleton)
- * puts that obligation on the author. So every row count here is a required prop: a default is a
- * count that can silently disagree with the caller's page size, which is the jump the skeleton
- * exists to prevent.
- *
- * No live region. These mount with their content already inside, and
- * [ARIA22](https://www.w3.org/WAI/WCAG22/Techniques/aria/ARIA22) requires the container to carry the
- * role *before* the message appears, so a `role="status"` added here would announce nothing. The
- * heading and landmark structure the reader navigates by is already mounted around them.
+ * Every row count is a required prop: a default is a count that can silently disagree with the
+ * caller's page size, which is the jump a skeleton exists to prevent.
  */
 export interface PracticeListSkeletonProps {
-	/** How many rows the resolved list will render. */
 	rows: number;
 }
 
-/** The shape of a practice row inside an area group. */
 export function PracticeListSkeleton({ rows }: PracticeListSkeletonProps) {
 	return (
 		<div className="space-y-2" aria-hidden>
@@ -38,13 +28,10 @@ export function PracticeListSkeleton({ rows }: PracticeListSkeletonProps) {
 }
 
 export interface PracticeTreeSkeletonProps {
-	/** How many area groups the resolved tree will render. */
 	areas: number;
-	/** How many practices each group draws. */
 	practicesPerArea: number;
 }
 
-/** The shape of the whole practice tree: a group heading, then its rows. */
 export function PracticeTreeSkeleton({ areas, practicesPerArea }: PracticeTreeSkeletonProps) {
 	return (
 		<div className="space-y-6" aria-hidden>
@@ -62,9 +49,7 @@ export function PracticeTreeSkeleton({ areas, practicesPerArea }: PracticeTreeSk
 }
 
 /**
- * The shape of a practice panel's body: the rationale paragraph, then the example, then the
- * disclosure rows. Mirrors {@link PracticeDefinitionPreview}, so the panel does not reflow when the
- * definition lands.
+ * Mirrors {@link PracticeDefinitionPreview}, so the panel does not reflow when the definition lands.
  */
 export function PracticeDefinitionSkeleton() {
 	return (

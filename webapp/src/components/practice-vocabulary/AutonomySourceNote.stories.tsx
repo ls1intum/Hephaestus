@@ -2,10 +2,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect } from "storybook/test";
 import { AutonomySourceNote } from "./AutonomySourceNote";
 
-/**
- * Where a practice's autonomy came from. Both states are named: silence for the chosen case is what
- * let three surfaces disagree about what it meant.
- */
+/** Where a practice's autonomy came from. Both states are named; neither is silence. */
 const meta = {
 	title: "Shared/Practice vocabulary/Autonomy source",
 	component: AutonomySourceNote,
@@ -30,7 +27,6 @@ export const FromItsGroup: Story = {
 	},
 };
 
-/** The state that used to render as nothing at all in one surface and a bare sentence in another. */
 export const ChosenHere: Story = {
 	args: { source: { kind: "chosen" } },
 	play: async ({ canvas }) => {

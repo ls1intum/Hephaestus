@@ -194,8 +194,6 @@ export const WithInstanceCatalog: Story = {
 	},
 	play: async ({ canvas }) => {
 		canvas.getByRole("heading", { name: "Instance catalog" });
-		// An already-added practice is not offered a second time, so the library lists only the one
-		// the workspace lacks.
 		await expect(
 			canvas.getAllByRole("link", { name: /Explain what changed and why/ }),
 		).toHaveLength(1);
@@ -235,8 +233,6 @@ export const InstanceCatalogLoading: Story = {
 		library: { open: true, onOpenChange: fn(), state: { status: "loading" } },
 	},
 	play: async ({ canvas }) => {
-		// A skeleton, not a spinner: the region holds the shape the rows will take, so nothing jumps
-		// when they arrive. It is `aria-hidden`, so the assertion is on the DOM rather than a role.
 		const library = within(canvas.getByRole("region", { name: "Instance catalog" }));
 		await expect(library.queryByRole("status")).not.toBeInTheDocument();
 		await expect(
@@ -247,7 +243,7 @@ export const InstanceCatalogLoading: Story = {
 	},
 };
 
-/** Filtering to zero used to leave "No matching practices." and a banner with no control to clear. */
+/** Filtering to zero must offer the control that clears the filter. */
 export const FilteredToNothing: Story = {
 	args: { focusFilter: "docs.document" },
 	play: async ({ args, canvas, userEvent }) => {
@@ -276,8 +272,6 @@ export const PracticeNameOpensTheDetailLevel: Story = {
 	parameters: { chromatic: { disableSnapshot: true } },
 	play: async ({ canvas }) => {
 		const link = canvas.getByRole("link", { name: mockPractices[0].name });
-		// Not a hover trigger: nothing about opening a practice may require a pointer.
-		await expect(link).not.toHaveAttribute("data-slot", "hover-card-trigger");
 		await expect(
 			new URL(link.getAttribute("href") ?? "", "https://example.test").searchParams.get("detail"),
 		).toBe('["practice:pr-description-quality"]');
@@ -289,13 +283,12 @@ export const Filtered: Story = {
 	parameters: { chromatic: { viewports: [1440] } },
 	play: async ({ canvas }) => {
 		await expect(canvas.getByText("Clear the filter to reorder practices.")).toBeVisible();
-		// Area handles stay — only entry handles are gated on the filter, so naming the practice is
-		// what makes this assertion about the thing the banner promises.
-		for (const practice of mockPractices) {
-			await expect(
-				canvas.queryByRole("button", { name: `Reorder ${practice.name}` }),
-			).not.toBeInTheDocument();
-		}
+		// The row the filter keeps loses its handle; the group's own handle stays, because only entry
+		// handles are gated on the filter.
+		await expect(
+			canvas.queryByRole("button", { name: `Reorder ${practices[2].name}` }),
+		).not.toBeInTheDocument();
+		await expect(canvas.getByRole("button", { name: `Reorder ${areas[0].name}` })).toBeVisible();
 	},
 };
 

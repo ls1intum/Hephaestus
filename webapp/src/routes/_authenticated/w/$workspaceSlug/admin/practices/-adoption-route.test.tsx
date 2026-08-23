@@ -143,7 +143,7 @@ describe("catalog adoption over practice setup", () => {
 		);
 
 		await screen.findByRole("button", { name: "Add practice" }, ROUTE_RENDER_WAIT);
-		// The library is still the page; only the drawer stack changed.
+		// The catalog is still the page; only the drawer stack changed.
 		expect(router.state.location.pathname).toBe("/w/acme/admin/practices");
 		expect(router.state.location.search.detail).toEqual([`catalog-practice:${preview.slug}`]);
 	});

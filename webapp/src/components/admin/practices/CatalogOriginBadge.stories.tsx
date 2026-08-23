@@ -15,10 +15,7 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/**
- * The matching case used to render nothing, which made it indistinguishable from a practice with no
- * provenance at all. Naming it is also the only place that says the relationship is permanent.
- */
+/** The only place that says the relationship is permanent. */
 export const MatchesCatalog: Story = {
 	play: async ({ canvas }) => {
 		canvas.getByRole("button", { name: "Same as the catalog" }).focus();

@@ -22,9 +22,8 @@ export interface FormErrorSummaryProps {
  * Every reason a submit was refused, linking to the field each one is about.
  *
  * Announced but never focused. [GOV.UK](https://design-system.service.gov.uk/components/error-summary/)
- * moves focus to the summary; this repo had already chosen the first invalid field instead, and says
- * so in a test named for it (`CuratedPracticeForm.test.tsx`: "sends focus to the moments … not to the
- * top of the form"). One focus target, and it is the one that fixes the error.
+ * moves focus to the summary; this repo focuses the first invalid field instead, so there is one
+ * focus target and it is the one that fixes the error.
  */
 export function FormErrorSummary({ errors, className }: FormErrorSummaryProps) {
 	if (errors.length === 0) return null;
@@ -45,8 +44,7 @@ export function FormErrorSummary({ errors, className }: FormErrorSummaryProps) {
 								href={`#${error.fieldId}`}
 								className="underline underline-offset-4"
 								onClick={(event) => {
-									// The browser's fragment jump cannot expand a collapsed section, nor wait a
-									// frame for the field to mount.
+									// A fragment jump cannot expand a collapsed section or wait for the field to mount.
 									event.preventDefault();
 									error.reveal?.();
 									requestAnimationFrame(() => document.getElementById(error.fieldId)?.focus());

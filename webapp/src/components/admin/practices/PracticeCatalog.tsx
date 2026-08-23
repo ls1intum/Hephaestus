@@ -244,9 +244,7 @@ export function PracticeCatalog({
 						supportedModes={supportedModesFor(practice)}
 						inheritedFrom={inheritedFromFor(practice)}
 						title={
-							// Opens the practice read-only over this tree. It used to link straight to the
-							// edit form, which made "what does this say?" and "change this" the same act —
-							// and the hover card that softened that never opened on touch.
+							// Opens the practice read-only over this tree: reading is not the same act as editing.
 							<DetailStackLink
 								entry={{ kind: "practice", id: practice.slug }}
 								className="break-words rounded-sm hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
