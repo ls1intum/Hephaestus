@@ -5362,7 +5362,6 @@ paths:
             - WORKSPACE_DELIVERY_PAUSED
             - STALE_ROLLOUT_REVISION
             - OUTSIDE_CURRENT_COVERAGE
-            - ADMINISTRATIVE_INTERNAL_ONLY
             - APPROVAL_STALE
             - APPROVAL_NO_LONGER_ELIGIBLE
             - PRACTICE_REQUIRES_APPROVAL
@@ -9435,8 +9434,6 @@ components:
           enum:
           - ACTIVE
           - PAUSED
-        externalDeliveryAllowed:
-          type: boolean
         personMatched:
           type: boolean
         personMode:
@@ -9467,7 +9464,6 @@ components:
           enum:
           - AUTO
           - MANUAL
-          - ADMINISTRATIVE
     DeliveryPolicyTrace:
       type: object
       properties:
@@ -9499,7 +9495,6 @@ components:
           - WORKSPACE_DELIVERY_PAUSED
           - STALE_ROLLOUT_REVISION
           - OUTSIDE_CURRENT_COVERAGE
-          - ADMINISTRATIVE_INTERNAL_ONLY
           - APPROVAL_STALE
           - APPROVAL_NO_LONGER_ELIGIBLE
           - PRACTICE_REQUIRES_APPROVAL
@@ -9552,7 +9547,6 @@ components:
           - WORKSPACE_DELIVERY
           - CURRENT_COVERAGE
           - PRACTICE_AUTHORITY
-          - HUMAN_APPROVAL
           - RECIPIENT_CONSENT
           - ARTIFACT_ELIGIBILITY
         status:
@@ -11797,7 +11791,6 @@ components:
             - WORKSPACE_DELIVERY_PAUSED
             - STALE_ROLLOUT_REVISION
             - OUTSIDE_CURRENT_COVERAGE
-            - ADMINISTRATIVE_INTERNAL_ONLY
             - APPROVAL_STALE
             - APPROVAL_NO_LONGER_ELIGIBLE
             - PRACTICE_REQUIRES_APPROVAL
@@ -12789,7 +12782,6 @@ components:
           - WORKSPACE_DELIVERY_PAUSED
           - STALE_ROLLOUT_REVISION
           - OUTSIDE_CURRENT_COVERAGE
-          - ADMINISTRATIVE_INTERNAL_ONLY
           - APPROVAL_STALE
           - APPROVAL_NO_LONGER_ELIGIBLE
           - PRACTICE_REQUIRES_APPROVAL
@@ -12945,7 +12937,6 @@ components:
           - WORKSPACE_DELIVERY_PAUSED
           - STALE_ROLLOUT_REVISION
           - OUTSIDE_CURRENT_COVERAGE
-          - ADMINISTRATIVE_INTERNAL_ONLY
           - APPROVAL_STALE
           - APPROVAL_NO_LONGER_ELIGIBLE
           - PRACTICE_REQUIRES_APPROVAL
@@ -13065,7 +13056,6 @@ components:
           - WORKSPACE_DELIVERY_PAUSED
           - STALE_ROLLOUT_REVISION
           - OUTSIDE_CURRENT_COVERAGE
-          - ADMINISTRATIVE_INTERNAL_ONLY
           - APPROVAL_STALE
           - APPROVAL_NO_LONGER_ELIGIBLE
           - PRACTICE_REQUIRES_APPROVAL

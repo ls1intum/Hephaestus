@@ -29,9 +29,7 @@ public final class DeliveryPolicyResolver {
             new Candidate(
                 DeliveryPolicyCheck.ROLLOUT_REVISION,
                 facts.rolloutCurrent(),
-                facts.externalDeliveryAllowed()
-                    ? FeedbackSuppressionReason.STALE_ROLLOUT_REVISION
-                    : FeedbackSuppressionReason.ADMINISTRATIVE_INTERNAL_ONLY
+                FeedbackSuppressionReason.STALE_ROLLOUT_REVISION
             ),
             new Candidate(
                 DeliveryPolicyCheck.WORKSPACE_DELIVERY,
@@ -46,11 +44,6 @@ public final class DeliveryPolicyResolver {
             new Candidate(
                 DeliveryPolicyCheck.PRACTICE_AUTHORITY,
                 facts.practiceAuthority(),
-                FeedbackSuppressionReason.PRACTICE_REQUIRES_APPROVAL
-            ),
-            new Candidate(
-                DeliveryPolicyCheck.HUMAN_APPROVAL,
-                facts.humanApproval(),
                 FeedbackSuppressionReason.PRACTICE_REQUIRES_APPROVAL
             ),
             new Candidate(
@@ -85,12 +78,10 @@ public final class DeliveryPolicyResolver {
     public record Facts(
         boolean instanceMayDeliver,
         boolean workspaceEnabled,
-        boolean externalDeliveryAllowed,
         @Nullable Boolean rolloutCurrent,
         @Nullable Boolean deliveryActive,
         @Nullable Boolean currentlyCovered,
         @Nullable Boolean practiceAuthority,
-        @Nullable Boolean humanApproval,
         @Nullable Boolean recipientConsent,
         @Nullable Boolean artifactEligible,
         @Nullable FeedbackSuppressionReason artifactRefusal

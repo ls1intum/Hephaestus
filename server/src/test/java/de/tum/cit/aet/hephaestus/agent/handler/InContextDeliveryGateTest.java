@@ -67,6 +67,46 @@ class InContextDeliveryGateTest extends BaseUnitTest {
         );
     }
 
+    /**
+     * The fence the whole rollout rests on: a job admitted under one configuration cannot post under
+     * another. Every other test here holds the revision still, so without these two the branch is
+     * unreachable and a broken fence reads as green.
+     */
+    @Test
+    void aJobAdmittedUnderAnOlderRolloutSaysNothingOnTheArtifact() {
+        InContextDeliveryGate gate = new InContextDeliveryGate(
+            practiceRepository,
+            observationRepository,
+            feedbackLedgerRecorder,
+            InContextDeliveryGateFixtures.workspaceDefaults(),
+            InContextDeliveryGateFixtures.workspacesAtRevision(7L)
+        );
+        List<Observation> persisted = List.of(observation("occ-1"));
+        when(observationRepository.findByAgentJobId(JOB_ID)).thenReturn(persisted);
+
+        assertThat(gate.admitInContext(job(), List.of(observation("loud", "occ-1")))).isEmpty();
+        assertThat(gate.awaitingApproval(job(), List.of(observation("loud", "occ-1")))).isEmpty();
+        verify(feedbackLedgerRecorder).recordWithheld(
+            any(),
+            any(),
+            eq(FeedbackSuppressionReason.STALE_ROLLOUT_REVISION),
+            anyInt()
+        );
+    }
+
+    @Test
+    void aWorkspaceThatNoLongerExistsHasNoRevisionToMatchAndWithholds() {
+        InContextDeliveryGate gate = new InContextDeliveryGate(
+            practiceRepository,
+            observationRepository,
+            feedbackLedgerRecorder,
+            InContextDeliveryGateFixtures.workspaceDefaults(),
+            InContextDeliveryGateFixtures.noWorkspaces()
+        );
+
+        assertThat(gate.admitInContext(job(), List.of(observation("loud", "occ-1")))).isEmpty();
+    }
+
     @Test
     void deliveringPracticesReachTheArtifact() {
         when(practiceRepository.findByWorkspaceId(WORKSPACE_ID)).thenReturn(

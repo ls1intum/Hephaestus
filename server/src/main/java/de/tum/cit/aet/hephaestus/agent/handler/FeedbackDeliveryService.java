@@ -399,19 +399,15 @@ class FeedbackDeliveryService {
         if (trend.countRegressed() > 0) {
             parts.add(trend.countRegressed() + " slipped back");
         }
-        String body =
-            "<!-- hephaestus:re-review-ping:" +
-            job.getId() +
-            " -->\n🔁 **Re-reviewed** — " +
-            String.join(", ", parts) +
-            ". See the updated review summary above.";
+        String marker = "<!-- hephaestus:re-review-ping:" + job.getId() + " -->";
+        String body = "🔁 **Re-reviewed** — " + String.join(", ", parts) + ". See the updated review summary above.";
         try {
             if (
                 !deliveryPolicy
                     .evaluatePullRequest(job, DeliveryPolicyStage.EGRESS, null, contributingPracticeSlugs)
                     .allowed()
             ) return;
-            String pingId = commentPoster.postFormattedBody(job, body);
+            String pingId = commentPoster.postAside(job, body, marker);
             log.info("Re-review ping posted: jobId={}, pingCommentId={}", job.getId(), pingId);
         } catch (RuntimeException e) {
             log.warn("Re-review ping failed (delivery unaffected): jobId={}, error={}", job.getId(), e.getMessage());

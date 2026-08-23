@@ -51,7 +51,6 @@ const REASON_FAMILY: Record<WithholdingReason, WithholdingFamily> = {
 	WORKSPACE_DELIVERY_PAUSED: "POLICY",
 	STALE_ROLLOUT_REVISION: "POLICY",
 	OUTSIDE_CURRENT_COVERAGE: "POLICY",
-	ADMINISTRATIVE_INTERNAL_ONLY: "POLICY",
 	APPROVAL_STALE: "POLICY",
 	APPROVAL_NO_LONGER_ELIGIBLE: "POLICY",
 	RECIPIENT_OPTED_OUT: "DEVELOPER_CHOICE",
@@ -81,8 +80,6 @@ export const WITHHOLDING_REASON_DEFS: Record<WithholdingReason, string> = {
 		"Review settings changed after this work was admitted, so its feedback cannot be released.",
 	OUTSIDE_CURRENT_COVERAGE:
 		"The author, repository, or base branch is no longer covered by practice review.",
-	ADMINISTRATIVE_INTERNAL_ONLY:
-		"This administrative evaluation was allowed to measure outside coverage, but not to send feedback.",
 	APPROVAL_STALE:
 		"The approved proposal no longer matches the content or destination being released.",
 	APPROVAL_NO_LONGER_ELIGIBLE:

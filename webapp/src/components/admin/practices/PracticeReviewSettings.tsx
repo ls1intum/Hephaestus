@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { AlertCircle, ChevronDownIcon, FolderGitIcon, UsersIcon, XIcon } from "lucide-react";
+import { AlertCircle, ChevronDownIcon, FolderGitIcon, UsersIcon } from "lucide-react";
 import { useState } from "react";
 import type {
 	AgentBinding,
@@ -10,6 +10,7 @@ import type {
 	WorkspaceReviewScope,
 } from "@/api/types.gen";
 import { FacetMultiSelect, type FacetSource } from "@/components/common/FacetMultiSelect";
+import { RemovableToken } from "@/components/common/RemovableToken";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
 	AlertDialog,
@@ -23,7 +24,6 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
-import { ButtonGroup, ButtonGroupText } from "@/components/ui/button-group";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
 	Empty,
@@ -38,6 +38,7 @@ import {
 	FieldDescription,
 	FieldError,
 	FieldLabel,
+	FieldTitle,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import {
@@ -99,11 +100,7 @@ export interface PracticeReviewSettingsProps {
 }
 
 /**
- * Sections rather than cards, and no rules between them: hierarchy is carried by the heading and the
- * spacing, so the only borders left on this surface are the row lists — the boxes the reader is meant
- * to count. The sweep schedule below renders as one more section of the same shape.
- *
- * <p>Four sections for four questions an operator asks separately: may a review start, what starts
+ * Four sections for four questions an operator asks separately: may a review start, what starts
  * one, whose work it may open, and whether the result may leave. Coverage and delivery were one
  * section until pausing — the control reached for when something is going wrong — ended up as the
  * second-to-last switch on the page, indistinguishable from a preference.
@@ -141,8 +138,6 @@ function ReviewStatusSection({
 				<h2 id="review-status-heading" className="font-semibold text-lg">
 					Practice reviews
 				</h2>
-				{/* Whether reviews are actually running is the page banner's sentence, not a second one
-				    here: two prose state machines over the same facts drift apart. */}
 				<p className="text-muted-foreground text-sm">
 					Whether new practice reviews can start in this workspace.
 				</p>
@@ -236,8 +231,6 @@ function ReviewTimingSection({
 	workspace,
 	policy,
 }: Pick<PracticeReviewSettingsProps, "workspace" | "policy">) {
-	// Reviews on, but no door open. The page banner cannot see this — it knows the switch and the
-	// model, not the triggers — so the only place it can be said is beside the switches that cause it.
 	const noWayIn =
 		workspace.enabled && !workspace.autoTriggerEnabled && !workspace.manualTriggerEnabled;
 
@@ -279,8 +272,6 @@ function ReviewTimingSection({
 			</Field>
 			<Field orientation="horizontal">
 				<FieldContent>
-					{/* One switch, four doors — and only GitLab publishes the comment command, so the copy
-							    scopes it rather than promising it to every workspace. */}
 					<FieldLabel htmlFor="trigger-manual">Reviews somebody asks for</FieldLabel>
 					<FieldDescription>
 						The <strong>Review this now</strong> button, a backfill of past work, a recurring check,
@@ -405,6 +396,13 @@ function ReviewedWorkSection({
 			names.some((name) => !repositoryNames.includes(name)),
 		);
 	};
+	// An empty branch list means "every base branch", so emptying one widens and every other removal
+	// narrows. Comparing lengths read both backwards: it opened the confirmation on a removal and
+	// skipped it on the addition that actually admitted new work.
+	const widensBranches = (before: string[], after: string[]) =>
+		after.length === 0
+			? before.length > 0
+			: before.length > 0 && after.some((branch) => !before.includes(branch));
 	const summary = settings.coverageSummary;
 	const preview = coverage.preview.data;
 	const coversNobody =
@@ -414,12 +412,6 @@ function ReviewedWorkSection({
 	// server read that lands after the write, so trusting it puts "3 of 3 covered" above a list
 	// holding one repository. Only the totals and the volume come from the server, and neither of
 	// those moves when the selection does.
-	const coveredRepositories =
-		scope.repositoryMode === "ALL_MONITORED"
-			? summary.monitoredRepositories
-			: scope.repositories.length;
-	const coveredPeople =
-		scope.personMode === "ALL_ELIGIBLE" ? summary.eligiblePeople : scope.personUserIds.length;
 	// A repository can leave the monitored set while it is still named here, and then it quietly
 	// covers nothing. Only claimed once the list is actually known: a failed or pending load holds
 	// no repositories either, and every row saying "not monitored" over a dropped request is worse
@@ -428,6 +420,12 @@ function ReviewedWorkSection({
 		coverage.repositories.isLoading ||
 		coverage.repositories.isError ||
 		coverage.repositories.options.some((option) => option.value === nameWithOwner);
+	const coveredRepositories =
+		scope.repositoryMode === "ALL_MONITORED"
+			? summary.monitoredRepositories
+			: scope.repositories.filter((repository) => monitoredNow(repository.nameWithOwner)).length;
+	const coveredPeople =
+		scope.personMode === "ALL_ELIGIBLE" ? summary.eligiblePeople : scope.personUserIds.length;
 
 	return (
 		<section className="space-y-6" aria-labelledby="reviewed-work-heading">
@@ -442,8 +440,7 @@ function ReviewedWorkSection({
 				</p>
 			</div>
 
-			{/* One consequence, said once, rather than the same grey sentence under each of the two
-			    lists — an empty selection on either axis stops everything, not half of it. */}
+			{/* One consequence, said once, rather than the same sentence under each of the two lists. */}
 			{coversNobody ? (
 				<Alert variant="warning" role="status">
 					<AlertCircle />
@@ -527,7 +524,7 @@ function ReviewedWorkSection({
 														: entry,
 												),
 											};
-											requestScope(next, baseBranches.length < repository.baseBranches.length);
+											requestScope(next, widensBranches(repository.baseBranches, baseBranches));
 										}}
 									/>
 								))}
@@ -636,7 +633,9 @@ function ReviewedWorkSection({
 					<AlertDialogHeader>
 						<AlertDialogTitle>Widen practice-review coverage?</AlertDialogTitle>
 						<AlertDialogDescription>
-							This may admit more new work. Historical work will not be released.
+							New work that matches will be reviewed from now on. Reviews that already finished are
+							not released, and any review still running is discarded and starts again under the new
+							coverage.
 						</AlertDialogDescription>
 					</AlertDialogHeader>
 					{coverage.preview.isPending ? (
@@ -716,8 +715,6 @@ function FeedbackDeliverySection({ policy }: Pick<PracticeReviewSettingsProps, "
 					Whether finished feedback may leave Hephaestus and reach the people it is about.
 				</p>
 			</div>
-			{/* Paused is a state somebody has to be able to notice weeks later, when the question is
-			    "why has nobody heard anything" — a switch left of centre does not answer that. */}
 			{paused ? (
 				<Alert variant="warning" role="status">
 					<AlertCircle />
@@ -773,7 +770,6 @@ function FeedbackDeliverySection({ policy }: Pick<PracticeReviewSettingsProps, "
 	);
 }
 
-/** The label of a coverage list, carrying how much of the available population it currently admits. */
 function CoverageLabel({
 	id,
 	label,
@@ -789,7 +785,7 @@ function CoverageLabel({
 }) {
 	return (
 		<div className="flex items-baseline justify-between gap-3">
-			<FieldLabel id={id}>{label}</FieldLabel>
+			<FieldTitle id={id}>{label}</FieldTitle>
 			<span className="text-muted-foreground text-sm">
 				{covered} of {total} {noun}
 			</span>
@@ -929,22 +925,14 @@ function BaseBranchEditor({
 					</InputGroupButton>
 				</InputGroupAddon>
 			</InputGroup>
-			{/* The live region is mounted empty: a region inserted together with its message is not
-			    reliably announced, and the only other sign of a duplicate is Add greying out. */}
-			<div aria-live="polite" aria-atomic="true">
-				{duplicate ? (
-					<p id={errorId} className="font-normal text-destructive text-sm">
-						{trimmed} is already listed.
-					</p>
-				) : null}
-			</div>
+			{duplicate ? <FieldError id={errorId}>{trimmed} is already listed.</FieldError> : null}
 			{values.length > 0 ? (
 				<ul className="flex flex-wrap gap-2">
 					{values.map((value) => (
 						<li key={value}>
 							<RemovableToken
 								label={value}
-								mono
+								className="font-mono"
 								removeLabel={`Remove ${value} from base branches for ${nameWithOwner}`}
 								disabled={disabled}
 								onRemove={() => onChange(values.filter((entry) => entry !== value))}
@@ -954,41 +942,6 @@ function BaseBranchEditor({
 				</ul>
 			) : null}
 		</Field>
-	);
-}
-
-/** A chosen value and the way back out of it, sized to sit in a wrapping row of its siblings. */
-function RemovableToken({
-	label,
-	mono = false,
-	removeLabel,
-	disabled,
-	onRemove,
-}: {
-	label: string;
-	mono?: boolean;
-	removeLabel: string;
-	disabled: boolean;
-	onRemove: () => void;
-}) {
-	return (
-		<ButtonGroup>
-			<ButtonGroupText className={cn("h-8 min-w-0 max-w-[60vw] sm:max-w-xs", mono && "font-mono")}>
-				<span className="truncate" title={label}>
-					{label}
-				</span>
-			</ButtonGroupText>
-			<Button
-				variant="outline"
-				size="sm"
-				className="h-8"
-				aria-label={removeLabel}
-				disabled={disabled}
-				onClick={onRemove}
-			>
-				<XIcon aria-hidden />
-			</Button>
-		</ButtonGroup>
 	);
 }
 

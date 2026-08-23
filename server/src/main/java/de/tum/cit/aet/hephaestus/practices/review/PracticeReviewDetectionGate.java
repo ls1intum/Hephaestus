@@ -113,11 +113,9 @@ public class PracticeReviewDetectionGate {
             return new GateDecision.Skip("no workspace");
         }
 
-        // Administrative evaluations bypass coverage but cannot deliver externally.
         GateDecision.@Nullable Skip scopeSkip = null;
         String targetBranch = reviewable instanceof PullRequest pr ? pr.getBaseRefName() : null;
         if (
-            triggerMode != TriggerMode.ADMINISTRATIVE &&
             !(reviewable instanceof PullRequest
                 ? coverageService.admits(workspace, nameWithOwner, targetBranch, reviewable.reviewSubject())
                 : coverageService.admits(workspace, nameWithOwner, null, reviewable.reviewSubject(), false))
@@ -146,9 +144,6 @@ public class PracticeReviewDetectionGate {
             String.valueOf(reviewable.getId()),
             scopeSkip
         );
-        if (shared instanceof GateDecision.Skip) {
-            return shared;
-        }
         return shared;
     }
 
@@ -175,8 +170,8 @@ public class PracticeReviewDetectionGate {
             return new GateDecision.Skip("practices disabled for workspace");
         }
 
-        // The artifact's own scope refusal: checked after the feature flag but before anything that costs
-        // a query.
+        // Reported after the feature flag: a workspace with practices off is off for every reason, and
+        // saying "outside coverage" there would send an admin to the wrong screen.
         if (scopeSkip != null) {
             return scopeSkip;
         }
@@ -248,8 +243,7 @@ public class PracticeReviewDetectionGate {
             workspace,
             match.admitted(),
             workspace.getReviewSettings().getRolloutRevision(),
-            triggerMode,
-            triggerMode != TriggerMode.ADMINISTRATIVE
+            triggerMode
         );
     }
 

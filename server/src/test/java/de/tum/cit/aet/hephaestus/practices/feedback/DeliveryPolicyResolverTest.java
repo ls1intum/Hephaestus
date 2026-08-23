@@ -28,8 +28,6 @@ class DeliveryPolicyResolverTest extends BaseUnitTest {
             true,
             true,
             true,
-            true,
-            false,
             false,
             false,
             false,
@@ -49,21 +47,14 @@ class DeliveryPolicyResolverTest extends BaseUnitTest {
                 DeliveryPolicyCheckStatus.PASSED,
                 DeliveryPolicyCheckStatus.DENIED,
                 DeliveryPolicyCheckStatus.NOT_REACHED,
-                DeliveryPolicyCheckStatus.NOT_REACHED,
                 DeliveryPolicyCheckStatus.NOT_REACHED
             );
     }
 
     @Test
-    void approvalOnlySatisfiesTheApprovalCheckAndCannotBypassConsentOrArtifactState() {
-        DeliveryPolicyResolver.Facts optedOut = factsWith(null, true, false, true, null);
-        DeliveryPolicyResolver.Facts closed = factsWith(
-            null,
-            true,
-            true,
-            false,
-            FeedbackSuppressionReason.ARTIFACT_CLOSED
-        );
+    void practiceAuthorityCannotBypassConsentOrArtifactState() {
+        DeliveryPolicyResolver.Facts optedOut = factsWith(true, false, true, null);
+        DeliveryPolicyResolver.Facts closed = factsWith(true, true, false, FeedbackSuppressionReason.ARTIFACT_CLOSED);
 
         assertThat(DeliveryPolicyResolver.resolve(optedOut).suppressionReason()).isEqualTo(
             FeedbackSuppressionReason.RECIPIENT_OPTED_OUT
@@ -75,17 +66,13 @@ class DeliveryPolicyResolverTest extends BaseUnitTest {
 
     @Test
     void notApplicableChecksDoNotInterruptResolution() {
-        DeliveryPolicyResolver.Result result = DeliveryPolicyResolver.resolve(factsWith(null, null, null, true, null));
+        DeliveryPolicyResolver.Result result = DeliveryPolicyResolver.resolve(factsWith(null, null, true, null));
 
         assertThat(result.allowed()).isTrue();
         assertThat(result.checks())
             .filteredOn(check -> check.status() == DeliveryPolicyCheckStatus.NOT_APPLICABLE)
             .extracting(DeliveryPolicyResolver.CheckResult::check)
-            .containsExactly(
-                DeliveryPolicyCheck.PRACTICE_AUTHORITY,
-                DeliveryPolicyCheck.HUMAN_APPROVAL,
-                DeliveryPolicyCheck.RECIPIENT_CONSENT
-            );
+            .containsExactly(DeliveryPolicyCheck.PRACTICE_AUTHORITY, DeliveryPolicyCheck.RECIPIENT_CONSENT);
     }
 
     @Test
@@ -96,7 +83,6 @@ class DeliveryPolicyResolverTest extends BaseUnitTest {
             FeedbackSuppressionReason.STALE_ROLLOUT_REVISION,
             FeedbackSuppressionReason.WORKSPACE_DELIVERY_PAUSED,
             FeedbackSuppressionReason.OUTSIDE_CURRENT_COVERAGE,
-            FeedbackSuppressionReason.PRACTICE_REQUIRES_APPROVAL,
             FeedbackSuppressionReason.PRACTICE_REQUIRES_APPROVAL,
             FeedbackSuppressionReason.RECIPIENT_OPTED_OUT,
             FeedbackSuppressionReason.ARTIFACT_GONE,
@@ -109,14 +95,12 @@ class DeliveryPolicyResolverTest extends BaseUnitTest {
             DeliveryPolicyResolver.Facts facts = new DeliveryPolicyResolver.Facts(
                 checks[0],
                 checks[1],
-                true,
                 checks[2],
                 checks[3],
                 checks[4],
                 checks[5],
                 checks[6],
                 checks[7],
-                checks[8],
                 null
             );
 
@@ -125,12 +109,11 @@ class DeliveryPolicyResolverTest extends BaseUnitTest {
     }
 
     private static DeliveryPolicyResolver.Facts allTrue() {
-        return factsWith(true, true, true, true, null);
+        return factsWith(true, true, true, null);
     }
 
     private static DeliveryPolicyResolver.Facts factsWith(
         Boolean authority,
-        Boolean approval,
         Boolean consent,
         Boolean artifact,
         FeedbackSuppressionReason artifactReason
@@ -141,9 +124,7 @@ class DeliveryPolicyResolverTest extends BaseUnitTest {
             true,
             true,
             true,
-            true,
             authority,
-            approval,
             consent,
             artifact,
             artifactReason

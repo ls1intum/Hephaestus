@@ -198,9 +198,6 @@ class InContextDeliveryGate {
      * workspace that has since disappeared has no revision to match, which withholds rather than delivers.
      */
     private @Nullable FeedbackSuppressionReason rolloutRefusal(AgentJob job) {
-        if (!job.isExternalDeliveryAllowed()) {
-            return FeedbackSuppressionReason.ADMINISTRATIVE_INTERNAL_ONLY;
-        }
         Long admitted = job.getPracticeRolloutRevision();
         Long current = workspaceRepository
             .findById(job.getWorkspace().getId())

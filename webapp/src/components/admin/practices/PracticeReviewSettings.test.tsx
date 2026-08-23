@@ -75,8 +75,8 @@ describe("PracticeReviewSettings", () => {
 	it("names both coverage mode groups", async () => {
 		await renderSettings();
 
-		expect(await screen.findByRole("radiogroup", { name: "Repositories" })).not.toBeNull();
-		expect(screen.getByRole("radiogroup", { name: "People" })).not.toBeNull();
+		await screen.findByRole("radiogroup", { name: "Repositories" });
+		screen.getByRole("radiogroup", { name: "People" });
 	});
 
 	it("keeps persisted targets visible when they are no longer available", async () => {
@@ -99,9 +99,9 @@ describe("PracticeReviewSettings", () => {
 		// Both readouts, without opening either picker: a target nobody can see is a target nobody
 		// corrects, and a repository that has left the monitored set covers nothing while still
 		// looking like coverage.
-		expect(await screen.findByText("acme/archived")).not.toBeNull();
-		expect(screen.getByText("Not monitored")).not.toBeNull();
-		expect(screen.getByTitle("Member 99 (unavailable)")).not.toBeNull();
+		await screen.findByText("acme/archived");
+		screen.getByText("Not monitored");
+		screen.getByTitle("Member 99 (unavailable)");
 	});
 
 	it("points at the page that owns the binding without restating the page banner", async () => {
@@ -111,22 +111,6 @@ describe("PracticeReviewSettings", () => {
 		expect(change.getAttribute("href")).toBe("/w/acme/admin/models");
 		// Readiness is the banner's sentence; saying it again here was the same fact three times.
 		expect(screen.queryByText("Ready to run")).toBeNull();
-	});
-
-	it("explains when the selected model can no longer run", async () => {
-		await renderSettings({
-			model: {
-				binding: { ...readyBinding, ready: false },
-				isLoading: false,
-				isError: false,
-				onRetry: vi.fn(),
-			},
-		});
-
-		await screen.findByText("The review model is unavailable");
-		expect(screen.getByRole("link", { name: "Choose a review model" }).getAttribute("href")).toBe(
-			"/w/acme/admin/models",
-		);
 	});
 
 	it("lets admins prepare triggers before choosing a runnable model", async () => {

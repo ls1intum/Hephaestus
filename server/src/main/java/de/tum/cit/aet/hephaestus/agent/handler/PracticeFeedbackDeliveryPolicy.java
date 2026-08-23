@@ -316,7 +316,10 @@ public class PracticeFeedbackDeliveryPolicy {
             job,
             workspace,
             null,
-            false,
+            // A kind without an artifact reaches nobody unsolicited: the in-app lane is the developer's
+            // own page and the conversation lane is one they opened. Recipient consent governs feedback
+            // that goes out to them, and is asked on the artifact paths that do that.
+            null,
             null,
             null,
             DeliveryPolicyStage.COMPOSITION,
@@ -397,18 +400,17 @@ public class PracticeFeedbackDeliveryPolicy {
             new DeliveryPolicyResolver.Facts(
                 !silentModeQuery.isSilentModeEngaged(),
                 workspace != null,
-                job.isExternalDeliveryAllowed(),
                 workspace == null
                     ? null
-                    : job.isExternalDeliveryAllowed() &&
-                      admittedRevision != null &&
-                      admittedRevision.longValue() == evaluatedRevision,
+                    : admittedRevision != null && admittedRevision.longValue() == evaluatedRevision,
                 workspace == null
                     ? null
                     : workspace.getReviewSettings().getDeliveryStatus() == PracticeDeliveryStatus.ACTIVE,
-                coverage == null ? false : coverage.admitted(),
+                // Both artifact paths assess coverage whenever the workspace resolves, so a null
+                // assessment means there is no artifact to judge — the kind-generic composition entry.
+                // WORKSPACE_ENABLED has already denied the other way of getting here.
+                coverage == null ? null : coverage.admitted(),
                 autonomy.authorized(),
-                isApprovedAttempt(stage, feedbackId) ? true : null,
                 consent,
                 artifactEligible,
                 artifactRefusal
@@ -427,7 +429,6 @@ public class PracticeFeedbackDeliveryPolicy {
             consent,
             workspace == null ? null : workspace.getReviewSettings().getDeliveryStatus(),
             job.getPracticeTriggerMode(),
-            job.isExternalDeliveryAllowed(),
             autonomy.facts()
         );
         return new Resolution(result, evaluatedRevision, snapshot);
@@ -440,6 +441,12 @@ public class PracticeFeedbackDeliveryPolicy {
         Collection<String> contributingPracticeSlugs
     ) {
         if (workspace == null) return new AutonomyAssessment(false, List.of());
+        // Composition runs before anything knows which practices will contribute, so the caller has no
+        // slug set to offer and no feedback row to read one from. That is a question not yet askable,
+        // not a refusal: answering false here closed the in-app and conversation lanes outright.
+        if (feedbackId == null && contributingPracticeSlugs.isEmpty()) {
+            return new AutonomyAssessment(null, List.of());
+        }
         List<Practice> practices;
         int expected;
         if (feedbackId != null) {
@@ -507,7 +514,11 @@ public class PracticeFeedbackDeliveryPolicy {
         );
     }
 
-    private record AutonomyAssessment(boolean authorized, List<DeliveryPolicyFactsSnapshot.PracticeFact> facts) {}
+    /** {@code authorized} is null when there is no practice set to judge yet — see {@link #autonomy}. */
+    private record AutonomyAssessment(
+        @Nullable Boolean authorized,
+        List<DeliveryPolicyFactsSnapshot.PracticeFact> facts
+    ) {}
 
     private record Resolution(
         DeliveryPolicyResolver.Result result,

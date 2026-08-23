@@ -390,7 +390,6 @@ public class AgentJobService {
             job.setArtifactKind(artifactKind);
             job.setPracticeRolloutRevision(currentWorkspace.getReviewSettings().getRolloutRevision());
             job.setPracticeTriggerMode(admission == null ? TriggerMode.MANUAL : admission.triggerMode());
-            job.setExternalDeliveryAllowed(admission == null || admission.externalDeliveryAllowed());
             job.setMetadata(submission.metadata());
             job.setIdempotencyKey(detectionKey);
             try {

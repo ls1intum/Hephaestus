@@ -117,7 +117,10 @@ export function TracePage({
 				artifactKind={trace.artifactKind}
 			/>
 
-			<DeliveryPolicyTrace evaluations={trace.deliveryPolicy} />
+			{/* Check identifiers and rollout revision numbers are the workspace's own plumbing, and a
+			    member can act on none of it. The endpoint still sends it to every member, so this hides
+			    the surface rather than withholding the data. */}
+			{canAdminister && <DeliveryPolicyTrace evaluations={trace.deliveryPolicy} />}
 
 			<p className="flex items-center gap-1.5 text-xs text-muted-foreground">
 				<RadarIcon className="size-3.5 shrink-0" aria-hidden />

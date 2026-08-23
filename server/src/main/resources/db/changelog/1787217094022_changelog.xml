@@ -108,12 +108,14 @@
         <addColumn tableName="agent_job">
             <column name="practice_rollout_revision" type="BIGINT" defaultValueNumeric="0"><constraints nullable="false"/></column>
             <column name="practice_trigger_mode" type="VARCHAR(24)" defaultValue="MANUAL"><constraints nullable="false"/></column>
-            <column name="external_delivery_allowed" type="BOOLEAN" defaultValueBoolean="true"><constraints nullable="false"/></column>
         </addColumn>
-        <sql>UPDATE agent_job SET external_delivery_allowed = FALSE;</sql>
-        <sql>ALTER TABLE agent_job ADD CONSTRAINT chk_agent_job_practice_trigger_mode CHECK (practice_trigger_mode IN ('AUTO', 'MANUAL', 'ADMINISTRATIVE'));</sql>
+        <!-- A job admitted before rollout provenance existed carries no revision anybody chose. -1 is below
+             every revision a workspace can hold (the column starts at 0 and only ever increments), so the
+             delivery fence refuses it as stale. A COMPLETED job is included because approval and dispatch
+             recovery both re-evaluate the fence long after the run itself finished. -->
+        <sql>UPDATE agent_job SET practice_rollout_revision = -1 WHERE status IN ('QUEUED', 'RUNNING', 'COMPLETED');</sql>
+        <sql>ALTER TABLE agent_job ADD CONSTRAINT chk_agent_job_practice_trigger_mode CHECK (practice_trigger_mode IN ('AUTO', 'MANUAL'));</sql>
         <rollback>
-            <dropColumn tableName="agent_job" columnName="external_delivery_allowed"/>
             <dropColumn tableName="agent_job" columnName="practice_trigger_mode"/>
             <dropColumn tableName="agent_job" columnName="practice_rollout_revision"/>
         </rollback>
@@ -197,15 +199,16 @@
                     'ARTIFACT_DRAFT', 'RECIPIENT_OPTED_OUT', 'EMPTY_AFTER_SANITIZE', 'INSTANCE_SILENCED',
                     'PRACTICE_REQUIRES_APPROVAL', 'BACKFILL_QUIET', 'WORKSPACE_DISABLED', 'APPROVAL_STALE',
                     'APPROVAL_NO_LONGER_ELIGIBLE', 'WORKSPACE_DELIVERY_PAUSED', 'STALE_ROLLOUT_REVISION',
-                    'OUTSIDE_CURRENT_COVERAGE', 'ADMINISTRATIVE_INTERNAL_ONLY'));
+                    'OUTSIDE_CURRENT_COVERAGE'));
         ]]></sql>
         <createIndex tableName="feedback_dispatch" indexName="idx_feedback_dispatch_recovery"><column name="state"/><column name="lease_expires_at"/><column name="updated_at"/></createIndex>
         <createIndex tableName="feedback_dispatch" indexName="idx_feedback_dispatch_workspace"><column name="workspace_id"/><column name="created_at" descending="true"/></createIndex>
         <rollback>
             <dropTable tableName="feedback_dispatch"/>
             <sql splitStatements="true" endDelimiter=";"><![CDATA[
-                DELETE FROM feedback WHERE suppression_reason IN ('WORKSPACE_DELIVERY_PAUSED', 'STALE_ROLLOUT_REVISION', 'OUTSIDE_CURRENT_COVERAGE', 'ADMINISTRATIVE_INTERNAL_ONLY');
-                ALTER TABLE feedback DROP CONSTRAINT chk_feedback_suppression_reason;
+                UPDATE feedback SET suppression_reason = 'WORKSPACE_DISABLED'
+                 WHERE suppression_reason IN ('WORKSPACE_DELIVERY_PAUSED', 'STALE_ROLLOUT_REVISION', 'OUTSIDE_CURRENT_COVERAGE');
+                ALTER TABLE feedback DROP CONSTRAINT IF EXISTS chk_feedback_suppression_reason;
                 ALTER TABLE feedback ADD CONSTRAINT chk_feedback_suppression_reason
                     CHECK (suppression_reason IS NULL OR suppression_reason IN (
                         'VOLUME_CAPPED', 'COMPOSER_DEDUPED', 'REACTED_DISPUTED', 'REACTED_NOT_APPLICABLE',

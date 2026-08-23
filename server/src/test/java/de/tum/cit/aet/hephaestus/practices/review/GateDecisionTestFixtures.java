@@ -13,8 +13,7 @@ public final class GateDecisionTestFixtures {
             workspace,
             practices,
             workspace.getReviewSettings().getRolloutRevision(),
-            TriggerMode.AUTO,
-            true
+            TriggerMode.AUTO
         );
     }
 }

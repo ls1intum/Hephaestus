@@ -22,7 +22,6 @@ public record DeliveryPolicyFactsSnapshot(
     @Nullable Boolean recipientConsent,
     @Nullable PracticeDeliveryStatus deliveryStatus,
     @Nullable TriggerMode triggerMode,
-    boolean externalDeliveryAllowed,
     List<PracticeFact> contributingPractices
 ) {
     public DeliveryPolicyFactsSnapshot {

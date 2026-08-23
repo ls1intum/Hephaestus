@@ -4,6 +4,7 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 
+import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
 import de.tum.cit.aet.hephaestus.practices.review.WorkspaceReviewDefaults;
@@ -13,9 +14,9 @@ import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.util.Optional;
 
 /**
- * The workspace side of {@link InContextDeliveryGate}, held still: every workspace resolves to the unset
- * review defaults and to the rollout revision its jobs were admitted under, so the gate decides on practice
- * autonomy and run provenance alone.
+ * The workspace side of {@link InContextDeliveryGate}, held still, so a handler test that needs a gate
+ * decides on practice autonomy and run provenance alone. A test of the rollout fence itself must build
+ * its own workspace: {@link #workspacesAtRevision} takes the revision the fence compares against.
  */
 final class InContextDeliveryGateFixtures {
 
@@ -36,15 +37,28 @@ final class InContextDeliveryGateFixtures {
         return provider;
     }
 
+    /** Every workspace sits at revision 0, which is what a test {@link AgentJob} is admitted under. */
     static WorkspaceRepository workspaces() {
+        return workspacesAtRevision(0L);
+    }
+
+    static WorkspaceRepository workspacesAtRevision(long rolloutRevision) {
         WorkspaceRepository repository = mock(WorkspaceRepository.class);
         lenient()
             .when(repository.findById(anyLong()))
             .thenAnswer(invocation -> {
                 Workspace workspace = new Workspace();
                 workspace.setId(invocation.getArgument(0));
+                workspace.getReviewSettings().setRolloutRevision(rolloutRevision);
                 return Optional.of(workspace);
             });
+        return repository;
+    }
+
+    /** No workspace at all: the fence has no revision to match and must withhold. */
+    static WorkspaceRepository noWorkspaces() {
+        WorkspaceRepository repository = mock(WorkspaceRepository.class);
+        lenient().when(repository.findById(anyLong())).thenReturn(Optional.empty());
         return repository;
     }
 }

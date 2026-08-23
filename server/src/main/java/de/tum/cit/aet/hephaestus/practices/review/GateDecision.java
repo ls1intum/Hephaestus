@@ -30,8 +30,7 @@ public sealed interface GateDecision permits GateDecision.Detect, GateDecision.S
         Workspace workspace,
         List<Practice> matchedPractices,
         long rolloutRevision,
-        TriggerMode triggerMode,
-        boolean externalDeliveryAllowed
+        TriggerMode triggerMode
     ) implements GateDecision {
         public Detect {
             Objects.requireNonNull(workspace, "workspace must not be null");

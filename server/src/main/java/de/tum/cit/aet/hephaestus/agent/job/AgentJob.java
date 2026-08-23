@@ -120,11 +120,6 @@ public class AgentJob {
     @Column(name = "practice_trigger_mode", nullable = false, length = 24)
     private TriggerMode practiceTriggerMode = TriggerMode.MANUAL;
 
-    /** Administrative evaluations set this false. */
-    @ColumnDefault("true")
-    @Column(name = "external_delivery_allowed", nullable = false)
-    private boolean externalDeliveryAllowed = true;
-
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "metadata", columnDefinition = "jsonb")
     private JsonNode metadata;

@@ -33,7 +33,7 @@ class PracticeFeedbackDispatchRecovery {
     private final PracticeFeedbackDispatchService dispatchService;
 
     @Scheduled(fixedDelayString = "PT30S", initialDelayString = "PT30S")
-    @SchedulerLock(name = "practice-feedback-dispatch-recovery", lockAtMostFor = "PT2M", lockAtLeastFor = "PT5S")
+    @SchedulerLock(name = "practice-feedback-dispatch-recovery", lockAtMostFor = "PT15M", lockAtLeastFor = "PT5S")
     void recover() {
         for (var exhausted : dispatchRepository.findExhausted(
             Instant.now(),
@@ -122,7 +122,24 @@ class PracticeFeedbackDispatchRecovery {
         }
     }
 
+    /**
+     * Gives up on a dispatch and says so in the ledger.
+     *
+     * <p>Only for a dispatch that never began its provider write. Once {@code write_started} is set the
+     * comment may be live on the artifact, and the lookup that would prove it can answer {@code UNKNOWN}
+     * for reasons of its own — a rate limit, a search budget. Recording FAILED there would tell a
+     * developer their feedback was lost while it sits on their pull request, and would clear the
+     * comment id the next review needs to edit in place. Those keep retrying the lookup instead.
+     */
     private void terminalize(FeedbackDispatch dispatch, String error) {
+        if (Boolean.TRUE.equals(dispatch.getWriteStarted())) {
+            log.warn(
+                "Dispatch exhausted after a provider write may have landed; leaving it for reconciliation: dispatchId={}, error={}",
+                dispatch.getId(),
+                error
+            );
+            return;
+        }
         dispatchService.fail(dispatch, error);
         if (
             dispatch.getDestination() == FeedbackDispatchDestination.APPROVED_ARTIFACT_COMMENT &&

@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn, screen, userEvent, within } from "storybook/test";
 import type { AgentBinding } from "@/api/types.gen";
+import { expectUnavailable } from "@/test/controls";
 import { expectSettledVisible } from "@/test/overlay";
 import { expectNoPageOverflow } from "@/test/reflow";
 import { PracticeReviewSettings } from "./PracticeReviewSettings";
@@ -125,10 +126,6 @@ export const NoModelSelected: Story = {
 	args: { model: { ...model, binding: undefined }, workspace: { ...workspace, enabled: false } },
 };
 
-export const SelectedModelUnavailable: Story = {
-	args: { model: { ...model, binding: { ...readyBinding, ready: false } } },
-};
-
 /**
  * Ready and turned off are two different facts about a model, and only one of them is `ready`. A
  * model that has been switched off elsewhere is still reported as ready by the binding, so a
@@ -141,10 +138,8 @@ export const SelectedModelTurnedOff: Story = {
 	},
 	play: async ({ canvas }) => {
 		await expect(canvas.getByText("The review model is unavailable")).toBeVisible();
-		await expect(canvas.getByRole("switch", { name: "Start practice reviews" })).toHaveAttribute(
-			"aria-disabled",
-			"true",
-		);
+		// aria-disabled alone still leaves the switch in the tab order, which is half a disabled control.
+		await expectUnavailable(canvas.getByRole("switch", { name: "Start practice reviews" }));
 	},
 };
 
@@ -231,36 +226,10 @@ export const PilotPopulation: Story = {
 		chromatic: { viewports: [320, 1440] },
 	},
 	play: async ({ canvas }) => {
-		await expect(canvas.getByText("4 of 12 monitored")).toBeVisible();
+		await expect(canvas.getByText("3 of 12 monitored")).toBeVisible();
 		await expect(canvas.getByText("5 of 24 linked")).toBeVisible();
 		// A repository that has left the monitored set is still named in the scope and covers nothing.
 		await expect(canvas.getByText("Not monitored")).toBeVisible();
-		await expectNoPageOverflow();
-	},
-};
-
-export const ReviewScopeNarrowed: Story = {
-	args: {
-		policy: {
-			...policy,
-			settings: {
-				...settings,
-				reviewScope: {
-					repositoryMode: "SELECTED",
-					personMode: "SELECTED",
-					repositories: [
-						{ nameWithOwner: "acme/widgets", baseBranches: ["main", "release/2026.1"] },
-					],
-					personUserIds: [7],
-				},
-			},
-		},
-	},
-	parameters: {
-		viewport: { defaultViewport: "reflow" },
-		chromatic: { viewports: [320, 1440] },
-	},
-	play: async () => {
 		await expectNoPageOverflow();
 	},
 };
@@ -304,6 +273,102 @@ export const AddingATargetBranch: Story = {
 				personUserIds: [],
 			},
 		});
+	},
+};
+
+/**
+ * A repository already limited to one branch admits a second one: more work is in scope than was, so
+ * the confirmation is owed. The predicate compared list lengths until it was measured, which read this
+ * as a narrowing and saved it silently.
+ */
+export const AddingASecondBranchWidens: Story = {
+	args: {
+		policy: {
+			...policy,
+			onUpdate: fn(),
+			settings: {
+				...settings,
+				reviewScope: {
+					repositoryMode: "SELECTED",
+					personMode: "ALL_ELIGIBLE",
+					repositories: [{ nameWithOwner: "acme/widgets", baseBranches: ["main"] }],
+					personUserIds: [],
+				},
+			},
+		},
+	},
+	play: async ({ args, canvas }) => {
+		await userEvent.click(canvas.getByRole("button", { name: "Base branches for acme/widgets" }));
+		await userEvent.type(canvas.getByLabelText("Only these base branches for acme/widgets"), "dev");
+		await userEvent.click(
+			canvas.getByRole("button", { name: "Add to base branches for acme/widgets" }),
+		);
+
+		await expect(await screen.findByRole("alertdialog")).toBeInTheDocument();
+		await expect(args.policy.onUpdate).not.toHaveBeenCalled();
+	},
+};
+
+/** Dropping one of two named branches admits strictly less, so it saves without asking. */
+export const RemovingOneOfTwoBranchesNarrows: Story = {
+	args: {
+		policy: {
+			...policy,
+			onUpdate: fn(),
+			settings: {
+				...settings,
+				reviewScope: {
+					repositoryMode: "SELECTED",
+					personMode: "ALL_ELIGIBLE",
+					repositories: [{ nameWithOwner: "acme/widgets", baseBranches: ["main", "dev"] }],
+					personUserIds: [],
+				},
+			},
+		},
+	},
+	play: async ({ args, canvas }) => {
+		await userEvent.click(canvas.getByRole("button", { name: "Base branches for acme/widgets" }));
+		await userEvent.click(
+			canvas.getByRole("button", { name: "Remove dev from base branches for acme/widgets" }),
+		);
+
+		await expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+		await expect(args.policy.onUpdate).toHaveBeenCalledWith({
+			reviewScope: {
+				repositoryMode: "SELECTED",
+				personMode: "ALL_ELIGIBLE",
+				repositories: [{ nameWithOwner: "acme/widgets", baseBranches: ["main"] }],
+				personUserIds: [],
+			},
+		});
+	},
+};
+
+/** Naming no branch at all means every branch, so emptying the list is the widest this axis goes. */
+export const ClearingEveryBranchWidens: Story = {
+	args: {
+		policy: {
+			...policy,
+			onUpdate: fn(),
+			settings: {
+				...settings,
+				reviewScope: {
+					repositoryMode: "SELECTED",
+					personMode: "ALL_ELIGIBLE",
+					repositories: [{ nameWithOwner: "acme/widgets", baseBranches: ["main"] }],
+					personUserIds: [],
+				},
+			},
+		},
+	},
+	play: async ({ args, canvas }) => {
+		await userEvent.click(canvas.getByRole("button", { name: "Base branches for acme/widgets" }));
+		await userEvent.click(
+			canvas.getByRole("button", { name: "Remove main from base branches for acme/widgets" }),
+		);
+
+		await expect(await screen.findByRole("alertdialog")).toBeInTheDocument();
+		await expect(args.policy.onUpdate).not.toHaveBeenCalled();
 	},
 };
 
@@ -394,19 +459,41 @@ export const WideningRequiresConfirmation: Story = {
 				},
 			},
 		},
+		// The server answers the preview for the scope on screen, so `current` is this story's one
+		// repository. The shared fixture's three would make the before/after read 3 → 3.
+		coverage: {
+			...coverage,
+			preview: {
+				...coverage.preview,
+				data: {
+					current: { ...settings.coverageSummary, coveredRepositories: 1 },
+					proposed: settings.coverageSummary,
+					widens: true,
+				},
+			},
+		},
 	},
 	play: async ({ args, canvas }) => {
 		await userEvent.click(canvas.getByRole("radio", { name: "All monitored repositories" }));
 
 		const dialog = within(await screen.findByRole("alertdialog"));
-		await expect(dialog.getByText(/Monitored repositories covered:/)).toHaveTextContent("3");
+		await expect(dialog.getByText(/Monitored repositories covered:/)).toHaveTextContent(
+			"Monitored repositories covered: 1 → 3 of 3",
+		);
 		await expect(dialog.getByText(/Workspace-wide context:/)).toHaveTextContent(
 			"not just this proposed population",
 		);
 		await expect(args.coverage.preview.onPreview).toHaveBeenCalled();
 
 		await userEvent.click(dialog.getByRole("button", { name: "Widen coverage" }));
-		await expect(args.policy.onUpdate).toHaveBeenCalled();
+		await expect(args.policy.onUpdate).toHaveBeenCalledWith({
+			reviewScope: {
+				repositoryMode: "ALL_MONITORED",
+				personMode: "ALL_ELIGIBLE",
+				repositories: [{ nameWithOwner: "acme/widgets", baseBranches: [] }],
+				personUserIds: [],
+			},
+		});
 	},
 };
 

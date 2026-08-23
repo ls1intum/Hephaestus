@@ -9,8 +9,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 @WorkspaceAgnostic("Immutable evaluations are tenant-scoped by a raw workspace_id")
 public interface DeliveryPolicyEvaluationRepository extends JpaRepository<DeliveryPolicyEvaluation, UUID> {
-    List<DeliveryPolicyEvaluation> findByFeedbackIdOrderByEvaluatedAtDesc(UUID feedbackId, Pageable pageable);
-
     List<DeliveryPolicyEvaluation> findByWorkspaceIdAndAgentJobIdInOrderByEvaluatedAtAsc(
         Long workspaceId,
         Collection<UUID> agentJobIds

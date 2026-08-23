@@ -120,9 +120,12 @@ class PracticeFeedbackDispatchService {
         FeedbackDispatch dispatch = repository
             .findByDestinationKeyAndWorkspaceId(key, workspaceId)
             .orElseThrow(() -> new JobDeliveryException("Dispatch intent was not persisted: " + key));
-        if (!dispatch.getBody().equals(body) || dispatch.getDestination() != destination) {
-            throw new JobDeliveryException("Dispatch key was reused with different immutable content: " + key);
+        if (dispatch.getDestination() != destination) {
+            throw new JobDeliveryException("Dispatch key was reused for a different destination: " + key);
         }
+        // The row that won the insert is the body of record, and the caller's is discarded. A retry
+        // recomposes the summary from observations this run has since persisted, so the two differ by
+        // the progress footer alone — refusing the mismatch would strand the delivery permanently.
         return dispatch;
     }
 
@@ -239,16 +242,14 @@ class PracticeFeedbackDispatchService {
             }
             return commentPoster.postApprovedProposal(job, dispatch.getFeedbackId(), dispatch.getBody());
         }
-        if (job.getMetadata() != null && job.getMetadata().has("issue_number")) {
-            return commentPoster.postIssueFormattedBody(job, dispatch.getBody());
-        }
+        // Editing the summary this review supersedes comes first, for issues as much as for pull requests:
+        // an artifact reviewed five times is one evolving comment, not five.
+        boolean issue = job.getMetadata() != null && job.getMetadata().has("issue_number");
         String target = dispatch.getTargetExternalRef();
         if (target != null) {
-            PullRequestCommentPoster.UpdateResult update = commentPoster.updateFormattedBody(
-                job,
-                target,
-                dispatch.getBody()
-            );
+            PullRequestCommentPoster.UpdateResult update = issue
+                ? commentPoster.updateIssueFormattedBody(job, target, dispatch.getBody())
+                : commentPoster.updateFormattedBody(job, target, dispatch.getBody());
             if (update.kind() == PullRequestCommentPoster.UpdateResult.Kind.TRANSIENT) {
                 return null;
             }
@@ -256,7 +257,9 @@ class PracticeFeedbackDispatchService {
                 return update.externalId();
             }
         }
-        return commentPoster.postFormattedBody(job, dispatch.getBody());
+        return issue
+            ? commentPoster.postIssueFormattedBody(job, dispatch.getBody())
+            : commentPoster.postFormattedBody(job, dispatch.getBody());
     }
 
     private boolean finish(

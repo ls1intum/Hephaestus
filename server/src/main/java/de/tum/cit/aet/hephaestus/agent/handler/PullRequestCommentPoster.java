@@ -164,14 +164,19 @@ class PullRequestCommentPoster {
         return postFormattedBody(job, formattedBody, "<!-- hephaestus:approved-feedback:" + feedbackId + " -->");
     }
 
+    /**
+     * A comment that is not the job's summary, and so must not carry the summary's marker: reconciliation
+     * looks the summary up by that marker, and would otherwise adopt this comment as the summary and edit
+     * it in place on the next review.
+     */
+    @Nullable
+    String postAside(AgentJob job, String formattedBody, String marker) {
+        return postFormattedBody(job, formattedBody, marker);
+    }
+
     private String postFormattedBody(AgentJob job, String formattedBody, String marker) {
         long workspaceId = job.getWorkspace().getId();
-        IntegrationKind kind = job.getIntegrationKind();
-        if (kind == null) {
-            throw new JobDeliveryException(
-                "AgentJob.integrationKind is null — cannot resolve a delivery channel. jobId=" + job.getId()
-            );
-        }
+        IntegrationKind kind = requireIntegrationKind(job);
         SummaryChannel channel = requireChannel(kind);
         FeedbackTarget target = buildTarget(job, kind, workspaceId);
         try {
@@ -197,15 +202,24 @@ class PullRequestCommentPoster {
      * @param externalRef the vendor comment id returned by a prior {@link #postFormattedBody}
      */
     UpdateResult updateFormattedBody(AgentJob job, String externalRef, String formattedBody) {
-        long workspaceId = job.getWorkspace().getId();
-        IntegrationKind kind = job.getIntegrationKind();
-        if (kind == null) {
-            throw new JobDeliveryException(
-                "AgentJob.integrationKind is null — cannot resolve a delivery channel. jobId=" + job.getId()
-            );
-        }
+        IntegrationKind kind = requireIntegrationKind(job);
+        return update(job, kind, buildTarget(job, kind, job.getWorkspace().getId()), externalRef, formattedBody);
+    }
+
+    /** Issue counterpart of {@link #updateFormattedBody}: same contract, issue subject. */
+    UpdateResult updateIssueFormattedBody(AgentJob job, String externalRef, String formattedBody) {
+        IntegrationKind kind = requireIntegrationKind(job);
+        return update(job, kind, buildIssueTarget(job, kind, job.getWorkspace().getId()), externalRef, formattedBody);
+    }
+
+    private UpdateResult update(
+        AgentJob job,
+        IntegrationKind kind,
+        FeedbackTarget target,
+        String externalRef,
+        String formattedBody
+    ) {
         SummaryChannel channel = requireChannel(kind);
-        FeedbackTarget target = buildTarget(job, kind, workspaceId);
         SummaryChannel.UpdateOutcome outcome;
         try {
             outcome = channel.updateSummary(
@@ -274,27 +288,9 @@ class PullRequestCommentPoster {
 
     private String postIssueFormattedBody(AgentJob job, String formattedBody, String marker) {
         long workspaceId = job.getWorkspace().getId();
-        IntegrationKind kind = job.getIntegrationKind();
-        if (kind == null) {
-            throw new JobDeliveryException(
-                "AgentJob.integrationKind is null — cannot resolve a delivery channel. jobId=" + job.getId()
-            );
-        }
+        IntegrationKind kind = requireIntegrationKind(job);
         SummaryChannel channel = requireChannel(kind);
-        JsonNode metadata = job.getMetadata();
-        String repoFullName = requireMetadataText(metadata, "repository_full_name");
-        int issueNumber = requireMetadataInt(metadata, "issue_number");
-        String subjectExternalId;
-        try {
-            subjectExternalId = channel.formatIssueSubjectId(repoFullName, issueNumber);
-        } catch (IllegalArgumentException e) {
-            throw new JobDeliveryException(e.getMessage(), e);
-        }
-        FeedbackTarget target = new FeedbackTarget(
-            new IntegrationRef(kind, workspaceId, null),
-            subjectExternalId,
-            null
-        );
+        FeedbackTarget target = buildIssueTarget(job, kind, workspaceId);
         try {
             SummaryHandle handle = channel.postSummary(target, new FeedbackContent(formattedBody, marker));
             log.info(
@@ -372,6 +368,29 @@ class PullRequestCommentPoster {
             );
         }
         return channel;
+    }
+
+    private IntegrationKind requireIntegrationKind(AgentJob job) {
+        IntegrationKind kind = job.getIntegrationKind();
+        if (kind == null) {
+            throw new JobDeliveryException(
+                "AgentJob.integrationKind is null — cannot resolve a delivery channel. jobId=" + job.getId()
+            );
+        }
+        return kind;
+    }
+
+    private FeedbackTarget buildIssueTarget(AgentJob job, IntegrationKind kind, long workspaceId) {
+        JsonNode metadata = job.getMetadata();
+        String repoFullName = requireMetadataText(metadata, "repository_full_name");
+        int issueNumber = requireMetadataInt(metadata, "issue_number");
+        String subjectExternalId;
+        try {
+            subjectExternalId = requireChannel(kind).formatIssueSubjectId(repoFullName, issueNumber);
+        } catch (IllegalArgumentException e) {
+            throw new JobDeliveryException(e.getMessage(), e);
+        }
+        return new FeedbackTarget(new IntegrationRef(kind, workspaceId, null), subjectExternalId, null);
     }
 
     FeedbackTarget buildTarget(AgentJob job, IntegrationKind kind, long workspaceId) {

@@ -11,7 +11,10 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-@WorkspaceAgnostic("Dispatch rows carry an explicit workspace_id and every access is tenant-keyed")
+@WorkspaceAgnostic(
+    "Every caller-facing method is keyed by workspace_id; findRecoverable and findExhausted are the " +
+        "fleet-wide recovery sweep and are deliberately cross-tenant"
+)
 public interface FeedbackDispatchRepository extends JpaRepository<FeedbackDispatch, UUID> {
     Optional<FeedbackDispatch> findByDestinationKeyAndWorkspaceId(String destinationKey, Long workspaceId);
 

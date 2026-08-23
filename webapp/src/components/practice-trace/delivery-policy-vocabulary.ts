@@ -1,63 +1,95 @@
-import type { DeliveryPolicyTrace, DeliveryPolicyTraceCheck } from "@/api/types.gen";
+import { CircleCheckIcon, CircleDashedIcon, CircleSlashIcon, OctagonXIcon } from "lucide-react";
+import type {
+	DeliveryPolicyFactsSnapshot,
+	DeliveryPolicyTrace,
+	DeliveryPolicyTraceCheck,
+} from "@/api/types.gen";
+import type { StatusDefs } from "@/components/practice-vocabulary/status-def";
+import { WITHHOLDING_REASON_DEFS } from "@/components/practice-vocabulary/withholding-defs";
 
 type Check = DeliveryPolicyTraceCheck["check"];
 type Status = DeliveryPolicyTraceCheck["status"];
 type Surface = DeliveryPolicyTrace["surface"];
 type Stage = DeliveryPolicyTrace["stage"];
 type Reason = NonNullable<DeliveryPolicyTrace["decisiveReason"]>;
+type RepositoryMode = NonNullable<DeliveryPolicyFactsSnapshot["repositoryMode"]>;
+type PersonMode = NonNullable<DeliveryPolicyFactsSnapshot["personMode"]>;
+type Subject = NonNullable<DeliveryPolicyFactsSnapshot["subject"]>;
 
-export const deliveryCheckLabels = {
+export const DELIVERY_CHECK_LABELS = {
 	INSTANCE_SILENT_MODE: "Instance Silent Mode",
 	WORKSPACE_ENABLED: "Workspace enabled",
 	ROLLOUT_REVISION: "Current rollout revision",
 	WORKSPACE_DELIVERY: "Workspace delivery",
 	CURRENT_COVERAGE: "Current review coverage",
 	PRACTICE_AUTHORITY: "Practice authority",
-	HUMAN_APPROVAL: "Human approval",
 	RECIPIENT_CONSENT: "Recipient preference",
 	ARTIFACT_ELIGIBILITY: "Work eligibility",
 } satisfies Record<Check, string>;
 
-export const deliveryStatusLabels = {
-	PASSED: "Passed",
-	DENIED: "Denied",
-	NOT_APPLICABLE: "Not applicable",
-	NOT_REACHED: "Not reached",
-} satisfies Record<Status, string>;
+export const DELIVERY_CHECK_STATUS_DEFS: StatusDefs<Status> = {
+	PASSED: {
+		label: "Passed",
+		icon: CircleCheckIcon,
+		badgeVariant: "success",
+		description: "The check had no objection, so the run carried on to the next one.",
+	},
+	DENIED: {
+		label: "Denied",
+		icon: OctagonXIcon,
+		badgeVariant: "destructive",
+		description: "The check stopped the delivery. The reason above it says which rule it applied.",
+	},
+	NOT_APPLICABLE: {
+		label: "Not applicable",
+		icon: CircleSlashIcon,
+		badgeVariant: "outline",
+		description: "The check ran and had nothing to decide for this surface and stage.",
+	},
+	NOT_REACHED: {
+		label: "Not reached",
+		icon: CircleDashedIcon,
+		badgeVariant: "secondary",
+		description: "An earlier check denied the delivery, so this one never ran at all.",
+	},
+};
 
-export const deliverySurfaceLabels = {
+export const DELIVERY_SURFACE_LABELS = {
 	ARTIFACT: "In-context feedback",
 	IN_APP: "In-app feedback",
 	CONVERSATION: "Conversation feedback",
 } satisfies Record<Surface, string>;
 
-export const deliveryStageLabels = {
+export const DELIVERY_STAGE_LABELS = {
 	COMPOSITION: "Composition",
 	AUTOMATIC: "Automatic authorization",
 	APPROVED: "Approved authorization",
 	EGRESS: "Final delivery",
 } satisfies Record<Stage, string>;
 
-export const deliveryReasonLabels = {
-	VOLUME_CAPPED: "Review volume limit reached",
-	COMPOSER_DEDUPED: "Duplicate feedback removed",
-	REACTED_DISPUTED: "Feedback was disputed",
-	REACTED_NOT_APPLICABLE: "Feedback was marked not applicable",
-	CONVERSATION_EXPIRED: "Conversation expired",
-	ARTIFACT_GONE: "Work no longer exists",
-	ARTIFACT_CLOSED: "Work is closed",
-	ARTIFACT_MERGED: "Work is merged",
-	ARTIFACT_DRAFT: "Work is still a draft",
-	RECIPIENT_OPTED_OUT: "Recipient opted out",
-	EMPTY_AFTER_SANITIZE: "No deliverable feedback remained",
-	INSTANCE_SILENCED: "Instance Silent Mode is active",
-	WORKSPACE_DISABLED: "Practice reviews are disabled",
-	WORKSPACE_DELIVERY_PAUSED: "Workspace delivery is paused",
-	STALE_ROLLOUT_REVISION: "Review used an older rollout configuration",
-	OUTSIDE_CURRENT_COVERAGE: "Work is outside current review coverage",
-	ADMINISTRATIVE_INTERNAL_ONLY: "Administrative review is internal only",
-	APPROVAL_STALE: "Approval is stale",
-	APPROVAL_NO_LONGER_ELIGIBLE: "Approved feedback is no longer eligible",
-	PRACTICE_REQUIRES_APPROVAL: "Practice requires human approval",
-	BACKFILL_QUIET: "Backfill is configured not to deliver feedback",
-} satisfies Record<Reason, string>;
+export const DELIVERY_REPOSITORY_MODE_LABELS = {
+	ALL_MONITORED: "all monitored",
+	SELECTED: "selected",
+} satisfies Record<RepositoryMode, string>;
+
+export const DELIVERY_PERSON_MODE_LABELS = {
+	ALL_ELIGIBLE: "all eligible",
+	SELECTED: "selected",
+} satisfies Record<PersonMode, string>;
+
+export const DELIVERY_SUBJECT_LABELS = {
+	RESOLVED_LINKED_HUMAN: "author linked to an account",
+	MISSING: "no author identified",
+	NON_HUMAN: "author is a bot",
+	UNLINKED: "author not linked",
+} satisfies Record<Subject, string>;
+
+/**
+ * One vocabulary with the withheld-feedback surfaces: a decisive reason here and a feedback unit's
+ * suppression reason are the same enum, and two sentences for one value is a drift.
+ *
+ * The annotation is the exhaustiveness check. `Reason` is generated separately from
+ * `WithholdingReason`, so a reason the policy can return that the registry has no words for fails
+ * `typecheck:webapp` on this line rather than rendering as a blank on the page.
+ */
+export const DELIVERY_REASON_SENTENCES: Record<Reason, string> = WITHHOLDING_REASON_DEFS;

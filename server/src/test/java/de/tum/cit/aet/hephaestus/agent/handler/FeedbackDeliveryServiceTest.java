@@ -383,7 +383,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             when(commentPoster.updateFormattedBody(eq(job), eq("IC_prior"), any(String.class))).thenReturn(
                 new PullRequestCommentPoster.UpdateResult(PullRequestCommentPoster.UpdateResult.Kind.EDITED, "IC_prior")
             );
-            when(commentPoster.postFormattedBody(eq(job), any(String.class))).thenReturn("IC_ping");
+            when(commentPoster.postAside(eq(job), any(String.class), any(String.class))).thenReturn("IC_ping");
             when(
                 observationTrendService.computeForTarget(ArtifactKinds.PULL_REQUEST, PULL_REQUEST_ID, WORKSPACE_ID)
             ).thenReturn(Optional.of(resolvedTrend()));
@@ -398,9 +398,14 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             var body = ArgumentCaptor.forClass(String.class);
             verify(commentPoster).updateFormattedBody(eq(job), eq("IC_prior"), body.capture());
             assertThat(body.getValue()).contains("Progress since your last review").contains("Resolved");
-            var ping = ArgumentCaptor.forClass(String.class);
-            verify(commentPoster).postFormattedBody(eq(job), ping.capture());
-            assertThat(ping.getValue()).contains("hephaestus:re-review-ping").contains("Re-reviewed");
+            // The ping carries its own marker. Under the summary's, reconciliation would find the ping,
+            // adopt it as the summary, and edit it in place on the next review.
+            var pingBody = ArgumentCaptor.forClass(String.class);
+            var pingMarker = ArgumentCaptor.forClass(String.class);
+            verify(commentPoster).postAside(eq(job), pingBody.capture(), pingMarker.capture());
+            assertThat(pingBody.getValue()).contains("Re-reviewed");
+            assertThat(pingMarker.getValue()).startsWith("<!-- hephaestus:re-review-ping:");
+            verify(commentPoster, never()).postFormattedBody(eq(job), any(String.class));
         }
 
         @Test
