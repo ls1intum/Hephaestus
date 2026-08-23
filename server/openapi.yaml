@@ -9416,8 +9416,9 @@ components:
       - decision
     DeliveryPolicyFactsSnapshot:
       type: object
-      description: Compact immutable facts used for one delivery decision; excludes
-        payload and personal identifiers.
+      description: |-
+        The facts behind one delivery decision, persisted and served as-is: never add feedback payload or a
+         personal identifier to it.
       properties:
         artifactKind:
           type: string
