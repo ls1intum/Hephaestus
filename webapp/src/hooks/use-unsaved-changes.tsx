@@ -15,13 +15,9 @@ export interface UnsavedChangesGuard {
 	/** Render this next to the form. It is inert until a navigation is actually blocked. */
 	dialog: React.ReactNode;
 	/**
-	 * Hand this whatever the save dispatch returned. The guard stays down until a promise settles,
-	 * so the caller's post-save navigation is not blocked by its own success, and comes back up if
-	 * the save rejects.
-	 *
-	 * A caller whose `onSubmit` returns `void` cannot report failure, so it gets no latch and relies
-	 * on `disabled` while the mutation is pending. That is why this is a no-op rather than an error
-	 * for a non-promise.
+	 * Hand this whatever the save dispatch returned: the guard stays down until the promise settles,
+	 * so a post-save navigation is not blocked by its own success, and comes back up if it rejects.
+	 * A no-op for a non-promise — an `onSubmit` returning `void` cannot report failure at all.
 	 */
 	track: (submission: unknown) => void;
 }
@@ -38,11 +34,8 @@ export interface UseUnsavedChangesOptions {
  * The latch is the subtle part: `isPending` drops before the caller navigates, so releasing on it
  * alone races the post-save navigation and asks the reader to discard work they just saved.
  *
- * Blocks *every* navigation. In a guarded `DetailDrawerStack` level that is what makes Cancel work
- * — leaving the level is a navigation — but it also catches navigations that leave the form on
- * screen, where it would offer to discard work that then stays. Nothing reachable behind a modal
- * level does that today; narrowing it would need both `routeId` and `params`, since two practices
- * share one route.
+ * Blocks *every* navigation, which is what makes Cancel work on a guarded drawer level — leaving
+ * one is a navigation. See `webapp/AGENTS.md` § Guarded levels for the trap on the other side.
  */
 export function useUnsavedChanges({
 	isDirty,

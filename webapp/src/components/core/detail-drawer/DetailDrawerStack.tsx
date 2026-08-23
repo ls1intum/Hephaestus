@@ -35,10 +35,9 @@ export interface DetailDrawerStackProps<TKind extends string = string> {
  * Base UI keeps nested portals out of the set it hides when a popup opens, which is what lets a
  * stack reach the accessibility tree at every depth.
  *
- * A dismissal shuts the drawer first and navigates when the exit animation ends. Dropping the level
- * from the URL first would render it with an entry the caller no longer has data for, and would show
- * the previous entry's content on the way out if the URL replaced that depth. The address bar
- * therefore lags the animation; a browser Back inside that window wins and skips it.
+ * A dismissal shuts the drawer first and navigates when the exit animation ends, so the URL lags it:
+ * dropping the level first would render it with an entry the caller no longer has data for. Clearing
+ * `closingDepth` before the stack catches up re-opens the level that just left.
  */
 export function DetailDrawerStack<TKind extends string>({
 	stack,
@@ -48,17 +47,13 @@ export function DetailDrawerStack<TKind extends string>({
 }: DetailDrawerStackProps<TKind>) {
 	const [closingDepth, setClosingDepth] = useState<number | null>(null);
 
-	// The URL lags the animation, so the level that just finished leaving is still in `stack`.
-	// Clearing this on the completion frame instead re-opens it for however long the navigation
-	// takes — it pops back in, and the level behind it snaps to its stepped-back position and
-	// animates forward a second time.
+	// Cleared when the stack catches up, not on the completion frame — see the JSDoc above.
 	if (closingDepth !== null && stack.length <= closingDepth) {
 		setClosingDepth(null);
 	}
 
-	// Not rendered at all until there is a level, so mounting the component *is* the level arriving —
-	// which is what `useArrived` needs. A component that stays mounted rendering `null` has already
-	// spent its first render by the time an entry shows up.
+	// Mounting is the arrival `useArrived` needs; a component left mounted on `null` has already
+	// spent its first render.
 	if (stack.length === 0) return null;
 	return (
 		<DetailDrawerLevelView
@@ -80,10 +75,7 @@ interface DetailDrawerLevelViewProps<TKind extends string> extends DetailDrawerS
 	setClosingDepth: (depth: number | null) => void;
 }
 
-/**
- * One level. A component rather than a loop in the parent because it owns a hook: opening has to be
- * a state change on a mounted drawer, and each level mounts at a different time.
- */
+/** A component, not a loop, because it owns `useArrived` and each level mounts at a different time. */
 function DetailDrawerLevelView<TKind extends string>({
 	depth,
 	stack,
@@ -148,18 +140,13 @@ function DetailDrawerLevelView<TKind extends string>({
 }
 
 /**
- * False for the level's first render, true from the commit onwards.
+ * False on the first render, true from the commit onwards. Base UI's `useTransitionStatus` seeds
+ * `mounted` from `open`, so a drawer that mounts already open never runs the branch that sets
+ * `starting`, gets no `data-starting-style` frame, and appears at rest. Levels mount from the URL,
+ * so all of them do.
  *
- * Base UI derives its enter transition from `open` *changing* on a mounted drawer:
- * `useTransitionStatus` seeds `mounted` from `open`, so `open && !mounted` — the branch that sets
- * `starting` — never runs for a drawer that mounts already open. It then gets no
- * `data-starting-style` frame and appears at its final position with no transition at all. Levels
- * are mounted and unmounted by the URL, so every one of them lands on that path.
- *
- * A layout effect, not a frame. All Base UI needs is for `open` to change on a Root that is already
- * mounted — it owns the `data-starting-style` frame itself — and flipping during the commit keeps
- * the panel queryable in the same tick it was asked for, which a `requestAnimationFrame` does not:
- * that frame can land after a caller has already looked for the panel and found nothing.
+ * A layout effect, not a frame: `requestAnimationFrame` can land after a caller has looked for the
+ * panel and found nothing.
  */
 function useArrived(): boolean {
 	const [arrived, setArrived] = useState(false);

@@ -6,13 +6,8 @@ import {
 } from "./practice";
 
 /**
- * A real bundled practice, copied verbatim from `default-catalog.json` — the one whose
- * `whyItMatters` is the longest of the 37.
- *
- * Design layout against this one: it is the widest the real data gets.
- *
- * `criteria` carries the work-type preamble the server composes in at load, because that is what the
- * API returns and so what the panel actually has to render.
+ * Copied verbatim from `default-catalog.json`, including the work-type preamble the server composes
+ * into `criteria` at load — that is what the API returns, so that is what the panel must render.
  */
 export const realPracticeDefinition = {
 	name: "Say what else you considered",

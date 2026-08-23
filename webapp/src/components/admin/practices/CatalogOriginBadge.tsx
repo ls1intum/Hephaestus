@@ -10,16 +10,10 @@ export interface CatalogOriginBadgeProps {
 }
 
 /**
- * How a workspace copy stands against the catalog entry it came from.
- *
- * Every one of these says the same underlying thing, because a copy never tracks its source:
- * `UPDATE_AVAILABLE` is computed for display and nothing in the product applies it, and the one-time
- * install is guarded by an installation record so it never runs twice. The wording is explicit about
- * that, because "the catalog changed" alone invites the opposite reading — that the copy is about to
- * change too.
- *
- * A copy with no provenance at all renders nothing, which is a fourth state; the matching case is
- * named rather than silent so the two are distinguishable.
+ * How a workspace copy stands against the catalog entry it came from. A copy never tracks its
+ * source — `UPDATE_AVAILABLE` is computed for display and nothing applies it — so every label says
+ * so explicitly: "the catalog changed" alone invites the reading that the copy is about to change
+ * too. No provenance renders nothing, which is why the matching case is named rather than silent.
  */
 export function CatalogOriginBadge({ origin, kind, className }: CatalogOriginBadgeProps) {
 	if (!origin) {
