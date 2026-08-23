@@ -82,17 +82,15 @@ export const Create: Story = {
 	},
 };
 
-export const LeavingTheEditor: Story = {
+export const EscapeLeavesACleanEditor: Story = {
 	parameters: { chromatic: { disableSnapshot: true } },
 	play: async () => {
-		const popup = await settledEditor();
+		await settledEditor();
 
-		// A draft is not discarded by a stray gesture. `DetailDrawerStack` proves the mechanism; this
-		// pins that the editor is one of the levels wired to it.
+		// Nothing typed, so nothing to ask about: Escape leaves, exactly as it does on a read-only
+		// panel. An editor that swallowed the gesture instead would be indistinguishable from a
+		// broken drawer. `-adoption-route.test.tsx` owns the half where a draft exists.
 		await userEvent.keyboard("{Escape}");
-		await expect(popup).not.toHaveAttribute("data-ending-style");
-
-		await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
 		await waitFor(() =>
 			expect(document.querySelectorAll('[data-slot="drawer-popup"]')).toHaveLength(0),
 		);

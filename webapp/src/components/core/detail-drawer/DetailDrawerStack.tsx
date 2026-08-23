@@ -3,13 +3,6 @@ import { useLayoutEffect, useState } from "react";
 import { Drawer, DrawerContent } from "@/components/ui/drawer";
 import { type DetailStackEntry, detailStackKey } from "./detail-stack";
 
-/**
- * The ways a drawer is left without deciding anything. `swipeDirection` is not a swipe toggle — it
- * is the edge the drawer belongs to, and omitting it defaults to `down`, a bottom sheet — so a
- * guarded level refuses the gesture by reason instead.
- */
-const CASUAL_DISMISSALS = ["escape-key", "outside-press", "focus-out", "swipe"];
-
 export interface DetailDrawerLevel {
 	depth: number;
 	/** Whether a level is covering another, which is what decides "back" against "close". */
@@ -20,9 +13,11 @@ export interface DetailDrawerStackProps<TKind extends string = string> {
 	/** The open levels, outermost first. */
 	stack: DetailStackEntry<TKind>[];
 	/**
-	 * Kinds that close only through their own controls. A level holding unsaved work cannot also be
-	 * dismissed by Escape, a press on the page or a swipe: those gestures are how a drawer is normally
-	 * left, and here they would discard the work without asking.
+	 * Kinds whose close goes straight to the URL, skipping the exit animation the others get.
+	 *
+	 * For a level holding a draft, where `useUnsavedChanges` blocks the navigation to ask about it:
+	 * animating out first unmounts the form while the prompt is still on screen, and a refused
+	 * navigation then leaves the level closed with the URL still holding it open.
 	 */
 	guardedKinds?: readonly TKind[];
 	/** Called with the depth to close down to — `close(0)` dismisses the whole stack. */
@@ -97,19 +92,12 @@ function DetailDrawerLevelView<TKind extends string>({
 			// Base UI shuts a parent's children anyway; this keeps the React tree in step.
 			open={arrived && (closingDepth === null || depth < closingDepth)}
 			swipeDirection="right"
-			onOpenChange={(next, details) => {
+			onOpenChange={(next) => {
 				if (next) return;
+				// Every way out is the same way out: Escape, a press on the page, a swipe and the
+				// panel's own controls all just close it. What protects a draft is the prompt
+				// `useUnsavedChanges` raises on the navigation, not a gesture this refuses.
 				if (guarded) {
-					if (CASUAL_DISMISSALS.includes(details.reason as string)) {
-						// `cancel()` rather than an early return: a swipe Base UI believes was accepted
-						// plays the dismiss animation optimistically and never resets the gesture.
-						details.cancel();
-						return;
-					}
-					// Straight to the URL, skipping the exit animation the other levels get. A guarded
-					// level holds a draft and `useUnsavedChanges` blocks the navigation to ask about it,
-					// so animating out first would unmount the form while the prompt is still on screen —
-					// and "Keep editing" would come back to an empty one.
 					onClose(depth);
 					return;
 				}

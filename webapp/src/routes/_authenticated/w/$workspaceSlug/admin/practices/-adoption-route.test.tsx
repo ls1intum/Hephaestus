@@ -364,4 +364,54 @@ describe("catalog adoption over practice setup", () => {
 			ROUTE_RENDER_WAIT,
 		);
 	});
+
+	// Escape here, a press on the page in `DetailDrawerStack`'s stories: jsdom does not drive Base
+	// UI's outside-press. Both reach the same `onClose`, and this is the half that also owns the
+	// guard, so it is the half worth asserting against the real form.
+	it("asks before Escape discards a draft, and keeps it when refused", async () => {
+		const { router } = renderRouteAtWithRouter("/w/acme/admin/practices?detail=practice-new:draft");
+		fireEvent.change(await screen.findByRole("textbox", { name: /Name/ }, ROUTE_RENDER_WAIT), {
+			target: { value: "A draft worth keeping" },
+		});
+
+		fireEvent.keyDown(document.body, { key: "Escape" });
+
+		await screen.findByRole("alertdialog", { name: "Discard unsaved changes?" }, ROUTE_RENDER_WAIT);
+		fireEvent.click(screen.getByRole("button", { name: "Keep editing" }));
+		await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+
+		// The level is still open and still holds the draft: refusing has to be free.
+		expect(router.state.location.search.detail).toEqual(["practice-new:draft"]);
+		screen.getByDisplayValue("A draft worth keeping");
+	});
+
+	it("discards the draft and leaves when the reader says so", async () => {
+		const { router } = renderRouteAtWithRouter("/w/acme/admin/practices?detail=practice-new:draft");
+		fireEvent.change(await screen.findByRole("textbox", { name: /Name/ }, ROUTE_RENDER_WAIT), {
+			target: { value: "A draft worth losing" },
+		});
+
+		fireEvent.keyDown(document.body, { key: "Escape" });
+		fireEvent.click(
+			await screen.findByRole("button", { name: "Discard changes" }, ROUTE_RENDER_WAIT),
+		);
+
+		await waitFor(
+			() => expect(router.state.location.search.detail).toBeUndefined(),
+			ROUTE_RENDER_WAIT,
+		);
+	});
+
+	it("leaves a clean editor without asking anything", async () => {
+		const { router } = renderRouteAtWithRouter("/w/acme/admin/practices?detail=practice-new:draft");
+		await screen.findByRole("textbox", { name: /Name/ }, ROUTE_RENDER_WAIT);
+
+		fireEvent.keyDown(document.body, { key: "Escape" });
+
+		await waitFor(
+			() => expect(router.state.location.search.detail).toBeUndefined(),
+			ROUTE_RENDER_WAIT,
+		);
+		expect(screen.queryByRole("alertdialog")).toBeNull();
+	});
 });

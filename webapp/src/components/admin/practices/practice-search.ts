@@ -21,7 +21,7 @@ export const DETAIL_LEVEL_KINDS = [
 	"practice-new",
 ] as const;
 
-/** Levels holding unsaved work: they close through Cancel or Save, not through Escape or a swipe. */
+/** Levels holding a draft, so their close must reach the URL before anything animates out. */
 export const GUARDED_LEVEL_KINDS = ["practice-edit", "practice-new"] as const;
 
 /** A stack id is always a slug; a practice that does not exist yet has none, so it is a draft. */

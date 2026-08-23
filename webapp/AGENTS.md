@@ -293,21 +293,19 @@ reaches both edges of the panel; only `DrawerBody` scrolls.
 
 ### Guarded levels
 
-A level whose kind is in the host's `guardedKinds` is not dismissed by Escape, by a press on the
-page or by a swipe — only by its own controls. That is what lets an editor be a level: those three
-gestures discard a draft without asking, and `Input`/`Textarea`/`Switch`/`Checkbox` do not claim
-Escape, so Escape in a text field would otherwise reach the drawer.
+A level whose kind is in the host's `guardedKinds` closes **straight to the URL, without the exit
+animation** the other levels get. Both editor stacks use it: `GUARDED_LEVEL_KINDS` (workspace
+practices) and `GUARDED_CURATED_LEVEL_KINDS` (instance catalog).
 
-Both editor stacks use it: `GUARDED_LEVEL_KINDS` (workspace practices) and
-`GUARDED_CURATED_LEVEL_KINDS` (instance catalog).
+That is the whole of it, and the reason is narrow: `useUnsavedChanges` blocks the *navigation* to ask
+about the draft, so animating out first unmounts the form while the prompt is still on screen, and a
+refused navigation then leaves the level shut with the URL still holding it open.
 
-Two rules follow, and breaking either is silent:
-
-- **Every exit is a `DrawerClose`.** Base UI reports it as `close-press`, which the guard lets
-  through; a bespoke `onClick={close}` is a fourth path that drifts from the other three.
-- **A guarded level closes straight to the URL, skipping the exit animation.** `useUnsavedChanges`
-  blocks the navigation to ask about the draft, so animating out first unmounts the form while the
-  prompt is still on screen — and "Keep editing" comes back to an empty one.
+**A guarded level is not a level that refuses to be dismissed.** Escape, a press on the page, a swipe
+and its own controls all close it, exactly like every other level — refusing a gesture silently is
+indistinguishable from a broken drawer, and the reader has no way to learn the rule. What protects a
+draft is the prompt, which appears on all four paths and on none of them when there is nothing to
+lose.
 
 Related trap: `useBlocker`'s `shouldBlockFn` sees `routeId`/`pathname`/`search`, and every drawer
 navigation on one surface shares a route. A guard written as `() => isDirty` will block navigations

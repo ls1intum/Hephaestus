@@ -101,7 +101,7 @@ const drawerContentVariants = cva("", {
 			 * a covered panel keeps on screen is the reason to stack rather than replace.
 			 */
 			detail:
-				"[--peek:4rem] data-[swipe-axis=x]:[--drawer-content-width:100%] data-[swipe-axis=x]:sm:[--drawer-content-width:min(44rem,92vw)] data-[swipe-axis=x]:xl:[--drawer-content-width:min(62rem,75vw)]",
+				"[--peek:6rem] data-[swipe-axis=x]:[--drawer-content-width:100%] data-[swipe-axis=x]:sm:[--drawer-content-width:min(44rem,92vw)] data-[swipe-axis=x]:xl:[--drawer-content-width:min(62rem,75vw)]",
 		},
 	},
 	defaultVariants: { size: "default" },

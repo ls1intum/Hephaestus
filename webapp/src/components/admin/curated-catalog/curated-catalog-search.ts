@@ -22,10 +22,7 @@ export const CURATED_LEVEL_KINDS = [
 
 export type CuratedLevelKind = (typeof CURATED_LEVEL_KINDS)[number];
 
-/**
- * Every level here is an editor, so every level holds unsaved work: they close through Cancel or
- * Save, not through Escape, a press on the page or a swipe.
- */
+/** Every level here is an editor, so every one holds a draft — see `GUARDED_LEVEL_KINDS`. */
 export const GUARDED_CURATED_LEVEL_KINDS = CURATED_LEVEL_KINDS;
 
 /** A stack id is always a slug; a practice or group that does not exist yet has none. */

@@ -139,26 +139,20 @@ export const PressingThePageDismisses: Story = {
 	},
 };
 
-export const GuardedLevelRefusesCasualDismissal: Story = {
+export const GuardedLevelLeavesTheSameWays: Story = {
 	args: { guardedKinds: ["practice"] },
 	play: async ({ args }) => {
 		await expectSettledVisible(await screen.findByText("practice · describe-what-and-why"));
-		// The two gestures that discard without asking. `PressingThePageDismisses` is the control: the
-		// same press ends an unguarded level. `data-ending-style` rather than the popup going away,
-		// because the exit is animated — the level is still mounted for the length of it either way,
-		// and `DismissedLevelSlidesOut` is what pins that the attribute lands on the gesture itself.
-		await userEvent.keyboard("{Escape}");
-		await expect(popups()[0]).not.toHaveAttribute("data-ending-style");
+
+		// A guarded level is not a level that refuses to be dismissed — refusing silently is
+		// indistinguishable from a broken drawer. It closes on a press on the page like every other
+		// level; what protects a draft is the prompt the navigation raises, which this level has none
+		// of. It skips the exit animation, so `onClose` lands without one.
 		await userEvent.pointer({
 			target: document.elementFromPoint(20, 200) as Element,
 			coords: { clientX: 20, clientY: 200 },
 			keys: "[MouseLeft]",
 		});
-		await expect(popups()[0]).not.toHaveAttribute("data-ending-style");
-		await expect(args.onClose).not.toHaveBeenCalled();
-
-		// The level's own control still works, or there would be no way out.
-		await userEvent.click(screen.getByRole("button", { name: "Close" }));
 		await waitFor(() => expect(args.onClose).toHaveBeenCalledWith(0));
 	},
 };
@@ -222,7 +216,7 @@ export const DetailSizeKeepsItsPeek: Story = {
 		// forced `prefers-reduced-motion`, so the computed value proves nothing. The bug was upstream
 		// of the cascade anyway — `cn()` dedupes an arbitrary custom property by name and keeps the
 		// last, so a `--peek` default declared after the size variant silently replaced it.
-		await expect(popups()[0].className).toContain("[--peek:4rem]");
+		await expect(popups()[0].className).toContain("[--peek:6rem]");
 	},
 };
 
