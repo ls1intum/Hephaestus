@@ -12,6 +12,7 @@ import de.tum.cit.aet.hephaestus.agent.context.InsufficientEvidenceException;
 import de.tum.cit.aet.hephaestus.agent.context.PreparedEvidence;
 import de.tum.cit.aet.hephaestus.agent.context.WorkspaceContextBuilder;
 import de.tum.cit.aet.hephaestus.agent.handler.composition.ComposedFeedbackUnit;
+import de.tum.cit.aet.hephaestus.agent.handler.composition.FeedbackCompositionInputs;
 import de.tum.cit.aet.hephaestus.agent.handler.composition.FeedbackCompositionResultParser;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.ExistingDeliveryLookup;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException;
@@ -254,6 +255,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         // Asks the run for a second, separate turn once its measurements are final: the feedback to say
         // now, on every lane this occasion can reach, composed over this person's record rather than over
         // this diff alone. Absent for a backfill sweep — see FeedbackCompositionInputs.
+        FeedbackCompositionInputs.stage(files, PracticeDetectionDeliveryService.originOf(metadata));
         ContextMapWriter.write(files);
 
         long elapsedMs = (System.nanoTime() - startNanos) / 1_000_000;

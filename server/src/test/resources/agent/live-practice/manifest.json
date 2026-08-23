@@ -1,0 +1,47 @@
+{
+  "contractVersion": "1.0.0",
+  "catalogDigest": "978097f57047bb716457e8b3c44115ef0bb55602dbce4f1a15900a40d70a39b8",
+  "artifactKind": "scm.pull_request",
+  "capturedAt": "2026-01-01T00:00:00Z",
+  "sources": [
+    {
+      "kind": "scm.pull-request.diff",
+      "state": {
+        "availability": "AVAILABLE",
+        "content": "NON_EMPTY"
+      },
+      "artifacts": [
+        {
+          "path": "inputs/context/diff.patch"
+        }
+      ]
+    },
+    {
+      "kind": "scm.pull-request.core",
+      "state": {
+        "availability": "AVAILABLE",
+        "content": "NON_EMPTY"
+      },
+      "artifacts": [
+        {
+          "path": "inputs/context/metadata.json"
+        },
+        {
+          "path": "inputs/context/diff_summary.md"
+        }
+      ]
+    },
+    {
+      "kind": "scm.pull-request.comments",
+      "state": {
+        "availability": "AVAILABLE",
+        "content": "EMPTY"
+      },
+      "artifacts": [
+        {
+          "path": "inputs/context/comments.json"
+        }
+      ]
+    }
+  ]
+}

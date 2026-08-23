@@ -162,8 +162,10 @@ function isAdmittedObservation(value: unknown): value is AdmittedObservation {
 	);
 }
 
-const OUTPUT = "/workspace/out";
-const CWD = "/workspace";
+// Overridable so a harness with no /workspace can drive the runner. Production never sets it.
+const WORKSPACE_ROOT = "/workspace";
+const CWD = process.env.PI_RUNNER_CWD ?? WORKSPACE_ROOT;
+const OUTPUT = `${CWD}/out`;
 const RESULT_PATH = `${OUTPUT}/result.json`;
 const REVIEW_STATE_PATH = `${OUTPUT}/review-state.json`;
 const AGENT_BUDGET_MS = Number(process.env.AGENT_BUDGET_MS);
@@ -829,7 +831,7 @@ function buildRetryScaffold(slugs: readonly string[]): string {
 const ENVELOPE_MISMATCH_EXIT = 42;
 const SUPPORTED_SCHEMA_VERSION = 1;
 const SUPPORTED_KIND = "practice_review";
-const TASK_PATH = "/workspace/task.json";
+const TASK_PATH = `${CWD}/task.json`;
 
 function readTaskEnvelope(): TaskEnvelope {
 	let raw: string;

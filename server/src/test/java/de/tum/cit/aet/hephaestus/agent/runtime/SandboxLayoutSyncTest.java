@@ -26,8 +26,12 @@ class SandboxLayoutSyncTest extends BaseUnitTest {
         String body = Files.readString(runner, StandardCharsets.UTF_8);
 
         assertThat(body)
-            .as("runner reads /workspace/task.json")
-            .contains("\"" + SandboxLayout.WORKSPACE_ROOT + "/" + SandboxLayout.TASK_ENVELOPE_FILENAME + "\"");
+            .as("runner defaults its root to SandboxLayout.WORKSPACE_ROOT")
+            .contains("\"" + SandboxLayout.WORKSPACE_ROOT + "\"");
+
+        assertThat(body)
+            .as("runner reads the task envelope at SandboxLayout.TASK_ENVELOPE_FILENAME")
+            .contains("/" + SandboxLayout.TASK_ENVELOPE_FILENAME);
 
         assertThat(body)
             .as("runner pins SUPPORTED_SCHEMA_VERSION to the Java SCHEMA_VERSION constant")
@@ -39,7 +43,7 @@ class SandboxLayoutSyncTest extends BaseUnitTest {
 
         assertThat(body)
             .as("runner writes its output under SandboxLayout.OUTPUT_PATH")
-            .contains("\"" + SandboxLayout.OUTPUT_PATH + "\"");
+            .contains(SandboxLayout.OUTPUT_PATH.substring(SandboxLayout.WORKSPACE_ROOT.length()));
 
         assertThat(body)
             .as("runner reads the practices index under SandboxLayout.PRACTICES_PREFIX")

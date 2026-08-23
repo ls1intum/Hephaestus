@@ -24,6 +24,7 @@ import de.tum.cit.aet.hephaestus.agent.handler.spi.JobPreparationException;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobSubmission;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobSubmissionRequest;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
+import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
 import de.tum.cit.aet.hephaestus.agent.task.TaskEnvelopeWriter;
 import de.tum.cit.aet.hephaestus.evidence.ArtifactSourceManifest;
 import de.tum.cit.aet.hephaestus.evidence.AutomatedReviewReadinessReport;
@@ -294,6 +295,29 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
             verify(workspaceContextBuilder).prepare(captor.capture(), any(EvidencePlan.class));
             assertThat(captor.getValue()).isInstanceOf(ContextRequest.PracticeReviewRequest.class);
             assertThat(((ContextRequest.PracticeReviewRequest) captor.getValue()).job()).isSameAs(job);
+        }
+
+        /**
+         * The composer only runs when this file is staged, and the runner is the only thing that reads it.
+         * Asserted over what preparation actually produces, because a test that calls the staging helper
+         * directly passes whether or not a review ever calls it.
+         */
+        @Test
+        void stagesTheRequestThatTurnsFeedbackCompositionOn() {
+            stubDefaults();
+
+            Map<String, byte[]> files = handler.prepareInputs(jobWithMetadata(sampleJobMetadata())).files();
+
+            assertThat(files)
+                .as("a live review composes feedback, so the request must reach the sandbox")
+                .containsKey(SandboxLayout.FEEDBACK_COMPOSITION_PATH);
+            JsonNode request = objectMapper.readTree(
+                new String(files.get(SandboxLayout.FEEDBACK_COMPOSITION_PATH), StandardCharsets.UTF_8)
+            );
+            assertThat(request.path("enabled").asBoolean()).isTrue();
+            assertThat(request.path("inContextPlacementKinds"))
+                .as("a pull request has a diff, so a note may be placed on one")
+                .anySatisfy(kind -> assertThat(kind.asString()).isEqualTo("DIFF"));
         }
 
         @Test
