@@ -24,8 +24,9 @@ for the database helpers.
 
 ## Skills
 
-Load these rather than reasoning from scratch. Each exists once, in `.claude/skills/<name>/`, which
-both supported agents read — never copy one anywhere else.
+Load these rather than reasoning from scratch. Each lives in `.claude/skills/<name>/`, which Claude
+Code and opencode both read. Codex reads `.agents/skills/` and nothing else, so a skill it needs is
+mirrored there byte for byte and `check:instructions` fails on any drift. Copy one nowhere else.
 
 | Skill | When |
 |-------|------|

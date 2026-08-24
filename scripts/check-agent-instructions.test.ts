@@ -6,9 +6,9 @@ import { test } from "node:test";
 import { promisify } from "node:util";
 import {
 	analyse,
+	CODEX_SKILLS,
 	parse,
 	references,
-	CODEX_SKILLS,
 	type Snapshot,
 	type TrackedFile,
 	withoutCode,

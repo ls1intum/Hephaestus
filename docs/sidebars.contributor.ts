@@ -18,6 +18,9 @@ const sidebars: SidebarsConfig = {
         'api-error-handling',
         'workspace-context',
         'dockerless-postgres',
+        // How we develop, not what we ship — the "AI Development" category below is the product's
+        // own agent runtime, which is a different meaning of the word.
+        'ai-agent-workflow',
       ],
     },
     {
@@ -41,7 +44,7 @@ const sidebars: SidebarsConfig = {
     {
       type: 'category',
       label: 'AI Development',
-      items: ['ai-agent-workflow', 'unified-pi-runtime', 'agent/agent-workspace-abi', 'llm-cost-vocabulary'],
+      items: ['unified-pi-runtime', 'agent/agent-workspace-abi', 'llm-cost-vocabulary'],
     },
     {
       type: 'category',

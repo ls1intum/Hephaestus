@@ -1,145 +1,116 @@
 ---
-title: AI Agent Workflow Guide
-description: The complete development workflow for AI-assisted coding in Hephaestus.
+id: ai-agent-workflow
+title: Coding agents
+description: The coding agents this repository is set up for, how work moves through them, and how to extend what they read.
 ---
 
-# AI Agent Workflow Guide
+# Coding agents
 
-This guide defines the **end-to-end workflow** for AI-assisted development. Follow it sequentially.
+Three are configured here: **Claude Code**, **opencode** and **Codex**. All three read the same
+`AGENTS.md` files, so which one you use is your preference. CodeRabbit reviews pull requests as a
+GitHub App and needs nothing in the tree.
 
-## The Complete Workflow
+Install any of them from its own documentation ([Claude Code](https://code.claude.com/docs),
+[opencode](https://opencode.ai/docs), [Codex](https://developers.openai.com/codex)) and sign in with
+your own account — nothing in this repository carries a credential, and none of them needs
+configuring beyond that to pick up everything below.
+
+## How work moves
 
 ```mermaid
 flowchart TD
     accTitle: AI-assisted contribution workflow
-    accDescr: A user task moves through issue creation, implementation, validation, review, and completion.
-    A[👤 User sends task] --> B[🤖 Agent creates beads issue]
-    B --> C[🤖 Agent implements]
-    C --> D{🤖 Agent validates}
-    D -->|Fail| C
-    D -->|Pass| E[👤 Review in Source Control]
-    
-    E --> F[Inspect file in tree view]
-    F --> G{File OK?}
-    G -->|Yes| H[Stage]
-    G -->|Fixable| I[Re-prompt agent]
-    G -->|Bad| J[Discard]
-    I --> C
-    H --> K{More files?}
-    J --> K
-    K -->|Yes| F
-    K -->|No| L{Staged changes?}
-    
-    L -->|None| C
-    L -->|Some| M([👤 /land-pr])
-    M --> N[🤖 Close beads issue with PR #]
-    N --> O[PR Created]
-    O --> P{CI passes?}
-    P -->|No| Q([👤 /fix-ci])
-    Q --> C
-    P -->|Yes| R[Request Review]
-    R --> S{Approved?}
-    S -->|Changes requested| T([👤 /resolve-review])
-    T --> C
-    S -->|Approved| U[Merge]
+    accDescr: An agent implements and self-validates, you review the diff, land-pr opens the PR, and fix-ci and resolve-review loop back into CI and review.
+    B[Agent implements] --> C{format && check}
+    C -->|Fails| B
+    C -->|Passes| D[You read the diff]
+    D -->|Not right yet| B
+    D -->|Good| F([/land-pr])
+    F --> H{CI green?}
+    H -->|No| I([/fix-ci])
+    I -->|Fixes and pushes| H
+    H -->|Yes| J{Review approved?}
+    J -->|Changes requested| K([/resolve-review])
+    K -->|Fixes, pushes, resolves| J
+    J -->|Approved| L[Merge]
 ```
 
-## Reusable Workflows
+**Agents do not stage, commit or push** until you run `/land-pr`; `/fix-ci` and `/resolve-review`
+push their own fixes afterwards, which is why neither loops back through it. Reading the diff
+yourself is the review that matters — the gates prove the tree is consistent, not that the change is
+right.
 
-These slash commands work in **GitHub Copilot** (`.github/prompts/`) and **Antigravity** (`.agent/workflows/`):
+`pnpm run format && pnpm run check` is the floor, not the whole ask. Name the thing your change could
+actually break: the test file that covers it rather than "run the tests", a request against the
+endpoint you added, a query confirming the row was written, the logs after the change.
 
-| Command | Description |
-|---------|-------------|
-| `/land-pr` | Format, validate, commit, push, create PR |
-| `/resolve-review` | Fetch and address PR review comments |
-| `/fix-ci` | Diagnose and fix failing CI checks |
+## Slash commands
 
-## Tools We Use
+| Command | Does |
+|---------|------|
+| `/land-pr` | Validate, regenerate, branch, commit, push, and open the PR |
+| `/fix-ci` | Read every failing check in one pass, fix in dependency order, push once |
+| `/resolve-review` | Fetch review threads, decide each, reply and resolve |
 
-| Tool | Use Case | Access |
-|------|----------|--------|
-| **GitHub Copilot** | Agent mode, inline completions, PR review | Free for students |
-| **Antigravity IDE** | Claude Opus 4.5, complex reasoning | Free for students |
-| **CodeRabbit** | Automated PR review | GitHub App |
+Each lives in `.claude/skills/<name>/SKILL.md`. opencode
+[reads `.claude/skills/` alongside its own](https://opencode.ai/docs/skills/) — `opencode debug
+skill` prints every skill with the path it resolved from — so no skill needs a second copy for it.
+A *typed* `/name` is the exception: opencode resolves that from `.opencode/commands/` only, so each
+of these three has a file there whose entire body is `@.claude/skills/<name>/SKILL.md`. opencode
+[inlines a referenced file into the prompt](https://opencode.ai/docs/commands/), which is what makes
+a pointer enough where a copy used to be needed.
 
-:::tip[Extra Context]
-Use **File → Add Folder to Workspace...** to temporarily attach another repository (e.g., a library you're integrating). Copilot's `#runSubagent` tool can then research that codebase alongside Hephaestus. Remove the folder when done to keep your workspace clean.
-:::
+Codex is the one tool that shares no directory with the others: it
+[scans `.agents/skills/`](https://developers.openai.com/codex/skills) and never `.claude/skills/`.
+A skill Codex needs is therefore copied to `.agents/skills/<name>/`, and `check:instructions` fails
+if the two halves ever differ. `/gh-stack` is mirrored that way today; add a skill there when Codex
+should have it, and keep the copy identical.
 
-## Agent Self-Validation
+The two tools differ on one thing here: `disable-model-invocation` makes these three typed-only in
+Claude Code, while opencode ignores the field and may load them itself. The rest of the skills, which
+`AGENTS.md` § Skills lists, are model-invocable in both and need no command file.
 
-Agents work best when they **validate their own work**. Always include validation in prompts:
+## Instructions live in `AGENTS.md`, once
 
-**Standard validation:**
+| File | Covers |
+|---|---|
+| `AGENTS.md` | The repository — layout, quality gates, generated artefacts, migrations, changesets |
+| `webapp/AGENTS.md` | The SPA — component conventions, linting traps, drawers, motion, vocabulary |
+| `server/AGENTS.md` | The Spring Boot server — build traps, the four test tiers, API and security conventions |
 
-```bash
-pnpm run format && pnpm run check
-```
+The two tools reach them differently, and neither difference is visible from the file:
 
-**Ad-hoc validation (when applicable):**
+- **opencode** reads `AGENTS.md` natively and takes the nested ones from the `instructions` globs in
+  `opencode.json`. Those load unconditionally, so an opencode session carries all three.
+- **Codex** reads `AGENTS.md` from the repository root down to the directory you launched it in, and
+  stops there. Start it in `webapp/` to get the SPA guide; started at the root it has only the root
+  file.
+- **Claude Code** reads `CLAUDE.md` and
+  [never `AGENTS.md`](https://code.claude.com/docs/en/memory#agents-md). Each `AGENTS.md` therefore
+  has a `CLAUDE.md` beside it holding one line — `@AGENTS.md` — which imports it. An import resolves
+  against the file holding it, so the same line means a different file in each directory, and Claude
+  loads a nested one the first time it reads a file anywhere in that tree. That is what keeps the
+  webapp guide out of a server-only session.
 
-- Make an API request to verify the endpoint works
-- Query the database to confirm data was written
-- Scan logs for errors after the change
-- Run the specific test file that covers your change
+`pnpm run check:instructions` fails on an `AGENTS.md` no `CLAUDE.md` imports, an `@` reference
+resolving to nothing, an `instructions` entry matching no file, a typed-only skill with no opencode
+command, a Codex mirror that has drifted, two agent files with one body, and any committed symlink
+among them. Each failure explains itself. Bodies are compared exactly, so a copy is caught when it is
+made rather than after it drifts.
 
-:::tip
-The more specific your validation request, the better the agent performs. "Run tests" is okay; "Run `npm test -- --grep 'auth'` and check for failures" is better.
-:::
+### Adding a tree, or a skill
 
-## Git Context Commands
+Write `<dir>/AGENTS.md`, add `<dir>/CLAUDE.md` containing `@AGENTS.md`, and give it its own
+`opencode.json` `instructions` entry unless `*/AGENTS.md` already matches. Then run the gate. A skill
+is a directory under `.claude/skills/`; it needs a file in `.opencode/commands/` only if you mark it
+`disable-model-invocation`.
 
-These commands help agents understand the current state. Use them in prompts to give context:
+To confirm a file actually loaded, `/context` in Claude Code lists it under **Memory files** once you
+have opened a file in that tree. The other two have no equivalent view — `opencode debug config`
+echoes the patterns you configured rather than the files they matched — so there the gate is the
+check.
 
-```bash
-git status --short          # What files changed?
-git --no-pager diff         # What are the unstaged changes?
-git --no-pager diff --cached # What's staged for commit?
-git --no-pager diff origin/main...HEAD  # Full PR diff vs main
-```
+### When an agent ignores an instruction
 
-## Human Controls Git
-
-**Agents should NOT stage, commit, or push** unless you explicitly run `/land-pr`.
-
-Your responsibilities:
-
-1. Review changes in VSCode Source Control (tree view)
-2. Run `pnpm run check` to validate
-3. Stage good changes, revert bad ones
-4. Use `/land-pr` when ready to commit
-
-## Beads Issue Tracking
-
-Track work across sessions with [Beads](https://github.com/steveyegge/beads):
-
-```bash
-bd create "Add auth endpoint" -t task  # Start work
-bd list --status open                  # See all open issues
-bd close <id> --reason "PR #123"       # Complete work
-```
-
-Issues persist in `.beads/issues.jsonl` and sync with git. See `AGENTS.md` section 0 for details.
-
-## Troubleshooting
-
-### Agent Uses Outdated APIs
-
-The agent's training data is stale. Solutions:
-
-- Paste current file contents into the prompt
-- Ask agent to use web search for current docs
-- Point to working examples in the codebase
-
-### Agent Ignores Instructions
-
-1. Simplify the prompt
-2. Break into smaller steps
-3. Use explicit constraints: "Do NOT modify..."
-
-## Configuration
-
-Agent instructions are loaded from:
-
-- `AGENTS.md` – Main reference for all agents
-- `.github/instructions/` – Scoped instructions per file type
+Confirm the instruction reached it before rewriting the instruction. An `AGENTS.md` in a tree the
+agent has not opened yet has not loaded.
