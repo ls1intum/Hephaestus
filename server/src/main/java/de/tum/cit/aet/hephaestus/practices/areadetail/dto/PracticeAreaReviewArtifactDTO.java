@@ -1,4 +1,4 @@
-package de.tum.cit.aet.hephaestus.practices.reviewhistory.dto;
+package de.tum.cit.aet.hephaestus.practices.areadetail.dto;
 
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;

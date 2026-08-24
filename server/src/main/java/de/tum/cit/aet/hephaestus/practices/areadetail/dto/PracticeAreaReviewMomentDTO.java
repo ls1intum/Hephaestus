@@ -1,4 +1,4 @@
-package de.tum.cit.aet.hephaestus.practices.reviewhistory.dto;
+package de.tum.cit.aet.hephaestus.practices.areadetail.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;

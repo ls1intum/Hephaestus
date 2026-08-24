@@ -1,4 +1,4 @@
-package de.tum.cit.aet.hephaestus.practices.reviewhistory;
+package de.tum.cit.aet.hephaestus.practices.areadetail;
 
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.practices.PracticeAreaRepository;

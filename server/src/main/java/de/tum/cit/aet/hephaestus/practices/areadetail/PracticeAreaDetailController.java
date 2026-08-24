@@ -1,7 +1,7 @@
-package de.tum.cit.aet.hephaestus.practices.reviewhistory;
+package de.tum.cit.aet.hephaestus.practices.areadetail;
 
+import de.tum.cit.aet.hephaestus.practices.areadetail.dto.PracticeAreaReviewMomentDTO;
 import de.tum.cit.aet.hephaestus.practices.observation.trend.dto.PracticeAreaTrendDTO;
-import de.tum.cit.aet.hephaestus.practices.reviewhistory.dto.PracticeAreaReviewMomentDTO;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceScopedController;
 import io.swagger.v3.oas.annotations.Operation;

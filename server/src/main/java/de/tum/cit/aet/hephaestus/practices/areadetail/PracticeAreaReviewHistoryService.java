@@ -1,7 +1,10 @@
-package de.tum.cit.aet.hephaestus.practices.reviewhistory;
+package de.tum.cit.aet.hephaestus.practices.areadetail;
 
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.practices.PracticeAreaService;
+import de.tum.cit.aet.hephaestus.practices.areadetail.dto.PracticeAreaReviewArtifactDTO;
+import de.tum.cit.aet.hephaestus.practices.areadetail.dto.PracticeAreaReviewFindingDTO;
+import de.tum.cit.aet.hephaestus.practices.areadetail.dto.PracticeAreaReviewMomentDTO;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository.DeliveredFeedbackBinding;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRatingState;
@@ -10,9 +13,6 @@ import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository.ReviewHistoryRunRow;
-import de.tum.cit.aet.hephaestus.practices.reviewhistory.dto.PracticeAreaReviewArtifactDTO;
-import de.tum.cit.aet.hephaestus.practices.reviewhistory.dto.PracticeAreaReviewFindingDTO;
-import de.tum.cit.aet.hephaestus.practices.reviewhistory.dto.PracticeAreaReviewMomentDTO;
 import de.tum.cit.aet.hephaestus.practices.spi.CurrentDeveloperLookup;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewRunTargetLookup;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
