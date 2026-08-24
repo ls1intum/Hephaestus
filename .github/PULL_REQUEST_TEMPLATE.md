@@ -26,7 +26,7 @@ AFTER DATABASE/ENTITY CHANGES:
 
 ## Description
 
-<!-- Use "Copilot Summary" button in toolbar above, or write 1-2 sentences. -->
+<!-- 1-2 sentences: what changed, and why. -->
 
 Fixes # <!-- Link issue if applicable, or delete this line -->
 

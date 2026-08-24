@@ -6,7 +6,7 @@ description: Run the Spring Boot server without Docker by managing a local Postg
 ---
 
 > **Scope**
-> This guide only applies to GitHub Copilot's Codex (or similar managed) sandboxes where Docker is disabled. These scripts are **not** meant for normal local workstations; if you have Docker available, follow the standard workflow in [Local Development](./local-development.mdx) instead.
+> This guide only applies to managed cloud sandboxes — Codex and the like — where Docker is disabled. These scripts are **not** meant for normal local workstations; if you have Docker available, follow the standard workflow in [Local Development](./local-development.mdx) instead.
 
 The repository ships a thin wrapper around the system PostgreSQL packages so that integration tests and local tooling work in Dockerless sandboxes. The scripts live under `scripts/` and are idempotent, so you can run them whenever the environment is reset.
 

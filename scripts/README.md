@@ -25,6 +25,16 @@ pnpm run db:draft-changelog                       # Generate Liquibase changelog
 | `POSTGRES_PORT`      | `5432`      | PostgreSQL port              |
 | `HEPHAESTUS_DB_MODE` | `docker`    | Database mode: docker/local  |
 
+### Achievement Formatting
+
+Rewrite `server/src/main/resources/achievements/achievements.yml` into the property order
+`PREFERRED_ORDER` defines. The fields themselves are documented in
+[Achievements](../docs/contributor/achievements.mdx).
+
+```bash
+pnpm run format:achievements
+```
+
 ### NATS Webhook Example Extraction
 
 Extract webhook payloads from NATS JetStream for test fixtures:

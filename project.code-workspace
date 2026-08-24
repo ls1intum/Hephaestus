@@ -36,11 +36,6 @@
 		},
 		"scm.defaultViewMode": "tree",
 		"diffEditor.renderSideBySide": false,
-		"github.copilot.chat.summarizeAgentConversationHistory.enabled": false,
-		"github.copilot.chat.languageContext.fix.typescript.enabled": true,
-		"github.copilot.chat.languageContext.inline.typescript.enabled": true,
-		"github.copilot.chat.languageContext.typescript.enabled": true,
-		"chat.agent.maxRequests": 1000,
 		"files.associations": {
 			"*.graphql": "graphql",
 			"*.graphqls": "graphql"
@@ -91,8 +86,6 @@
 			"oxc.oxc-vscode",
 			"esbenp.prettier-vscode",
 			"editorconfig.editorconfig",
-			"github.copilot",
-			"github.copilot-chat",
 			"vscjava.vscode-java-pack",
 			"redhat.java",
 			"vscjava.vscode-maven",

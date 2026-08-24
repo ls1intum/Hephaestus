@@ -94,7 +94,10 @@ no skip.
 Name tests `should[ExpectedBehavior]When[Condition]`. Controller-level integration tests extend
 `AbstractWorkspaceIntegrationTest` (or a domain-specific base) and exercise access control through
 `WebTestClient` + `TestAuthUtils` — the identity comes from the mock JWT **token string**, not from an
-annotation. Assume data from previous tests may exist; do not write cleanup that other tests depend on.
+annotation.
+
+**Rows written by earlier tests are already there.** Assert on the row you created, never on a count
+or on "the only" result, and never write cleanup that another test depends on having run.
 
 ## Things that bite
 

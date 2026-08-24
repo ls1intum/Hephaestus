@@ -24,7 +24,10 @@ for the database helpers.
 
 ## Skills
 
-Load these rather than reasoning from scratch.
+Load these rather than reasoning from scratch. Each lives in `.claude/skills/<name>/`, which Claude
+Code and opencode both read. Codex reads `.agents/skills/` and nothing else, so the four that drive a
+contribution are mirrored there byte for byte; `check:instructions` fails if a half goes missing or
+drifts. Copy a skill nowhere else.
 
 | Skill | When |
 |-------|------|
@@ -32,8 +35,8 @@ Load these rather than reasoning from scratch.
 | `/composition-patterns` | Compound components, render props, React 19 API shape |
 | `/web-design-guidelines` | UI accessibility and UX review |
 | `/react-best-practices` | Frontend performance — a vendored Vercel pack; read its applicability table first, since much of it is Next.js-only |
-| `/fix-ci`, `/land-pr`, `/resolve-review` | CI triage, opening a PR, answering review comments |
-| `/gh-stack` | Creating and maintaining stacked pull requests |
+| `/fix-ci`, `/land-pr`, `/resolve-review` | CI triage, opening a PR, answering review comments — mirrored for Codex |
+| `/gh-stack` | Creating and maintaining stacked pull requests — mirrored for Codex |
 
 ## Quality gates
 
@@ -86,6 +89,21 @@ Each config carries the reasoning for its own deltas; read it before switching a
 house rules are oxlint JS plugins under `webapp/tools/oxlint/`, registered by its `index.ts`. They
 live under `webapp/` but all three configs load that one plugin and each chooses which to turn on, so
 adding a rule there enables it nowhere. `webapp/AGENTS.md` § Linting has the rest.
+
+## TypeScript, in every tree
+
+Holds wherever TypeScript is written here, the Bun agent trees and `scripts/**` included.
+`webapp/AGENTS.md` wins over it inside the SPA.
+
+- **A leading `_` marks what the language or a tool reads that way** — an intentionally unused
+  binding, a server field name (`_id`), a runtime global. It never marks something private, which
+  carries no prefix.
+- **A cast is usually the linter telling you the type is wrong upstream.** `no-explicit-any`,
+  `no-non-null-assertion` and the `no-unsafe-*` family are errors; reach for `satisfies` instead.
+- **Validate anything crossing a trust boundary** — a webhook body, a hand-parsed stream, a
+  `JSON.parse` — with a discriminated union, or with a `zod` schema in the SPA, which is the only tree
+  that has zod. Generated API types are already checked by `tsc` and need no second guard.
+- **Never log a token, a secret or a raw request body.**
 
 ## Generated artefacts — never hand-edit, regenerate
 
