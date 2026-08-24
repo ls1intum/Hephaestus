@@ -25,8 +25,9 @@ for the database helpers.
 ## Skills
 
 Load these rather than reasoning from scratch. Each lives in `.claude/skills/<name>/`, which Claude
-Code and opencode both read. Codex reads `.agents/skills/` and nothing else, so a skill it needs is
-mirrored there byte for byte and `check:instructions` fails on any drift. Copy one nowhere else.
+Code and opencode both read. Codex reads `.agents/skills/` and nothing else, so the four that drive a
+contribution are mirrored there byte for byte; `check:instructions` fails if a half goes missing or
+drifts. Copy a skill nowhere else.
 
 | Skill | When |
 |-------|------|
@@ -34,8 +35,8 @@ mirrored there byte for byte and `check:instructions` fails on any drift. Copy o
 | `/composition-patterns` | Compound components, render props, React 19 API shape |
 | `/web-design-guidelines` | UI accessibility and UX review |
 | `/react-best-practices` | Frontend performance — a vendored Vercel pack; read its applicability table first, since much of it is Next.js-only |
-| `/fix-ci`, `/land-pr`, `/resolve-review` | CI triage, opening a PR, answering review comments |
-| `/gh-stack` | Creating and maintaining stacked pull requests |
+| `/fix-ci`, `/land-pr`, `/resolve-review` | CI triage, opening a PR, answering review comments — mirrored for Codex |
+| `/gh-stack` | Creating and maintaining stacked pull requests — mirrored for Codex |
 
 ## Quality gates
 

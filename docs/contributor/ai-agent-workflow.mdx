@@ -60,15 +60,22 @@ of these three has a file there whose entire body is `@.claude/skills/<name>/SKI
 [inlines a referenced file into the prompt](https://opencode.ai/docs/commands/), which is what makes
 a pointer enough where a copy used to be needed.
 
-Codex is the one tool that shares no directory with the others: it
-[scans `.agents/skills/`](https://developers.openai.com/codex/skills) and never `.claude/skills/`.
-A skill Codex needs is therefore copied to `.agents/skills/<name>/`, and `check:instructions` fails
-if the two halves ever differ. `/gh-stack` is mirrored that way today; add a skill there when Codex
-should have it, and keep the copy identical.
+Codex shares no directory with the other two: it
+[scans `.agents/skills/`](https://developers.openai.com/codex/skills) and never `.claude/skills/`,
+and it has no repo-level slash commands at all —
+[`~/.codex/prompts/` is personal and uncommitted](https://developers.openai.com/codex/custom-prompts),
+and OpenAI's own guidance for sharing one is to make it a skill. So the four skills that drive a
+contribution — these three and `/gh-stack` — are copied to `.agents/skills/<name>/`, and
+`check:instructions` fails if a half goes missing or the two drift. `CODEX_SKILLS` in that script is
+the list; add a name and the copy when Codex should have another.
 
-The two tools differ on one thing here: `disable-model-invocation` makes these three typed-only in
-Claude Code, while opencode ignores the field and may load them itself. The rest of the skills, which
-`AGENTS.md` § Skills lists, are model-invocable in both and need no command file.
+The knowledge packs are deliberately not mirrored: `react-best-practices` alone is fifty files, and a
+Codex session that needs them is working in `webapp/`, whose `AGENTS.md` names them by path. The
+mirror also costs one `duplicate skill name` warning per skill in opencode's log, since opencode
+reads both directories and sees the same name twice.
+
+`disable-model-invocation` makes these three typed-only in Claude Code. opencode and Codex both
+ignore the field, so there they are ordinary skills the model can reach on its own.
 
 ## Instructions live in `AGENTS.md`, once
 

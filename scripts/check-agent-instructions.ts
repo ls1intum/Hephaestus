@@ -50,12 +50,18 @@ const AGENT_ROOTS = [".claude/", ".opencode/", ".agents/"];
 const CODEX_SKILLS_ROOT = ".agents/skills";
 
 /**
- * The skills Codex is meant to have. Keeping the two halves identical is `unmirrored`'s job; this
- * list is what stops the pair quietly becoming one, which is how `/gh-stack` was lost from Codex
- * once already. Naming a skill `.claude/skills/` does not have fails too, so a rename cannot leave a
- * dead entry behind that checks nothing. Add a name here when Codex should have that skill.
+ * The skills Codex is meant to have: the four that drive a contribution. Codex has no repo-level
+ * slash commands — `~/.codex/prompts/` is personal and uncommitted — so a shared workflow reaches it
+ * as a skill or not at all (https://developers.openai.com/codex/custom-prompts).
+ *
+ * The knowledge packs are deliberately absent. `react-best-practices` alone is 50 files, and a Codex
+ * session that needs them is working in `webapp/`, whose `AGENTS.md` names them by path.
+ *
+ * Keeping the two halves identical is `unmirrored`'s job; this list is what stops a pair quietly
+ * becoming one, which is how `/gh-stack` was lost from Codex once already. Naming a skill
+ * `.claude/skills/` does not have fails too, so a rename cannot leave a dead entry behind.
  */
-export const CODEX_SKILLS = ["gh-stack"];
+export const CODEX_SKILLS = ["fix-ci", "gh-stack", "land-pr", "resolve-review"];
 
 const mirrorOf = (path: string): string | undefined =>
 	path.startsWith(`${CODEX_SKILLS_ROOT}/`)
