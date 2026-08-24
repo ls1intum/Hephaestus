@@ -23,7 +23,9 @@ import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Central service for workspace management operations.
@@ -77,6 +79,7 @@ public class WorkspaceService {
 
     /** Fires {@link WorkspaceCreatedEvent} after workspace commit; vendor adapters subscribe. */
     private final ApplicationEventPublisher eventPublisher;
+    private final TransactionTemplate transactionTemplate;
 
     public WorkspaceService(
         WorkspaceRepository workspaceRepository,
@@ -86,7 +89,8 @@ public class WorkspaceService {
         LeaguePointsRecalculator leaguePointsRecalculator,
         WorkspaceMembershipService workspaceMembershipService,
         ConnectionService connectionService,
-        ApplicationEventPublisher eventPublisher
+        ApplicationEventPublisher eventPublisher,
+        PlatformTransactionManager transactionManager
     ) {
         this.workspaceRepository = workspaceRepository;
         this.userRepository = userRepository;
@@ -96,6 +100,7 @@ public class WorkspaceService {
         this.workspaceMembershipService = workspaceMembershipService;
         this.connectionService = connectionService;
         this.eventPublisher = eventPublisher;
+        this.transactionTemplate = new TransactionTemplate(transactionManager);
     }
 
     // Workspace Lookup
@@ -140,6 +145,16 @@ public class WorkspaceService {
         AccountType accountType,
         Long ownerUserId
     ) {
+        return createWorkspaceInTransaction(rawSlug, displayName, accountLogin, accountType, ownerUserId);
+    }
+
+    private Workspace createWorkspaceInTransaction(
+        String rawSlug,
+        String displayName,
+        String accountLogin,
+        AccountType accountType,
+        Long ownerUserId
+    ) {
         String slug = workspaceSlugService.normalize(rawSlug);
         workspaceSlugService.validate(slug);
 
@@ -172,11 +187,15 @@ public class WorkspaceService {
      */
     @Transactional
     public Workspace createWorkspace(CreateWorkspaceRequestDTO request) {
+        return createWorkspaceInTransaction(request);
+    }
+
+    private Workspace createWorkspaceInTransaction(CreateWorkspaceRequestDTO request) {
         // Always prefer the authenticated user to prevent privilege escalation.
         // Fall back to the deprecated ownerUserId only when no auth context exists (e.g. tests).
         Long ownerUserId = userRepository.getCurrentUser().map(User::getId).orElse(request.ownerUserId());
 
-        Workspace workspace = createWorkspace(
+        Workspace workspace = createWorkspaceInTransaction(
             request.workspaceSlug(),
             request.displayName(),
             request.accountLogin(),
@@ -232,19 +251,19 @@ public class WorkspaceService {
     /**
      * Creates a workspace and triggers async GitLab initialization if applicable.
      *
-     * <p>This method is intentionally NOT {@code @Transactional} so that the inner
-     * {@link #createWorkspace(CreateWorkspaceRequestDTO)} transaction commits before
-     * the async initialization reads the workspace from the database.
+     * <p>Workspace creation commits before the initialization event is published so an
+     * asynchronous listener can load it immediately.
      *
      * @param request the workspace creation request
      * @return the created workspace
      */
     public Workspace createWorkspaceWithInitialization(CreateWorkspaceRequestDTO request) {
-        Workspace workspace = createWorkspace(request);
+        Workspace workspace = Objects.requireNonNull(
+            transactionTemplate.execute(status -> createWorkspaceInTransaction(request))
+        );
 
         // Trigger async vendor-specific initialization (e.g. GitLab group discovery + webhook
-        // setup). The @Transactional createWorkspace() has already committed by the time we
-        // dispatch, so the async thread can find the workspace. Hooks are kind-keyed so
+        // setup). Hooks are kind-keyed so
         // adding a new SCM is a matter of registering an impl, not editing this class.
         eventPublisher.publishEvent(new WorkspaceCreatedEvent(workspace.getId(), request.kind()));
 
@@ -404,11 +423,15 @@ public class WorkspaceService {
             throw new EntityNotFoundException("Workspace", "context");
         }
 
-        return renameSlug(workspaceId, newSlug);
+        return renameSlugInTransaction(workspaceId, newSlug);
     }
 
     @Transactional
     public Workspace renameSlug(Long workspaceId, String newSlug) {
+        return renameSlugInTransaction(workspaceId, newSlug);
+    }
+
+    private Workspace renameSlugInTransaction(Long workspaceId, String newSlug) {
         workspaceSlugService.validate(newSlug);
 
         Workspace workspace = workspaceRepository

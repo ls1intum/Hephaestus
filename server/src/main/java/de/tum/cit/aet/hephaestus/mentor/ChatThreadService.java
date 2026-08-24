@@ -38,6 +38,10 @@ public class ChatThreadService {
      */
     @Transactional(readOnly = true)
     public ChatThread getOwnedThread(Long workspaceId, UUID threadId) {
+        return requireOwnedThread(workspaceId, threadId);
+    }
+
+    private ChatThread requireOwnedThread(Long workspaceId, UUID threadId) {
         User user = userRepository.getCurrentUserElseThrow();
         ChatThread thread = chatThreadRepository
             .findByIdAndWorkspaceId(threadId, workspaceId)
@@ -51,7 +55,7 @@ public class ChatThreadService {
     /** Delete a thread (cascades to messages, votes). Owner-scoped via {@link #getOwnedThread}. */
     @Transactional
     public void deleteOwnedThread(Long workspaceId, UUID threadId) {
-        chatThreadRepository.delete(getOwnedThread(workspaceId, threadId));
+        chatThreadRepository.delete(requireOwnedThread(workspaceId, threadId));
     }
 
     /**
@@ -61,7 +65,7 @@ public class ChatThreadService {
      */
     @Transactional(readOnly = true)
     public ThreadDetail loadOwnedThreadDetail(Long workspaceId, UUID threadId) {
-        ChatThread thread = getOwnedThread(workspaceId, threadId);
+        ChatThread thread = requireOwnedThread(workspaceId, threadId);
         List<ChatMessageDTO> messages = thread
             .getAllMessages()
             .stream()

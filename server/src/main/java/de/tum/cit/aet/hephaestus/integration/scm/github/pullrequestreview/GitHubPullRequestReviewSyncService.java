@@ -42,14 +42,15 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Stream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.context.annotation.Lazy;
 import org.springframework.graphql.client.ClientGraphQlResponse;
 import org.springframework.graphql.client.FieldAccessException;
 import org.springframework.graphql.client.HttpGraphQlClient;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.UnexpectedRollbackException;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 import reactor.core.publisher.Mono;
 import reactor.util.retry.Retry;
 
@@ -77,7 +78,7 @@ public class GitHubPullRequestReviewSyncService {
     private final GitHubSyncProperties syncProperties;
     private final GitHubExceptionClassifier exceptionClassifier;
     private final GitHubGraphQlSyncCoordinator graphQlSyncHelper;
-    private final GitHubPullRequestReviewSyncService self;
+    private final TransactionTemplate transactionTemplate;
     private static final int MAX_RETRY_ATTEMPTS = 3;
     private static final int MAX_DEADLOCK_RETRIES = 3;
 
@@ -89,7 +90,7 @@ public class GitHubPullRequestReviewSyncService {
         GitHubSyncProperties syncProperties,
         GitHubExceptionClassifier exceptionClassifier,
         GitHubGraphQlSyncCoordinator graphQlSyncHelper,
-        @Lazy GitHubPullRequestReviewSyncService self
+        PlatformTransactionManager transactionManager
     ) {
         this.repositoryRepository = repositoryRepository;
         this.pullRequestRepository = pullRequestRepository;
@@ -98,7 +99,8 @@ public class GitHubPullRequestReviewSyncService {
         this.syncProperties = syncProperties;
         this.exceptionClassifier = exceptionClassifier;
         this.graphQlSyncHelper = graphQlSyncHelper;
-        this.self = self;
+        this.transactionTemplate = new TransactionTemplate(transactionManager);
+        this.transactionTemplate.setPropagationBehavior(Propagation.REQUIRES_NEW.value());
     }
 
     /**
@@ -430,7 +432,9 @@ public class GitHubPullRequestReviewSyncService {
     ) {
         for (int attempt = 0; attempt <= MAX_DEADLOCK_RETRIES; attempt++) {
             try {
-                return self.processReviewPageInTransaction(reviews, pullRequestId, scopeId, repository);
+                return transactionTemplate.execute(status ->
+                    processReviewPageInTransaction(reviews, pullRequestId, scopeId, repository)
+                );
             } catch (Exception e) {
                 boolean retryable;
                 String errorDetail;
@@ -488,7 +492,6 @@ public class GitHubPullRequestReviewSyncService {
      * @param repository    the repository entity for creating the processing context
      * @return number of reviews persisted
      */
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public int processReviewPageInTransaction(
         List<GHPullRequestReview> reviews,
         Long pullRequestId,

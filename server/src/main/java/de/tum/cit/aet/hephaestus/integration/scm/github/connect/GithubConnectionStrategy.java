@@ -101,7 +101,7 @@ public class GithubConnectionStrategy implements ConnectionStrategy {
             return;
         }
         try {
-            revokeProvider(ref);
+            revokeProviderInternal(ref);
         } catch (RuntimeException e) {
             log.warn("GitHub uninstall failed during disconnect: ref={}, error={}", ref, e.toString());
         }
@@ -111,6 +111,10 @@ public class GithubConnectionStrategy implements ConnectionStrategy {
     @Override
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public void revokeProvider(IntegrationRef ref) {
+        revokeProviderInternal(ref);
+    }
+
+    private void revokeProviderInternal(IntegrationRef ref) {
         var connectionOpt = connectionService.findReferenced(ref);
         if (connectionOpt.isEmpty()) {
             return;

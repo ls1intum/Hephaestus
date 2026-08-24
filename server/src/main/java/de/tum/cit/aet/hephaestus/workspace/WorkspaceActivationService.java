@@ -22,7 +22,6 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.core.task.AsyncTaskExecutor;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Activates workspaces on application startup: metadata population, sync orchestration,
@@ -253,7 +252,6 @@ public class WorkspaceActivationService {
     }
 
     /** Ensures workspace metadata (account login) is populated, persisting when it was derived. */
-    @Transactional
     public Workspace ensureWorkspaceMetadata(Workspace workspace) {
         if (isBlank(workspace.getAccountLogin())) {
             String derived = deriveAccountLogin(workspace);

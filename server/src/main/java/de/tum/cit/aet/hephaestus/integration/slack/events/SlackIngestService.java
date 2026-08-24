@@ -86,6 +86,17 @@ public class SlackIngestService {
         @Nullable String authorSlackUserId,
         @Nullable String text
     ) {
+        ingestChannelMessageInTransaction(teamId, channelId, ts, threadTs, authorSlackUserId, text);
+    }
+
+    private void ingestChannelMessageInTransaction(
+        String teamId,
+        String channelId,
+        String ts,
+        @Nullable String threadTs,
+        @Nullable String authorSlackUserId,
+        @Nullable String text
+    ) {
         if (!conversationIngestEnabled) {
             return;
         }
@@ -215,7 +226,7 @@ public class SlackIngestService {
         // Edit raced ahead of a NAK-redelivered base insert (row absent). existsBy distinguishes a TOMBSTONED row
         // (updated == 0 but present -> skip, no resurrection) from a genuinely-absent one (re-ingest).
         if (!messageRepository.existsByWorkspaceIdAndSlackChannelIdAndSlackTs(workspaceId, channelId, ts)) {
-            ingestChannelMessage(teamId, channelId, ts, threadTs, authorSlackUserId, text);
+            ingestChannelMessageInTransaction(teamId, channelId, ts, threadTs, authorSlackUserId, text);
             // Stamp edited_at (insertIfAbsent does not): a row born from message_changed genuinely is an edited message,
             // so the projector's `edited` flag reads true. Idempotent second write on the now-present row.
             messageRepository.applyEdit(workspaceId, channelId, ts, text, Instant.now());

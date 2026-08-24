@@ -76,6 +76,10 @@ public class GitHubDiscussionProcessor extends BaseGitHubProcessor {
      */
     @Transactional
     public Discussion process(GitHubDiscussionDTO dto, ProcessingContext context) {
+        return processInternal(dto, context);
+    }
+
+    private Discussion processInternal(GitHubDiscussionDTO dto, ProcessingContext context) {
         Long dbId = dto.getDatabaseId();
         if (dbId == null) {
             log.warn("Skipped discussion processing: reason=missingDatabaseId, discussionNumber={}", dto.number());
@@ -221,7 +225,7 @@ public class GitHubDiscussionProcessor extends BaseGitHubProcessor {
      */
     @Transactional
     public Discussion processClosed(GitHubDiscussionDTO dto, ProcessingContext context) {
-        Discussion discussion = process(dto, context);
+        Discussion discussion = processInternal(dto, context);
         if (discussion != null) {
             String stateReason = dto.stateReason() != null ? dto.stateReason() : null;
             eventPublisher.publishEvent(
@@ -246,7 +250,7 @@ public class GitHubDiscussionProcessor extends BaseGitHubProcessor {
      */
     @Transactional
     public Discussion processReopened(GitHubDiscussionDTO dto, ProcessingContext context) {
-        Discussion discussion = process(dto, context);
+        Discussion discussion = processInternal(dto, context);
         if (discussion != null) {
             eventPublisher.publishEvent(
                 new ScmDomainEvent.DiscussionReopened(
@@ -269,7 +273,7 @@ public class GitHubDiscussionProcessor extends BaseGitHubProcessor {
      */
     @Transactional
     public Discussion processAnswered(GitHubDiscussionDTO dto, ProcessingContext context) {
-        Discussion discussion = process(dto, context);
+        Discussion discussion = processInternal(dto, context);
         if (discussion != null) {
             // The answer comment's database ID, if available from the DTO
             Long answerCommentId = dto.answerComment() != null ? dto.answerComment().getDatabaseId() : null;

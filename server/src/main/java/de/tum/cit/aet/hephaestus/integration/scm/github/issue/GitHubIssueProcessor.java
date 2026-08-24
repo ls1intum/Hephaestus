@@ -274,7 +274,7 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
         String orgLogin,
         ProcessingContext context
     ) {
-        Issue issue = process(issueDto, context);
+        Issue issue = processInternal(issueDto, context, true, true);
 
         if (typeDto != null) {
             IssueType issueType = findOrCreateIssueType(typeDto, orgLogin);
@@ -297,7 +297,7 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
 
     @Transactional
     public Issue processUntyped(GitHubIssueDTO issueDto, ProcessingContext context) {
-        Issue issue = process(issueDto, context);
+        Issue issue = processInternal(issueDto, context, true, true);
 
         IssueType previousType = issue.getIssueType();
         if (previousType != null) {
@@ -333,7 +333,7 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
 
     @Transactional
     public Issue processReopened(GitHubIssueDTO issueDto, ProcessingContext context) {
-        Issue issue = process(issueDto, context);
+        Issue issue = processInternal(issueDto, context, true, true);
         eventPublisher.publishEvent(
             new ScmDomainEvent.IssueReopened(ScmEventPayload.IssueData.from(issue), EventContext.from(context))
         );
@@ -343,7 +343,7 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
 
     @Transactional
     public Issue processLabeled(GitHubIssueDTO issueDto, GitHubLabelDTO labelDto, ProcessingContext context) {
-        Issue issue = process(issueDto, context);
+        Issue issue = processInternal(issueDto, context, true, true);
         Label label = findOrCreateLabel(labelDto, context.repository());
         if (label != null) {
             eventPublisher.publishEvent(
@@ -360,7 +360,7 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
 
     @Transactional
     public Issue processUnlabeled(GitHubIssueDTO issueDto, GitHubLabelDTO labelDto, ProcessingContext context) {
-        Issue issue = process(issueDto, context);
+        Issue issue = processInternal(issueDto, context, true, true);
         Label label = findOrCreateLabel(labelDto, context.repository());
         if (label != null) {
             eventPublisher.publishEvent(

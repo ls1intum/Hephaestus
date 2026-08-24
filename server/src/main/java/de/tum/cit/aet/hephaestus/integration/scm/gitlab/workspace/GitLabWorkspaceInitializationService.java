@@ -40,7 +40,6 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.core.task.AsyncTaskExecutor;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Initializes a GitLab PAT workspace by discovering all repositories in its group.
@@ -60,9 +59,7 @@ import org.springframework.transaction.annotation.Transactional;
  * workspace lifecycle (creation/activation) with integration.scm sync services. The dependency
  * direction is always {@code workspace → integration.scm}, never the reverse.
  *
- * <p><b>Transaction note:</b> {@link #linkWorkspaceToOrganization} is {@code @Transactional}
- * and {@code public} so that Spring's proxy intercepts calls from the non-transactional
- * {@link #initialize} method. {@link #ensureRepositoryMonitors} is intentionally
+ * <p>{@link #ensureRepositoryMonitors} is intentionally
  * NOT {@code @Transactional} — each monitor save auto-commits independently so that
  * a failure on one does not roll back previously created monitors.
  *
@@ -96,6 +93,7 @@ public class GitLabWorkspaceInitializationService {
 
     // Authoritative source for per-workspace integration config (server URL, PAT presence).
     private final ConnectionService connectionService;
+    private final GitLabWorkspaceLinkService workspaceLinkService;
 
     // Infrastructure
     private final AsyncTaskExecutor monitoringExecutor;
@@ -114,6 +112,7 @@ public class GitLabWorkspaceInitializationService {
         ObjectProvider<GitLabRateLimitTracker> rateLimitTrackerProvider,
         ObjectProvider<GitLabWorkspaceDataSyncTrigger> dataSyncTriggerProvider,
         ConnectionService connectionService,
+        GitLabWorkspaceLinkService workspaceLinkService,
         @Qualifier("monitoringExecutor") AsyncTaskExecutor monitoringExecutor
     ) {
         this.workspaceRepository = workspaceRepository;
@@ -129,6 +128,7 @@ public class GitLabWorkspaceInitializationService {
         this.rateLimitTrackerProvider = rateLimitTrackerProvider;
         this.dataSyncTriggerProvider = dataSyncTriggerProvider;
         this.connectionService = connectionService;
+        this.workspaceLinkService = workspaceLinkService;
         this.monitoringExecutor = monitoringExecutor;
     }
 
@@ -330,51 +330,8 @@ public class GitLabWorkspaceInitializationService {
         }
     }
 
-    /**
-     * Links the workspace to its Organization entity (created during sync).
-     *
-     * <p>This method is {@code public} and {@code @Transactional} so that Spring's
-     * transactional proxy intercepts calls from the non-transactional {@link #initialize}.
-     */
-    @Transactional
     public void linkWorkspaceToOrganization(Workspace workspace) {
-        if (workspace.getOrganization() != null || isBlank(workspace.getAccountLogin())) {
-            return;
-        }
-        organizationRepository
-            .findByLoginIgnoreCaseAndProvider_Type(workspace.getAccountLogin(), IdentityProviderType.GITLAB)
-            .ifPresent(org -> {
-                // Check if another workspace already references this organization
-                // (workspace.organization_id has a unique constraint)
-                if (
-                    workspaceRepository.existsByOrganizationId(org.getId()) &&
-                    !workspaceRepository.existsByIdAndOrganizationId(workspace.getId(), org.getId())
-                ) {
-                    log.warn(
-                        "Organization already linked to another workspace: orgId={}, workspaceId={}",
-                        org.getId(),
-                        workspace.getId()
-                    );
-                    return;
-                }
-
-                // Re-read to get latest state (may have been linked concurrently)
-                workspaceRepository
-                    .findById(workspace.getId())
-                    .ifPresent(current -> {
-                        if (current.getOrganization() == null) {
-                            current.setOrganization(org);
-                            workspaceRepository.save(current);
-                            // Update the in-memory reference for subsequent phases
-                            workspace.setOrganization(org);
-                            log.info(
-                                "Linked organization to workspace: orgId={}, workspaceId={}",
-                                org.getId(),
-                                current.getId()
-                            );
-                        }
-                    });
-            });
+        workspaceLinkService.link(workspace);
     }
 
     /**

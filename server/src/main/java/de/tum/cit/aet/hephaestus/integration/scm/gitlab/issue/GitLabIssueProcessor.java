@@ -93,6 +93,11 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
     @Transactional
     @Nullable
     public Issue process(GitLabIssueEventDTO event, ProcessingContext context) {
+        return processInternal(event, context);
+    }
+
+    @Nullable
+    private Issue processInternal(GitLabIssueEventDTO event, ProcessingContext context) {
         if (event.isConfidential()) {
             log.debug("Skipped confidential issue: iid={}", event.objectAttributes().iid());
             return null;
@@ -184,7 +189,7 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
     public Issue processUpdated(GitLabIssueEventDTO event, ProcessingContext context) {
         // Capture the delta from the payload (independent of the entity's label set, which process() rewrites).
         List<GitLabWebhookLabel> addedLabels = event.addedLabels();
-        Issue issue = process(event, context);
+        Issue issue = processInternal(event, context);
         if (issue == null || addedLabels.isEmpty()) {
             return issue;
         }
@@ -377,7 +382,7 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
     @Transactional
     @Nullable
     public Issue processClosed(GitLabIssueEventDTO event, ProcessingContext context) {
-        Issue issue = process(event, context);
+        Issue issue = processInternal(event, context);
         if (issue != null) {
             eventPublisher.publishEvent(
                 new ScmDomainEvent.IssueClosed(
@@ -394,7 +399,7 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
     @Transactional
     @Nullable
     public Issue processReopened(GitLabIssueEventDTO event, ProcessingContext context) {
-        Issue issue = process(event, context);
+        Issue issue = processInternal(event, context);
         if (issue != null) {
             eventPublisher.publishEvent(
                 new ScmDomainEvent.IssueReopened(ScmEventPayload.IssueData.from(issue), EventContext.from(context))

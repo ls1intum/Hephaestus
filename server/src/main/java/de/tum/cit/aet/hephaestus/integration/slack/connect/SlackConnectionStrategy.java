@@ -154,7 +154,7 @@ public class SlackConnectionStrategy implements ConnectionStrategy {
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public void revoke(IntegrationRef ref) {
         try {
-            revokeProvider(ref);
+            revokeProviderWithoutTransaction(ref);
         } catch (RuntimeException e) {
             log.warn("Slack token revoke failed for workspace={}: {}", ref.workspaceId(), e.toString());
         }
@@ -168,6 +168,10 @@ public class SlackConnectionStrategy implements ConnectionStrategy {
     @Override
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public void revokeProvider(IntegrationRef ref) {
+        revokeProviderWithoutTransaction(ref);
+    }
+
+    private void revokeProviderWithoutTransaction(IntegrationRef ref) {
         if (connectionService.hasOtherInstalledConnection(ref)) {
             return;
         }

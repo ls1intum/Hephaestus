@@ -118,6 +118,10 @@ public class LoginProviderService {
 
     @Transactional(readOnly = true)
     public LoginProvider require(String registrationId) {
+        return loadRequired(registrationId);
+    }
+
+    private LoginProvider loadRequired(String registrationId) {
         return repository
             .findByRegistrationId(registrationId)
             .orElseThrow(() ->
@@ -160,7 +164,7 @@ public class LoginProviderService {
     /** Apply a partial update (only non-null fields). registrationId + type are immutable identity. */
     @Transactional
     public LoginProvider update(String registrationId, Patch patch) {
-        LoginProvider provider = require(registrationId);
+        LoginProvider provider = loadRequired(registrationId);
         // Field NAMES only — this list goes into the audit trail, so it must stay free of values.
         List<String> changed = new ArrayList<>();
         if (patch.displayName() != null && !patch.displayName().isBlank()) {
@@ -201,7 +205,7 @@ public class LoginProviderService {
     /** Delete a login provider. Refuses to remove the last enabled one (would lock everyone out). */
     @Transactional
     public void delete(String registrationId) {
-        LoginProvider provider = require(registrationId);
+        LoginProvider provider = loadRequired(registrationId);
         if (provider.isEnabled()) {
             requireNotLastEnabled(registrationId, "delete");
         }

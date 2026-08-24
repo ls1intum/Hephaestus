@@ -37,19 +37,31 @@ public class CuratedCatalogService {
 
     @Transactional(readOnly = true)
     public EffectiveCatalog catalog() {
+        return loadCatalog();
+    }
+
+    private EffectiveCatalog loadCatalog() {
         return CuratedCatalogModel.compose(loader.catalog(), areaOverrides.findAll(), practiceOverrides.findAll());
     }
 
     @Transactional(readOnly = true)
     public CatalogEntry<PracticeDefinition> practice(String slug) {
-        return catalog()
+        return loadPractice(slug);
+    }
+
+    private CatalogEntry<PracticeDefinition> loadPractice(String slug) {
+        return loadCatalog()
             .practice(slug)
             .orElseThrow(() -> new EntityNotFoundException(CATALOG_PRACTICE, slug));
     }
 
     @Transactional(readOnly = true)
     public CatalogEntry<AreaDefinition> area(String slug) {
-        return catalog()
+        return loadArea(slug);
+    }
+
+    private CatalogEntry<AreaDefinition> loadArea(String slug) {
+        return loadCatalog()
             .area(slug)
             .orElseThrow(() -> new EntityNotFoundException(CATALOG_AREA, slug));
     }
@@ -61,7 +73,7 @@ public class CuratedCatalogService {
         PracticeDefinition definition
     ) {
         lockCatalog();
-        EffectiveCatalog before = catalog();
+        EffectiveCatalog before = loadCatalog();
         CuratedCatalogModel.validatePracticeArea(before, definition);
         definitionValidator.validate(definition);
         CatalogEntry<PracticeDefinition> entry = CuratedCatalogModel.requireEntry(
@@ -88,7 +100,7 @@ public class CuratedCatalogService {
     @Transactional
     public CatalogEntry<PracticeDefinition> createPractice(String slug, PracticeDefinition definition) {
         lockCatalog();
-        EffectiveCatalog before = catalog();
+        EffectiveCatalog before = loadCatalog();
         CuratedCatalogModel.validatePracticeArea(before, definition);
         definitionValidator.validate(definition);
         if (before.practice(slug).isPresent()) {
@@ -98,7 +110,7 @@ public class CuratedCatalogService {
         CuratedPracticeOverride override = new CuratedPracticeOverride(slug, now);
         override.write(definition, null, now);
         practiceOverrides.save(override);
-        CatalogEntry<PracticeDefinition> created = practice(slug);
+        CatalogEntry<PracticeDefinition> created = loadPractice(slug);
         configAudit.record(
             ConfigAuditEntry.instanceCreated(
                 ConfigAuditEntityType.CURATED_PRACTICE,
@@ -113,7 +125,7 @@ public class CuratedCatalogService {
     public CatalogEntry<PracticeDefinition> resetPractice(String slug, @Nullable EntityTagPrecondition precondition) {
         lockCatalog();
         CatalogEntry<PracticeDefinition> entry = CuratedCatalogModel.requireEntry(
-            catalog().practice(slug),
+            loadCatalog().practice(slug),
             CATALOG_PRACTICE,
             slug,
             precondition
@@ -138,7 +150,7 @@ public class CuratedCatalogService {
     public CatalogEntry<PracticeDefinition> keepPractice(String slug, @Nullable EntityTagPrecondition precondition) {
         lockCatalog();
         CatalogEntry<PracticeDefinition> entry = CuratedCatalogModel.requireEntry(
-            catalog().practice(slug),
+            loadCatalog().practice(slug),
             CATALOG_PRACTICE,
             slug,
             precondition
@@ -163,7 +175,7 @@ public class CuratedCatalogService {
     ) {
         lockCatalog();
         CatalogEntry<PracticeDefinition> entry = CuratedCatalogModel.requireEntry(
-            catalog().practice(slug),
+            loadCatalog().practice(slug),
             CATALOG_PRACTICE,
             slug,
             precondition
@@ -191,7 +203,7 @@ public class CuratedCatalogService {
     ) {
         lockCatalog();
         CatalogEntry<AreaDefinition> entry = CuratedCatalogModel.requireEntry(
-            catalog().area(slug),
+            loadCatalog().area(slug),
             CATALOG_AREA,
             slug,
             precondition
@@ -214,7 +226,7 @@ public class CuratedCatalogService {
     @Transactional
     public CatalogEntry<AreaDefinition> createArea(String slug, AreaDefinition definition) {
         lockCatalog();
-        EffectiveCatalog before = catalog();
+        EffectiveCatalog before = loadCatalog();
         if (before.area(slug).isPresent()) {
             throw new CuratedCatalogConflictException("An area with slug '" + slug + "' already exists.");
         }
@@ -222,7 +234,7 @@ public class CuratedCatalogService {
         CuratedAreaOverride override = new CuratedAreaOverride(slug, now);
         override.write(definition, null, now);
         areaOverrides.save(override);
-        CatalogEntry<AreaDefinition> created = area(slug);
+        CatalogEntry<AreaDefinition> created = loadArea(slug);
         configAudit.record(
             ConfigAuditEntry.instanceCreated(
                 ConfigAuditEntityType.CURATED_PRACTICE_AREA,
@@ -237,7 +249,7 @@ public class CuratedCatalogService {
     public CatalogEntry<AreaDefinition> resetArea(String slug, @Nullable EntityTagPrecondition precondition) {
         lockCatalog();
         CatalogEntry<AreaDefinition> entry = CuratedCatalogModel.requireEntry(
-            catalog().area(slug),
+            loadCatalog().area(slug),
             CATALOG_AREA,
             slug,
             precondition
@@ -262,7 +274,7 @@ public class CuratedCatalogService {
     public CatalogEntry<AreaDefinition> keepArea(String slug, @Nullable EntityTagPrecondition precondition) {
         lockCatalog();
         CatalogEntry<AreaDefinition> entry = CuratedCatalogModel.requireEntry(
-            catalog().area(slug),
+            loadCatalog().area(slug),
             CATALOG_AREA,
             slug,
             precondition
@@ -286,7 +298,7 @@ public class CuratedCatalogService {
         CuratedStatus status
     ) {
         lockCatalog();
-        EffectiveCatalog before = catalog();
+        EffectiveCatalog before = loadCatalog();
         CuratedCatalogModel.requireCatalog(before, precondition);
         CatalogEntry<AreaDefinition> entry = before
             .area(slug)
@@ -304,13 +316,13 @@ public class CuratedCatalogService {
             areaOverrides.save(override);
         }
         recordArea(slug, entry);
-        return catalog();
+        return loadCatalog();
     }
 
     @Transactional
     public EffectiveCatalog reorderAreas(@Nullable EntityTagPrecondition precondition, List<String> orderedSlugs) {
         lockCatalog();
-        EffectiveCatalog before = catalog();
+        EffectiveCatalog before = loadCatalog();
         CuratedCatalogModel.requireCatalog(before, precondition);
         CuratedCatalogModel.validateCompleteOrder(
             before.areas().stream().map(CatalogEntry::slug).toList(),
@@ -326,7 +338,7 @@ public class CuratedCatalogService {
             override.setPosition(position, now);
             areaOverrides.save(override);
         }
-        return catalog();
+        return loadCatalog();
     }
 
     @Transactional
@@ -336,7 +348,7 @@ public class CuratedCatalogService {
         List<String> orderedSlugs
     ) {
         lockCatalog();
-        EffectiveCatalog before = catalog();
+        EffectiveCatalog before = loadCatalog();
         CuratedCatalogModel.requireCatalog(before, precondition);
         if (areaSlug != null && before.area(areaSlug).isEmpty()) {
             throw new EntityNotFoundException(CATALOG_AREA, areaSlug);
@@ -350,13 +362,13 @@ public class CuratedCatalogService {
             return before;
         }
         resequencePractices(orderedSlugs, clock.instant());
-        return catalog();
+        return loadCatalog();
     }
 
     @Transactional
     public EffectiveCatalog resetOrder(@Nullable EntityTagPrecondition precondition) {
         lockCatalog();
-        EffectiveCatalog before = catalog();
+        EffectiveCatalog before = loadCatalog();
         CuratedCatalogModel.requireCatalog(before, precondition);
         if (!before.customOrder()) {
             return before;
@@ -386,7 +398,7 @@ public class CuratedCatalogService {
                     areaOverrides.save(override);
                 }
             });
-        return catalog();
+        return loadCatalog();
     }
 
     @Transactional
@@ -397,7 +409,7 @@ public class CuratedCatalogService {
         int position
     ) {
         lockCatalog();
-        EffectiveCatalog before = catalog();
+        EffectiveCatalog before = loadCatalog();
         CuratedCatalogModel.requireCatalog(before, precondition);
         CatalogEntry<PracticeDefinition> entry = before
             .practice(slug)
@@ -441,11 +453,11 @@ public class CuratedCatalogService {
         resequencePractices(source, now);
         resequencePractices(target, now);
         recordPractice(slug, entry);
-        return catalog();
+        return loadCatalog();
     }
 
     private CatalogEntry<PracticeDefinition> recordPractice(String slug, CatalogEntry<PracticeDefinition> before) {
-        CatalogEntry<PracticeDefinition> after = practice(slug);
+        CatalogEntry<PracticeDefinition> after = loadPractice(slug);
         configAudit.record(
             ConfigAuditEntry.instanceUpdated(
                 ConfigAuditEntityType.CURATED_PRACTICE,
@@ -458,7 +470,7 @@ public class CuratedCatalogService {
     }
 
     private CatalogEntry<AreaDefinition> recordArea(String slug, CatalogEntry<AreaDefinition> before) {
-        CatalogEntry<AreaDefinition> after = area(slug);
+        CatalogEntry<AreaDefinition> after = loadArea(slug);
         configAudit.record(
             ConfigAuditEntry.instanceUpdated(
                 ConfigAuditEntityType.CURATED_PRACTICE_AREA,

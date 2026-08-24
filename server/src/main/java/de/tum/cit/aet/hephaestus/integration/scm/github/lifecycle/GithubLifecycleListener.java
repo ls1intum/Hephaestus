@@ -150,7 +150,7 @@ public class GithubLifecycleListener implements IntegrationLifecycleListener {
             return;
         }
         TenantAccount account = event.account();
-        createOrUpdateFromInstallation(
+        createOrUpdateFromInstallationInternal(
             installationId,
             account != null ? parseAccountIdNullable(account.externalId()) : null,
             account != null ? account.displayName() : null,
@@ -172,7 +172,7 @@ public class GithubLifecycleListener implements IntegrationLifecycleListener {
             log.warn("GitHub onInstanceUninstalled: skipped, reason=invalidInstanceKey, ref={}", ref);
             return;
         }
-        purgeWorkspaceForInstallation(installationId);
+        purgeWorkspaceForInstallationInternal(installationId);
     }
 
     /**
@@ -203,7 +203,7 @@ public class GithubLifecycleListener implements IntegrationLifecycleListener {
             log.warn("GitHub onTenantRenamed: skipped, reason=invalidInstanceKey, ref={}", ref);
             return;
         }
-        handleAccountRename(installationId, oldName, newName);
+        handleAccountRenameInternal(installationId, oldName, newName);
     }
 
     // Public helpers — called by adapter / provisioning service (non-SPI)
@@ -230,7 +230,7 @@ public class GithubLifecycleListener implements IntegrationLifecycleListener {
         String accountLogin,
         RepositorySelection repositorySelection
     ) {
-        return createOrUpdateFromInstallation(
+        return createOrUpdateFromInstallationInternal(
             installationId,
             null,
             accountLogin,
@@ -253,6 +253,24 @@ public class GithubLifecycleListener implements IntegrationLifecycleListener {
      */
     @Transactional
     public Workspace createOrUpdateFromInstallation(
+        long installationId,
+        Long accountId,
+        String accountLogin,
+        AccountKind accountKind,
+        String avatarUrl,
+        RepositorySelection repositorySelection
+    ) {
+        return createOrUpdateFromInstallationInternal(
+            installationId,
+            accountId,
+            accountLogin,
+            accountKind,
+            avatarUrl,
+            repositorySelection
+        );
+    }
+
+    private Workspace createOrUpdateFromInstallationInternal(
         long installationId,
         Long accountId,
         String accountLogin,
@@ -501,6 +519,10 @@ public class GithubLifecycleListener implements IntegrationLifecycleListener {
      */
     @Transactional
     public Optional<Workspace> purgeWorkspaceForInstallation(long installationId) {
+        return purgeWorkspaceForInstallationInternal(installationId);
+    }
+
+    private Optional<Workspace> purgeWorkspaceForInstallationInternal(long installationId) {
         var workspaceOpt = workspaceRepository.findByInstallationIdForUpdate(installationId);
         if (workspaceOpt.isEmpty()) {
             log.warn(
@@ -615,6 +637,10 @@ public class GithubLifecycleListener implements IntegrationLifecycleListener {
      */
     @Transactional
     public void handleAccountRename(long installationId, String previousLogin, String newLogin) {
+        handleAccountRenameInternal(installationId, previousLogin, newLogin);
+    }
+
+    private void handleAccountRenameInternal(long installationId, String previousLogin, String newLogin) {
         if (isBlank(newLogin)) {
             log.warn("Skipped account rename: reason=missingTargetLogin, installationId={}", installationId);
             return;

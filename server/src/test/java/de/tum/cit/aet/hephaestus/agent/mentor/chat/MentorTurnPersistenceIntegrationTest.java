@@ -728,9 +728,8 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
     private MentorInFlightReaper reaperWithAnUnsafeWindow() {
         return new MentorInFlightReaper(
             chatMessageRepository,
-            usageRecorder,
+            new MentorInFlightAccounting(chatMessageRepository, usageRecorder),
             meterRegistry,
-            reaper,
             Duration.ofMinutes(10)
         );
     }

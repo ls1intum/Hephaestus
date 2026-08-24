@@ -83,7 +83,7 @@ public class HephaestusJwtIssuer {
      */
     @Transactional
     public Token issue(JwtPrincipal principal, @Nullable Long impersonatorId, @Nullable HttpServletRequest request) {
-        return issue(principal, impersonatorId, null, request);
+        return issueToken(principal, impersonatorId, null, null, request);
     }
 
     /**
@@ -100,7 +100,7 @@ public class HephaestusJwtIssuer {
         @Nullable Instant impersonationExpiresAt,
         @Nullable HttpServletRequest request
     ) {
-        return issue(principal, impersonatorId, impersonationExpiresAt, null, request);
+        return issueToken(principal, impersonatorId, impersonationExpiresAt, null, request);
     }
 
     /**
@@ -112,6 +112,16 @@ public class HephaestusJwtIssuer {
      */
     @Transactional
     public Token issue(
+        JwtPrincipal principal,
+        @Nullable Long impersonatorId,
+        @Nullable Instant impersonationExpiresAt,
+        @Nullable Instant sessionExpiresAt,
+        @Nullable HttpServletRequest request
+    ) {
+        return issueToken(principal, impersonatorId, impersonationExpiresAt, sessionExpiresAt, request);
+    }
+
+    private Token issueToken(
         JwtPrincipal principal,
         @Nullable Long impersonatorId,
         @Nullable Instant impersonationExpiresAt,

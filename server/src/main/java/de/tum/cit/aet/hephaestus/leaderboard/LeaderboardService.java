@@ -88,6 +88,17 @@ public class LeaderboardService {
         LeaderboardSortType sort,
         LeaderboardMode mode
     ) {
+        return buildLeaderboard(workspace, after, before, team, sort, mode);
+    }
+
+    private List<LeaderboardEntryDTO> buildLeaderboard(
+        Workspace workspace,
+        Instant after,
+        Instant before,
+        String team,
+        LeaderboardSortType sort,
+        LeaderboardMode mode
+    ) {
         if (mode == LeaderboardMode.INDIVIDUAL) {
             Optional<Team> resolvedTeam = "all".equals(team)
                 ? Optional.empty()
@@ -445,7 +456,7 @@ public class LeaderboardService {
 
         // Always use the GLOBAL leaderboard (team = "all") so that league points are
         // independent of any team filter the caller might be viewing.
-        List<LeaderboardEntryDTO> globalLeaderboard = createLeaderboard(
+        List<LeaderboardEntryDTO> globalLeaderboard = buildLeaderboard(
             workspace,
             after,
             before,

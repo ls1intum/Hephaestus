@@ -169,6 +169,11 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
     @Transactional
     @Nullable
     public PullRequest process(GitLabMergeRequestEventDTO event, ProcessingContext context) {
+        return processInternal(event, context);
+    }
+
+    @Nullable
+    private PullRequest processInternal(GitLabMergeRequestEventDTO event, ProcessingContext context) {
         if (event.isConfidential()) {
             log.debug("Skipped confidential merge request: iid={}", event.objectAttributes().iid());
             return null;
@@ -273,7 +278,7 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
     @Nullable
     public PullRequest processClosed(GitLabMergeRequestEventDTO event, ProcessingContext context) {
         Issue.State before = getExistingState(event, context);
-        PullRequest pr = process(event, context);
+        PullRequest pr = processInternal(event, context);
         if (pr != null && before != Issue.State.CLOSED && before != Issue.State.MERGED) {
             eventPublisher.publishEvent(
                 new ScmDomainEvent.PullRequestClosed(
@@ -294,7 +299,7 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
     @Nullable
     public PullRequest processReopened(GitLabMergeRequestEventDTO event, ProcessingContext context) {
         Issue.State before = getExistingState(event, context);
-        PullRequest pr = process(event, context);
+        PullRequest pr = processInternal(event, context);
         if (pr != null && before != Issue.State.OPEN) {
             eventPublisher.publishEvent(
                 new ScmDomainEvent.PullRequestReopened(
@@ -314,7 +319,7 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
     @Nullable
     public PullRequest processMerged(GitLabMergeRequestEventDTO event, ProcessingContext context) {
         Issue.State before = getExistingState(event, context);
-        PullRequest pr = process(event, context);
+        PullRequest pr = processInternal(event, context);
         if (pr != null && before != Issue.State.MERGED) {
             var prData = ScmEventPayload.PullRequestData.from(pr);
             if (before != Issue.State.CLOSED) {
@@ -337,7 +342,7 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
     @Transactional
     @Nullable
     public PullRequest processApproved(GitLabMergeRequestEventDTO event, ProcessingContext context) {
-        PullRequest pr = process(event, context);
+        PullRequest pr = processInternal(event, context);
         if (pr == null || event.user() == null) return pr;
 
         User approver = findOrCreateUser(event.user(), context.providerId());
@@ -394,7 +399,7 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
     @Transactional
     @Nullable
     public PullRequest processUnapproved(GitLabMergeRequestEventDTO event, ProcessingContext context) {
-        PullRequest pr = process(event, context);
+        PullRequest pr = processInternal(event, context);
         if (pr == null || event.user() == null) return pr;
 
         User approver = findOrCreateUser(event.user(), context.providerId());

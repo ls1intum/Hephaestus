@@ -121,6 +121,10 @@ public class WorkspaceRepositoryMonitorService {
 
     @Transactional(readOnly = true)
     public List<String> getMonitoredRepositories(String slug) {
+        return getMonitoredRepositoriesInTransaction(slug);
+    }
+
+    private List<String> getMonitoredRepositoriesInTransaction(String slug) {
         Workspace workspace = requireWorkspace(slug);
         log.debug(
             "Retrieved monitored repositories: workspaceId={}, workspaceSlug={}",
@@ -130,8 +134,9 @@ public class WorkspaceRepositoryMonitorService {
         return workspace.getRepositoriesToMonitor().stream().map(RepositoryToMonitor::getNameWithOwner).toList();
     }
 
+    @Transactional(readOnly = true)
     public List<String> getMonitoredRepositories(WorkspaceContext workspaceContext) {
-        return getMonitoredRepositories(requireSlug(workspaceContext));
+        return getMonitoredRepositoriesInTransaction(requireSlug(workspaceContext));
     }
 
     public void addRepositoryToMonitor(String slug, String nameWithOwner)
@@ -243,7 +248,7 @@ public class WorkspaceRepositoryMonitorService {
      */
     @Transactional
     public Optional<Workspace> ensureRepositoryMonitorForInstallation(long installationId, String nameWithOwner) {
-        return ensureRepositoryMonitorForInstallation(installationId, nameWithOwner, false);
+        return ensureRepositoryMonitorInTransaction(installationId, nameWithOwner, false);
     }
 
     /**
@@ -256,6 +261,14 @@ public class WorkspaceRepositoryMonitorService {
      */
     @Transactional
     public Optional<Workspace> ensureRepositoryMonitorForInstallation(
+        long installationId,
+        String nameWithOwner,
+        boolean deferSync
+    ) {
+        return ensureRepositoryMonitorInTransaction(installationId, nameWithOwner, deferSync);
+    }
+
+    private Optional<Workspace> ensureRepositoryMonitorInTransaction(
         long installationId,
         String nameWithOwner,
         boolean deferSync
@@ -282,6 +295,10 @@ public class WorkspaceRepositoryMonitorService {
     /** Remove a repository monitor for a given installation id if it exists; no-op if missing. */
     @Transactional
     public Optional<Workspace> removeRepositoryMonitorForInstallation(long installationId, String nameWithOwner) {
+        return removeRepositoryMonitorInTransaction(installationId, nameWithOwner);
+    }
+
+    private Optional<Workspace> removeRepositoryMonitorInTransaction(long installationId, String nameWithOwner) {
         if (StringUtils.isBlank(nameWithOwner)) {
             return Optional.empty();
         }
@@ -316,6 +333,10 @@ public class WorkspaceRepositoryMonitorService {
      */
     @Transactional
     public Optional<Workspace> removeAllRepositoriesFromMonitor(long installationId, boolean deleteRepositories) {
+        return removeAllRepositoriesInTransaction(installationId, deleteRepositories);
+    }
+
+    private Optional<Workspace> removeAllRepositoriesInTransaction(long installationId, boolean deleteRepositories) {
         var workspaceOpt = workspaceRepository.findActiveByInstallationIdForUpdate(installationId);
         workspaceOpt.ifPresent(workspace -> {
             List<RepositoryToMonitor> monitors = repositoryToMonitorRepository.findByWorkspaceId(workspace.getId());
@@ -334,7 +355,7 @@ public class WorkspaceRepositoryMonitorService {
     /** Remove all repository monitors tied to an installation; keeps the Repository entities. */
     @Transactional
     public Optional<Workspace> removeAllRepositoriesFromMonitor(long installationId) {
-        return removeAllRepositoriesFromMonitor(installationId, false);
+        return removeAllRepositoriesInTransaction(installationId, false);
     }
 
     /**
@@ -473,7 +494,7 @@ public class WorkspaceRepositoryMonitorService {
                 snapshot.name(),
                 snapshot.isPrivate()
             );
-            ensureRepositoryMonitorForInstallation(installationId, snapshot.nameWithOwner(), deferSync);
+            ensureRepositoryMonitorInTransaction(installationId, snapshot.nameWithOwner(), deferSync);
         });
 
         repositoryToMonitorRepository
@@ -481,7 +502,7 @@ public class WorkspaceRepositoryMonitorService {
             .stream()
             .filter(monitor -> !StringUtils.isBlank(monitor.getNameWithOwner()))
             .filter(monitor -> !desiredRepositories.contains(monitor.getNameWithOwner().toLowerCase(Locale.ENGLISH)))
-            .forEach(monitor -> removeRepositoryMonitorForInstallation(installationId, monitor.getNameWithOwner()));
+            .forEach(monitor -> removeRepositoryMonitorInTransaction(installationId, monitor.getNameWithOwner()));
     }
 
     /**

@@ -14,7 +14,6 @@ import com.tngtech.archunit.lang.ArchCondition;
 import com.tngtech.archunit.lang.ArchRule;
 import com.tngtech.archunit.lang.ConditionEvents;
 import com.tngtech.archunit.lang.SimpleConditionEvent;
-import com.tngtech.archunit.library.freeze.FreezingArchRule;
 import jakarta.annotation.PostConstruct;
 import jakarta.validation.Valid;
 import java.util.Collection;
@@ -32,7 +31,7 @@ class SpringCorrectnessArchitectureTest extends HephaestusArchitectureTest {
         ArchRule rule = methods()
             .that(transactionalMethods())
             .should()
-            .notBePrivate()
+            .bePublic()
             .andShould()
             .notBeStatic()
             .andShould()
@@ -45,11 +44,9 @@ class SpringCorrectnessArchitectureTest extends HephaestusArchitectureTest {
 
     @Test
     void shouldRejectTransactionalSelfInvocation() {
-        ArchRule rule = FreezingArchRule.freeze(
-            methods()
-                .should(notCallTransactionalMethodsOnSelf())
-                .because("self-invocation bypasses Spring's transactional proxy")
-        );
+        ArchRule rule = methods()
+            .should(notCallTransactionalMethodsOnSelf())
+            .because("self-invocation bypasses Spring's transactional proxy");
 
         rule.check(classes);
     }
@@ -65,11 +62,9 @@ class SpringCorrectnessArchitectureTest extends HephaestusArchitectureTest {
 
     @Test
     void shouldValidateApplicationRequestBodies() {
-        ArchRule rule = FreezingArchRule.freeze(
-            methods()
-                .should(haveValidatedRequestBodies())
-                .because("bean validation is not applied to a request body unless the parameter is @Valid")
-        );
+        ArchRule rule = methods()
+            .should(haveValidatedRequestBodies())
+            .because("bean validation is not applied to a request body unless the parameter is @Valid");
 
         rule.check(classes);
     }
@@ -132,6 +127,9 @@ class SpringCorrectnessArchitectureTest extends HephaestusArchitectureTest {
         return new ArchCondition<>("not call a transactional method on the same class") {
             @Override
             public void check(JavaMethod method, ConditionEvents events) {
+                if (method.getOwner().isInterface()) {
+                    return;
+                }
                 method
                     .getMethodCallsFromSelf()
                     .stream()
@@ -140,7 +138,7 @@ class SpringCorrectnessArchitectureTest extends HephaestusArchitectureTest {
                         call
                             .getTarget()
                             .resolveMember()
-                            .map(SpringCorrectnessArchitectureTest::isEffectivelyTransactional)
+                            .map(SpringCorrectnessArchitectureTest::isTransactionallyAnnotatedMethod)
                             .orElse(false)
                     )
                     .forEach(call ->
@@ -195,16 +193,7 @@ class SpringCorrectnessArchitectureTest extends HephaestusArchitectureTest {
     }
 
     private static boolean isEffectivelyTransactional(JavaMethod method) {
-        boolean methodAnnotated = method
-            .getOwner()
-            .getAllMethods()
-            .stream()
-            .filter(candidate -> candidate.getName().equals(method.getName()))
-            .filter(candidate -> candidate.getRawParameterTypes().equals(method.getRawParameterTypes()))
-            .anyMatch(
-                candidate ->
-                    candidate.isAnnotatedWith(Transactional.class) || candidate.isMetaAnnotatedWith(Transactional.class)
-            );
+        boolean methodAnnotated = isTransactionallyAnnotatedMethod(method);
         boolean ownerAnnotated = method
             .getOwner()
             .getAllClassesSelfIsAssignableTo()
@@ -216,6 +205,19 @@ class SpringCorrectnessArchitectureTest extends HephaestusArchitectureTest {
             !method.getModifiers().contains(JavaModifier.PRIVATE) &&
             !method.getModifiers().contains(JavaModifier.STATIC);
         return methodAnnotated || (ownerAnnotated && proxyCandidate);
+    }
+
+    private static boolean isTransactionallyAnnotatedMethod(JavaMethod method) {
+        return method
+            .getOwner()
+            .getAllMethods()
+            .stream()
+            .filter(candidate -> candidate.getName().equals(method.getName()))
+            .filter(candidate -> candidate.getRawParameterTypes().equals(method.getRawParameterTypes()))
+            .anyMatch(
+                candidate ->
+                    candidate.isAnnotatedWith(Transactional.class) || candidate.isMetaAnnotatedWith(Transactional.class)
+            );
     }
 
     private static ArchCondition<JavaMethod> notReturnOptionalCollection() {

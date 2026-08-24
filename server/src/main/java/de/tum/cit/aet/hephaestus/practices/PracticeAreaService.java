@@ -79,6 +79,10 @@ public class PracticeAreaService {
 
     @Transactional(readOnly = true)
     public PracticeArea getArea(WorkspaceContext ctx, String slug) {
+        return loadArea(ctx, slug);
+    }
+
+    private PracticeArea loadArea(WorkspaceContext ctx, String slug) {
         return practiceAreaRepository
             .findByWorkspaceIdAndSlug(ctx.id(), slug)
             .orElseThrow(() -> new EntityNotFoundException("PracticeArea", slug));
@@ -142,6 +146,15 @@ public class PracticeAreaService {
         AreaDefinition definition,
         int displayOrder
     ) {
+        return createCatalogArea(ctx, slug, definition, displayOrder);
+    }
+
+    private PracticeArea createCatalogArea(
+        WorkspaceContext ctx,
+        String slug,
+        AreaDefinition definition,
+        int displayOrder
+    ) {
         PracticeArea area = createArea(
             ctx,
             slug,
@@ -166,7 +179,7 @@ public class PracticeAreaService {
         AreaDefinition definition,
         int displayOrder
     ) {
-        PracticeArea area = createAreaFromCatalog(ctx, slug, definition, displayOrder);
+        PracticeArea area = createCatalogArea(ctx, slug, definition, displayOrder);
         configAudit.record(
             ConfigAuditEntry.created(
                 ConfigAuditEntityType.PRACTICE_AREA,
@@ -191,7 +204,7 @@ public class PracticeAreaService {
     @Transactional
     public PracticeArea setAutonomy(WorkspaceContext ctx, String slug, @Nullable PracticeAutonomy autonomy) {
         lockWorkspace(ctx);
-        PracticeArea area = getArea(ctx, slug);
+        PracticeArea area = loadArea(ctx, slug);
         if (area.getAutonomy() == autonomy) {
             return area;
         }
@@ -212,7 +225,7 @@ public class PracticeAreaService {
 
     @Transactional
     public PracticeArea updateArea(WorkspaceContext ctx, String slug, AreaAttributes attributes) {
-        return updateArea(ctx, slug, attributes, null);
+        return applyAreaUpdate(ctx, slug, attributes, null);
     }
 
     @Transactional
@@ -222,8 +235,17 @@ public class PracticeAreaService {
         AreaAttributes attributes,
         @Nullable Boolean visibleInPracticeDashboards
     ) {
+        return applyAreaUpdate(ctx, slug, attributes, visibleInPracticeDashboards);
+    }
+
+    private PracticeArea applyAreaUpdate(
+        WorkspaceContext ctx,
+        String slug,
+        AreaAttributes attributes,
+        @Nullable Boolean visibleInPracticeDashboards
+    ) {
         lockWorkspace(ctx);
-        PracticeArea area = getArea(ctx, slug);
+        PracticeArea area = loadArea(ctx, slug);
         PracticeAreaSnapshot before = PracticeAreaSnapshot.of(area);
         boolean snapshotChanged =
             (attributes.name() != null && !Objects.equals(attributes.name(), area.getName())) ||
@@ -271,13 +293,17 @@ public class PracticeAreaService {
 
     @Transactional
     public void deleteArea(WorkspaceContext ctx, String slug) {
-        deleteArea(ctx, slug, false);
+        removeArea(ctx, slug, false);
     }
 
     @Transactional
     public void deleteArea(WorkspaceContext ctx, String slug, boolean deletePractices) {
+        removeArea(ctx, slug, deletePractices);
+    }
+
+    private void removeArea(WorkspaceContext ctx, String slug, boolean deletePractices) {
         lockWorkspace(ctx);
-        PracticeArea area = getArea(ctx, slug);
+        PracticeArea area = loadArea(ctx, slug);
         PracticeAreaSnapshot areaBefore = PracticeAreaSnapshot.of(area);
         List<Practice> practices = practiceRepository.findByWorkspaceIdAndAreaIdOrderByDisplayOrderAscNameAsc(
             ctx.id(),

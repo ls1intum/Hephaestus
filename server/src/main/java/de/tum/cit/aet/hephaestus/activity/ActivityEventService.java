@@ -127,6 +127,19 @@ public class ActivityEventService implements ActivityRecorder {
         Long targetId,
         double xp
     ) {
+        return persist(workspaceId, eventType, occurredAt, actor, repository, targetType, targetId, xp);
+    }
+
+    private boolean persist(
+        Long workspaceId,
+        ActivityEventType eventType,
+        Instant occurredAt,
+        @Nullable User actor,
+        @Nullable Repository repository,
+        ActivityTargetType targetType,
+        Long targetId,
+        double xp
+    ) {
         // Validate workspace exists first (cheap lookup)
         if (!workspaceRepository.existsById(workspaceId)) {
             eventsFailedCounter.increment();
@@ -208,7 +221,7 @@ public class ActivityEventService implements ActivityRecorder {
      * @see RecordActivityCommand
      */
     public boolean record(RecordActivityCommand command) {
-        return record(
+        return persist(
             command.workspaceId(),
             command.eventType(),
             command.occurredAt(),
@@ -248,7 +261,7 @@ public class ActivityEventService implements ActivityRecorder {
         Long targetId
     ) {
         // Record with null actor and repository - acceptable for deletion audit trail
-        return record(
+        return persist(
             workspaceId,
             eventType,
             occurredAt,

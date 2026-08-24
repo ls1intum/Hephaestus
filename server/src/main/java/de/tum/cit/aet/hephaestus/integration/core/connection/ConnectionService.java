@@ -64,6 +64,10 @@ public class ConnectionService {
 
     @Transactional(readOnly = true)
     public Optional<Connection> findActive(long workspaceId, IntegrationKind kind) {
+        return findActiveInTransaction(workspaceId, kind);
+    }
+
+    private Optional<Connection> findActiveInTransaction(long workspaceId, IntegrationKind kind) {
         return connectionRepository.findFirstByWorkspaceIdAndKindAndStateOrderByCreatedAtDesc(
             workspaceId,
             kind,
@@ -86,8 +90,8 @@ public class ConnectionService {
      */
     @Transactional(readOnly = true)
     public Optional<IntegrationKind> findActiveProviderKind(long workspaceId) {
-        boolean github = findActive(workspaceId, IntegrationKind.GITHUB).isPresent();
-        boolean gitlab = findActive(workspaceId, IntegrationKind.GITLAB).isPresent();
+        boolean github = findActiveInTransaction(workspaceId, IntegrationKind.GITHUB).isPresent();
+        boolean gitlab = findActiveInTransaction(workspaceId, IntegrationKind.GITLAB).isPresent();
         if (github && gitlab) {
             throw new IllegalStateException(
                 "Workspace " +
@@ -103,7 +107,7 @@ public class ConnectionService {
 
     @Transactional(readOnly = true)
     public Optional<ConnectionConfig.GitHubAppConfig> findActiveGitHubAppConfig(long workspaceId) {
-        return findActive(workspaceId, IntegrationKind.GITHUB)
+        return findActiveInTransaction(workspaceId, IntegrationKind.GITHUB)
             .map(Connection::getConfig)
             .filter(c -> c instanceof ConnectionConfig.GitHubAppConfig)
             .map(c -> (ConnectionConfig.GitHubAppConfig) c);
@@ -111,7 +115,7 @@ public class ConnectionService {
 
     @Transactional(readOnly = true)
     public Optional<ConnectionConfig.GitHubPatConfig> findActiveGitHubPatConfig(long workspaceId) {
-        return findActive(workspaceId, IntegrationKind.GITHUB)
+        return findActiveInTransaction(workspaceId, IntegrationKind.GITHUB)
             .map(Connection::getConfig)
             .filter(c -> c instanceof ConnectionConfig.GitHubPatConfig)
             .map(c -> (ConnectionConfig.GitHubPatConfig) c);
@@ -119,7 +123,7 @@ public class ConnectionService {
 
     @Transactional(readOnly = true)
     public Optional<ConnectionConfig.GitLabConfig> findActiveGitLabConfig(long workspaceId) {
-        return findActive(workspaceId, IntegrationKind.GITLAB)
+        return findActiveInTransaction(workspaceId, IntegrationKind.GITLAB)
             .map(Connection::getConfig)
             .filter(c -> c instanceof ConnectionConfig.GitLabConfig)
             .map(c -> (ConnectionConfig.GitLabConfig) c);
@@ -127,7 +131,7 @@ public class ConnectionService {
 
     @Transactional(readOnly = true)
     public Optional<ConnectionConfig.SlackConfig> findSlackNotificationConfig(long workspaceId) {
-        return findActive(workspaceId, IntegrationKind.SLACK)
+        return findActiveInTransaction(workspaceId, IntegrationKind.SLACK)
             .map(Connection::getConfig)
             .filter(c -> c instanceof ConnectionConfig.SlackConfig)
             .map(c -> (ConnectionConfig.SlackConfig) c);
@@ -135,7 +139,7 @@ public class ConnectionService {
 
     @Transactional(readOnly = true)
     public Optional<ConnectionConfig.OutlineConfig> findActiveOutlineConfig(long workspaceId) {
-        return findActive(workspaceId, IntegrationKind.OUTLINE)
+        return findActiveInTransaction(workspaceId, IntegrationKind.OUTLINE)
             .map(Connection::getConfig)
             .filter(c -> c instanceof ConnectionConfig.OutlineConfig)
             .map(c -> (ConnectionConfig.OutlineConfig) c);
@@ -198,7 +202,7 @@ public class ConnectionService {
      */
     @Transactional(readOnly = true)
     public Optional<BearerToken> findActiveBearerToken(long workspaceId, IntegrationKind kind) {
-        return findActive(workspaceId, kind)
+        return findActiveInTransaction(workspaceId, kind)
             .flatMap(c -> c.credentials(credentialConverter))
             .flatMap(b -> b instanceof BearerToken bt ? Optional.of(bt) : Optional.empty());
     }
@@ -210,6 +214,10 @@ public class ConnectionService {
      */
     @Transactional(readOnly = true)
     public Optional<Connection> findInWorkspace(long workspaceId, long connectionId) {
+        return findInWorkspaceInTransaction(workspaceId, connectionId);
+    }
+
+    private Optional<Connection> findInWorkspaceInTransaction(long workspaceId, long connectionId) {
         return connectionRepository.findByIdAndWorkspaceId(connectionId, workspaceId);
     }
 
@@ -217,7 +225,9 @@ public class ConnectionService {
     @Transactional(readOnly = true)
     public Optional<Connection> findReferenced(IntegrationRef ref) {
         if (ref.connectionId() != null) {
-            return findInWorkspace(ref.workspaceId(), ref.connectionId()).filter(c -> c.getKind() == ref.kind());
+            return findInWorkspaceInTransaction(ref.workspaceId(), ref.connectionId()).filter(
+                c -> c.getKind() == ref.kind()
+            );
         }
         if (ref.instanceKey() != null) {
             return connectionRepository.findByWorkspaceIdAndKindAndInstanceKey(
@@ -226,7 +236,7 @@ public class ConnectionService {
                 ref.instanceKey()
             );
         }
-        return findActive(ref.workspaceId(), ref.kind());
+        return findActiveInTransaction(ref.workspaceId(), ref.kind());
     }
 
     @Transactional(readOnly = true)
@@ -248,7 +258,7 @@ public class ConnectionService {
      */
     @Transactional(readOnly = true)
     public Optional<BearerToken> findBearerToken(long workspaceId, long connectionId) {
-        return findInWorkspace(workspaceId, connectionId)
+        return findInWorkspaceInTransaction(workspaceId, connectionId)
             .flatMap(c -> c.credentials(credentialConverter))
             .flatMap(b -> b instanceof BearerToken bt ? Optional.of(bt) : Optional.empty());
     }
@@ -264,7 +274,7 @@ public class ConnectionService {
         IntegrationKind kind,
         UnaryOperator<ConnectionConfig> mutator
     ) {
-        return findActive(workspaceId, kind).map(c -> {
+        return findActiveInTransaction(workspaceId, kind).map(c -> {
             ConnectionConfig next = mutator.apply(c.getConfig());
             if (next == null) {
                 throw new IllegalArgumentException(
@@ -292,7 +302,15 @@ public class ConnectionService {
      */
     @Transactional
     public Optional<Connection> rotateBearerToken(long workspaceId, IntegrationKind kind, BearerToken bundle) {
-        return findActive(workspaceId, kind).map(c -> {
+        return rotateBearerTokenInTransaction(workspaceId, kind, bundle);
+    }
+
+    private Optional<Connection> rotateBearerTokenInTransaction(
+        long workspaceId,
+        IntegrationKind kind,
+        BearerToken bundle
+    ) {
+        return findActiveInTransaction(workspaceId, kind).map(c -> {
             c.setCredentials(bundle, credentialConverter);
             return connectionRepository.save(c);
         });
@@ -325,7 +343,7 @@ public class ConnectionService {
             if (instanceKey.equals(existing.getInstanceKey())) {
                 continue;
             }
-            transition(
+            transitionInTransaction(
                 existing,
                 new TransitionRequest(
                     IntegrationState.UNINSTALLED,
@@ -372,7 +390,7 @@ public class ConnectionService {
         }
 
         if (connection.getState() != IntegrationState.ACTIVE) {
-            connection = transition(
+            connection = transitionInTransaction(
                 connection,
                 new TransitionRequest(
                     IntegrationState.ACTIVE,
@@ -410,7 +428,7 @@ public class ConnectionService {
             });
 
         if (connection.getState() != IntegrationState.ACTIVE) {
-            connection = transition(
+            connection = transitionInTransaction(
                 connection,
                 new TransitionRequest(
                     IntegrationState.ACTIVE,
@@ -424,7 +442,7 @@ public class ConnectionService {
         }
 
         if (token != null && !token.isBlank()) {
-            rotateBearerToken(workspace.getId(), kind, new BearerToken(token, null));
+            rotateBearerTokenInTransaction(workspace.getId(), kind, new BearerToken(token, null));
         }
     }
 
@@ -442,6 +460,10 @@ public class ConnectionService {
      */
     @Transactional
     public Connection transition(Connection connection, TransitionRequest req) {
+        return transitionInTransaction(connection, req);
+    }
+
+    private Connection transitionInTransaction(Connection connection, TransitionRequest req) {
         return applyTransition(connection, req, null);
     }
 

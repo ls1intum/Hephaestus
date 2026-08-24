@@ -154,6 +154,7 @@ class GitLabWorkspaceInitializationServiceTest extends BaseUnitTest {
             rateLimitTrackerProvider,
             dataSyncTriggerProvider,
             connectionService,
+            new GitLabWorkspaceLinkService(workspaceRepository, organizationRepository),
             monitoringExecutor
         );
 
@@ -214,6 +215,7 @@ class GitLabWorkspaceInitializationServiceTest extends BaseUnitTest {
             rateLimitTrackerProvider,
             dataSyncTriggerProvider,
             connectionService,
+            new GitLabWorkspaceLinkService(workspaceRepository, organizationRepository),
             monitoringExecutor
         );
     }

@@ -28,7 +28,6 @@ import java.util.Set;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Base class for GitLab entity processors with shared helper methods.
@@ -106,7 +105,6 @@ public abstract class BaseGitLabProcessor {
      * {@link GitLabUserLookup#publicEmail()} so downstream commit-author resolution can
      * match the user by email.
      */
-    @Transactional
     @Nullable
     public User findOrCreateUser(GitLabUserLookup lookup, Long providerId) {
         return gitLabUserService.findOrCreateUser(lookup, providerId);
@@ -142,16 +140,12 @@ public abstract class BaseGitLabProcessor {
      * Finds or creates a label from GraphQL data (title, color).
      * <p>
      * Public because sync services need to resolve labels from GraphQL response data.
-     * {@code @Transactional} is required because the underlying {@code insertIfAbsent}
-     * is a native query that needs an active transaction.
-     * <p>
      * Uses deterministic composite IDs based on (repositoryId, labelName) rather than
      * GitLab global IDs. GitLab group-level labels share the same global ID across all
      * projects, but labels are stored per-repository in the database. Using the GitLab
      * global ID would cause primary key collisions when the same label appears in
      * multiple projects.
      */
-    @Transactional
     @Nullable
     public Label findOrCreateLabel(@Nullable String title, @Nullable String color, Repository repository) {
         if (title == null || title.isBlank()) {

@@ -48,6 +48,10 @@ public class AccountPreferencesService {
 
     @Transactional
     public UserPreferences getOrCreatePreferences(User user) {
+        return loadOrCreatePreferences(user);
+    }
+
+    private UserPreferences loadOrCreatePreferences(User user) {
         return userPreferencesRepository
             .findByUserId(user.getId())
             .orElseGet(() -> {
@@ -56,9 +60,10 @@ public class AccountPreferencesService {
             });
     }
 
+    @Transactional
     public UserSettingsDTO getUserSettings(User user) {
         log.debug("Fetching user settings: userLogin={}", user.getLogin());
-        return toDTO(getOrCreatePreferences(user));
+        return toDTO(loadOrCreatePreferences(user));
     }
 
     /**
@@ -69,7 +74,7 @@ public class AccountPreferencesService {
     @Transactional
     public UserSettingsDTO updateUserSettings(User user, UserSettingsDTO userSettings, String subjectId) {
         log.info("Updating user settings: userLogin={}", user.getLogin());
-        UserPreferences preferences = getOrCreatePreferences(user);
+        UserPreferences preferences = loadOrCreatePreferences(user);
 
         preferences.setPracticeFeedbackDeliveryEnabled(
             Objects.requireNonNull(
@@ -135,7 +140,7 @@ public class AccountPreferencesService {
             return;
         }
         User user = userOpt.get();
-        UserPreferences preferences = getOrCreatePreferences(user);
+        UserPreferences preferences = loadOrCreatePreferences(user);
         boolean previousParticipation = preferences.isParticipateInResearch();
         preferences.setParticipateInResearch(participate);
         userPreferencesRepository.save(preferences);

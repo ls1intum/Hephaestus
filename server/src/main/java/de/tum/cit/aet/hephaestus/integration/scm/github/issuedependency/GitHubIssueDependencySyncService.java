@@ -44,12 +44,13 @@ import java.util.stream.Collectors;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.context.annotation.Lazy;
 import org.springframework.graphql.client.ClientGraphQlResponse;
 import org.springframework.graphql.client.HttpGraphQlClient;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 import reactor.core.publisher.Mono;
 import reactor.util.retry.Retry;
 
@@ -98,7 +99,7 @@ public class GitHubIssueDependencySyncService {
     private final GitHubExceptionClassifier exceptionClassifier;
     private final SyncSchedulerProperties syncSchedulerProperties;
     private final GitHubIssueProcessor issueProcessor;
-    private final GitHubIssueDependencySyncService self;
+    private final TransactionTemplate transactionTemplate;
     private final GitHubGraphQlSyncCoordinator graphQlSyncHelper;
     private static final int MAX_RETRY_ATTEMPTS = 3;
 
@@ -111,7 +112,7 @@ public class GitHubIssueDependencySyncService {
         GitHubExceptionClassifier exceptionClassifier,
         SyncSchedulerProperties syncSchedulerProperties,
         GitHubIssueProcessor issueProcessor,
-        @Lazy GitHubIssueDependencySyncService self,
+        PlatformTransactionManager transactionManager,
         GitHubGraphQlSyncCoordinator graphQlSyncHelper
     ) {
         this.issueRepository = issueRepository;
@@ -122,7 +123,8 @@ public class GitHubIssueDependencySyncService {
         this.exceptionClassifier = exceptionClassifier;
         this.syncSchedulerProperties = syncSchedulerProperties;
         this.issueProcessor = issueProcessor;
-        this.self = self;
+        this.transactionTemplate = new TransactionTemplate(transactionManager);
+        this.transactionTemplate.setPropagationBehavior(Propagation.REQUIRES_NEW.value());
         this.graphQlSyncHelper = graphQlSyncHelper;
     }
 
@@ -204,7 +206,7 @@ public class GitHubIssueDependencySyncService {
         if (repositoryNames.isEmpty()) {
             log.debug("No repositories found for scope: scopeId={}", scopeId);
             // Still update timestamp to prevent repeated empty checks
-            updateSyncTimestamp(scopeId);
+            transactionTemplate.executeWithoutResult(status -> updateSyncTimestamp(scopeId));
             return 0;
         }
 
@@ -254,7 +256,7 @@ public class GitHubIssueDependencySyncService {
 
         // Only update timestamp if at least some repos succeeded
         if (failedRepoCount < repositoryNames.size()) {
-            updateSyncTimestamp(scopeId);
+            transactionTemplate.executeWithoutResult(status -> updateSyncTimestamp(scopeId));
         }
 
         log.info(
@@ -269,8 +271,7 @@ public class GitHubIssueDependencySyncService {
     /**
      * Update the sync timestamp for issue dependencies.
      */
-    @Transactional
-    public void updateSyncTimestamp(Long scopeId) {
+    private void updateSyncTimestamp(Long scopeId) {
         syncTargetProvider.updateScopeSyncTimestamp(
             scopeId,
             SyncTargetProvider.SyncType.ISSUE_DEPENDENCIES,
@@ -417,7 +418,9 @@ public class GitHubIssueDependencySyncService {
             retryAttempt = 0;
 
             // Process each page in its own transaction (call through proxy for @Transactional to work)
-            totalSynced += self.processIssueDependenciesPage(issueConnection, repo, scopeId);
+            totalSynced += transactionTemplate.execute(status ->
+                processIssueDependenciesPage(issueConnection, repo, scopeId)
+            );
         }
 
         // Raw issue nodes received (not dependency relationships synced) vs issues.totalCount.
@@ -440,7 +443,6 @@ public class GitHubIssueDependencySyncService {
      * Using REQUIRES_NEW ensures each page is committed independently,
      * providing better resilience if a single page fails.
      */
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
     protected int processIssueDependenciesPage(GHIssueConnection issueConnection, Repository repo, Long scopeId) {
         if (issueConnection.getNodes() == null) {
             return 0;

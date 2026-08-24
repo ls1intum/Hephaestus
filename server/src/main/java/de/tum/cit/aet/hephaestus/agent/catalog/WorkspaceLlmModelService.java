@@ -45,6 +45,10 @@ public class WorkspaceLlmModelService {
 
     @Transactional(readOnly = true)
     public WorkspaceLlmModel get(WorkspaceContext workspaceContext, Long id) {
+        return load(workspaceContext, id);
+    }
+
+    private WorkspaceLlmModel load(WorkspaceContext workspaceContext, Long id) {
         return modelRepository
             .findByIdAndWorkspaceIdWithConnection(id, workspaceContext.id())
             .orElseThrow(() -> new EntityNotFoundException("WorkspaceLlmModel", id));
@@ -183,7 +187,7 @@ public class WorkspaceLlmModelService {
 
     @Transactional
     public void delete(WorkspaceContext workspaceContext, Long id) {
-        WorkspaceLlmModel model = get(workspaceContext, id);
+        WorkspaceLlmModel model = load(workspaceContext, id);
         if (agentBindingRepository.existsByWorkspaceModelIdAndWorkspaceId(id, workspaceContext.id())) {
             throw new LlmModelInUseException(id);
         }

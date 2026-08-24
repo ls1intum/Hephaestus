@@ -365,6 +365,14 @@ public class WorkspaceTeamSettingsService {
      */
     @Transactional
     public Optional<WorkspaceTeamLabelFilter> addLabelFilter(Workspace workspace, Long teamId, Long labelId) {
+        return addLabelFilterInTransaction(workspace, teamId, labelId);
+    }
+
+    private Optional<WorkspaceTeamLabelFilter> addLabelFilterInTransaction(
+        Workspace workspace,
+        Long teamId,
+        Long labelId
+    ) {
         Optional<Team> teamOpt = teamRepository.findById(teamId);
         if (teamOpt.isEmpty() || !belongsToWorkspace(teamOpt.get(), workspace)) {
             log.warn(
@@ -435,7 +443,7 @@ public class WorkspaceTeamSettingsService {
             return Optional.empty();
         }
 
-        return addLabelFilter(workspace, teamId, labelOpt.get().getId());
+        return addLabelFilterInTransaction(workspace, teamId, labelOpt.get().getId());
     }
 
     /**

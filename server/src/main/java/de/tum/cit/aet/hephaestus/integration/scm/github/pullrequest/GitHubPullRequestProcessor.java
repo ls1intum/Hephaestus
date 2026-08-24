@@ -381,7 +381,7 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
      */
     @Transactional
     public PullRequest processReopened(GitHubPullRequestDTO dto, ProcessingContext context) {
-        PullRequest pr = process(dto, context);
+        PullRequest pr = processInternal(dto, context, true);
         eventPublisher.publishEvent(
             new ScmDomainEvent.PullRequestReopened(ScmEventPayload.PullRequestData.from(pr), EventContext.from(context))
         );
@@ -394,7 +394,7 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
      */
     @Transactional
     public PullRequest processReadyForReview(GitHubPullRequestDTO dto, ProcessingContext context) {
-        PullRequest pr = process(dto, context);
+        PullRequest pr = processInternal(dto, context, true);
         eventPublisher.publishEvent(
             new ScmDomainEvent.PullRequestReady(ScmEventPayload.PullRequestData.from(pr), EventContext.from(context))
         );
@@ -407,7 +407,7 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
      */
     @Transactional
     public PullRequest processConvertedToDraft(GitHubPullRequestDTO dto, ProcessingContext context) {
-        PullRequest pr = process(dto, context);
+        PullRequest pr = processInternal(dto, context, true);
         eventPublisher.publishEvent(
             new ScmDomainEvent.PullRequestDrafted(ScmEventPayload.PullRequestData.from(pr), EventContext.from(context))
         );
@@ -420,7 +420,7 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
      */
     @Transactional
     public PullRequest processSynchronize(GitHubPullRequestDTO dto, ProcessingContext context) {
-        PullRequest pr = process(dto, context);
+        PullRequest pr = processInternal(dto, context, true);
         eventPublisher.publishEvent(
             new ScmDomainEvent.PullRequestSynchronized(
                 ScmEventPayload.PullRequestData.from(pr),
@@ -436,7 +436,7 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
      */
     @Transactional
     public PullRequest processLabeled(GitHubPullRequestDTO dto, GitHubLabelDTO labelDto, ProcessingContext context) {
-        PullRequest pr = process(dto, context);
+        PullRequest pr = processInternal(dto, context, true);
         Label label = findOrCreateLabel(labelDto, context.repository());
         if (label != null) {
             eventPublisher.publishEvent(
@@ -456,7 +456,7 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
      */
     @Transactional
     public PullRequest processUnlabeled(GitHubPullRequestDTO dto, GitHubLabelDTO labelDto, ProcessingContext context) {
-        PullRequest pr = process(dto, context);
+        PullRequest pr = processInternal(dto, context, true);
         Label label = findOrCreateLabel(labelDto, context.repository());
         if (label != null) {
             eventPublisher.publishEvent(

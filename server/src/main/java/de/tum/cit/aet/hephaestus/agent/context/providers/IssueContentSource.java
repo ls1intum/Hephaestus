@@ -95,7 +95,7 @@ public class IssueContentSource implements EvidenceSource, ReviewContextBuilder 
     @Override
     @Transactional(readOnly = true)
     public void contribute(ContextRequest request, Map<String, byte[]> files) {
-        contributeSelected(request, sourceKinds(), files);
+        files.putAll(captureSelected(request, sourceKinds()).files());
     }
 
     @Override

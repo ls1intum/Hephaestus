@@ -38,6 +38,10 @@ public class WorkspaceLlmConnectionService {
 
     @Transactional(readOnly = true)
     public WorkspaceLlmConnection get(WorkspaceContext workspaceContext, Long id) {
+        return load(workspaceContext, id);
+    }
+
+    private WorkspaceLlmConnection load(WorkspaceContext workspaceContext, Long id) {
         return connectionRepository
             .findByIdAndWorkspaceId(id, workspaceContext.id())
             .orElseThrow(() -> new EntityNotFoundException("WorkspaceLlmConnection", id));
@@ -138,7 +142,7 @@ public class WorkspaceLlmConnectionService {
 
     @Transactional
     public void delete(WorkspaceContext workspaceContext, Long id) {
-        WorkspaceLlmConnection connection = get(workspaceContext, id);
+        WorkspaceLlmConnection connection = load(workspaceContext, id);
         if (modelRepository.existsByConnectionIdAndWorkspaceId(id, workspaceContext.id())) {
             throw new LlmConnectionInUseException(id);
         }

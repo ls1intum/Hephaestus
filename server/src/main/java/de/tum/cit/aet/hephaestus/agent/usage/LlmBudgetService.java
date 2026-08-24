@@ -81,7 +81,7 @@ public class LlmBudgetService {
 
     @Transactional(readOnly = true)
     public LlmBudgetDecision decide(Long workspaceId) {
-        return headroom(workspaceId).decide();
+        return loadHeadroom(workspaceId).decide();
     }
 
     /**
@@ -90,6 +90,10 @@ public class LlmBudgetService {
      */
     @Transactional(readOnly = true)
     public LlmBudgetHeadroom headroom(Long workspaceId) {
+        return loadHeadroom(workspaceId);
+    }
+
+    private LlmBudgetHeadroom loadHeadroom(Long workspaceId) {
         return workspaceRepository.findById(workspaceId).map(this::headroom).orElse(LlmBudgetHeadroom.UNCAPPED);
     }
 

@@ -40,21 +40,21 @@ class MentorInFlightReaperTest extends BaseUnitTest {
     @Test
     @DisplayName("one turn's failed write does not stop the turns behind it")
     void shouldKeepAccountingAfterOneTurnFails() {
-        MentorInFlightReaper self = mock(MentorInFlightReaper.class);
+        MentorInFlightAccounting accounting = mock(MentorInFlightAccounting.class);
         List<ChatMessage> stale = List.of(messageWithId(), messageWithId(), messageWithId());
         UUID first = stale.get(0).getId();
         UUID second = stale.get(1).getId();
         UUID third = stale.get(2).getId();
         when(chatMessageRepository.findStaleInFlightForAccounting(any())).thenReturn(stale);
         // The turn finished between the select and the write; its snapshot is stale and the write loses.
-        when(self.accountOne(second)).thenThrow(new OptimisticLockingFailureException("row moved"));
-        when(self.accountOne(first)).thenReturn(true);
-        when(self.accountOne(third)).thenReturn(true);
+        when(accounting.account(second)).thenThrow(new OptimisticLockingFailureException("row moved"));
+        when(accounting.account(first)).thenReturn(true);
+        when(accounting.account(third)).thenReturn(true);
 
-        MentorInFlightReaper reaper = reaperWith(self);
+        MentorInFlightReaper reaper = reaperWith(accounting);
 
         assertThatCode(reaper::reap).doesNotThrowAnyException();
-        verify(self).accountOne(third);
+        verify(accounting).account(third);
         assertThat(meterRegistry.counter("mentor.in_flight.reaper.failure").count())
             .as("a lost write must be counted, not swallowed — it means a turn is staying stuck")
             .isEqualTo(1.0);
@@ -67,9 +67,11 @@ class MentorInFlightReaperTest extends BaseUnitTest {
         finished.setStatus(ChatMessage.Status.completed);
         when(chatMessageRepository.findById(finished.getId())).thenReturn(Optional.of(finished));
 
-        MentorInFlightReaper reaper = reaperWith(mock(MentorInFlightReaper.class));
+        MentorInFlightReaper reaper = reaperWith(new MentorInFlightAccounting(chatMessageRepository, usageRecorder));
 
-        assertThat(reaper.accountOne(finished.getId())).isFalse();
+        assertThat(
+            new MentorInFlightAccounting(chatMessageRepository, usageRecorder).account(finished.getId())
+        ).isFalse();
         verify(usageRecorder, never()).record(anyLong(), any());
         verify(usageRecorder, never()).recordUnverifiable(anyLong(), any());
     }
@@ -80,9 +82,9 @@ class MentorInFlightReaperTest extends BaseUnitTest {
         UUID gone = UUID.randomUUID();
         when(chatMessageRepository.findById(gone)).thenReturn(Optional.empty());
 
-        MentorInFlightReaper reaper = reaperWith(mock(MentorInFlightReaper.class));
+        MentorInFlightReaper reaper = reaperWith(new MentorInFlightAccounting(chatMessageRepository, usageRecorder));
 
-        assertThat(reaper.accountOne(gone)).isFalse();
+        assertThat(new MentorInFlightAccounting(chatMessageRepository, usageRecorder).account(gone)).isFalse();
         verify(usageRecorder, never()).record(anyLong(), any());
     }
 
@@ -114,13 +116,14 @@ class MentorInFlightReaperTest extends BaseUnitTest {
     void shouldNeverReapWithinTheConfigurableTimeoutCeiling() {
         Duration longestPossibleTurn = Duration.ofSeconds(AgentBindingLimits.MAX_TIMEOUT_SECONDS);
 
-        MentorInFlightReaper defaultWindow = reaperWith(mock(MentorInFlightReaper.class));
+        MentorInFlightReaper defaultWindow = reaperWith(
+            new MentorInFlightAccounting(chatMessageRepository, usageRecorder)
+        );
         // The window property is a knob for sweeping LATER, never sooner: below the floor you get the floor.
         MentorInFlightReaper misconfigured = new MentorInFlightReaper(
             chatMessageRepository,
-            usageRecorder,
+            new MentorInFlightAccounting(chatMessageRepository, usageRecorder),
             meterRegistry,
-            mock(MentorInFlightReaper.class),
             Duration.ofMinutes(1)
         );
 
@@ -130,14 +133,8 @@ class MentorInFlightReaperTest extends BaseUnitTest {
             .isGreaterThan(longestPossibleTurn);
     }
 
-    private MentorInFlightReaper reaperWith(MentorInFlightReaper self) {
-        return new MentorInFlightReaper(
-            chatMessageRepository,
-            usageRecorder,
-            meterRegistry,
-            self,
-            Duration.ofMinutes(70)
-        );
+    private MentorInFlightReaper reaperWith(MentorInFlightAccounting accounting) {
+        return new MentorInFlightReaper(chatMessageRepository, accounting, meterRegistry, Duration.ofMinutes(70));
     }
 
     private static ChatMessage messageWithId() {

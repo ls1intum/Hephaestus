@@ -7,6 +7,7 @@ import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import java.util.List;
 import org.jspecify.annotations.Nullable;
 import org.springframework.http.ResponseEntity;
@@ -70,7 +71,7 @@ public class AccountAdminController {
     @Audited(ledger = AuditLedger.AUTH_EVENT, type = "APP_ROLE_CHANGED")
     public ResponseEntity<AdminAccountViewDTO> update(
         @PathVariable Long id,
-        @RequestBody UpdateAccountRequestDTO body
+        @Valid @RequestBody UpdateAccountRequestDTO body
     ) {
         Account account = accountService.adminSetRole(id, body.appRole(), CurrentAccount.requireId());
         return ResponseEntity.ok(toView(account));
