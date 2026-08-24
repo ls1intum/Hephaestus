@@ -14,7 +14,7 @@ The opt-in `e2e` profile enables these local-only capabilities:
 | Dev review trigger | `hephaestus.dev.trigger-enabled=true` |
 | PostgreSQL job executor | `hephaestus.agent.enabled=true` |
 
-Activate it with `local`, which starts Postgres and NATS.
+`pnpm dev:server:e2e` starts Postgres and NATS before activating the profile.
 
 Do not expose this profile outside a trusted development machine: it enables passwordless app-admin
 login. The setup script accepts only loopback application and database URLs. The application server
