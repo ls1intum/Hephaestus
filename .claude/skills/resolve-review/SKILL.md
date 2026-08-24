@@ -1,7 +1,7 @@
 ---
 name: resolve-review
 description: |
-  Fetch, analyze, and resolve PR review comments with full code context.
+  Fetch review threads, decide each, reply and resolve.
   Use when addressing review feedback, resolving threads, or responding to reviewers.
 disable-model-invocation: true
 allowed-tools:

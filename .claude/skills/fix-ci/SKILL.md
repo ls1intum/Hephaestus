@@ -1,9 +1,8 @@
 ---
 name: fix-ci
 description: |
-  Diagnose and fix ALL failing CI checks on the current PR in a single pass.
-  Collects all failures first, then prescribes fixes. Use when CI is failing,
-  tests are broken, GitHub Actions report errors, or PR checks show red.
+  Read every failing check in one pass, fix in dependency order, push once.
+  Use when CI is failing, tests are broken, GitHub Actions report errors, or PR checks show red.
 disable-model-invocation: true
 allowed-tools:
   - Bash(gh *)

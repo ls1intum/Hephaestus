@@ -1,8 +1,8 @@
 ---
 name: land-pr
 description: |
-  Validate, branch, commit, and create PR following Hephaestus conventions.
-  Runs local CI mirror before pushing to prevent remote CI failures.
+  Validate, regenerate, branch, commit, push, and open the PR.
+  Runs the local CI mirror first, so a remote build cannot fail on something a local gate catches.
 disable-model-invocation: true
 allowed-tools:
   - Bash(gh *)
