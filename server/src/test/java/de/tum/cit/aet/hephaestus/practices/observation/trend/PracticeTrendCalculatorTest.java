@@ -53,7 +53,6 @@ class PracticeTrendCalculatorTest {
 
     private PracticeTrend trend(String slug, BetaPosterior.Difference difference) {
         TrendSupport support = new TrendSupport(
-            SupportLevel.WELL_SUPPORTED,
             4,
             4,
             0,

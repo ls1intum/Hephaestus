@@ -40,7 +40,7 @@ public record ReflectionPracticeDTO(
     @Nullable
     @Schema(
         description = "Opportunity-indexed direction of this practice's recent evidence",
-        allowableValues = { "IMPROVING", "STABLE", "DECLINING", "UNCERTAIN", "INSUFFICIENT_EVIDENCE" }
+        allowableValues = { "IMPROVING", "DECLINING", "UNCERTAIN", "INSUFFICIENT_EVIDENCE" }
     )
     TrendDirection trajectory,
     @Nullable @Schema(description = "Evidence support and provenance for the trajectory") TrendSupportDTO trendSupport
@@ -51,8 +51,8 @@ public record ReflectionPracticeDTO(
      * <p>The first three are verdicts, read off the share of that evidence that was positive. The last two are
      * the reasons there is NO verdict, and they are deliberately separate: a learner cannot act on an empty
      * state that means "nothing was reviewed" and "your work offered no opportunity" interchangeably. The same
-     * split runs through the area status and, as {@code STABLE} against {@code INSUFFICIENT_EVIDENCE}, through
-     * the trend — absence of a claim is not the same fact as a claim of absence.
+     * split runs through the area status and, as {@code UNCERTAIN} against {@code INSUFFICIENT_EVIDENCE},
+     * through the trend — absence of a claim is not the same fact as a claim of absence.
      *
      * <p>Carrying the non-verdicts HERE rather than beside the cards is what lets the area be a pure roll-up of
      * its practices. It costs a longer list: a practice the workspace watches appears even when it has nothing

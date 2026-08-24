@@ -660,11 +660,36 @@ class PracticeAreaStatusIntegrationTest extends AbstractWorkspaceIntegrationTest
 
         @Test
         @WithUser
-        @DisplayName("reads as DEVELOPING when fewer than half the practices stand as a strength")
-        void shouldReadAsDevelopingBelowTheMixedShare() {
-            // Two of five: 0.4. Strengths exist, but not enough of the area is standing for a mixed verdict.
+        @DisplayName("two of five standing is still a mixed area, not a developing one")
+        void shouldStayMixedJustAboveTheLowerBoundary() {
+            // 0.4, and the lower boundary sits at 0.37. The boundary is placed on the PRACTICE scale to
+            // separate one setback from a pattern of them; an area inherits it, which means an area with real
+            // strength in two of five practices is not described as though it had none.
             persistStrengthPractice("commit-messages", "Commit Messages", 1L);
             persistStrengthPractice("review-comments", "Actionable Review Comments", 2L);
+            persistDevelopingPractice("issue-descriptions", "Issue Descriptions", 3L);
+            persistDevelopingPractice("test-coverage", "Test Coverage", 4L);
+            persistDevelopingPractice("documentation", "Documentation", 5L);
+
+            webTestClient
+                .get()
+                .uri(STATUS_URI, workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$[0].status")
+                .isEqualTo("MIXED");
+        }
+
+        @Test
+        @WithUser
+        @DisplayName("reads as DEVELOPING when barely any practice in the area is standing")
+        void shouldReadAsDevelopingBelowTheLowerBoundary() {
+            // One of five: 0.2, below the boundary. Problems dominate the area, and saying so is the point.
+            persistStrengthPractice("commit-messages", "Commit Messages", 1L);
+            persistDevelopingPractice("review-comments", "Actionable Review Comments", 2L);
             persistDevelopingPractice("issue-descriptions", "Issue Descriptions", 3L);
             persistDevelopingPractice("test-coverage", "Test Coverage", 4L);
             persistDevelopingPractice("documentation", "Documentation", 5L);
@@ -781,8 +806,8 @@ class PracticeAreaStatusIntegrationTest extends AbstractWorkspaceIntegrationTest
                 .isEqualTo("MIXED")
                 .jsonPath("$[0].direction")
                 .isEqualTo("INSUFFICIENT_EVIDENCE")
-                .jsonPath("$[0].trendSupport.level")
-                .isEqualTo("NONE")
+                .jsonPath("$[0].trendSupport.opportunitiesUntilComparable")
+                .isEqualTo(4)
                 .jsonPath("$[0].items.length()")
                 .isEqualTo(2);
         }

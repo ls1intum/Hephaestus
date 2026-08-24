@@ -1428,7 +1428,6 @@ export type TrendSupport = {
     eligiblePractices?: number;
     firstOpportunityAt?: Date;
     lastOpportunityAt?: Date;
-    level: 'WELL_SUPPORTED' | 'TENTATIVE' | 'NONE';
     opportunitiesUntilComparable: number;
     previousOpportunities: number;
     ropeHalfWidth: number;
@@ -2581,7 +2580,7 @@ export type ReflectionPractice = {
     /**
      * Opportunity-indexed direction of this practice's recent evidence
      */
-    trajectory?: 'IMPROVING' | 'STABLE' | 'DECLINING' | 'UNCERTAIN' | 'INSUFFICIENT_EVIDENCE';
+    trajectory?: 'IMPROVING' | 'DECLINING' | 'UNCERTAIN' | 'INSUFFICIENT_EVIDENCE';
     /**
      * Evidence support and provenance for the trajectory
      */
@@ -3094,7 +3093,7 @@ export type PracticeEvidenceSourceOption = {
 
 export type PracticeTrend = {
     currentOutcomes?: OutcomeVector;
-    direction: 'IMPROVING' | 'STABLE' | 'DECLINING' | 'UNCERTAIN' | 'INSUFFICIENT_EVIDENCE';
+    direction: 'IMPROVING' | 'DECLINING' | 'UNCERTAIN' | 'INSUFFICIENT_EVIDENCE';
     opportunities: Array<TrendOpportunity>;
     previousOutcomes?: OutcomeVector;
     scope: 'AREA' | 'PRACTICE';
@@ -3278,7 +3277,7 @@ export type PracticeAreaStatus = {
     /**
      * Evidence-weighted, opportunity-indexed direction across the area's practices
      */
-    direction?: 'IMPROVING' | 'STABLE' | 'DECLINING' | 'UNCERTAIN' | 'INSUFFICIENT_EVIDENCE';
+    direction?: 'IMPROVING' | 'DECLINING' | 'UNCERTAIN' | 'INSUFFICIENT_EVIDENCE';
     /**
      * Oldest contributing observation, for provenance only (null without a verdict)
      */

@@ -217,12 +217,12 @@ class PracticeReflectionServiceTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("a problem on the newest work item outweighs three older clean ones")
-    void aFreshProblemOutweighsTheOlderCleanRecord() {
+    @DisplayName("one problem on the newest work item moves the standing to MIXED, but does not condemn")
+    void aSingleFreshProblemDoesNotCondemn() {
         Practice practice = practice("robust-error-handling");
-        // The mirror image of the recovery case: recency cuts both ways, so a regression is acknowledged as
-        // quickly as a fix. Under the previous existence rule this read MIXED — one problem and one strength
-        // both existed somewhere in the window, and nothing asked which of them was the more recent.
+        // The scale draws its lower line between ONE setback and a PATTERN of them. A developer working at a
+        // 80% success rate trips this on one review in five; reading that as "needs attention" while the
+        // trend beside it stays silent — a single item is no evidence of a change — told them off for noise.
         when(
             observationRepository.findRecentByDeveloperAndWorkspace(
                 eq(USER_ID),
@@ -232,6 +232,35 @@ class PracticeReflectionServiceTest extends BaseUnitTest {
             )
         ).thenReturn(
             List.of(good(practice, 41L), good(practice, 42L), good(practice, 43L), bad(practice, Severity.MAJOR, 44L))
+        );
+        when(feedbackObservationRepository.findLatestFeedbackBodiesByObservationIds(any(), any(), any())).thenReturn(
+            List.of()
+        );
+
+        List<ReflectionPracticeDTO> cards = practiceReflectionService.getReflection(WORKSPACE_ID);
+
+        assertThat(cards).hasSize(1);
+        assertThat(cards.get(0).standing()).isEqualTo(ReflectionPracticeDTO.Standing.MIXED);
+    }
+
+    @Test
+    @DisplayName("two problems in a row do condemn — the mirror of two clean ones restoring a strength")
+    void twoFreshProblemsInARowDropToDeveloping() {
+        Practice practice = practice("robust-error-handling");
+        when(
+            observationRepository.findRecentByDeveloperAndWorkspace(
+                eq(USER_ID),
+                eq(WORKSPACE_ID),
+                any(Instant.class),
+                any(Pageable.class)
+            )
+        ).thenReturn(
+            List.of(
+                good(practice, 41L),
+                good(practice, 42L),
+                bad(practice, Severity.MAJOR, 43L),
+                bad(practice, Severity.MAJOR, 44L)
+            )
         );
         when(feedbackObservationRepository.findLatestFeedbackBodiesByObservationIds(any(), any(), any())).thenReturn(
             List.of()

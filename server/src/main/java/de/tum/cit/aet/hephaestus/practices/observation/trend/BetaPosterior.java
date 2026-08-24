@@ -108,10 +108,6 @@ final class BetaPosterior {
             return probabilityWhere(boundary, false);
         }
 
-        double probabilityInside(double halfWidth) {
-            return Math.max(0.0, 1.0 - probabilityAbove(halfWidth) - probabilityBelow(-halfWidth));
-        }
-
         /**
          * The mass of the product grid on one side of {@code boundary}, in one pass instead of the full
          * {@code gridSize²} product.

@@ -11539,7 +11539,6 @@ components:
             \ area's practices"
           enum:
           - IMPROVING
-          - STABLE
           - DECLINING
           - UNCERTAIN
           - INSUFFICIENT_EVIDENCE
@@ -12089,7 +12088,6 @@ components:
           type: string
           enum:
           - IMPROVING
-          - STABLE
           - DECLINING
           - UNCERTAIN
           - INSUFFICIENT_EVIDENCE
@@ -12758,7 +12756,6 @@ components:
           description: Opportunity-indexed direction of this practice's recent evidence
           enum:
           - IMPROVING
-          - STABLE
           - DECLINING
           - UNCERTAIN
           - INSUFFICIENT_EVIDENCE
@@ -14512,12 +14509,6 @@ components:
         lastOpportunityAt:
           type: string
           format: date-time
-        level:
-          type: string
-          enum:
-          - WELL_SUPPORTED
-          - TENTATIVE
-          - NONE
         opportunitiesUntilComparable:
           type: integer
           format: int32
@@ -14531,7 +14522,6 @@ components:
       - bundleSize
       - credibilityThreshold
       - currentOpportunities
-      - level
       - opportunitiesUntilComparable
       - previousOpportunities
       - ropeHalfWidth

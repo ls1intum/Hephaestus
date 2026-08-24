@@ -1,6 +1,5 @@
 package de.tum.cit.aet.hephaestus.practices.observation.trend.dto;
 
-import de.tum.cit.aet.hephaestus.practices.observation.trend.SupportLevel;
 import de.tum.cit.aet.hephaestus.practices.observation.trend.TrendSupport;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
@@ -8,7 +7,6 @@ import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
 public record TrendSupportDTO(
-    @NonNull SupportLevel level,
     @Schema(requiredMode = Schema.RequiredMode.REQUIRED) int currentOpportunities,
     @Schema(requiredMode = Schema.RequiredMode.REQUIRED) int previousOpportunities,
     @Schema(requiredMode = Schema.RequiredMode.REQUIRED) int opportunitiesUntilComparable,
@@ -23,7 +21,6 @@ public record TrendSupportDTO(
 ) {
     public static TrendSupportDTO from(TrendSupport support) {
         return new TrendSupportDTO(
-            support.level(),
             support.currentOpportunities(),
             support.previousOpportunities(),
             support.opportunitiesUntilComparable(),

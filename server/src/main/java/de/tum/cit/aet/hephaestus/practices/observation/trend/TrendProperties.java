@@ -13,11 +13,10 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 public class TrendProperties {
 
     private int bundleSize = 4;
-    private int minBundleSize = 3;
+    private int minBundleSize = 4;
     private double ropeHalfWidth = 0.15;
     private double credibilityThreshold = 0.90;
     private int horizonDays = 90;
-    private int tentativeBundleSize = 3;
 
     @PostConstruct
     void validate() {
@@ -32,9 +31,6 @@ public class TrendProperties {
         }
         if (horizonDays < 1 || horizonDays > PracticeReflectionService.LOOKBACK_DAYS) {
             throw new IllegalArgumentException("Trend horizon-days must not exceed the reflection lookback");
-        }
-        if (tentativeBundleSize < 1 || tentativeBundleSize > bundleSize) {
-            throw new IllegalArgumentException("Trend tentative-bundle-size must be between 1 and bundle-size");
         }
     }
 }

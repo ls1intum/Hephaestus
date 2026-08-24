@@ -25,11 +25,20 @@ final class StandingScale {
     static final double STRENGTH_SHARE = 0.8;
 
     /**
-     * Positive share AT or above which the subject still reads as mixed rather than developing. At exactly one
-     * half sits the evenly balanced case — a practice whose reviewed work was half positive, or an area whose
-     * every practice is itself mixed — and it belongs on the side that acknowledges both.
+     * Positive share AT or above which the subject still reads as mixed rather than developing.
+     *
+     * <p>Placed to separate ONE setback from a PATTERN of them, which is where the meaning changes. With the
+     * standing's recency weights a single problem on the newest work item, everything before it clean, scores
+     * {@code 0.384}; two problems in a row score {@code 0.138}. A boundary at one half put both on the same
+     * side, so one slip after a clean run read as "needs attention" — for a developer working at an 80%
+     * success rate that fired on one review in five, while the trend beside it stayed silent because a single
+     * item is no evidence of a change. The boundary now sits between those two cases.
+     *
+     * <p>That makes the scale symmetric in the unit it reasons about: two clean opportunities in a row earn a
+     * strength, two problems in a row cost one, and a single event of either kind moves the standing without
+     * settling it.
      */
-    static final double MIXED_SHARE = 0.5;
+    static final double MIXED_SHARE = 0.37;
 
     private StandingScale() {}
 

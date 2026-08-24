@@ -44,7 +44,7 @@ final class PracticeTrendCalculator {
                 practiceSlug,
                 TrendScope.PRACTICE,
                 TrendDirection.INSUFFICIENT_EVIDENCE,
-                support(properties, SupportLevel.NONE, bundles, missing, null, null, trail),
+                support(properties, bundles, missing, null, null, trail),
                 null,
                 null,
                 trail,
@@ -62,16 +62,11 @@ final class PracticeTrendCalculator {
             properties.getRopeHalfWidth(),
             properties.getCredibilityThreshold()
         );
-        SupportLevel level =
-            bundles.current().size() <= properties.getTentativeBundleSize() ||
-            bundles.previous().size() <= properties.getTentativeBundleSize()
-                ? SupportLevel.TENTATIVE
-                : SupportLevel.WELL_SUPPORTED;
         return new PracticeTrend(
             practiceSlug,
             TrendScope.PRACTICE,
             direction,
-            support(properties, level, bundles, 0, null, null, trail),
+            support(properties, bundles, 0, null, null, trail),
             currentOutcomes,
             previousOutcomes,
             trail,
@@ -100,16 +95,7 @@ final class PracticeTrendCalculator {
                 areaSlug,
                 TrendScope.AREA,
                 TrendDirection.INSUFFICIENT_EVIDENCE,
-                areaSupport(
-                    properties,
-                    SupportLevel.NONE,
-                    current,
-                    previous,
-                    missing,
-                    0,
-                    eligiblePracticeSlugs.size(),
-                    areaTrail
-                ),
+                areaSupport(properties, current, previous, missing, 0, eligiblePracticeSlugs.size(), areaTrail),
                 null,
                 null,
                 areaTrail,
@@ -145,18 +131,12 @@ final class PracticeTrendCalculator {
             .reduce(OutcomeVector.EMPTY, OutcomeVector::plus);
         int currentCount = distinctOpportunityCount(comparable, TrendBundle.CURRENT);
         int previousCount = distinctOpportunityCount(comparable, TrendBundle.PREVIOUS);
-        SupportLevel level = comparable
-            .stream()
-            .allMatch(trend -> trend.support().level() == SupportLevel.WELL_SUPPORTED)
-            ? SupportLevel.WELL_SUPPORTED
-            : SupportLevel.TENTATIVE;
         return new PracticeTrend(
             areaSlug,
             TrendScope.AREA,
             direction,
             areaSupport(
                 properties,
-                level,
                 currentCount,
                 previousCount,
                 0,
@@ -183,10 +163,8 @@ final class PracticeTrendCalculator {
         double standardDeviation = Math.sqrt(variance);
         double above = 1.0 - normalCdf((rope - mean) / standardDeviation);
         double below = normalCdf((-rope - mean) / standardDeviation);
-        double inside = Math.max(0.0, 1.0 - above - below);
         if (above >= threshold) return TrendDirection.IMPROVING;
         if (below >= threshold) return TrendDirection.DECLINING;
-        if (inside >= threshold) return TrendDirection.STABLE;
         return TrendDirection.UNCERTAIN;
     }
 
@@ -217,7 +195,6 @@ final class PracticeTrendCalculator {
 
     private static TrendSupport support(
         TrendProperties properties,
-        SupportLevel level,
         OpportunityBundler.Bundles bundles,
         int missing,
         @Nullable Integer comparablePractices,
@@ -226,7 +203,6 @@ final class PracticeTrendCalculator {
     ) {
         return support(
             properties,
-            level,
             bundles.current().size(),
             bundles.previous().size(),
             missing,
@@ -238,7 +214,6 @@ final class PracticeTrendCalculator {
 
     private static TrendSupport areaSupport(
         TrendProperties properties,
-        SupportLevel level,
         int current,
         int previous,
         int missing,
@@ -246,12 +221,11 @@ final class PracticeTrendCalculator {
         int eligiblePractices,
         List<EvidenceOpportunity> trail
     ) {
-        return support(properties, level, current, previous, missing, comparablePractices, eligiblePractices, trail);
+        return support(properties, current, previous, missing, comparablePractices, eligiblePractices, trail);
     }
 
     private static TrendSupport support(
         TrendProperties properties,
-        SupportLevel level,
         int current,
         int previous,
         int missing,
@@ -270,7 +244,6 @@ final class PracticeTrendCalculator {
                   ) +
                   1;
         return new TrendSupport(
-            level,
             current,
             previous,
             missing,

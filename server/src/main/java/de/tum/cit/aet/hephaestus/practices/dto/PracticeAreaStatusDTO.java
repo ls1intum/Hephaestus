@@ -62,7 +62,7 @@ public record PracticeAreaStatusDTO(
      * <p>The first three are verdicts. The last two are the reasons there is NO verdict, and they are
      * deliberately separate: a learner cannot act on an empty state that means "nothing was reviewed" and
      * "your work offered no opportunity" interchangeably. This mirrors the trend surface's split of
-     * {@code STABLE} from {@code INSUFFICIENT_EVIDENCE} — absence of a claim is not the same fact as a
+     * {@code UNCERTAIN} from {@code INSUFFICIENT_EVIDENCE} — absence of a claim is not the same fact as a
      * claim of absence.
      */
     public enum AreaStatus {
