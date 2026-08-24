@@ -4317,11 +4317,9 @@ export type InitiateConnectionResponse = {
  * <p><code>userInput</code> is intentionally a free-form map so per-kind ConnectionStrategy
  * implementations can dictate their own field schema (e.g. GitLab needs <code>pat</code> +
  * <code>group_id</code>; GitHub needs nothing because the install URL is server-configured).
- * Validation is the strategy's responsibility — invalid input surfaces as a 400 via
- * <code>IllegalArgumentException</code>.
  */
 export type InitiateConnectionRequest = {
-    kind?: 'GITHUB' | 'GITLAB' | 'SLACK' | 'OUTLINE';
+    kind: 'GITHUB' | 'GITLAB' | 'SLACK' | 'OUTLINE';
     userInput?: {
         [key: string]: string;
     };

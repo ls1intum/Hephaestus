@@ -157,13 +157,18 @@ public class ReviewHistoryContentSource implements EvidenceSource {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public void contribute(ContextRequest request, Map<String, byte[]> files) {
-        files.putAll(capture(request, sourceKinds()).files());
+        files.putAll(captureSelected(request, sourceKinds()).files());
     }
 
     @Override
     @Transactional(readOnly = true)
     public EvidenceContribution capture(ContextRequest request, Set<SourceKind> selectedKinds) {
+        return captureSelected(request, selectedKinds);
+    }
+
+    private EvidenceContribution captureSelected(ContextRequest request, Set<SourceKind> selectedKinds) {
         AgentJob job = reviewJob(request);
         if (job == null || job.getWorkspace() == null) {
             return new EvidenceContribution(Map.of(), Map.of());

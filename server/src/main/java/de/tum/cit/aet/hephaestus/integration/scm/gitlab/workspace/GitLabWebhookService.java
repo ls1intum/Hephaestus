@@ -169,7 +169,6 @@ public class GitLabWebhookService {
      * @param workspace the workspace to register a webhook for
      * @return result indicating success or failure with reason
      */
-    @Transactional
     public WebhookSetupResult registerWebhook(Workspace workspace) {
         Optional<GitLabConfig> configOpt = gitLabConfig(workspace);
         if (configOpt.isEmpty()) {
@@ -397,7 +396,7 @@ public class GitLabWebhookService {
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public void deregisterWebhookForConnection(long workspaceId, long connectionId) {
         try {
-            deregisterWebhookForConnectionStrict(workspaceId, connectionId);
+            deregisterWebhookForConnectionInternal(workspaceId, connectionId);
         } catch (RuntimeException e) {
             log.info(
                 "Webhook deregistration at deactivation was a no-op (best-effort): workspaceId={}, connectionId={}, reason={}",
@@ -410,6 +409,10 @@ public class GitLabWebhookService {
 
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public void deregisterWebhookForConnectionStrict(long workspaceId, long connectionId) {
+        deregisterWebhookForConnectionInternal(workspaceId, connectionId);
+    }
+
+    private void deregisterWebhookForConnectionInternal(long workspaceId, long connectionId) {
         Optional<GitLabConfig> configOpt = connectionService
             .findInWorkspace(workspaceId, connectionId)
             .map(c -> c.getConfig())

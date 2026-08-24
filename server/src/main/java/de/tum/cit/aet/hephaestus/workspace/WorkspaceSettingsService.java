@@ -49,6 +49,10 @@ public class WorkspaceSettingsService {
      */
     @Transactional
     public Workspace updateSchedule(Long workspaceId, Integer day, String time) {
+        return updateScheduleInTransaction(workspaceId, day, time);
+    }
+
+    private Workspace updateScheduleInTransaction(Long workspaceId, Integer day, String time) {
         Workspace workspace = requireWorkspace(workspaceId);
 
         if (day != null) {
@@ -88,6 +92,15 @@ public class WorkspaceSettingsService {
      */
     @Transactional
     public Workspace updateNotifications(Long workspaceId, Boolean enabled, String team, String channelId) {
+        return updateNotificationsInTransaction(workspaceId, enabled, team, channelId);
+    }
+
+    private Workspace updateNotificationsInTransaction(
+        Long workspaceId,
+        Boolean enabled,
+        String team,
+        String channelId
+    ) {
         Workspace workspace = requireWorkspace(workspaceId);
 
         if (enabled != null) {
@@ -123,13 +136,7 @@ public class WorkspaceSettingsService {
         return workspace;
     }
 
-    /**
-     * Atomically update the entire weekly digest configuration — schedule (day/time) plus
-     * notification settings (enabled/team/channel) — in a single transaction. Composes
-     * {@link #updateSchedule} and {@link #updateNotifications} so a mid-failure can never leave the
-     * schedule changed but the channel not (or vice versa); the schedule-changed event is published
-     * once. Same-bean calls run inside this method's transaction, so the whole change is all-or-nothing.
-     */
+    /** Updates the weekly digest schedule and notification settings atomically. */
     @Transactional
     public Workspace updateLeaderboardDigest(
         Long workspaceId,
@@ -139,8 +146,8 @@ public class WorkspaceSettingsService {
         String team,
         String channelId
     ) {
-        updateSchedule(workspaceId, day, time);
-        return updateNotifications(workspaceId, enabled, team, channelId);
+        updateScheduleInTransaction(workspaceId, day, time);
+        return updateNotificationsInTransaction(workspaceId, enabled, team, channelId);
     }
 
     /**

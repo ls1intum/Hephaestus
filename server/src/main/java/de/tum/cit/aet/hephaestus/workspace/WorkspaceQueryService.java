@@ -164,7 +164,7 @@ public class WorkspaceQueryService {
      * @param currentUsers the SCM users (the account's identity mirrors) to check accessibility for
      * @return list of accessible workspaces
      */
-    List<Workspace> findAccessibleWorkspaces(Collection<User> currentUsers) {
+    public List<Workspace> findAccessibleWorkspaces(Collection<User> currentUsers) {
         // Always include public, active workspaces
         List<Workspace> publicWorkspaces = workspaceRepository.findByStatusAndIsPubliclyViewableTrue(
             Workspace.WorkspaceStatus.ACTIVE

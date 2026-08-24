@@ -50,6 +50,10 @@ public interface ConnectionRepository extends JpaRepository<Connection, Long> {
         IntegrationState state
     );
 
+    default Optional<Connection> findActive(long workspaceId, IntegrationKind kind) {
+        return findFirstByWorkspaceIdAndKindAndStateOrderByCreatedAtDesc(workspaceId, kind, IntegrationState.ACTIVE);
+    }
+
     List<Connection> findByWorkspaceIdAndState(long workspaceId, IntegrationState state);
 
     /**

@@ -60,7 +60,7 @@ public class GitHubProjectItemProcessor extends BaseGitHubProcessor {
      */
     @Transactional
     public ProjectItem process(GitHubProjectItemDTO dto, Project project, ProcessingContext context) {
-        return process(dto, project, context, null);
+        return processInternal(dto, project, context, null);
     }
 
     /**
@@ -74,6 +74,15 @@ public class GitHubProjectItemProcessor extends BaseGitHubProcessor {
      */
     @Transactional
     public ProjectItem process(GitHubProjectItemDTO dto, Project project, ProcessingContext context, Long actorId) {
+        return processInternal(dto, project, context, actorId);
+    }
+
+    private ProjectItem processInternal(
+        GitHubProjectItemDTO dto,
+        Project project,
+        ProcessingContext context,
+        Long actorId
+    ) {
         if (dto == null) {
             log.warn(
                 "Skipped project item processing: reason=nullDto, projectId={}",
@@ -176,7 +185,7 @@ public class GitHubProjectItemProcessor extends BaseGitHubProcessor {
      */
     @Transactional
     public ProjectItem processArchived(GitHubProjectItemDTO dto, Project project, ProcessingContext context) {
-        return processArchived(dto, project, context, null);
+        return processArchivedInternal(dto, project, context, null);
     }
 
     /**
@@ -195,12 +204,21 @@ public class GitHubProjectItemProcessor extends BaseGitHubProcessor {
         ProcessingContext context,
         Long actorId
     ) {
+        return processArchivedInternal(dto, project, context, actorId);
+    }
+
+    private ProjectItem processArchivedInternal(
+        GitHubProjectItemDTO dto,
+        Project project,
+        ProcessingContext context,
+        Long actorId
+    ) {
         if (dto == null) {
             return null;
         }
         // GitHub webhooks send "archived_at" (timestamp) but no "archived" boolean,
         // so the primitive defaults to false during deserialization. Force it to true.
-        ProjectItem item = process(dto.withArchived(true), project, context, actorId);
+        ProjectItem item = processInternal(dto.withArchived(true), project, context, actorId);
         if (item != null) {
             GitHubProjectEventPayload.ProjectItemData itemData = GitHubProjectEventPayload.ProjectItemData.from(
                 item,
@@ -224,7 +242,7 @@ public class GitHubProjectItemProcessor extends BaseGitHubProcessor {
      */
     @Transactional
     public ProjectItem processRestored(GitHubProjectItemDTO dto, Project project, ProcessingContext context) {
-        return processRestored(dto, project, context, null);
+        return processRestoredInternal(dto, project, context, null);
     }
 
     /**
@@ -243,12 +261,21 @@ public class GitHubProjectItemProcessor extends BaseGitHubProcessor {
         ProcessingContext context,
         Long actorId
     ) {
+        return processRestoredInternal(dto, project, context, actorId);
+    }
+
+    private ProjectItem processRestoredInternal(
+        GitHubProjectItemDTO dto,
+        Project project,
+        ProcessingContext context,
+        Long actorId
+    ) {
         if (dto == null) {
             return null;
         }
         // Explicitly force archived=false for clarity, even though webhook deserialization
         // defaults to false. This makes the intent unambiguous.
-        ProjectItem item = process(dto.withArchived(false), project, context, actorId);
+        ProjectItem item = processInternal(dto.withArchived(false), project, context, actorId);
         if (item != null) {
             GitHubProjectEventPayload.ProjectItemData itemData = GitHubProjectEventPayload.ProjectItemData.from(
                 item,
@@ -272,7 +299,7 @@ public class GitHubProjectItemProcessor extends BaseGitHubProcessor {
      */
     @Transactional
     public ProjectItem processConverted(GitHubProjectItemDTO dto, Project project, ProcessingContext context) {
-        return processConverted(dto, project, context, null);
+        return processConvertedInternal(dto, project, context, null);
     }
 
     /**
@@ -291,7 +318,16 @@ public class GitHubProjectItemProcessor extends BaseGitHubProcessor {
         ProcessingContext context,
         Long actorId
     ) {
-        ProjectItem item = process(dto, project, context, actorId);
+        return processConvertedInternal(dto, project, context, actorId);
+    }
+
+    private ProjectItem processConvertedInternal(
+        GitHubProjectItemDTO dto,
+        Project project,
+        ProcessingContext context,
+        Long actorId
+    ) {
+        ProjectItem item = processInternal(dto, project, context, actorId);
         if (item != null) {
             GitHubProjectEventPayload.ProjectItemData itemData = GitHubProjectEventPayload.ProjectItemData.from(
                 item,
@@ -315,7 +351,7 @@ public class GitHubProjectItemProcessor extends BaseGitHubProcessor {
      */
     @Transactional
     public ProjectItem processReordered(GitHubProjectItemDTO dto, Project project, ProcessingContext context) {
-        return processReordered(dto, project, context, null);
+        return processReorderedInternal(dto, project, context, null);
     }
 
     /**
@@ -334,7 +370,16 @@ public class GitHubProjectItemProcessor extends BaseGitHubProcessor {
         ProcessingContext context,
         Long actorId
     ) {
-        ProjectItem item = process(dto, project, context, actorId);
+        return processReorderedInternal(dto, project, context, actorId);
+    }
+
+    private ProjectItem processReorderedInternal(
+        GitHubProjectItemDTO dto,
+        Project project,
+        ProcessingContext context,
+        Long actorId
+    ) {
+        ProjectItem item = processInternal(dto, project, context, actorId);
         if (item != null) {
             GitHubProjectEventPayload.ProjectItemData itemData = GitHubProjectEventPayload.ProjectItemData.from(
                 item,

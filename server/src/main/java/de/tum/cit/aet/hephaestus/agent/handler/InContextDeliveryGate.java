@@ -69,7 +69,7 @@ class InContextDeliveryGate {
 
     /** The subset of {@code observations} that may be placed on the artifact, in the order given. */
     @Transactional(readOnly = true)
-    List<ValidatedObservation> admitInContext(AgentJob job, List<ValidatedObservation> observations) {
+    public List<ValidatedObservation> admitInContext(AgentJob job, List<ValidatedObservation> observations) {
         if (observations.isEmpty() || job.getWorkspace() == null || job.getWorkspace().getId() == null) {
             return observations;
         }
@@ -125,7 +125,7 @@ class InContextDeliveryGate {
     }
 
     @Transactional(readOnly = true)
-    List<ValidatedObservation> awaitingApproval(AgentJob job, List<ValidatedObservation> observations) {
+    public List<ValidatedObservation> awaitingApproval(AgentJob job, List<ValidatedObservation> observations) {
         if (
             observations.isEmpty() || job.getWorkspace() == null || job.getWorkspace().getId() == null
         ) return List.of();

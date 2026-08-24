@@ -25,7 +25,7 @@ class ReviewRunSummaryQueryService {
     private final FeedbackRepository feedbackRepository;
 
     @Transactional(readOnly = true)
-    Page<ReviewRunSummaryDTO> list(Long workspaceId, ReviewRunFilterParams filter, Pageable pageable) {
+    public Page<ReviewRunSummaryDTO> list(Long workspaceId, ReviewRunFilterParams filter, Pageable pageable) {
         Page<ReviewRunSummaryRow> reviews = agentJobRepository.findReviewRunSummaries(
             workspaceId,
             AgentPurpose.PRACTICE_REVIEW,

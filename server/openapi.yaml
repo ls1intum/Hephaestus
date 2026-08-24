@@ -9769,8 +9769,6 @@ components:
          <p><code>userInput</code> is intentionally a free-form map so per-kind ConnectionStrategy
          implementations can dictate their own field schema (e.g. GitLab needs <code>pat</code> +
          <code>group_id</code>; GitHub needs nothing because the install URL is server-configured).
-         Validation is the strategy's responsibility — invalid input surfaces as a 400 via
-         <code>IllegalArgumentException</code>.
       properties:
         kind:
           type: string
@@ -9783,6 +9781,8 @@ components:
           type: object
           additionalProperties:
             type: string
+      required:
+      - kind
     InitiateConnectionResponse:
       type: object
       description: |-

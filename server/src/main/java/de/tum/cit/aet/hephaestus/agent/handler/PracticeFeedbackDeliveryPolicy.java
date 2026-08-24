@@ -49,7 +49,7 @@ class PracticeFeedbackDeliveryPolicy {
     }
 
     @Transactional(readOnly = true)
-    Decision<Issue> evaluateIssue(AgentJob job) {
+    public Decision<Issue> evaluateIssue(AgentJob job) {
         if (silentModeQuery.isSilentModeEngaged()) {
             return Decision.suppressed(FeedbackSuppressionReason.INSTANCE_SILENCED);
         }
@@ -76,7 +76,7 @@ class PracticeFeedbackDeliveryPolicy {
     }
 
     @Transactional(readOnly = true)
-    Decision<PullRequest> evaluatePullRequest(AgentJob job) {
+    public Decision<PullRequest> evaluatePullRequest(AgentJob job) {
         if (silentModeQuery.isSilentModeEngaged()) {
             return Decision.suppressed(FeedbackSuppressionReason.INSTANCE_SILENCED);
         }

@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.agent.mentor.chat;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.NotNull;
 import java.util.UUID;
 import tools.jackson.databind.JsonNode;
 
@@ -19,4 +20,4 @@ import tools.jackson.databind.JsonNode;
  *                as the prompt. Other parts (images, files) are ignored in v1.
  */
 @Schema(description = "Mentor chat turn request — AI SDK DefaultChatTransport shape.")
-public record MentorChatRequestBody(UUID id, JsonNode message) {}
+public record MentorChatRequestBody(UUID id, @NotNull JsonNode message) {}

@@ -122,7 +122,7 @@ public class ConnectionController {
     @Audited(ledger = AuditLedger.CONNECTION_AUDIT)
     public ResponseEntity<InitiateConnectionResponseDTO> initiate(
         WorkspaceContext workspace,
-        @RequestBody @NotNull InitiateConnectionRequestDTO body,
+        @Valid @RequestBody @NotNull InitiateConnectionRequestDTO body,
         @Nullable Authentication authentication
     ) {
         Long workspaceId = workspace.id();

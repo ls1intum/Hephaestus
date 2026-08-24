@@ -36,7 +36,7 @@ class ReviewFeedbackQueryService {
     private final ReviewArtifactResolver artifactResolver;
 
     @Transactional(readOnly = true)
-    Page<ReviewFeedbackDTO> list(Long workspaceId, FeedbackQueryFilter filter, Pageable pageable) {
+    public Page<ReviewFeedbackDTO> list(Long workspaceId, FeedbackQueryFilter filter, Pageable pageable) {
         Page<OperatorFeedbackRow> rows = feedbackRepository.findForWorkspace(workspaceId, filter, pageable);
         List<Long> userIds = new ArrayList<>(rows.getNumberOfElements() * 2);
         for (OperatorFeedbackRow row : rows) {
@@ -71,7 +71,7 @@ class ReviewFeedbackQueryService {
     }
 
     @Transactional(readOnly = true)
-    ReviewFeedbackDetailDTO get(Long workspaceId, UUID feedbackId) {
+    public ReviewFeedbackDetailDTO get(Long workspaceId, UUID feedbackId) {
         Feedback feedback = feedbackRepository
             .findByIdAndWorkspaceId(feedbackId, workspaceId)
             .orElseThrow(() -> new EntityNotFoundException("Feedback", feedbackId.toString()));

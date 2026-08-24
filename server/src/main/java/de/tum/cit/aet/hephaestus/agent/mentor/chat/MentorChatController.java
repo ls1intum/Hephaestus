@@ -9,6 +9,7 @@ import io.swagger.v3.oas.annotations.Hidden;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.validation.Valid;
 import java.time.Duration;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -46,7 +47,7 @@ public class MentorChatController {
     @PreAuthorize("@workspaceSecure.isMember()")
     public SseEmitter chat(
         WorkspaceContext workspaceContext,
-        @RequestBody MentorChatRequestBody body,
+        @Valid @RequestBody MentorChatRequestBody body,
         HttpServletResponse response
     ) {
         if (!workspaceContext.mentorEnabled()) {

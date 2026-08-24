@@ -63,11 +63,15 @@ public class JwtPrincipalFactory {
         Account account = accountRepository
             .findById(accountId)
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "account not found"));
-        return forAccount(account);
+        return createPrincipal(account);
     }
 
     @Transactional(readOnly = true)
     public JwtPrincipal forAccount(Account account) {
+        return createPrincipal(account);
+    }
+
+    private JwtPrincipal createPrincipal(Account account) {
         // Defense-in-depth account-status gate (ADR 0017). Every JWT-issue path funnels through here
         // (login success handler, token refresh, impersonation). A SUSPENDED / DELETING / DELETED
         // account must never be minted a principal — even if a caller forgot the upstream check. The

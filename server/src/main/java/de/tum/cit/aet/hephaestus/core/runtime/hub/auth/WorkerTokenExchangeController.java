@@ -7,6 +7,7 @@ import de.tum.cit.aet.hephaestus.core.runtime.RuntimeRole;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.swagger.v3.oas.annotations.Hidden;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
 import java.security.MessageDigest;
 import java.time.Duration;
 import java.time.Instant;
@@ -60,7 +61,7 @@ public class WorkerTokenExchangeController {
 
     @PostMapping("/exchange")
     @PreAuthorize("permitAll()")
-    public ResponseEntity<?> exchange(@RequestBody ExchangeRequest request, HttpServletRequest http) {
+    public ResponseEntity<?> exchange(@Valid @RequestBody ExchangeRequest request, HttpServletRequest http) {
         if (!properties.isExchangeEnabled()) {
             log.warn("worker token exchange attempted but no registration token is configured");
             meterRegistry.counter(AUDIT_METRIC, "outcome", "failed", "reason", "disabled").increment();

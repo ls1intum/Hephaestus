@@ -144,7 +144,7 @@ public class FeedbackLedgerRecorder {
         ArtifactKind artifact,
         List<DeliveredSignal> inlineSignals
     ) {
-        record(job, delivery, artifact, inlineSignals, true, !inlineSignals.isEmpty());
+        record(job, delivery, artifact, inlineSignals, true, !inlineSignals.isEmpty(), true);
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -420,6 +420,14 @@ public class FeedbackLedgerRecorder {
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void recordSuppressedUnit(AgentJob job, DeliveryContent delivery, FeedbackSuppressionReason reason) {
+        recordSuppressedUnitInCurrentTransaction(job, delivery, reason);
+    }
+
+    private void recordSuppressedUnitInCurrentTransaction(
+        AgentJob job,
+        DeliveryContent delivery,
+        FeedbackSuppressionReason reason
+    ) {
         if (delivery == null || job.getWorkspace() == null) {
             return;
         }
@@ -691,7 +699,7 @@ public class FeedbackLedgerRecorder {
             return; // nothing to post on the work; the lanes above are already awake
         }
         if (!deliveryAllowed()) {
-            recordSuppressedUnit(job, delivery, FeedbackSuppressionReason.INSTANCE_SILENCED);
+            recordSuppressedUnitInCurrentTransaction(job, delivery, FeedbackSuppressionReason.INSTANCE_SILENCED);
             return;
         }
         if (feedbackRepository.existsByAgentJobIdAndPosition(job.getId(), UNDELIVERED_UNIT_ORDINAL)) {

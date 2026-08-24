@@ -65,6 +65,14 @@ public class SlackMentorIdentityResolver {
      */
     @Transactional(readOnly = true)
     public Optional<String> resolveDeveloperLogin(long workspaceId, @Nullable String teamId, String slackUserId) {
+        return resolveDeveloperLoginInternal(workspaceId, teamId, slackUserId);
+    }
+
+    private Optional<String> resolveDeveloperLoginInternal(
+        long workspaceId,
+        @Nullable String teamId,
+        String slackUserId
+    ) {
         if (slackUserId == null || slackUserId.isBlank()) {
             return Optional.empty();
         }
@@ -93,7 +101,7 @@ public class SlackMentorIdentityResolver {
      */
     @Transactional(readOnly = true)
     public Optional<Long> resolveMemberId(long workspaceId, @Nullable String teamId, String slackUserId) {
-        return resolveDeveloperLogin(workspaceId, teamId, slackUserId)
+        return resolveDeveloperLoginInternal(workspaceId, teamId, slackUserId)
             .flatMap(userRepository::findByLogin)
             .map(User::getId);
     }

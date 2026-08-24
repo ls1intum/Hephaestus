@@ -43,7 +43,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.graphql.client.ClientGraphQlResponse;
 import org.springframework.graphql.client.HttpGraphQlClient;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 import reactor.core.publisher.Mono;
 import reactor.util.retry.Retry;
 
@@ -106,7 +105,6 @@ public class GitHubOrganizationSyncService {
      * @param organizationLogin  the GitHub organization login to sync
      * @return the synchronized Organization entity, or null if sync failed
      */
-    @Transactional
     public Organization syncOrganization(Long scopeId, String organizationLogin) {
         if (organizationLogin == null || organizationLogin.isBlank()) {
             log.warn("Skipped organization sync: reason=missingLogin, scopeId={}", scopeId);

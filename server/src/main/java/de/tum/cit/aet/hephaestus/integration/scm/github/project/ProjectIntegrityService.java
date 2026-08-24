@@ -110,11 +110,15 @@ public class ProjectIntegrityService {
      */
     @EventListener
     public void onRepositoryAboutToBeDeleted(RepositoryAboutToBeDeletedEvent event) {
-        cascadeDeleteProjectsForRepository(event.repositoryId());
+        cascadeDeleteProjectsForRepositoryInternal(event.repositoryId());
     }
 
     @Transactional
     public int cascadeDeleteProjectsForRepository(Long repositoryId) {
+        return cascadeDeleteProjectsForRepositoryInternal(repositoryId);
+    }
+
+    private int cascadeDeleteProjectsForRepositoryInternal(Long repositoryId) {
         if (repositoryId == null) {
             return 0;
         }

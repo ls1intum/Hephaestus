@@ -94,7 +94,7 @@ public class InAppCompositionListener {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onPracticeDetectionDelivered(PracticeDetectionDeliveredEvent event) {
         try {
-            prepare(event.agentJobId(), event.workspaceId());
+            prepare(event.agentJobId(), event.agentJobId(), event.workspaceId());
         } catch (RuntimeException e) {
             log.warn(
                 "In-app composition routing failed (delivery unaffected): jobId={}, error={}",

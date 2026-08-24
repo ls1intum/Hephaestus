@@ -130,8 +130,16 @@ public class WorkspaceRepositoryMonitorService {
         return workspace.getRepositoriesToMonitor().stream().map(RepositoryToMonitor::getNameWithOwner).toList();
     }
 
+    @Transactional(readOnly = true)
     public List<String> getMonitoredRepositories(WorkspaceContext workspaceContext) {
-        return getMonitoredRepositories(requireSlug(workspaceContext));
+        String slug = requireSlug(workspaceContext);
+        Workspace workspace = requireWorkspace(slug);
+        log.debug(
+            "Retrieved monitored repositories: workspaceId={}, workspaceSlug={}",
+            workspace.getId(),
+            LoggingUtils.sanitizeForLog(slug)
+        );
+        return workspace.getRepositoriesToMonitor().stream().map(RepositoryToMonitor::getNameWithOwner).toList();
     }
 
     public void addRepositoryToMonitor(String slug, String nameWithOwner)
@@ -157,7 +165,12 @@ public class WorkspaceRepositoryMonitorService {
         }
 
         // For GitLab PAT workspaces, the repo may not be synced yet — allow adding by name.
-        if (!isGitLabWorkspace(workspace)) {
+        if (
+            connectionService
+                .findActiveProviderKind(workspace.getId())
+                .map(kind -> kind != IntegrationKind.GITLAB)
+                .orElse(true)
+        ) {
             var repository = findRepository(nameWithOwner);
             if (repository.isEmpty()) {
                 log.debug(
@@ -237,51 +250,13 @@ public class WorkspaceRepositoryMonitorService {
         removeRepositoryFromMonitor(requireSlug(workspaceContext), nameWithOwner);
     }
 
-    /**
-     * Idempotently ensure a repository monitor exists for a given installation id
-     * without issuing extra GitHub fetches.
-     */
-    @Transactional
-    public Optional<Workspace> ensureRepositoryMonitorForInstallation(long installationId, String nameWithOwner) {
-        return ensureRepositoryMonitorForInstallation(installationId, nameWithOwner, false);
-    }
-
-    /**
-     * Idempotently ensure a repository monitor exists for a given installation id.
-     *
-     * @param installationId the GitHub App installation ID
-     * @param nameWithOwner  the repository full name (e.g., "owner/repo")
-     * @param deferSync      if true, skip immediate sync (use during provisioning
-     *                       when activation will sync in bulk)
-     */
-    @Transactional
-    public Optional<Workspace> ensureRepositoryMonitorForInstallation(
-        long installationId,
-        String nameWithOwner,
-        boolean deferSync
-    ) {
-        if (StringUtils.isBlank(nameWithOwner)) {
-            return Optional.empty();
-        }
-        // Check suspension BEFORE adding the repo monitor so NATS replay cannot
-        // add repos to suspended installations.
-        if (isInstallationSuspended(installationId)) {
-            log.debug(
-                "Skipped repository monitor: reason=installationSuspended, installationId={}, repoName={}",
-                installationId,
-                LoggingUtils.sanitizeForLog(nameWithOwner)
-            );
-            return Optional.empty();
-        }
-
-        return workspaceRepository
-            .findActiveByInstallationIdForUpdate(installationId)
-            .flatMap(workspace -> ensureRepositoryMonitorInternal(workspace, nameWithOwner, deferSync));
-    }
-
     /** Remove a repository monitor for a given installation id if it exists; no-op if missing. */
     @Transactional
     public Optional<Workspace> removeRepositoryMonitorForInstallation(long installationId, String nameWithOwner) {
+        return removeRepositoryMonitorInTransaction(installationId, nameWithOwner);
+    }
+
+    private Optional<Workspace> removeRepositoryMonitorInTransaction(long installationId, String nameWithOwner) {
         if (StringUtils.isBlank(nameWithOwner)) {
             return Optional.empty();
         }
@@ -316,6 +291,10 @@ public class WorkspaceRepositoryMonitorService {
      */
     @Transactional
     public Optional<Workspace> removeAllRepositoriesFromMonitor(long installationId, boolean deleteRepositories) {
+        return removeAllRepositoriesInTransaction(installationId, deleteRepositories);
+    }
+
+    private Optional<Workspace> removeAllRepositoriesInTransaction(long installationId, boolean deleteRepositories) {
         var workspaceOpt = workspaceRepository.findActiveByInstallationIdForUpdate(installationId);
         workspaceOpt.ifPresent(workspace -> {
             List<RepositoryToMonitor> monitors = repositoryToMonitorRepository.findByWorkspaceId(workspace.getId());
@@ -329,12 +308,6 @@ public class WorkspaceRepositoryMonitorService {
             }
         });
         return workspaceOpt;
-    }
-
-    /** Remove all repository monitors tied to an installation; keeps the Repository entities. */
-    @Transactional
-    public Optional<Workspace> removeAllRepositoriesFromMonitor(long installationId) {
-        return removeAllRepositoriesFromMonitor(installationId, false);
     }
 
     /**
@@ -473,7 +446,7 @@ public class WorkspaceRepositoryMonitorService {
                 snapshot.name(),
                 snapshot.isPrivate()
             );
-            ensureRepositoryMonitorForInstallation(installationId, snapshot.nameWithOwner(), deferSync);
+            ensureRepositoryMonitorInternal(workspace, snapshot.nameWithOwner(), deferSync);
         });
 
         repositoryToMonitorRepository
@@ -481,7 +454,7 @@ public class WorkspaceRepositoryMonitorService {
             .stream()
             .filter(monitor -> !StringUtils.isBlank(monitor.getNameWithOwner()))
             .filter(monitor -> !desiredRepositories.contains(monitor.getNameWithOwner().toLowerCase(Locale.ENGLISH)))
-            .forEach(monitor -> removeRepositoryMonitorForInstallation(installationId, monitor.getNameWithOwner()));
+            .forEach(monitor -> removeRepositoryMonitorInTransaction(installationId, monitor.getNameWithOwner()));
     }
 
     /**
@@ -742,13 +715,5 @@ public class WorkspaceRepositoryMonitorService {
                 .orElse(false) &&
             connectionService.findActiveGitHubAppConfig(workspace.getId()).isPresent()
         );
-    }
-
-    /** Workspace is bound to a GitLab PAT (vs GitHub of either flavour). */
-    private boolean isGitLabWorkspace(Workspace workspace) {
-        return connectionService
-            .findActiveProviderKind(workspace.getId())
-            .map(k -> k == IntegrationKind.GITLAB)
-            .orElse(false);
     }
 }

@@ -91,6 +91,14 @@ public class GitLabIssueDependencySyncService {
         Repository repository,
         @Nullable OffsetDateTime updatedAfter
     ) {
+        return syncDependenciesInternal(scopeId, repository, updatedAfter);
+    }
+
+    private SyncResult syncDependenciesInternal(
+        Long scopeId,
+        Repository repository,
+        @Nullable OffsetDateTime updatedAfter
+    ) {
         String safeProjectPath = sanitizeForLog(repository.getNameWithOwner());
 
         // Issues only: GitLab keeps issue IIDs and merge-request IIDs in separate per-project namespaces
@@ -178,7 +186,7 @@ public class GitLabIssueDependencySyncService {
      */
     @Transactional
     public SyncResult syncDependenciesForRepository(Long scopeId, Repository repository) {
-        return syncDependenciesForRepository(scopeId, repository, null);
+        return syncDependenciesInternal(scopeId, repository, null);
     }
 
     @SuppressWarnings("unchecked")

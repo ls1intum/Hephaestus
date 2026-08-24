@@ -38,7 +38,7 @@ class ReviewObservationQueryService {
     private final EvidenceAuthorization evidenceAuthorization;
 
     @Transactional(readOnly = true)
-    Page<ReviewObservationDTO> list(
+    public Page<ReviewObservationDTO> list(
         Long workspaceId,
         ObservationQueryFilter filter,
         ReviewObservationSort sort,
@@ -83,7 +83,7 @@ class ReviewObservationQueryService {
     }
 
     @Transactional(readOnly = true)
-    ReviewObservationDetailDTO get(Long workspaceId, UUID observationId) {
+    public ReviewObservationDetailDTO get(Long workspaceId, UUID observationId) {
         Observation observation = observationRepository
             .findByIdAndWorkspaceId(observationId, workspaceId)
             .orElseThrow(() -> new EntityNotFoundException("Observation", observationId.toString()));

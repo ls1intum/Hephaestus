@@ -55,7 +55,7 @@ public class GitHubProjectProcessor extends BaseGitHubProcessor {
      */
     @Transactional
     public Project process(GitHubProjectDTO dto, Project.OwnerType ownerType, Long ownerId, ProcessingContext context) {
-        return process(dto, ownerType, ownerId, context, null);
+        return processInternal(dto, ownerType, ownerId, context, null);
     }
 
     /**
@@ -70,6 +70,16 @@ public class GitHubProjectProcessor extends BaseGitHubProcessor {
      */
     @Transactional
     public Project process(
+        GitHubProjectDTO dto,
+        Project.OwnerType ownerType,
+        Long ownerId,
+        ProcessingContext context,
+        Long actorId
+    ) {
+        return processInternal(dto, ownerType, ownerId, context, actorId);
+    }
+
+    private Project processInternal(
         GitHubProjectDTO dto,
         Project.OwnerType ownerType,
         Long ownerId,
@@ -200,7 +210,7 @@ public class GitHubProjectProcessor extends BaseGitHubProcessor {
         Long ownerId,
         ProcessingContext context
     ) {
-        return processClosed(dto, ownerType, ownerId, context, null);
+        return processClosedInternal(dto, ownerType, ownerId, context, null);
     }
 
     /**
@@ -215,6 +225,16 @@ public class GitHubProjectProcessor extends BaseGitHubProcessor {
      */
     @Transactional
     public Project processClosed(
+        GitHubProjectDTO dto,
+        Project.OwnerType ownerType,
+        Long ownerId,
+        ProcessingContext context,
+        Long actorId
+    ) {
+        return processClosedInternal(dto, ownerType, ownerId, context, actorId);
+    }
+
+    private Project processClosedInternal(
         GitHubProjectDTO dto,
         Project.OwnerType ownerType,
         Long ownerId,
@@ -252,7 +272,7 @@ public class GitHubProjectProcessor extends BaseGitHubProcessor {
         Long ownerId,
         ProcessingContext context
     ) {
-        return processReopened(dto, ownerType, ownerId, context, null);
+        return processReopenedInternal(dto, ownerType, ownerId, context, null);
     }
 
     /**
@@ -267,6 +287,16 @@ public class GitHubProjectProcessor extends BaseGitHubProcessor {
      */
     @Transactional
     public Project processReopened(
+        GitHubProjectDTO dto,
+        Project.OwnerType ownerType,
+        Long ownerId,
+        ProcessingContext context,
+        Long actorId
+    ) {
+        return processReopenedInternal(dto, ownerType, ownerId, context, actorId);
+    }
+
+    private Project processReopenedInternal(
         GitHubProjectDTO dto,
         Project.OwnerType ownerType,
         Long ownerId,

@@ -357,6 +357,14 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
         @Nullable Long resolvedNativeId,
         @Nullable String resolvedNameWithOwner
     ) {
+        reconcileSyncTargetInTransaction(syncTargetId, resolvedNativeId, resolvedNameWithOwner);
+    }
+
+    private void reconcileSyncTargetInTransaction(
+        Long syncTargetId,
+        @Nullable Long resolvedNativeId,
+        @Nullable String resolvedNameWithOwner
+    ) {
         if (syncTargetId == null) {
             return;
         }
@@ -416,7 +424,7 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
         // Shared repositories mean N monitors for one nativeId — re-key each, reusing the single
         // re-key/consumer-refresh body so webhook healing and reconcile healing cannot diverge.
         for (RepositoryToMonitor rtm : repositoryToMonitorRepository.findByNativeId(nativeId)) {
-            reconcileSyncTargetIdentity(rtm.getId(), nativeId, newNameWithOwner);
+            reconcileSyncTargetInTransaction(rtm.getId(), nativeId, newNameWithOwner);
         }
     }
 

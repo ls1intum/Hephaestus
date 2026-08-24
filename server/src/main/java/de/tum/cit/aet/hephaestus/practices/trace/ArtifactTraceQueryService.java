@@ -79,7 +79,7 @@ class ArtifactTraceQueryService {
     private final ArtifactIdentities identities;
 
     @Transactional(readOnly = true)
-    ArtifactTraceDTO trace(Long workspaceId, ArtifactKind artifactKind, Long artifactId) {
+    public ArtifactTraceDTO trace(Long workspaceId, ArtifactKind artifactKind, Long artifactId) {
         List<ArtifactSignal> recorded = signals.findForArtifact(workspaceId, artifactKind.value(), artifactId);
         if (recorded.isEmpty()) {
             throw new EntityNotFoundException("Traced artifact", artifactKind.value() + "/" + artifactId);
@@ -130,7 +130,7 @@ class ArtifactTraceQueryService {
     }
 
     @Transactional(readOnly = true)
-    Page<TracedArtifactDTO> list(Long workspaceId, @Nullable ArtifactKind artifactKind, Pageable pageable) {
+    public Page<TracedArtifactDTO> list(Long workspaceId, @Nullable ArtifactKind artifactKind, Pageable pageable) {
         Page<SignalledArtifactRow> page = signals.findSignalledArtifacts(
             workspaceId,
             artifactKind == null ? null : artifactKind.value(),

@@ -35,11 +35,20 @@ public class LeaderboardXpQueryService {
 
     @Transactional(readOnly = true)
     public Map<Long, LeaderboardUserXp> getLeaderboardData(Long workspaceId, Instant since, Instant until) {
-        return getLeaderboardData(workspaceId, since, until, Set.of());
+        return queryLeaderboardData(workspaceId, since, until, Set.of());
     }
 
     @Transactional(readOnly = true)
     public Map<Long, LeaderboardUserXp> getLeaderboardData(
+        Long workspaceId,
+        Instant since,
+        Instant until,
+        Set<Long> teamIds
+    ) {
+        return queryLeaderboardData(workspaceId, since, until, teamIds);
+    }
+
+    private Map<Long, LeaderboardUserXp> queryLeaderboardData(
         Long workspaceId,
         Instant since,
         Instant until,

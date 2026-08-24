@@ -39,10 +39,6 @@ public class ConnectionService {
     private final ApplicationEventPublisher eventPublisher;
     private final SyncJobService syncJobService;
 
-    /**
-     * Runs the pre-transition revoke/erase callback in its own {@code REQUIRES_NEW} transaction so a
-     * failing erase cannot mark the lifecycle transaction rollback-only — see {@link #runRevokeIsolated}.
-     */
     private final TransactionTemplate revokeTransactionTemplate;
 
     public ConnectionService(
@@ -64,11 +60,7 @@ public class ConnectionService {
 
     @Transactional(readOnly = true)
     public Optional<Connection> findActive(long workspaceId, IntegrationKind kind) {
-        return connectionRepository.findFirstByWorkspaceIdAndKindAndStateOrderByCreatedAtDesc(
-            workspaceId,
-            kind,
-            IntegrationState.ACTIVE
-        );
+        return connectionRepository.findActive(workspaceId, kind);
     }
 
     /**
@@ -86,8 +78,8 @@ public class ConnectionService {
      */
     @Transactional(readOnly = true)
     public Optional<IntegrationKind> findActiveProviderKind(long workspaceId) {
-        boolean github = findActive(workspaceId, IntegrationKind.GITHUB).isPresent();
-        boolean gitlab = findActive(workspaceId, IntegrationKind.GITLAB).isPresent();
+        boolean github = connectionRepository.findActive(workspaceId, IntegrationKind.GITHUB).isPresent();
+        boolean gitlab = connectionRepository.findActive(workspaceId, IntegrationKind.GITLAB).isPresent();
         if (github && gitlab) {
             throw new IllegalStateException(
                 "Workspace " +
@@ -103,7 +95,8 @@ public class ConnectionService {
 
     @Transactional(readOnly = true)
     public Optional<ConnectionConfig.GitHubAppConfig> findActiveGitHubAppConfig(long workspaceId) {
-        return findActive(workspaceId, IntegrationKind.GITHUB)
+        return connectionRepository
+            .findActive(workspaceId, IntegrationKind.GITHUB)
             .map(Connection::getConfig)
             .filter(c -> c instanceof ConnectionConfig.GitHubAppConfig)
             .map(c -> (ConnectionConfig.GitHubAppConfig) c);
@@ -111,7 +104,8 @@ public class ConnectionService {
 
     @Transactional(readOnly = true)
     public Optional<ConnectionConfig.GitHubPatConfig> findActiveGitHubPatConfig(long workspaceId) {
-        return findActive(workspaceId, IntegrationKind.GITHUB)
+        return connectionRepository
+            .findActive(workspaceId, IntegrationKind.GITHUB)
             .map(Connection::getConfig)
             .filter(c -> c instanceof ConnectionConfig.GitHubPatConfig)
             .map(c -> (ConnectionConfig.GitHubPatConfig) c);
@@ -119,7 +113,8 @@ public class ConnectionService {
 
     @Transactional(readOnly = true)
     public Optional<ConnectionConfig.GitLabConfig> findActiveGitLabConfig(long workspaceId) {
-        return findActive(workspaceId, IntegrationKind.GITLAB)
+        return connectionRepository
+            .findActive(workspaceId, IntegrationKind.GITLAB)
             .map(Connection::getConfig)
             .filter(c -> c instanceof ConnectionConfig.GitLabConfig)
             .map(c -> (ConnectionConfig.GitLabConfig) c);
@@ -127,7 +122,8 @@ public class ConnectionService {
 
     @Transactional(readOnly = true)
     public Optional<ConnectionConfig.SlackConfig> findSlackNotificationConfig(long workspaceId) {
-        return findActive(workspaceId, IntegrationKind.SLACK)
+        return connectionRepository
+            .findActive(workspaceId, IntegrationKind.SLACK)
             .map(Connection::getConfig)
             .filter(c -> c instanceof ConnectionConfig.SlackConfig)
             .map(c -> (ConnectionConfig.SlackConfig) c);
@@ -135,7 +131,8 @@ public class ConnectionService {
 
     @Transactional(readOnly = true)
     public Optional<ConnectionConfig.OutlineConfig> findActiveOutlineConfig(long workspaceId) {
-        return findActive(workspaceId, IntegrationKind.OUTLINE)
+        return connectionRepository
+            .findActive(workspaceId, IntegrationKind.OUTLINE)
             .map(Connection::getConfig)
             .filter(c -> c instanceof ConnectionConfig.OutlineConfig)
             .map(c -> (ConnectionConfig.OutlineConfig) c);
@@ -198,7 +195,8 @@ public class ConnectionService {
      */
     @Transactional(readOnly = true)
     public Optional<BearerToken> findActiveBearerToken(long workspaceId, IntegrationKind kind) {
-        return findActive(workspaceId, kind)
+        return connectionRepository
+            .findActive(workspaceId, kind)
             .flatMap(c -> c.credentials(credentialConverter))
             .flatMap(b -> b instanceof BearerToken bt ? Optional.of(bt) : Optional.empty());
     }
@@ -217,7 +215,9 @@ public class ConnectionService {
     @Transactional(readOnly = true)
     public Optional<Connection> findReferenced(IntegrationRef ref) {
         if (ref.connectionId() != null) {
-            return findInWorkspace(ref.workspaceId(), ref.connectionId()).filter(c -> c.getKind() == ref.kind());
+            return connectionRepository
+                .findByIdAndWorkspaceId(ref.connectionId(), ref.workspaceId())
+                .filter(c -> c.getKind() == ref.kind());
         }
         if (ref.instanceKey() != null) {
             return connectionRepository.findByWorkspaceIdAndKindAndInstanceKey(
@@ -226,7 +226,7 @@ public class ConnectionService {
                 ref.instanceKey()
             );
         }
-        return findActive(ref.workspaceId(), ref.kind());
+        return connectionRepository.findActive(ref.workspaceId(), ref.kind());
     }
 
     @Transactional(readOnly = true)
@@ -248,7 +248,8 @@ public class ConnectionService {
      */
     @Transactional(readOnly = true)
     public Optional<BearerToken> findBearerToken(long workspaceId, long connectionId) {
-        return findInWorkspace(workspaceId, connectionId)
+        return connectionRepository
+            .findByIdAndWorkspaceId(connectionId, workspaceId)
             .flatMap(c -> c.credentials(credentialConverter))
             .flatMap(b -> b instanceof BearerToken bt ? Optional.of(bt) : Optional.empty());
     }
@@ -264,26 +265,28 @@ public class ConnectionService {
         IntegrationKind kind,
         UnaryOperator<ConnectionConfig> mutator
     ) {
-        return findActive(workspaceId, kind).map(c -> {
-            ConnectionConfig next = mutator.apply(c.getConfig());
-            if (next == null) {
-                throw new IllegalArgumentException(
-                    "Mutator returned null for connection " + c.getId() + " — config must be non-null"
-                );
-            }
-            if (!next.getClass().equals(c.getConfig().getClass())) {
-                throw new IllegalArgumentException(
-                    "Mutator changed config variant on connection " +
-                        c.getId() +
-                        ": " +
-                        c.getConfig().getClass().getSimpleName() +
-                        " → " +
-                        next.getClass().getSimpleName()
-                );
-            }
-            c.setConfig(next);
-            return connectionRepository.save(c);
-        });
+        return connectionRepository
+            .findActive(workspaceId, kind)
+            .map(c -> {
+                ConnectionConfig next = mutator.apply(c.getConfig());
+                if (next == null) {
+                    throw new IllegalArgumentException(
+                        "Mutator returned null for connection " + c.getId() + " — config must be non-null"
+                    );
+                }
+                if (!next.getClass().equals(c.getConfig().getClass())) {
+                    throw new IllegalArgumentException(
+                        "Mutator changed config variant on connection " +
+                            c.getId() +
+                            ": " +
+                            c.getConfig().getClass().getSimpleName() +
+                            " → " +
+                            next.getClass().getSimpleName()
+                    );
+                }
+                c.setConfig(next);
+                return connectionRepository.save(c);
+            });
     }
 
     /**
@@ -292,10 +295,12 @@ public class ConnectionService {
      */
     @Transactional
     public Optional<Connection> rotateBearerToken(long workspaceId, IntegrationKind kind, BearerToken bundle) {
-        return findActive(workspaceId, kind).map(c -> {
-            c.setCredentials(bundle, credentialConverter);
-            return connectionRepository.save(c);
-        });
+        return connectionRepository
+            .findActive(workspaceId, kind)
+            .map(c -> {
+                c.setCredentials(bundle, credentialConverter);
+                return connectionRepository.save(c);
+            });
     }
 
     /**
@@ -325,7 +330,7 @@ public class ConnectionService {
             if (instanceKey.equals(existing.getInstanceKey())) {
                 continue;
             }
-            transition(
+            applyTransition(
                 existing,
                 new TransitionRequest(
                     IntegrationState.UNINSTALLED,
@@ -334,7 +339,8 @@ public class ConnectionService {
                     "github-install-" + installationId,
                     correlationId + "-retire-" + existing.getId(),
                     "Replaced by GitHub App installation " + installationId
-                )
+                ),
+                null
             );
         }
 
@@ -372,7 +378,7 @@ public class ConnectionService {
         }
 
         if (connection.getState() != IntegrationState.ACTIVE) {
-            connection = transition(
+            connection = applyTransition(
                 connection,
                 new TransitionRequest(
                     IntegrationState.ACTIVE,
@@ -381,7 +387,8 @@ public class ConnectionService {
                     "github-install-" + installationId,
                     correlationId,
                     "Linked workspace to GitHub App installation " + installationId
-                )
+                ),
+                null
             );
         }
 
@@ -410,7 +417,7 @@ public class ConnectionService {
             });
 
         if (connection.getState() != IntegrationState.ACTIVE) {
-            connection = transition(
+            connection = applyTransition(
                 connection,
                 new TransitionRequest(
                     IntegrationState.ACTIVE,
@@ -419,12 +426,14 @@ public class ConnectionService {
                     "scm-connection-provisioner",
                     correlationId,
                     "Provisioned PAT connection on workspace creation"
-                )
+                ),
+                null
             );
         }
 
         if (token != null && !token.isBlank()) {
-            rotateBearerToken(workspace.getId(), kind, new BearerToken(token, null));
+            connection.setCredentials(new BearerToken(token, null), credentialConverter);
+            connectionRepository.save(connection);
         }
     }
 
@@ -603,38 +612,8 @@ public class ConnectionService {
     }
 
     /**
-     * Runs the vendor revoke / provider-data erase in its own {@code REQUIRES_NEW} transaction and
-     * absorbs its failure, so "best effort, proceed locally" is actually reachable.
-     *
-     * <p><b>Why a nested transaction and not a plain try/catch.</b> The erasers
-     * ({@code ScmWorkspaceContentEraser}, {@code SlackWorkspaceContentEraser}, the Outline
-     * {@code deleteByWorkspaceId} sweep) are {@code @Transactional} with default {@code REQUIRED}
-     * propagation, so joining the lifecycle transaction would let a {@code DataAccessException} from any
-     * of them — an FK surprise, a statement timeout on a large mirror delete — mark the shared
-     * transaction rollback-only, and the commit would then fail with {@code UnexpectedRollbackException}
-     * even though the transition and audit row were written. Running the callback on its own transaction
-     * confines that poisoning to the callback; catching OUTSIDE the template also absorbs the
-     * {@code UnexpectedRollbackException} raised at the nested commit when a callback swallowed the
-     * failure internally.
-     *
-     * <p><b>Why this cannot deadlock against our own row lock.</b> We hold {@code SELECT … FOR UPDATE}
-     * on the {@code connection} row on the outer connection, and the nested transaction runs on a
-     * second pooled connection — so it must never wait on that row. It does not: no revoke path writes
-     * the {@code connection} row (both {@code OutlineWebhookRegistrar#deregister} and
-     * {@code GitLabWebhookService#deregisterActiveWebhook} refuse to rewrite config there), and the FK
-     * children they DO write are only ever deleted — {@code outline_document},
-     * {@code outline_collection} and {@code outline_document_event} carry a {@code connection_id}, but
-     * PostgreSQL runs no parent-side referential check on a child DELETE, so no {@code FOR KEY SHARE} is
-     * taken on the locked row. Plain reads of {@code connection} from the nested transaction (e.g.
-     * {@code findActiveBearerToken}) are MVCC snapshots and never block on {@code FOR UPDATE}. Adding a
-     * write of {@code connection} — or an INSERT into any table keyed on it — to a revoke path would
-     * break this and self-deadlock.
-     *
-     * <p><b>Accepted consequence.</b> Erase and transition are not atomic. A revoke that erases
-     * successfully still commits even if the transition afterwards fails (duplicate-correlation
-     * short-circuit, illegal transition), leaving erased data behind an ACTIVE connection. Every erase
-     * path is idempotent and the next disconnect re-runs it, so this is recoverable — and it is the
-     * direction to fail in, since the reverse strands the admin with a 500 and an ACTIVE connection.
+     * Isolates vendor revocation from the local lifecycle transition. A vendor failure rolls back its
+     * database work while the local transition proceeds, so the operation is intentionally non-atomic.
      */
     private void runRevokeIsolated(Connection connection, Runnable revoke) {
         try {

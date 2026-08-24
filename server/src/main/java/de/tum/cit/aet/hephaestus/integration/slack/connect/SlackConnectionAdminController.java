@@ -10,6 +10,7 @@ import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceScopedController;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import java.util.List;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
@@ -55,7 +56,7 @@ public class SlackConnectionAdminController {
     @AuditExempt(reason = "sends a message to verify delivery; stores no configuration")
     public SlackTestMessageResponseDTO sendTestMessage(
         WorkspaceContext workspace,
-        @RequestBody(required = false) @Nullable SlackTestMessageRequestDTO body
+        @Valid @RequestBody(required = false) @Nullable SlackTestMessageRequestDTO body
     ) {
         long workspaceId = workspace.id();
         String override = body == null ? null : body.channelId();

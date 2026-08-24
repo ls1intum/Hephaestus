@@ -40,6 +40,10 @@ public class ReviewBackfillCostEstimator {
      */
     @Transactional(readOnly = true)
     public @Nullable BigDecimal meanCostPerReviewUsd(Long workspaceId, AgentJobType jobType) {
+        return calculateMeanCostPerReviewUsd(workspaceId, jobType);
+    }
+
+    private @Nullable BigDecimal calculateMeanCostPerReviewUsd(Long workspaceId, AgentJobType jobType) {
         Instant to = Instant.now();
         Instant from = to.minus(properties.costHistoryWindow());
         LlmUsageEventRepository.ReviewCostAggregate row = usageRepository.aggregateCostPerReview(
@@ -59,8 +63,9 @@ public class ReviewBackfillCostEstimator {
     }
 
     /** The campaign's forecast, or {@code null} when the per-review cost is unknown. */
+    @Transactional(readOnly = true)
     public @Nullable BigDecimal estimateTotalUsd(Long workspaceId, AgentJobType jobType, int artifacts) {
-        BigDecimal perReview = meanCostPerReviewUsd(workspaceId, jobType);
+        BigDecimal perReview = calculateMeanCostPerReviewUsd(workspaceId, jobType);
         if (perReview == null) {
             return null;
         }

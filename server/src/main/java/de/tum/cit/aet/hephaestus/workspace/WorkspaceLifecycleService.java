@@ -90,6 +90,10 @@ public class WorkspaceLifecycleService {
      */
     @Transactional
     public Workspace suspendWorkspace(String workspaceSlug) {
+        return suspendWorkspaceInTransaction(workspaceSlug);
+    }
+
+    private Workspace suspendWorkspaceInTransaction(String workspaceSlug) {
         Workspace workspace = workspaceRepository
             .findByWorkspaceSlug(workspaceSlug)
             .orElseThrow(() -> new EntityNotFoundException("Workspace", workspaceSlug));
@@ -112,7 +116,7 @@ public class WorkspaceLifecycleService {
 
     @Transactional
     public Workspace suspendWorkspace(WorkspaceContext workspaceContext) {
-        return suspendWorkspace(requireSlug(workspaceContext));
+        return suspendWorkspaceInTransaction(requireSlug(workspaceContext));
     }
 
     /**
@@ -126,6 +130,10 @@ public class WorkspaceLifecycleService {
      */
     @Transactional
     public Workspace resumeWorkspace(String workspaceSlug) {
+        return resumeWorkspaceInTransaction(workspaceSlug);
+    }
+
+    private Workspace resumeWorkspaceInTransaction(String workspaceSlug) {
         Workspace workspace = workspaceRepository
             .findByWorkspaceSlug(workspaceSlug)
             .orElseThrow(() -> new EntityNotFoundException("Workspace", workspaceSlug));
@@ -148,12 +156,16 @@ public class WorkspaceLifecycleService {
 
     @Transactional
     public Workspace resumeWorkspace(WorkspaceContext workspaceContext) {
-        return resumeWorkspace(requireSlug(workspaceContext));
+        return resumeWorkspaceInTransaction(requireSlug(workspaceContext));
     }
 
     /** Purges an idle workspace. Repeated calls after a successful purge are no-ops. */
     @Transactional
     public Workspace purgeWorkspace(String workspaceSlug) {
+        return purgeWorkspaceInTransaction(workspaceSlug);
+    }
+
+    private Workspace purgeWorkspaceInTransaction(String workspaceSlug) {
         Workspace workspace = workspaceRepository
             .findByWorkspaceSlugForUpdate(workspaceSlug)
             .orElseThrow(() -> new EntityNotFoundException("Workspace", workspaceSlug));
@@ -208,7 +220,7 @@ public class WorkspaceLifecycleService {
 
     @Transactional
     public Workspace purgeWorkspace(WorkspaceContext workspaceContext) {
-        return purgeWorkspace(requireSlug(workspaceContext));
+        return purgeWorkspaceInTransaction(requireSlug(workspaceContext));
     }
 
     /**
@@ -237,9 +249,13 @@ public class WorkspaceLifecycleService {
      */
     @Transactional
     public Workspace updateStatus(String workspaceSlug, WorkspaceStatus targetStatus) {
+        return updateStatusInTransaction(workspaceSlug, targetStatus);
+    }
+
+    private Workspace updateStatusInTransaction(String workspaceSlug, WorkspaceStatus targetStatus) {
         return switch (targetStatus) {
-            case ACTIVE -> resumeWorkspace(workspaceSlug);
-            case SUSPENDED -> suspendWorkspace(workspaceSlug);
+            case ACTIVE -> resumeWorkspaceInTransaction(workspaceSlug);
+            case SUSPENDED -> suspendWorkspaceInTransaction(workspaceSlug);
             case PURGED -> throw new WorkspaceLifecycleViolationException(
                 "Workspaces cannot be purged via the status endpoint. Use DELETE /workspaces/{workspaceSlug} (requires the OWNER role)."
             );
@@ -248,7 +264,7 @@ public class WorkspaceLifecycleService {
 
     @Transactional
     public Workspace updateStatus(WorkspaceContext workspaceContext, WorkspaceStatus targetStatus) {
-        return updateStatus(requireSlug(workspaceContext), targetStatus);
+        return updateStatusInTransaction(requireSlug(workspaceContext), targetStatus);
     }
 
     private String requireSlug(WorkspaceContext workspaceContext) {
