@@ -4,37 +4,31 @@
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://pmd.sourceforge.net/ruleset/2.0.0 https://pmd.sourceforge.io/ruleset_2_0_0.xsd">
 
-    <description>
-        PMD ruleset for Hephaestus following industry best practices.
-        Run with: ./mvnw pmd:check or npm run lint:java
+    <description>Project PMD rules.</description>
 
-        Based on PMD Best Practices and Maven PMD Plugin defaults.
-        See: https://pmd.github.io/pmd/pmd_rules_java_bestpractices.html
-    </description>
+    <!-- Best practices -->
 
-    <!-- Exclude generated code -->
-    <exclude-pattern>.*/target/.*</exclude-pattern>
-
-    <!-- ====================================================================
-         BEST PRACTICES - High-value rules for code quality
-         ==================================================================== -->
-
-    <!-- Unused code detection -->
-    <rule ref="category/java/bestpractices.xml/UnusedPrivateField"/>
+    <rule ref="category/java/bestpractices.xml/UnusedPrivateField">
+        <!-- These type-level annotations do not imply that fields are used. -->
+        <properties>
+            <property name="reportForAnnotations"
+                      value="org.springframework.boot.autoconfigure.SpringBootApplication,
+                             org.springframework.boot.context.properties.ConfigurationPropertiesScan,
+                             org.springframework.cache.annotation.EnableCaching,
+                             org.springframework.resilience.annotation.EnableResilientMethods"/>
+        </properties>
+    </rule>
     <rule ref="category/java/bestpractices.xml/UnusedLocalVariable"/>
     <rule ref="category/java/bestpractices.xml/UnusedPrivateMethod"/>
 
-    <!-- Avoid common mistakes -->
     <rule ref="category/java/bestpractices.xml/AvoidReassigningParameters"/>
-    <rule ref="category/java/bestpractices.xml/DefaultLabelNotLastInSwitchStmt"/>
+    <rule ref="category/java/bestpractices.xml/DefaultLabelNotLastInSwitch"/>
     <rule ref="category/java/bestpractices.xml/MissingOverride"/>
     <rule ref="category/java/bestpractices.xml/PreserveStackTrace"/>
-    <rule ref="category/java/bestpractices.xml/SwitchStmtsShouldHaveDefault"/>
+    <rule ref="category/java/bestpractices.xml/NonExhaustiveSwitch"/>
     <rule ref="category/java/bestpractices.xml/UseCollectionIsEmpty"/>
 
-    <!-- ====================================================================
-         ERROR PRONE - Catch potential bugs early
-         ==================================================================== -->
+    <!-- Error prone -->
 
     <rule ref="category/java/errorprone.xml/AvoidDecimalLiteralsInBigDecimalConstructor"/>
     <rule ref="category/java/errorprone.xml/AvoidMultipleUnaryOperators"/>
@@ -48,42 +42,19 @@
     <rule ref="category/java/errorprone.xml/ReturnFromFinallyBlock"/>
     <rule ref="category/java/errorprone.xml/UnconditionalIfStatement"/>
     <rule ref="category/java/errorprone.xml/UnnecessaryConversionTemporary"/>
-    <rule ref="category/java/errorprone.xml/UselessOperationOnImmutable"/>
 
-    <!-- ====================================================================
-         DESIGN - Encourage maintainable code
-         ==================================================================== -->
-
+    <!-- Design -->
     <!--
-        SimplifyBooleanReturns is NOT enabled, deliberately.
-
-        The rule's original target is `if (c) { return true; } else { return false; }`. PMD 7 also
-        applies it to a guard clause followed by a return — `if (c) { return false; } return other;` —
-        and demands `return !c && other;`. Every site it flags in this tree is that second shape; the
-        two that were genuine tautologies (WorkspaceAccessService#canManageRole,
-        GitHubExceptionClassifier) were rewritten rather than excluded.
-
-        The sites that decide it are the guard TABLES: PrivateAddressGuard lists the non-public IPv4
-        ranges one per line, each with its CIDR in a trailing comment, and LogSafe does the same for
-        the Unicode control ranges. The rule flags only the last row of such a table and wants it fused
-        into the final `return`, which orphans a comment and breaks the alignment that makes the table
-        checkable against the RFC. Doing that inside an SSRF guard buys nothing and costs review
-        confidence. The rest are the same shape at smaller scale: a null check, an "unlimited means no
-        limit" check, an @AssertTrue whose constraint does not apply unless a flag is on.
-
-        Enable it again only if PMD narrows it back to the if/else form. To re-derive all of this, add
-        the rule and run `./mvnw pmd:pmd`; target/pmd.xml then lists every site it would fail on.
+        SimplifyBooleanReturns is omitted because it rewrites readable guard clauses into compound
+        expressions. Re-evaluate if its scope narrows to redundant if/else returns.
     -->
     <rule ref="category/java/design.xml/UselessOverridingMethod"/>
 
-    <!-- ====================================================================
-         CODE STYLE - Keep code clean
-         ==================================================================== -->
+    <!-- Code style -->
 
     <rule ref="category/java/codestyle.xml/UnnecessaryImport"/>
     <rule ref="category/java/codestyle.xml/ExtendsObject"/>
     <rule ref="category/java/codestyle.xml/UnnecessaryReturn"/>
-    <!-- PMD 7: EmptyControlStatement replaces EmptyIfStmt, EmptyWhileStmt, etc. -->
     <rule ref="category/java/codestyle.xml/EmptyControlStatement"/>
 
 </ruleset>

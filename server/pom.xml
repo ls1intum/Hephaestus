@@ -1126,7 +1126,6 @@
                     <failOnError>true</failOnError>
                 </configuration>
             </plugin>
-            <!-- PMD for static code analysis - detects unused fields, variables, and other code quality issues -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-pmd-plugin</artifactId>
@@ -1136,26 +1135,14 @@
                         <ruleset>${project.basedir}/pmd-ruleset.xml</ruleset>
                     </rulesets>
                     <targetJdk>${java.version}</targetJdk>
+                    <!--
+                        Test fixtures need a separate ruleset because reflection and injection make
+                        the production dead-code rules unsuitable for some test sources.
+                    -->
                     <includeTests>false</includeTests>
                     <linkXRef>false</linkXRef>
                     <printFailingErrors>true</printFailingErrors>
-                    <!--
-                        Never set this to false. `lint:java` runs pmd:check with -q, so with the gate
-                        disarmed PMD logs its findings at WARNING and still returns BUILD SUCCESS: the
-                        whole Java lint reports clean while violating whatever it likes. Argue a rule in
-                        pmd-ruleset.xml instead of disarming the gate.
-
-                        `lint:java` also runs `compile` first, because PMD resolves types off the
-                        compiled classes on its auxclasspath. Without them it cannot tell that an enum
-                        switch is exhaustive or that a wildcard import is used, and reports both.
-                    -->
                     <failOnViolation>true</failOnViolation>
-                    <!--
-                        The generated roots wholesale, not an enumerated list: annotation processors
-                        write Java under generated-sources/annotations, which a local run with the
-                        `quick` profile never produces — so a list that names only the codegen plugins'
-                        output passes locally and fails in CI.
-                    -->
                     <excludeRoots>
                         <excludeRoot>${project.build.directory}/generated-sources</excludeRoot>
                         <excludeRoot>${project.build.directory}/generated-test-sources</excludeRoot>
