@@ -435,7 +435,7 @@ export const SendingPaused: Story = {
 		await expect(canvas.getByText("Sending is paused")).toBeVisible();
 		await expect(canvas.getByRole("switch", { name: /Send feedback/ })).not.toBeChecked();
 		await expect(
-			canvas.getByText(/developers can still read their own feedback in Hephaestus/),
+			canvas.getByText(/proposals waiting for approval stay in your queue/),
 		).toBeVisible();
 	},
 };

@@ -30,6 +30,7 @@ import de.tum.cit.aet.hephaestus.practices.review.WorkspaceReviewDefaultsProvide
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
+import de.tum.cit.aet.hephaestus.workspace.settings.PracticeDeliveryStatus;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -100,6 +101,24 @@ class InContextDeliveryGateTest extends BaseUnitTest {
         );
 
         assertThat(gate.admitInContext(job(), List.of(observation("loud", "occ-1")))).isEmpty();
+    }
+
+    /**
+     * Pausing drops what would have been sent automatically, so resuming never releases a backlog at the
+     * developers. It deliberately does not empty the approval queue: a human reads each proposal before it
+     * goes anywhere, and the staleness and artifact checks still run when they decide.
+     */
+    @Test
+    void pausingSendingKeepsTheApprovalQueueForAHumanToDecideOn() {
+        Workspace paused = new Workspace();
+        paused.setId(WORKSPACE_ID);
+        paused.getReviewSettings().setDeliveryStatus(PracticeDeliveryStatus.PAUSED);
+        when(practiceRepository.findByWorkspaceId(WORKSPACE_ID)).thenReturn(
+            List.of(practice("measured", PracticeAutonomy.HUMAN_APPROVAL))
+        );
+        ValidatedObservation measured = observation("measured", "occ-1");
+
+        assertThat(gate().awaitingApproval(job(), List.of(measured))).containsExactly(measured);
     }
 
     @Test

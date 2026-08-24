@@ -686,8 +686,10 @@ function FeedbackDeliverySection({ policy }: Pick<PracticeReviewSettingsProps, "
 					<AlertTitle>Sending is paused</AlertTitle>
 					<AlertDescription>
 						Reviews still run, and developers can still read their own feedback in Hephaestus.
-						Nothing reaches a pull request or the mentor while this is paused, and resuming sends
-						only work reviewed afterwards — it does not release what was withheld.
+						Nothing reaches a pull request or the mentor. Feedback that would have been sent
+						automatically is dropped rather than queued, so resuming never releases a backlog at
+						your developers; proposals waiting for approval stay in your queue, and you decide on
+						them once you resume.
 					</AlertDescription>
 				</Alert>
 			) : null}
