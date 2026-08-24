@@ -147,6 +147,70 @@ class ApprovedFeedbackDeliveryListenerTest {
     }
 
     @Test
+    void shouldSanitizeTheApprovedProposalBeforeItReachesTheProvider() {
+        FeedbackRepository feedbackRepository = mock(FeedbackRepository.class);
+        FeedbackApprovalRepository approvalRepository = mock(FeedbackApprovalRepository.class);
+        AgentJobRepository jobRepository = mock(AgentJobRepository.class);
+        PracticeFeedbackDeliveryPolicy policy = mock(PracticeFeedbackDeliveryPolicy.class);
+        PullRequestCommentPoster poster = mock(PullRequestCommentPoster.class);
+        UUID feedbackId = UUID.randomUUID();
+        UUID jobId = UUID.randomUUID();
+        Feedback feedback = proposal(feedbackId, jobId, "Ask <script>alert(1)</script> @octocat about it.");
+        AgentJob job = agentJob();
+        when(feedbackRepository.lockByIdAndWorkspaceId(feedbackId, 7L)).thenReturn(Optional.of(feedback));
+        approve(approvalRepository, feedback);
+        when(jobRepository.findByIdAndWorkspaceId(jobId, 7L)).thenReturn(Optional.of(job));
+        when(policy.evaluatePullRequest(job)).thenReturn(
+            PracticeFeedbackDeliveryPolicy.Decision.allowed(new PullRequest())
+        );
+        when(poster.findApprovedProposal(job, feedbackId)).thenReturn(ExistingDeliveryLookup.absent());
+
+        new ApprovedFeedbackDeliveryListener(
+            feedbackRepository,
+            approvalRepository,
+            jobRepository,
+            policy,
+            poster,
+            eligible()
+        ).deliver(new ApprovedFeedbackReadyEvent(7L, feedbackId));
+
+        verify(poster).postApprovedProposal(job, feedbackId, "Ask alert(1) `@octocat` about it.");
+    }
+
+    @Test
+    void shouldSuppressRatherThanPostAProposalThatSanitizesToNothing() {
+        FeedbackRepository feedbackRepository = mock(FeedbackRepository.class);
+        FeedbackApprovalRepository approvalRepository = mock(FeedbackApprovalRepository.class);
+        AgentJobRepository jobRepository = mock(AgentJobRepository.class);
+        PracticeFeedbackDeliveryPolicy policy = mock(PracticeFeedbackDeliveryPolicy.class);
+        PullRequestCommentPoster poster = mock(PullRequestCommentPoster.class);
+        UUID feedbackId = UUID.randomUUID();
+        UUID jobId = UUID.randomUUID();
+        Feedback feedback = proposal(feedbackId, jobId, "LGTM");
+        AgentJob job = agentJob();
+        when(feedbackRepository.lockByIdAndWorkspaceId(feedbackId, 7L)).thenReturn(Optional.of(feedback));
+        approve(approvalRepository, feedback);
+        when(jobRepository.findByIdAndWorkspaceId(jobId, 7L)).thenReturn(Optional.of(job));
+        when(policy.evaluatePullRequest(job)).thenReturn(
+            PracticeFeedbackDeliveryPolicy.Decision.allowed(new PullRequest())
+        );
+        when(poster.findApprovedProposal(job, feedbackId)).thenReturn(ExistingDeliveryLookup.absent());
+
+        new ApprovedFeedbackDeliveryListener(
+            feedbackRepository,
+            approvalRepository,
+            jobRepository,
+            policy,
+            poster,
+            eligible()
+        ).deliver(new ApprovedFeedbackReadyEvent(7L, feedbackId));
+
+        verify(poster, never()).postApprovedProposal(any(), any(), any());
+        verify(feedbackRepository).markApprovedSuppressed(7L, feedbackId, "EMPTY_AFTER_SANITIZE");
+        verify(feedbackRepository, never()).markApprovedDelivered(7L, feedbackId);
+    }
+
+    @Test
     void shouldReconcileWithoutSecondPostWhenProviderAlreadyHasProposal() {
         FeedbackRepository feedbackRepository = mock(FeedbackRepository.class);
         FeedbackApprovalRepository approvalRepository = mock(FeedbackApprovalRepository.class);
@@ -266,6 +330,10 @@ class ApprovedFeedbackDeliveryListenerTest {
     }
 
     private static Feedback proposal(UUID feedbackId, UUID jobId) {
+        return proposal(feedbackId, jobId, "Exact proposal");
+    }
+
+    private static Feedback proposal(UUID feedbackId, UUID jobId, String body) {
         return Feedback.builder()
             .id(feedbackId)
             .agentJobId(jobId)
@@ -276,7 +344,7 @@ class ApprovedFeedbackDeliveryListenerTest {
             .channel(FeedbackChannel.IN_CONTEXT)
             .position(7_000)
             .deliveryState(FeedbackDeliveryState.PREPARED)
-            .body("Exact proposal")
+            .body(body)
             .source(FeedbackSource.AGENT)
             .build();
     }

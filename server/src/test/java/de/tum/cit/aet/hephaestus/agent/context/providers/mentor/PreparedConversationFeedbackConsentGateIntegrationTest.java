@@ -193,7 +193,8 @@ class PreparedConversationFeedbackConsentGateIntegrationTest extends AbstractSla
                         "On !18, !20 and !22 the test landed a push after the review comment.",
                         "Writing the test last is what leaves the review to find the gap.",
                         "On !18, !20 and !22 the test arrived a push later.",
-                        "They name a check they could run before pushing."
+                        "They name a check they could run before pushing.",
+                        null
                     ),
                     null
                 )
@@ -246,7 +247,8 @@ class PreparedConversationFeedbackConsentGateIntegrationTest extends AbstractSla
                 "The practice recurred.",
                 "Recognize the decision point.",
                 "The observations show the same pattern.",
-                "They can explain the decision in their own words."
+                "They can explain the decision in their own words.",
+                null
             ),
             null
         );

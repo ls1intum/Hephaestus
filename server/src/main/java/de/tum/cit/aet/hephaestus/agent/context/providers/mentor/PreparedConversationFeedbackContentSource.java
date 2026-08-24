@@ -146,6 +146,11 @@ public class PreparedConversationFeedbackContentSource implements ContentSource 
         notes.put("capability", brief.capability());
         notes.put("evidenceSummary", brief.evidenceSummary());
         notes.put("inConversationSignal", brief.inConversationSignal());
+        // Absent on a brief written before the field existed, and absent when nothing has been put to them
+        // yet. Either way the mentor is told nothing rather than told there is nothing.
+        if (brief.alreadySaid() != null) {
+            notes.put("alreadySaid", brief.alreadySaid());
+        }
     }
 
     /**

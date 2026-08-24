@@ -25,7 +25,7 @@ class ConversationBriefBodyTest extends BaseUnitTest {
     @DisplayName("every note survives the round trip, newlines and all")
     void roundTrips() {
         ConversationBriefBody.Brief brief = ConversationBriefBody.parse(
-            ConversationBriefBody.render(TITLE, SITUATION, COACHING_GOAL, EVIDENCE_SUMMARY, SUCCESS_SIGNAL)
+            ConversationBriefBody.render(TITLE, SITUATION, COACHING_GOAL, EVIDENCE_SUMMARY, SUCCESS_SIGNAL, null)
         );
 
         assertThat(brief).isNotNull();
@@ -92,7 +92,14 @@ class ConversationBriefBodyTest extends BaseUnitTest {
     @Test
     @DisplayName("a brief carries no in-app headline")
     void isNotAnInAppBody() {
-        String body = ConversationBriefBody.render(TITLE, SITUATION, COACHING_GOAL, EVIDENCE_SUMMARY, SUCCESS_SIGNAL);
+        String body = ConversationBriefBody.render(
+            TITLE,
+            SITUATION,
+            COACHING_GOAL,
+            EVIDENCE_SUMMARY,
+            SUCCESS_SIGNAL,
+            null
+        );
 
         assertThat(InAppFeedbackBody.headlineOf(body)).isNull();
         assertThat(ConversationBriefBody.isBrief(body)).isTrue();

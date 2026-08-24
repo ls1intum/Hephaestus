@@ -2,7 +2,6 @@ package de.tum.cit.aet.hephaestus.agent.handler;
 
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.config.ApplicationProperties;
-import java.time.Duration;
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
 import org.springframework.web.util.HtmlUtils;
@@ -56,12 +55,7 @@ class PracticeFeedbackCommentFormatter {
         if (modelName != null && !modelName.isBlank()) {
             sb.append(" &middot; ").append(HtmlUtils.htmlEscape(modelName));
         }
-        if (job.getStartedAt() != null && job.getCompletedAt() != null) {
-            sb.append(" &middot; ").append(formatDuration(Duration.between(job.getStartedAt(), job.getCompletedAt())));
-        }
-
-        sb.append("</sub>\n");
-        sb.append("<sub>AI-generated feedback can be inaccurate. React with 👍 or 👎 to give feedback.</sub>\n");
+        sb.append(" &middot; AI-generated and can be inaccurate. React with 👍 or 👎 to give feedback.</sub>\n");
     }
 
     @Nullable
@@ -71,15 +65,5 @@ class PracticeFeedbackCommentFormatter {
         }
         JsonNode model = configSnapshot.path("upstreamModelId");
         return model.isString() ? model.asString() : null;
-    }
-
-    private static String formatDuration(Duration duration) {
-        long totalSeconds = Math.max(0, duration.toSeconds());
-        if (totalSeconds < 60) {
-            return totalSeconds + "s";
-        }
-        long minutes = totalSeconds / 60;
-        long seconds = totalSeconds % 60;
-        return minutes + "m " + seconds + "s";
     }
 }

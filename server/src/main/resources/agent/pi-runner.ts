@@ -930,6 +930,63 @@ interface ConversationNotes {
 	capability?: string;
 	evidenceSummary?: string;
 	inConversationSignal?: string;
+	alreadySaid?: string;
+}
+
+const LEAD_MAX_LENGTH = 240;
+
+interface ReportSummaryDetails {
+	stored: number;
+}
+
+function buildSummaryTool() {
+	const refuse = (text: string): Promise<AgentToolResult<ReportSummaryDetails>> =>
+		Promise.resolve({ content: [{ type: "text", text }], details: { stored: 0 } });
+
+	return defineTool({
+		name: "report_summary",
+		label: "Report Summary",
+		description:
+			"Write how this review opens, in your own words. One call, no counts, no quotes. Skip it and " +
+			"the review opens on its first finding.",
+		parameters: {
+			type: "object",
+			additionalProperties: false,
+			required: ["lead"],
+			properties: {
+				lead: {
+					type: "string",
+					minLength: 1,
+					maxLength: LEAD_MAX_LENGTH,
+					description: "One or two sentences orienting the reader in this change.",
+				},
+			},
+		},
+		execute: (_toolCallId, params): Promise<AgentToolResult<ReportSummaryDetails>> => {
+			if (!compositionAdmitted) {
+				return refuse(
+					"Feedback composition opens only after Java admits the completed observations.",
+				);
+			}
+			const trimmed = optionalString((params as { lead?: unknown }).lead)?.trim() ?? "";
+			if (!trimmed) {
+				return refuse("A lead needs one or two sentences; skip the call instead.");
+			}
+			// Truncating mid-word would ship the cut to the reader, so an over-long lead is sent back to be
+			// rewritten, as an over-long feedback unit is.
+			if (trimmed.length > LEAD_MAX_LENGTH) {
+				return refuse(
+					`A lead is at most ${LEAD_MAX_LENGTH} characters; this one is ${trimmed.length}.`,
+				);
+			}
+			composedFeedback.lead = trimmed;
+			persistComposedFeedback();
+			return Promise.resolve({
+				content: [{ type: "text", text: "Stored the opening line." }],
+				details: { stored: 1 },
+			});
+		},
+	});
 }
 
 /**
@@ -979,6 +1036,7 @@ interface ComposedFeedback extends ComposedFeedbackEnvelope {
 	observations: LeanObservation[];
 	preparedThreadKeys: string[];
 	units: FeedbackUnit[];
+	lead: string | null;
 }
 
 // Echo the exact composition inputs so Java validates references against the same snapshot.
@@ -987,6 +1045,7 @@ const composedFeedback: ComposedFeedback = {
 	observations: [],
 	preparedThreadKeys: [],
 	units: [],
+	lead: null,
 };
 
 /**
@@ -1244,6 +1303,12 @@ function buildFeedbackTool(
 									description:
 										"A sign detectable before the conversation ends: a distinction, decision, question, or self-check the developer can articulate. Not a promise, future artifact, message text, or compliance target.",
 								},
+								alreadySaid: {
+									type: "string",
+									maxLength: 2000,
+									description:
+										"Optional. Where this has already been put to the developer and what has moved without help, from the feedback history. Omit it when the history has nothing on this practice: absent means nothing has been said yet, which the mentor reads differently from nothing to say.",
+								},
 							},
 						},
 						placement: {
@@ -1352,6 +1417,7 @@ function asFeedbackUnit(value: unknown): FeedbackUnit | null {
 				capability: optionalString(value.notes.capability),
 				evidenceSummary: optionalString(value.notes.evidenceSummary),
 				inConversationSignal: optionalString(value.notes.inConversationSignal),
+				alreadySaid: optionalString(value.notes.alreadySaid),
 			}
 		: undefined;
 	const placement = isRecord(value.placement)
@@ -1499,8 +1565,9 @@ function buildCompositionTurn(
 		`therefore carry a note on the work. Read that file first, then the history.\n\n` +
 		`Lanes open this turn: ${lanes}.${closedNote}${placementNote}` +
 		`\nA pattern claim needs at least ${request.minDistinctArtifacts} distinct pieces of work.\n\n` +
-		`Persist each unit with report_feedback as soon as it is ready. Writing nothing on a lane is a ` +
-		`correct and common outcome; say in one line why, and stop.`
+		`Persist each unit with report_feedback as soon as it is ready, and call report_summary once for ` +
+		`how the review opens. Writing nothing on a lane is a correct and common outcome; say in one line ` +
+		`why, and stop.`
 	);
 }
 
@@ -1588,9 +1655,12 @@ async function main() {
 			"bash",
 			"grep",
 			"report_observation",
-			...(feedbackTool ? ["report_feedback"] : []),
+			...(feedbackTool ? ["report_feedback", "report_summary"] : []),
 		],
-		customTools: [reportObservationTool, ...(feedbackTool ? [feedbackTool] : [])],
+		customTools: [
+			reportObservationTool,
+			...(feedbackTool ? [feedbackTool, buildSummaryTool()] : []),
+		],
 		sessionManager,
 		settingsManager,
 		authStorage,

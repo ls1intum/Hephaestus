@@ -12,10 +12,7 @@ import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationTrendService;
 import de.tum.cit.aet.hephaestus.practices.observation.TrendDelta;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties;
-import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
-import java.util.stream.Collectors;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -51,10 +48,6 @@ class FeedbackDeliveryService {
         this.commentFormatter = commentFormatter;
     }
 
-    void deliverFeedback(AgentJob job, @Nullable DeliveryContent delivery) {
-        deliverFeedback(job, delivery, null);
-    }
-
     void recordProposal(
         AgentJob job,
         @Nullable DeliveryContent delivery,
@@ -67,17 +60,7 @@ class FeedbackDeliveryService {
         return commentPoster.findExistingSummaryComment(job);
     }
 
-    @FunctionalInterface
-    interface InlineAwareSummaryComposer {
-        @Nullable
-        String compose(Set<String> deliveredObservationFingerprints);
-    }
-
-    void deliverFeedback(
-        AgentJob job,
-        @Nullable DeliveryContent delivery,
-        @Nullable InlineAwareSummaryComposer summaryComposer
-    ) {
+    void deliverFeedback(AgentJob job, @Nullable DeliveryContent delivery) {
         if (delivery == null) {
             log.debug("No delivery content, skipping: jobId={}", job.getId());
             return;
@@ -95,7 +78,7 @@ class FeedbackDeliveryService {
         }
 
         try {
-            doDeliverEligible(job, delivery, summaryComposer, decision.artifact());
+            doDeliverEligible(job, delivery, decision.artifact());
         } catch (JobDeliverySuppressedException e) {
             log.info("Delivery suppressed at egress: jobId={}", job.getId());
             recordGateSuppressed(job, delivery, FeedbackSuppressionReason.INSTANCE_SILENCED);
@@ -124,12 +107,7 @@ class FeedbackDeliveryService {
         }
     }
 
-    private void doDeliverEligible(
-        AgentJob job,
-        DeliveryContent delivery,
-        @Nullable InlineAwareSummaryComposer summaryComposer,
-        PullRequest pullRequest
-    ) {
+    private void doDeliverEligible(AgentJob job, DeliveryContent delivery, PullRequest pullRequest) {
         TrendDelta trend = reviewProperties.progressFooter()
             ? observationTrendService
                   .computeForTarget(ArtifactKinds.PULL_REQUEST, pullRequest.getId(), job.getWorkspace().getId())
@@ -152,9 +130,6 @@ class FeedbackDeliveryService {
         }
         List<InlineFeedbackChannel.DeliveredSignal> inlineSignals = inlineResult.signals();
 
-        if (summaryOutcome == SummaryOutcome.DELIVERED && !inlineResult.suppressed()) {
-            reEditSummaryWithSignals(job, summaryComposer, inlineSignals, trend);
-        }
         boolean inlineDelivered = inlineResult.posted() > 0;
         if (inlineResult.suppressed() && summaryOutcome != SummaryOutcome.DELIVERED && !inlineDelivered) {
             recordGateSuppressed(job, delivery, FeedbackSuppressionReason.INSTANCE_SILENCED);
@@ -240,7 +215,6 @@ class FeedbackDeliveryService {
     private enum SummaryOutcome {
         DELIVERED,
         NOT_REQUIRED,
-        TRANSIENT_NOOP,
         SKIPPED_EMPTY,
     }
 
@@ -257,120 +231,19 @@ class FeedbackDeliveryService {
         String footer = ProgressFooterRenderer.render(trend);
         String body = footer.isEmpty() ? sanitized : sanitized + "\n\n" + footer;
         String formatted = commentFormatter.format(body, job);
-        String priorRef = feedbackLedgerRecorder.priorLiveSummaryRef(job).orElse(null);
-        PullRequestCommentPoster.UpdateResult update =
-            priorRef == null ? null : commentPoster.updateFormattedBody(job, priorRef, formatted);
 
-        if (update != null && update.kind() == PullRequestCommentPoster.UpdateResult.Kind.TRANSIENT) {
-            // A transient edit failure must not create a duplicate summary.
-            job.setDeliveryCommentId(priorRef);
-            log.warn(
-                "Summary edit transient — kept prior summary, no fresh post: jobId={}, commentId={}",
-                job.getId(),
-                priorRef
-            );
-            return SummaryOutcome.TRANSIENT_NOOP;
-        }
-
-        boolean editedInPlace = update != null && update.kind() == PullRequestCommentPoster.UpdateResult.Kind.EDITED;
-        String commentId = editedInPlace ? update.externalId() : commentPoster.postFormattedBody(job, formatted);
+        // A review that has been posted stays as it was written. A later look at the same change leaves a
+        // new comment beside it, the way a person would, and the composer is told what it already said so
+        // the new one reads as a second visit rather than a repeat.
+        String commentId = commentPoster.postFormattedBody(job, formatted);
         if (commentId == null) {
             throw new JobDeliveryException(
                 "Summary note post returned no comment id despite a non-empty body: jobId=" + job.getId()
             );
         }
         job.setDeliveryCommentId(commentId);
-        log.info(
-            "Practice summary note delivered: jobId={}, commentId={}, editedInPlace={}",
-            job.getId(),
-            commentId,
-            editedInPlace
-        );
-        if (editedInPlace && trend != null && trend.hasMeaningfulChange()) {
-            postReReviewPing(job, trend);
-        }
+        log.info("Practice summary note delivered: jobId={}, commentId={}", job.getId(), commentId);
         return SummaryOutcome.DELIVERED;
-    }
-
-    private void reEditSummaryWithSignals(
-        AgentJob job,
-        @Nullable InlineAwareSummaryComposer summaryComposer,
-        List<InlineFeedbackChannel.DeliveredSignal> inlineSignals,
-        @Nullable TrendDelta trend
-    ) {
-        String summaryRef = job.getDeliveryCommentId();
-        if (summaryComposer == null || summaryRef == null) {
-            return;
-        }
-        Set<String> deliveredKeys = inlineSignals
-            .stream()
-            .filter(signal -> signal.disposition() != InlineFeedbackChannel.Disposition.FAILED)
-            .map(InlineFeedbackChannel.DeliveredSignal::recurrenceKey)
-            .filter(key -> key != null && !key.isBlank())
-            .collect(Collectors.toSet());
-        if (deliveredKeys.isEmpty()) {
-            return;
-        }
-
-        String demoted = summaryComposer.compose(deliveredKeys);
-        if (demoted == null) {
-            return;
-        }
-        String sanitized = PullRequestCommentPoster.sanitize(demoted);
-        if (sanitized.isBlank()) {
-            return;
-        }
-        String footer = ProgressFooterRenderer.render(trend);
-        String body = footer.isEmpty() ? sanitized : sanitized + "\n\n" + footer;
-        String formatted = commentFormatter.format(body, job);
-
-        try {
-            PullRequestCommentPoster.UpdateResult update = commentPoster.updateFormattedBody(
-                job,
-                summaryRef,
-                formatted
-            );
-            if (update.kind() == PullRequestCommentPoster.UpdateResult.Kind.EDITED) {
-                log.info(
-                    "Summary demoted in place after inline delivery: jobId={}, commentId={}",
-                    job.getId(),
-                    summaryRef
-                );
-            } else {
-                log.debug(
-                    "Summary demotion did not land ({}); keeping full-line summary: jobId={}",
-                    update.kind(),
-                    job.getId()
-                );
-            }
-        } catch (RuntimeException e) {
-            log.warn("Summary demotion failed (delivery unaffected): jobId={}, error={}", job.getId(), e.getMessage());
-        }
-    }
-
-    private void postReReviewPing(AgentJob job, TrendDelta trend) {
-        List<String> parts = new ArrayList<>();
-        if (trend.countResolved() > 0) {
-            parts.add(trend.countResolved() + " resolved");
-        }
-        if (trend.countNew() > 0) {
-            parts.add(trend.countNew() + " new");
-        }
-        if (trend.countRegressed() > 0) {
-            parts.add(trend.countRegressed() + " slipped back");
-        }
-        String body =
-            "<!-- hephaestus:re-review-ping:" +
-            job.getId() +
-            " -->\n🔁 **Re-reviewed** — " +
-            String.join(", ", parts) +
-            ". See the updated review summary above.";
-        try {
-            String pingId = commentPoster.postFormattedBody(job, body);
-            log.info("Re-review ping posted: jobId={}, pingCommentId={}", job.getId(), pingId);
-        } catch (RuntimeException e) {
-            log.warn("Re-review ping failed (delivery unaffected): jobId={}, error={}", job.getId(), e.getMessage());
-        }
     }
 
     private DiffNotePoster.DiffNoteResult postDiffNotes(AgentJob job, DeliveryContent delivery) {

@@ -41,7 +41,7 @@ class PullRequestCommentPoster {
      *  Lookbehind covers start-of-line, whitespace, punctuation, and markdown formatting chars
      *  ({@code * _ ~ > | -}) to prevent bypass via {@code *@user*}, {@code >@user}, or {@code - @user}. */
     private static final Pattern AT_MENTION = Pattern.compile(
-        "(?<=^|[\\s(\\[\"'*_~>|#!+={}\\-])@([a-zA-Z0-9][-a-zA-Z0-9._]*)",
+        "(?<=^|[\\s(\\[\"'*_~>|#!+={}\\-,.:;/)])@([a-zA-Z0-9][-a-zA-Z0-9._]*)",
         Pattern.MULTILINE
     );
 
@@ -406,6 +406,8 @@ class PullRequestCommentPoster {
         result = result.replace("\r\n", "\n").replace("\r", "\n");
         result = INVISIBLE_CHARS.matcher(result).replaceAll("");
         result = HTML_COMMENT.matcher(result).replaceAll("");
+        // An unterminated opener matches nothing above, and runs to end of document in both renderers.
+        result = result.replace("<!--", "");
 
         // Autolinks become plain links first, so the tag stripping below does not eat them.
         result = AUTOLINK.matcher(result).replaceAll("$1");
@@ -438,11 +440,56 @@ class PullRequestCommentPoster {
         result = EXCESSIVE_NEWLINES.matcher(result).replaceAll("\n\n");
 
         result = result.strip();
-        if (result.length() > MAX_BODY_LENGTH) {
-            result = result.substring(0, MAX_BODY_LENGTH) + "\n\n[... truncated — comment exceeded length limit]";
+        boolean truncated = result.length() > MAX_BODY_LENGTH;
+        if (truncated) {
+            result = result.substring(0, MAX_BODY_LENGTH);
+        }
+        // Last, because the cut above can reopen a block that was balanced upstream, and because everything
+        // below an open fence renders as code — including the AI-generated disclosure this comment carries.
+        result = balanceCodeFences(result);
+        if (truncated) {
+            result += "\n\n[... truncated — comment exceeded length limit]";
         }
 
         return result;
+    }
+
+    /**
+     * Closes a fenced block the body leaves open. Counting fences is not enough: CommonMark ends a block
+     * only on a fence of the same character and at least the opening length that carries no info string, so
+     * an inner fence is content, a `~~~` is a fence, and an indented line is not one.
+     */
+    static String balanceCodeFences(String text) {
+        char openChar = 0;
+        int openLength = 0;
+        for (String line : text.split("\n", -1)) {
+            String stripped = line.stripLeading();
+            if (line.length() - stripped.length() >= 4 || stripped.isEmpty()) {
+                continue;
+            }
+            char marker = stripped.charAt(0);
+            if (marker != '`' && marker != '~') {
+                continue;
+            }
+            int run = 0;
+            while (run < stripped.length() && stripped.charAt(run) == marker) {
+                run++;
+            }
+            if (run < 3) {
+                continue;
+            }
+            String info = stripped.substring(run);
+            if (openLength == 0) {
+                if (marker == '`' && info.indexOf('`') >= 0) {
+                    continue;
+                }
+                openChar = marker;
+                openLength = run;
+            } else if (marker == openChar && run >= openLength && info.isBlank()) {
+                openLength = 0;
+            }
+        }
+        return openLength == 0 ? text : text + "\n" + String.valueOf(openChar).repeat(openLength);
     }
 
     static String requireMetadataText(@Nullable JsonNode metadata, String field) {

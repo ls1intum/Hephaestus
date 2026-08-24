@@ -95,8 +95,19 @@ class ApprovedFeedbackDeliveryListener {
             return;
         }
         if (existing.kind() == ExistingDeliveryLookup.Kind.ABSENT) {
+            String sanitized = PullRequestCommentPoster.sanitize(feedback.getBody());
+            // A provider rejects an empty comment, and the resulting exception would escape this listener and
+            // strand the approval in PREPARED with nothing to retry it.
+            if (sanitized.isBlank()) {
+                feedbackRepository.markApprovedSuppressed(
+                    event.workspaceId(),
+                    feedback.getId(),
+                    FeedbackSuppressionReason.EMPTY_AFTER_SANITIZE.name()
+                );
+                return;
+            }
             try {
-                commentPoster.postApprovedProposal(job, feedback.getId(), feedback.getBody());
+                commentPoster.postApprovedProposal(job, feedback.getId(), sanitized);
             } catch (JobDeliverySuppressedException exception) {
                 feedbackRepository.markApprovedSuppressed(
                     event.workspaceId(),

@@ -86,17 +86,28 @@ class AgentVocabularySyncTest extends BaseUnitTest {
         List<String> javaFields = Arrays.stream(ComposedFeedbackUnit.ConversationBrief.class.getRecordComponents())
             .map(component -> component.getName())
             .toList();
+        // A component the record allows to be null is a field the runner may omit, so it belongs in the
+        // schema's properties but not in its required list. Keeping it out of both would let the two
+        // vocabularies drift apart silently, which is the whole point of this test.
+        List<String> requiredFields = Arrays.stream(ComposedFeedbackUnit.ConversationBrief.class.getRecordComponents())
+            .filter(
+                component -> component.getAnnotatedType().getAnnotation(org.jspecify.annotations.Nullable.class) == null
+            )
+            .map(component -> component.getName())
+            .toList();
         String required =
             "required: [" +
-            javaFields
+            requiredFields
                 .stream()
                 .map(field -> "\"" + field + "\"")
                 .collect(java.util.stream.Collectors.joining(", ")) +
             "]";
 
-        assertThat(Files.readString(RUNNER, StandardCharsets.UTF_8))
-            .as("pi-runner.ts conversation-note schema vs ConversationBrief")
-            .contains(required);
+        String runner = Files.readString(RUNNER, StandardCharsets.UTF_8);
+        assertThat(runner).as("pi-runner.ts conversation-note schema vs ConversationBrief").contains(required);
+        assertThat(javaFields)
+            .as("every note field the record carries is declared in the runner schema")
+            .allSatisfy(field -> assertThat(runner).contains(field + ": {"));
         assertThat(Files.readString(resolveResource("agent/feedback-composer.md"), StandardCharsets.UTF_8))
             .as("feedback-composer.md conversation-note shape vs ConversationBrief")
             .contains("notes: { " + String.join(", ", javaFields) + " }");

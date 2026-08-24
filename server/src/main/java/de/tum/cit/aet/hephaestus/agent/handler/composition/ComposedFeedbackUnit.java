@@ -89,7 +89,8 @@ public record ComposedFeedbackUnit(
         String situation,
         String capability,
         String evidenceSummary,
-        String inConversationSignal
+        String inConversationSignal,
+        @Nullable String alreadySaid
     ) {
         public ConversationBrief {
             requirePresent(situation, "situation");

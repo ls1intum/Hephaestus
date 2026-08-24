@@ -25,13 +25,15 @@ public final class ConversationBriefBody {
      * @param capability the useful understanding or behaviour the conversation should support
      * @param evidenceSummary a concise account of the evidence grounding the note
      * @param inConversationSignal an observable sign that the conversation helped
+     * @param alreadySaid where this has already been put to the developer, and what has moved without help
      */
     public record Brief(
         String title,
         String situation,
         String capability,
         String evidenceSummary,
-        String inConversationSignal
+        String inConversationSignal,
+        @Nullable String alreadySaid
     ) {}
 
     public static String render(
@@ -39,7 +41,8 @@ public final class ConversationBriefBody {
         String situation,
         String capability,
         String evidenceSummary,
-        String inConversationSignal
+        String inConversationSignal,
+        @Nullable String alreadySaid
     ) {
         ObjectNode node = MAPPER.createObjectNode();
         node.put("kind", KIND);
@@ -48,6 +51,11 @@ public final class ConversationBriefBody {
         node.put("capability", capability);
         node.put("evidenceSummary", evidenceSummary);
         node.put("inConversationSignal", inConversationSignal);
+        // Absent on every brief written before this field existed, and absent whenever nothing has been
+        // said yet, which are different things the reader can tell apart from the rest of the note.
+        if (alreadySaid != null && !alreadySaid.isBlank()) {
+            node.put("alreadySaid", alreadySaid);
+        }
         return node.toString();
     }
 
@@ -70,7 +78,14 @@ public final class ConversationBriefBody {
         ) {
             return null;
         }
-        return new Brief(title, situation, capability, evidenceSummary, inConversationSignal);
+        return new Brief(
+            title,
+            situation,
+            capability,
+            evidenceSummary,
+            inConversationSignal,
+            text(node, "alreadySaid")
+        );
     }
 
     public static boolean isBrief(@Nullable String body) {
