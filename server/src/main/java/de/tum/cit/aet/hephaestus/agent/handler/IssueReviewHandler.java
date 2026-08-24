@@ -10,6 +10,7 @@ import de.tum.cit.aet.hephaestus.agent.context.InsufficientEvidenceException;
 import de.tum.cit.aet.hephaestus.agent.context.PreparedEvidence;
 import de.tum.cit.aet.hephaestus.agent.context.WorkspaceContextBuilder;
 import de.tum.cit.aet.hephaestus.agent.handler.composition.ComposedFeedbackUnit;
+import de.tum.cit.aet.hephaestus.agent.handler.composition.FeedbackCompositionInputs;
 import de.tum.cit.aet.hephaestus.agent.handler.composition.FeedbackCompositionResultParser;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.ExistingDeliveryLookup;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException;
@@ -191,7 +192,13 @@ public class IssueReviewHandler implements JobTypeHandler {
         files.put(SandboxLayout.TASK_ENVELOPE_FILENAME, taskEnvelopeWriter.write(buildTaskEnvelope(job, metadata)));
         practiceCatalogInjector.inject(files, job, ArtifactKinds.ISSUE, practices);
         // See PullRequestReviewHandler: a second, separate turn composes this developer's feedback once
-        // the measurements are final — here for the two longitudinal lanes only, per ISSUE_REVIEW_CHANNELS.
+        // the measurements are final. An issue has no diff, so the note it may place is artifact-level.
+        FeedbackCompositionInputs.stage(
+            files,
+            PracticeDetectionDeliveryService.originOf(metadata),
+            ISSUE_REVIEW_CHANNELS,
+            EnumSet.of(FeedbackCompositionInputs.InContextPlacementKind.ARTIFACT)
+        );
         log.info(
             "Issue context preparation complete: {} files, issueNumber={}, jobId={}",
             files.size(),

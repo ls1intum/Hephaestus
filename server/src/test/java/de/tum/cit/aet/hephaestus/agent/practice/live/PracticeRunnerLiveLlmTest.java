@@ -72,7 +72,10 @@ class PracticeRunnerLiveLlmTest {
     ).toAbsolutePath();
 
     /** The runner reads/writes here verbatim; we own the directory for the duration of one test. */
-    private static final Path WORKSPACE = Path.of("/workspace").toAbsolutePath();
+    // Somewhere writable, rather than a root-owned /workspace this harness may not be able to create.
+    private static final Path WORKSPACE = Path.of(
+        System.getenv().getOrDefault("PI_RUNNER_CWD", "/workspace")
+    ).toAbsolutePath();
 
     /** Wall-clock cap for the whole runner — initial + retry budgets are derived from this. */
     private static final long AGENT_BUDGET_MS = 240_000L;
@@ -333,6 +336,8 @@ class PracticeRunnerLiveLlmTest {
         // PullRequestContentSource materialises in production.
         Path contextDir = WORKSPACE.resolve(SandboxLayout.CONTEXT_PREFIX);
         Files.createDirectories(contextDir);
+        // Every citation is checked against this; the runner refuses to start without it.
+        copyFixture("manifest.json", WORKSPACE.resolve("inputs").resolve("manifest.json"));
         copyFixture("diff.patch", contextDir.resolve("diff.patch"));
         copyFixture("metadata.json", contextDir.resolve("metadata.json"));
         copyFixture("comments.json", contextDir.resolve("comments.json"));
@@ -411,6 +416,8 @@ class PracticeRunnerLiveLlmTest {
         env.put("PATH", path);
         env.put("HOME", WORKSPACE.resolve(".home").toString());
         env.put("LANG", "C.UTF-8");
+        // The only name carried through the clear() above.
+        env.put("PI_RUNNER_CWD", WORKSPACE.toString());
         env.put("LLM_PROXY_URL", creds.baseUrl());
         env.put("LLM_PROXY_TOKEN", creds.apiKey());
         // PI_CODING_AGENT_DIR points Pi at our staged extension + settings, away from ~/.pi.
