@@ -78,8 +78,7 @@ class FeedbackLedgerRecorderTest extends BaseUnitTest {
             feedbackObservationRepository,
             feedbackPlacementRepository,
             eventPublisher,
-            egressGuard,
-            mock(org.springframework.transaction.PlatformTransactionManager.class)
+            egressGuard
         );
     }
 

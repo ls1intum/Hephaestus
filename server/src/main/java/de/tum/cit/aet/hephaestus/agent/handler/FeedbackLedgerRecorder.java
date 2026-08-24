@@ -44,10 +44,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Records the delivered-feedback LEDGER (ADR 0021): after the hardened delivery path posts the MR/issue
@@ -121,7 +119,6 @@ public class FeedbackLedgerRecorder {
     private final FeedbackPlacementRepository feedbackPlacementRepository;
     private final ApplicationEventPublisher eventPublisher;
     private final OutboundEgressGuard egressGuard;
-    private final TransactionTemplate requiresNewTransaction;
 
     FeedbackLedgerRecorder(
         ObservationRepository observationRepository,
@@ -129,8 +126,7 @@ public class FeedbackLedgerRecorder {
         FeedbackObservationRepository feedbackObservationRepository,
         FeedbackPlacementRepository feedbackPlacementRepository,
         ApplicationEventPublisher eventPublisher,
-        OutboundEgressGuard egressGuard,
-        PlatformTransactionManager transactionManager
+        OutboundEgressGuard egressGuard
     ) {
         this.observationRepository = observationRepository;
         this.feedbackRepository = feedbackRepository;
@@ -138,8 +134,6 @@ public class FeedbackLedgerRecorder {
         this.feedbackPlacementRepository = feedbackPlacementRepository;
         this.eventPublisher = eventPublisher;
         this.egressGuard = egressGuard;
-        this.requiresNewTransaction = new TransactionTemplate(transactionManager);
-        this.requiresNewTransaction.setPropagationBehavior(Propagation.REQUIRES_NEW.value());
     }
 
     /** Records a delivery whose summary landed. */
@@ -705,9 +699,7 @@ public class FeedbackLedgerRecorder {
             return; // nothing to post on the work; the lanes above are already awake
         }
         if (!deliveryAllowed()) {
-            requiresNewTransaction.executeWithoutResult(ignored ->
-                recordSuppressedUnitInCurrentTransaction(job, delivery, FeedbackSuppressionReason.INSTANCE_SILENCED)
-            );
+            recordSuppressedUnitInCurrentTransaction(job, delivery, FeedbackSuppressionReason.INSTANCE_SILENCED);
             return;
         }
         if (feedbackRepository.existsByAgentJobIdAndPosition(job.getId(), UNDELIVERED_UNIT_ORDINAL)) {

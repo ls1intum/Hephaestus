@@ -57,10 +57,6 @@ public class CuratedCatalogService {
 
     @Transactional(readOnly = true)
     public CatalogEntry<AreaDefinition> area(String slug) {
-        return loadArea(slug);
-    }
-
-    private CatalogEntry<AreaDefinition> loadArea(String slug) {
         return loadCatalog()
             .area(slug)
             .orElseThrow(() -> new EntityNotFoundException(CATALOG_AREA, slug));
@@ -234,7 +230,9 @@ public class CuratedCatalogService {
         CuratedAreaOverride override = new CuratedAreaOverride(slug, now);
         override.write(definition, null, now);
         areaOverrides.save(override);
-        CatalogEntry<AreaDefinition> created = loadArea(slug);
+        CatalogEntry<AreaDefinition> created = loadCatalog()
+            .area(slug)
+            .orElseThrow(() -> new EntityNotFoundException(CATALOG_AREA, slug));
         configAudit.record(
             ConfigAuditEntry.instanceCreated(
                 ConfigAuditEntityType.CURATED_PRACTICE_AREA,
@@ -470,7 +468,9 @@ public class CuratedCatalogService {
     }
 
     private CatalogEntry<AreaDefinition> recordArea(String slug, CatalogEntry<AreaDefinition> before) {
-        CatalogEntry<AreaDefinition> after = loadArea(slug);
+        CatalogEntry<AreaDefinition> after = loadCatalog()
+            .area(slug)
+            .orElseThrow(() -> new EntityNotFoundException(CATALOG_AREA, slug));
         configAudit.record(
             ConfigAuditEntry.instanceUpdated(
                 ConfigAuditEntityType.CURATED_PRACTICE_AREA,

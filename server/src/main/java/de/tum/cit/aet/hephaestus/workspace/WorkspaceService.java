@@ -14,7 +14,6 @@ import de.tum.cit.aet.hephaestus.workspace.dto.UpdateWorkspaceFeaturesRequestDTO
 import de.tum.cit.aet.hephaestus.workspace.events.WorkspaceCreatedEvent;
 import de.tum.cit.aet.hephaestus.workspace.exception.*;
 import de.tum.cit.aet.hephaestus.workspace.settings.WorkspaceTeamSettingsService;
-import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -77,7 +76,7 @@ public class WorkspaceService {
     private final WorkspaceMembershipService workspaceMembershipService;
     private final ConnectionService connectionService;
 
-    /** Fires {@link WorkspaceCreatedEvent} after workspace commit; vendor adapters subscribe. */
+    /** Notifies subscribers when a workspace is created. */
     private final ApplicationEventPublisher eventPublisher;
     private final TransactionTemplate transactionTemplate;
 
@@ -107,32 +106,6 @@ public class WorkspaceService {
 
     public Optional<Workspace> getWorkspaceBySlug(String slug) {
         return workspaceRepository.findByWorkspaceSlug(slug);
-    }
-
-    @Transactional(readOnly = true)
-    public Workspace getWorkspaceByRepositoryOwner(String nameWithOwner) {
-        return workspaceRepository
-            .findByRepositoriesToMonitor_NameWithOwner(nameWithOwner)
-            .or(() -> resolveFallbackWorkspace("repository " + nameWithOwner))
-            .orElseThrow(() -> new IllegalStateException("No workspace found for repository: " + nameWithOwner));
-    }
-
-    private Optional<Workspace> resolveFallbackWorkspace(String context) {
-        List<Workspace> all = workspaceRepository.findAll();
-        if (all.size() == 1) {
-            log.info(
-                "Resolved fallback workspace: workspaceId={}, context={}",
-                all.getFirst().getId(),
-                LoggingUtils.sanitizeForLog(context)
-            );
-            return Optional.of(all.getFirst());
-        }
-        log.warn(
-            "Skipped workspace resolution: reason=ambiguousContext, context={}, workspaceCount={}",
-            LoggingUtils.sanitizeForLog(context),
-            all.size()
-        );
-        return Optional.empty();
     }
 
     // Workspace Creation
@@ -251,9 +224,6 @@ public class WorkspaceService {
     /**
      * Creates a workspace and triggers async GitLab initialization if applicable.
      *
-     * <p>Workspace creation commits before the initialization event is published so an
-     * asynchronous listener can load it immediately.
-     *
      * @param request the workspace creation request
      * @return the created workspace
      */
@@ -262,9 +232,6 @@ public class WorkspaceService {
             transactionTemplate.execute(status -> createWorkspaceInTransaction(request))
         );
 
-        // Trigger async vendor-specific initialization (e.g. GitLab group discovery + webhook
-        // setup). Hooks are kind-keyed so
-        // adding a new SCM is a matter of registering an impl, not editing this class.
         eventPublisher.publishEvent(new WorkspaceCreatedEvent(workspace.getId(), request.kind()));
 
         return workspace;
@@ -339,13 +306,9 @@ public class WorkspaceService {
 
     // Settings Delegation
 
-    public Workspace updateSchedule(String slug, Integer day, String time) {
-        Workspace workspace = requireWorkspace(slug);
-        return workspaceSettingsService.updateSchedule(workspace.getId(), day, time);
-    }
-
     public Workspace updateSchedule(WorkspaceContext workspaceContext, Integer day, String time) {
-        return updateSchedule(requireSlug(workspaceContext), day, time);
+        Workspace workspace = requireWorkspace(requireSlug(workspaceContext));
+        return workspaceSettingsService.updateSchedule(workspace.getId(), day, time);
     }
 
     public Workspace updateNotifications(String slug, Boolean enabled, String team, String channelId) {
@@ -403,13 +366,9 @@ public class WorkspaceService {
         return updatePublicVisibility(requireSlug(workspaceContext), isPubliclyViewable);
     }
 
-    public Workspace updateFeatures(String slug, UpdateWorkspaceFeaturesRequestDTO request) {
-        Workspace workspace = requireWorkspace(slug);
-        return workspaceSettingsService.updateFeatures(workspace.getId(), request);
-    }
-
     public Workspace updateFeatures(WorkspaceContext workspaceContext, UpdateWorkspaceFeaturesRequestDTO request) {
-        return updateFeatures(requireSlug(workspaceContext), request);
+        Workspace workspace = requireWorkspace(requireSlug(workspaceContext));
+        return workspaceSettingsService.updateFeatures(workspace.getId(), request);
     }
 
     // Slug Renaming
@@ -475,7 +434,7 @@ public class WorkspaceService {
     // Helper Methods
 
     private Workspace requireWorkspace(String slug) {
-        if (isBlank(slug)) {
+        if (slug == null || slug.isBlank()) {
             throw new IllegalArgumentException("Workspace slug must not be blank.");
         }
         return workspaceRepository
@@ -486,13 +445,9 @@ public class WorkspaceService {
     private String requireSlug(WorkspaceContext workspaceContext) {
         Objects.requireNonNull(workspaceContext, "WorkspaceContext must not be null");
         String slug = workspaceContext.slug();
-        if (isBlank(slug)) {
+        if (slug == null || slug.isBlank()) {
             throw new IllegalArgumentException("Workspace context slug must not be blank.");
         }
         return slug;
-    }
-
-    private boolean isBlank(String value) {
-        return value == null || value.isBlank();
     }
 }

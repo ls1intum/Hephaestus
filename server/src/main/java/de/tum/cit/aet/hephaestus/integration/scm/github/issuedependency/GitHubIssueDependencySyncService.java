@@ -417,9 +417,8 @@ public class GitHubIssueDependencySyncService {
 
             retryAttempt = 0;
 
-            // Process each page in its own transaction (call through proxy for @Transactional to work)
             totalSynced += transactionTemplate.execute(status ->
-                processIssueDependenciesPage(issueConnection, repo, scopeId)
+                processIssueDependencies(issueConnection, repo, scopeId)
             );
         }
 
@@ -443,7 +442,7 @@ public class GitHubIssueDependencySyncService {
      * Using REQUIRES_NEW ensures each page is committed independently,
      * providing better resilience if a single page fails.
      */
-    protected int processIssueDependenciesPage(GHIssueConnection issueConnection, Repository repo, Long scopeId) {
+    private int processIssueDependencies(GHIssueConnection issueConnection, Repository repo, Long scopeId) {
         if (issueConnection.getNodes() == null) {
             return 0;
         }

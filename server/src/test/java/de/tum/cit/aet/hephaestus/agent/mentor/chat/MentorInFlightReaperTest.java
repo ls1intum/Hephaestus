@@ -67,11 +67,9 @@ class MentorInFlightReaperTest extends BaseUnitTest {
         finished.setStatus(ChatMessage.Status.completed);
         when(chatMessageRepository.findById(finished.getId())).thenReturn(Optional.of(finished));
 
-        MentorInFlightReaper reaper = reaperWith(new MentorInFlightAccounting(chatMessageRepository, usageRecorder));
+        MentorInFlightAccounting accounting = new MentorInFlightAccounting(chatMessageRepository, usageRecorder);
 
-        assertThat(
-            new MentorInFlightAccounting(chatMessageRepository, usageRecorder).account(finished.getId())
-        ).isFalse();
+        assertThat(accounting.account(finished.getId())).isFalse();
         verify(usageRecorder, never()).record(anyLong(), any());
         verify(usageRecorder, never()).recordUnverifiable(anyLong(), any());
     }
@@ -82,9 +80,9 @@ class MentorInFlightReaperTest extends BaseUnitTest {
         UUID gone = UUID.randomUUID();
         when(chatMessageRepository.findById(gone)).thenReturn(Optional.empty());
 
-        MentorInFlightReaper reaper = reaperWith(new MentorInFlightAccounting(chatMessageRepository, usageRecorder));
+        MentorInFlightAccounting accounting = new MentorInFlightAccounting(chatMessageRepository, usageRecorder);
 
-        assertThat(new MentorInFlightAccounting(chatMessageRepository, usageRecorder).account(gone)).isFalse();
+        assertThat(accounting.account(gone)).isFalse();
         verify(usageRecorder, never()).record(anyLong(), any());
     }
 

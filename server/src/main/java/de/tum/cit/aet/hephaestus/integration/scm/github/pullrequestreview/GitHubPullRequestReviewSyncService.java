@@ -162,7 +162,7 @@ public class GitHubPullRequestReviewSyncService {
      * Synchronizes remaining reviews for a pull request starting from a cursor.
      * <p>
      * This method is non-transactional: it fetches data from the GraphQL API and
-     * delegates persistence to {@link #processReviewPageInTransaction} which runs
+     * delegates persistence to a page-scoped transaction which runs
      * each page in a {@code REQUIRES_NEW} transaction. This ensures that a deadlock
      * on one page does not poison the entire sync, and retries start fresh transactions.
      *
@@ -433,7 +433,7 @@ public class GitHubPullRequestReviewSyncService {
         for (int attempt = 0; attempt <= MAX_DEADLOCK_RETRIES; attempt++) {
             try {
                 return transactionTemplate.execute(status ->
-                    processReviewPageInTransaction(reviews, pullRequestId, scopeId, repository)
+                    processReviewPage(reviews, pullRequestId, scopeId, repository)
                 );
             } catch (Exception e) {
                 boolean retryable;
@@ -492,7 +492,7 @@ public class GitHubPullRequestReviewSyncService {
      * @param repository    the repository entity for creating the processing context
      * @return number of reviews persisted
      */
-    public int processReviewPageInTransaction(
+    private int processReviewPage(
         List<GHPullRequestReview> reviews,
         Long pullRequestId,
         Long scopeId,

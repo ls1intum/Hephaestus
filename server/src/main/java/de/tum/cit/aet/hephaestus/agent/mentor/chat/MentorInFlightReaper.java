@@ -67,7 +67,6 @@ public class MentorInFlightReaper {
         this.window = safeWindow(window);
     }
 
-    /** Deliberately not transactional: the only transactions are the per-turn ones the accounting collaborator opens. */
     @Scheduled(cron = "${hephaestus.mentor.in-flight-reaper.cron:0 */2 * * * *}")
     @SchedulerLock(name = "mentor-in-flight-reaper", lockAtMostFor = "PT10M", lockAtLeastFor = "PT30S")
     public void reap() {
@@ -80,7 +79,6 @@ public class MentorInFlightReaper {
         int failed = 0;
         for (UUID messageId : stale) {
             try {
-                // Through the proxy, or the per-turn transaction boundary would not exist.
                 if (accounting.account(messageId)) {
                     billed++;
                 }

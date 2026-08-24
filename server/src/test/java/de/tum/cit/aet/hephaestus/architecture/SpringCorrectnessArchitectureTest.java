@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.architecture;
 
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.fields;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.methods;
+import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 import static de.tum.cit.aet.hephaestus.architecture.ArchitectureTestConstants.BASE_PACKAGE;
 
 import com.tngtech.archunit.base.DescribedPredicate;
@@ -16,7 +17,6 @@ import com.tngtech.archunit.lang.ConditionEvents;
 import com.tngtech.archunit.lang.SimpleConditionEvent;
 import jakarta.annotation.PostConstruct;
 import jakarta.validation.Valid;
-import java.util.Collection;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -37,7 +37,9 @@ class SpringCorrectnessArchitectureTest extends HephaestusArchitectureTest {
             .andShould()
             .notBeFinal()
             .andShould(beDeclaredInANonFinalClass())
-            .because("class-based transaction proxies cannot advise private or final methods");
+            .because(
+                "public instance methods work consistently with JDK and class-based proxies, while class-based proxies cannot advise final methods or classes"
+            );
 
         rule.check(classes);
     }
@@ -49,6 +51,21 @@ class SpringCorrectnessArchitectureTest extends HephaestusArchitectureTest {
             .because("self-invocation bypasses Spring's transactional proxy");
 
         rule.check(classes);
+    }
+
+    @Test
+    void shouldUseSpringTransactionalAnnotation() {
+        ArchRule methodsRule = methods()
+            .should()
+            .notBeAnnotatedWith(jakarta.transaction.Transactional.class)
+            .because("transaction rules use Spring's @Transactional consistently");
+        ArchRule classesRule = noClasses()
+            .should()
+            .beAnnotatedWith(jakarta.transaction.Transactional.class)
+            .because("transaction rules use Spring's @Transactional consistently");
+
+        methodsRule.check(classes);
+        classesRule.check(classes);
     }
 
     @Test
@@ -87,7 +104,7 @@ class SpringCorrectnessArchitectureTest extends HephaestusArchitectureTest {
             .areDeclaredInClassesThat()
             .areAssignableTo(Repository.class)
             .should(notReturnOptionalCollection())
-            .because("Spring Data collection queries return an empty collection rather than null");
+            .because("Spring Data multi-result queries return an empty result rather than null");
 
         rule.check(classes);
     }
@@ -221,7 +238,7 @@ class SpringCorrectnessArchitectureTest extends HephaestusArchitectureTest {
     }
 
     private static ArchCondition<JavaMethod> notReturnOptionalCollection() {
-        return new ArchCondition<>("not return Optional-wrapped collections") {
+        return new ArchCondition<>("not return Optional-wrapped multi-result types") {
             @Override
             public void check(JavaMethod method, ConditionEvents events) {
                 JavaType returnType = method.getReturnType();
@@ -231,7 +248,7 @@ class SpringCorrectnessArchitectureTest extends HephaestusArchitectureTest {
                     parameterized
                         .getActualTypeArguments()
                         .stream()
-                        .anyMatch(SpringCorrectnessArchitectureTest::isCollection)
+                        .anyMatch(SpringCorrectnessArchitectureTest::isMultiResultType)
                 ) {
                     events.add(
                         SimpleConditionEvent.violated(
@@ -244,7 +261,7 @@ class SpringCorrectnessArchitectureTest extends HephaestusArchitectureTest {
         };
     }
 
-    private static boolean isCollection(JavaType type) {
-        return type.toErasure().isAssignableTo(Collection.class);
+    private static boolean isMultiResultType(JavaType type) {
+        return type.toErasure().isAssignableTo(Iterable.class);
     }
 }

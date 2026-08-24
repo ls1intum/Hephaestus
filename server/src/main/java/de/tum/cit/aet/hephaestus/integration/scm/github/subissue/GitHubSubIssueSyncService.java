@@ -481,9 +481,8 @@ public class GitHubSubIssueSyncService {
 
                 issuesReceived += issueConnection.getNodes() != null ? issueConnection.getNodes().size() : 0;
 
-                // Process each page in its own transaction (call through proxy for @Transactional)
                 linkedCount += transactionTemplate.execute(status ->
-                    processIssueNodesInTransaction(issueConnection, repository, scopeId)
+                    processIssueNodes(issueConnection, repository, scopeId)
                 );
             } catch (InstallationNotFoundException e) {
                 // Re-throw to abort the entire sync operation
@@ -529,11 +528,7 @@ public class GitHubSubIssueSyncService {
      * Using REQUIRES_NEW ensures each page is committed independently,
      * providing better resilience if a single page fails.
      */
-    protected int processIssueNodesInTransaction(
-        GHIssueConnection issueConnection,
-        Repository repository,
-        Long scopeId
-    ) {
+    private int processIssueNodes(GHIssueConnection issueConnection, Repository repository, Long scopeId) {
         if (issueConnection.getNodes() == null) {
             return 0;
         }
