@@ -31,6 +31,9 @@ not open that as work.
   the component, either point `component` at the real component or drop `autodocs` — do not publish the
   harness's props as if they were the API. A file that opts out says why in its meta
   (`webapp/src/components/admin/practice-catalog/SortableCatalogTree.stories.tsx`).
+- **`layout: "centered"` for an isolated component, `"fullscreen"` for a page-level one.** The default
+  padded layout gives a page-level story a margin production does not have, which is how a full-bleed
+  header or a sticky footer comes to look right in Storybook and wrong in the app.
 - **A controlled component closes its own loop** through `Stateful` / `StatefulPatch`
   (`webapp/src/stories/stateful.tsx`), so the control moves the component *and* the `fn()` spy in `meta.args`
   still fires.
@@ -46,7 +49,10 @@ instrumented: it spreads `{...args}` and patches only the props it holds state f
 
 Add `argTypes` to **correct** what `react-docgen` inferred wrong — a union rendered as a free-text box,
 an object arg that should be `control: false` — or to make a genuinely explorable prop explorable. Do
-not add them to restate what inference already produced.
+not add them to restate what inference already produced, and never park a default in
+`argTypes.defaultValue`: the Controls panel reads `args`, so a default written there renders in the
+docs table and nowhere else, leaving the story and its own published documentation disagreeing about
+what the component was given.
 
 A component whose one prop is a domain object (`StatusDef`, a `ReactNode`) gains nothing from
 `argTypes`; there is no useful control for a `Pick<Wire, …>`. A minority of story files use them, which
