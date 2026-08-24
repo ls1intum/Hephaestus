@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.integration.outline.connect;
 
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
@@ -11,8 +12,9 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.CredentialBundleCon
 import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.BearerToken;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
-import de.tum.cit.aet.hephaestus.integration.outline.client.OutlineApiClient;
 import de.tum.cit.aet.hephaestus.integration.outline.client.OutlineApiClient.OutlineIdentity;
+import de.tum.cit.aet.hephaestus.integration.outline.client.OutlineContentClient;
+import de.tum.cit.aet.hephaestus.integration.outline.client.OutlineTokenClient;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
 import de.tum.cit.aet.hephaestus.testconfig.WithAdminUser;
@@ -24,12 +26,12 @@ import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembership.WorkspaceRole;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.context.TestPropertySource;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.reactive.server.WebTestClient;
 
 /**
@@ -57,13 +59,22 @@ class OutlineConnectionAdminControllerIntegrationTest extends AbstractWorkspaceI
     @Autowired
     private CredentialBundleConverter credentialConverter;
 
-    @MockitoBean
-    private OutlineApiClient outlineApiClient;
+    @Autowired
+    private OutlineTokenClient outlineApiClient;
+
+    @Autowired
+    private OutlineContentClient outlineContentClient;
 
     private Workspace workspace;
 
+    @AfterEach
+    void resetOutlineClient() {
+        reset(outlineApiClient, outlineContentClient);
+    }
+
     @BeforeEach
     void setUp() {
+        reset(outlineApiClient, outlineContentClient);
         User owner = persistUser("outline-conn-owner-" + System.nanoTime());
         workspace = createWorkspace(
             "outline-conn-" + System.nanoTime(),
@@ -80,10 +91,10 @@ class OutlineConnectionAdminControllerIntegrationTest extends AbstractWorkspaceI
             .when(outlineApiClient.validateToken(SERVER_URL, "outline-token"))
             .thenReturn(new OutlineIdentity("team-1", "Acme", "user-1"));
         lenient().when(outlineApiClient.describeToken(SERVER_URL, "outline-token")).thenReturn(Optional.empty());
-        lenient().when(outlineApiClient.listCollections(anyString(), anyString())).thenReturn(List.of());
-        lenient().when(outlineApiClient.listDocuments(anyString(), anyString(), anyString())).thenReturn(List.of());
+        lenient().when(outlineContentClient.listCollections(anyString(), anyString())).thenReturn(List.of());
+        lenient().when(outlineContentClient.listDocuments(anyString(), anyString(), anyString())).thenReturn(List.of());
         lenient()
-            .when(outlineApiClient.listCollectionDocuments(anyString(), anyString(), anyString()))
+            .when(outlineContentClient.listCollectionDocuments(anyString(), anyString(), anyString()))
             .thenReturn(List.of());
     }
 

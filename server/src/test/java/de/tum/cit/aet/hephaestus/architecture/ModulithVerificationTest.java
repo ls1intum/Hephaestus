@@ -1,5 +1,7 @@
 package de.tum.cit.aet.hephaestus.architecture;
 
+import static com.tngtech.archunit.core.domain.JavaClass.Predicates.resideInAnyPackage;
+
 import de.tum.cit.aet.hephaestus.Application;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -21,6 +23,10 @@ import org.springframework.modulith.core.ApplicationModules;
  * fix. Resist the urge to "break the cycle" via events; prefer named interfaces or moving
  * code.
  *
+ * <p>Generated GraphQL/OpenAPI wire models are excluded because they contain no application module
+ * behavior or dependencies. Their isolation from production boundaries is enforced separately by
+ * the vendor DTO architecture tests.
+ *
  * <p>Documenter (PlantUML / C4 / Application Module Canvas) output is generated locally
  * via {@code mvn spring-boot:run -Pdocumenter} (not in the test path — writing diagrams
  * adds ~57s of CI time with no assertions).
@@ -33,6 +39,13 @@ class ModulithVerificationTest {
 
     @Test
     void modulesAreCycleFreeAndRespectNamedInterfaces() {
-        ApplicationModules.of(Application.class).verify();
+        ApplicationModules.of(
+            Application.class,
+            resideInAnyPackage(
+                "..integration.scm.github.graphql.model..",
+                "..integration.scm.gitlab.graphql.model..",
+                "..integration.outline.client.model.."
+            )
+        ).verify();
     }
 }

@@ -8,23 +8,15 @@ import de.tum.cit.aet.hephaestus.core.auth.jwt.HephaestusJwtIssuer;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.IssuedJwt;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.IssuedJwtRepository;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.JwtPrincipalFactory;
-import de.tum.cit.aet.hephaestus.testconfig.RealAuthDatasource;
+import de.tum.cit.aet.hephaestus.testconfig.RealAuthIntegrationTest;
 import java.time.Instant;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.webtestclient.autoconfigure.AutoConfigureWebTestClient;
-import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpHeaders;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.reactive.server.WebTestClient;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
 /**
  * Verifies the cookie-session bearer-token resolution wired on the resource-server chain (ADR 0017).
@@ -38,12 +30,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
  * and mints a genuine ES256 cookie-JWT through {@link HephaestusJwtIssuer}, so the full
  * resolver → decoder → revocation → controller path is exercised end-to-end.
  */
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@ActiveProfiles("test")
-@AutoConfigureWebTestClient
-@Testcontainers
-@Tag("integration")
-class CookieAuthenticationIntegrationTest {
+class CookieAuthenticationIntegrationTest extends RealAuthIntegrationTest {
 
     @Autowired
     private WebTestClient webTestClient;
@@ -65,11 +52,6 @@ class CookieAuthenticationIntegrationTest {
 
     @Value("${hephaestus.auth.cookie-name:__Host-HEPHAESTUS_AT}")
     private String cookieName;
-
-    @DynamicPropertySource
-    static void datasource(DynamicPropertyRegistry registry) {
-        RealAuthDatasource.register(registry);
-    }
 
     @Test
     void cookieOnlyRequestAuthenticatesAndGetUserReturnsAccount() {

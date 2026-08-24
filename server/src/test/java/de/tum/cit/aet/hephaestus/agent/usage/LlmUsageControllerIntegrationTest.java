@@ -30,15 +30,9 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
-import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.reactive.server.WebTestClient;
 
 @Tag("integration")
-// Pins the unconfigured half of the display-currency feature, mirroring
-// LlmUsageFxDisplayIntegrationTest's EUR. Stated rather than inherited: application.yml imports an
-// optional local .env, so a developer who sets HEPHAESTUS_LLM_DISPLAY_CURRENCY would otherwise fail
-// a test that is supposed to be about the property being unset.
-@TestPropertySource(properties = "hephaestus.llm.display-currency=")
 class LlmUsageControllerIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     @Autowired

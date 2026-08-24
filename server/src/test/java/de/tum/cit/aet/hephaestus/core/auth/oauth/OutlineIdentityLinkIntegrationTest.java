@@ -9,21 +9,14 @@ import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityLink;
 import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityLinkRepository;
 import de.tum.cit.aet.hephaestus.core.auth.provider.LoginProvider;
 import de.tum.cit.aet.hephaestus.core.auth.provider.LoginProviderRepository;
-import de.tum.cit.aet.hephaestus.testconfig.RealAuthDatasource;
+import de.tum.cit.aet.hephaestus.testconfig.RealAuthIntegrationTest;
 import java.util.List;
 import java.util.Map;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.context.annotation.Import;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.core.user.DefaultOAuth2User;
 import org.springframework.security.oauth2.core.user.OAuth2User;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
 /**
  * Authenticated Outline identity link, against a REAL Postgres. Drives {@link AccountProvisioningService}
@@ -39,11 +32,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
  * orphan account behind; (3) an Outline identity already linked to a DIFFERENT account cannot be
  * re-bound ({@code identity_already_linked}) — that would be account takeover.
  */
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@ActiveProfiles("test")
-@Testcontainers
-@Tag("integration")
-class OutlineIdentityLinkIntegrationTest {
+class OutlineIdentityLinkIntegrationTest extends RealAuthIntegrationTest {
 
     /** Outline's subject is the immutable user UUID; the tenant key is the team UUID. */
     private static final String OUTLINE_USER = "0aa1bb2c-user";
@@ -60,11 +49,6 @@ class OutlineIdentityLinkIntegrationTest {
 
     @Autowired
     private LoginProviderRepository loginProviderRepository;
-
-    @DynamicPropertySource
-    static void datasource(DynamicPropertyRegistry registry) {
-        RealAuthDatasource.register(registry);
-    }
 
     @Test
     void linkingOutlineAttachesExactlyOneOutlineIdentityToTheSameAccount() {

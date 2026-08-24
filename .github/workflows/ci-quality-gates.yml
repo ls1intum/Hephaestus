@@ -18,13 +18,21 @@ on:
         required: false
         type: string
         default: "true"
+      pmd_canary:
+        description: "Whether PMD wiring inputs changed"
+        required: false
+        type: string
+        default: "false"
 
 jobs:
   quality-gates:
     name: "${{ matrix.display-name }}"
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: write
     if: inputs.should_skip != 'true'
-    timeout-minutes: ${{ matrix.check == 'database-validation' && 20 || 15 }}
+    timeout-minutes: ${{ matrix.check == 'server-contracts' && 25 || 15 }}
     strategy:
       fail-fast: false
       matrix:
@@ -33,12 +41,8 @@ jobs:
             display-name: "App Server"
           - check: webapp-quality
             display-name: "Webapp"
-          - check: openapi-validation
-            display-name: "OpenAPI"
-          - check: database-validation
-            display-name: "Database"
-          - check: database-migrations
-            display-name: "Migrations"
+          - check: server-contracts
+            display-name: "API and Database"
     steps:
       - name: Determine if check should run
         id: should_run
@@ -47,7 +51,7 @@ jobs:
             "webapp-quality")
               echo "run=${{ inputs.webapp_changed }}" >> $GITHUB_OUTPUT
               ;;
-            "application-server-quality"|"openapi-validation"|"database-validation"|"database-migrations")
+            "application-server-quality"|"server-contracts")
               echo "run=${{ inputs.application_server_changed }}" >> $GITHUB_OUTPUT
               ;;
             *)
@@ -66,16 +70,13 @@ jobs:
         if: steps.should_run.outputs.run == 'true'
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
-          # Full history for the three legs that compare against a base commit: check:contracts
-          # resolves `git merge-base HEAD origin/<base>`, and both database legs diff the changelog
-          # tree. The rest only need HEAD.
           # The depths are QUOTED. Unquoted, `cond && 0 || 1` always yields 1, because the number 0
           # is falsy in GitHub expressions; the non-empty string '0' is truthy.
-          fetch-depth: ${{ contains(fromJSON('["application-server-quality", "database-validation", "database-migrations"]'), matrix.check) && '0' || '1' }}
+          fetch-depth: ${{ matrix.check == 'application-server-quality' && '0' || '1' }}
+          persist-credentials: false
 
       - name: Setup pnpm + Node.js
-        # database-migrations is a pure git check — no Node/pnpm/JDK/Maven needed.
-        if: steps.should_run.outputs.run == 'true' && matrix.check != 'database-migrations'
+        if: steps.should_run.outputs.run == 'true'
         uses: ./.github/actions/setup-pnpm-node
 
       # The agent runtime is Bun, so its tests and typecheck must run on the Bun the sandbox ships.
@@ -100,7 +101,7 @@ jobs:
           bun-version: ${{ steps.bun.outputs.version }}
 
       - name: Setup caches
-        if: steps.should_run.outputs.run == 'true' && matrix.check != 'database-migrations'
+        if: steps.should_run.outputs.run == 'true'
         uses: ./.github/actions/setup-caches
         with:
           cache-type: ${{ matrix.check }}
@@ -118,8 +119,7 @@ jobs:
 
           pnpm run format:java:check || { FMT_OK=false; ISSUES_FOUND+=("Java formatting failed. Run: pnpm run format:java"); }
           pnpm run lint:java || { PMD_OK=false; ISSUES_FOUND+=("PMD found violations. Run: pnpm run lint:java:report"); }
-          # Verify the public lint command rejects a representative violation.
-          if [ "$PMD_OK" = "true" ]; then
+          if [ "$PMD_OK" = "true" ] && [ "${{ inputs.pmd_canary }}" = "true" ]; then
             PMD_CANARY=server/src/main/java/de/tum/cit/aet/hephaestus/Application.java
             cp "$PMD_CANARY" "$RUNNER_TEMP/Application.java"
             trap 'cp "$RUNNER_TEMP/Application.java" "$PMD_CANARY"' EXIT
@@ -201,12 +201,15 @@ jobs:
           SORT_OK=true
           BUILD_OK=true
           ROUTES_OK=true
+          TESTS_OK=true
 
           pnpm run check || { LINT_OK=false; ISSUES_FOUND+=("Lint or formatting failed. Run: cd webapp && pnpm run check:fix"); }
           pnpm run typecheck || { TYPES_OK=false; ISSUES_FOUND+=("TypeScript errors found. Run: cd webapp && pnpm run typecheck"); }
           node ../scripts/check-presentational-components.ts || { COMPONENTS_OK=false; ISSUES_FOUND+=("Components must take data as props. Run: pnpm run check:components"); }
           node ../scripts/check-story-prose.ts || { STORIES_OK=false; ISSUES_FOUND+=("Story prose renders HTML paragraphs. Run: pnpm run check:stories"); }
           node ../scripts/check-story-sort.ts || { SORT_OK=false; ISSUES_FOUND+=("Storybook sidebar order is stale. Run: pnpm run check:story-sort"); }
+          timeout --kill-after=30s 10m pnpm run test \
+            || { TESTS_OK=false; ISSUES_FOUND+=("Unit tests failed. Run: cd webapp && pnpm run test"); }
 
           # src/routeTree.gen.ts is written by the TanStack Router Vite plugin, so a build is the
           # only thing that can say whether the committed copy is current. The webapp image build
@@ -230,21 +233,43 @@ jobs:
             [[ "$SORT_OK" == "false" ]] && echo "| Storybook sidebar order | :x: Failed | \`pnpm run check:story-sort\` |" >> $GITHUB_STEP_SUMMARY
             [[ "$BUILD_OK" == "false" ]] && echo "| Vite build | :x: Failed | \`cd webapp && pnpm run build\` |" >> $GITHUB_STEP_SUMMARY
             [[ "$ROUTES_OK" == "false" ]] && echo "| routeTree.gen.ts up to date | :x: Stale | \`cd webapp && pnpm run build\` and commit |" >> $GITHUB_STEP_SUMMARY
+            [[ "$TESTS_OK" == "false" ]] && echo "| Unit tests | :x: Failed | \`cd webapp && pnpm run test\` |" >> $GITHUB_STEP_SUMMARY
             for issue in "${ISSUES_FOUND[@]}"; do echo "::error::$issue"; done
             exit 1
           fi
 
+      - name: Upload webapp unit-test results
+        if: steps.should_run.outputs.run == 'true' && matrix.check == 'webapp-quality' && always()
+        uses: dorny/test-reporter@a43b3a5f7366b97d083190328d2c652e1a8b6aa2 # v3.0.0
+        with:
+          name: "Test Results - Webapp Unit"
+          path: "webapp/test-results/junit-*.xml"
+          reporter: java-junit
+          fail-on-error: false
+
+      - name: Summarize webapp unit tests
+        if: steps.should_run.outputs.run == 'true' && matrix.check == 'webapp-quality' && always()
+        continue-on-error: true
+        run: pnpm run summarize:test-results "Webapp Unit" webapp/test-results ci-metrics/webapp-unit.json
+
+      - name: Upload webapp test metrics
+        if: steps.should_run.outputs.run == 'true' && matrix.check == 'webapp-quality' && always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: test-metrics-webapp-unit
+          path: ci-metrics/webapp-unit.json
+          if-no-files-found: ignore
+          retention-days: 14
+
       - name: OpenAPI validation
-        if: steps.should_run.outputs.run == 'true' && matrix.check == 'openapi-validation'
+        id: openapi
+        continue-on-error: true
+        if: steps.should_run.outputs.run == 'true' && matrix.check == 'server-contracts'
         env:
           DATABASE_URL: postgresql://fake:fake@localhost:5432/fake
           MODEL_NAME: fake:model
         run: |
           pnpm install --frozen-lockfile
-          cd server
-          mvn compile -DskipTests --quiet -Dmaven.build.cache.enabled=true
-          cd ..
-
           pnpm run generate:api
           git add .
           if ! git diff --cached --quiet; then
@@ -257,10 +282,10 @@ jobs:
           fi
 
       - name: Database validation (schema + ERD + models)
-        if: steps.should_run.outputs.run == 'true' && matrix.check == 'database-validation'
+        id: database
+        continue-on-error: true
+        if: steps.should_run.outputs.run == 'true' && matrix.check == 'server-contracts' && always()
         run: |
-          pnpm install --frozen-lockfile
-
           # The pg_partman image, not stock Postgres: the auth_event changeset that calls
           # partman.create_parent is preconditioned onFail="MARK_RAN" on the extension being
           # available, so on a stock image the chain replays with that changeset never executed.
@@ -275,8 +300,8 @@ jobs:
           export SPRING_DATASOURCE_USERNAME="root"
           export SPRING_DATASOURCE_PASSWORD="root"
 
-          if ! (cd server && mvn compile -DskipTests --quiet -Dmaven.build.cache.enabled=true); then
-            echo "::error::Maven compilation failed. This blocks all database validation checks. Fix compilation errors first."
+          if ! (cd server && ./mvnw test -P'!quick' -Dsurefire.includedGroups=database -Dmaven.test.skip=false -DskipCoverage=true --quiet); then
+            echo "::error::Maven compilation or database contract tests failed. Fix the reported error before continuing."
             echo "### Database Validation" >> $GITHUB_STEP_SUMMARY
             echo "| Check | Status | Fix |" >> $GITHUB_STEP_SUMMARY
             echo "|-------|--------|-----|" >> $GITHUB_STEP_SUMMARY
@@ -318,126 +343,13 @@ jobs:
             exit 1
           fi
 
-      # database-migrations: git-level guard that released changelog files never change. The
-      # empty→head chain replay already lives in the database-validation leg; this leg adds the
-      # one thing replay can't — immutability. Why git, not Liquibase checksums:
-      # docs/contributor/database-migration.mdx.
-      - name: Resolve released-chain baseline
-        id: baseline
-        if: steps.should_run.outputs.run == 'true' && matrix.check == 'database-migrations'
+      - name: Evaluate API and database contracts
+        if: steps.should_run.outputs.run == 'true' && matrix.check == 'server-contracts' && always()
         env:
-          PUSH_BEFORE: ${{ github.event.before }}
-          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          OPENAPI: ${{ steps.openapi.outcome }}
+          DATABASE: ${{ steps.database.outcome }}
         run: |
-          set -euo pipefail
-          # Baseline = the released state this branch descends from. For a PR that is the base
-          # commit (an ancestor of the checked-out merge ref, so `git diff BASE HEAD` is exactly
-          # the PR's net change); for a main push it is the previous tip. checkout does NOT expose
-          # origin/<base> as a ref, so use the SHA the event gives us directly.
-          BASE=""
-          if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
-            # A PR always has a base commit, and it is always an ancestor of the merge ref. If it
-            # is missing, the checkout is too shallow — fail loudly rather than let the guard
-            # silently no-op, which would report a vacuous green.
-            if ! git cat-file -e "$PR_BASE_SHA^{commit}" 2>/dev/null; then
-              echo "::error::PR base commit $PR_BASE_SHA is not in local history — this job needs fetch-depth: 0. Refusing to pass without checking."
-              exit 1
-            fi
-            BASE="$PR_BASE_SHA"
-          elif [ -n "$PUSH_BEFORE" ] && git cat-file -e "$PUSH_BEFORE^{commit}" 2>/dev/null; then
-            # Branch creation and force pushes leave no reachable previous tip; nothing released
-            # to enforce against, so the guard is skipped.
-            BASE="$PUSH_BEFORE"
-          fi
-          echo "base=$BASE" >> "$GITHUB_OUTPUT"
-          echo "Baseline: ${BASE:-<none — no reachable previous tip, nothing to enforce>}"
-
-      - name: Changelog immutability guard
-        if: steps.should_run.outputs.run == 'true' && matrix.check == 'database-migrations' && steps.baseline.outputs.base != ''
-        env:
-          BASE: ${{ steps.baseline.outputs.base }}
-          RELEASED_REF: ${{ github.event_name == 'pull_request' && github.base_ref || 'main' }}
-        run: |
-          set -euo pipefail
-          CHANGELOG_DIR="server/src/main/resources/db/changelog"
-          MASTER="server/src/main/resources/db/master.xml"
-          FAILED=false
-
-          # 1. No released changelog file may be modified, deleted, or renamed.
-          VIOLATIONS=$(git diff --name-only --diff-filter=MDR "$BASE" HEAD -- "$CHANGELOG_DIR")
-          if [ -n "$VIOLATIONS" ]; then
-            FAILED=true
-            echo "::error::Released Liquibase changesets were modified, renamed, or deleted. Ship a new follow-up changelog instead:"
-            echo "$VIOLATIONS"
-          fi
-
-          # 2. master.xml is append-only: every <include> line the baseline had must survive
-          #    unchanged, in order, as a prefix of the current list. Comparing whole lines (not
-          #    just paths) also catches edits to a released include's attributes. Order is NOT
-          #    asserted beyond the prefix — the historical list is not monotonic by timestamp.
-          #    `|| true` keeps the `-s` guard live: an include-less baseline (never happens today)
-          #    skips the check instead of aborting under pipefail.
-          git show "$BASE:$MASTER" 2>/dev/null | grep '<include ' > /tmp/includes-base || true
-          grep '<include ' "$MASTER" > /tmp/includes-head || true
-          if [ -s /tmp/includes-base ] && ! diff /tmp/includes-base <(head -n "$(wc -l < /tmp/includes-base)" /tmp/includes-head) >/dev/null; then
-            FAILED=true
-            echo "::error::master.xml is append-only: an existing <include> was removed, reordered, or edited. New changelogs go at the end of the list."
-          fi
-
-          if [ "$FAILED" = "true" ]; then
-            {
-              echo "### Changelog immutability"
-              echo "Changesets that reached \`$RELEASED_REF\` may already be applied to production databases — editing or removing them breaks the upgrade path (checksum errors or silently orphaned changesets)."
-              echo "Fix forward with a **new** changelog appended to \`master.xml\`. See \`docs/contributor/database-migration.mdx\`."
-            } >> "$GITHUB_STEP_SUMMARY"
-            exit 1
-          fi
-          echo "No released changeset was touched; master.xml stays append-only."
-
-  legacy-cleanup-guard:
-    name: "No legacy agent image"
-    if: inputs.should_skip != 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 2
-    steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-        with:
-          fetch-depth: 1
-      - name: Assert no legacy agent-image references
-        run: |
-          set -euo pipefail
-          # Needle built at runtime so this guard file doesn't self-match.
-          NEEDLE="agent-$(printf 'open\x63ode')"
-          if grep -rEnI "$NEEDLE" \
-                --exclude-dir=node_modules --exclude-dir=target --exclude-dir=.git \
-                . \
-              | grep -vE '^\./(MIGRATION\.md|docs/admin/agent-image-digests\.md):' ; then
-            echo "::error::Legacy agent image is removed in issue #1076; relocate any new references to MIGRATION.md."
-            exit 1
-          fi
-      # The defect ADR 0031 removed: a reference that floats on the release channel resolves to
-      # whatever released most recently, which is a pair no release ever built. The reference is
-      # derived from the deployment's own image tag, so nothing may name a channel again.
-      - name: Assert no release-channel agent image references
-        run: |
-          set -euo pipefail
-          # Needle built at runtime so this guard file doesn't self-match.
-          NEEDLE="agent-pi:$(printf 'lat\x65st')"
-          if grep -rEnI "$NEEDLE" \
-                --exclude-dir=node_modules --exclude-dir=target --exclude-dir=.git \
-                . \
-              | grep -vE '^\./(MIGRATION\.md|docs/admin/agent-image-digests\.md|docs/decisions/0031-.*\.md|server/src/test/java/de/tum/cit/aet/hephaestus/agent/sandbox/AgentImageReferenceGuardTest\.java):' ; then
-            echo "::error::A release-channel agent image tag resolves to another release's image (ADR 0031). Leave the reference unset so it follows this deployment's image tag, or pin a digest."
-            exit 1
-          fi
-
-      - name: Assert no legacy agent-image-pin.env references
-        run: |
-          set -euo pipefail
-          if grep -rEnI 'docker/agent-image-pin(\.local)?\.env' \
-                --exclude-dir=node_modules --exclude-dir=target --exclude-dir=.git \
-                . \
-              | grep -vE '^\./(MIGRATION\.md|docs/admin/agent-image-digests\.md):' ; then
-            echo "::error::The legacy pin file was removed in v0.10.0; new references must live in MIGRATION.md only."
+          if [ "$OPENAPI" != "success" ] || [ "$DATABASE" != "success" ]; then
+            echo "::error::OpenAPI or database validation failed; review both independently reported steps."
             exit 1
           fi

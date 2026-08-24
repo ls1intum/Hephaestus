@@ -20,8 +20,10 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.ObjectMapper;
 
+@Transactional
 class PracticeRepositoryIntegrationTest extends BaseIntegrationTest {
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
@@ -39,7 +41,6 @@ class PracticeRepositoryIntegrationTest extends BaseIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        databaseTestUtils.cleanDatabase();
         workspace = workspaceRepository.save(WorkspaceTestFixtures.activeWorkspace("practice-test"));
     }
 

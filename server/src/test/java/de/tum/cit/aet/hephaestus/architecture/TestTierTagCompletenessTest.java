@@ -29,7 +29,7 @@ import org.junit.jupiter.api.Test;
 @Tag("architecture")
 class TestTierTagCompletenessTest {
 
-    private static final Set<String> TIER_TAGS = Set.of("unit", "architecture", "integration", "live");
+    private static final Set<String> TIER_TAGS = Set.of("unit", "architecture", "database", "integration", "live");
 
     private static final Pattern CLASS_DECL = Pattern.compile(
         "\\b(abstract\\s+)?class\\s+(\\w+)\\b([^\\n{]*)\\{",

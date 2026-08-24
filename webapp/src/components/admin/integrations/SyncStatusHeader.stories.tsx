@@ -210,7 +210,7 @@ export const RateLimitThrottled: Story = {
 			kind: "SLACK",
 			health: "DEGRADED",
 			backfillSupported: false,
-			rateLimit: { observedAt: minutesBefore(1), throttledUntil: minutesAfter(1) },
+			rateLimit: { observedAt: minutesBefore(1), throttledUntil: minutesAfter(10) },
 		},
 		onBackfill: undefined,
 	},

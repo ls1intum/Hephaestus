@@ -26,11 +26,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
-import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.reactive.server.WebTestClient;
 
 @DisplayName("GitLab workspace creation integration")
-@TestPropertySource(properties = "hephaestus.features.flags.gitlab-workspace-creation=true")
 class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     @Autowired

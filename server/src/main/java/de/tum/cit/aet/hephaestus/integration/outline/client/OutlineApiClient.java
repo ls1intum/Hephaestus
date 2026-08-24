@@ -32,7 +32,7 @@ import org.springframework.web.reactive.function.client.WebClientResponseExcepti
 
 @Component
 @ConditionalOnProperty(name = "hephaestus.integration.outline.enabled", havingValue = "true", matchIfMissing = false)
-public class OutlineApiClient {
+public class OutlineApiClient implements OutlineTokenClient, OutlineContentClient, OutlineWebhookClient {
 
     private static final Logger log = LoggerFactory.getLogger(OutlineApiClient.class);
     private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(10);
@@ -90,6 +90,7 @@ public class OutlineApiClient {
      * Validates a token via {@code auth.info}, returning the resolved identity. Throws
      * {@link OutlineApiException} on an unreachable host, a rejected token, or a response without a team.
      */
+    @Override
     public OutlineIdentity validateToken(String serverUrl, String token) {
         String resolvedUrl = resolveAndValidateServerUrl(serverUrl);
         OutlineEnvelope<OutlineAuth> response = post(resolvedUrl, token, "/api/auth.info", Map.of(), AUTH_INFO);
@@ -113,6 +114,7 @@ public class OutlineApiClient {
      * is absent or {@code apiKeys.list} is out of scope — such a token still works for content sync, so
      * missing metadata must not surface as an error.
      */
+    @Override
     public Optional<OutlineTokenDescription> describeToken(String serverUrl, String token) {
         String resolvedUrl = resolveAndValidateServerUrl(serverUrl);
         OutlineEnvelope<List<OutlineApiKey>> response;
@@ -140,6 +142,7 @@ public class OutlineApiClient {
     }
 
     /** Lists the collections the token can see ({@code collections.list}); the catalog pass refreshes mirrored-collection metadata. */
+    @Override
     public List<OutlineCollectionModel> listCollections(String serverUrl, String token) {
         return listCollections(serverUrl, token, MAX_PAGES);
     }
@@ -148,6 +151,7 @@ public class OutlineApiClient {
      * {@link #listCollections(String, String)} under an explicit page cap — interactive admin paths pass a
      * small cap so a pathological instance cannot stall a request thread; a hit cap logs and returns partial.
      */
+    @Override
     public List<OutlineCollectionModel> listCollections(String serverUrl, String token, int maxPages) {
         String resolvedUrl = resolveAndValidateServerUrl(serverUrl);
         List<OutlineCollectionModel> all = new ArrayList<>();
@@ -181,6 +185,7 @@ public class OutlineApiClient {
      * Fetches a collection's document tree ({@code collections.documents}); {@code children} carry the
      * nesting the sync flattens into parent relationships.
      */
+    @Override
     public List<OutlineNavigationNode> listCollectionDocuments(String serverUrl, String token, String collectionId) {
         String resolvedUrl = resolveAndValidateServerUrl(serverUrl);
         OutlineEnvelope<List<OutlineNavigationNode>> body = post(
@@ -198,6 +203,7 @@ public class OutlineApiClient {
      * Lists per-document metadata ({@code documents.list}, newest-{@code updatedAt} first). Ordering matters:
      * the sync spends its bounded export budget front-to-back, and {@code updatedAt} is the incremental cursor.
      */
+    @Override
     public List<OutlineDocumentModel> listDocuments(String serverUrl, String token, String collectionId) {
         String resolvedUrl = resolveAndValidateServerUrl(serverUrl);
         List<OutlineDocumentModel> all = new ArrayList<>();
@@ -236,6 +242,7 @@ public class OutlineApiClient {
      * Fetches one document's metadata ({@code documents.info}); empty on HTTP 404 (the webhook refresh treats
      * that as a tombstone), rethrows every other failure.
      */
+    @Override
     public Optional<OutlineDocumentModel> getDocumentInfo(String serverUrl, String token, String documentId) {
         String resolvedUrl = resolveAndValidateServerUrl(serverUrl);
         OutlineEnvelope<OutlineDocumentModel> body;
@@ -255,6 +262,7 @@ public class OutlineApiClient {
      * Outline's default listing excludes archived documents, so without this call the tombstone-by-absence
      * sweep would wipe an archived (soft-deleted, recoverable) document as a permanent delete.
      */
+    @Override
     public List<OutlineDocumentModel> listArchivedDocuments(String serverUrl, String token, String collectionId) {
         String resolvedUrl = resolveAndValidateServerUrl(serverUrl);
         List<OutlineDocumentModel> all = new ArrayList<>();
@@ -335,6 +343,7 @@ public class OutlineApiClient {
      * Lists the change-notification subscriptions the token owns ({@code webhookSubscriptions.list}). The
      * registrar's self-heal pass diffs its stored subscription id against this.
      */
+    @Override
     public List<OutlineWebhookSubscription> listWebhookSubscriptions(String serverUrl, String token) {
         String resolvedUrl = resolveAndValidateServerUrl(serverUrl);
         List<OutlineWebhookSubscription> all = new ArrayList<>();
@@ -369,6 +378,7 @@ public class OutlineApiClient {
     }
 
     /** Exports a document's body as Markdown ({@code documents.export}); {@code null} when Outline responds without a body. */
+    @Override
     public String exportDocument(String serverUrl, String token, String documentId) {
         String resolvedUrl = resolveAndValidateServerUrl(serverUrl);
         OutlineEnvelope<String> body = post(
@@ -385,6 +395,7 @@ public class OutlineApiClient {
      * Creates a subscription ({@code webhookSubscriptions.create}) posting the given events to
      * {@code deliveryUrl}, signed with {@code signingSecret}; returns its id, or {@code null} when Outline responds without one.
      */
+    @Override
     public String createWebhookSubscription(
         String serverUrl,
         String token,
@@ -404,6 +415,7 @@ public class OutlineApiClient {
         return body == null || body.data() == null ? null : body.data().getId();
     }
 
+    @Override
     public void deleteWebhookSubscription(String serverUrl, String token, String subscriptionId) {
         String resolvedUrl = resolveAndValidateServerUrl(serverUrl);
         try {

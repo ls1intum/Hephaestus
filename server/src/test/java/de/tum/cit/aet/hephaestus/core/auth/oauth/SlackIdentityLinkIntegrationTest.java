@@ -9,21 +9,14 @@ import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityLink;
 import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityLinkRepository;
 import de.tum.cit.aet.hephaestus.core.auth.provider.LoginProvider;
 import de.tum.cit.aet.hephaestus.core.auth.provider.LoginProviderRepository;
-import de.tum.cit.aet.hephaestus.testconfig.RealAuthDatasource;
+import de.tum.cit.aet.hephaestus.testconfig.RealAuthIntegrationTest;
 import java.util.List;
 import java.util.Map;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.context.annotation.Import;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.core.user.DefaultOAuth2User;
 import org.springframework.security.oauth2.core.user.OAuth2User;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
 /**
  * Authenticated Slack identity link, against a REAL Postgres. Drives {@link AccountProvisioningService}
@@ -35,11 +28,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
  * {@code IdentityLink(SLACK, U1, T1) MANUAL_LINK} to the SAME account, creating no new account; (2) an
  * unauthenticated link start (no bound account) fails closed and creates no orphan account.
  */
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@ActiveProfiles("test")
-@Testcontainers
-@Tag("integration")
-class SlackIdentityLinkIntegrationTest {
+class SlackIdentityLinkIntegrationTest extends RealAuthIntegrationTest {
 
     @Autowired
     private AccountProvisioningService service;
@@ -52,11 +41,6 @@ class SlackIdentityLinkIntegrationTest {
 
     @Autowired
     private LoginProviderRepository loginProviderRepository;
-
-    @DynamicPropertySource
-    static void datasource(DynamicPropertyRegistry registry) {
-        RealAuthDatasource.register(registry);
-    }
 
     @Test
     void linkingSlackAttachesExactlyOneSlackIdentityToTheSameAccount() {

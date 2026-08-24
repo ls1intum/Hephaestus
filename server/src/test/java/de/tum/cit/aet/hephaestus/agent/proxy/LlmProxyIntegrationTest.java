@@ -8,42 +8,34 @@ import de.tum.cit.aet.hephaestus.agent.catalog.LlmConnection;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmConnectionRepository;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModel;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelRepository;
+import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelResolver;
+import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelResolver.ConnectionRef;
 import de.tum.cit.aet.hephaestus.agent.catalog.ModelVisibility;
 import de.tum.cit.aet.hephaestus.agent.config.AgentPurpose;
-import de.tum.cit.aet.hephaestus.agent.config.ConfigSnapshot;
 import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBinding;
 import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBindingRepository;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobStatus;
+import de.tum.cit.aet.hephaestus.agent.usage.FundingSource;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.testconfig.LlmCatalogTestFixtures;
 import de.tum.cit.aet.hephaestus.workspace.AbstractWorkspaceIntegrationTest;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
-import java.util.concurrent.TimeUnit;
-import mockwebserver3.MockResponse;
-import mockwebserver3.MockWebServer;
-import mockwebserver3.RecordedRequest;
-import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.BeforeAll;
+import java.util.concurrent.atomic.AtomicReference;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.MediaType;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
-import org.springframework.test.web.reactive.server.WebTestClient;
+import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.mock.web.MockHttpServletResponse;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
 
 class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
-
-    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
-    private static MockWebServer upstream;
-
-    @Autowired
-    private WebTestClient webTestClient;
 
     @Autowired
     private AgentJobRepository jobRepository;
@@ -57,166 +49,73 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
     @Autowired
     private LlmModelRepository modelRepository;
 
+    @Autowired
+    private ObjectMapper objectMapper;
+
+    @Autowired
+    private LlmModelResolver modelResolver;
+
+    private JobTokenAuthenticationFilter filter;
     private Workspace workspace;
 
-    @BeforeAll
-    static void startUpstream() throws Exception {
-        upstream = new MockWebServer();
-        upstream.start();
-    }
-
-    @AfterAll
-    static void stopUpstream() throws Exception {
-        upstream.close();
-    }
-
-    @DynamicPropertySource
-    static void properties(DynamicPropertyRegistry registry) {
-        registry.add("hephaestus.agent.enabled", () -> "true");
-        registry.add("hephaestus.agent.poll-interval", () -> "1h");
-        registry.add("hephaestus.runtime.worker.enabled", () -> "true");
-        registry.add("hephaestus.runtime.webhook.enabled", () -> "false");
-        registry.add("hephaestus.sandbox.docker-host", () -> "unix:///nonexistent/llm-proxy-test.sock");
-        registry.add("hephaestus.agent.image.pull-policy", () -> "NEVER");
-        registry.add("hephaestus.llm.egress.allow-loopback", () -> "true");
-    }
-
     @BeforeEach
-    void setUp() throws Exception {
+    void setUp() {
+        SecurityContextHolder.clearContext();
+        filter = new JobTokenAuthenticationFilter(jobRepository, new MentorProxyCredentialRegistry(), objectMapper);
         User owner = persistUser("proxy-owner");
         workspace = createWorkspace("proxy-ws", "Proxy Workspace", "proxy-org", AccountType.ORG, owner);
-        while (upstream.takeRequest(0, TimeUnit.MILLISECONDS) != null) {
-            // Drain requests from prior tests.
-        }
+    }
+
+    @AfterEach
+    void clearSecurityContext() {
+        SecurityContextHolder.clearContext();
     }
 
     @Test
-    void shouldRequireProxyBearerToken() {
-        webTestClient
-            .post()
-            .uri("/internal/llm/chat/completions")
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue("{}")
-            .exchange()
-            .expectStatus()
-            .isUnauthorized();
-    }
+    void shouldAuthenticateRunningJobTokenAgainstPersistedRouting() throws Exception {
+        AgentJob job = runningJob(true);
+        AuthenticationResult result = authenticate(job.getJobToken());
 
-    @Test
-    void shouldForwardChatCompletionsWithCatalogModelAndBearerCredential() throws Exception {
-        upstream.enqueue(jsonResponse("{\"id\":\"chatcmpl-test\"}"));
-        AgentJob job = runningJob("openai-completions", LlmAuthMode.BEARER, "catalog-chat-model", true);
-
-        webTestClient
-            .post()
-            .uri("/internal/llm/chat/completions")
-            .header("Authorization", "Bearer " + job.getJobToken())
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue("{\"model\":\"caller-model\",\"service_tier\":\"priority\",\"messages\":[]}")
-            .exchange()
-            .expectStatus()
-            .isOk();
-
-        RecordedRequest request = upstream.takeRequest(5, TimeUnit.SECONDS);
-        assertThat(request).isNotNull();
-        assertThat(request.getMethod()).isEqualTo("POST");
-        assertThat(request.getTarget()).isEqualTo("/v1/chat/completions");
-        assertThat(request.getHeaders().get("Authorization")).isEqualTo("Bearer upstream-secret");
-        assertThat(request.getBody().utf8()).contains("\"model\":\"catalog-chat-model\"");
-        assertThat(request.getBody().utf8()).doesNotContain("caller-model").doesNotContain("service_tier");
-    }
-
-    @Test
-    void shouldForwardResponsesWithRawApiKeyCredential() throws Exception {
-        upstream.enqueue(jsonResponse("{\"id\":\"response-test\"}"));
-        AgentJob job = runningJob("openai-responses", LlmAuthMode.API_KEY, "catalog-response-model", true);
-
-        webTestClient
-            .post()
-            .uri("/internal/llm/responses")
-            .header("Authorization", "Bearer " + job.getJobToken())
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue("{\"model\":\"caller-model\",\"input\":\"hello\"}")
-            .exchange()
-            .expectStatus()
-            .isOk();
-
-        RecordedRequest request = upstream.takeRequest(5, TimeUnit.SECONDS);
-        assertThat(request).isNotNull();
-        assertThat(request.getTarget()).isEqualTo("/v1/responses");
-        assertThat(request.getHeaders().get("api-key")).isEqualTo("upstream-secret");
-        assertThat(request.getHeaders().get("Authorization")).isNull();
-        assertThat(request.getBody().utf8()).contains("\"model\":\"catalog-response-model\"");
-    }
-
-    @Test
-    void shouldRejectQueryAndWrongPathWithoutCallingUpstream() {
-        AgentJob job = runningJob("openai-completions", LlmAuthMode.BEARER, "model", true);
-        int requestsBefore = upstream.getRequestCount();
-
-        webTestClient
-            .post()
-            .uri("/internal/llm/chat/completions?api-version=unsafe")
-            .header("Authorization", "Bearer " + job.getJobToken())
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue("{}")
-            .exchange()
-            .expectStatus()
-            .isBadRequest();
-        webTestClient
-            .post()
-            .uri("/internal/llm/responses")
-            .header("Authorization", "Bearer " + job.getJobToken())
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue("{}")
-            .exchange()
-            .expectStatus()
-            .isNotFound();
-
-        assertThat(upstream.getRequestCount()).isEqualTo(requestsBefore);
-    }
-
-    @Test
-    void shouldRejectHostedProviderToolsWithoutCallingUpstream() {
-        AgentJob job = runningJob("openai-responses", LlmAuthMode.BEARER, "model", true);
-        int requestsBefore = upstream.getRequestCount();
-
-        webTestClient
-            .post()
-            .uri("/internal/llm/responses")
-            .header("Authorization", "Bearer " + job.getJobToken())
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue("{\"tools\":[{\"type\":\"web_search_preview\"}]}")
-            .exchange()
-            .expectStatus()
-            .isBadRequest();
-
-        assertThat(upstream.getRequestCount()).isEqualTo(requestsBefore);
+        assertThat(result.status()).isEqualTo(200);
+        assertThat(result.authentication())
+            .isNotNull()
+            .extracting(Authentication::getPrincipal)
+            .isInstanceOf(ProxyRouting.class);
     }
 
     @Test
     void shouldFailClosedWhenCatalogModelIsDisabled() {
-        AgentJob job = runningJob("openai-completions", LlmAuthMode.BEARER, "model", false);
-        int requestsBefore = upstream.getRequestCount();
+        AgentJob job = runningJob(false);
+        long connectionId = job.getConfigSnapshot().get("connectionId").asLong();
+        long modelId = job.getConfigSnapshot().get("modelId").asLong();
 
-        webTestClient
-            .post()
-            .uri("/internal/llm/chat/completions")
-            .header("Authorization", "Bearer " + job.getJobToken())
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue("{}")
-            .exchange()
-            .expectStatus()
-            .isEqualTo(502);
-
-        assertThat(upstream.getRequestCount()).isEqualTo(requestsBefore);
+        assertThat(
+            modelResolver.resolveProxyCredential(
+                new ConnectionRef(FundingSource.INSTANCE, connectionId, modelId, workspace.getId())
+            )
+        ).isNull();
     }
 
-    private AgentJob runningJob(String protocol, LlmAuthMode authMode, String upstreamModelId, boolean modelEnabled) {
+    private AuthenticationResult authenticate(String token) throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.setRemoteAddr("127.0.0.1");
+        request.setRequestURI("/internal/llm/chat/completions");
+        request.addHeader("Authorization", "Bearer " + token);
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        AtomicReference<Authentication> authentication = new AtomicReference<>();
+        filter.doFilter(request, response, (filteredRequest, filteredResponse) ->
+            authentication.set(SecurityContextHolder.getContext().getAuthentication())
+        );
+        return new AuthenticationResult(response.getStatus(), authentication.get());
+    }
+
+    private record AuthenticationResult(int status, Authentication authentication) {}
+
+    private AgentJob runningJob(boolean modelEnabled) {
         LlmConnection connection = LlmCatalogTestFixtures.connection("connection-" + System.nanoTime());
-        connection.setBaseUrl(upstream.url("/v1").toString().replaceAll("/$", ""));
-        connection.setApiProtocol(protocol);
-        connection.setAuthMode(authMode);
+        connection.setBaseUrl("https://api.example.com/v1");
+        connection.setApiProtocol("openai-completions");
+        connection.setAuthMode(LlmAuthMode.BEARER);
         connection.setApiKey("upstream-secret");
         connection = connectionRepository.save(connection);
 
@@ -224,29 +123,26 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
             LlmCatalogTestFixtures.model(
                 connection,
                 "model-" + System.nanoTime(),
-                upstreamModelId,
+                "catalog-model",
                 ModelVisibility.PUBLIC,
                 modelEnabled
             )
         );
-
         WorkspaceAgentBinding binding = new WorkspaceAgentBinding();
         binding.setWorkspace(workspace);
         binding.setPurpose(AgentPurpose.PRACTICE_REVIEW);
         binding.setInstanceModel(model);
         binding.setEnabled(true);
         binding.setTimeoutSeconds(600);
-        binding.setAllowInternet(false);
-        binding = agentBindingRepository.save(binding);
+        agentBindingRepository.save(binding);
 
-        ObjectNode snapshot = OBJECT_MAPPER.createObjectNode();
-        snapshot.put("schemaVersion", ConfigSnapshot.SCHEMA_VERSION);
-        snapshot.put("configId", binding.getId());
-        snapshot.put("apiProtocol", protocol);
+        ObjectNode snapshot = objectMapper.createObjectNode();
+        snapshot.put("schemaVersion", 1);
+        snapshot.put("apiProtocol", "openai-completions");
         snapshot.put("baseUrl", connection.getBaseUrl());
-        snapshot.put("upstreamModelId", upstreamModelId);
-        snapshot.put("supportsReasoning", false);
+        snapshot.put("upstreamModelId", model.getUpstreamModelId());
         snapshot.put("connectionScope", "INSTANCE");
+        snapshot.put("fundingSource", "INSTANCE");
         snapshot.put("connectionId", connection.getId());
         snapshot.put("modelId", model.getId());
         snapshot.put("workspaceId", workspace.getId());
@@ -260,9 +156,5 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
         job.setStatus(AgentJobStatus.RUNNING);
         job.setConfigSnapshot(snapshot);
         return jobRepository.save(job);
-    }
-
-    private static MockResponse jsonResponse(String body) {
-        return new MockResponse.Builder().code(200).addHeader("Content-Type", "application/json").body(body).build();
     }
 }

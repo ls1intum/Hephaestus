@@ -55,13 +55,13 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.event.ApplicationEvents;
 import org.springframework.test.context.event.RecordApplicationEvents;
 import tools.jackson.databind.JsonNode;
@@ -118,13 +118,13 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
     @Autowired
     private InstanceSettingsService instanceSettingsService;
 
-    @MockitoBean
+    @Autowired
     private PullRequestCommentPoster commentPoster;
 
-    @MockitoBean
+    @Autowired
     private DiffNotePoster diffNotePoster;
 
-    @MockitoBean
+    @Autowired
     private AccountPreferencesQuery accountPreferencesQuery;
 
     private JobTypeHandler handler;
@@ -132,8 +132,14 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
     private AgentJob agentJob;
     private Long prId;
 
+    @AfterEach
+    void resetHandlerDoubles() {
+        org.mockito.Mockito.reset(commentPoster, diffNotePoster, accountPreferencesQuery);
+    }
+
     @BeforeEach
     void setUp() {
+        org.mockito.Mockito.reset(commentPoster, diffNotePoster, accountPreferencesQuery);
         databaseTestUtils.cleanDatabase();
         releaseSilentMode();
 

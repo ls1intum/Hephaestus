@@ -4,6 +4,7 @@ import de.tum.cit.aet.hephaestus.agent.mentor.chat.MentorChannel;
 import de.tum.cit.aet.hephaestus.agent.mentor.chat.wire.UIMessageChunk;
 import de.tum.cit.aet.hephaestus.integration.slack.messaging.SlackMessageService;
 import de.tum.cit.aet.hephaestus.integration.slack.messaging.SlackSendException;
+import java.time.Duration;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.Executors;
@@ -37,6 +38,8 @@ public class SlackStreamingMentorChannel implements MentorChannel {
      * {@value #MAX_CONSECUTIVE_FAILURES}, but an unbounded 429 storm must still terminate the turn eventually.
      */
     private static final int MAX_CONSECUTIVE_RATE_LIMITS = 20;
+    private static final Duration GRACEFUL_SHUTDOWN_TIMEOUT = Duration.ofSeconds(2);
+    private static final Duration FORCED_SHUTDOWN_TIMEOUT = Duration.ofSeconds(10);
 
     private static final Set<String> TERMINAL_ERRORS = Set.of(
         "message_not_found",
@@ -54,6 +57,10 @@ public class SlackStreamingMentorChannel implements MentorChannel {
     private final long workspaceId;
     private final String channel;
     private final String threadTs;
+    private final Duration gracefulShutdownTimeout;
+    private final Duration forcedShutdownTimeout;
+    private final long initialFlushDelayMillis;
+    private final long flushIntervalMillis;
     private final SlackMentorTextFilter textFilter = new SlackMentorTextFilter();
 
     private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
@@ -80,10 +87,36 @@ public class SlackStreamingMentorChannel implements MentorChannel {
     private int consecutiveRateLimits; // flush-thread only
 
     public SlackStreamingMentorChannel(SlackMessageService slack, long workspaceId, String channel, String threadTs) {
+        this(
+            slack,
+            workspaceId,
+            channel,
+            threadTs,
+            GRACEFUL_SHUTDOWN_TIMEOUT,
+            FORCED_SHUTDOWN_TIMEOUT,
+            INITIAL_DELAY_MS,
+            FLUSH_INTERVAL_MS
+        );
+    }
+
+    SlackStreamingMentorChannel(
+        SlackMessageService slack,
+        long workspaceId,
+        String channel,
+        String threadTs,
+        Duration gracefulShutdownTimeout,
+        Duration forcedShutdownTimeout,
+        long initialFlushDelayMillis,
+        long flushIntervalMillis
+    ) {
         this.slack = slack;
         this.workspaceId = workspaceId;
         this.channel = channel;
         this.threadTs = threadTs;
+        this.gracefulShutdownTimeout = gracefulShutdownTimeout;
+        this.forcedShutdownTimeout = forcedShutdownTimeout;
+        this.initialFlushDelayMillis = initialFlushDelayMillis;
+        this.flushIntervalMillis = flushIntervalMillis;
     }
 
     @Override
@@ -177,8 +210,8 @@ public class SlackStreamingMentorChannel implements MentorChannel {
         }
         flushTask = scheduler.scheduleWithFixedDelay(
             this::tick,
-            INITIAL_DELAY_MS,
-            FLUSH_INTERVAL_MS,
+            initialFlushDelayMillis,
+            flushIntervalMillis,
             TimeUnit.MILLISECONDS
         );
     }
@@ -406,9 +439,9 @@ public class SlackStreamingMentorChannel implements MentorChannel {
         }
         scheduler.shutdown();
         try {
-            if (!scheduler.awaitTermination(2, TimeUnit.SECONDS)) {
+            if (!scheduler.awaitTermination(gracefulShutdownTimeout.toMillis(), TimeUnit.MILLISECONDS)) {
                 scheduler.shutdownNow();
-                if (!scheduler.awaitTermination(10, TimeUnit.SECONDS)) {
+                if (!scheduler.awaitTermination(forcedShutdownTimeout.toMillis(), TimeUnit.MILLISECONDS)) {
                     log.warn("Slack stream flush tick still in-flight at finalize (channel={})", channel);
                 }
             }

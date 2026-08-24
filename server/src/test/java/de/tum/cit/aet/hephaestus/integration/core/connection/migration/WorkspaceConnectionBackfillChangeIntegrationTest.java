@@ -26,7 +26,6 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.test.annotation.DirtiesContext;
 
 /**
  * Drives {@link WorkspaceConnectionBackfillChange#execute} against a real PostgreSQL
@@ -47,7 +46,6 @@ import org.springframework.test.annotation.DirtiesContext;
  * the change's separate connection. Cleanup is explicit: {@code cleanDatabase()} in
  * {@link #setUp} and the column drop in {@link #tearDown}.
  */
-@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 class WorkspaceConnectionBackfillChangeIntegrationTest extends BaseIntegrationTest {
 
     private static final String ENCRYPTION_KEY = "test-encryption-key-32-bytes-aes";

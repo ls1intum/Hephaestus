@@ -1,11 +1,9 @@
 package de.tum.cit.aet.hephaestus.agent.mentor.chat;
 
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.doAnswer;
-import static org.mockito.Mockito.timeout;
-import static org.mockito.Mockito.verify;
+import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
+import de.tum.cit.aet.hephaestus.testconfig.StubMentorChatStarter;
 import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
 import de.tum.cit.aet.hephaestus.testconfig.WithMentorUser;
 import de.tum.cit.aet.hephaestus.workspace.AbstractWorkspaceIntegrationTest;
@@ -16,13 +14,12 @@ import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.reactive.server.WebTestClient;
-import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 /**
  * Fires the real filter chain so the SSE endpoint's two guards — WorkspaceContextFilter
@@ -34,10 +31,13 @@ class MentorChatControllerAuthIntegrationTest extends AbstractWorkspaceIntegrati
     @Autowired
     private WebTestClient webTestClient;
 
-    // Only MentorChatService is stubbed/verified; the other collaborators resolve fine unmocked, so
-    // they stay out of the override set (a smaller set = fewer distinct test contexts).
-    @MockitoBean
-    private MentorChatService mentorChatService;
+    @Autowired
+    private StubMentorChatStarter mentorChatStarter;
+
+    @BeforeEach
+    void resetMentorChatStarter() {
+        mentorChatStarter.reset();
+    }
 
     @Autowired
     private WorkspaceRepository workspaceRepositoryForFeatures;
@@ -103,16 +103,6 @@ class MentorChatControllerAuthIntegrationTest extends AbstractWorkspaceIntegrati
         enableMentor(workspace);
         ensureWorkspaceMembership(workspace, mentor, WorkspaceMembership.WorkspaceRole.MEMBER);
 
-        // Mocked service must complete the emitter or WebTestClient blocks on the SSE body.
-        doAnswer(inv -> {
-            SseEmitter emitter = inv.getArgument(1);
-            emitter.send(SseEmitter.event().data("[DONE]"));
-            emitter.complete();
-            return null;
-        })
-            .when(mentorChatService)
-            .start(any(), any());
-
         webTestClient
             .post()
             .uri("/workspaces/{workspaceSlug}/mentor/chat", workspace.getWorkspaceSlug())
@@ -130,8 +120,7 @@ class MentorChatControllerAuthIntegrationTest extends AbstractWorkspaceIntegrati
             .expectHeader()
             .valueEquals("Cache-Control", "no-cache");
 
-        // timeout() because the controller submits to a vthread executor and returns.
-        verify(mentorChatService, timeout(2_000)).start(any(), any());
+        assertThat(mentorChatStarter.awaitInvocation()).isTrue();
     }
 
     @Test

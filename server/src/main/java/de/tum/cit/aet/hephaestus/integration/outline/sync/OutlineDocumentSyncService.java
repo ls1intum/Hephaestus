@@ -13,8 +13,8 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.SyncPhase;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncProgress;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobType;
 import de.tum.cit.aet.hephaestus.integration.outline.OutlineProperties;
-import de.tum.cit.aet.hephaestus.integration.outline.client.OutlineApiClient;
 import de.tum.cit.aet.hephaestus.integration.outline.client.OutlineApiException;
+import de.tum.cit.aet.hephaestus.integration.outline.client.OutlineContentClient;
 import de.tum.cit.aet.hephaestus.integration.outline.client.OutlineRateLimitedException;
 import de.tum.cit.aet.hephaestus.integration.outline.client.model.OutlineCollectionModel;
 import de.tum.cit.aet.hephaestus.integration.outline.client.model.OutlineDocumentModel;
@@ -91,7 +91,7 @@ public class OutlineDocumentSyncService {
     private static final int MAX_DESCRIPTION_LENGTH = 2048;
 
     private final ConnectionService connectionService;
-    private final OutlineApiClient outlineApiClient;
+    private final OutlineContentClient outlineApiClient;
     private final OutlineDocumentRepository documentRepository;
     private final OutlineCollectionRepository collectionRepository;
     private final OutlineWebhookRegistrar webhookRegistrar;
@@ -105,7 +105,7 @@ public class OutlineDocumentSyncService {
 
     public OutlineDocumentSyncService(
         ConnectionService connectionService,
-        OutlineApiClient outlineApiClient,
+        OutlineContentClient outlineApiClient,
         OutlineDocumentRepository documentRepository,
         OutlineCollectionRepository collectionRepository,
         OutlineWebhookRegistrar webhookRegistrar,

@@ -31,10 +31,6 @@ jobs:
       - name: Install Node.js dependencies
         run: pnpm install --frozen-lockfile --prefer-offline
 
-      - name: Compile Application Server
-        working-directory: server
-        run: mvn compile -DskipTests --quiet -Dmaven.build.cache.enabled=true
-
       - name: Generate OpenAPI specs and clients
         run: pnpm run generate:api
 

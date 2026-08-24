@@ -48,7 +48,7 @@ import org.junit.jupiter.api.Test;
 @Tag("architecture")
 class TestTierTaggingArchTest {
 
-    private static final Set<String> TIERS = Set.of("unit", "architecture", "integration", "live");
+    private static final Set<String> TIERS = Set.of("unit", "architecture", "database", "integration", "live");
 
     /** The two suffixes Failsafe is configured to discover. Anything else is dead on arrival. */
     private static final Set<String> FAILSAFE_SUFFIXES = Set.of("IntegrationTest", "LiquibaseTest");

@@ -26,8 +26,6 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.web.server.LocalServerPort;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
 import tools.jackson.databind.ObjectMapper;
 
 /**
@@ -38,15 +36,9 @@ import tools.jackson.databind.ObjectMapper;
  *
  * <p>This exercises the full transport stack (Spring {@code WebSocketHandlerRegistry} + JWT
  * handshake interceptor + sealed-switch dispatch + per-session lifecycle events) against a
- * real booted context — the JWT signing key is configured via {@code DynamicPropertySource}
- * and the bound port via {@code @LocalServerPort}.
+ * real booted context on the bound {@code @LocalServerPort}.
  */
 class WorkerControlChannelIntegrationTest extends BaseIntegrationTest {
-
-    @DynamicPropertySource
-    static void registration(DynamicPropertyRegistry registry) {
-        registry.add("hephaestus.worker.hub.token.registration-token", () -> "e2e-secret");
-    }
 
     @LocalServerPort
     int port;

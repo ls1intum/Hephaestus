@@ -3,6 +3,14 @@ package de.tum.cit.aet.hephaestus.testconfig;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
+import java.sql.Statement;
+import java.util.regex.Pattern;
+import liquibase.Contexts;
+import liquibase.Liquibase;
+import liquibase.database.Database;
+import liquibase.database.DatabaseFactory;
+import liquibase.database.jvm.JdbcConnection;
+import liquibase.resource.ClassLoaderResourceAccessor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.PostgreSQLContainer;
@@ -12,10 +20,13 @@ public final class PostgreSQLTestContainer {
     private static final String DEFAULT_TEST_DB = "hephaestus_test";
     private static final String DEFAULT_TEST_USER = "test";
     private static final String DEFAULT_TEST_PASSWORD = "test";
+    private static final String MIGRATED_TEMPLATE_DATABASE = "hephaestus_template_dev";
+    private static final Pattern DATABASE_NAME = Pattern.compile("[a-z][a-z0-9_]*");
 
     private static final Logger LOGGER = LoggerFactory.getLogger(PostgreSQLTestContainer.class);
 
     private static PostgreSQLContainer<?> container;
+    private static boolean migratedTemplateReady;
 
     private PostgreSQLTestContainer() {}
 
@@ -26,6 +37,95 @@ public final class PostgreSQLTestContainer {
         return container;
     }
 
+    public static synchronized TestDatabase createDatabase(String name) {
+        validateDatabaseName(name);
+        PostgreSQLContainer<?> postgres = getInstance();
+        try (
+            Connection connection = DriverManager.getConnection(
+                postgres.getJdbcUrl(),
+                postgres.getUsername(),
+                postgres.getPassword()
+            );
+            Statement statement = connection.createStatement()
+        ) {
+            statement.execute("CREATE DATABASE \"" + name + "\"");
+        } catch (SQLException exception) {
+            throw new IllegalStateException("Failed to create test database " + name, exception);
+        }
+        return database(postgres, name);
+    }
+
+    public static synchronized TestDatabase createMigratedDatabase(String name) {
+        validateDatabaseName(name);
+        if (!migratedTemplateReady) {
+            TestDatabase template = createDatabase(MIGRATED_TEMPLATE_DATABASE);
+            migrateDatabase(template, "dev");
+            migratedTemplateReady = true;
+        }
+        return cloneDatabase(name, MIGRATED_TEMPLATE_DATABASE);
+    }
+
+    private static TestDatabase cloneDatabase(String name, String templateName) {
+        PostgreSQLContainer<?> postgres = getInstance();
+        try (
+            Connection connection = DriverManager.getConnection(
+                postgres.getJdbcUrl(),
+                postgres.getUsername(),
+                postgres.getPassword()
+            );
+            Statement statement = connection.createStatement()
+        ) {
+            statement.execute("CREATE DATABASE \"" + name + "\" TEMPLATE \"" + templateName + "\"");
+        } catch (SQLException exception) {
+            throw new IllegalStateException("Failed to clone test database " + name, exception);
+        }
+        return database(postgres, name);
+    }
+
+    public static void migrateDatabase(TestDatabase testDatabase, String contexts) {
+        String validationSetting = System.getProperty("liquibase.validateXmlChangelogFiles");
+        System.setProperty("liquibase.validateXmlChangelogFiles", "false");
+        try (
+            Connection connection = DriverManager.getConnection(
+                testDatabase.jdbcUrl(),
+                testDatabase.username(),
+                testDatabase.password()
+            )
+        ) {
+            Database database = DatabaseFactory.getInstance().findCorrectDatabaseImplementation(
+                new JdbcConnection(connection)
+            );
+            try (Liquibase liquibase = new Liquibase("db/master.xml", new ClassLoaderResourceAccessor(), database)) {
+                liquibase.update(new Contexts(contexts));
+            }
+        } catch (Exception exception) {
+            throw new IllegalStateException("Failed to prepare migrated test database template", exception);
+        } finally {
+            if (validationSetting == null) {
+                System.clearProperty("liquibase.validateXmlChangelogFiles");
+            } else {
+                System.setProperty("liquibase.validateXmlChangelogFiles", validationSetting);
+            }
+        }
+    }
+
+    public static String getLogs() {
+        return getInstance().getLogs();
+    }
+
+    private static void validateDatabaseName(String name) {
+        if (!DATABASE_NAME.matcher(name).matches()) {
+            throw new IllegalArgumentException("Invalid test database name: " + name);
+        }
+    }
+
+    private static TestDatabase database(PostgreSQLContainer<?> postgres, String name) {
+        String jdbcUrl = "jdbc:postgresql://" + postgres.getHost() + ":" + postgres.getMappedPort(5432) + "/" + name;
+        return new TestDatabase(jdbcUrl, postgres.getUsername(), postgres.getPassword());
+    }
+
+    public record TestDatabase(String jdbcUrl, String username, String password) {}
+
     @SuppressWarnings("resource") // Closed by the JVM shutdown hook.
     private static PostgreSQLContainer<?> createContainer() {
         PostgreSQLContainer<?> newContainer = new PostgreSQLContainer<>("postgres:16")
@@ -34,6 +134,11 @@ public final class PostgreSQLTestContainer {
             .withPassword(DEFAULT_TEST_PASSWORD);
 
         newContainer.start();
+        ensureExtensions(
+            database(newContainer, "template1").jdbcUrl(),
+            newContainer.getUsername(),
+            newContainer.getPassword()
+        );
         ensureExtensions(newContainer.getJdbcUrl(), newContainer.getUsername(), newContainer.getPassword());
 
         LOGGER.info(

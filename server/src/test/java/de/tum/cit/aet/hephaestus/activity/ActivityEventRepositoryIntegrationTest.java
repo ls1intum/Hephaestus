@@ -21,6 +21,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Integration tests for {@link ActivityEventRepository#backfillCommitActors(Long, double)}.
@@ -30,6 +31,7 @@ import org.springframework.beans.factory.annotation.Autowired;
  * {@code git_commit.author_id} is backfilled via email match, this native UPDATE
  * rewrites the activity-event columns so the contributor actually receives XP.
  */
+@Transactional
 class ActivityEventRepositoryIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
@@ -58,8 +60,6 @@ class ActivityEventRepositoryIntegrationTest extends BaseIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        databaseTestUtils.cleanDatabase();
-
         workspace = new Workspace();
         workspace.setWorkspaceSlug("backfill-workspace");
         workspace.setDisplayName("Backfill Workspace");

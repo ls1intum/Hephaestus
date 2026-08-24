@@ -7,7 +7,7 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.consumer.IntegrationNatsConsumer;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.BearerToken;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
-import de.tum.cit.aet.hephaestus.integration.outline.client.OutlineApiClient;
+import de.tum.cit.aet.hephaestus.integration.outline.client.OutlineWebhookClient;
 import de.tum.cit.aet.hephaestus.integration.outline.client.model.OutlineWebhookSubscription;
 import de.tum.cit.aet.hephaestus.integration.outline.webhook.OutlineWebhookEvents;
 import java.security.SecureRandom;
@@ -48,7 +48,7 @@ public class OutlineWebhookRegistrar {
     private static final String SUBSCRIPTION_NAME = "Hephaestus documentation sync";
 
     private final ConnectionService connectionService;
-    private final OutlineApiClient outlineApiClient;
+    private final OutlineWebhookClient outlineApiClient;
     private final EncryptedStringConverter secretCipher;
     private final String externalUrl;
 
@@ -57,7 +57,7 @@ public class OutlineWebhookRegistrar {
 
     public OutlineWebhookRegistrar(
         ConnectionService connectionService,
-        OutlineApiClient outlineApiClient,
+        OutlineWebhookClient outlineApiClient,
         EncryptedStringConverter secretCipher,
         @Value("${hephaestus.webhook.external-url:}") String externalUrl,
         ObjectProvider<IntegrationNatsConsumer> natsConsumer

@@ -14,7 +14,9 @@ import com.tngtech.archunit.lang.SimpleConditionEvent;
 import java.util.Set;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.bind.annotation.*;
@@ -410,17 +412,19 @@ class AdvancedArchitectureTest extends HephaestusArchitectureTest {
                 "AbstractWorkspaceIntegrationTest",
                 "AbstractGitHubLiveSyncIntegrationTest",
                 "BaseGitHubLiveIntegrationTest",
-                "BaseIntegrationTest"
+                "BaseIntegrationTest",
+                "RealAuthIntegrationTest"
             );
 
             Set<String> validBaseClasses = Set.of(
                 "de.tum.cit.aet.hephaestus.workspace.AbstractWorkspaceIntegrationTest",
                 "de.tum.cit.aet.hephaestus.integration.scm.github.AbstractGitHubLiveSyncIntegrationTest",
-                "de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest"
+                "de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest",
+                "de.tum.cit.aet.hephaestus.testconfig.RealAuthIntegrationTest"
             );
 
-            ArchCondition<JavaClass> haveProperSpringContext = new ArchCondition<>(
-                "have Spring context via @SpringBootTest annotation or extend a recognized base class"
+            ArchCondition<JavaClass> haveIntegrationHarness = new ArchCondition<>(
+                "declare its integration harness explicitly"
             ) {
                 @Override
                 public void check(JavaClass javaClass, ConditionEvents events) {
@@ -428,18 +432,24 @@ class AdvancedArchitectureTest extends HephaestusArchitectureTest {
                         return;
                     }
                     boolean hasSpringBootTest = javaClass.isAnnotatedWith(SpringBootTest.class);
+                    boolean hasFocusedHarness =
+                        javaClass.isAnnotatedWith(DataJpaTest.class) ||
+                        (javaClass.isAnnotatedWith(Tag.class) &&
+                            Set.of("integration", "database").contains(
+                                javaClass.getAnnotationOfType(Tag.class).value()
+                            ));
 
                     boolean extendsValidBase = javaClass
                         .getAllRawSuperclasses()
                         .stream()
                         .anyMatch(superClass -> validBaseClasses.contains(superClass.getName()));
 
-                    if (!hasSpringBootTest && !extendsValidBase) {
+                    if (!hasSpringBootTest && !hasFocusedHarness && !extendsValidBase) {
                         events.add(
                             SimpleConditionEvent.violated(
                                 javaClass,
                                 String.format(
-                                    "%s is an integration test but doesn't have @SpringBootTest or extend a base class",
+                                    "%s is an integration test but does not declare a Spring slice, integration tag, or full-context base",
                                     javaClass.getSimpleName()
                                 )
                             )
@@ -455,7 +465,7 @@ class AdvancedArchitectureTest extends HephaestusArchitectureTest {
                 .haveSimpleNameNotContaining("Abstract")
                 .and()
                 .haveSimpleNameNotStartingWith("Base")
-                .should(haveProperSpringContext)
+                .should(haveIntegrationHarness)
                 .because("Integration tests need proper Spring context via base class or annotation");
             rule.check(classesWithTests);
         }

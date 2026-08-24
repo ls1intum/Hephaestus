@@ -134,7 +134,13 @@ stop_postgres() {
 apply_migrations() {
     log_info "Applying Liquibase migrations..."
     cd "$APP_SERVER_DIR"
-    SPRING_PROFILES_ACTIVE=local,dev ./mvnw liquibase:update -Dpostgres.port="$POSTGRES_PORT"
+    SPRING_PROFILES_ACTIVE=local,dev ./mvnw liquibase:update -P'!quick' -Dpostgres.port="$POSTGRES_PORT"
+}
+
+apply_migrations_and_generate_diff() {
+    log_info "Applying Liquibase migrations and generating changelog diff..."
+    cd "$APP_SERVER_DIR"
+    SPRING_PROFILES_ACTIVE=local,dev ./mvnw liquibase:update liquibase:diff -P'!quick' -Dpostgres.port="$POSTGRES_PORT"
 }
 
 DB_NAME="${POSTGRES_DB:-hephaestus}"
@@ -169,10 +175,7 @@ generate_changelog_diff() {
         log_info "Ensuring PostgreSQL is ready..."
         wait_for_postgres_ready
         
-        apply_migrations
-        
-        log_info "Generating changelog diff..."
-        SPRING_PROFILES_ACTIVE=local,dev ./mvnw liquibase:diff -Dpostgres.port="$POSTGRES_PORT"
+        apply_migrations_and_generate_diff
     else
         log_info "Backing up current database state..."
         stop_postgres
@@ -199,10 +202,7 @@ generate_changelog_diff() {
         fi
 
         start_postgres
-        apply_migrations
-        
-        log_info "Generating changelog diff..."
-        SPRING_PROFILES_ACTIVE=local,dev ./mvnw liquibase:diff -Dpostgres.port="$POSTGRES_PORT"
+        apply_migrations_and_generate_diff
         
         log_info "Restoring original database state..."
         stop_postgres

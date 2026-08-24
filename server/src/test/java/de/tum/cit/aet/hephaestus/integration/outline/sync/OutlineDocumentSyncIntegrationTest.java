@@ -7,6 +7,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -18,8 +19,8 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.CredentialBundleCon
 import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.BearerToken;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
-import de.tum.cit.aet.hephaestus.integration.outline.client.OutlineApiClient;
 import de.tum.cit.aet.hephaestus.integration.outline.client.OutlineClientModels;
+import de.tum.cit.aet.hephaestus.integration.outline.client.OutlineContentClient;
 import de.tum.cit.aet.hephaestus.integration.outline.client.model.OutlineDocumentModel;
 import de.tum.cit.aet.hephaestus.integration.outline.client.model.OutlineNavigationNode;
 import de.tum.cit.aet.hephaestus.integration.outline.client.model.OutlineUser;
@@ -36,12 +37,12 @@ import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.time.Instant;
 import java.util.List;
 import java.util.Set;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.test.context.TestPropertySource;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 /**
  * Real-Postgres proof of the Outline document reconcile with the HTTP wire mocked at the client boundary
@@ -65,8 +66,8 @@ class OutlineDocumentSyncIntegrationTest extends BaseIntegrationTest {
     private static final Instant T2 = Instant.parse("2026-02-01T00:00:00Z");
     private static final OutlineUser AUTHOR = OutlineClientModels.user("user-1", "Ada Lovelace");
 
-    @MockitoBean
-    private OutlineApiClient outlineApiClient;
+    @Autowired
+    private OutlineContentClient outlineApiClient;
 
     @Autowired
     private OutlineDocumentSyncScheduler scheduler;
@@ -89,8 +90,14 @@ class OutlineDocumentSyncIntegrationTest extends BaseIntegrationTest {
     private long workspaceId;
     private long connectionId;
 
+    @AfterEach
+    void resetOutlineClient() {
+        reset(outlineApiClient);
+    }
+
     @BeforeEach
     void setUp() {
+        reset(outlineApiClient);
         databaseTestUtils.cleanDatabase();
         Workspace workspace = workspaceRepository.save(WorkspaceTestFixtures.activeWorkspace("outline-sync"));
         workspaceId = workspace.getId();
