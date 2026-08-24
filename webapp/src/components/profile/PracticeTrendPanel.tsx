@@ -1,5 +1,4 @@
 import type { OutcomeVector, PracticeTrend, TrendOpportunity } from "@/api/types.gen";
-import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { OBSERVATION_OUTCOME_PRESENTATION } from "./observation-outcome";
 import {
@@ -145,7 +144,6 @@ export interface PracticeTrendPanelProps {
 /** Inspectable comparison behind a practice or area direction. */
 export function PracticeTrendPanel({ trend, className }: PracticeTrendPanelProps) {
 	const presentation = PRACTICE_TREND_PRESENTATION[trend.direction];
-	const tentative = trend.support.level === "TENTATIVE";
 	const insufficient = trend.direction === "INSUFFICIENT_EVIDENCE";
 	const coverage = formatTrendCoverage(trend.support);
 	const comparisonLabel =
@@ -167,7 +165,7 @@ export function PracticeTrendPanel({ trend, className }: PracticeTrendPanelProps
 			className={cn("grid gap-4 rounded-xl border bg-card p-4", className)}
 		>
 			<div className="flex flex-wrap items-start justify-between gap-3">
-				<div className={cn("flex items-start gap-2", tentative && "opacity-75")}>
+				<div className={"flex items-start gap-2"}>
 					<presentation.Icon
 						className={cn(
 							"mt-0.5 size-5 shrink-0",
@@ -185,7 +183,6 @@ export function PracticeTrendPanel({ trend, className }: PracticeTrendPanelProps
 						<p className="text-sm text-muted-foreground">{presentation.label}</p>
 					</div>
 				</div>
-				{tentative && <Badge variant="outline">Early indication</Badge>}
 			</div>
 
 			{insufficient ? (

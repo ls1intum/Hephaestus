@@ -37,7 +37,6 @@ const mixedStatus: PracticeAreaStatus = {
 	guidanceSource: "RULE_BASED",
 	direction: "IMPROVING",
 	trendSupport: {
-		level: "WELL_SUPPORTED",
 		currentOpportunities: 4,
 		previousOpportunities: 4,
 		opportunitiesUntilComparable: 0,
@@ -63,7 +62,6 @@ const makeTrend = (
 	scope,
 	direction,
 	support: {
-		level: "WELL_SUPPORTED",
 		currentOpportunities: 4,
 		previousOpportunities: 4,
 		opportunitiesUntilComparable: 0,
@@ -232,7 +230,7 @@ export const Overview: Story = {
 		areaTrend: makeTrend("review-ready-work", "AREA", "IMPROVING"),
 		practiceTrends: {
 			"scope-one-concern": makeTrend("scope-one-concern", "PRACTICE", "IMPROVING"),
-			"describe-what-changed": makeTrend("describe-what-changed", "PRACTICE", "STABLE"),
+			"describe-what-changed": makeTrend("describe-what-changed", "PRACTICE", "UNCERTAIN"),
 		},
 		practiceNextSteps: {
 			"scope-one-concern":

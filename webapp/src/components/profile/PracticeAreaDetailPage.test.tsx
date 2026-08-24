@@ -31,7 +31,6 @@ const status: PracticeAreaStatus = {
 	guidanceSource: "RULE_BASED",
 	direction: "DECLINING",
 	trendSupport: {
-		level: "WELL_SUPPORTED",
 		currentOpportunities: 4,
 		previousOpportunities: 4,
 		opportunitiesUntilComparable: 0,
@@ -48,7 +47,6 @@ const makeTrend = (direction: PracticeTrend["direction"] = "DECLINING"): Practic
 	scope: "AREA",
 	direction,
 	support: {
-		level: "WELL_SUPPORTED",
 		currentOpportunities: 4,
 		previousOpportunities: 4,
 		opportunitiesUntilComparable: 0,
@@ -202,7 +200,7 @@ describe("PracticeAreaDetailPage", () => {
 				practices={practices}
 				practiceTrends={{
 					"scope-one-concern": {
-						...makeTrend("STABLE"),
+						...makeTrend("UNCERTAIN"),
 						scope: "PRACTICE",
 						slug: "scope-one-concern",
 					},
@@ -217,7 +215,7 @@ describe("PracticeAreaDetailPage", () => {
 			/>,
 		);
 		expect(screen.queryByText("Showing feedback")).toBeNull();
-		screen.getByText("Broadly consistent lately");
+		screen.getByText("Direction unclear");
 		screen.getByRole("button", { name: "Showing: Scope the change to one concern" });
 		screen.getByText("Your next step");
 		screen.getByText(

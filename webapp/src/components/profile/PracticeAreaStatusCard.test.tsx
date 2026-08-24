@@ -345,7 +345,7 @@ describe("PracticeAreaStatusCard", () => {
 		screen.getByText("More difficulties recently");
 	});
 
-	it("keeps stable and insufficient-evidence directions visible without a standing ring", () => {
+	it("keeps directionless and insufficient-evidence areas visible without a standing ring", () => {
 		const codeQualityStatus = statuses["code-quality"];
 		const reviewCommunicationStatus = statuses["review-communication"];
 		if (!codeQualityStatus || !reviewCommunicationStatus) {
@@ -353,7 +353,6 @@ describe("PracticeAreaStatusCard", () => {
 		}
 		const supportWithoutComparison = {
 			...trendSupport,
-			level: "NONE" as const,
 			currentOpportunities: 2,
 			previousOpportunities: 0,
 			opportunitiesUntilComparable: 2,
@@ -364,7 +363,7 @@ describe("PracticeAreaStatusCard", () => {
 				statuses={{
 					"code-quality": {
 						...codeQualityStatus,
-						direction: "STABLE",
+						direction: "UNCERTAIN",
 					},
 					"review-communication": {
 						...reviewCommunicationStatus,
@@ -376,7 +375,9 @@ describe("PracticeAreaStatusCard", () => {
 			/>,
 		);
 
-		screen.getByText("Broadly consistent lately");
+		// Two different silences, both shown: one where the evidence is there but separates too little to
+		// name a direction, one where there is not yet enough of it to compare at all.
+		screen.getByText("Direction unclear");
 		screen.getByText("Not enough to compare yet");
 		expect(screen.queryByRole("img")).toBeNull();
 	});

@@ -31,7 +31,6 @@ const base: PracticeTrend = {
 	scope: "AREA",
 	direction: "IMPROVING",
 	support: {
-		level: "WELL_SUPPORTED",
 		currentOpportunities: 4,
 		previousOpportunities: 4,
 		opportunitiesUntilComparable: 0,
@@ -59,10 +58,10 @@ const base: PracticeTrend = {
 	opportunities,
 };
 
-const withState = (
-	direction: PracticeTrend["direction"],
-	level: PracticeTrend["support"]["level"],
-): PracticeTrend => ({ ...base, direction, support: { ...base.support, level } });
+const withDirection = (direction: PracticeTrend["direction"]): PracticeTrend => ({
+	...base,
+	direction,
+});
 
 const meta = {
 	component: PracticeTrendPanel,
@@ -73,22 +72,10 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const ImprovingWellSupported: Story = {
-	args: { trend: withState("IMPROVING", "WELL_SUPPORTED") },
-};
-export const ImprovingTentative: Story = { args: { trend: withState("IMPROVING", "TENTATIVE") } };
-export const DecliningWellSupported: Story = {
-	args: { trend: withState("DECLINING", "WELL_SUPPORTED") },
-};
-export const DecliningTentative: Story = { args: { trend: withState("DECLINING", "TENTATIVE") } };
-export const StableWellSupported: Story = {
-	args: { trend: withState("STABLE", "WELL_SUPPORTED") },
-};
-export const StableTentative: Story = { args: { trend: withState("STABLE", "TENTATIVE") } };
-export const UncertainWellSupported: Story = {
-	args: { trend: withState("UNCERTAIN", "WELL_SUPPORTED") },
-};
-export const UncertainTentative: Story = { args: { trend: withState("UNCERTAIN", "TENTATIVE") } };
+export const Improving: Story = { args: { trend: withDirection("IMPROVING") } };
+export const Declining: Story = { args: { trend: withDirection("DECLINING") } };
+/** The everyday case: eight reviewed work items are rarely enough to claim a direction either way. */
+export const Uncertain: Story = { args: { trend: withDirection("UNCERTAIN") } };
 
 const insufficient = (count: number): PracticeTrend => ({
 	...base,
@@ -98,7 +85,6 @@ const insufficient = (count: number): PracticeTrend => ({
 	opportunities: opportunities.slice(0, count).map((item) => ({ ...item, bundle: "OLDER" })),
 	support: {
 		...base.support,
-		level: "NONE",
 		currentOpportunities: count,
 		previousOpportunities: 0,
 		opportunitiesUntilComparable: 3,
@@ -112,11 +98,5 @@ export const InsufficientEvidenceWithZeroOpportunities: Story = {
 };
 export const InsufficientEvidenceWithTwoOpportunities: Story = { args: { trend: insufficient(2) } };
 export const UncertainWithFullBundle: Story = {
-	args: { trend: withState("UNCERTAIN", "WELL_SUPPORTED") },
-};
-export const ImprovingAtTentativeSupport: Story = {
-	args: { trend: withState("IMPROVING", "TENTATIVE") },
-};
-export const ImprovingAtWellSupported: Story = {
-	args: { trend: withState("IMPROVING", "WELL_SUPPORTED") },
+	args: { trend: withDirection("UNCERTAIN") },
 };

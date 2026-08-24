@@ -8,7 +8,6 @@ const trend = (overrides: Partial<PracticeTrend> = {}): PracticeTrend => ({
 	scope: "AREA",
 	direction: "IMPROVING",
 	support: {
-		level: "WELL_SUPPORTED",
 		currentOpportunities: 4,
 		previousOpportunities: 4,
 		opportunitiesUntilComparable: 0,
@@ -92,7 +91,6 @@ describe("PracticeTrendPanel", () => {
 					opportunities: [],
 					support: {
 						...trend().support,
-						level: "NONE",
 						currentOpportunities: 0,
 						previousOpportunities: 0,
 						opportunitiesUntilComparable: 3,
@@ -108,12 +106,9 @@ describe("PracticeTrendPanel", () => {
 		screen.getByText("No reviewed work items are available yet.");
 	});
 
-	it("labels tentative support in words and keeps strip marks out of the tab order", () => {
-		const { container } = render(
-			<PracticeTrendPanel trend={trend({ support: { ...trend().support, level: "TENTATIVE" } })} />,
-		);
+	it("keeps the opportunity strip out of the tab order and names it for screen readers", () => {
+		const { container } = render(<PracticeTrendPanel trend={trend()} />);
 
-		screen.getByText("Early indication");
 		screen.getByRole("img", { name: /evidence opportunities, ordered oldest to newest/ });
 		expect(container.querySelectorAll('[tabindex="0"]')).toHaveLength(0);
 	});

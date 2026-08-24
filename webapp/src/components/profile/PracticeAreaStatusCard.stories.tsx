@@ -192,7 +192,7 @@ const moreStatuses: Record<string, PracticeAreaStatus> = {
 		guidance:
 			"Your recent feedback is mixed in “Validate inputs and edge cases at the boundary”, with both strengths and room to grow.",
 		guidanceSource: "RULE_BASED",
-		direction: "STABLE",
+		direction: "UNCERTAIN",
 		trendSupport,
 		feedbackSpanDays: 27,
 		feedbackSince: new Date("2026-07-01T09:00:00Z"),

@@ -2,7 +2,6 @@ import {
 	CircleDashedIcon,
 	CircleHelpIcon,
 	type LucideIcon,
-	MinusIcon,
 	TrendingDownIcon,
 	TrendingUpIcon,
 } from "lucide-react";
@@ -28,11 +27,6 @@ export const PRACTICE_TREND_PRESENTATION = {
 		label: "More difficulties recently",
 		Icon: TrendingDownIcon,
 		tone: "negative",
-	},
-	STABLE: {
-		label: "Broadly consistent lately",
-		Icon: MinusIcon,
-		tone: "neutral",
 	},
 	UNCERTAIN: {
 		label: "Direction unclear",

@@ -7,7 +7,6 @@ import {
 } from "./practice-trend-presentation";
 
 const support = (overrides: Partial<TrendSupport> = {}): TrendSupport => ({
-	level: "WELL_SUPPORTED",
 	currentOpportunities: 4,
 	previousOpportunities: 4,
 	opportunitiesUntilComparable: 0,
