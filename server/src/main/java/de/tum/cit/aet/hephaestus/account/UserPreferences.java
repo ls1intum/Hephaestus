@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.account;
 
+import de.tum.cit.aet.hephaestus.core.auth.spi.AccountPreferencesQuery;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -45,7 +46,8 @@ public class UserPreferences {
     private boolean participateInResearch = true;
 
     @Column(name = "ai_review_enabled", nullable = false)
-    private boolean practiceFeedbackDeliveryEnabled = true;
+    private boolean practiceFeedbackDeliveryEnabled =
+        AccountPreferencesQuery.PreferencesView.PRACTICE_FEEDBACK_DELIVERY_ENABLED_BY_DEFAULT;
 
     public UserPreferences(User user) {
         this.user = user;

@@ -2,15 +2,17 @@ package de.tum.cit.aet.hephaestus.practices.feedback;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.tum.cit.aet.hephaestus.practices.feedback.DeliveryPolicyResolver.FactAnswer;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.Arrays;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 
 class DeliveryPolicyResolverTest extends BaseUnitTest {
 
     @Test
     void recordsEveryCheckInStableOrderWhenDeliveryIsAllowed() {
-        DeliveryPolicyResolver.Result result = DeliveryPolicyResolver.resolve(allTrue());
+        DeliveryPolicyResolver.Result result = DeliveryPolicyResolver.resolve(everyCheckPasses());
 
         assertThat(result.allowed()).isTrue();
         assertThat(result.suppressionReason()).isNull();
@@ -25,12 +27,12 @@ class DeliveryPolicyResolverTest extends BaseUnitTest {
         DeliveryPolicyResolver.Facts facts = new DeliveryPolicyResolver.Facts(
             true,
             true,
-            true,
-            true,
-            true,
-            false,
-            false,
-            false,
+            FactAnswer.PASSES,
+            FactAnswer.PASSES,
+            FactAnswer.PASSES,
+            FactAnswer.DENIES,
+            FactAnswer.DENIES,
+            FactAnswer.DENIES,
             FeedbackSuppressionReason.ARTIFACT_CLOSED
         );
 
@@ -53,8 +55,18 @@ class DeliveryPolicyResolverTest extends BaseUnitTest {
 
     @Test
     void practiceAuthorityCannotBypassConsentOrArtifactState() {
-        DeliveryPolicyResolver.Facts optedOut = factsWith(true, false, true, null);
-        DeliveryPolicyResolver.Facts closed = factsWith(true, true, false, FeedbackSuppressionReason.ARTIFACT_CLOSED);
+        DeliveryPolicyResolver.Facts optedOut = factsWith(
+            FactAnswer.PASSES,
+            FactAnswer.DENIES,
+            FactAnswer.PASSES,
+            null
+        );
+        DeliveryPolicyResolver.Facts closed = factsWith(
+            FactAnswer.PASSES,
+            FactAnswer.PASSES,
+            FactAnswer.DENIES,
+            FeedbackSuppressionReason.ARTIFACT_CLOSED
+        );
 
         assertThat(DeliveryPolicyResolver.resolve(optedOut).suppressionReason()).isEqualTo(
             FeedbackSuppressionReason.RECIPIENT_OPTED_OUT
@@ -66,7 +78,9 @@ class DeliveryPolicyResolverTest extends BaseUnitTest {
 
     @Test
     void notApplicableChecksDoNotInterruptResolution() {
-        DeliveryPolicyResolver.Result result = DeliveryPolicyResolver.resolve(factsWith(null, null, true, null));
+        DeliveryPolicyResolver.Result result = DeliveryPolicyResolver.resolve(
+            factsWith(FactAnswer.NOT_APPLICABLE, FactAnswer.NOT_APPLICABLE, FactAnswer.PASSES, null)
+        );
 
         assertThat(result.allowed()).isTrue();
         assertThat(result.checks())
@@ -89,12 +103,12 @@ class DeliveryPolicyResolverTest extends BaseUnitTest {
         };
 
         for (int denied = 0; denied < expected.length; denied++) {
-            Boolean[] checks = new Boolean[expected.length];
-            Arrays.fill(checks, true);
-            checks[denied] = false;
+            FactAnswer[] checks = new FactAnswer[expected.length];
+            Arrays.fill(checks, FactAnswer.PASSES);
+            checks[denied] = FactAnswer.DENIES;
             DeliveryPolicyResolver.Facts facts = new DeliveryPolicyResolver.Facts(
-                checks[0],
-                checks[1],
+                checks[0] == FactAnswer.PASSES,
+                checks[1] == FactAnswer.PASSES,
                 checks[2],
                 checks[3],
                 checks[4],
@@ -108,22 +122,22 @@ class DeliveryPolicyResolverTest extends BaseUnitTest {
         }
     }
 
-    private static DeliveryPolicyResolver.Facts allTrue() {
-        return factsWith(true, true, true, null);
+    private static DeliveryPolicyResolver.Facts everyCheckPasses() {
+        return factsWith(FactAnswer.PASSES, FactAnswer.PASSES, FactAnswer.PASSES, null);
     }
 
     private static DeliveryPolicyResolver.Facts factsWith(
-        Boolean authority,
-        Boolean consent,
-        Boolean artifact,
-        FeedbackSuppressionReason artifactReason
+        FactAnswer authority,
+        FactAnswer consent,
+        FactAnswer artifact,
+        @Nullable FeedbackSuppressionReason artifactReason
     ) {
         return new DeliveryPolicyResolver.Facts(
             true,
             true,
-            true,
-            true,
-            true,
+            FactAnswer.PASSES,
+            FactAnswer.PASSES,
+            FactAnswer.PASSES,
             authority,
             consent,
             artifact,

@@ -45,7 +45,8 @@ export type WorkspaceTeamRepositorySettings = {
 };
 
 /**
- * Selected mode with no targets admits nobody; a selected repository with no branches admits every branch.
+ * The work a workspace reviews. Under a <code>SELECTED</code> mode an empty list admits nobody, never
+ * everybody; a selected repository with no branches admits every branch of it.
  */
 export type WorkspaceReviewScope = {
     personMode: 'ALL_ELIGIBLE' | 'SELECTED';
@@ -4618,8 +4619,7 @@ export type DeliveryPolicyTrace = {
 };
 
 /**
- * The facts behind one delivery decision, persisted and served as-is: never add feedback payload or a
- * personal identifier to it.
+ * The facts behind one delivery decision. Carries no feedback payload.
  */
 export type DeliveryPolicyFactsSnapshot = {
     artifactKind?: string;

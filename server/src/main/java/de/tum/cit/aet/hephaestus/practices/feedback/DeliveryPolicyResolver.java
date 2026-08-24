@@ -4,23 +4,32 @@ import java.util.ArrayList;
 import java.util.List;
 import org.jspecify.annotations.Nullable;
 
-/** A null fact passes its check as {@link DeliveryPolicyCheckStatus#NOT_APPLICABLE}; only {@code false} denies. */
 public final class DeliveryPolicyResolver {
 
     public static final String VERSION = "1";
 
     private DeliveryPolicyResolver() {}
 
+    public enum FactAnswer {
+        PASSES,
+        DENIES,
+        NOT_APPLICABLE;
+
+        public static FactAnswer of(boolean passes) {
+            return passes ? PASSES : DENIES;
+        }
+    }
+
     public static Result resolve(Facts facts) {
         List<Candidate> candidates = List.of(
             new Candidate(
                 DeliveryPolicyCheck.INSTANCE_SILENT_MODE,
-                facts.instanceMayDeliver(),
+                FactAnswer.of(facts.instanceMayDeliver()),
                 FeedbackSuppressionReason.INSTANCE_SILENCED
             ),
             new Candidate(
                 DeliveryPolicyCheck.WORKSPACE_ENABLED,
-                facts.workspaceEnabled(),
+                FactAnswer.of(facts.workspaceEnabled()),
                 FeedbackSuppressionReason.WORKSPACE_DISABLED
             ),
             new Candidate(
@@ -60,27 +69,33 @@ public final class DeliveryPolicyResolver {
         for (Candidate candidate : candidates) {
             if (refusal != null) {
                 checks.add(new CheckResult(candidate.check(), DeliveryPolicyCheckStatus.NOT_REACHED));
-            } else if (candidate.fact() == null) {
-                checks.add(new CheckResult(candidate.check(), DeliveryPolicyCheckStatus.NOT_APPLICABLE));
-            } else if (candidate.fact()) {
-                checks.add(new CheckResult(candidate.check(), DeliveryPolicyCheckStatus.PASSED));
-            } else {
-                refusal = candidate.refusal();
-                checks.add(new CheckResult(candidate.check(), DeliveryPolicyCheckStatus.DENIED));
+                continue;
             }
+            if (candidate.answer() == FactAnswer.DENIES) {
+                refusal = candidate.refusal();
+            }
+            checks.add(new CheckResult(candidate.check(), statusOf(candidate.answer())));
         }
         return new Result(refusal == null, refusal, List.copyOf(checks));
+    }
+
+    private static DeliveryPolicyCheckStatus statusOf(FactAnswer answer) {
+        return switch (answer) {
+            case PASSES -> DeliveryPolicyCheckStatus.PASSED;
+            case DENIES -> DeliveryPolicyCheckStatus.DENIED;
+            case NOT_APPLICABLE -> DeliveryPolicyCheckStatus.NOT_APPLICABLE;
+        };
     }
 
     public record Facts(
         boolean instanceMayDeliver,
         boolean workspaceEnabled,
-        @Nullable Boolean rolloutCurrent,
-        @Nullable Boolean deliveryActive,
-        @Nullable Boolean currentlyCovered,
-        @Nullable Boolean practiceAuthority,
-        @Nullable Boolean recipientConsent,
-        @Nullable Boolean artifactEligible,
+        FactAnswer rolloutCurrent,
+        FactAnswer deliveryActive,
+        FactAnswer currentlyCovered,
+        FactAnswer practiceAuthority,
+        FactAnswer recipientConsent,
+        FactAnswer artifactEligible,
         @Nullable FeedbackSuppressionReason artifactRefusal
     ) {}
 
@@ -92,5 +107,5 @@ public final class DeliveryPolicyResolver {
         List<CheckResult> checks
     ) {}
 
-    private record Candidate(DeliveryPolicyCheck check, @Nullable Boolean fact, FeedbackSuppressionReason refusal) {}
+    private record Candidate(DeliveryPolicyCheck check, FactAnswer answer, FeedbackSuppressionReason refusal) {}
 }

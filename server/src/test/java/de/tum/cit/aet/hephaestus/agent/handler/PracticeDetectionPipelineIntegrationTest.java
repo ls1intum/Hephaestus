@@ -239,9 +239,7 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
         when(diffNotePoster.reconcileInlineNotes(any(), any())).thenReturn(
             new DiffNotePoster.DiffNoteResult(0, 0, List.of())
         );
-        when(accountPreferencesQuery.preferencesForUserId(anyLong())).thenReturn(
-            Optional.of(new AccountPreferencesQuery.PreferencesView(false, true))
-        );
+        when(accountPreferencesQuery.practiceFeedbackDeliveryEnabled(anyLong())).thenReturn(true);
     }
 
     private Practice createPractice(String slug, String name) {

@@ -8,7 +8,7 @@ import de.tum.cit.aet.hephaestus.workspace.settings.ReviewRepositoryMode;
 import java.util.List;
 import org.jspecify.annotations.Nullable;
 
-/** Persisted and served verbatim: never add feedback payload or a personal identifier to it. */
+/** The facts behind one delivery decision. Carries no feedback payload. */
 public record DeliveryPolicyFactsSnapshot(
     @Nullable String artifactKind,
     @Nullable String repository,

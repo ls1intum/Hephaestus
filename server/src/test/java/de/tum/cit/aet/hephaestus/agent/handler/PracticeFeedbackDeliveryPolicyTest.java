@@ -12,9 +12,11 @@ import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
+import de.tum.cit.aet.hephaestus.practices.feedback.DeliveryPolicyEvaluationCommand;
 import de.tum.cit.aet.hephaestus.practices.feedback.DeliveryPolicyEvaluationRecorder;
 import de.tum.cit.aet.hephaestus.practices.feedback.DeliveryPolicyStage;
 import de.tum.cit.aet.hephaestus.practices.feedback.DeliveryPolicySurface;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewCoverageService;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties;
@@ -23,9 +25,11 @@ import de.tum.cit.aet.hephaestus.testconfig.WorkspaceTestFixtures;
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitorRepository;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
+import de.tum.cit.aet.hephaestus.workspace.settings.PracticeDeliveryStatus;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 
 class PracticeFeedbackDeliveryPolicyTest extends BaseUnitTest {
@@ -78,6 +82,38 @@ class PracticeFeedbackDeliveryPolicyTest extends BaseUnitTest {
                 policy().allowsComposition(conversationJob(), DeliveryPolicySurface.ARTIFACT)
             )
         ).isInstanceOf(IllegalArgumentException.class);
+    }
+
+    /**
+     * The resolver owns the order of the checks, but this class owns which fact lands in which slot.
+     * These two pin the adjacent revision and pause slots against being wired to each other's fact.
+     */
+    @Test
+    void aPausedWorkspaceIsRefusedForThePauseAndNotForTheRevision() {
+        AgentJob job = conversationJob();
+        job.getWorkspace().getReviewSettings().setDeliveryStatus(PracticeDeliveryStatus.PAUSED);
+        job.setPracticeRolloutRevision(job.getWorkspace().getReviewSettings().getRolloutRevision());
+
+        assertThat(policy().allowsComposition(job, DeliveryPolicySurface.IN_APP)).isFalse();
+        assertThat(recordedRefusal()).isEqualTo(FeedbackSuppressionReason.WORKSPACE_DELIVERY_PAUSED);
+    }
+
+    @Test
+    void aJobFromAnOlderRolloutIsRefusedForTheRevisionAndNotForThePause() {
+        AgentJob job = conversationJob();
+        job.getWorkspace().getReviewSettings().setDeliveryStatus(PracticeDeliveryStatus.ACTIVE);
+        job.setPracticeRolloutRevision(job.getWorkspace().getReviewSettings().getRolloutRevision() - 1);
+
+        assertThat(policy().allowsComposition(job, DeliveryPolicySurface.IN_APP)).isFalse();
+        assertThat(recordedRefusal()).isEqualTo(FeedbackSuppressionReason.STALE_ROLLOUT_REVISION);
+    }
+
+    private FeedbackSuppressionReason recordedRefusal() {
+        ArgumentCaptor<DeliveryPolicyEvaluationCommand> recorded = ArgumentCaptor.forClass(
+            DeliveryPolicyEvaluationCommand.class
+        );
+        org.mockito.Mockito.verify(evaluationRecorder).record(recorded.capture());
+        return recorded.getValue().result().suppressionReason();
     }
 
     private AgentJob conversationJob() {

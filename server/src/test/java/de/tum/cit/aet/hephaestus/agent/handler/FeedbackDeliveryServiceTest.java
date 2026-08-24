@@ -174,8 +174,8 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             .when(workspaceRepository.findById(WORKSPACE_ID))
             .thenReturn(Optional.of(activePracticeWorkspace()));
         org.mockito.Mockito.lenient()
-            .when(accountPreferencesQuery.preferencesForUserId(AUTHOR_ID))
-            .thenReturn(Optional.of(new AccountPreferencesQuery.PreferencesView(false, true)));
+            .when(accountPreferencesQuery.practiceFeedbackDeliveryEnabled(AUTHOR_ID))
+            .thenReturn(true);
         org.mockito.Mockito.lenient()
             .when(
                 coverageService.admits(
@@ -645,9 +645,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
         void skipsWhenPracticeFeedbackDeliveryDisabled() {
             AgentJob job = createJob();
             stubOpenPr();
-            when(accountPreferencesQuery.preferencesForUserId(AUTHOR_ID)).thenReturn(
-                Optional.of(new AccountPreferencesQuery.PreferencesView(false, false))
-            );
+            when(accountPreferencesQuery.practiceFeedbackDeliveryEnabled(AUTHOR_ID)).thenReturn(false);
 
             var delivery = new DeliveryContent("Fix stuff.", List.of(), List.of());
             service.deliverFeedback(job, delivery, null, Set.of("practice"));
@@ -722,7 +720,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
         void preferenceLookupFailureFailsJobWithoutConversationalEscalation() {
             AgentJob job = createJob();
             stubOpenPr();
-            when(accountPreferencesQuery.preferencesForUserId(AUTHOR_ID)).thenThrow(
+            when(accountPreferencesQuery.practiceFeedbackDeliveryEnabled(AUTHOR_ID)).thenThrow(
                 new IllegalStateException("db down")
             );
 

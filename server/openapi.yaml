@@ -9416,9 +9416,7 @@ components:
       - decision
     DeliveryPolicyFactsSnapshot:
       type: object
-      description: |-
-        The facts behind one delivery decision, persisted and served as-is: never add feedback payload or a
-         personal identifier to it.
+      description: The facts behind one delivery decision. Carries no feedback payload.
       properties:
         artifactKind:
           type: string
@@ -15401,8 +15399,9 @@ components:
           description: "GitLab workspace provider config, null if not available"
     WorkspaceReviewScope:
       type: object
-      description: Selected mode with no targets admits nobody; a selected repository
-        with no branches admits every branch.
+      description: |-
+        The work a workspace reviews. Under a <code>SELECTED</code> mode an empty list admits nobody, never
+         everybody; a selected repository with no branches admits every branch of it.
       properties:
         personMode:
           type: string
