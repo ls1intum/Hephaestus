@@ -12,6 +12,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.JsonNode;
 
@@ -218,7 +219,7 @@ public class GitlabSubjectKeyDeriver implements SubjectKeyDeriver {
         return v.isMissingNode() || v.isNull() ? "" : v.asString("");
     }
 
-    private static String firstNonBlank(String... values) {
+    private static @Nullable String firstNonBlank(String... values) {
         for (String v : values) {
             if (v != null && !v.isBlank()) return v;
         }

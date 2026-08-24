@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.scm.github.repository;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
@@ -20,6 +21,7 @@ import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -126,7 +128,7 @@ class GitHubMemberMessageHandlerIntegrationTest extends BaseIntegrationTest {
         // User should be created if member contains user info
         if (event.member() != null) {
             assertThat(
-                userRepository.findByNativeIdAndProviderId(event.member().id(), gitProvider.getId())
+                userRepository.findByNativeIdAndProviderId(required(event.member().id()), gitProviderId())
             ).isPresent();
         }
     }
@@ -137,10 +139,10 @@ class GitHubMemberMessageHandlerIntegrationTest extends BaseIntegrationTest {
         GitHubMemberEventDTO addEvent = loadPayload("member.added");
         if (addEvent.member() != null) {
             User member = new User();
-            member.setNativeId(addEvent.member().id());
+            member.setNativeId(required(addEvent.member().id()));
             member.setProvider(gitProvider);
             member.setLogin(addEvent.member().login());
-            member.setAvatarUrl(addEvent.member().avatarUrl());
+            member.setAvatarUrl(required(addEvent.member().avatarUrl()));
             member.setCreatedAt(Instant.now());
             member.setUpdatedAt(Instant.now());
             userRepository.save(member);
@@ -159,5 +161,16 @@ class GitHubMemberMessageHandlerIntegrationTest extends BaseIntegrationTest {
         ClassPathResource resource = new ClassPathResource("github/" + filename + ".json");
         String json = resource.getContentAsString(StandardCharsets.UTF_8);
         return objectMapper.readValue(json, GitHubMemberEventDTO.class);
+    }
+
+    private Long gitProviderId() {
+        Long id = gitProvider.getId();
+        assertNotNull(id);
+        return id;
+    }
+
+    private static <T> T required(@Nullable T value) {
+        assertNotNull(value);
+        return value;
     }
 }

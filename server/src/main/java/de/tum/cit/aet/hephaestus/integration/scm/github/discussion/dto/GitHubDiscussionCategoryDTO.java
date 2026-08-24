@@ -22,8 +22,8 @@ public record GitHubDiscussionCategoryDTO(
     @JsonProperty("emoji") String emoji,
     @JsonProperty("description") String description,
     @JsonProperty("is_answerable") boolean isAnswerable,
-    @JsonProperty("created_at") Instant createdAt,
-    @JsonProperty("updated_at") Instant updatedAt
+    @JsonProperty("created_at") @Nullable Instant createdAt,
+    @JsonProperty("updated_at") @Nullable Instant updatedAt
 ) {
     // STATIC FACTORY METHODS FOR GRAPHQL RESPONSES
 

@@ -6,6 +6,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubEventAction
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubWebhookEvent;
 import de.tum.cit.aet.hephaestus.integration.scm.github.user.dto.GitHubUserDTO;
 import java.util.Map;
+import org.jspecify.annotations.Nullable;
 
 /**
  * DTO for GitHub repository webhook events (created, deleted, archived, renamed, etc.).
@@ -19,10 +20,10 @@ import java.util.Map;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record GitHubRepositoryEventDTO(
     @JsonProperty("action") String action,
-    @JsonProperty("repository") GitHubRepositoryRefDTO repository,
-    @JsonProperty("changes") Changes changes,
-    @JsonProperty("sender") GitHubUserDTO sender,
-    @JsonProperty("installation") InstallationRef installation
+    @JsonProperty("repository") @Nullable GitHubRepositoryRefDTO repository,
+    @JsonProperty("changes") @Nullable Changes changes,
+    @JsonProperty("sender") @Nullable GitHubUserDTO sender,
+    @JsonProperty("installation") @Nullable InstallationRef installation
 ) implements GitHubWebhookEvent {
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record InstallationRef(@JsonProperty("id") Long id, @JsonProperty("node_id") String nodeId) {}
@@ -33,14 +34,14 @@ public record GitHubRepositoryEventDTO(
     }
 
     @Override
-    public GitHubRepositoryRefDTO repository() {
+    public @Nullable GitHubRepositoryRefDTO repository() {
         return repository;
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record Changes(
-        @JsonProperty("repository") RepositoryChanges repository,
-        @JsonProperty("owner") OwnerChanges owner
+        @JsonProperty("repository") @Nullable RepositoryChanges repository,
+        @JsonProperty("owner") @Nullable OwnerChanges owner
     ) {
         @JsonIgnoreProperties(ignoreUnknown = true)
         public record RepositoryChanges(@JsonProperty("name") NameChange name) {}
@@ -56,7 +57,7 @@ public record GitHubRepositoryEventDTO(
      * @return the old repository name, or {@code null} unless this is a rename event with changes
      *     present
      */
-    public String getOldName() {
+    public @Nullable String getOldName() {
         if (changes == null || changes.repository() == null || changes.repository().name() == null) {
             return null;
         }
@@ -67,7 +68,7 @@ public record GitHubRepositoryEventDTO(
      * @return the old {@code owner/repo}, or {@code null} unless this is a rename event with
      *     changes present
      */
-    public String getOldFullName() {
+    public @Nullable String getOldFullName() {
         String oldName = getOldName();
         if (oldName == null || repository == null || repository.fullName() == null) {
             return null;
@@ -94,7 +95,7 @@ public record GitHubRepositoryEventDTO(
      * @return the previous {@code owner/name}, or {@code null} when the payload carries no usable
      *         change record
      */
-    public String getPreviousNameWithOwner() {
+    public @Nullable String getPreviousNameWithOwner() {
         String renamed = getOldFullName();
         if (renamed != null) {
             return renamed;
@@ -110,7 +111,7 @@ public record GitHubRepositoryEventDTO(
      * Extracts {@code changes.owner.from.{user|organization}.login} from a transfer payload. GitHub
      * nests the previous owner under whichever account type it was, so both keys are probed.
      */
-    private String getPreviousOwnerLogin() {
+    private @Nullable String getPreviousOwnerLogin() {
         if (changes == null || changes.owner() == null || changes.owner().from() == null) {
             return null;
         }

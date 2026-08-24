@@ -164,7 +164,7 @@ public class JobTokenAuthenticationFilter extends OncePerRequestFilter {
      * {@code Authorization: Bearer} is the only shape accepted: also honouring provider-key headers
      * would blur the sandbox's trust boundary with the upstream provider's.
      */
-    private String extractProxyToken(HttpServletRequest request) {
+    private @Nullable String extractProxyToken(HttpServletRequest request) {
         String auth = request.getHeader("Authorization");
         if (auth != null && auth.regionMatches(true, 0, BEARER_PREFIX, 0, BEARER_PREFIX.length())) {
             String bearer = auth.substring(BEARER_PREFIX.length()).trim();
@@ -179,7 +179,7 @@ public class JobTokenAuthenticationFilter extends OncePerRequestFilter {
     /** Matches numeric IPv4 or IPv6 address literals (rejects hostnames to avoid DNS resolution). */
     private static final Pattern IP_LITERAL_PATTERN = Pattern.compile("^[0-9]{1,3}(\\.[0-9]{1,3}){3}$|^[0-9a-fA-F:]+$");
 
-    static boolean isPrivateIp(String ip) {
+    static boolean isPrivateIp(@Nullable String ip) {
         if (ip == null || !IP_LITERAL_PATTERN.matcher(ip).matches()) {
             return false;
         }

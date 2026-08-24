@@ -6,4 +6,5 @@
  * sibling {@code observation} / {@code model} / {@code review} interfaces.
  */
 @org.springframework.modulith.NamedInterface("feedback")
+@org.jspecify.annotations.NullMarked
 package de.tum.cit.aet.hephaestus.practices.feedback;

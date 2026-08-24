@@ -26,9 +26,9 @@ public record RepositoryInfoDTO(
     @NonNull @Schema(description = "Unique identifier of the repository") Long id,
     @NonNull @Schema(description = "Name of the repository") String name,
     @NonNull @Schema(description = "Full name including owner (e.g., 'owner/repo')") String nameWithOwner,
-    @Schema(description = "Description of the repository") String description,
+    @Nullable @Schema(description = "Description of the repository") String description,
     @NonNull @Schema(description = "URL to the repository on the git provider") String htmlUrl,
-    @Schema(description = "Labels defined in the repository") List<LabelInfoDTO> labels,
+    @Nullable @Schema(description = "Labels defined in the repository") List<LabelInfoDTO> labels,
     /**
      * Whether contributions from this repository are hidden from leaderboard calculations.
      * <p>

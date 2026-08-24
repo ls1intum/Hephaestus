@@ -6,6 +6,7 @@ import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
 import java.util.Locale;
 import java.util.Objects;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Stable cross-run identity of a {@link Feedback} delivery <em>unit</em> (ADR 0021, F-16) — the join key
@@ -59,7 +60,12 @@ public final class FeedbackThreadKey {
      * @param surface the delivery surface (required)
      * @return the lowercase SHA-256 hex digest (exactly 64 characters)
      */
-    public static String compute(String artifactKind, Long artifactId, long recipientUserId, FeedbackChannel surface) {
+    public static String compute(
+        String artifactKind,
+        @Nullable Long artifactId,
+        long recipientUserId,
+        FeedbackChannel surface
+    ) {
         return canonical(
             artifactKind == null ? "" : artifactKind,
             artifactId == null ? "" : String.valueOf(artifactId),

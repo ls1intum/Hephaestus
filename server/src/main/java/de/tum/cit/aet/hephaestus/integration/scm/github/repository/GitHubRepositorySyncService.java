@@ -27,6 +27,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHReposito
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHRepositoryOwner;
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHUser;
 import java.time.Instant;
+import java.util.Objects;
 import java.util.Optional;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
@@ -97,7 +98,7 @@ public class GitHubRepositorySyncService {
         IdentityProvider provider,
         int retryAttempt
     ) {
-        String safeNameWithOwner = sanitizeForLog(nameWithOwner);
+        String safeNameWithOwner = Objects.requireNonNull(sanitizeForLog(nameWithOwner));
         Optional<RepositoryOwnerAndName> parsedName = GitHubRepositoryNameParser.parse(nameWithOwner);
         if (parsedName.isEmpty()) {
             log.warn(
@@ -208,7 +209,7 @@ public class GitHubRepositorySyncService {
             }
 
             Repository repository = repositoryRepository
-                .findByNativeIdAndProviderId(githubDatabaseId, provider.getId())
+                .findByNativeIdAndProviderId(githubDatabaseId, Objects.requireNonNull(provider.getId()))
                 .orElseGet(Repository::new);
 
             repository.setNativeId(githubDatabaseId);
@@ -216,7 +217,7 @@ public class GitHubRepositorySyncService {
             repository.setName(repoData.getName());
             repository.setNameWithOwner(repoData.getNameWithOwner());
             repository.setDescription(repoData.getDescription());
-            repository.setHtmlUrl(repoData.getUrl() != null ? repoData.getUrl().toString() : null);
+            repository.setHtmlUrl(Objects.requireNonNull(repoData.getUrl()).toString());
             repository.setOrganization(organization);
 
             repository.setPrivate(repoData.getIsPrivate());
@@ -303,8 +304,17 @@ public class GitHubRepositorySyncService {
             String avatarUrl = graphQlOrg.getAvatarUrl() != null ? graphQlOrg.getAvatarUrl().toString() : null;
 
             // Use upsert for thread-safe concurrent inserts
-            organizationRepository.upsert(databaseId, provider.getId(), login, name, avatarUrl, url);
-            return organizationRepository.findByNativeIdAndProviderId(databaseId, provider.getId()).orElse(null);
+            organizationRepository.upsert(
+                databaseId,
+                Objects.requireNonNull(provider.getId()),
+                login,
+                name,
+                avatarUrl,
+                url
+            );
+            return organizationRepository
+                .findByNativeIdAndProviderId(databaseId, Objects.requireNonNull(provider.getId()))
+                .orElse(null);
         } else if (owner instanceof GHUser graphQlUser) {
             // User repositories - create a "virtual" organization from the user
             Integer dbId = graphQlUser.getDatabaseId();
@@ -319,8 +329,17 @@ public class GitHubRepositorySyncService {
             String avatarUrl = graphQlUser.getAvatarUrl() != null ? graphQlUser.getAvatarUrl().toString() : null;
 
             // Use upsert for thread-safe concurrent inserts
-            organizationRepository.upsert(databaseId, provider.getId(), login, name, avatarUrl, url);
-            return organizationRepository.findByNativeIdAndProviderId(databaseId, provider.getId()).orElse(null);
+            organizationRepository.upsert(
+                databaseId,
+                Objects.requireNonNull(provider.getId()),
+                login,
+                name,
+                avatarUrl,
+                url
+            );
+            return organizationRepository
+                .findByNativeIdAndProviderId(databaseId, Objects.requireNonNull(provider.getId()))
+                .orElse(null);
         }
 
         return null;

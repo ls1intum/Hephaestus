@@ -12,6 +12,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.gitlab.repository.dto.GitLabPus
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeParseException;
+import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -59,7 +60,7 @@ public class GitLabProjectProcessor {
     @Transactional
     @Nullable
     public Repository processGraphQlResponse(
-        GitLabProjectResponse project,
+        @Nullable GitLabProjectResponse project,
         @Nullable Organization organization,
         IdentityProvider provider
     ) {
@@ -77,7 +78,7 @@ public class GitLabProjectProcessor {
         }
 
         Repository repository = repositoryRepository
-            .findByNativeIdAndProviderId(nativeId, provider.getId())
+            .findByNativeIdAndProviderId(nativeId, Objects.requireNonNull(provider.getId()))
             .orElseGet(Repository::new);
 
         repository.setNativeId(nativeId);
@@ -139,10 +140,14 @@ public class GitLabProjectProcessor {
      */
     @Transactional
     @Nullable
-    public Repository processPushEvent(GitLabPushEventDTO.ProjectInfo projectInfo, IdentityProvider provider) {
+    public Repository processPushEvent(
+        GitLabPushEventDTO.@Nullable ProjectInfo projectInfo,
+        IdentityProvider provider
+    ) {
         if (
             projectInfo == null ||
             projectInfo.id() == null ||
+            projectInfo.name() == null ||
             projectInfo.pathWithNamespace() == null ||
             projectInfo.webUrl() == null
         ) {
@@ -152,7 +157,7 @@ public class GitLabProjectProcessor {
 
         long nativeId = GitLabSyncConstants.toEntityId(projectInfo.id());
         Repository repository = repositoryRepository
-            .findByNativeIdAndProviderId(nativeId, provider.getId())
+            .findByNativeIdAndProviderId(nativeId, Objects.requireNonNull(provider.getId()))
             .orElseGet(Repository::new);
 
         repository.setNativeId(nativeId);

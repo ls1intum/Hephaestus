@@ -191,7 +191,9 @@ class AuthRateLimitFilterTest extends BaseUnitTest {
         verify(chain, times(1)).doFilter(req, res);
         assertThat(store).containsOnlyKeys("refresh:acct:4242");
         // verify the configured limit (60/min) reached the resolver for this endpoint
-        assertThat(capturedConfigs.get("refresh:acct:4242").getBandwidths()[0].getCapacity()).isEqualTo(60);
+        var config = capturedConfigs.get("refresh:acct:4242");
+        org.junit.jupiter.api.Assertions.assertNotNull(config);
+        assertThat(config.getBandwidths()[0].getCapacity()).isEqualTo(60);
     }
 
     @Test
@@ -248,7 +250,9 @@ class AuthRateLimitFilterTest extends BaseUnitTest {
         verify(blockedChain, never()).doFilter(ArgumentMatchers.any(), ArgumentMatchers.any());
         assertThat(blocked.getStatus()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS.value());
         assertThat(store).containsOnlyKeys("delete-user:acct:7");
-        assertThat(capturedConfigs.get("delete-user:acct:7").getBandwidths()[0].getCapacity()).isEqualTo(3);
+        var config = capturedConfigs.get("delete-user:acct:7");
+        org.junit.jupiter.api.Assertions.assertNotNull(config);
+        assertThat(config.getBandwidths()[0].getCapacity()).isEqualTo(3);
     }
 
     @Test

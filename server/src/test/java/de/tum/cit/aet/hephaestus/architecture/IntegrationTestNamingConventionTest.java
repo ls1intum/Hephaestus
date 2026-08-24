@@ -54,7 +54,12 @@ class IntegrationTestNamingConventionTest {
 
     private static final Pattern EXTENDS_CLAUSE = Pattern.compile("\\bextends\\s+(\\w+)");
 
-    private record TestClass(String name, boolean isAbstract, String superName, Path file) {}
+    private record TestClass(
+        String name,
+        boolean isAbstract,
+        @org.jspecify.annotations.Nullable String superName,
+        Path file
+    ) {}
 
     @Test
     void everyConcreteIntegrationTestIsNamedIntegrationTestSoFailsafeRunsIt() {
@@ -96,7 +101,10 @@ class IntegrationTestNamingConventionTest {
      *     not transitively extend the integration base. Cycles (impossible in valid Java, but reachable
      *     in a half-edited source tree) terminate instead of hanging.
      */
-    private static String integrationBaseChain(TestClass decl, Map<String, TestClass> declarations) {
+    private static @org.jspecify.annotations.Nullable String integrationBaseChain(
+        TestClass decl,
+        Map<String, TestClass> declarations
+    ) {
         Set<String> chain = new LinkedHashSet<>();
         String current = decl.superName();
         while (current != null && chain.add(current)) {

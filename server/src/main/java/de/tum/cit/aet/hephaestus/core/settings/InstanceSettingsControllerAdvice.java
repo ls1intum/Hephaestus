@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.core.settings;
 
+import java.util.Objects;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpStatus;
@@ -13,12 +14,20 @@ class InstanceSettingsControllerAdvice {
 
     @ExceptionHandler(StaleInstanceSettingsException.class)
     ProblemDetail handleStaleSettings(StaleInstanceSettingsException exception) {
-        return problem(HttpStatus.PRECONDITION_FAILED, "Instance settings changed", exception.getMessage());
+        return problem(
+            HttpStatus.PRECONDITION_FAILED,
+            "Instance settings changed",
+            Objects.requireNonNullElse(exception.getMessage(), exception.getClass().getSimpleName())
+        );
     }
 
     @ExceptionHandler(InstanceSettingsPreconditionRequiredException.class)
     ProblemDetail handleMissingPrecondition(InstanceSettingsPreconditionRequiredException exception) {
-        return problem(HttpStatus.PRECONDITION_REQUIRED, "Instance settings version required", exception.getMessage());
+        return problem(
+            HttpStatus.PRECONDITION_REQUIRED,
+            "Instance settings version required",
+            Objects.requireNonNullElse(exception.getMessage(), exception.getClass().getSimpleName())
+        );
     }
 
     private static ProblemDetail problem(HttpStatus status, String title, String detail) {

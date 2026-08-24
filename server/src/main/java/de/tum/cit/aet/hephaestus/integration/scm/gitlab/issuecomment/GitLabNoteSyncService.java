@@ -12,6 +12,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabSyncExcepti
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.graphql.GitLabPageInfo;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -71,7 +72,9 @@ public class GitLabNoteSyncService {
     ) {
         String projectPath = repository.getNameWithOwner();
         String safeContext = sanitizeForLog(projectPath) + "#" + iidValue;
-        Long providerId = repository.getProvider() != null ? repository.getProvider().getId() : null;
+        Long providerId = Objects.requireNonNull(
+            repository.getProvider() != null ? Objects.requireNonNull(repository.getProvider().getId()) : null
+        );
 
         if (providerId == null) {
             log.warn("Skipping note sync: reason=nullProviderId, context={}", safeContext);
@@ -131,7 +134,9 @@ public class GitLabNoteSyncService {
 
                 if (page == 0) {
                     try {
-                        Object countField = response.field(notesFieldPath + ".count").getValue();
+                        Object countField = Objects.requireNonNull(response)
+                            .field(notesFieldPath + ".count")
+                            .getValue();
                         if (countField instanceof Number number) {
                             reportedTotalCount = number.intValue();
                         }
@@ -141,7 +146,9 @@ public class GitLabNoteSyncService {
                 }
 
                 @SuppressWarnings("rawtypes")
-                List nodesRaw = response.field(notesFieldPath + ".nodes").toEntityList(Map.class);
+                List nodesRaw = Objects.requireNonNull(response)
+                    .field(notesFieldPath + ".nodes")
+                    .toEntityList(Map.class);
                 List<Map<String, Object>> nodes = (List<Map<String, Object>>) nodesRaw;
 
                 if (nodes == null || nodes.isEmpty()) {
@@ -162,7 +169,9 @@ public class GitLabNoteSyncService {
                 }
 
                 // Pagination
-                GitLabPageInfo pageInfo = response.field(notesFieldPath + ".pageInfo").toEntity(GitLabPageInfo.class);
+                GitLabPageInfo pageInfo = Objects.requireNonNull(response)
+                    .field(notesFieldPath + ".pageInfo")
+                    .toEntity(GitLabPageInfo.class);
 
                 if (pageInfo == null || !pageInfo.hasNextPage()) {
                     break;

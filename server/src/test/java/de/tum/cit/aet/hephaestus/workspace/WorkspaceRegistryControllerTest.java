@@ -15,6 +15,7 @@ import de.tum.cit.aet.hephaestus.workspace.dto.CreateWorkspaceRequestDTO;
 import de.tum.cit.aet.hephaestus.workspace.dto.WorkspaceDTO;
 import java.time.Instant;
 import java.util.List;
+import java.util.Objects;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
@@ -76,7 +77,7 @@ class WorkspaceRegistryControllerTest {
         authenticate(List.of(SecurityUtils.APP_ADMIN_AUTHORITY));
         var request = request(IntegrationKind.GITHUB);
         var workspace = new Workspace();
-        workspace.setWorkspaceSlug(request.workspaceSlug());
+        workspace.setWorkspaceSlug(Objects.requireNonNull(request.workspaceSlug()));
         var dto = org.mockito.Mockito.mock(WorkspaceDTO.class);
         when(workspaceService.createWorkspaceWithInitialization(request)).thenReturn(workspace);
         when(workspaceQueryService.toWorkspaceDTO(workspace)).thenReturn(dto);

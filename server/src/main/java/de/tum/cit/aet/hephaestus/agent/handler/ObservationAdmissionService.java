@@ -58,7 +58,8 @@ public class ObservationAdmissionService {
             throw new IllegalStateException("Observation admission requires a RUNNING job");
         }
         String digest = ProvenanceDigest.sha256Hex(serializedPayload(submitted));
-        String existing = job.getMetadata().path(DIGEST_METADATA_KEY).asString();
+        JsonNode currentMetadata = job.getMetadata();
+        String existing = currentMetadata == null ? "" : currentMetadata.path(DIGEST_METADATA_KEY).asString();
         if (!existing.isBlank()) {
             if (!existing.equals(digest)) throw new AdmissionConflictException();
             return response(job, existing, observations.findByAgentJobId(jobId));
@@ -69,7 +70,7 @@ public class ObservationAdmissionService {
             default -> throw new IllegalArgumentException("Job type does not admit review observations");
         }
         ObjectNode metadata =
-            job.getMetadata() instanceof ObjectNode object ? (ObjectNode) object.deepCopy() : mapper.createObjectNode();
+            currentMetadata instanceof ObjectNode object ? (ObjectNode) object.deepCopy() : mapper.createObjectNode();
         metadata.put(DIGEST_METADATA_KEY, digest);
         job.setMetadata(metadata);
         jobs.save(job);

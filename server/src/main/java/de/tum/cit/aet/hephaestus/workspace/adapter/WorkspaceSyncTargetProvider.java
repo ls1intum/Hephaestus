@@ -19,6 +19,7 @@ import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceScopeFilter;
 import java.time.Instant;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
@@ -196,14 +197,14 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
         // The accountLogin is always the GitHub account (org or user) that owns the repositories,
         // so it's safe to use for organization-level operations like team sync.
         // For user accounts, the team sync will simply find no teams (which is expected).
-        String orgLogin =
-            workspace.getOrganization() != null ? workspace.getOrganization().getLogin() : workspace.getAccountLogin();
+        var organization = workspace.getOrganization();
+        String orgLogin = organization != null ? organization.getLogin() : workspace.getAccountLogin();
 
         return new SyncMetadata(
             workspace.getId(),
             workspace.getDisplayName(),
             orgLogin,
-            workspace.getOrganization() != null ? workspace.getOrganization().getId() : null,
+            organization != null ? organization.getId() : null,
             workspace.getIssueTypesSyncedAt(),
             workspace.getIssueDependenciesSyncedAt(),
             workspace.getSubIssuesSyncedAt()
@@ -274,9 +275,11 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
     public Optional<SyncTarget> findSyncTargetById(Long syncTargetId) {
         return repositoryToMonitorRepository
             .findById(syncTargetId)
-            .map(rtm -> {
+            .flatMap(rtm -> {
                 var workspace = rtm.getWorkspace();
-                return SyncTargetFactory.create(workspace, rtm, connectionService);
+                return workspace == null
+                    ? Optional.empty()
+                    : Optional.of(SyncTargetFactory.create(workspace, rtm, connectionService));
             });
     }
 
@@ -284,9 +287,9 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
     @Transactional
     public void updateIssueBackfillState(
         Long syncTargetId,
-        Integer highWaterMark,
-        Integer checkpoint,
-        Instant lastRunAt
+        @Nullable Integer highWaterMark,
+        @Nullable Integer checkpoint,
+        @Nullable Instant lastRunAt
     ) {
         repositoryToMonitorRepository
             .findById(syncTargetId)
@@ -316,9 +319,9 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
     @Transactional
     public void updatePullRequestBackfillState(
         Long syncTargetId,
-        Integer highWaterMark,
-        Integer checkpoint,
-        Instant lastRunAt
+        @Nullable Integer highWaterMark,
+        @Nullable Integer checkpoint,
+        @Nullable Instant lastRunAt
     ) {
         repositoryToMonitorRepository
             .findById(syncTargetId)
@@ -397,7 +400,7 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
                         sanitizeForLog(resolvedNameWithOwner),
                         rtm.getNativeId()
                     );
-                    rtm.setNameWithOwner(resolvedNameWithOwner);
+                    rtm.setNameWithOwner(Objects.requireNonNull(resolvedNameWithOwner));
                     dirty = true;
                     nameChanged = true;
                 }
@@ -434,7 +437,7 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
      */
     @Override
     @Transactional
-    public void updateSyncCursor(Long syncTargetId, SyncCursorKind kind, String cursor) {
+    public void updateSyncCursor(Long syncTargetId, SyncCursorKind kind, @Nullable String cursor) {
         repositoryToMonitorRepository
             .findById(syncTargetId)
             .ifPresentOrElse(

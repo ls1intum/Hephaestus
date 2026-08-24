@@ -114,7 +114,11 @@ public sealed interface UIMessageChunk {
      */
     @JsonInclude(JsonInclude.Include.NON_NULL)
     record MessageMetadata(@Nullable String model, @Nullable Usage usage, @Nullable Double costUsd) {
-        public static MessageMetadata of(@Nullable String model, @Nullable Usage usage, @Nullable Double costUsd) {
+        public static @Nullable MessageMetadata of(
+            @Nullable String model,
+            @Nullable Usage usage,
+            @Nullable Double costUsd
+        ) {
             // Cheap "nothing observed" gate so we don't ship `{}` to clients (which the strict
             // validator still accepts but bloats every Finish chunk).
             if (model == null && usage == null && costUsd == null) return null;
@@ -131,7 +135,7 @@ public sealed interface UIMessageChunk {
             @Nullable Integer totalTokens
         ) {
             /** Build from a Pi JSONNode {@code usage} block; null-tolerant on every field. */
-            public static Usage fromJsonNode(@Nullable JsonNode node) {
+            public static @Nullable Usage fromJsonNode(@Nullable JsonNode node) {
                 if (node == null || !node.isObject() || node.isEmpty()) return null;
                 Integer in = readInt(node, "input");
                 Integer out = readInt(node, "output");

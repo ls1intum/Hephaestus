@@ -20,9 +20,9 @@ public final class DockerOperations {
         String image,
         List<String> command,
         Map<String, String> environment,
-        String networkId,
-        String hostname,
-        String user,
+        @Nullable String networkId,
+        @Nullable String hostname,
+        @Nullable String user,
         Map<String, String> labels,
         HostConfigSpec hostConfig,
         List<String> extraHosts
@@ -40,9 +40,9 @@ public final class DockerOperations {
         List<String> securityOpts,
         Map<String, String> tmpfsMounts,
         List<String> dns,
-        String cgroupnsMode,
-        String ipcMode,
-        String runtime,
+        @Nullable String cgroupnsMode,
+        @Nullable String ipcMode,
+        @Nullable String runtime,
         Map<String, UlimitSpec> ulimits
     ) {}
 

@@ -31,6 +31,7 @@ import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -92,12 +93,12 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
 
     // Sync Data Records
 
-    public record SyncLabelData(String globalId, String title, @Nullable String color) {}
+    public record SyncLabelData(@Nullable String globalId, @Nullable String title, @Nullable String color) {}
 
     /** Shared record for user references in sync data (assignees, reviewers, approvers). */
     public record SyncUserData(
-        String globalId,
-        String username,
+        @Nullable String globalId,
+        @Nullable String username,
         @Nullable String name,
         @Nullable String avatarUrl,
         @Nullable String webUrl,
@@ -105,16 +106,16 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
     ) {}
 
     public record SyncMergeRequestData(
-        String globalId,
-        String iid,
-        String title,
+        @Nullable String globalId,
+        @Nullable String iid,
+        @Nullable String title,
         @Nullable String description,
-        String state,
+        @Nullable String state,
         boolean draft,
         @Nullable Boolean mergeable,
         @Nullable String detailedMergeStatus,
         boolean approved,
-        String webUrl,
+        @Nullable String webUrl,
         @Nullable String createdAt,
         @Nullable String updatedAt,
         @Nullable String closedAt,
@@ -123,8 +124,8 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
         int additions,
         int deletions,
         int fileCount,
-        String sourceBranch,
-        String targetBranch,
+        @Nullable String sourceBranch,
+        @Nullable String targetBranch,
         @Nullable String diffHeadSha,
         @Nullable String baseSha,
         @Nullable String mergeCommitSha,
@@ -174,12 +175,15 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
 
     @Nullable
     private PullRequest processInternal(GitLabMergeRequestEventDTO event, ProcessingContext context) {
-        if (event.isConfidential()) {
-            log.debug("Skipped confidential merge request: iid={}", event.objectAttributes().iid());
+        var attrs = event.objectAttributes();
+        if (attrs == null || attrs.id() == null || attrs.iid() == null) {
+            log.warn("Skipped merge request event with missing object attributes or identifiers");
             return null;
         }
-
-        var attrs = event.objectAttributes();
+        if (event.isConfidential()) {
+            log.debug("Skipped confidential merge request: iid={}", attrs.iid());
+            return null;
+        }
 
         // Stale webhook detection BEFORE upsert to avoid data regression.
         // Returns existing entity so callers can still publish lifecycle events.
@@ -188,7 +192,7 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
         Boolean wasDraft = null;
         if (attrs.iid() != null) {
             Optional<PullRequest> existingOpt = pullRequestRepository.findByRepositoryIdAndNumber(
-                context.repository().getId(),
+                Objects.requireNonNull(context.repository()).getId(),
                 attrs.iid()
             );
             if (existingOpt.isPresent()) {
@@ -212,9 +216,12 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
             }
         }
 
-        User author = resolveWebhookAuthor(event, context.providerId());
-        User mergedBy = resolveWebhookMergeUser(event, context.providerId());
-        Long milestoneId = resolveWebhookMilestoneId(attrs.milestoneId(), context.repository().getProvider().getId());
+        User author = resolveWebhookAuthor(event, Objects.requireNonNull(context.providerId()));
+        User mergedBy = resolveWebhookMergeUser(event, Objects.requireNonNull(context.providerId()));
+        Long milestoneId = resolveWebhookMilestoneId(
+            attrs.milestoneId(),
+            Objects.requireNonNull(Objects.requireNonNull(context.repository()).getProvider().getId())
+        );
 
         String headRefOid = attrs.lastCommit() != null ? attrs.lastCommit().id() : null;
 
@@ -236,16 +243,20 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
             author,
             mergedBy,
             milestoneId,
-            context.repository(),
+            Objects.requireNonNull(context.repository()),
             context,
             isNew
         );
 
         if (pr == null) return null;
 
-        boolean changed = updateLabels(event.labels(), pr.getLabels(), context.repository());
-        changed |= updateAssignees(event.assignees(), pr.getAssignees(), context.providerId());
-        changed |= updateRequestedReviewers(event.reviewers(), pr.getRequestedReviewers(), context.providerId());
+        boolean changed = updateLabels(event.labels(), pr.getLabels(), Objects.requireNonNull(context.repository()));
+        changed |= updateAssignees(event.assignees(), pr.getAssignees(), Objects.requireNonNull(context.providerId()));
+        changed |= updateRequestedReviewers(
+            event.reviewers(),
+            pr.getRequestedReviewers(),
+            Objects.requireNonNull(context.providerId())
+        );
         if (changed) {
             pr = pullRequestRepository.save(pr);
         }
@@ -345,11 +356,14 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
         PullRequest pr = processInternal(event, context);
         if (pr == null || event.user() == null) return pr;
 
-        User approver = findOrCreateUser(event.user(), context.providerId());
+        User approver = findOrCreateUser(event.user(), Objects.requireNonNull(context.providerId()));
         if (approver == null) return pr;
 
         long approvalNativeId = generateApprovalNativeId(pr.getNativeId(), approver.getNativeId());
-        var existingReview = reviewRepository.findByNativeIdAndProviderId(approvalNativeId, context.providerId());
+        var existingReview = reviewRepository.findByNativeIdAndProviderId(
+            approvalNativeId,
+            Objects.requireNonNull(context.providerId())
+        );
 
         if (existingReview.isPresent()) {
             // Re-approval: update existing review (may be DISMISSED from unapproval or CHANGES_REQUESTED)
@@ -402,12 +416,12 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
         PullRequest pr = processInternal(event, context);
         if (pr == null || event.user() == null) return pr;
 
-        User approver = findOrCreateUser(event.user(), context.providerId());
+        User approver = findOrCreateUser(event.user(), Objects.requireNonNull(context.providerId()));
         if (approver == null) return pr;
 
         long approvalNativeId = generateApprovalNativeId(pr.getNativeId(), approver.getNativeId());
         reviewRepository
-            .findByNativeIdAndProviderId(approvalNativeId, context.providerId())
+            .findByNativeIdAndProviderId(approvalNativeId, Objects.requireNonNull(context.providerId()))
             .ifPresent(review -> {
                 if (review.getState() == PullRequestReview.State.DISMISSED) {
                     log.debug(
@@ -457,7 +471,10 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
         if (pr.getNativeId() == null || reviewer.getNativeId() == null) return;
 
         long approvalNativeId = generateApprovalNativeId(pr.getNativeId(), reviewer.getNativeId());
-        var existingReview = reviewRepository.findByNativeIdAndProviderId(approvalNativeId, context.providerId());
+        var existingReview = reviewRepository.findByNativeIdAndProviderId(
+            approvalNativeId,
+            Objects.requireNonNull(context.providerId())
+        );
 
         if (existingReview.isEmpty()) {
             // No existing review for this reviewer — cannot safely attribute from note signal.
@@ -505,7 +522,10 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
             return null;
         }
         return pullRequestRepository
-            .findByRepositoryIdAndNumber(context.repository().getId(), event.objectAttributes().iid())
+            .findByRepositoryIdAndNumber(
+                Objects.requireNonNull(context.repository()).getId(),
+                event.objectAttributes().iid()
+            )
             .map(PullRequest::getState)
             .orElse(null);
     }
@@ -516,6 +536,10 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
     @Transactional
     @Nullable
     public PullRequest processFromSync(SyncMergeRequestData data, Repository repository, @Nullable Long scopeId) {
+        if (data.globalId() == null || data.iid() == null || data.title() == null || data.state() == null) {
+            log.warn("Skipped merge request processing: reason=missingRequiredData");
+            return null;
+        }
         long nativeId;
         try {
             nativeId = GitLabSyncConstants.extractNumericId(data.globalId());
@@ -532,7 +556,7 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
             return null;
         }
 
-        Long providerId = repository.getProvider().getId();
+        Long providerId = Objects.requireNonNull(repository.getProvider().getId());
 
         Optional<PullRequest> existingOpt = pullRequestRepository.findByRepositoryIdAndNumber(
             repository.getId(),
@@ -611,7 +635,7 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
             nativeId,
             providerId,
             mrNumber,
-            sanitize(data.title()),
+            Objects.requireNonNullElse(sanitize(data.title()), ""),
             sanitize(data.description()),
             mrState.name(),
             null, // stateReason
@@ -702,7 +726,9 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
 
     @Nullable
     private User resolveWebhookAuthor(GitLabMergeRequestEventDTO event, Long providerId) {
-        Long authorId = event.objectAttributes().authorId();
+        var attrs = event.objectAttributes();
+        if (attrs == null) return null;
+        Long authorId = attrs.authorId();
         GitLabWebhookUser eventUser = event.user();
 
         // If the event user IS the author, use the webhook user data to upsert
@@ -721,7 +747,9 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
 
     @Nullable
     private User resolveWebhookMergeUser(GitLabMergeRequestEventDTO event, Long providerId) {
-        Long mergeUserId = event.objectAttributes().mergeUserId();
+        var attrs = event.objectAttributes();
+        if (attrs == null) return null;
+        Long mergeUserId = attrs.mergeUserId();
         if (mergeUserId == null) return null;
 
         if (event.user() != null && mergeUserId.equals(event.user().id())) {
@@ -746,9 +774,9 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
     private PullRequest upsertMergeRequest(
         Long rawId,
         Integer iid,
-        String title,
+        @Nullable String title,
         @Nullable String description,
-        String state,
+        @Nullable String state,
         @Nullable String sourceBranch,
         @Nullable String targetBranch,
         @Nullable String headRefOid,
@@ -772,7 +800,7 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
 
         long nativeId = rawId;
         int mrNumber = iid;
-        Long providerId = repository.getProvider().getId();
+        Long providerId = Objects.requireNonNull(repository.getProvider().getId());
 
         Issue.State mrState = convertState(state);
         boolean isMerged = mrState == Issue.State.MERGED;
@@ -788,7 +816,7 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
             nativeId,
             providerId,
             mrNumber,
-            sanitize(title),
+            Objects.requireNonNullElse(sanitize(title), ""),
             sanitize(description),
             mrState.name(),
             null,
@@ -983,7 +1011,7 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
         Map<Long, PullRequestReview> existingReviewsByNativeId = pr
             .getReviews()
             .stream()
-            .filter(r -> r.getProvider() != null && r.getProvider().getId().equals(providerId))
+            .filter(r -> r.getProvider() != null && Objects.requireNonNull(r.getProvider().getId()).equals(providerId))
             .collect(Collectors.toMap(PullRequestReview::getNativeId, r -> r, (a, b) -> a));
 
         for (SyncUserData approver : syncApprovers) {
@@ -1062,7 +1090,7 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
             .getReviews()
             .stream()
             .filter(r -> r.getState() == PullRequestReview.State.APPROVED)
-            .filter(r -> r.getProvider() != null && r.getProvider().getId().equals(providerId))
+            .filter(r -> r.getProvider() != null && Objects.requireNonNull(r.getProvider().getId()).equals(providerId))
             .filter(r -> !expectedNativeIds.contains(r.getNativeId()))
             .collect(Collectors.toSet());
 

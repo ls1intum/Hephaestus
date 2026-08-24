@@ -31,6 +31,7 @@ import java.util.HashSet;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import org.jspecify.annotations.Nullable;
@@ -314,7 +315,7 @@ public final class ClasspathArtifactSourceCatalogRegistry implements ArtifactSou
         for (ArtifactSourceContract source : catalog.sources()) {
             java.util.EnumSet<SourceUsePurpose> covered = java.util.EnumSet.noneOf(SourceUsePurpose.class);
             for (String decisionId : source.useDecisionIds()) {
-                SourceUseDecision decision = decisions.get(decisionId);
+                SourceUseDecision decision = Objects.requireNonNull(decisions.get(decisionId));
                 if (!decision.sourceKind().equals(source.kind())) {
                     throw new IllegalStateException("Source-use decision kind does not match: " + decisionId);
                 }

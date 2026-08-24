@@ -16,4 +16,5 @@
  * </ul>
  */
 @org.springframework.modulith.ApplicationModule(displayName = "Mentor")
+@org.jspecify.annotations.NullMarked
 package de.tum.cit.aet.hephaestus.mentor;

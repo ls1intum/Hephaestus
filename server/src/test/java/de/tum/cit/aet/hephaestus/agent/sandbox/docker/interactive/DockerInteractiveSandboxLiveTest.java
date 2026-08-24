@@ -47,6 +47,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 import org.assertj.core.api.Assertions;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -63,6 +64,12 @@ import tools.jackson.databind.node.ObjectNode;
 @LiveDockerTest
 @Tag("live")
 class DockerInteractiveSandboxLiveTest {
+
+    private static <T> T captured(AtomicReference<T> reference) {
+        T value = reference.get();
+        assertThat(value).isNotNull();
+        return value;
+    }
 
     /** The image under test. A release-channel tag would test some other release's image (ADR 0031);
      * point this at a locally built agent image, or export the reference a deployment would use. */
@@ -425,8 +432,8 @@ class DockerInteractiveSandboxLiveTest {
             );
 
             assertThat(reused).isSameAs(first);
-            assertThat(proxyCredentialRegistry.validate(firstToken.get())).isPresent();
-            assertThat(proxyCredentialRegistry.validate(unusedToken.get())).isEmpty();
+            assertThat(proxyCredentialRegistry.validate(captured(firstToken))).isPresent();
+            assertThat(proxyCredentialRegistry.validate(captured(unusedToken))).isEmpty();
             first.close(Duration.ofSeconds(2));
         }
 
@@ -444,8 +451,8 @@ class DockerInteractiveSandboxLiveTest {
 
             assertThat(replacement).isNotSameAs(oldSandbox);
             assertThat(((DockerAttachedSandboxAdapter) oldSandbox).state()).isEqualTo(AttachedSandboxState.CLOSED);
-            assertThat(proxyCredentialRegistry.validate(oldToken.get())).isEmpty();
-            assertThat(proxyCredentialRegistry.validate(newToken.get()))
+            assertThat(proxyCredentialRegistry.validate(captured(oldToken))).isEmpty();
+            assertThat(proxyCredentialRegistry.validate(captured(newToken)))
                 .get()
                 .extracting(route -> route.baseUrl())
                 .isEqualTo("https://new.example/v1");
@@ -461,7 +468,7 @@ class DockerInteractiveSandboxLiveTest {
             CyclicBarrier gate = new CyclicBarrier(2);
             AtomicReference<AttachedSandbox> r1 = new AtomicReference<>();
             AtomicReference<AttachedSandbox> r2 = new AtomicReference<>();
-            AtomicReference<Throwable> err = new AtomicReference<>();
+            AtomicReference<@Nullable Throwable> err = new AtomicReference<>();
             Thread t1 = Thread.ofVirtual().start(() -> {
                 try {
                     gate.await();
@@ -481,14 +488,14 @@ class DockerInteractiveSandboxLiveTest {
             t1.join();
             t2.join();
             assertThat(err.get()).isNull();
-            assertThat(r1.get()).isSameAs(r2.get());
+            assertThat(captured(r1)).isSameAs(r2.get());
 
             // Reclaim of loser is fire-and-forget; wait for the close future then assert one container.
             await()
                 .atMost(Duration.ofSeconds(15))
                 .untilAsserted(() -> assertThat(managedInteractiveCount() - containersBefore).isEqualTo(1));
 
-            r1.get().close(Duration.ofSeconds(2));
+            captured(r1).close(Duration.ofSeconds(2));
         }
 
         private int managedInteractiveCount() {

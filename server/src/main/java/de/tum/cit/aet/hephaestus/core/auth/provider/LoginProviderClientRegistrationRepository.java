@@ -7,6 +7,7 @@ import de.tum.cit.aet.hephaestus.core.security.OutlineOriginPolicy;
 import java.time.Duration;
 import java.util.Iterator;
 import java.util.List;
+import org.jspecify.annotations.Nullable;
 import org.springframework.security.oauth2.client.registration.ClientRegistration;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
@@ -52,7 +53,7 @@ public class LoginProviderClientRegistrationRepository
     }
 
     @Override
-    public ClientRegistration findByRegistrationId(String registrationId) {
+    public @Nullable ClientRegistration findByRegistrationId(String registrationId) {
         ClientRegistration cached = cache.getIfPresent(registrationId);
         if (cached != null) {
             return cached;

@@ -14,6 +14,7 @@ import java.net.URI;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
+import java.util.Objects;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -96,7 +97,7 @@ public class GithubConnectionStrategy implements ConnectionStrategy {
 
     @Override
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
-    public void revoke(IntegrationRef ref) {
+    public void revoke(@org.jspecify.annotations.Nullable IntegrationRef ref) {
         if (ref == null) {
             return;
         }
@@ -130,7 +131,7 @@ public class GithubConnectionStrategy implements ConnectionStrategy {
             return;
         }
         if (connection.getConfig() instanceof ConnectionConfig.GitHubAppConfig config) {
-            appTokenService.deleteInstallation(config.installationId());
+            appTokenService.deleteInstallation(Objects.requireNonNull(config.installationId()));
         }
     }
 }

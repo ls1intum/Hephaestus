@@ -9,7 +9,10 @@ import org.jspecify.annotations.Nullable;
 public record WorkspaceReviewDefaults(PracticeAutonomy defaultAutonomy) {
     public static final WorkspaceReviewDefaults UNSET = new WorkspaceReviewDefaults(PracticeAutonomy.DEFAULT);
 
-    public static WorkspaceReviewDefaults of(Workspace workspace) {
+    public static WorkspaceReviewDefaults of(@Nullable Workspace workspace) {
+        if (workspace == null) {
+            return UNSET;
+        }
         return of(workspace.getReviewSettings());
     }
 

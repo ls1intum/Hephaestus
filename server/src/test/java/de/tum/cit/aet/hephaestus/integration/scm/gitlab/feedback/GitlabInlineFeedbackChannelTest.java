@@ -31,6 +31,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -519,7 +520,7 @@ class GitlabInlineFeedbackChannelTest extends BaseUnitTest {
         return response;
     }
 
-    private static void stubField(ClientGraphQlResponse response, String path, Object value) {
+    private static void stubField(ClientGraphQlResponse response, String path, @Nullable Object value) {
         assertVendorCouldReturn(GITLAB, mutationDocument(path), path, value);
         ClientResponseField field = mock(ClientResponseField.class);
         when(response.field(path)).thenReturn(field);
@@ -542,7 +543,7 @@ class GitlabInlineFeedbackChannelTest extends BaseUnitTest {
         return n;
     }
 
-    private static Map<String, Object> discussion(String id, List<Map<String, Object>> notes) {
+    private static Map<String, Object> discussion(@Nullable String id, List<Map<String, Object>> notes) {
         Map<String, Object> disc = new HashMap<>();
         disc.put("id", id);
         disc.put("notes", Map.of("nodes", new ArrayList<>(notes)));

@@ -27,6 +27,7 @@ import java.time.format.DateTimeParseException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -101,7 +102,7 @@ public class GitLabDiscussionSyncService {
         String projectPath = repository.getNameWithOwner();
         String safeContext = sanitizeForLog(projectPath) + "!" + mrIid;
         IdentityProvider provider = repository.getProvider();
-        Long providerId = provider.getId();
+        Long providerId = Objects.requireNonNull(provider.getId());
 
         if (providerId == null) {
             log.warn("Skipping discussion sync: reason=nullProviderId, context={}", safeContext);
@@ -162,7 +163,9 @@ public class GitLabDiscussionSyncService {
                 String discussionsPath = "project.mergeRequest.discussions";
 
                 @SuppressWarnings("rawtypes")
-                List nodesRaw = response.field(discussionsPath + ".nodes").toEntityList(Map.class);
+                List nodesRaw = Objects.requireNonNull(response)
+                    .field(discussionsPath + ".nodes")
+                    .toEntityList(Map.class);
                 @SuppressWarnings("unchecked")
                 List<Map<String, Object>> nodes = (List<Map<String, Object>>) nodesRaw;
 
@@ -188,7 +191,9 @@ public class GitLabDiscussionSyncService {
                 }
 
                 // Pagination
-                GitLabPageInfo pageInfo = response.field(discussionsPath + ".pageInfo").toEntity(GitLabPageInfo.class);
+                GitLabPageInfo pageInfo = Objects.requireNonNull(response)
+                    .field(discussionsPath + ".pageInfo")
+                    .toEntity(GitLabPageInfo.class);
                 if (pageInfo == null || !pageInfo.hasNextPage()) {
                     break;
                 }
@@ -502,7 +507,7 @@ public class GitLabDiscussionSyncService {
         Long providerId,
         Long scopeId
     ) {
-        record AuthorEarliest(User author, Instant earliest) {}
+        record AuthorEarliest(User author, @Nullable Instant earliest) {}
 
         Map<Long, AuthorEarliest> byAuthor = new HashMap<>();
         for (Map<String, Object> noteNode : noteNodes) {

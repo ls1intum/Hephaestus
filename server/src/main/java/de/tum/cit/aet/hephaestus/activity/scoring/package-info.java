@@ -2,4 +2,5 @@
  * XP scoring primitives shared with the leaderboard + profile modules.
  */
 @org.springframework.modulith.NamedInterface("scoring")
+@org.jspecify.annotations.NullMarked
 package de.tum.cit.aet.hephaestus.activity.scoring;

@@ -72,8 +72,10 @@ class AuthEventTypeConstraintParityTest {
         while (include.find()) {
             included.add(include.group(1));
         }
+        Path changelogDirectory = MASTER.getParent();
+        org.junit.jupiter.api.Assertions.assertNotNull(changelogDirectory);
         for (String changelog : included.reversed()) {
-            Path path = MASTER.getParent().resolve(changelog).normalize();
+            Path path = changelogDirectory.resolve(changelog).normalize();
             if (!Files.exists(path)) {
                 continue;
             }

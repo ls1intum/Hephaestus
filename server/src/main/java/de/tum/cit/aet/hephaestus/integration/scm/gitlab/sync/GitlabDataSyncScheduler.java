@@ -47,6 +47,7 @@ import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
@@ -411,7 +412,7 @@ public class GitlabDataSyncScheduler {
         for (Repository repo : existingRepos) {
             if (
                 repo.getProvider() != null &&
-                repo.getProvider().getId().equals(providerId) &&
+                Objects.requireNonNull(repo.getProvider().getId()).equals(providerId) &&
                 !syncedNativeIds.contains(repo.getNativeId())
             ) {
                 log.info(
@@ -903,7 +904,7 @@ public class GitlabDataSyncScheduler {
     /**
      * Resolves the GitLab provider ID by looking up the organization.
      */
-    private Long getGitLabProviderId(String accountLogin) {
+    private @Nullable Long getGitLabProviderId(String accountLogin) {
         return organizationRepository
             .findByLoginIgnoreCaseAndProvider_Type(accountLogin, IdentityProviderType.GITLAB)
             .map(org -> org.getProvider() != null ? org.getProvider().getId() : null)

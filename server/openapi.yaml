@@ -11905,7 +11905,6 @@ components:
           type: string
           description: Title of the pull request
       required:
-      - htmlUrl
       - id
       - isDraft
       - isMerged
@@ -11995,7 +11994,6 @@ components:
       - additions
       - commentsCount
       - deletions
-      - htmlUrl
       - id
       - isDraft
       - isMerged

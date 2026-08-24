@@ -213,8 +213,7 @@ public class GitlabWebhookSignatureVerifier implements WebhookSignatureVerifier 
     }
 
     /** SHA-256 digest, or {@code null} if the algorithm is somehow unavailable (never on a JRE). */
-    @Nullable
-    private static byte[] sha256(byte[] input) {
+    private static byte@Nullable [] sha256(byte[] input) {
         try {
             return MessageDigest.getInstance("SHA-256").digest(input);
         } catch (NoSuchAlgorithmException e) {
@@ -222,8 +221,7 @@ public class GitlabWebhookSignatureVerifier implements WebhookSignatureVerifier 
         }
     }
 
-    @Nullable
-    private static byte[] extractHmacKey(byte[] secret) {
+    private static byte@Nullable [] extractHmacKey(byte[] secret) {
         String secretStr = new String(secret, StandardCharsets.UTF_8);
         if (!secretStr.startsWith(WHSEC_PREFIX)) {
             // Non-whsec secret in whsec path; configuration mismatch.
@@ -237,8 +235,7 @@ public class GitlabWebhookSignatureVerifier implements WebhookSignatureVerifier 
         }
     }
 
-    @Nullable
-    private static byte[] computeHmac(byte[] key, String msgId, String timestamp, byte[] body) {
+    private static byte@Nullable [] computeHmac(byte[] key, String msgId, String timestamp, byte[] body) {
         try {
             Mac mac = Mac.getInstance(HMAC_SHA256);
             mac.init(new SecretKeySpec(key, HMAC_SHA256));

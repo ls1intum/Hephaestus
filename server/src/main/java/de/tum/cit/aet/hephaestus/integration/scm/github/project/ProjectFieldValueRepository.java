@@ -5,6 +5,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
+import org.jspecify.annotations.Nullable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -105,11 +106,11 @@ public interface ProjectFieldValueRepository extends JpaRepository<ProjectFieldV
     int upsertCore(
         @Param("itemId") Long itemId,
         @Param("fieldId") String fieldId,
-        @Param("textValue") String textValue,
-        @Param("numberValue") Double numberValue,
-        @Param("dateValue") LocalDate dateValue,
-        @Param("singleSelectOptionId") String singleSelectOptionId,
-        @Param("iterationId") String iterationId,
+        @Param("textValue") @Nullable String textValue,
+        @Param("numberValue") @Nullable Double numberValue,
+        @Param("dateValue") @Nullable LocalDate dateValue,
+        @Param("singleSelectOptionId") @Nullable String singleSelectOptionId,
+        @Param("iterationId") @Nullable String iterationId,
         @Param("updatedAt") Instant updatedAt
     );
 }

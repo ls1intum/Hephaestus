@@ -28,9 +28,9 @@ public final class WorkerSession {
     private final WebSocketSession transport;
     private final FrameCodec codec;
     private final Object sendLock = new Object();
-    private final AtomicReference<CapacityReport> lastCapacity = new AtomicReference<>();
+    private final AtomicReference<@Nullable CapacityReport> lastCapacity = new AtomicReference<>();
     private final AtomicBoolean forceReconnectSent = new AtomicBoolean(false);
-    private final AtomicReference<ScheduledFuture<?>> helloDeadline = new AtomicReference<>();
+    private final AtomicReference<@Nullable ScheduledFuture<?>> helloDeadline = new AtomicReference<>();
     private volatile Instant lastInboundAt;
 
     public WorkerSession(

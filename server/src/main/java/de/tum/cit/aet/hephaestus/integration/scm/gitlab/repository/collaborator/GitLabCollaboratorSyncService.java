@@ -20,6 +20,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.gitlab.user.GitLabUserService;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
@@ -78,7 +79,7 @@ public class GitLabCollaboratorSyncService {
     @Transactional
     public SyncResult syncCollaboratorsForRepository(Long scopeId, Repository repository) {
         String projectPath = repository.getNameWithOwner();
-        String safeProjectPath = sanitizeForLog(projectPath);
+        String safeProjectPath = Objects.requireNonNullElse(sanitizeForLog(projectPath), "<unknown>");
 
         int totalSynced = 0;
         Set<Long> syncedUserIds = new HashSet<>();
@@ -120,20 +121,22 @@ public class GitLabCollaboratorSyncService {
                 graphQlClientProvider.recordSuccess();
 
                 @SuppressWarnings("unchecked")
-                List<Map<String, Object>> nodes = (List<Map<String, Object>>) (List<?>) response
+                List<Map<String, Object>> nodes = (List<Map<String, Object>>) (List<?>) Objects.requireNonNull(response)
                     .field("project.projectMembers.nodes")
                     .toEntityList(Map.class);
 
                 if (nodes == null || nodes.isEmpty()) break;
 
-                Long providerId = repository.getProvider() != null ? repository.getProvider().getId() : null;
+                Long providerId = Objects.requireNonNull(
+                    repository.getProvider() != null ? Objects.requireNonNull(repository.getProvider().getId()) : null
+                );
 
                 for (Map<String, Object> node : nodes) {
                     processCollaboratorNode(node, repository, providerId, syncedUserIds);
                     totalSynced++;
                 }
 
-                GitLabPageInfo pageInfo = response
+                GitLabPageInfo pageInfo = Objects.requireNonNull(response)
                     .field("project.projectMembers.pageInfo")
                     .toEntity(GitLabPageInfo.class);
                 cursor = pageInfo != null ? pageInfo.endCursor() : null;
@@ -194,7 +197,7 @@ public class GitLabCollaboratorSyncService {
 
         User user = userService.findOrCreateUser(
             GitLabUserLookup.of(globalId, username, name, avatarUrl, webUrl),
-            providerId
+            Objects.requireNonNull(providerId)
         );
         if (user == null) return;
 

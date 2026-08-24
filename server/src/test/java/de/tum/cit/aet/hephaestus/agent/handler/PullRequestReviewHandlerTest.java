@@ -402,7 +402,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
         @Test
         void throwsWhenMetadataMissing() {
             var job = new AgentJob();
-            job.setMetadata(null);
+            org.springframework.test.util.ReflectionTestUtils.setField(job, "metadata", null);
             assertThatThrownBy(() -> handler.prepareInputs(job))
                 .isInstanceOf(JobPreparationException.class)
                 .hasMessageContaining("no metadata");
@@ -644,6 +644,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
             assertThat(secret.assessment()).isEqualTo(Assessment.BAD);
             assertThat(secret.evidenceRationale()).doesNotContain("AKIA1234567890ABCDEF");
             JsonNode evidence = secret.evidence();
+            org.junit.jupiter.api.Assertions.assertNotNull(evidence);
             assertThat(evidence.toString()).doesNotContain("AKIA1234567890ABCDEF");
             assertThat(evidence.path("detector").asString()).isEqualTo("secret-diff-scanner");
             JsonNode citation = evidence.path("citations").get(0);

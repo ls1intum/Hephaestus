@@ -18,6 +18,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Represents a status update for a GitHub Projects V2 project.
@@ -62,7 +63,7 @@ public class ProjectStatusUpdate extends BaseGitServiceEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "project_id", nullable = false)
     @ToString.Exclude
-    private Project project;
+    private @Nullable Project project;
 
     /**
      * The body/content of the status update (markdown).

@@ -14,6 +14,7 @@ import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembership.WorkspaceRole;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.ParameterizedTypeReference;
@@ -51,18 +52,20 @@ class WorkspaceLlmModelControllerIntegrationTest extends AbstractWorkspaceIntegr
             "sk-workspace-secret",
             true
         );
-        return webTestClient
-            .post()
-            .uri("/workspaces/{slug}/llm/connections", workspace.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(request)
-            .exchange()
-            .expectStatus()
-            .isCreated()
-            .expectBody(WorkspaceLlmConnectionDTO.class)
-            .returnResult()
-            .getResponseBody();
+        return Objects.requireNonNull(
+            webTestClient
+                .post()
+                .uri("/workspaces/{slug}/llm/connections", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(request)
+                .exchange()
+                .expectStatus()
+                .isCreated()
+                .expectBody(WorkspaceLlmConnectionDTO.class)
+                .returnResult()
+                .getResponseBody()
+        );
     }
 
     private WorkspaceLlmModelDTO createWorkspaceModel(Workspace workspace, Long connectionId, String slug) {
@@ -81,18 +84,24 @@ class WorkspaceLlmModelControllerIntegrationTest extends AbstractWorkspaceIntegr
             null,
             "Test-owned model has no per-token charge"
         );
-        return webTestClient
-            .post()
-            .uri("/workspaces/{slug}/llm/connections/{connectionId}/models", workspace.getWorkspaceSlug(), connectionId)
-            .headers(TestAuthUtils.withCurrentUser())
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(request)
-            .exchange()
-            .expectStatus()
-            .isCreated()
-            .expectBody(WorkspaceLlmModelDTO.class)
-            .returnResult()
-            .getResponseBody();
+        return Objects.requireNonNull(
+            webTestClient
+                .post()
+                .uri(
+                    "/workspaces/{slug}/llm/connections/{connectionId}/models",
+                    workspace.getWorkspaceSlug(),
+                    connectionId
+                )
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(request)
+                .exchange()
+                .expectStatus()
+                .isCreated()
+                .expectBody(WorkspaceLlmModelDTO.class)
+                .returnResult()
+                .getResponseBody()
+        );
     }
 
     private void saveGrant(Long modelId, Long workspaceId) {

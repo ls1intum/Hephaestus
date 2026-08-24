@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 import java.util.TreeSet;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Blocklist of env-var names callers must not inject into a sandbox: library injection,
@@ -94,7 +95,7 @@ public final class SandboxEnvBlocklist {
     private SandboxEnvBlocklist() {}
 
     /** {@return true if the named env var is forbidden by exact or prefix match (case-insensitive)}. */
-    public static boolean isBlocked(String name) {
+    public static boolean isBlocked(@Nullable String name) {
         if (name == null) {
             return false;
         }

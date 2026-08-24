@@ -37,6 +37,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import org.jspecify.annotations.Nullable;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.core.io.Resource;
 
@@ -124,7 +125,12 @@ public final class GraphQlResponseStubValidator {
      * vendor at {@code fieldPath} (a dotted response path from the operation root, e.g.
      * {@code "project.mergeRequests.nodes"}).
      */
-    public static void assertVendorCouldReturn(Vendor vendor, String documentName, String fieldPath, Object stub) {
+    public static void assertVendorCouldReturn(
+        Vendor vendor,
+        String documentName,
+        String fieldPath,
+        @Nullable Object stub
+    ) {
         GraphQLSchema schema = schema(vendor);
         Document document = document(vendor, documentName);
         OperationDefinition operation = document.getDefinitionsOfType(OperationDefinition.class).getFirst();
@@ -180,10 +186,13 @@ public final class GraphQlResponseStubValidator {
                 selectionSet = next.selectionSet();
                 walked.append(walked.isEmpty() ? "" : ".").append(segment);
             }
+            if (definition == null) {
+                throw new IllegalArgumentException("fieldPath must not be empty");
+            }
             return new Selected(definition, selectionSet);
         }
 
-        private void validate(String path, GraphQLType declared, SelectionSet selectionSet, Object value) {
+        private void validate(String path, GraphQLType declared, SelectionSet selectionSet, @Nullable Object value) {
             if (value == null) {
                 return;
             }
@@ -264,7 +273,11 @@ public final class GraphQlResponseStubValidator {
             return selectable;
         }
 
-        private void collect(GraphQLType parentType, SelectionSet selectionSet, Map<String, Selected> into) {
+        private void collect(
+            @Nullable GraphQLType parentType,
+            @Nullable SelectionSet selectionSet,
+            Map<String, Selected> into
+        ) {
             if (parentType == null || selectionSet == null) {
                 return;
             }

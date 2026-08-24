@@ -254,7 +254,7 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
         @Param("id") UUID id,
         @Param("newStatus") AgentJobStatus newStatus,
         @Param("now") Instant now,
-        @Param("error") String error,
+        @Param("error") @Nullable String error,
         @Param("fromStatuses") Collection<AgentJobStatus> fromStatuses
     );
 
@@ -274,7 +274,7 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
         @Param("id") UUID id,
         @Param("newStatus") AgentJobStatus newStatus,
         @Param("now") Instant now,
-        @Param("error") String error,
+        @Param("error") @Nullable String error,
         @Param("fromStatuses") Collection<AgentJobStatus> fromStatuses,
         @Param("workerId") String workerId
     );
@@ -432,7 +432,11 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
             "WHERE j.id = :id AND j.status = 'RUNNING' AND j.executionStartedAt IS NULL " +
             "AND ((:workerId IS NULL AND j.workerId IS NULL) OR j.workerId = :workerId)"
     )
-    int markExecutionStarted(@Param("id") UUID id, @Param("workerId") String workerId, @Param("now") Instant now);
+    int markExecutionStarted(
+        @Param("id") UUID id,
+        @Param("workerId") @Nullable String workerId,
+        @Param("now") Instant now
+    );
 
     /** Written before the sandbox starts, so a failed or cancelled run still records what it consumed. */
     @WorkspaceAgnostic("ID-based provenance stamp; job ID + owner from worker-local execution context")
@@ -448,7 +452,7 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
     )
     int updateProvenanceDigests(
         @Param("id") UUID id,
-        @Param("workerId") String workerId,
+        @Param("workerId") @Nullable String workerId,
         @Param("retryCount") int retryCount,
         @Param("stamp") ProvenanceStamp stamp
     );
@@ -471,7 +475,7 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
     )
     int transitionToEvidenceRefused(
         @Param("id") UUID id,
-        @Param("workerId") String workerId,
+        @Param("workerId") @Nullable String workerId,
         @Param("retryCount") int retryCount,
         @Param("now") Instant now,
         @Param("output") JsonNode output
@@ -585,7 +589,7 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
             "j.executionStartedAt = null " +
             "WHERE j.id = :id AND j.status = 'RUNNING' AND (:workerId IS NULL OR j.workerId = :workerId)"
     )
-    int requeueRejectedClaim(@Param("id") UUID id, @Param("workerId") String workerId);
+    int requeueRejectedClaim(@Param("id") UUID id, @Param("workerId") @Nullable String workerId);
 
     @WorkspaceAgnostic("ID-based delivery update; job ID from workspace-scoped delivery context")
     @Modifying(flushAutomatically = true, clearAutomatically = true)
@@ -593,7 +597,7 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
     void updateDeliveryStatus(
         @Param("id") UUID id,
         @Param("status") DeliveryStatus status,
-        @Param("commentId") String commentId
+        @Param("commentId") @Nullable String commentId
     );
 
     /** @return 1 if transitioned, 0 if the row no longer matches the expected job/delivery statuses. */

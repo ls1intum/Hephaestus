@@ -33,6 +33,7 @@ import java.time.ZoneOffset;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -118,9 +119,9 @@ class AuthSessionServiceTest extends BaseUnitTest {
     }
 
     private static AuthSessionService.RefreshContext ctx(
-        Long impersonatorId,
-        Instant impersonationExpiresAt,
-        Instant sessionExpiresAt
+        @Nullable Long impersonatorId,
+        @Nullable Instant impersonationExpiresAt,
+        @Nullable Instant sessionExpiresAt
     ) {
         return new AuthSessionService.RefreshContext(impersonatorId, impersonationExpiresAt, sessionExpiresAt);
     }
@@ -269,8 +270,9 @@ class AuthSessionServiceTest extends BaseUnitTest {
         service.refresh(ACCOUNT_ID, jti, ctx(null, null, null), mock(HttpServletRequest.class), response);
 
         assertThat(refreshResult("success")).isEqualTo(1.0);
-        assertThat(response.getCookie("__Host-HEPHAESTUS_AT")).isNotNull();
-        assertThat(response.getCookie("__Host-HEPHAESTUS_AT").getValue()).isEqualTo("fresh-token");
+        var cookie = response.getCookie("__Host-HEPHAESTUS_AT");
+        assertThat(cookie).isNotNull();
+        assertThat(cookie.getValue()).isEqualTo("fresh-token");
         // An ordinary rotation is audited as TOKEN_REFRESH for the account.
         AuthEventData event = capturedEvent();
         assertThat(event.type()).isEqualTo(AuthEvent.EventType.TOKEN_REFRESH);
@@ -299,6 +301,8 @@ class AuthSessionServiceTest extends BaseUnitTest {
         assertThat(refreshResult("error")).isEqualTo(1.0);
         assertThat(refreshResult("success")).isZero();
         // The timer's count still reflects the call (finally ran) — telemetry is not lost on failure.
-        assertThat(meterRegistry.find("auth.token.refresh").timer().count()).isEqualTo(1L);
+        var timer = meterRegistry.find("auth.token.refresh").timer();
+        assertThat(timer).isNotNull();
+        assertThat(timer.count()).isEqualTo(1L);
     }
 }

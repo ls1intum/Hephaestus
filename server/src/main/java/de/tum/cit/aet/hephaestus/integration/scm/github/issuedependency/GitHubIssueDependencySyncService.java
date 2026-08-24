@@ -38,6 +38,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -247,7 +248,7 @@ public class GitHubIssueDependencySyncService {
                         MAX_RETRY_ATTEMPTS,
                         "dependency sync",
                         "repoName",
-                        sanitizeForLog(repoNameWithOwner),
+                        Objects.requireNonNullElse(sanitizeForLog(repoNameWithOwner), "<unknown>"),
                         log
                     )
                 );
@@ -284,7 +285,7 @@ public class GitHubIssueDependencySyncService {
      * Uses type-safe generated DTOs for GraphQL response handling.
      */
     private int syncRepositoryDependencies(HttpGraphQlClient client, Repository repo, Long scopeId) {
-        String safeNameWithOwner = sanitizeForLog(repo.getNameWithOwner());
+        String safeNameWithOwner = Objects.requireNonNullElse(sanitizeForLog(repo.getNameWithOwner()), "<unknown>");
         Optional<RepositoryOwnerAndName> parsedName = GitHubRepositoryNameParser.parse(repo.getNameWithOwner());
         if (parsedName.isEmpty()) {
             log.warn("Skipped dependency sync: reason=invalidNameFormat, repoName={}", safeNameWithOwner);
@@ -636,8 +637,7 @@ public class GitHubIssueDependencySyncService {
      * triggering domain events. These stubs will be hydrated with full data when
      * the regular issue sync runs.
      */
-    @Nullable
-    private Issue createBlockerIssue(GHIssue blockerGraphQl, Long scopeId) {
+    private @Nullable Issue createBlockerIssue(@Nullable GHIssue blockerGraphQl, Long scopeId) {
         if (blockerGraphQl == null || blockerGraphQl.getFullDatabaseId() == null) {
             return null;
         }

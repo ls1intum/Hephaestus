@@ -20,6 +20,7 @@ import java.util.Base64;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.env.Environment;
@@ -69,7 +70,7 @@ public class JwtSigningKeyService implements JWKSource<SecurityContext> {
     private final JwtSigningKeyRepository repository;
     private final Environment environment;
     private final JwtSigningKeySealer sealer;
-    private final AtomicReference<CachedSet> cache = new AtomicReference<>();
+    private final AtomicReference<@Nullable CachedSet> cache = new AtomicReference<>();
 
     /** How long to trust the in-memory key cache before reloading from DB. */
     private static final long CACHE_TTL_MILLIS = 60_000L;

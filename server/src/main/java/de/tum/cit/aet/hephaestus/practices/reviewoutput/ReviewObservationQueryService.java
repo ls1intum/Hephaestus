@@ -18,6 +18,7 @@ import de.tum.cit.aet.hephaestus.practices.reviewoutput.dto.ReviewSubjectDTO;
 import de.tum.cit.aet.hephaestus.practices.spi.EvidenceAuthorization;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -78,7 +79,12 @@ class ReviewObservationQueryService {
                 ArtifactKind.of(row.getArtifactKind()),
                 row.getArtifactId()
             );
-            return ReviewObservationDTO.from(row, dispositions.get(row.getId()), artifacts.get(key), subjects);
+            return ReviewObservationDTO.from(
+                row,
+                dispositions.get(row.getId()),
+                Objects.requireNonNull(artifacts.get(key)),
+                subjects
+            );
         });
     }
 
@@ -106,6 +112,12 @@ class ReviewObservationQueryService {
             observation,
             SourceUsePurpose.OPERATOR_EVIDENCE_REVIEW
         );
-        return ReviewObservationDetailDTO.from(observation, artifact, subject, feedback, includeEvidence);
+        return ReviewObservationDetailDTO.from(
+            observation,
+            Objects.requireNonNull(artifact),
+            subject,
+            feedback,
+            includeEvidence
+        );
     }
 }

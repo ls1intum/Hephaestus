@@ -5,12 +5,13 @@ import de.tum.cit.aet.hephaestus.practices.feedback.approval.FeedbackApprovalDec
 import de.tum.cit.aet.hephaestus.practices.feedback.approval.FeedbackRejectionReason;
 import java.time.Instant;
 import java.util.UUID;
+import org.jspecify.annotations.Nullable;
 
 public record FeedbackApprovalDTO(
     UUID feedbackId,
     FeedbackApprovalDecision decision,
     FeedbackRejectionReason rejectionReason,
-    String rejectionNote,
+    @Nullable String rejectionNote,
     Long actorAccountId,
     Instant decidedAt
 ) {

@@ -7,6 +7,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+import org.jspecify.annotations.Nullable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -34,10 +35,10 @@ public class SessionWebController {
 
     public record SessionViewDTO(
         UUID jti,
-        Instant issuedAt,
+        @Nullable Instant issuedAt,
         Instant expiresAt,
-        String userAgent,
-        String ip,
+        @Nullable String userAgent,
+        @Nullable String ip,
         boolean current
     ) {}
 

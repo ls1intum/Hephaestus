@@ -23,8 +23,10 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -112,7 +114,7 @@ public class GitLabGroupSyncService {
     @Transactional
     public Optional<Organization> syncGroup(
         Long scopeId,
-        String groupFullPath,
+        @Nullable String groupFullPath,
         @org.jspecify.annotations.Nullable String serverUrl
     ) {
         if (groupFullPath == null || groupFullPath.isBlank()) {
@@ -123,7 +125,7 @@ public class GitLabGroupSyncService {
 
         try {
             IdentityProvider provider = resolveProvider(serverUrl);
-            Long providerId = provider.getId();
+            Long providerId = Objects.requireNonNull(provider.getId());
             graphQlClientProvider.acquirePermission();
             HttpGraphQlClient client = graphQlClientProvider.forScope(scopeId);
 
@@ -147,7 +149,9 @@ public class GitLabGroupSyncService {
 
             graphQlClientProvider.recordSuccess();
 
-            GitLabGroupResponse group = response.field("group").toEntity(GitLabGroupResponse.class);
+            GitLabGroupResponse group = Objects.requireNonNull(response)
+                .field("group")
+                .toEntity(GitLabGroupResponse.class);
             if (group == null) {
                 log.warn(
                     "Skipped group sync: reason=notFoundOnGitLab, scopeId={}, groupPath={}",
@@ -157,7 +161,7 @@ public class GitLabGroupSyncService {
                 return Optional.empty();
             }
 
-            Organization organization = groupProcessor.process(group, providerId);
+            Organization organization = groupProcessor.process(group, Objects.requireNonNull(providerId));
             if (organization != null) {
                 log.info(
                     "Synced group: scopeId={}, orgId={}, groupPath={}",
@@ -196,7 +200,7 @@ public class GitLabGroupSyncService {
     // network calls or Thread.sleep().
     public GitLabSyncResult syncGroupProjects(
         Long scopeId,
-        String groupFullPath,
+        @Nullable String groupFullPath,
         @org.jspecify.annotations.Nullable String serverUrl
     ) {
         if (groupFullPath == null || groupFullPath.isBlank()) {
@@ -220,7 +224,7 @@ public class GitLabGroupSyncService {
 
         try {
             IdentityProvider provider = resolveProvider(serverUrl);
-            Long providerId = provider.getId();
+            Long providerId = Objects.requireNonNull(provider.getId());
             graphQlClientProvider.acquirePermission();
 
             do {
@@ -272,7 +276,7 @@ public class GitLabGroupSyncService {
                 if (pageCount == 0) {
                     // Extract reported total count for post-sync verification
                     try {
-                        Object countField = response.field("group.projects.count").getValue();
+                        Object countField = Objects.requireNonNull(response).field("group.projects.count").getValue();
                         if (countField instanceof Number number) {
                             reportedTotalCount = number.intValue();
                             log.info(
@@ -285,7 +289,9 @@ public class GitLabGroupSyncService {
                         log.debug("Could not extract project count: groupPath={}", safeGroupPath);
                     }
 
-                    GitLabGroupResponse groupData = response.field("group").toEntity(GitLabGroupResponse.class);
+                    GitLabGroupResponse groupData = Objects.requireNonNull(response)
+                        .field("group")
+                        .toEntity(GitLabGroupResponse.class);
                     if (groupData != null) {
                         topLevelOrganization = groupProcessor.process(groupData, providerId);
                     }
@@ -307,7 +313,7 @@ public class GitLabGroupSyncService {
                 }
 
                 // Parse project nodes — each project may belong to a different subgroup
-                List<GitLabProjectResponse> projects = response
+                List<GitLabProjectResponse> projects = Objects.requireNonNull(response)
                     .field("group.projects.nodes")
                     .toEntityList(GitLabProjectResponse.class);
 
@@ -318,7 +324,11 @@ public class GitLabGroupSyncService {
                     }
                     try {
                         // Resolve the project's immediate parent group (may differ from top-level)
-                        Organization projectOrg = resolveProjectOrganization(project, topLevelOrganization, providerId);
+                        Organization projectOrg = resolveProjectOrganization(
+                            project,
+                            Objects.requireNonNull(topLevelOrganization),
+                            providerId
+                        );
                         Repository repo = projectProcessor.processGraphQlResponse(project, projectOrg, provider);
                         if (repo != null) {
                             syncedRepositories.add(repo);
@@ -336,7 +346,9 @@ public class GitLabGroupSyncService {
                 }
 
                 // Check pagination
-                GitLabPageInfo pageInfo = response.field("group.projects.pageInfo").toEntity(GitLabPageInfo.class);
+                GitLabPageInfo pageInfo = Objects.requireNonNull(response)
+                    .field("group.projects.pageInfo")
+                    .toEntity(GitLabPageInfo.class);
 
                 if (pageInfo == null || !pageInfo.hasNextPage()) {
                     break;
@@ -556,7 +568,7 @@ public class GitLabGroupSyncService {
 
                 graphQlClientProvider.recordSuccess();
 
-                List<GitLabProjectResponse> projects = response
+                List<GitLabProjectResponse> projects = Objects.requireNonNull(response)
                     .field("group.projects.nodes")
                     .toEntityList(GitLabProjectResponse.class);
 
@@ -588,7 +600,9 @@ public class GitLabGroupSyncService {
                     }
                 }
 
-                GitLabPageInfo pageInfo = response.field("group.projects.pageInfo").toEntity(GitLabPageInfo.class);
+                GitLabPageInfo pageInfo = Objects.requireNonNull(response)
+                    .field("group.projects.pageInfo")
+                    .toEntity(GitLabPageInfo.class);
 
                 if (pageInfo == null || !pageInfo.hasNextPage()) {
                     break;

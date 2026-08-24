@@ -28,6 +28,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -264,7 +265,7 @@ class FeedbackSupersessionIntegrationTest extends BaseIntegrationTest {
         return card(body, FeedbackDeliveryState.PREPARED, null);
     }
 
-    private Feedback card(String body, FeedbackDeliveryState state, FeedbackSuppressionReason reason) {
+    private Feedback card(String body, FeedbackDeliveryState state, @Nullable FeedbackSuppressionReason reason) {
         return feedbackRepository.save(cardBuilder(body, state, reason).build());
     }
 
@@ -272,7 +273,7 @@ class FeedbackSupersessionIntegrationTest extends BaseIntegrationTest {
     private Feedback.FeedbackBuilder cardBuilder(
         String body,
         FeedbackDeliveryState state,
-        FeedbackSuppressionReason reason
+        @Nullable FeedbackSuppressionReason reason
     ) {
         AgentJob job = new AgentJob();
         job.setWorkspace(workspace);

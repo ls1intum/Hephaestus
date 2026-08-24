@@ -21,6 +21,7 @@ import java.time.ZonedDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -161,7 +162,7 @@ class WebhookStreamMonitor {
                     )
                 );
                 accountForLoss(name, state.getFirstSequence());
-                lastSuccessfulPollMillis.get(name).set(System.currentTimeMillis());
+                Objects.requireNonNull(lastSuccessfulPollMillis.get(name)).set(System.currentTimeMillis());
                 recovered(name);
             } catch (Exception e) {
                 failed(name, e);
@@ -223,9 +224,9 @@ class WebhookStreamMonitor {
                 );
             }
         }
-        unacknowledgedGap.get(stream).set(worstGap);
+        Objects.requireNonNull(unacknowledgedGap.get(stream)).set(worstGap);
         if (newLoss > 0) {
-            dropped.get(stream).increment(newLoss);
+            Objects.requireNonNull(dropped.get(stream)).increment(newLoss);
         }
         lastFirstSequence.put(stream, firstSequence);
     }

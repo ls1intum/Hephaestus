@@ -140,9 +140,10 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
         repo = repositoryRepository.save(repo);
 
         Instant now = Instant.now();
+        Long providerId = java.util.Objects.requireNonNull(provider.getId());
         pullRequestRepository.upsertCore(
             5001L,
-            provider.getId(),
+            providerId,
             42,
             "Test PR",
             "Test body",

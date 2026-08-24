@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.integration.scm.gitlab.sync;
 import static de.tum.cit.aet.hephaestus.integration.scm.GraphQlResponseStubValidator.Vendor.GITLAB;
 import static de.tum.cit.aet.hephaestus.integration.scm.GraphQlResponseStubValidator.assertVendorCouldReturn;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -162,7 +163,9 @@ class GitLabDeletionSweepServiceTest extends BaseUnitTest {
             .stream()
             .map(iid -> Map.<String, Object>of("iid", String.valueOf(iid)))
             .toList();
-        assertVendorCouldReturn(GITLAB, LISTING_DOCUMENTS.get(prefix), prefix + ".nodes", nodes);
+        String document = LISTING_DOCUMENTS.get(prefix);
+        assertNotNull(document);
+        assertVendorCouldReturn(GITLAB, document, prefix + ".nodes", nodes);
         // doReturn to sidestep the generic signature of toEntityList(Class<T>).
         lenient().doReturn(nodes).when(nodesField).toEntityList(Map.class);
         lenient().when(response.field(prefix + ".nodes")).thenReturn(nodesField);

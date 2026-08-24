@@ -154,7 +154,9 @@ class MentorRunnerClientTest extends BaseUnitTest {
         JsonNode response = sandbox.takeFrame();
         assertThat(response.get("id").asLong()).isEqualTo(9999L);
         assertThat(response.get("result").get("content").get("ok").asBoolean()).isTrue();
-        assertThat(lastFetchContext.get().path()).isEqualTo("inputs/context/workspace.json");
+        var fetchContext = lastFetchContext.get();
+        org.junit.jupiter.api.Assertions.assertNotNull(fetchContext);
+        assertThat(fetchContext.path()).isEqualTo("inputs/context/workspace.json");
     }
 
     @Test

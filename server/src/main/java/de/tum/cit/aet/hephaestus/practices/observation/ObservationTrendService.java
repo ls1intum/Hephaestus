@@ -11,8 +11,10 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
+import org.jspecify.annotations.Nullable;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -103,7 +105,8 @@ public class ObservationTrendService {
             if (prior == null) {
                 // present now, absent prior → NEW (carries curr.getAssessment() so the footer can tell a new
                 // PROBLEM from a newly-observed strength; only a BAD-new is a "new problem" — C10).
-                transitions.add(transition(key, TransitionStatus.NEW, curr, null, curr.getAssessment()));
+                LocusObservation current = Objects.requireNonNull(curr);
+                transitions.add(transition(key, TransitionStatus.NEW, current, null, current.getAssessment()));
             } else if (curr == null) {
                 // present prior, absent now. Only a vanished PROBLEM is RESOLVED ("you fixed X"). A GOOD strength
                 // that simply was not re-observed this run is NOT a fix — emitting RESOLVED would credit the
@@ -132,8 +135,8 @@ public class ObservationTrendService {
         String key,
         TransitionStatus status,
         LocusObservation represent,
-        Assessment priorAssessment,
-        Assessment currentAssessment
+        @Nullable Assessment priorAssessment,
+        @Nullable Assessment currentAssessment
     ) {
         return new LocusTransition(
             key,

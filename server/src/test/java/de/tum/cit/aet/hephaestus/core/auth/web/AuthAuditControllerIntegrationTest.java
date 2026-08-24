@@ -1,5 +1,7 @@
 package de.tum.cit.aet.hephaestus.core.auth.web;
 
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+
 import de.tum.cit.aet.hephaestus.core.auth.audit.AuthEvent;
 import de.tum.cit.aet.hephaestus.core.auth.audit.AuthEventData;
 import de.tum.cit.aet.hephaestus.core.auth.audit.AuthEventRepository;
@@ -10,6 +12,7 @@ import de.tum.cit.aet.hephaestus.core.auth.jwt.JwtPrincipalFactory;
 import de.tum.cit.aet.hephaestus.testconfig.RealAuthIntegrationTest;
 import java.time.Instant;
 import org.assertj.core.api.Assertions;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -60,13 +63,13 @@ class AuthAuditControllerIntegrationTest extends RealAuthIntegrationTest {
         Account admin = persist("Keeper Admin", Account.AppRole.APP_ADMIN);
         Account target = persist("Target", Account.AppRole.USER);
         // Older login, then a newer role change (acted by the admin on the target).
-        seed(1L, AuthEvent.EventType.LOGIN, Instant.parse("2026-06-01T10:00:00Z"), target.getId(), null);
+        seed(1L, AuthEvent.EventType.LOGIN, Instant.parse("2026-06-01T10:00:00Z"), persistedId(target.getId()), null);
         seed(
             2L,
             AuthEvent.EventType.APP_ROLE_CHANGED,
             Instant.parse("2026-06-02T10:00:00Z"),
-            target.getId(),
-            admin.getId()
+            persistedId(target.getId()),
+            persistedId(admin.getId())
         );
 
         webTestClient
@@ -83,9 +86,9 @@ class AuthAuditControllerIntegrationTest extends RealAuthIntegrationTest {
             .jsonPath("$.content[0].eventType")
             .isEqualTo("APP_ROLE_CHANGED")
             .jsonPath("$.content[0].accountId")
-            .isEqualTo(target.getId())
+            .isEqualTo(persistedId(target.getId()))
             .jsonPath("$.content[0].actingAccountId")
-            .isEqualTo(admin.getId())
+            .isEqualTo(persistedId(admin.getId()))
             .jsonPath("$.content[1].eventType")
             .isEqualTo("LOGIN");
     }
@@ -93,8 +96,14 @@ class AuthAuditControllerIntegrationTest extends RealAuthIntegrationTest {
     @Test
     void eventTypeFilterNarrowsResults() {
         Account admin = persist("Keeper Admin", Account.AppRole.APP_ADMIN);
-        seed(1L, AuthEvent.EventType.LOGIN, Instant.parse("2026-06-01T10:00:00Z"), admin.getId(), null);
-        seed(2L, AuthEvent.EventType.APP_ROLE_CHANGED, Instant.parse("2026-06-02T10:00:00Z"), admin.getId(), null);
+        seed(1L, AuthEvent.EventType.LOGIN, Instant.parse("2026-06-01T10:00:00Z"), persistedId(admin.getId()), null);
+        seed(
+            2L,
+            AuthEvent.EventType.APP_ROLE_CHANGED,
+            Instant.parse("2026-06-02T10:00:00Z"),
+            persistedId(admin.getId()),
+            null
+        );
 
         webTestClient
             .get()
@@ -113,9 +122,15 @@ class AuthAuditControllerIntegrationTest extends RealAuthIntegrationTest {
     @Test
     void eventTypeFilterAcceptsSeveralValuesAtOnce() {
         Account admin = persist("Keeper Admin", Account.AppRole.APP_ADMIN);
-        seed(1L, AuthEvent.EventType.LOGIN, Instant.parse("2026-06-01T10:00:00Z"), admin.getId(), null);
-        seed(2L, AuthEvent.EventType.LOGOUT, Instant.parse("2026-06-02T10:00:00Z"), admin.getId(), null);
-        seed(3L, AuthEvent.EventType.APP_ROLE_CHANGED, Instant.parse("2026-06-03T10:00:00Z"), admin.getId(), null);
+        seed(1L, AuthEvent.EventType.LOGIN, Instant.parse("2026-06-01T10:00:00Z"), persistedId(admin.getId()), null);
+        seed(2L, AuthEvent.EventType.LOGOUT, Instant.parse("2026-06-02T10:00:00Z"), persistedId(admin.getId()), null);
+        seed(
+            3L,
+            AuthEvent.EventType.APP_ROLE_CHANGED,
+            Instant.parse("2026-06-03T10:00:00Z"),
+            persistedId(admin.getId()),
+            null
+        );
 
         // Two values on one dimension is a disjunction, not a last-one-wins overwrite. The unfiltered
         // case pins the other half of the predicate: a null list must not degrade into `IN ()`, which
@@ -146,8 +161,8 @@ class AuthAuditControllerIntegrationTest extends RealAuthIntegrationTest {
             1L,
             AuthEvent.EventType.APP_ROLE_CHANGED,
             Instant.parse("2026-06-02T10:00:00Z"),
-            target.getId(),
-            admin.getId()
+            persistedId(target.getId()),
+            persistedId(admin.getId())
         );
 
         webTestClient
@@ -167,7 +182,7 @@ class AuthAuditControllerIntegrationTest extends RealAuthIntegrationTest {
     @Test
     void resultFilterNarrowsToFailuresWithReason() {
         Account admin = persist("Keeper Admin", Account.AppRole.APP_ADMIN);
-        seed(1L, AuthEvent.EventType.LOGIN, Instant.parse("2026-06-01T10:00:00Z"), admin.getId(), null);
+        seed(1L, AuthEvent.EventType.LOGIN, Instant.parse("2026-06-01T10:00:00Z"), persistedId(admin.getId()), null);
         seedFailure(2L, AuthEvent.EventType.LOGIN_FAILED, Instant.parse("2026-06-02T10:00:00Z"), "Email not verified");
 
         webTestClient
@@ -189,8 +204,8 @@ class AuthAuditControllerIntegrationTest extends RealAuthIntegrationTest {
     @Test
     void timeRangeFilterNarrowsToWindow() {
         Account admin = persist("Keeper Admin", Account.AppRole.APP_ADMIN);
-        seed(1L, AuthEvent.EventType.LOGIN, Instant.parse("2026-06-01T10:00:00Z"), admin.getId(), null);
-        seed(2L, AuthEvent.EventType.LOGIN, Instant.parse("2026-06-05T10:00:00Z"), admin.getId(), null);
+        seed(1L, AuthEvent.EventType.LOGIN, Instant.parse("2026-06-01T10:00:00Z"), persistedId(admin.getId()), null);
+        seed(2L, AuthEvent.EventType.LOGIN, Instant.parse("2026-06-05T10:00:00Z"), persistedId(admin.getId()), null);
 
         webTestClient
             .get()
@@ -217,18 +232,20 @@ class AuthAuditControllerIntegrationTest extends RealAuthIntegrationTest {
         Account admin = persist("Keeper Admin", Account.AppRole.APP_ADMIN);
         Account target = persist("Target", Account.AppRole.USER);
         // One self-login (no actor) + one acted-by-admin event.
-        seed(1L, AuthEvent.EventType.LOGIN, Instant.parse("2026-06-01T10:00:00Z"), target.getId(), null);
+        seed(1L, AuthEvent.EventType.LOGIN, Instant.parse("2026-06-01T10:00:00Z"), persistedId(target.getId()), null);
         seed(
             2L,
             AuthEvent.EventType.IMPERSONATION_BEGIN,
             Instant.parse("2026-06-02T10:00:00Z"),
-            target.getId(),
-            admin.getId()
+            persistedId(target.getId()),
+            persistedId(admin.getId())
         );
 
         webTestClient
             .get()
-            .uri(builder -> builder.path("/admin/audit").queryParam("actingAccountId", admin.getId()).build())
+            .uri(builder ->
+                builder.path("/admin/audit").queryParam("actingAccountId", persistedId(admin.getId())).build()
+            )
             .headers(h -> h.setBearerAuth(tokenFor(admin)))
             .exchange()
             .expectStatus()
@@ -243,7 +260,7 @@ class AuthAuditControllerIntegrationTest extends RealAuthIntegrationTest {
     @Test
     void adminExportsCsvWithHeaderAndRows() {
         Account admin = persist("Keeper Admin", Account.AppRole.APP_ADMIN);
-        seed(1L, AuthEvent.EventType.LOGIN, Instant.parse("2026-06-01T10:00:00Z"), admin.getId(), null);
+        seed(1L, AuthEvent.EventType.LOGIN, Instant.parse("2026-06-01T10:00:00Z"), persistedId(admin.getId()), null);
 
         String csv = webTestClient
             .get()
@@ -298,7 +315,7 @@ class AuthAuditControllerIntegrationTest extends RealAuthIntegrationTest {
     void pageSizeIsClampedToTheMaximum() {
         // MAX_PAGE_SIZE caps a malicious/typo'd size so it can't scan a whole monthly partition.
         Account admin = persist("Keeper Admin", Account.AppRole.APP_ADMIN);
-        seed(1L, AuthEvent.EventType.LOGIN, Instant.parse("2026-06-01T10:00:00Z"), admin.getId(), null);
+        seed(1L, AuthEvent.EventType.LOGIN, Instant.parse("2026-06-01T10:00:00Z"), persistedId(admin.getId()), null);
 
         webTestClient
             .get()
@@ -340,7 +357,13 @@ class AuthAuditControllerIntegrationTest extends RealAuthIntegrationTest {
         authEventRepository.save(AuthEvent.create(data, id, occurredAt, "127.0.0.1", "test-agent"));
     }
 
-    private void seed(long id, AuthEvent.EventType type, Instant occurredAt, Long accountId, Long actingAccountId) {
+    private void seed(
+        long id,
+        AuthEvent.EventType type,
+        Instant occurredAt,
+        @Nullable Long accountId,
+        @Nullable Long actingAccountId
+    ) {
         AuthEventData data = new AuthEventData(
             type,
             AuthEvent.Result.SUCCESS,
@@ -364,5 +387,10 @@ class AuthAuditControllerIntegrationTest extends RealAuthIntegrationTest {
 
     private String tokenFor(Account account) {
         return jwtIssuer.issue(principalFactory.forAccount(account), null, null).value();
+    }
+
+    private static long persistedId(@Nullable Long id) {
+        assertNotNull(id);
+        return id;
     }
 }

@@ -8,6 +8,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider.SyncTar
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetTestBuilder;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.List;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 
 /** The checkpoint arithmetic that turns backfill from an endless spinner into a percent-done bar. */
@@ -19,10 +20,10 @@ class BackfillTallyTest extends BaseUnitTest {
      */
     private static SyncTarget target(
         long id,
-        Integer issueHwm,
-        Integer issueCheckpoint,
-        Integer prHwm,
-        Integer prCheckpoint
+        @Nullable Integer issueHwm,
+        @Nullable Integer issueCheckpoint,
+        @Nullable Integer prHwm,
+        @Nullable Integer prCheckpoint
     ) {
         return SyncTargetTestBuilder.syncTarget()
             .id(id)

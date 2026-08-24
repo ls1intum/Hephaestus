@@ -17,6 +17,7 @@ import java.util.EnumMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.regex.Pattern;
 import org.jspecify.annotations.Nullable;
@@ -184,9 +185,9 @@ class PullRequestCommentPoster {
             );
             return handle.externalId();
         } catch (OutboundEgressSuppressedException e) {
-            throw new JobDeliverySuppressedException(e.getMessage(), e);
+            throw new JobDeliverySuppressedException(e.toString(), e);
         } catch (FeedbackDeliveryException e) {
-            throw new JobDeliveryException(e.getMessage(), e);
+            throw new JobDeliveryException(e.toString(), e);
         }
     }
 
@@ -214,7 +215,7 @@ class PullRequestCommentPoster {
                 new FeedbackContent(formattedBody, summaryMarkerFor(job))
             );
         } catch (OutboundEgressSuppressedException e) {
-            throw new JobDeliverySuppressedException(e.getMessage(), e);
+            throw new JobDeliverySuppressedException(e.toString(), e);
         }
         return switch (outcome.kind()) {
             case EDITED -> {
@@ -222,9 +223,9 @@ class PullRequestCommentPoster {
                     "Edited feedback summary in place: jobId={}, kind={}, commentId={}",
                     job.getId(),
                     kind,
-                    outcome.handle().externalId()
+                    Objects.requireNonNull(outcome.handle()).externalId()
                 );
-                yield new UpdateResult(UpdateResult.Kind.EDITED, outcome.handle().externalId());
+                yield new UpdateResult(UpdateResult.Kind.EDITED, Objects.requireNonNull(outcome.handle()).externalId());
             }
             case GONE -> {
                 log.info(
@@ -279,7 +280,7 @@ class PullRequestCommentPoster {
         try {
             subjectExternalId = channel.formatIssueSubjectId(repoFullName, issueNumber);
         } catch (IllegalArgumentException e) {
-            throw new JobDeliveryException(e.getMessage(), e);
+            throw new JobDeliveryException(e.toString(), e);
         }
         FeedbackTarget target = new FeedbackTarget(
             new IntegrationRef(kind, workspaceId, null),
@@ -299,9 +300,9 @@ class PullRequestCommentPoster {
             );
             return handle.externalId();
         } catch (OutboundEgressSuppressedException e) {
-            throw new JobDeliverySuppressedException(e.getMessage(), e);
+            throw new JobDeliverySuppressedException(e.toString(), e);
         } catch (FeedbackDeliveryException e) {
-            throw new JobDeliveryException(e.getMessage(), e);
+            throw new JobDeliveryException(e.toString(), e);
         }
     }
 
@@ -342,7 +343,7 @@ class PullRequestCommentPoster {
             }
             SummaryChannel.ExistingSummaryLookup lookup = channel.findExistingSummary(target, marker);
             return switch (lookup.kind()) {
-                case FOUND -> ExistingDeliveryLookup.found(lookup.handle().externalId());
+                case FOUND -> ExistingDeliveryLookup.found(Objects.requireNonNull(lookup.handle()).externalId());
                 case ABSENT -> ExistingDeliveryLookup.absent();
                 case UNKNOWN -> ExistingDeliveryLookup.unknown();
             };
@@ -378,7 +379,7 @@ class PullRequestCommentPoster {
         try {
             subjectExternalId = channel.formatPullRequestSubjectId(repoFullName, prNumber);
         } catch (IllegalArgumentException e) {
-            throw new JobDeliveryException(e.getMessage(), e);
+            throw new JobDeliveryException(e.toString(), e);
         }
 
         String resourceUrl = optionalMetadataText(metadata, "commit_sha");
@@ -396,7 +397,7 @@ class PullRequestCommentPoster {
      * steps below is load-bearing — autolinks must survive tag stripping, and stripping must reach a
      * fixed point before the markdown passes run.
      */
-    static String sanitize(String raw) {
+    static String sanitize(@Nullable String raw) {
         if (raw == null || raw.isEmpty()) {
             return "";
         }

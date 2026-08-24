@@ -9,6 +9,7 @@ import de.tum.cit.aet.hephaestus.workspace.spi.WorkspacePurgeContributor;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -62,7 +63,7 @@ public class ConnectionPurgeContributor implements WorkspacePurgeContributor {
         }
     }
 
-    private void revokeProvider(Connection connection, ConnectionStrategy strategy) {
+    private void revokeProvider(Connection connection, @Nullable ConnectionStrategy strategy) {
         if (strategy == null) {
             log.warn(
                 "Provider teardown unavailable during workspace purge: kind={}, connectionId={}; continuing with local erasure",

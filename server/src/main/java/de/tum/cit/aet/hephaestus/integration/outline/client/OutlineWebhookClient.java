@@ -2,9 +2,12 @@ package de.tum.cit.aet.hephaestus.integration.outline.client;
 
 import de.tum.cit.aet.hephaestus.integration.outline.client.model.OutlineWebhookSubscription;
 import java.util.List;
+import org.jspecify.annotations.Nullable;
 
 public interface OutlineWebhookClient {
     List<OutlineWebhookSubscription> listWebhookSubscriptions(String serverUrl, String token);
+
+    @Nullable
     String createWebhookSubscription(
         String serverUrl,
         String token,
@@ -13,5 +16,6 @@ public interface OutlineWebhookClient {
         String signingSecret,
         List<String> events
     );
+
     void deleteWebhookSubscription(String serverUrl, String token, String subscriptionId);
 }

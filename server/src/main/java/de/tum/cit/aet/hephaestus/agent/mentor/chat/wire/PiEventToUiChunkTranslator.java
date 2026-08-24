@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.agent.mentor.chat.wire;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
@@ -241,7 +242,7 @@ public class PiEventToUiChunkTranslator {
             out.add(new UIMessageChunk.TextStart(id));
         }
         state.appendText(deltaText);
-        out.add(new UIMessageChunk.TextDelta(state.activeTextId(), deltaText));
+        out.add(new UIMessageChunk.TextDelta(Objects.requireNonNull(state.activeTextId()), deltaText));
         return out;
     }
 

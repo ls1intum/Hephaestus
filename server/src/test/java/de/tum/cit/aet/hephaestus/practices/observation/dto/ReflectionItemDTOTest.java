@@ -11,6 +11,7 @@ import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.UUID;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.ObjectMapper;
@@ -19,7 +20,7 @@ class ReflectionItemDTOTest extends BaseUnitTest {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
-    private static Observation finding(String evidenceJson) {
+    private static Observation finding(@Nullable String evidenceJson) {
         return Observation.builder()
             .id(UUID.randomUUID())
             .summary("Distance-warning logic ships with no test")

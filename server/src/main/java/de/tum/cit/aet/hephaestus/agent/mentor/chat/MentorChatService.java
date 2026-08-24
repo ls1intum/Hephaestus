@@ -37,6 +37,7 @@ import io.micrometer.core.instrument.Timer;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -99,7 +100,7 @@ public class MentorChatService implements MentorTurnRunner, MentorChatStarter {
     public void start(MentorTurnRequest request, SseEmitter emitter) {
         MentorSseChannel channel = new MentorSseChannel(emitter, objectMapper, runnerTimeoutScheduler.scheduler());
         channel.bindLifecycle();
-        AtomicReference<MentorRunnerClient> clientHolder = new AtomicReference<>();
+        AtomicReference<@Nullable MentorRunnerClient> clientHolder = new AtomicReference<>();
         channel.onDisconnect(() -> abortRunnerOnDisconnect(clientHolder.get(), request.threadId()));
 
         // Record-started fires here so started/completed balance on the executor-rejected branch.
@@ -144,7 +145,7 @@ public class MentorChatService implements MentorTurnRunner, MentorChatStarter {
     private void dispatchTurn(
         MentorTurnRequest request,
         MentorChannel channel,
-        AtomicReference<MentorRunnerClient> clientHolder
+        AtomicReference<@Nullable MentorRunnerClient> clientHolder
     ) {
         MentorTurnLock.ThreadKey key = new MentorTurnLock.ThreadKey(request.workspaceId(), request.threadId());
         // Outer catch: anything that escapes the lock helper itself (not the lambda) would leave
@@ -210,7 +211,7 @@ public class MentorChatService implements MentorTurnRunner, MentorChatStarter {
     private MentorChatMetrics.Outcome runTurn(
         MentorTurnRequest request,
         MentorChannel channel,
-        AtomicReference<MentorRunnerClient> clientHolder
+        AtomicReference<@Nullable MentorRunnerClient> clientHolder
     ) {
         // Push thread + workspace ids into MDC so every WARN/ERROR in this turn carries the
         // correlation keys. Cleared in `finally` so the v-thread pool doesn't leak context.
@@ -227,14 +228,17 @@ public class MentorChatService implements MentorTurnRunner, MentorChatStarter {
     private MentorChatMetrics.Outcome runTurnInternal(
         MentorTurnRequest request,
         MentorChannel channel,
-        AtomicReference<MentorRunnerClient> clientHolder
+        AtomicReference<@Nullable MentorRunnerClient> clientHolder
     ) {
         // Both gates run before ANYTHING persists, so a refused turn leaves no partial rows and never
         // warms a sandbox. Budget runs after admission: which purse applies depends on who pays for
         // the bound model.
         MentorLlmConfig llmConfig = resolveLlmConfig(request.workspaceId());
 
-        FundingSource mentorFunding = llmConfig.connectionScope();
+        FundingSource mentorFunding = Objects.requireNonNull(
+            llmConfig.connectionScope(),
+            "Mentor model must have a funding source"
+        );
         LlmBudgetBlockReason blockReason = llmBudgetService.decide(request.workspaceId()).forFunding(mentorFunding);
         if (blockReason == LlmBudgetBlockReason.EXHAUSTED) {
             metrics.recordBudgetBlocked();
@@ -458,7 +462,7 @@ public class MentorChatService implements MentorTurnRunner, MentorChatStarter {
         InteractiveSandboxSpec spec,
         MentorTurnRequest request,
         MentorChannel channel,
-        AtomicReference<MentorRunnerClient> clientHolder,
+        AtomicReference<@Nullable MentorRunnerClient> clientHolder,
         TranslatorState state,
         MentorTurnPersistence.TurnPersistenceCookie cookie,
         CompletableFuture<Void> turnComplete,
@@ -674,10 +678,13 @@ public class MentorChatService implements MentorTurnRunner, MentorChatStarter {
      */
     private static String userFacingError(Throwable e) {
         if (e instanceof LlmBudgetExhaustedException budget) {
-            return budget.getMessage();
+            return Objects.requireNonNullElse(budget.getMessage(), "The mentor budget is exhausted.");
         }
         if (e instanceof LlmUnpricedUsageBlockedException unpriced) {
-            return unpriced.getMessage();
+            return Objects.requireNonNullElse(
+                unpriced.getMessage(),
+                "The mentor cannot use an unpriced model under the current budget policy."
+            );
         }
         if (e instanceof MentorRunnerException) {
             return "The mentor hit an unexpected error. Please try again.";

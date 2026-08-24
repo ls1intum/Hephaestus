@@ -1,5 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.scm.github;
 
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+
 import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
@@ -103,7 +105,6 @@ public abstract class AbstractGitHubLiveSyncIntegrationTest extends BaseGitHubLi
             fixtureService.deleteTeam(team.orgLogin(), team.teamSlug());
             allTeamsCreated.remove(team); // Remove from safety net if successfully deleted
         }
-        workspace = null;
     }
 
     /**
@@ -290,6 +291,8 @@ public abstract class AbstractGitHubLiveSyncIntegrationTest extends BaseGitHubLi
         GitHubTestFixtureService.RepositoryInfo repoInfo = fixtureService.getRepositoryInfo(repository.fullName());
         String defaultBranch = repoInfo.defaultBranch();
         String headCommitSha = repoInfo.headCommitSha();
+        assertNotNull(defaultBranch);
+        assertNotNull(headCommitSha);
 
         // Create feature branch
         fixtureService.createBranch(repoInfo.nodeId(), branchName, headCommitSha);

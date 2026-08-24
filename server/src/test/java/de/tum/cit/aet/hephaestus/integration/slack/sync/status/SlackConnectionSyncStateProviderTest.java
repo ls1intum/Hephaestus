@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.slack.sync.status;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.integration.core.spi.ConnectionSyncDetails;
@@ -41,7 +42,7 @@ class SlackConnectionSyncStateProviderTest extends BaseUnitTest {
 
     private final SlackRateLimitTracker rateLimitTracker = new SlackRateLimitTracker(new SimpleMeterRegistry());
 
-    private SlackConnectionSyncStateProvider provider;
+    private SlackConnectionSyncStateProvider provider = mock(SlackConnectionSyncStateProvider.class);
 
     private SlackConnectionSyncStateProvider providerWith(String cron) {
         return new SlackConnectionSyncStateProvider(

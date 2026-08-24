@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.core.auth.oauth;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
 import de.tum.cit.aet.hephaestus.core.auth.domain.AccountFeature;
@@ -19,6 +20,7 @@ import de.tum.cit.aet.hephaestus.testconfig.TestUserFactory;
 import java.net.URI;
 import java.util.List;
 import java.util.Map;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -86,7 +88,7 @@ class PracticeRoleResolutionEndToEndIntegrationTest extends RealAuthIntegrationT
             .resolveOrProvision(REGISTRATION_ID, subject, principal, AuthIntentCookie.Intent.login(null, null))
             .account();
 
-        IdentityLink link = identityLinkRepository.findActiveByAccountId(account.getId()).get(0);
+        IdentityLink link = identityLinkRepository.findActiveByAccountId(persistedId(account.getId())).get(0);
         // (a) the stored subject IS the numeric id — exactly what the gate stringifies from User.nativeId.
         assertThat(link.getSubject()).isEqualTo(String.valueOf(NATIVE_ID));
         long loginResolvedProviderId = link.getProviderId();
@@ -102,16 +104,16 @@ class PracticeRoleResolutionEndToEndIntegrationTest extends RealAuthIntegrationT
                         " — login/SCM canonicalization diverged"
                 )
             );
-        assertThat(scmProvider.getId()).isEqualTo(loginResolvedProviderId);
+        assertThat(persistedId(scmProvider.getId())).isEqualTo(loginResolvedProviderId);
 
         // Synced SCM User for the same person under that same provider row.
         User user = userRepository.save(TestUserFactory.createUser(NATIVE_ID, "octocat", scmProvider));
-        accountFeatureRepository.save(new AccountFeature(account.getId(), ROLE));
+        accountFeatureRepository.save(new AccountFeature(persistedId(account.getId()), ROLE));
 
         // THE PROOF: the (provider.id, valueOf(nativeId)) tuple the gate passes resolves the granted flag.
         assertThat(
             accountFeatureRepository.existsActiveFeatureForProviderSubject(
-                user.getProvider().getId(),
+                persistedId(user.getProvider().getId()),
                 String.valueOf(user.getNativeId()),
                 ROLE
             )
@@ -138,5 +140,10 @@ class PracticeRoleResolutionEndToEndIntegrationTest extends RealAuthIntegrationT
         URI uri = URI.create(baseUrl);
         String origin = uri.getScheme() + "://" + uri.getHost();
         return uri.getPort() == -1 ? origin : origin + ":" + uri.getPort();
+    }
+
+    private static long persistedId(@Nullable Long id) {
+        assertNotNull(id);
+        return id;
     }
 }

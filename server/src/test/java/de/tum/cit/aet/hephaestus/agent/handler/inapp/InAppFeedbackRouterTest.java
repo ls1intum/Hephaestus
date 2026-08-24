@@ -15,6 +15,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -164,9 +165,9 @@ class InAppFeedbackRouterTest extends BaseUnitTest {
 
     private static InAppRoutingDecision route(
         List<Observation> evidence,
-        PracticeAutonomy autonomy,
+        @Nullable PracticeAutonomy autonomy,
         ActorRole subjectRole,
-        Instant lastSurfaced
+        @Nullable Instant lastSurfaced
     ) {
         return InAppFeedbackRouter.route(message(), evidence, autonomy, subjectRole, lastSurfaced, NOW);
     }

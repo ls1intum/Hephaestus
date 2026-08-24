@@ -26,21 +26,6 @@ class JobSubmissionTest extends BaseUnitTest {
         }
 
         @Test
-        void shouldRejectNullMetadata() {
-            assertThatThrownBy(() -> new JobSubmission(null, "key"))
-                .isInstanceOf(NullPointerException.class)
-                .hasMessageContaining("metadata");
-        }
-
-        @Test
-        void shouldRejectNullIdempotencyKey() {
-            ObjectNode metadata = objectMapper.createObjectNode();
-            assertThatThrownBy(() -> new JobSubmission(metadata, null))
-                .isInstanceOf(NullPointerException.class)
-                .hasMessageContaining("idempotencyKey");
-        }
-
-        @Test
         void shouldRejectBlankIdempotencyKey() {
             ObjectNode metadata = objectMapper.createObjectNode();
             assertThatThrownBy(() -> new JobSubmission(metadata, "  "))

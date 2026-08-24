@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.scm.github.pullrequestreviewthread;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
@@ -22,6 +23,7 @@ import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -61,7 +63,7 @@ class GitHubPullRequestReviewThreadMessageHandlerIntegrationTest extends BaseInt
 
     private IdentityProvider gitProvider;
     private Repository testRepository;
-    private PullRequest testPullRequest;
+    private PullRequest testPullRequest = new PullRequest();
 
     @BeforeEach
     void setUp() {
@@ -138,11 +140,11 @@ class GitHubPullRequestReviewThreadMessageHandlerIntegrationTest extends BaseInt
         GitHubPullRequestReviewThreadEventDTO event = loadPayload("pull_request_review_thread.resolved");
 
         // Create the PR that the thread belongs to
-        createTestPullRequest(event.pullRequest().getDatabaseId(), event.pullRequest().number());
+        createTestPullRequest(required(event.pullRequest().getDatabaseId()), event.pullRequest().number());
 
         // The thread ID is derived from the first comment's ID in the webhook payload.
         // This matches how threads are stored during sync (first comment's databaseId = thread ID).
-        Long threadId = event.thread().getFirstCommentId();
+        Long threadId = required(event.thread().getFirstCommentId());
         assertThat(threadId).isEqualTo(2494208170L); // First comment ID from fixture
 
         // Create the thread in UNRESOLVED state first
@@ -178,10 +180,10 @@ class GitHubPullRequestReviewThreadMessageHandlerIntegrationTest extends BaseInt
         GitHubPullRequestReviewThreadEventDTO event = loadPayload("pull_request_review_thread.unresolved");
 
         // Create the PR that the thread belongs to
-        createTestPullRequest(event.pullRequest().getDatabaseId(), event.pullRequest().number());
+        createTestPullRequest(required(event.pullRequest().getDatabaseId()), event.pullRequest().number());
 
         // The thread ID is derived from the first comment's ID in the webhook payload.
-        Long threadId = event.thread().getFirstCommentId();
+        Long threadId = required(event.thread().getFirstCommentId());
         assertThat(threadId).isEqualTo(2494208170L); // First comment ID from fixture
 
         // Create the thread in RESOLVED state first
@@ -251,5 +253,10 @@ class GitHubPullRequestReviewThreadMessageHandlerIntegrationTest extends BaseInt
         ClassPathResource resource = new ClassPathResource("github/" + filename + ".json");
         String json = resource.getContentAsString(StandardCharsets.UTF_8);
         return objectMapper.readValue(json, GitHubPullRequestReviewThreadEventDTO.class);
+    }
+
+    private static <T> T required(@Nullable T value) {
+        assertNotNull(value);
+        return value;
     }
 }

@@ -22,6 +22,7 @@ import lombok.NoArgsConstructor;
 import org.hibernate.annotations.Immutable;
 import org.hibernate.annotations.OnDelete;
 import org.hibernate.annotations.OnDeleteAction;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Immutable record of one concrete placement of a synthesized {@code Feedback} unit on a
@@ -109,7 +110,7 @@ public class FeedbackPlacement {
 
     /** Last anchored line (1-based); equals start for a single-line anchor. */
     @Column(name = "anchor_end_line")
-    private Integer anchorEndLine;
+    private @Nullable Integer anchorEndLine;
 
     /**
      * Diff side of the anchor end / single line (OLD or NEW). Writers emit {@code NEW} (head side);
@@ -127,7 +128,7 @@ public class FeedbackPlacement {
      * Indexed for reconciling a posted id back to its placement.
      */
     @Column(name = "posted_comment_ref", columnDefinition = "TEXT")
-    private String postedCommentRef;
+    private @Nullable String postedCommentRef;
 
     /**
      * Link to the mentor assistant {@code chat_message} that delivered this placement — set only for a

@@ -22,6 +22,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
+import org.jspecify.annotations.Nullable;
 
 @Entity
 @Table(
@@ -53,34 +54,34 @@ public class PullRequestReviewThread extends BaseGitServiceEntity {
     private State state = State.UNRESOLVED;
 
     @Column(columnDefinition = "TEXT")
-    private String path;
+    private @Nullable String path;
 
-    private Integer line;
+    private @Nullable Integer line;
 
-    private Integer startLine;
-
-    @Enumerated(EnumType.STRING)
-    @Column(length = 16)
-    private PullRequestReviewComment.Side side;
+    private @Nullable Integer startLine;
 
     @Enumerated(EnumType.STRING)
     @Column(length = 16)
-    private PullRequestReviewComment.Side startSide;
+    private PullRequestReviewComment.@Nullable Side side;
+
+    @Enumerated(EnumType.STRING)
+    @Column(length = 16)
+    private PullRequestReviewComment.@Nullable Side startSide;
 
     /** SHA of the head commit the thread's root note anchors to (GitLab: {@code diffRefs.headSha}). */
     @Column(name = "commit_sha", length = 64)
-    private String commitSha;
+    private @Nullable String commitSha;
 
     /**
      * SHA of the base commit the thread's root note anchors to (GitLab: {@code diffRefs.baseSha},
      * falling back to {@code startSha} when the base is unavailable).
      */
     @Column(name = "original_commit_sha", length = 64)
-    private String originalCommitSha;
+    private @Nullable String originalCommitSha;
 
-    private Boolean outdated;
+    private @Nullable Boolean outdated;
 
-    private Boolean collapsed;
+    private @Nullable Boolean collapsed;
 
     @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "root_comment_id")
@@ -90,12 +91,13 @@ public class PullRequestReviewThread extends BaseGitServiceEntity {
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "pull_request_id")
     @ToString.Exclude
+    @Nullable
     private PullRequest pullRequest;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "resolved_by_id")
     @ToString.Exclude
-    private User resolvedBy;
+    private @Nullable User resolvedBy;
 
     @OneToMany(mappedBy = "thread", cascade = CascadeType.REMOVE, orphanRemoval = true)
     @ToString.Exclude

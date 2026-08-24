@@ -26,6 +26,7 @@ import java.lang.reflect.Field;
 import java.util.Optional;
 import java.util.Set;
 import org.assertj.core.api.Assertions;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
@@ -348,7 +349,7 @@ class OAuthCallbackServiceTest extends BaseUnitTest {
         long id,
         long workspaceId,
         IntegrationKind kind,
-        String instanceKey,
+        @Nullable String instanceKey,
         IntegrationState state
     ) {
         Workspace ws = new Workspace();

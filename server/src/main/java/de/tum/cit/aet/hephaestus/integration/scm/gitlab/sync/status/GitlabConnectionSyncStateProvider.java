@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
+import org.jspecify.annotations.Nullable;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.stereotype.Component;
@@ -161,7 +162,7 @@ public class GitlabConnectionSyncStateProvider implements ConnectionSyncStatePro
     }
 
     /** Most recent of the non-null instants, or null if all are null. */
-    private static Instant latestNonNull(Instant... candidates) {
+    private static @Nullable Instant latestNonNull(@Nullable Instant... candidates) {
         Instant latest = null;
         for (Instant candidate : candidates) {
             if (candidate != null && (latest == null || candidate.isAfter(latest))) {

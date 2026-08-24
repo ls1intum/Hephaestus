@@ -8,6 +8,7 @@ import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Optional;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -272,7 +273,12 @@ class ProxyStreamingUtilsTest extends BaseUnitTest {
                 .verifyComplete();
         }
 
-        private ClientResponse mockClientResponse(int status, HttpHeaders headers, MediaType contentType, byte[] body) {
+        private ClientResponse mockClientResponse(
+            int status,
+            HttpHeaders headers,
+            @Nullable MediaType contentType,
+            byte[] body
+        ) {
             ClientResponse resp = mock(ClientResponse.class);
             ClientResponse.Headers respHeaders = mock(ClientResponse.Headers.class);
             when(resp.headers()).thenReturn(respHeaders);

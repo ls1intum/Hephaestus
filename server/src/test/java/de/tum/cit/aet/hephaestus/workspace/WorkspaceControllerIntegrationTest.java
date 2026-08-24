@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.workspace;
 
 import static de.tum.cit.aet.hephaestus.leaderboard.LeaguePointsConstants.POINTS_DEFAULT;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
@@ -81,6 +82,7 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
 
         assertThat(problem).isNotNull();
         assertThat(problem.getTitle()).isEqualTo("Validation failed");
+        assertNotNull(problem.getProperties());
         assertThat(problem.getProperties().get("errors"))
             .asInstanceOf(InstanceOfAssertFactories.map(String.class, Object.class))
             .containsKeys("workspaceSlug", "displayName", "accountLogin", "accountType");
@@ -414,6 +416,7 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
             .expectBody(ProblemDetail.class)
             .value(problem -> {
                 assertThat(problem.getTitle()).isEqualTo("Validation failed");
+                assertNotNull(problem.getProperties());
                 assertThat(problem.getProperties()).containsKey("errors");
                 assertThat(problem.getProperties().get("errors"))
                     .asInstanceOf(InstanceOfAssertFactories.map(String.class, Object.class))
@@ -478,6 +481,7 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
             .getResponseBody();
 
         assertThat(invalid).isNotNull();
+        assertNotNull(invalid.getProperties());
         assertThat(invalid.getProperties().get("errors"))
             .asInstanceOf(InstanceOfAssertFactories.map(String.class, Object.class))
             .containsKeys("day", "time");
@@ -525,6 +529,7 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
             .getResponseBody();
 
         assertThat(invalid).isNotNull();
+        assertNotNull(invalid.getProperties());
         assertThat(invalid.getProperties().get("errors"))
             .asInstanceOf(InstanceOfAssertFactories.map(String.class, Object.class))
             .containsKeys("day", "time");
@@ -923,6 +928,7 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
 
         assertThat(problem).isNotNull();
         assertThat(problem.getTitle()).isEqualTo("Validation failed");
+        assertNotNull(problem.getProperties());
         assertThat(problem.getProperties().get("errors"))
             .asInstanceOf(InstanceOfAssertFactories.map(String.class, Object.class))
             .containsKey("workspaceSlug");

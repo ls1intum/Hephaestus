@@ -36,23 +36,23 @@ import org.jspecify.annotations.Nullable;
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record GitHubPullRequestDTO(
-    @JsonProperty("id") Long id,
-    @JsonProperty("database_id") Long databaseId,
+    @JsonProperty("id") @Nullable Long id,
+    @JsonProperty("database_id") @Nullable Long databaseId,
     @JsonProperty("node_id") String nodeId,
     @JsonProperty("number") int number,
     @JsonProperty("title") String title,
-    @JsonProperty("body") String body,
-    @JsonProperty("state") String state,
-    @JsonProperty("html_url") String htmlUrl,
-    @JsonProperty("created_at") Instant createdAt,
-    @JsonProperty("updated_at") Instant updatedAt,
-    @JsonProperty("closed_at") Instant closedAt,
-    @JsonProperty("merged_at") Instant mergedAt,
-    @JsonProperty("merged_by") GitHubUserDTO mergedBy,
-    @JsonProperty("merge_commit_sha") String mergeCommitSha,
+    @JsonProperty("body") @Nullable String body,
+    @JsonProperty("state") @Nullable String state,
+    @JsonProperty("html_url") @Nullable String htmlUrl,
+    @JsonProperty("created_at") @Nullable Instant createdAt,
+    @JsonProperty("updated_at") @Nullable Instant updatedAt,
+    @JsonProperty("closed_at") @Nullable Instant closedAt,
+    @JsonProperty("merged_at") @Nullable Instant mergedAt,
+    @JsonProperty("merged_by") @Nullable GitHubUserDTO mergedBy,
+    @JsonProperty("merge_commit_sha") @Nullable String mergeCommitSha,
     @JsonProperty("draft") boolean isDraft,
     @JsonProperty("merged") boolean isMerged,
-    @JsonProperty("mergeable") String mergeable,
+    @JsonProperty("mergeable") @Nullable String mergeable,
     @JsonProperty("locked") boolean locked,
     @JsonProperty("additions") int additions,
     @JsonProperty("deletions") int deletions,
@@ -60,14 +60,14 @@ public record GitHubPullRequestDTO(
     @JsonProperty("commits") int commits,
     @JsonProperty("comments") int commentsCount,
     @JsonProperty("review_comments") int reviewCommentsCount,
-    @JsonProperty("user") GitHubUserDTO author,
-    @JsonProperty("assignees") List<GitHubUserDTO> assignees,
-    @JsonProperty("requested_reviewers") List<GitHubUserDTO> requestedReviewers,
-    @JsonProperty("labels") List<GitHubLabelDTO> labels,
-    @JsonProperty("milestone") GitHubMilestoneDTO milestone,
-    @JsonProperty("head") GitHubBranchRefDTO head,
-    @JsonProperty("base") GitHubBranchRefDTO base,
-    @JsonProperty("repository") GitHubRepositoryRefDTO repository,
+    @JsonProperty("user") @Nullable GitHubUserDTO author,
+    @JsonProperty("assignees") @Nullable List<GitHubUserDTO> assignees,
+    @JsonProperty("requested_reviewers") @Nullable List<GitHubUserDTO> requestedReviewers,
+    @JsonProperty("labels") @Nullable List<GitHubLabelDTO> labels,
+    @JsonProperty("milestone") @Nullable GitHubMilestoneDTO milestone,
+    @JsonProperty("head") @Nullable GitHubBranchRefDTO head,
+    @JsonProperty("base") @Nullable GitHubBranchRefDTO base,
+    @JsonProperty("repository") @Nullable GitHubRepositoryRefDTO repository,
     // GraphQL-only fields
     @Nullable ReviewDecision reviewDecision,
     @Nullable MergeStateStatus mergeStateStatus,
@@ -103,7 +103,7 @@ public record GitHubPullRequestDTO(
     /**
      * Get the database ID, preferring databaseId over id for GraphQL responses.
      */
-    public Long getDatabaseId() {
+    public @Nullable Long getDatabaseId() {
         return databaseId != null ? databaseId : id;
     }
 

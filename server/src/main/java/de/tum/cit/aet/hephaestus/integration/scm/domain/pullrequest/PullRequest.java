@@ -59,7 +59,7 @@ import org.jspecify.annotations.Nullable;
 @ToString(callSuper = true)
 public class PullRequest extends Issue {
 
-    private Instant mergedAt;
+    private @Nullable Instant mergedAt;
 
     private boolean isDraft;
 
@@ -112,7 +112,7 @@ public class PullRequest extends Issue {
      * The SHA of the head commit (40 characters).
      */
     @Column(length = 40)
-    private String headRefOid;
+    private @Nullable String headRefOid;
 
     /**
      * The SHA of the base commit (40 characters).

@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -27,6 +28,7 @@ import de.tum.cit.aet.hephaestus.testconfig.TestEntities;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -34,6 +36,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.transaction.TransactionStatus;
 import org.springframework.transaction.support.TransactionCallback;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -67,7 +70,7 @@ class GitHubCommitBackfillServiceTest extends BaseUnitTest {
             .when(transactionTemplate.execute(any(TransactionCallback.class)))
             .thenAnswer(invocation -> {
                 TransactionCallback<Object> callback = invocation.getArgument(0);
-                return callback.doInTransaction(null);
+                return callback.doInTransaction(mock(TransactionStatus.class));
             });
 
         service = new GitHubCommitBackfillService(
@@ -81,18 +84,19 @@ class GitHubCommitBackfillServiceTest extends BaseUnitTest {
     }
 
     private static SyncTarget createSyncTarget(AuthMode authMode) {
-        return SyncTargetTestBuilder.syncTarget()
+        var builder = SyncTargetTestBuilder.syncTarget()
             .id(1L)
             .scopeId(100L)
-            .installationId(authMode == AuthMode.INSTALLATION_APP ? 42L : null)
-            .personalAccessToken(authMode == AuthMode.PERSONAL_ACCESS_TOKEN ? "ghp_test_token" : null)
             .authMode(authMode)
-            .repositoryNameWithOwner("owner/repo")
-            .build();
+            .repositoryNameWithOwner("owner/repo");
+        if (authMode == AuthMode.INSTALLATION_APP) builder.installationId(42L);
+        if (authMode == AuthMode.PERSONAL_ACCESS_TOKEN) builder.personalAccessToken("ghp_test_token");
+        return builder.build();
     }
 
-    private static Repository createMockRepository(Long id, String nameWithOwner, String defaultBranch) {
-        Repository repo = TestEntities.repository(id, nameWithOwner, defaultBranch);
+    private static Repository createMockRepository(Long id, String nameWithOwner, @Nullable String defaultBranch) {
+        Repository repo = TestEntities.repository(id, nameWithOwner, "main");
+        repo.setDefaultBranch(defaultBranch);
         repo.setProvider(TestEntities.gitProvider(1L, IdentityProviderType.GITHUB));
         return repo;
     }
@@ -132,7 +136,7 @@ class GitHubCommitBackfillServiceTest extends BaseUnitTest {
         commit.setAdditions(0);
         commit.setDeletions(0);
         commit.setChangedFiles(0);
-        commit.setRepository(TestEntities.repository(repoId, null));
+        commit.setRepository(TestEntities.repository(repoId, "owner/repository"));
         return commit;
     }
 

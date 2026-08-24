@@ -20,6 +20,7 @@ import java.time.Instant;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentMatchers;
@@ -104,7 +105,11 @@ class MentorContextInvalidatorTest extends BaseUnitTest {
         verify(workspaceCache).evict(eq("7:9"));
     }
 
-    private static ScmDomainEvent.PullRequestUpdated buildPrUpdated(long repoId, Long authorId, Long mergedById) {
+    private static ScmDomainEvent.PullRequestUpdated buildPrUpdated(
+        long repoId,
+        Long authorId,
+        @Nullable Long mergedById
+    ) {
         ScmEventPayload.PullRequestData pr = new ScmEventPayload.PullRequestData(
             1L,
             42,

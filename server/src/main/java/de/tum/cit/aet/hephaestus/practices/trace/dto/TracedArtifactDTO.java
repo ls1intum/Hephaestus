@@ -4,6 +4,7 @@ import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 /**
  * One line in the index of everything this workspace was in a position to say something about.
@@ -17,9 +18,11 @@ public record TracedArtifactDTO(
     @NonNull ArtifactKind artifactKind,
     @NonNull Long artifactId,
     @NonNull String title,
-    @Schema(description = "The number the provider shows, for kinds that have one") Integer number,
-    @Schema(description = "Repository, collection or channel it sits in") String container,
-    @Schema(description = "Where to open it upstream; absent for a deleted or unlinkable artifact") String url,
+    @Schema(description = "The number the provider shows, for kinds that have one") @Nullable Integer number,
+    @Schema(description = "Repository, collection or channel it sits in") @Nullable String container,
+    @Schema(description = "Where to open it upstream; absent for a deleted or unlinkable artifact")
+    @Nullable
+    String url,
     @NonNull Instant lastSignalAt,
     @NonNull @Schema(description = "Occurrences recorded on this artifact") Integer signalCount,
     @NonNull @Schema(description = "How many of them started a review") Integer reviewedSignalCount

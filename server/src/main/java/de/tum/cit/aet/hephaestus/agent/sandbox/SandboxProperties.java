@@ -60,7 +60,7 @@ public record SandboxProperties(
     @Nullable String appServerContainerId,
     @DefaultValue("1073741824") @Min(1) long maxDirectoryBytes, // 1 GB
     @DefaultValue("500000") @Min(1) int maxDirectoryEntries,
-    @Valid DefaultResourceLimits defaultResourceLimits
+    @Nullable @Valid DefaultResourceLimits defaultResourceLimits
 ) {
     public SandboxProperties {
         if (defaultResourceLimits == null) {
@@ -76,7 +76,7 @@ public record SandboxProperties(
      *
      * @return the container ID, or null if auto-detection is needed
      */
-    public String resolvedAppServerContainerId() {
+    public @Nullable String resolvedAppServerContainerId() {
         if (appServerContainerId != null && !appServerContainerId.isBlank()) {
             return appServerContainerId;
         }

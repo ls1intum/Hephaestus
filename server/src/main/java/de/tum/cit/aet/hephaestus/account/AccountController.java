@@ -6,6 +6,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.util.Optional;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -76,7 +77,7 @@ public class AccountController {
         return ResponseEntity.ok(preferencesService.updateUserSettings(user.get(), userSettings, subjectId));
     }
 
-    private JwtAuthenticationToken resolveAuthentication(JwtAuthenticationToken injectedToken) {
+    private @Nullable JwtAuthenticationToken resolveAuthentication(@Nullable JwtAuthenticationToken injectedToken) {
         if (injectedToken != null) {
             return injectedToken;
         }

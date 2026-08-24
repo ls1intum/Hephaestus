@@ -81,7 +81,7 @@ public class SandboxWorkspaceManager {
      * @param containerId the target container (must be created but can be stopped)
      * @param files map of relative paths to file contents
      */
-    public void injectFiles(String containerId, Map<String, byte[]> files) {
+    public void injectFiles(String containerId, @org.jspecify.annotations.Nullable Map<String, byte[]> files) {
         injectFiles(containerId, files, Map.of());
     }
 
@@ -98,7 +98,11 @@ public class SandboxWorkspaceManager {
      * @implNote The archive stream is valid only for the duration of the {@code copyArchiveToContainer}
      *     call; callers and test doubles must consume it eagerly rather than retain it.
      */
-    public void injectFiles(String containerId, Map<String, byte[]> files, Map<String, Path> filesOnDisk) {
+    public void injectFiles(
+        String containerId,
+        @org.jspecify.annotations.Nullable Map<String, byte[]> files,
+        @org.jspecify.annotations.Nullable Map<String, Path> filesOnDisk
+    ) {
         Map<String, byte[]> inMemory = files == null ? Map.of() : files;
         Map<String, Path> onDisk = filesOnDisk == null ? Map.of() : filesOnDisk;
         if (inMemory.isEmpty() && onDisk.isEmpty()) {
@@ -141,7 +145,10 @@ public class SandboxWorkspaceManager {
      * @param containerId the target container (must be created but can be stopped)
      * @param directoryMounts map of host path to container path
      */
-    public void injectDirectories(String containerId, Map<String, String> directoryMounts) {
+    public void injectDirectories(
+        String containerId,
+        @org.jspecify.annotations.Nullable Map<String, String> directoryMounts
+    ) {
         if (directoryMounts == null || directoryMounts.isEmpty()) {
             return;
         }

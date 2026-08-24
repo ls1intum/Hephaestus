@@ -27,6 +27,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import org.jspecify.annotations.Nullable;
@@ -316,7 +317,7 @@ public class GitHubDeletionSweepService {
      */
     public SweepOutcome sweepRepository(Long scopeId, Repository repository, @Nullable SyncExecutionHandle handle) {
         String nameWithOwner = repository.getNameWithOwner();
-        String safeNameWithOwner = sanitizeForLog(nameWithOwner);
+        String safeNameWithOwner = Objects.requireNonNullElse(sanitizeForLog(nameWithOwner), "null");
 
         Optional<RepositoryOwnerAndName> parsed = GitHubRepositoryNameParser.parse(nameWithOwner);
         if (parsed.isEmpty()) {

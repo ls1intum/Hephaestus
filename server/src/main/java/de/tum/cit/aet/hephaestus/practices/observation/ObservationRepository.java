@@ -137,17 +137,17 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
         @Param("idempotencyKey") String idempotencyKey,
         @Param("agentJobId") UUID agentJobId,
         @Param("practiceId") Long practiceId,
-        @Param("practiceRevisionId") Long practiceRevisionId,
+        @Param("practiceRevisionId") @Nullable Long practiceRevisionId,
         @Param("artifactKind") String artifactKind,
         @Param("artifactId") Long artifactId,
-        @Param("aboutUserId") Long aboutUserId,
+        @Param("aboutUserId") @Nullable Long aboutUserId,
         @Param("summary") String summary,
         @Param("presence") String presence,
-        @Param("assessment") String assessment,
-        @Param("severity") String severity,
-        @Param("evidence") String evidence,
-        @Param("evidenceRationale") String evidenceRationale,
-        @Param("recurrenceKey") String recurrenceKey,
+        @Param("assessment") @Nullable String assessment,
+        @Param("severity") @Nullable String severity,
+        @Param("evidence") @Nullable String evidence,
+        @Param("evidenceRationale") @Nullable String evidenceRationale,
+        @Param("recurrenceKey") @Nullable String recurrenceKey,
         @Param("observedAt") Instant observedAt,
         @Param("origin") String origin
     );
@@ -307,8 +307,8 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
     Page<Observation> findByAboutUserAndWorkspace(
         @Param("aboutUserId") Long aboutUserId,
         @Param("workspaceId") Long workspaceId,
-        @Param("practiceSlug") String practiceSlug,
-        @Param("presence") Presence presence,
+        @Param("practiceSlug") @Nullable String practiceSlug,
+        @Param("presence") @Nullable Presence presence,
         Pageable pageable
     );
 
@@ -623,12 +623,16 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
         UUID getAgentJobId();
         String getRecurrenceKey();
         Presence getPresence();
+
+        @Nullable
         Assessment getAssessment();
     }
 
     /** Projection: a correlation-keyed observation reduced to the fields the trend classifier needs. */
     interface LocusObservation extends LocusKey {
+        @Nullable
         Severity getSeverity();
+
         String getPracticeSlug();
         String getSummary();
         Instant getObservedAt();
@@ -731,28 +735,54 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
         UUID getAgentJobId();
         String getPracticeSlug();
         String getPracticeName();
+
+        @Nullable
         String getAreaSlug();
+
+        @Nullable
         String getAreaName();
+
+        @Nullable
         String getAreaIcon();
+
+        @Nullable
         String getAreaColor();
+
         /** The raw column: a native-query projection is mapped from JDBC types, with no converter run. */
         String getArtifactKind();
         Long getArtifactId();
+
+        @Nullable
         Long getAboutUserId();
+
         String getSummary();
         Presence getPresence();
+
+        @Nullable
         Assessment getAssessment();
+
+        @Nullable
         Severity getSeverity();
+
+        @Nullable
         String getRecurrenceKey();
+
         /**
          * What occasioned the measurement. Without it the operator surface cannot tell a campaign's observations
          * from live ones, which is a population-mixing hazard in exactly the surface used to judge whether a
          * campaign was worth its cost.
          */
         ObservationOrigin getOrigin();
+
+        @Nullable
         Long getPracticeRevisionId();
+
+        @Nullable
         String getPracticeRevisionFingerprint();
+
+        @Nullable
         String getCurrentPracticeRevisionFingerprint();
+
         Instant getObservedAt();
     }
 

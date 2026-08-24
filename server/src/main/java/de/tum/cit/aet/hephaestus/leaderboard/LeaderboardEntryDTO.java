@@ -7,6 +7,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserInfoDTO;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.List;
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 /** Ranked leaderboard entry. Exactly one of {@code user} / {@code team} is populated depending on leaderboard mode. */
 @JsonInclude(JsonInclude.Include.NON_NULL)
@@ -14,8 +15,8 @@ import org.jspecify.annotations.NonNull;
 public record LeaderboardEntryDTO(
     @NonNull @Schema(description = "Position in the leaderboard (1-based)", example = "1") Integer rank,
     @NonNull @Schema(description = "Total XP score for the timeframe", example = "150") Integer score,
-    @Schema(description = "User info (populated in INDIVIDUAL mode, null in TEAM mode)") UserInfoDTO user,
-    @Schema(description = "Team info (populated in TEAM mode, null in INDIVIDUAL mode)") TeamInfoDTO team,
+    @Schema(description = "User info (populated in INDIVIDUAL mode, null in TEAM mode)") @Nullable UserInfoDTO user,
+    @Schema(description = "Team info (populated in TEAM mode, null in INDIVIDUAL mode)") @Nullable TeamInfoDTO team,
     @NonNull @Schema(description = "Sample of reviewed PRs for display") List<PullRequestInfoDTO> reviewedPullRequests,
     @NonNull @Schema(description = "Count of distinct PRs reviewed", example = "5") Integer numberOfReviewedPRs,
     @NonNull @Schema(description = "Count of review approvals", example = "3") Integer numberOfApprovals,

@@ -170,9 +170,10 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
         repositoryToMonitorRepository.save(WorkspaceTestFixtures.repositoryMonitor(workspace, repo.getNameWithOwner()));
 
         Instant now = Instant.now();
+        Long providerId = java.util.Objects.requireNonNull(provider.getId());
         pullRequestRepository.upsertCore(
             8001L,
-            provider.getId(),
+            providerId,
             50,
             "Pipeline Test PR",
             "Test body",
@@ -261,7 +262,9 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
         JsonNode observations = OBJECT_MAPPER.readTree(withEvidence(rawOutput)).path("observations");
         ((PullRequestReviewHandler) handler).admitObservations(job, observations);
         String digest = "test-admission-digest";
-        ObjectNode metadata = (ObjectNode) job.getMetadata().deepCopy();
+        JsonNode jobMetadata = job.getMetadata();
+        org.junit.jupiter.api.Assertions.assertNotNull(jobMetadata);
+        ObjectNode metadata = (ObjectNode) jobMetadata.deepCopy();
         metadata.put(ObservationAdmissionService.DIGEST_METADATA_KEY, digest);
         job.setMetadata(metadata);
         ObjectNode output = OBJECT_MAPPER.createObjectNode();
@@ -291,7 +294,9 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
         next.setJobType(AgentJobType.PULL_REQUEST_REVIEW);
         next.setStatus(AgentJobStatus.COMPLETED);
         next.setConfigSnapshot(agentJob.getConfigSnapshot());
-        next.setMetadata(agentJob.getMetadata().deepCopy());
+        JsonNode metadata = agentJob.getMetadata();
+        org.junit.jupiter.api.Assertions.assertNotNull(metadata);
+        next.setMetadata(metadata.deepCopy());
         next.setEvidenceSnapshot(agentJob.getEvidenceSnapshot().deepCopy());
         next = agentJobRepository.save(next);
         return admitAndSetOutput(next, rawOutput);
@@ -548,9 +553,12 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
         @Test
         void closedPrSkipsDelivery() {
             var pr = pullRequestRepository.findById(prId).orElseThrow();
+            var provider = java.util.Objects.requireNonNull(pr.getProvider());
+            var author = java.util.Objects.requireNonNull(pr.getAuthor());
+            var createdAt = java.util.Objects.requireNonNull(pr.getCreatedAt());
             pullRequestRepository.upsertCore(
                 8001L,
-                pr.getProvider().getId(),
+                java.util.Objects.requireNonNull(provider.getId()),
                 50,
                 "Pipeline Test PR",
                 "Test body",
@@ -560,11 +568,11 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
                 false,
                 null,
                 0,
-                pr.getCreatedAt(),
+                createdAt,
                 Instant.now(),
-                pr.getCreatedAt(),
-                pr.getAuthor().getId(),
-                pr.getRepository().getId(),
+                createdAt,
+                author.getId(),
+                pr.requireRepository().getId(),
                 null,
                 null,
                 false,

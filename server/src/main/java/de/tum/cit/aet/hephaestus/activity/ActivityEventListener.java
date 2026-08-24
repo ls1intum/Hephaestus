@@ -71,21 +71,12 @@ public class ActivityEventListener {
         }
     }
 
-    /**
-     * Validates that the event context has a valid scopeId.
-     * Events without scopeId cannot be properly associated with a scope.
-     *
-     * @param eventName name of the event for logging
-     * @param entityId  ID of the entity for logging
-     * @param scopeId   the scopeId to validate
-     * @return true if scopeId is valid, false otherwise
-     */
-    private boolean hasValidScopeId(String eventName, Long entityId, Long scopeId) {
+    @Nullable
+    private Long validScopeId(String eventName, Long entityId, @Nullable Long scopeId) {
         if (scopeId == null) {
             log.warn("Skipped event due to null scopeId: eventType={}, entityId={}", eventName, entityId);
-            return false;
         }
-        return true;
+        return scopeId;
     }
 
     /**
@@ -134,10 +125,13 @@ public class ActivityEventListener {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onPullRequestCreated(ScmDomainEvent.PullRequestCreated event) {
         var pr = event.pullRequest();
-        if (!hasValidScopeId("PR created", pr.id(), event.context().scopeId())) {
+        Long scopeId = validScopeId("PR created", pr.id(), event.context().scopeId());
+        if (scopeId == null) {
             return;
         }
-        if (pr.authorId() == null || pr.createdAt() == null) {
+        Long authorId = pr.authorId();
+        Instant createdAt = pr.createdAt();
+        if (authorId == null || createdAt == null) {
             log.debug(
                 "Skipping PR created event (author may be deleted): prId={}, authorId={}, createdAt={}",
                 pr.id(),
@@ -148,10 +142,10 @@ public class ActivityEventListener {
         }
         safeRecord("PR opened", pr.id(), () ->
             activityEventService.record(
-                event.context().scopeId(),
+                scopeId,
                 ActivityEventType.PULL_REQUEST_OPENED,
-                pr.createdAt(),
-                userRepository.getReferenceById(pr.authorId()),
+                createdAt,
+                userRepository.getReferenceById(authorId),
                 repositoryRepository.getReferenceById(pr.repository().id()),
                 ActivityTargetType.PULL_REQUEST,
                 pr.id(),
@@ -165,7 +159,8 @@ public class ActivityEventListener {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onPullRequestMerged(ScmDomainEvent.PullRequestMerged event) {
         var pr = event.pullRequest();
-        if (!hasValidScopeId("PR merged", pr.id(), event.context().scopeId())) {
+        Long scopeId = validScopeId("PR merged", pr.id(), event.context().scopeId());
+        if (scopeId == null) {
             return;
         }
         // For merged PRs, prefer mergedBy, fall back to author
@@ -181,7 +176,7 @@ public class ActivityEventListener {
         final Instant finalOccurredAt = occurredAt;
         safeRecord("PR merged", pr.id(), () ->
             activityEventService.record(
-                event.context().scopeId(),
+                scopeId,
                 ActivityEventType.PULL_REQUEST_MERGED,
                 finalOccurredAt,
                 userRepository.getReferenceById(awardeeId),
@@ -201,10 +196,12 @@ public class ActivityEventListener {
             return;
         }
         var pr = event.pullRequest();
-        if (!hasValidScopeId("PR closed", pr.id(), event.context().scopeId())) {
+        Long scopeId = validScopeId("PR closed", pr.id(), event.context().scopeId());
+        if (scopeId == null) {
             return;
         }
-        if (pr.authorId() == null) {
+        Long authorId = pr.authorId();
+        if (authorId == null) {
             log.debug("Skipping PR closed event (author may be deleted): prId={}", pr.id());
             return;
         }
@@ -215,10 +212,10 @@ public class ActivityEventListener {
         final Instant finalOccurredAt = occurredAt;
         safeRecord("PR closed", pr.id(), () ->
             activityEventService.record(
-                event.context().scopeId(),
+                scopeId,
                 ActivityEventType.PULL_REQUEST_CLOSED,
                 finalOccurredAt,
-                userRepository.getReferenceById(pr.authorId()),
+                userRepository.getReferenceById(authorId),
                 repositoryRepository.getReferenceById(pr.repository().id()),
                 ActivityTargetType.PULL_REQUEST,
                 pr.id(),
@@ -232,20 +229,22 @@ public class ActivityEventListener {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onPullRequestReopened(ScmDomainEvent.PullRequestReopened event) {
         var pr = event.pullRequest();
-        if (!hasValidScopeId("PR reopened", pr.id(), event.context().scopeId())) {
+        Long scopeId = validScopeId("PR reopened", pr.id(), event.context().scopeId());
+        if (scopeId == null) {
             return;
         }
-        if (pr.authorId() == null) {
+        Long authorId = pr.authorId();
+        if (authorId == null) {
             log.debug("Skipping PR reopened event (author may be deleted): prId={}", pr.id());
             return;
         }
         Instant occurredAt = pr.updatedAt() != null ? pr.updatedAt() : Instant.now();
         safeRecord("PR reopened", pr.id(), () ->
             activityEventService.record(
-                event.context().scopeId(),
+                scopeId,
                 ActivityEventType.PULL_REQUEST_REOPENED,
                 occurredAt,
-                userRepository.getReferenceById(pr.authorId()),
+                userRepository.getReferenceById(authorId),
                 repositoryRepository.getReferenceById(pr.repository().id()),
                 ActivityTargetType.PULL_REQUEST,
                 pr.id(),
@@ -259,20 +258,22 @@ public class ActivityEventListener {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onPullRequestReady(ScmDomainEvent.PullRequestReady event) {
         var pr = event.pullRequest();
-        if (!hasValidScopeId("PR ready", pr.id(), event.context().scopeId())) {
+        Long scopeId = validScopeId("PR ready", pr.id(), event.context().scopeId());
+        if (scopeId == null) {
             return;
         }
-        if (pr.authorId() == null) {
+        Long authorId = pr.authorId();
+        if (authorId == null) {
             log.debug("Skipping PR ready event (author may be deleted): prId={}", pr.id());
             return;
         }
         Instant occurredAt = pr.updatedAt() != null ? pr.updatedAt() : Instant.now();
         safeRecord("PR ready", pr.id(), () ->
             activityEventService.record(
-                event.context().scopeId(),
+                scopeId,
                 ActivityEventType.PULL_REQUEST_READY,
                 occurredAt,
-                userRepository.getReferenceById(pr.authorId()),
+                userRepository.getReferenceById(authorId),
                 repositoryRepository.getReferenceById(pr.repository().id()),
                 ActivityTargetType.PULL_REQUEST,
                 pr.id(),
@@ -292,20 +293,22 @@ public class ActivityEventListener {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onPullRequestDrafted(ScmDomainEvent.PullRequestDrafted event) {
         var pr = event.pullRequest();
-        if (!hasValidScopeId("PR drafted", pr.id(), event.context().scopeId())) {
+        Long scopeId = validScopeId("PR drafted", pr.id(), event.context().scopeId());
+        if (scopeId == null) {
             return;
         }
-        if (pr.authorId() == null) {
+        Long authorId = pr.authorId();
+        if (authorId == null) {
             log.debug("Skipping PR drafted event (author may be deleted): prId={}", pr.id());
             return;
         }
         Instant occurredAt = pr.updatedAt() != null ? pr.updatedAt() : Instant.now();
         safeRecord("PR drafted", pr.id(), () ->
             activityEventService.record(
-                event.context().scopeId(),
+                scopeId,
                 ActivityEventType.PULL_REQUEST_DRAFTED,
                 occurredAt,
-                userRepository.getReferenceById(pr.authorId()),
+                userRepository.getReferenceById(authorId),
                 repositoryRepository.getReferenceById(pr.repository().id()),
                 ActivityTargetType.PULL_REQUEST,
                 pr.id(),
@@ -325,20 +328,22 @@ public class ActivityEventListener {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onPullRequestSynchronized(ScmDomainEvent.PullRequestSynchronized event) {
         var pr = event.pullRequest();
-        if (!hasValidScopeId("PR synchronized", pr.id(), event.context().scopeId())) {
+        Long scopeId = validScopeId("PR synchronized", pr.id(), event.context().scopeId());
+        if (scopeId == null) {
             return;
         }
-        if (pr.authorId() == null) {
+        Long authorId = pr.authorId();
+        if (authorId == null) {
             log.debug("Skipping PR synchronized event (author may be deleted): prId={}", pr.id());
             return;
         }
         Instant occurredAt = pr.updatedAt() != null ? pr.updatedAt() : Instant.now();
         safeRecord("PR synchronized", pr.id(), () ->
             activityEventService.record(
-                event.context().scopeId(),
+                scopeId,
                 ActivityEventType.PULL_REQUEST_SYNCHRONIZED,
                 occurredAt,
-                userRepository.getReferenceById(pr.authorId()),
+                userRepository.getReferenceById(authorId),
                 repositoryRepository.getReferenceById(pr.repository().id()),
                 ActivityTargetType.PULL_REQUEST,
                 pr.id(),
@@ -358,20 +363,22 @@ public class ActivityEventListener {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onPullRequestLabeled(ScmDomainEvent.PullRequestLabeled event) {
         var pr = event.pullRequest();
-        if (!hasValidScopeId("PR labeled", pr.id(), event.context().scopeId())) {
+        Long scopeId = validScopeId("PR labeled", pr.id(), event.context().scopeId());
+        if (scopeId == null) {
             return;
         }
-        if (pr.authorId() == null) {
+        Long authorId = pr.authorId();
+        if (authorId == null) {
             log.debug("Skipping PR labeled event (author may be deleted): prId={}", pr.id());
             return;
         }
         Instant occurredAt = pr.updatedAt() != null ? pr.updatedAt() : Instant.now();
         safeRecord("PR labeled", pr.id(), () ->
             activityEventService.record(
-                event.context().scopeId(),
+                scopeId,
                 ActivityEventType.PULL_REQUEST_LABELED,
                 occurredAt,
-                userRepository.getReferenceById(pr.authorId()),
+                userRepository.getReferenceById(authorId),
                 repositoryRepository.getReferenceById(pr.repository().id()),
                 ActivityTargetType.PULL_REQUEST,
                 pr.id(),
@@ -391,20 +398,22 @@ public class ActivityEventListener {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onPullRequestUnlabeled(ScmDomainEvent.PullRequestUnlabeled event) {
         var pr = event.pullRequest();
-        if (!hasValidScopeId("PR unlabeled", pr.id(), event.context().scopeId())) {
+        Long scopeId = validScopeId("PR unlabeled", pr.id(), event.context().scopeId());
+        if (scopeId == null) {
             return;
         }
-        if (pr.authorId() == null) {
+        Long authorId = pr.authorId();
+        if (authorId == null) {
             log.debug("Skipping PR unlabeled event (author may be deleted): prId={}", pr.id());
             return;
         }
         Instant occurredAt = pr.updatedAt() != null ? pr.updatedAt() : Instant.now();
         safeRecord("PR unlabeled", pr.id(), () ->
             activityEventService.record(
-                event.context().scopeId(),
+                scopeId,
                 ActivityEventType.PULL_REQUEST_UNLABELED,
                 occurredAt,
-                userRepository.getReferenceById(pr.authorId()),
+                userRepository.getReferenceById(authorId),
                 repositoryRepository.getReferenceById(pr.repository().id()),
                 ActivityTargetType.PULL_REQUEST,
                 pr.id(),
@@ -418,18 +427,21 @@ public class ActivityEventListener {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onReviewSubmitted(ScmDomainEvent.ReviewSubmitted event) {
         var reviewData = event.review();
+        Long scopeId = validScopeId("Review submitted", reviewData.id(), event.context().scopeId());
         log.debug(
             "Received ReviewSubmitted event: reviewId={}, state={}, scopeId={}, authorId={}, repositoryId={}",
             reviewData.id(),
             reviewData.state(),
-            event.context().scopeId(),
+            scopeId,
             reviewData.authorId(),
             reviewData.repositoryId()
         );
-        if (!hasValidScopeId("Review submitted", reviewData.id(), event.context().scopeId())) {
+        if (scopeId == null) {
             return;
         }
-        if (reviewData.authorId() == null || reviewData.repositoryId() == null) {
+        Long authorId = reviewData.authorId();
+        Long repositoryId = reviewData.repositoryId();
+        if (authorId == null || repositoryId == null) {
             log.warn(
                 "Skipping review submitted event (author or repository may be deleted): reviewId={}, authorId={}, repositoryId={}",
                 reviewData.id(),
@@ -449,11 +461,11 @@ public class ActivityEventListener {
         Instant occurredAt = reviewData.submittedAt() != null ? reviewData.submittedAt() : Instant.now();
         safeRecord("review", reviewData.id(), () ->
             activityEventService.record(
-                event.context().scopeId(),
+                scopeId,
                 mapReviewState(reviewData.state()),
                 occurredAt,
-                userRepository.getReferenceById(reviewData.authorId()),
-                repositoryRepository.getReferenceById(reviewData.repositoryId()),
+                userRepository.getReferenceById(authorId),
+                repositoryRepository.getReferenceById(repositoryId),
                 ActivityTargetType.REVIEW,
                 reviewData.id(),
                 xp
@@ -466,10 +478,13 @@ public class ActivityEventListener {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onReviewDismissed(ScmDomainEvent.ReviewDismissed event) {
         var reviewData = event.review();
-        if (!hasValidScopeId("Review dismissed", reviewData.id(), event.context().scopeId())) {
+        Long scopeId = validScopeId("Review dismissed", reviewData.id(), event.context().scopeId());
+        if (scopeId == null) {
             return;
         }
-        if (reviewData.authorId() == null || reviewData.repositoryId() == null) {
+        Long authorId = reviewData.authorId();
+        Long repositoryId = reviewData.repositoryId();
+        if (authorId == null || repositoryId == null) {
             log.debug(
                 "Skipping review dismissed event (author may be deleted): reviewId={}, authorId={}, repositoryId={}",
                 reviewData.id(),
@@ -484,11 +499,11 @@ public class ActivityEventListener {
 
         safeRecord("review dismissed", reviewData.id(), () ->
             activityEventService.record(
-                event.context().scopeId(),
+                scopeId,
                 ActivityEventType.REVIEW_DISMISSED,
                 Instant.now(), // Use current time for dismissal
-                userRepository.getReferenceById(reviewData.authorId()),
-                repositoryRepository.getReferenceById(reviewData.repositoryId()),
+                userRepository.getReferenceById(authorId),
+                repositoryRepository.getReferenceById(repositoryId),
                 ActivityTargetType.REVIEW,
                 reviewData.id(),
                 xpAdjustment
@@ -512,10 +527,13 @@ public class ActivityEventListener {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onReviewEdited(ScmDomainEvent.ReviewEdited event) {
         var reviewData = event.review();
-        if (!hasValidScopeId("Review edited", reviewData.id(), event.context().scopeId())) {
+        Long scopeId = validScopeId("Review edited", reviewData.id(), event.context().scopeId());
+        if (scopeId == null) {
             return;
         }
-        if (reviewData.authorId() == null || reviewData.repositoryId() == null) {
+        Long authorId = reviewData.authorId();
+        Long repositoryId = reviewData.repositoryId();
+        if (authorId == null || repositoryId == null) {
             log.debug(
                 "Skipping review edited event (author may be deleted): reviewId={}, authorId={}, repositoryId={}",
                 reviewData.id(),
@@ -529,11 +547,11 @@ public class ActivityEventListener {
         Instant occurredAt = reviewData.submittedAt() != null ? reviewData.submittedAt() : Instant.now();
         safeRecord("review edited", reviewData.id(), () ->
             activityEventService.record(
-                event.context().scopeId(),
+                scopeId,
                 ActivityEventType.REVIEW_EDITED,
                 occurredAt,
-                userRepository.getReferenceById(reviewData.authorId()),
-                repositoryRepository.getReferenceById(reviewData.repositoryId()),
+                userRepository.getReferenceById(authorId),
+                repositoryRepository.getReferenceById(repositoryId),
                 ActivityTargetType.REVIEW,
                 reviewData.id(),
                 0.0 // No XP for edits - original submission already counted
@@ -546,10 +564,13 @@ public class ActivityEventListener {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onCommentCreated(ScmDomainEvent.CommentCreated event) {
         var commentData = event.comment();
-        if (!hasValidScopeId("Comment created", commentData.id(), event.context().scopeId())) {
+        Long scopeId = validScopeId("Comment created", commentData.id(), event.context().scopeId());
+        if (scopeId == null) {
             return;
         }
-        if (commentData.authorId() == null || commentData.repositoryId() == null) {
+        Long authorId = commentData.authorId();
+        Long repositoryId = commentData.repositoryId();
+        if (authorId == null || repositoryId == null) {
             log.debug(
                 "Skipping comment created event (author may be deleted): commentId={}, authorId={}, repositoryId={}",
                 commentData.id(),
@@ -571,11 +592,11 @@ public class ActivityEventListener {
         final double finalXp = xp;
         safeRecord("comment", commentData.id(), () ->
             activityEventService.record(
-                event.context().scopeId(),
+                scopeId,
                 ActivityEventType.COMMENT_CREATED,
                 occurredAt,
-                userRepository.getReferenceById(commentData.authorId()),
-                repositoryRepository.getReferenceById(commentData.repositoryId()),
+                userRepository.getReferenceById(authorId),
+                repositoryRepository.getReferenceById(repositoryId),
                 ActivityTargetType.ISSUE_COMMENT,
                 commentData.id(),
                 finalXp
@@ -594,10 +615,13 @@ public class ActivityEventListener {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onCommentUpdated(ScmDomainEvent.CommentUpdated event) {
         var commentData = event.comment();
-        if (!hasValidScopeId("Comment updated", commentData.id(), event.context().scopeId())) {
+        Long scopeId = validScopeId("Comment updated", commentData.id(), event.context().scopeId());
+        if (scopeId == null) {
             return;
         }
-        if (commentData.authorId() == null || commentData.repositoryId() == null) {
+        Long authorId = commentData.authorId();
+        Long repositoryId = commentData.repositoryId();
+        if (authorId == null || repositoryId == null) {
             log.debug(
                 "Skipping comment updated event (author may be deleted): commentId={}, authorId={}, repositoryId={}",
                 commentData.id(),
@@ -609,11 +633,11 @@ public class ActivityEventListener {
         Instant occurredAt = Instant.now(); // Use current time for edits
         safeRecord("comment updated", commentData.id(), () ->
             activityEventService.record(
-                event.context().scopeId(),
+                scopeId,
                 ActivityEventType.COMMENT_UPDATED,
                 occurredAt,
-                userRepository.getReferenceById(commentData.authorId()),
-                repositoryRepository.getReferenceById(commentData.repositoryId()),
+                userRepository.getReferenceById(authorId),
+                repositoryRepository.getReferenceById(repositoryId),
                 ActivityTargetType.ISSUE_COMMENT,
                 commentData.id(),
                 0.0 // No XP for edits - original creation already counted
@@ -632,7 +656,8 @@ public class ActivityEventListener {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onCommentDeleted(ScmDomainEvent.CommentDeleted event) {
         Long commentId = event.commentId();
-        if (!hasValidScopeId("Comment deleted", commentId, event.context().scopeId())) {
+        Long scopeId = validScopeId("Comment deleted", commentId, event.context().scopeId());
+        if (scopeId == null) {
             return;
         }
         // For deleted comments, we don't have author info from the event
@@ -640,7 +665,7 @@ public class ActivityEventListener {
         log.debug("Recording comment deleted event: commentId={}", commentId);
         safeRecord("comment deleted", commentId, () ->
             activityEventService.recordDeleted(
-                event.context().scopeId(),
+                scopeId,
                 ActivityEventType.COMMENT_DELETED,
                 Instant.now(),
                 ActivityTargetType.ISSUE_COMMENT,
@@ -665,10 +690,13 @@ public class ActivityEventListener {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onReviewCommentCreated(ScmDomainEvent.ReviewCommentCreated event) {
         var commentData = event.comment();
-        if (!hasValidScopeId("Review comment created", commentData.id(), event.context().scopeId())) {
+        Long scopeId = validScopeId("Review comment created", commentData.id(), event.context().scopeId());
+        if (scopeId == null) {
             return;
         }
-        if (commentData.authorId() == null || commentData.repositoryId() == null) {
+        Long authorId = commentData.authorId();
+        Long repositoryId = commentData.repositoryId();
+        if (authorId == null || repositoryId == null) {
             log.debug(
                 "Skipping review comment created event (author may be deleted): commentId={}, authorId={}, repositoryId={}",
                 commentData.id(),
@@ -683,18 +711,19 @@ public class ActivityEventListener {
         // flat-rate XP directly. Comments linked to a review get 0 XP since
         // the review's calculateCodeReviewBonus() already factors in comment count.
         double xp = 0.0;
-        if (commentData.reviewId() == null && commentData.pullRequestId() != null) {
-            xp = calculateStandaloneReviewCommentXp(commentData);
+        Long pullRequestId = commentData.pullRequestId();
+        if (commentData.reviewId() == null && pullRequestId != null) {
+            xp = calculateStandaloneReviewCommentXp(commentData, pullRequestId, authorId);
         }
 
         final double finalXp = xp;
         safeRecord("review comment", commentData.id(), () ->
             activityEventService.record(
-                event.context().scopeId(),
+                scopeId,
                 ActivityEventType.REVIEW_COMMENT_CREATED,
                 occurredAt,
-                userRepository.getReferenceById(commentData.authorId()),
-                repositoryRepository.getReferenceById(commentData.repositoryId()),
+                userRepository.getReferenceById(authorId),
+                repositoryRepository.getReferenceById(repositoryId),
                 ActivityTargetType.REVIEW_COMMENT,
                 commentData.id(),
                 finalXp
@@ -707,16 +736,20 @@ public class ActivityEventListener {
      * Self-review check and XP formula are handled inside the calculator
      * to maintain the single-source-of-truth contract.
      */
-    private double calculateStandaloneReviewCommentXp(ScmEventPayload.ReviewCommentData commentData) {
-        PullRequest pr = pullRequestRepository.findById(commentData.pullRequestId()).orElse(null);
+    private double calculateStandaloneReviewCommentXp(
+        ScmEventPayload.ReviewCommentData commentData,
+        Long pullRequestId,
+        Long authorId
+    ) {
+        PullRequest pr = pullRequestRepository.findById(pullRequestId).orElse(null);
         if (pr == null) {
-            log.warn("PR not found for standalone review comment XP: prId={}", commentData.pullRequestId());
+            log.warn("PR not found for standalone review comment XP: prId={}", pullRequestId);
             return 0.0;
         }
 
         return xpCalc.calculateStandaloneReviewCommentXp(
             pr,
-            commentData.authorId(),
+            authorId,
             commentData.body() != null ? commentData.body().length() : 0
         );
     }
@@ -732,10 +765,13 @@ public class ActivityEventListener {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onReviewCommentEdited(ScmDomainEvent.ReviewCommentEdited event) {
         var commentData = event.comment();
-        if (!hasValidScopeId("Review comment edited", commentData.id(), event.context().scopeId())) {
+        Long scopeId = validScopeId("Review comment edited", commentData.id(), event.context().scopeId());
+        if (scopeId == null) {
             return;
         }
-        if (commentData.authorId() == null || commentData.repositoryId() == null) {
+        Long authorId = commentData.authorId();
+        Long repositoryId = commentData.repositoryId();
+        if (authorId == null || repositoryId == null) {
             log.debug(
                 "Skipping review comment edited event (author may be deleted): commentId={}, authorId={}, repositoryId={}",
                 commentData.id(),
@@ -747,11 +783,11 @@ public class ActivityEventListener {
         Instant occurredAt = Instant.now(); // Use current time for edits
         safeRecord("review comment edited", commentData.id(), () ->
             activityEventService.record(
-                event.context().scopeId(),
+                scopeId,
                 ActivityEventType.REVIEW_COMMENT_EDITED,
                 occurredAt,
-                userRepository.getReferenceById(commentData.authorId()),
-                repositoryRepository.getReferenceById(commentData.repositoryId()),
+                userRepository.getReferenceById(authorId),
+                repositoryRepository.getReferenceById(repositoryId),
                 ActivityTargetType.REVIEW_COMMENT,
                 commentData.id(),
                 0.0 // No XP for edits
@@ -770,13 +806,14 @@ public class ActivityEventListener {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onReviewCommentDeleted(ScmDomainEvent.ReviewCommentDeleted event) {
         Long commentId = event.commentId();
-        if (!hasValidScopeId("Review comment deleted", commentId, event.context().scopeId())) {
+        Long scopeId = validScopeId("Review comment deleted", commentId, event.context().scopeId());
+        if (scopeId == null) {
             return;
         }
         log.debug("Recording review comment deleted event: commentId={}", commentId);
         safeRecord("review comment deleted", commentId, () ->
             activityEventService.recordDeleted(
-                event.context().scopeId(),
+                scopeId,
                 ActivityEventType.REVIEW_COMMENT_DELETED,
                 Instant.now(),
                 ActivityTargetType.REVIEW_COMMENT,
@@ -800,7 +837,8 @@ public class ActivityEventListener {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onReviewThreadResolved(ScmDomainEvent.ReviewThreadResolved event) {
         var threadData = event.thread();
-        if (!hasValidScopeId("Review thread resolved", threadData.id(), event.context().scopeId())) {
+        Long scopeId = validScopeId("Review thread resolved", threadData.id(), event.context().scopeId());
+        if (scopeId == null) {
             return;
         }
         // Fetch the thread to get repository and resolver info
@@ -825,7 +863,7 @@ public class ActivityEventListener {
         Long repositoryId = thread.getPullRequest().getRepository().getId();
         safeRecord("review thread resolved", threadData.id(), () ->
             activityEventService.record(
-                event.context().scopeId(),
+                scopeId,
                 ActivityEventType.REVIEW_THREAD_RESOLVED,
                 Instant.now(),
                 userRepository.getReferenceById(resolverId),
@@ -848,7 +886,8 @@ public class ActivityEventListener {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onReviewThreadUnresolved(ScmDomainEvent.ReviewThreadUnresolved event) {
         var threadData = event.thread();
-        if (!hasValidScopeId("Review thread unresolved", threadData.id(), event.context().scopeId())) {
+        Long scopeId = validScopeId("Review thread unresolved", threadData.id(), event.context().scopeId());
+        if (scopeId == null) {
             return;
         }
         // Fetch the thread to get repository info
@@ -873,7 +912,7 @@ public class ActivityEventListener {
         Long repositoryId = thread.getPullRequest().getRepository().getId();
         safeRecord("review thread unresolved", threadData.id(), () ->
             activityEventService.record(
-                event.context().scopeId(),
+                scopeId,
                 ActivityEventType.REVIEW_THREAD_UNRESOLVED,
                 Instant.now(),
                 userRepository.getReferenceById(userId),
@@ -903,7 +942,8 @@ public class ActivityEventListener {
         if (issueData.isPullRequest()) {
             return;
         }
-        if (!hasValidScopeId("Issue created", issueData.id(), event.context().scopeId())) {
+        Long scopeId = validScopeId("Issue created", issueData.id(), event.context().scopeId());
+        if (scopeId == null) {
             return;
         }
         User actor = getActorOrNull(issueData.authorId());
@@ -917,7 +957,7 @@ public class ActivityEventListener {
         Instant occurredAt = issueData.createdAt() != null ? issueData.createdAt() : Instant.now();
         safeRecord("issue created", issueData.id(), () ->
             activityEventService.record(
-                event.context().scopeId(),
+                scopeId,
                 ActivityEventType.ISSUE_CREATED,
                 occurredAt,
                 actor,
@@ -946,7 +986,8 @@ public class ActivityEventListener {
         if (issueData.isPullRequest()) {
             return;
         }
-        if (!hasValidScopeId("Issue closed", issueData.id(), event.context().scopeId())) {
+        Long scopeId = validScopeId("Issue closed", issueData.id(), event.context().scopeId());
+        if (scopeId == null) {
             return;
         }
         Instant occurredAt = issueData.closedAt() != null ? issueData.closedAt() : issueData.updatedAt();
@@ -956,7 +997,7 @@ public class ActivityEventListener {
         final Instant finalOccurredAt = occurredAt;
         safeRecord("issue closed", issueData.id(), () ->
             activityEventService.record(
-                event.context().scopeId(),
+                scopeId,
                 ActivityEventType.ISSUE_CLOSED,
                 finalOccurredAt,
                 getActorOrNull(issueData.authorId()),
@@ -985,13 +1026,14 @@ public class ActivityEventListener {
         if (issueData.isPullRequest()) {
             return;
         }
-        if (!hasValidScopeId("Issue reopened", issueData.id(), event.context().scopeId())) {
+        Long scopeId = validScopeId("Issue reopened", issueData.id(), event.context().scopeId());
+        if (scopeId == null) {
             return;
         }
         Instant occurredAt = issueData.updatedAt() != null ? issueData.updatedAt() : Instant.now();
         safeRecord("issue reopened", issueData.id(), () ->
             activityEventService.record(
-                event.context().scopeId(),
+                scopeId,
                 ActivityEventType.ISSUE_REOPENED,
                 occurredAt,
                 getActorOrNull(issueData.authorId()),
@@ -1014,13 +1056,14 @@ public class ActivityEventListener {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onIssueDeleted(ScmDomainEvent.IssueDeleted event) {
         Long issueId = event.issueId();
-        if (!hasValidScopeId("Issue deleted", issueId, event.context().scopeId())) {
+        Long scopeId = validScopeId("Issue deleted", issueId, event.context().scopeId());
+        if (scopeId == null) {
             return;
         }
         log.debug("Recording issue deleted event: issueId={}", issueId);
         safeRecord("issue deleted", issueId, () ->
             activityEventService.recordDeleted(
-                event.context().scopeId(),
+                scopeId,
                 ActivityEventType.ISSUE_DELETED,
                 Instant.now(),
                 ActivityTargetType.ISSUE,
@@ -1046,13 +1089,14 @@ public class ActivityEventListener {
         if (issueData.isPullRequest()) {
             return;
         }
-        if (!hasValidScopeId("Issue labeled", issueData.id(), event.context().scopeId())) {
+        Long scopeId = validScopeId("Issue labeled", issueData.id(), event.context().scopeId());
+        if (scopeId == null) {
             return;
         }
         Instant occurredAt = issueData.updatedAt() != null ? issueData.updatedAt() : Instant.now();
         safeRecord("issue labeled", issueData.id(), () ->
             activityEventService.record(
-                event.context().scopeId(),
+                scopeId,
                 ActivityEventType.ISSUE_LABELED,
                 occurredAt,
                 getActorOrNull(issueData.authorId()),
@@ -1081,13 +1125,14 @@ public class ActivityEventListener {
         if (issueData.isPullRequest()) {
             return;
         }
-        if (!hasValidScopeId("Issue unlabeled", issueData.id(), event.context().scopeId())) {
+        Long scopeId = validScopeId("Issue unlabeled", issueData.id(), event.context().scopeId());
+        if (scopeId == null) {
             return;
         }
         Instant occurredAt = issueData.updatedAt() != null ? issueData.updatedAt() : Instant.now();
         safeRecord("issue unlabeled", issueData.id(), () ->
             activityEventService.record(
-                event.context().scopeId(),
+                scopeId,
                 ActivityEventType.ISSUE_UNLABELED,
                 occurredAt,
                 getActorOrNull(issueData.authorId()),
@@ -1116,13 +1161,14 @@ public class ActivityEventListener {
         if (issueData.isPullRequest()) {
             return;
         }
-        if (!hasValidScopeId("Issue typed", issueData.id(), event.context().scopeId())) {
+        Long scopeId = validScopeId("Issue typed", issueData.id(), event.context().scopeId());
+        if (scopeId == null) {
             return;
         }
         Instant occurredAt = issueData.updatedAt() != null ? issueData.updatedAt() : Instant.now();
         safeRecord("issue typed", issueData.id(), () ->
             activityEventService.record(
-                event.context().scopeId(),
+                scopeId,
                 ActivityEventType.ISSUE_TYPED,
                 occurredAt,
                 getActorOrNull(issueData.authorId()),
@@ -1151,13 +1197,14 @@ public class ActivityEventListener {
         if (issueData.isPullRequest()) {
             return;
         }
-        if (!hasValidScopeId("Issue untyped", issueData.id(), event.context().scopeId())) {
+        Long scopeId = validScopeId("Issue untyped", issueData.id(), event.context().scopeId());
+        if (scopeId == null) {
             return;
         }
         Instant occurredAt = issueData.updatedAt() != null ? issueData.updatedAt() : Instant.now();
         safeRecord("issue untyped", issueData.id(), () ->
             activityEventService.record(
-                event.context().scopeId(),
+                scopeId,
                 ActivityEventType.ISSUE_UNTYPED,
                 occurredAt,
                 getActorOrNull(issueData.authorId()),
@@ -1197,14 +1244,15 @@ public class ActivityEventListener {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onCommitCreated(ScmDomainEvent.CommitCreated event) {
         var commitData = event.commit();
-        if (!hasValidScopeId("Commit created", commitData.id(), event.context().scopeId())) {
+        Long scopeId = validScopeId("Commit created", commitData.id(), event.context().scopeId());
+        if (scopeId == null) {
             return;
         }
         User actor = getActorOrNull(commitData.authorId());
         Instant occurredAt = commitData.authoredAt();
         safeRecord("commit created", commitData.id(), () ->
             activityEventService.record(
-                event.context().scopeId(),
+                scopeId,
                 ActivityEventType.COMMIT_CREATED,
                 occurredAt,
                 actor,
@@ -1273,14 +1321,15 @@ public class ActivityEventListener {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onDiscussionCreated(ScmDomainEvent.DiscussionCreated event) {
         var discussion = event.discussion();
-        if (!hasValidScopeId("Discussion created", discussion.id(), event.context().scopeId())) {
+        Long scopeId = validScopeId("Discussion created", discussion.id(), event.context().scopeId());
+        if (scopeId == null) {
             return;
         }
         Instant occurredAt = discussion.createdAt() != null ? discussion.createdAt() : Instant.now();
         User actor = getActorOrNull(discussion.authorId());
         safeRecord("discussion created", discussion.id(), () ->
             activityEventService.record(
-                event.context().scopeId(),
+                scopeId,
                 ActivityEventType.DISCUSSION_CREATED,
                 occurredAt,
                 actor,
@@ -1305,7 +1354,8 @@ public class ActivityEventListener {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onDiscussionClosed(ScmDomainEvent.DiscussionClosed event) {
         var discussion = event.discussion();
-        if (!hasValidScopeId("Discussion closed", discussion.id(), event.context().scopeId())) {
+        Long scopeId = validScopeId("Discussion closed", discussion.id(), event.context().scopeId());
+        if (scopeId == null) {
             return;
         }
         Instant occurredAt =
@@ -1316,7 +1366,7 @@ public class ActivityEventListener {
                     : Instant.now();
         safeRecord("discussion closed", discussion.id(), () ->
             activityEventService.record(
-                event.context().scopeId(),
+                scopeId,
                 ActivityEventType.DISCUSSION_CLOSED,
                 occurredAt,
                 getActorOrNull(discussion.authorId()),
@@ -1341,13 +1391,14 @@ public class ActivityEventListener {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onDiscussionReopened(ScmDomainEvent.DiscussionReopened event) {
         var discussion = event.discussion();
-        if (!hasValidScopeId("Discussion reopened", discussion.id(), event.context().scopeId())) {
+        Long scopeId = validScopeId("Discussion reopened", discussion.id(), event.context().scopeId());
+        if (scopeId == null) {
             return;
         }
         Instant occurredAt = discussion.updatedAt() != null ? discussion.updatedAt() : Instant.now();
         safeRecord("discussion reopened", discussion.id(), () ->
             activityEventService.record(
-                event.context().scopeId(),
+                scopeId,
                 ActivityEventType.DISCUSSION_REOPENED,
                 occurredAt,
                 getActorOrNull(discussion.authorId()),
@@ -1378,7 +1429,8 @@ public class ActivityEventListener {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onDiscussionAnswered(ScmDomainEvent.DiscussionAnswered event) {
         var discussion = event.discussion();
-        if (!hasValidScopeId("Discussion answered", discussion.id(), event.context().scopeId())) {
+        Long scopeId = validScopeId("Discussion answered", discussion.id(), event.context().scopeId());
+        if (scopeId == null) {
             return;
         }
         Instant occurredAt =
@@ -1390,7 +1442,7 @@ public class ActivityEventListener {
         User actor = getActorOrNull(discussion.authorId());
         safeRecord("discussion answered", discussion.id(), () ->
             activityEventService.record(
-                event.context().scopeId(),
+                scopeId,
                 ActivityEventType.DISCUSSION_ANSWERED,
                 occurredAt,
                 actor,
@@ -1413,13 +1465,14 @@ public class ActivityEventListener {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onDiscussionDeleted(ScmDomainEvent.DiscussionDeleted event) {
         Long discussionId = event.discussionId();
-        if (!hasValidScopeId("Discussion deleted", discussionId, event.context().scopeId())) {
+        Long scopeId = validScopeId("Discussion deleted", discussionId, event.context().scopeId());
+        if (scopeId == null) {
             return;
         }
         log.debug("Recording discussion deleted event: discussionId={}", discussionId);
         safeRecord("discussion deleted", discussionId, () ->
             activityEventService.recordDeleted(
-                event.context().scopeId(),
+                scopeId,
                 ActivityEventType.DISCUSSION_DELETED,
                 Instant.now(),
                 ActivityTargetType.DISCUSSION,
@@ -1441,10 +1494,13 @@ public class ActivityEventListener {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onDiscussionCommentCreated(ScmDomainEvent.DiscussionCommentCreated event) {
         var commentData = event.comment();
-        if (!hasValidScopeId("Discussion comment created", commentData.id(), event.context().scopeId())) {
+        Long scopeId = validScopeId("Discussion comment created", commentData.id(), event.context().scopeId());
+        if (scopeId == null) {
             return;
         }
-        if (commentData.authorId() == null || commentData.repositoryId() == null) {
+        Long authorId = commentData.authorId();
+        Long repositoryId = commentData.repositoryId();
+        if (authorId == null || repositoryId == null) {
             log.debug(
                 "Skipping discussion comment created event (author may be deleted): commentId={}, authorId={}, repositoryId={}",
                 commentData.id(),
@@ -1456,11 +1512,11 @@ public class ActivityEventListener {
         Instant occurredAt = commentData.createdAt() != null ? commentData.createdAt() : Instant.now();
         safeRecord("discussion comment created", commentData.id(), () ->
             activityEventService.record(
-                event.context().scopeId(),
+                scopeId,
                 ActivityEventType.DISCUSSION_COMMENT_CREATED,
                 occurredAt,
-                userRepository.getReferenceById(commentData.authorId()),
-                repositoryRepository.getReferenceById(commentData.repositoryId()),
+                userRepository.getReferenceById(authorId),
+                repositoryRepository.getReferenceById(repositoryId),
                 ActivityTargetType.DISCUSSION_COMMENT,
                 commentData.id(),
                 xpCalc.getXpDiscussionCommentCreated()
@@ -1479,10 +1535,13 @@ public class ActivityEventListener {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onDiscussionCommentEdited(ScmDomainEvent.DiscussionCommentEdited event) {
         var commentData = event.comment();
-        if (!hasValidScopeId("Discussion comment edited", commentData.id(), event.context().scopeId())) {
+        Long scopeId = validScopeId("Discussion comment edited", commentData.id(), event.context().scopeId());
+        if (scopeId == null) {
             return;
         }
-        if (commentData.authorId() == null || commentData.repositoryId() == null) {
+        Long authorId = commentData.authorId();
+        Long repositoryId = commentData.repositoryId();
+        if (authorId == null || repositoryId == null) {
             log.debug(
                 "Skipping discussion comment edited event (author may be deleted): commentId={}, authorId={}, repositoryId={}",
                 commentData.id(),
@@ -1494,11 +1553,11 @@ public class ActivityEventListener {
         Instant occurredAt = Instant.now(); // Use current time for edits
         safeRecord("discussion comment edited", commentData.id(), () ->
             activityEventService.record(
-                event.context().scopeId(),
+                scopeId,
                 ActivityEventType.DISCUSSION_COMMENT_EDITED,
                 occurredAt,
-                userRepository.getReferenceById(commentData.authorId()),
-                repositoryRepository.getReferenceById(commentData.repositoryId()),
+                userRepository.getReferenceById(authorId),
+                repositoryRepository.getReferenceById(repositoryId),
                 ActivityTargetType.DISCUSSION_COMMENT,
                 commentData.id(),
                 0.0 // No XP for edits - original creation already counted
@@ -1517,13 +1576,14 @@ public class ActivityEventListener {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onDiscussionCommentDeleted(ScmDomainEvent.DiscussionCommentDeleted event) {
         Long commentId = event.commentId();
-        if (!hasValidScopeId("Discussion comment deleted", commentId, event.context().scopeId())) {
+        Long scopeId = validScopeId("Discussion comment deleted", commentId, event.context().scopeId());
+        if (scopeId == null) {
             return;
         }
         log.debug("Recording discussion comment deleted event: commentId={}", commentId);
         safeRecord("discussion comment deleted", commentId, () ->
             activityEventService.recordDeleted(
-                event.context().scopeId(),
+                scopeId,
                 ActivityEventType.DISCUSSION_COMMENT_DELETED,
                 Instant.now(),
                 ActivityTargetType.DISCUSSION_COMMENT,

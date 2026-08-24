@@ -19,6 +19,7 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import java.time.Instant;
 import java.util.Map;
+import java.util.Objects;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -61,7 +62,7 @@ public class SyncJob {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    private @Nullable Long id;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "workspace_id", nullable = false, foreignKey = @ForeignKey(name = "fk_sync_job_workspace"))
@@ -86,7 +87,7 @@ public class SyncJob {
     )
     @Getter(AccessLevel.NONE)
     @Setter(AccessLevel.NONE)
-    private Connection tenantOwnedConnection;
+    private @Nullable Connection tenantOwnedConnection;
 
     /**
      * Denormalized from {@link #connection} so job-history queries and DTO mapping never need to
@@ -125,7 +126,7 @@ public class SyncJob {
 
     @Column(name = "created_at", nullable = false, updatable = false)
     @CreationTimestamp(source = SourceType.DB)
-    private Instant createdAt;
+    private @Nullable Instant createdAt;
 
     /**
      * Lease heartbeat, touched every 60s by {@link SyncJobService} for every registered
@@ -174,5 +175,13 @@ public class SyncJob {
         this.type = type;
         this.trigger = trigger;
         this.triggeredByUserId = triggeredByUserId;
+    }
+
+    public Long getId() {
+        return Objects.requireNonNull(id, "Sync job has not been persisted");
+    }
+
+    public Instant getCreatedAt() {
+        return Objects.requireNonNull(createdAt, "Sync job has not been persisted");
     }
 }

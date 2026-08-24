@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.scm.github.project;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
@@ -200,6 +201,7 @@ class GitHubProjectItemMessageHandlerIntegrationTest extends BaseIntegrationTest
             .satisfies(i -> {
                 assertThat(i.getNativeId()).isEqualTo(FIXTURE_ITEM2_ID);
                 assertThat(i.getContentType()).isEqualTo(ProjectItem.ContentType.DRAFT_ISSUE);
+                assertNotNull(i.getProject());
                 assertThat(i.getProject().getId()).isEqualTo(testProject.getId());
                 assertThat(i.isArchived()).isTrue();
             });
@@ -262,6 +264,7 @@ class GitHubProjectItemMessageHandlerIntegrationTest extends BaseIntegrationTest
                 assertThat(i.getNativeId()).isEqualTo(FIXTURE_ITEM_ID);
                 assertThat(i.getNodeId()).isEqualTo(FIXTURE_ITEM_NODE_ID);
                 assertThat(i.getContentType()).isEqualTo(ProjectItem.ContentType.DRAFT_ISSUE);
+                assertNotNull(i.getProject());
                 assertThat(i.getProject().getId()).isEqualTo(testProject.getId());
                 assertThat(i.isArchived()).isFalse();
                 assertThat(i.getCreatedAt()).isEqualTo(FIXTURE_ITEM_CREATED_AT);
@@ -311,6 +314,7 @@ class GitHubProjectItemMessageHandlerIntegrationTest extends BaseIntegrationTest
                 assertThat(i.getNativeId()).isEqualTo(FIXTURE_ITEM_ID);
                 assertThat(i.getNodeId()).isEqualTo(FIXTURE_ITEM_NODE_ID);
                 assertThat(i.getContentType()).isEqualTo(ProjectItem.ContentType.DRAFT_ISSUE);
+                assertNotNull(i.getProject());
                 assertThat(i.getProject().getId()).isEqualTo(testProject.getId());
                 assertThat(i.isArchived()).isFalse();
                 assertThat(i.getUpdatedAt()).isEqualTo(Instant.parse("2025-11-01T23:55:09Z"));
@@ -341,6 +345,7 @@ class GitHubProjectItemMessageHandlerIntegrationTest extends BaseIntegrationTest
             .satisfies(i -> {
                 assertThat(i.getNativeId()).isEqualTo(FIXTURE_ITEM2_ID);
                 assertThat(i.getContentType()).isEqualTo(ProjectItem.ContentType.DRAFT_ISSUE);
+                assertNotNull(i.getProject());
                 assertThat(i.getProject().getId()).isEqualTo(testProject.getId());
                 assertThat(i.isArchived()).isFalse();
             });
@@ -372,6 +377,7 @@ class GitHubProjectItemMessageHandlerIntegrationTest extends BaseIntegrationTest
             .satisfies(i -> {
                 assertThat(i.getNativeId()).isEqualTo(FIXTURE_ITEM_ID);
                 assertThat(i.getContentType()).isEqualTo(ProjectItem.ContentType.ISSUE);
+                assertNotNull(i.getProject());
                 assertThat(i.getProject().getId()).isEqualTo(testProject.getId());
                 assertThat(i.isArchived()).isFalse();
             });
@@ -402,6 +408,7 @@ class GitHubProjectItemMessageHandlerIntegrationTest extends BaseIntegrationTest
             .satisfies(i -> {
                 assertThat(i.getNativeId()).isEqualTo(FIXTURE_ITEM2_ID);
                 assertThat(i.getContentType()).isEqualTo(ProjectItem.ContentType.DRAFT_ISSUE);
+                assertNotNull(i.getProject());
                 assertThat(i.getProject().getId()).isEqualTo(testProject.getId());
                 assertThat(i.isArchived()).isFalse();
             });

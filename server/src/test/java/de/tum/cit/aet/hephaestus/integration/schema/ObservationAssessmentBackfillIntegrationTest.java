@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.schema;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import de.tum.cit.aet.hephaestus.testconfig.PostgreSQLTestContainer;
 import de.tum.cit.aet.hephaestus.testconfig.PostgreSQLTestContainer.TestDatabase;
@@ -9,6 +10,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -144,7 +146,7 @@ class ObservationAssessmentBackfillIntegrationTest {
      * seed resilient to schema evolution (new NOT-NULL columns won't break this test).
      */
     private void insertRow(String table, Map<String, ?> overrides) {
-        List<Map<String, Object>> columns = jdbcTemplate.queryForList(
+        List<Map<String, @Nullable Object>> columns = jdbcTemplate.queryForList(
             "SELECT column_name, data_type, is_nullable, column_default " +
                 "FROM information_schema.columns " +
                 "WHERE table_schema = 'public' AND table_name = ?",
@@ -156,6 +158,8 @@ class ObservationAssessmentBackfillIntegrationTest {
         for (Map<String, Object> col : columns) {
             String name = (String) col.get("column_name");
             String dataType = (String) col.get("data_type");
+            assertNotNull(name);
+            assertNotNull(dataType);
             dataTypes.put(name, dataType);
             if (values.containsKey(name)) {
                 continue;
@@ -175,7 +179,7 @@ class ObservationAssessmentBackfillIntegrationTest {
                 .keySet()
                 .stream()
                 .map(name ->
-                    switch (dataTypes.get(name)) {
+                    switch (required(dataTypes.get(name))) {
                         case "json" -> "?::json";
                         case "jsonb" -> "?::jsonb";
                         default -> "?";
@@ -206,12 +210,17 @@ class ObservationAssessmentBackfillIntegrationTest {
         };
     }
 
-    private String assessmentOf(UUID observationId) {
+    private @Nullable String assessmentOf(UUID observationId) {
         return jdbcTemplate.queryForObject(
             "SELECT assessment FROM observation WHERE id = ?",
             String.class,
             observationId
         );
+    }
+
+    private static <T> T required(@org.jspecify.annotations.Nullable T value) {
+        assertNotNull(value);
+        return value;
     }
 
     private boolean columnExists(String table, String column) {

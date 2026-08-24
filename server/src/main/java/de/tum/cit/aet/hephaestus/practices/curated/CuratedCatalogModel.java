@@ -242,7 +242,13 @@ final class CuratedCatalogModel {
             D shippedDefinition = shippedBySlug.get(slug);
             O override = bySlug.get(slug);
             if (override == null) {
-                entries.add(CatalogEntry.shippedOnly(slug, shippedDefinition, shippedPositionBySlug.get(slug)));
+                entries.add(
+                    CatalogEntry.shippedOnly(
+                        slug,
+                        Objects.requireNonNull(shippedDefinition),
+                        Objects.requireNonNull(shippedPositionBySlug.get(slug))
+                    )
+                );
                 continue;
             }
             D overridden = definitionOf.apply(override);
@@ -250,6 +256,7 @@ final class CuratedCatalogModel {
             if (effective == null) {
                 continue;
             }
+            Integer overridePosition = positionOf.apply(override);
             entries.add(
                 new CatalogEntry<>(
                     slug,
@@ -258,8 +265,8 @@ final class CuratedCatalogModel {
                     overridden,
                     acceptedBundledDigestOf.apply(override),
                     retiredAtOf.apply(override) != null,
-                    positionOf.apply(override) != null
-                        ? positionOf.apply(override)
+                    overridePosition != null
+                        ? overridePosition
                         : shippedPositionBySlug.getOrDefault(slug, Integer.MAX_VALUE),
                     updatedAtOf.apply(override)
                 )

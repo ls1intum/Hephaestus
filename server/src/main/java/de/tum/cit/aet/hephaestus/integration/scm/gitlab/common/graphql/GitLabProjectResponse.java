@@ -25,7 +25,7 @@ import org.jspecify.annotations.Nullable;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record GitLabProjectResponse(
     String id,
-    String fullPath,
+    @Nullable String fullPath,
     String name,
     @Nullable String webUrl,
     @Nullable String description,

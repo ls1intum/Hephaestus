@@ -132,9 +132,11 @@ class AgentJobSubmissionIntegrationTest extends BaseIntegrationTest {
         repo = repositoryRepository.save(repo);
 
         Instant now = Instant.now();
+        Long providerId = provider.getId();
+        org.junit.jupiter.api.Assertions.assertNotNull(providerId);
         pullRequestRepository.upsertCore(
             6001L,
-            provider.getId(),
+            providerId,
             10,
             "Submit Test PR",
             "Body",
@@ -171,7 +173,9 @@ class AgentJobSubmissionIntegrationTest extends BaseIntegrationTest {
     }
 
     private PullRequestReviewSubmissionRequest createRequest(String commitSha) {
-        RepositoryRef repoRef = new RepositoryRef(repo.getId(), repo.getNameWithOwner(), repo.getDefaultBranch());
+        String defaultBranch = repo.getDefaultBranch();
+        org.junit.jupiter.api.Assertions.assertNotNull(defaultBranch);
+        RepositoryRef repoRef = new RepositoryRef(repo.getId(), repo.getNameWithOwner(), defaultBranch);
         ScmEventPayload.PullRequestData prData = new ScmEventPayload.PullRequestData(
             prId,
             10,
@@ -192,7 +196,7 @@ class AgentJobSubmissionIntegrationTest extends BaseIntegrationTest {
             null,
             null
         );
-        return new PullRequestReviewSubmissionRequest(prData, "feature/submit", commitSha, repo.getDefaultBranch());
+        return new PullRequestReviewSubmissionRequest(prData, "feature/submit", commitSha, defaultBranch);
     }
 
     @Nested
@@ -216,9 +220,11 @@ class AgentJobSubmissionIntegrationTest extends BaseIntegrationTest {
             assertThat(job.getIdempotencyKey()).isEqualTo("pr_review:org/submit-repo:10:manual:abc123:detection");
             assertThat(job.getPurpose()).isEqualTo(AgentPurpose.PRACTICE_REVIEW);
             assertThat(job.getConfigSnapshot()).isNotNull();
-            assertThat(job.getMetadata().get("pull_request_id").asLong()).isEqualTo(prId);
-            assertThat(job.getMetadata().get("pr_number").asInt()).isEqualTo(10);
-            assertThat(job.getMetadata().get("commit_sha").asString()).isEqualTo("abc123");
+            var metadata = job.getMetadata();
+            org.junit.jupiter.api.Assertions.assertNotNull(metadata);
+            assertThat(metadata.get("pull_request_id").asLong()).isEqualTo(prId);
+            assertThat(metadata.get("pr_number").asInt()).isEqualTo(10);
+            assertThat(metadata.get("commit_sha").asString()).isEqualTo("abc123");
 
             AgentJob fromDb = agentJobRepository.findById(job.getId()).orElseThrow();
             assertThat(fromDb.getStatus()).isEqualTo(AgentJobStatus.QUEUED);

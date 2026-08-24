@@ -407,8 +407,6 @@ class MentorSandboxStressTest {
                 }
             });
 
-            r.threadIds = new UUID[r.k];
-
             // Stage 1a — open thread #0 and run one warm-up turn so the Pi runtime is fully
             // initialised. RSS sample taken here is the honest "one-session container floor".
             UUID warmupTid = UUID.randomUUID();
@@ -439,7 +437,9 @@ class MentorSandboxStressTest {
                     "In one sentence: what is dependency injection? (thread #" + (i + 1) + "/" + r.k + ")",
                     Duration.ofSeconds(10)
                 );
-                turnCompletes.get(tid).get(SESSION_BUDGET.toSeconds(), TimeUnit.SECONDS);
+                var turnComplete = turnCompletes.get(tid);
+                org.junit.jupiter.api.Assertions.assertNotNull(turnComplete);
+                turnComplete.get(SESSION_BUDGET.toSeconds(), TimeUnit.SECONDS);
                 long turnMs = (System.nanoTime() - promptStart) / 1_000_000;
                 r.perTurnMs.add(turnMs);
             }
@@ -860,14 +860,15 @@ class MentorSandboxStressTest {
         long rssAfterOpenKb;
         long rssAfterAllTurnsKb;
         long rssOneSessionFloorKb;
-        UUID[] threadIds;
+        final UUID[] threadIds;
         final List<Long> perTurnMs = new CopyOnWriteArrayList<>();
         final List<long[]> samples = new CopyOnWriteArrayList<>();
-        volatile Throwable failure;
+        volatile @org.jspecify.annotations.Nullable Throwable failure;
 
         MultiSessionRunnerMetrics(int id, int k) {
             this.id = id;
             this.k = k;
+            this.threadIds = new UUID[k];
         }
     }
 
@@ -883,7 +884,7 @@ class MentorSandboxStressTest {
         long promptAcceptedNanos;
         long agentEndNanos;
         final List<long[]> samples = new CopyOnWriteArrayList<>();
-        volatile Throwable failure;
+        volatile @org.jspecify.annotations.Nullable Throwable failure;
 
         SessionMetrics(int id) {
             this.id = id;

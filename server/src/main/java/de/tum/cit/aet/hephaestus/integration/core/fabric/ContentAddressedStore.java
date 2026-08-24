@@ -14,6 +14,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
 import java.util.HexFormat;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.locks.ReentrantLock;
@@ -171,7 +172,8 @@ public class ContentAddressedStore {
             blobs
                 .filter(Files::isRegularFile)
                 .forEach(blob -> {
-                    String candidate = blob.getParent().getFileName() + blob.getFileName().toString();
+                    Path parent = Objects.requireNonNull(blob.getParent());
+                    String candidate = parent.getFileName() + blob.getFileName().toString();
                     if (isShaHex(candidate) && !liveShas.contains(candidate)) {
                         try (BlobLock ignored = lockBlob(candidate)) {
                             if (lastModifiedBefore(blob, createdBefore)) {

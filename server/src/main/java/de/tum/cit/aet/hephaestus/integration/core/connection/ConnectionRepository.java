@@ -28,7 +28,7 @@ public interface ConnectionRepository extends JpaRepository<Connection, Long> {
     Optional<Connection> findByWorkspaceIdAndKindAndInstanceKey(
         long workspaceId,
         IntegrationKind kind,
-        String instanceKey
+        @Nullable String instanceKey
     );
 
     Optional<Connection> findFirstByKindAndInstanceKeyAndState(

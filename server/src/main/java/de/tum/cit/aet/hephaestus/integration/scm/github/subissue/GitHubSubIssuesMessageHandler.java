@@ -78,6 +78,10 @@ public class GitHubSubIssuesMessageHandler extends AbstractIntegrationMessageHan
         Long subIssueId = subIssueDto.getDatabaseId();
         Long parentIssueId = parentIssueDto.getDatabaseId();
         GitHubEventAction.SubIssue action = event.actionType();
+        if (subIssueId == null || parentIssueId == null) {
+            log.warn("Skipped sub_issues event: reason=missingIssueId");
+            return;
+        }
 
         if (action.isAdded()) {
             subIssueSyncService.processSubIssueEvent(subIssueId, parentIssueId, true);

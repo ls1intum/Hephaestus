@@ -2,10 +2,12 @@ package de.tum.cit.aet.hephaestus.practices.curated;
 
 import static de.tum.cit.aet.hephaestus.practices.curated.CuratedCatalogFixtures.practice;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import de.tum.cit.aet.hephaestus.practices.AreaDefinition;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 
 class CatalogEntryTest extends BaseUnitTest {
@@ -122,11 +124,12 @@ class CatalogEntryTest extends BaseUnitTest {
     }
 
     private static CatalogEntry<PracticeDefinition> entry(
-        PracticeDefinition mine,
-        PracticeDefinition shipped,
-        String acceptedBundledDigest
+        @Nullable PracticeDefinition mine,
+        @Nullable PracticeDefinition shipped,
+        @Nullable String acceptedBundledDigest
     ) {
         PracticeDefinition effective = mine != null ? mine : shipped;
+        assertNotNull(effective);
         return new CatalogEntry<>(SLUG, effective, shipped, mine, acceptedBundledDigest, false, 0, null);
     }
 

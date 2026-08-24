@@ -8,6 +8,7 @@ import java.util.Map;
 import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -35,7 +36,7 @@ class DiffHunkValidator {
      * @param diff the unified diff output (from git diff)
      * @return map of file path → sorted set of valid new-side line numbers
      */
-    static Map<String, TreeSet<Integer>> parseValidLines(String diff) {
+    static Map<String, TreeSet<Integer>> parseValidLines(@Nullable String diff) {
         Map<String, TreeSet<Integer>> result = new HashMap<>();
         if (diff == null || diff.isBlank()) return result;
 
@@ -88,7 +89,7 @@ class DiffHunkValidator {
             // blank — is invisible on the new side and must not advance the counter, or every note
             // after it anchors a line too low.
             if (effectiveLine.startsWith("+") || effectiveLine.startsWith(" ")) {
-                result.get(currentFile).add(newLineNum);
+                result.computeIfAbsent(currentFile, ignored -> new TreeSet<>()).add(newLineNum);
                 newLineNum++;
             }
         }
@@ -185,7 +186,7 @@ class DiffHunkValidator {
             // Create corrected note with new position, preserving the original span width
             Integer correctedEnd = note.endLine();
             if (correctedEnd != null) {
-                int originalSpan = Math.max(0, note.endLine() - note.startLine());
+                int originalSpan = Math.max(0, correctedEnd - note.startLine());
                 int desiredEnd = nearest + originalSpan;
                 // Find nearest valid line that doesn't expand beyond the original span, then enforce contiguity.
                 Integer nearestEnd = fileLines.floor(desiredEnd);
@@ -209,7 +210,7 @@ class DiffHunkValidator {
      * surrounding quotes stripped (git quotes paths containing spaces). Returns null when no {@code  b/}
      * segment is present.
      */
-    private static String parseGitHeaderPath(String header) {
+    private static @Nullable String parseGitHeaderPath(String header) {
         int bIdx = header.lastIndexOf(" b/");
         if (bIdx <= 0) {
             return null;
@@ -222,7 +223,7 @@ class DiffHunkValidator {
      * tab-and-metadata, surrounding quotes, and the {@code b/} prefix. Returns null for {@code /dev/null}
      * (a delete has no new-side path).
      */
-    private static String parsePlusPath(String header) {
+    private static @Nullable String parsePlusPath(String header) {
         String p = header.substring(4).trim();
         int tab = p.indexOf('\t');
         if (tab >= 0) {
@@ -250,7 +251,11 @@ class DiffHunkValidator {
      * multi-line suggestion anchor. Returns {@code endLine} when the whole span is contiguous and valid,
      * otherwise collapses to single-line ({@code startLine}). A null {@code endLine} stays null.
      */
-    private static Integer containedEnd(TreeSet<Integer> fileLines, int startLine, Integer endLine) {
+    private static @Nullable Integer containedEnd(
+        TreeSet<Integer> fileLines,
+        int startLine,
+        @Nullable Integer endLine
+    ) {
         if (endLine == null || endLine <= startLine) {
             return endLine;
         }
@@ -258,7 +263,7 @@ class DiffHunkValidator {
         return contiguous ? endLine : startLine;
     }
 
-    private static Integer findNearest(TreeSet<Integer> set, int target) {
+    private static @Nullable Integer findNearest(TreeSet<Integer> set, int target) {
         Integer floor = set.floor(target);
         Integer ceiling = set.ceiling(target);
 

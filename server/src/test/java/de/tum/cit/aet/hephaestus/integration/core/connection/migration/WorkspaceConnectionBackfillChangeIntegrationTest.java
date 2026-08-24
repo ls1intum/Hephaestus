@@ -22,6 +22,7 @@ import javax.crypto.spec.SecretKeySpec;
 import javax.sql.DataSource;
 import liquibase.database.core.PostgresDatabase;
 import liquibase.database.jvm.JdbcConnection;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -251,22 +252,22 @@ class WorkspaceConnectionBackfillChangeIntegrationTest extends BaseIntegrationTe
     }
 
     private long insertWorkspaceWithLegacyColumns(
-        String mode,
-        String accountLogin,
-        Long installationId,
-        String encryptedPat,
-        Long gitlabGroupId
+        @Nullable String mode,
+        @Nullable String accountLogin,
+        @Nullable Long installationId,
+        @Nullable String encryptedPat,
+        @Nullable Long gitlabGroupId
     ) throws Exception {
         return insertWorkspaceWithLegacyColumns(mode, accountLogin, installationId, encryptedPat, gitlabGroupId, null);
     }
 
     private long insertWorkspaceWithLegacyColumns(
-        String mode,
-        String accountLogin,
-        Long installationId,
-        String encryptedPat,
-        Long gitlabGroupId,
-        String serverUrl
+        @Nullable String mode,
+        @Nullable String accountLogin,
+        @Nullable Long installationId,
+        @Nullable String encryptedPat,
+        @Nullable Long gitlabGroupId,
+        @Nullable String serverUrl
     ) throws Exception {
         try (
             Connection conn = dataSource.getConnection();

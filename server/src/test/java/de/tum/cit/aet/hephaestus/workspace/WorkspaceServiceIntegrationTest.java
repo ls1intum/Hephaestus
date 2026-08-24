@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.workspace;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
@@ -156,6 +157,7 @@ class WorkspaceServiceIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
         // provider mode + installation id live on the Connection
         // registry now, not on Workspace.
+        assertNotNull(promoted);
         assertThat(connectionService.findActiveProviderKind(promoted.getId())).hasValue(IntegrationKind.GITHUB);
         assertThat(connectionService.findActiveGitHubAppConfig(promoted.getId())).hasValueSatisfying(cfg ->
             assertThat(cfg.installationId()).isEqualTo(95711017L)

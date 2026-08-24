@@ -17,8 +17,10 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Supplier;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -84,7 +86,7 @@ public class OutlineApiClient implements OutlineTokenClient, OutlineContentClien
     }
 
     /** Identity from Outline's {@code auth.info}. The team id is stable per instance and becomes the Connection's instance key. */
-    public record OutlineIdentity(String teamId, String teamName, String userId) {}
+    public record OutlineIdentity(String teamId, @Nullable String teamName, @Nullable String userId) {}
 
     /**
      * Validates a token via {@code auth.info}, returning the resolved identity. Throws
@@ -104,10 +106,19 @@ public class OutlineApiClient implements OutlineTokenClient, OutlineContentClien
         }
         OutlineTeam team = response.data().getTeam();
         OutlineUser user = response.data().getUser();
-        return new OutlineIdentity(team.getId(), team.getName(), user == null ? null : user.getId());
+        return new OutlineIdentity(
+            Objects.requireNonNull(team.getId()),
+            team.getName(),
+            user == null ? null : user.getId()
+        );
     }
 
-    public record OutlineTokenDescription(String name, String last4, Instant expiresAt, Instant lastActiveAt) {}
+    public record OutlineTokenDescription(
+        @Nullable String name,
+        @Nullable String last4,
+        @Nullable Instant expiresAt,
+        @Nullable Instant lastActiveAt
+    ) {}
 
     /**
      * Describes the token via {@code apiKeys.list}, matched on the {@code last4} suffix. Empty when the key
@@ -379,7 +390,7 @@ public class OutlineApiClient implements OutlineTokenClient, OutlineContentClien
 
     /** Exports a document's body as Markdown ({@code documents.export}); {@code null} when Outline responds without a body. */
     @Override
-    public String exportDocument(String serverUrl, String token, String documentId) {
+    public @Nullable String exportDocument(String serverUrl, String token, String documentId) {
         String resolvedUrl = resolveAndValidateServerUrl(serverUrl);
         OutlineEnvelope<String> body = post(
             resolvedUrl,
@@ -396,7 +407,7 @@ public class OutlineApiClient implements OutlineTokenClient, OutlineContentClien
      * {@code deliveryUrl}, signed with {@code signingSecret}; returns its id, or {@code null} when Outline responds without one.
      */
     @Override
-    public String createWebhookSubscription(
+    public @Nullable String createWebhookSubscription(
         String serverUrl,
         String token,
         String name,
@@ -483,7 +494,7 @@ public class OutlineApiClient implements OutlineTokenClient, OutlineContentClien
     }
 
     /** Reads the {@code Retry-After} header (delta-seconds) from a 429, or {@code null} when absent/unparseable. */
-    private static Duration parseRetryAfter(WebClientResponseException e) {
+    private static @Nullable Duration parseRetryAfter(WebClientResponseException e) {
         String header = e.getHeaders().getFirst(HttpHeaders.RETRY_AFTER);
         if (header == null || header.isBlank()) {
             return null;

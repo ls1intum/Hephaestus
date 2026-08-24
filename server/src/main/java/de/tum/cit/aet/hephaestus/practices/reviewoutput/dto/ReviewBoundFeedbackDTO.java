@@ -9,6 +9,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
 import java.util.UUID;
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 @Schema(description = "Feedback composed from an observation")
 public record ReviewBoundFeedbackDTO(
@@ -18,9 +19,10 @@ public record ReviewBoundFeedbackDTO(
     @NonNull FeedbackChannel channel,
     @NonNull FeedbackDeliveryState deliveryState,
     @Schema(description = "Why the message was withheld; null unless the state is SUPPRESSED")
+    @Nullable
     FeedbackSuppressionReason suppressionReason,
     @NonNull Instant createdAt,
-    @Schema(description = "When the message was placed; null if it was not delivered") Instant deliveredAt
+    @Schema(description = "When the message was placed; null if it was not delivered") @Nullable Instant deliveredAt
 ) {
     public static ReviewBoundFeedbackDTO from(BoundFeedbackUnit row) {
         return new ReviewBoundFeedbackDTO(

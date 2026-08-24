@@ -39,6 +39,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -48,6 +49,7 @@ import org.springframework.graphql.client.ClientGraphQlResponse;
 import org.springframework.graphql.client.ClientResponseField;
 import org.springframework.graphql.client.GraphQlClient.RequestSpec;
 import org.springframework.graphql.client.HttpGraphQlClient;
+import org.springframework.transaction.TransactionStatus;
 import org.springframework.transaction.support.TransactionCallback;
 import org.springframework.transaction.support.TransactionTemplate;
 import reactor.core.publisher.Mono;
@@ -157,7 +159,7 @@ class GitHubProjectItemSyncServiceTest extends BaseUnitTest {
         );
     }
 
-    private GitHubProjectFieldValueDTO createFieldValueDTO(String fieldId, String type, String value) {
+    private GitHubProjectFieldValueDTO createFieldValueDTO(String fieldId, String type, @Nullable String value) {
         return new GitHubProjectFieldValueDTO(fieldId, type, value, null, null, null, null);
     }
 
@@ -591,7 +593,7 @@ class GitHubProjectItemSyncServiceTest extends BaseUnitTest {
 
             GHProjectV2ItemConnection connection = new GHProjectV2ItemConnection();
             connection.setNodes(List.of(ghItem));
-            GHPageInfo pageInfo = new GHPageInfo(null, false, false, null);
+            GHPageInfo pageInfo = pageInfo(null, false);
             connection.setPageInfo(pageInfo);
 
             ClientGraphQlResponse response = mock(ClientGraphQlResponse.class);
@@ -604,7 +606,7 @@ class GitHubProjectItemSyncServiceTest extends BaseUnitTest {
             // Mock transaction template to execute the action
             when(transactionTemplate.execute(any())).thenAnswer(invocation -> {
                 var callback = invocation.getArgument(0, TransactionCallback.class);
-                return callback.doInTransaction(null);
+                return callback.doInTransaction(mock(TransactionStatus.class));
             });
 
             // The embedded item creation from GHProjectV2Item will yield a DTO;
@@ -790,7 +792,7 @@ class GitHubProjectItemSyncServiceTest extends BaseUnitTest {
 
             GHProjectV2ItemConnection page1 = new GHProjectV2ItemConnection();
             page1.setNodes(List.of(ghItem1));
-            page1.setPageInfo(new GHPageInfo("cursor-page2", true, false, null));
+            page1.setPageInfo(pageInfo("cursor-page2", true));
 
             // Page 2: one item, no more pages
             GHProjectV2Item ghItem2 = new GHProjectV2Item();
@@ -802,7 +804,7 @@ class GitHubProjectItemSyncServiceTest extends BaseUnitTest {
 
             GHProjectV2ItemConnection page2 = new GHProjectV2ItemConnection();
             page2.setNodes(List.of(ghItem2));
-            page2.setPageInfo(new GHPageInfo(null, false, false, null));
+            page2.setPageInfo(pageInfo(null, false));
 
             ClientGraphQlResponse response1 = mock(ClientGraphQlResponse.class);
             when(response1.isValid()).thenReturn(true);
@@ -821,7 +823,7 @@ class GitHubProjectItemSyncServiceTest extends BaseUnitTest {
             // Mock transaction template
             when(transactionTemplate.execute(any())).thenAnswer(invocation -> {
                 var callback = invocation.getArgument(0, TransactionCallback.class);
-                return callback.doInTransaction(null);
+                return callback.doInTransaction(mock(TransactionStatus.class));
             });
 
             Project project = createProject();
@@ -842,5 +844,12 @@ class GitHubProjectItemSyncServiceTest extends BaseUnitTest {
             assertThat(result).isEqualTo(2);
             verify(graphQlClientProvider, times(2)).trackRateLimit(eq(SCOPE_ID), any());
         }
+    }
+
+    private static GHPageInfo pageInfo(@Nullable String endCursor, boolean hasNextPage) {
+        GHPageInfo pageInfo = new GHPageInfo();
+        pageInfo.setHasNextPage(hasNextPage);
+        if (endCursor != null) pageInfo.setEndCursor(endCursor);
+        return pageInfo;
     }
 }

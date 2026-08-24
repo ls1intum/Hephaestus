@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -187,7 +188,7 @@ class DocumentContentSourceTest extends BaseUnitTest {
         return job;
     }
 
-    private static ProjectedDocument document(String body) {
+    private static ProjectedDocument document(@Nullable String body) {
         return new ProjectedDocument(
             "engineering",
             "architecture-decision",

@@ -4,6 +4,7 @@ import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import org.jspecify.annotations.Nullable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -67,14 +68,14 @@ public interface MilestoneRepository extends JpaRepository<Milestone, Long> {
         @Param("providerId") Long providerId,
         @Param("number") int number,
         @Param("title") String title,
-        @Param("description") String description,
+        @Param("description") @Nullable String description,
         @Param("state") String state,
         @Param("htmlUrl") String htmlUrl,
-        @Param("dueOn") Instant dueOn,
+        @Param("dueOn") @Nullable Instant dueOn,
         @Param("openIssuesCount") int openIssuesCount,
         @Param("closedIssuesCount") int closedIssuesCount,
         @Param("repositoryId") Long repositoryId,
-        @Param("createdAt") Instant createdAt,
-        @Param("updatedAt") Instant updatedAt
+        @Param("createdAt") @Nullable Instant createdAt,
+        @Param("updatedAt") @Nullable Instant updatedAt
     );
 }

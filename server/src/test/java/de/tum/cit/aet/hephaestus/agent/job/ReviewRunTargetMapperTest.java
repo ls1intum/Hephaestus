@@ -33,7 +33,7 @@ class ReviewRunTargetMapperTest extends BaseUnitTest {
         AgentJob job = new AgentJob();
         job.setJobType(jobType);
         job.setIntegrationKind(integrationKind);
-        job.setMetadata(metadata);
+        org.springframework.test.util.ReflectionTestUtils.setField(job, "metadata", metadata);
 
         assertThat(ReviewRunTargetMapper.from(job)).isEqualTo(expected);
     }

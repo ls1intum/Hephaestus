@@ -7,6 +7,7 @@ import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.Optional;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -38,7 +39,7 @@ class WorkspaceResolverTest extends BaseUnitTest {
         return workspace;
     }
 
-    private RepositoryToMonitor createMonitor(Workspace workspace) {
+    private RepositoryToMonitor createMonitor(@Nullable Workspace workspace) {
         RepositoryToMonitor monitor = new RepositoryToMonitor();
         monitor.setWorkspace(workspace);
         return monitor;

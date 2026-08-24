@@ -116,7 +116,9 @@ class ArtifactTraceQueryService {
             outputs(workspaceId, artifactKind, artifactId)
         );
 
-        ArtifactIdentity identity = identities.resolve(workspaceId, artifactKind, List.of(artifactId)).get(artifactId);
+        ArtifactIdentity identity = Objects.requireNonNull(
+            identities.resolve(workspaceId, artifactKind, List.of(artifactId)).get(artifactId)
+        );
         return new ArtifactTraceDTO(
             artifactKind,
             artifactId,
@@ -148,7 +150,9 @@ class ArtifactTraceQueryService {
         idsByKind.forEach((kind, ids) -> resolved.put(kind, identities.resolve(workspaceId, kind, ids)));
         return page.map(row -> {
             ArtifactKind kind = ArtifactKind.of(row.getArtifactKind());
-            ArtifactIdentity identity = resolved.get(kind).get(row.getArtifactId());
+            ArtifactIdentity identity = Objects.requireNonNull(
+                Objects.requireNonNull(resolved.get(kind)).get(row.getArtifactId())
+            );
             return new TracedArtifactDTO(
                 kind,
                 row.getArtifactId(),

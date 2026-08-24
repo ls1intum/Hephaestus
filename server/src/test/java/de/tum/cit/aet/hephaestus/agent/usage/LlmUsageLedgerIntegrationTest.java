@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.agent.usage;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.catchThrowable;
 import static org.assertj.core.api.Assertions.within;
+import static org.mockito.Mockito.mock;
 
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmConnection;
@@ -12,6 +13,7 @@ import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelRepository;
 import de.tum.cit.aet.hephaestus.agent.config.AgentPurpose;
 import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBinding;
 import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBindingRepository;
+import de.tum.cit.aet.hephaestus.agent.handler.spi.JobSubmissionRequest;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobService;
@@ -367,7 +369,12 @@ class LlmUsageLedgerIntegrationTest extends AbstractWorkspaceIntegrationTest {
         record(workspace.getId(), agentSample(UUID.randomUUID(), 0, 1000, price));
         double blockedBefore = blockedCount("instance");
 
-        var job = agentJobService.submit(workspace.getId(), AgentJobType.PULL_REQUEST_REVIEW, null, null);
+        var job = agentJobService.submit(
+            workspace.getId(),
+            AgentJobType.PULL_REQUEST_REVIEW,
+            mock(JobSubmissionRequest.class),
+            null
+        );
 
         assertThat(job).isEmpty();
         assertThat(blockedCount("instance")).isEqualTo(blockedBefore + 1);
@@ -388,7 +395,12 @@ class LlmUsageLedgerIntegrationTest extends AbstractWorkspaceIntegrationTest {
         double byoBlockedBefore = blockedCount("byo");
 
         Throwable thrown = catchThrowable(() ->
-            agentJobService.submit(workspace.getId(), AgentJobType.PULL_REQUEST_REVIEW, null, null)
+            agentJobService.submit(
+                workspace.getId(),
+                AgentJobType.PULL_REQUEST_REVIEW,
+                mock(JobSubmissionRequest.class),
+                null
+            )
         );
 
         // A budget refusal is a QUIET return of Optional.empty(), never a throw. So a non-null
@@ -409,7 +421,12 @@ class LlmUsageLedgerIntegrationTest extends AbstractWorkspaceIntegrationTest {
         bindDetectionTo(workspace, FundingSource.WORKSPACE);
         double blockedBefore = blockedCount("byo");
 
-        var job = agentJobService.submit(workspace.getId(), AgentJobType.PULL_REQUEST_REVIEW, null, null);
+        var job = agentJobService.submit(
+            workspace.getId(),
+            AgentJobType.PULL_REQUEST_REVIEW,
+            mock(JobSubmissionRequest.class),
+            null
+        );
 
         assertThat(job).isEmpty();
         assertThat(blockedCount("byo")).isEqualTo(blockedBefore + 1);
@@ -425,7 +442,12 @@ class LlmUsageLedgerIntegrationTest extends AbstractWorkspaceIntegrationTest {
         double byoBlockedBefore = blockedCount("byo");
 
         Throwable thrown = catchThrowable(() ->
-            agentJobService.submit(workspace.getId(), AgentJobType.PULL_REQUEST_REVIEW, null, null)
+            agentJobService.submit(
+                workspace.getId(),
+                AgentJobType.PULL_REQUEST_REVIEW,
+                mock(JobSubmissionRequest.class),
+                null
+            )
         );
 
         // As above: a throw means the gate let this through. A zero BYO cap that reached across would

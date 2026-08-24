@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.scm.github.discussion;
 
 import static org.assertj.core.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
@@ -227,7 +228,7 @@ class GitHubDiscussionProcessorIntegrationTest extends BaseIntegrationTest {
             Discussion result = processor.process(dto, createContext());
 
             // Then - should use databaseId
-            assertThat(result).isNotNull();
+            assertNotNull(result);
             assertThat(result.getNativeId()).isEqualTo(databaseId);
             assertThat(discussionRepository.findByRepositoryIdAndNumber(testRepository.getId(), 27)).isPresent();
         }
@@ -267,7 +268,7 @@ class GitHubDiscussionProcessorIntegrationTest extends BaseIntegrationTest {
             Discussion result = processor.process(dto, createContext());
 
             // Then - should use id as fallback
-            assertThat(result).isNotNull();
+            assertNotNull(result);
             assertThat(result.getNativeId()).isEqualTo(webhookId);
             assertThat(discussionRepository.findByRepositoryIdAndNumber(testRepository.getId(), 27)).isPresent();
         }
@@ -323,7 +324,7 @@ class GitHubDiscussionProcessorIntegrationTest extends BaseIntegrationTest {
             Discussion result = processor.process(dto, createContext());
 
             // Then - verify discussion created
-            assertThat(result).isNotNull();
+            assertNotNull(result);
             assertThat(result.getNativeId()).isEqualTo(discussionId);
             assertThat(result.getNumber()).isEqualTo(27);
             assertThat(result.getTitle()).isEqualTo("Test Discussion #27");
@@ -346,19 +347,18 @@ class GitHubDiscussionProcessorIntegrationTest extends BaseIntegrationTest {
         @Test
         void shouldCreateAuthorIfNotExists() {
             // Given - no user exists
-            assertThat(userRepository.findByNativeIdAndProviderId(FIXTURE_AUTHOR_ID, githubProvider.getId())).isEmpty();
+            assertThat(userRepository.findByNativeIdAndProviderId(FIXTURE_AUTHOR_ID, providerId())).isEmpty();
 
             Long discussionId = 111222333L;
             GitHubDiscussionDTO dto = createBasicDiscussionDto(discussionId, 1);
 
             Discussion result = processor.process(dto, createContext());
+            assertNotNull(result);
 
             assertThat(result.getAuthor()).isNotNull();
             assertThat(result.getAuthor().getNativeId()).isEqualTo(FIXTURE_AUTHOR_ID);
             assertThat(result.getAuthor().getLogin()).isEqualTo(FIXTURE_AUTHOR_LOGIN);
-            assertThat(
-                userRepository.findByNativeIdAndProviderId(FIXTURE_AUTHOR_ID, githubProvider.getId())
-            ).isPresent();
+            assertThat(userRepository.findByNativeIdAndProviderId(FIXTURE_AUTHOR_ID, providerId())).isPresent();
         }
 
         @Test
@@ -377,8 +377,10 @@ class GitHubDiscussionProcessorIntegrationTest extends BaseIntegrationTest {
             GitHubDiscussionDTO dto = createBasicDiscussionDto(discussionId, 2);
 
             Discussion result = processor.process(dto, createContext());
+            assertNotNull(result);
 
             // Then - should reuse existing user, not create new
+            assertNotNull(result.getAuthor());
             assertThat(result.getAuthor().getNativeId()).isEqualTo(FIXTURE_AUTHOR_ID);
             assertThat(userRepository.count()).isEqualTo(userCountBefore);
         }
@@ -412,6 +414,7 @@ class GitHubDiscussionProcessorIntegrationTest extends BaseIntegrationTest {
             );
 
             Discussion result = processor.process(dto, createContext());
+            assertNotNull(result);
 
             assertThat(result.getBody()).isNull();
         }
@@ -446,7 +449,7 @@ class GitHubDiscussionProcessorIntegrationTest extends BaseIntegrationTest {
 
             Discussion result = processor.process(dto, createContext());
 
-            assertThat(result).isNotNull();
+            assertNotNull(result);
             assertThat(result.getAuthor()).isNull();
         }
 
@@ -481,10 +484,11 @@ class GitHubDiscussionProcessorIntegrationTest extends BaseIntegrationTest {
             );
 
             Discussion result = processor.process(dto, createContext());
+            assertNotNull(result);
 
             assertThat(result.getLabels()).hasSize(1);
             assertThat(result.getLabels().iterator().next().getName()).isEqualTo("bug");
-            assertThat(labelRepository.findByNativeIdAndProviderId(labelId, githubProvider.getId())).isPresent();
+            assertThat(labelRepository.findByNativeIdAndProviderId(labelId, providerId())).isPresent();
         }
 
         @Test
@@ -526,6 +530,7 @@ class GitHubDiscussionProcessorIntegrationTest extends BaseIntegrationTest {
             );
 
             Discussion result = processor.process(dto, createContext());
+            assertNotNull(result);
 
             assertThat(result.getCategory()).isNotNull();
             assertThat(result.getCategory().getName()).isEqualTo("General");
@@ -571,6 +576,7 @@ class GitHubDiscussionProcessorIntegrationTest extends BaseIntegrationTest {
             );
 
             Discussion result = processor.process(dto, createContext());
+            assertNotNull(result);
 
             assertThat(result.getCategory()).isNotNull();
             assertThat(result.getCategory().getName()).isEqualTo("Q&A");
@@ -642,6 +648,7 @@ class GitHubDiscussionProcessorIntegrationTest extends BaseIntegrationTest {
             );
 
             Discussion result = processor.process(updateDto, createContext());
+            assertNotNull(result);
 
             // Then - verify discussion updated
             assertThat(result.getTitle()).isEqualTo("New Title");
@@ -798,7 +805,7 @@ class GitHubDiscussionProcessorIntegrationTest extends BaseIntegrationTest {
             Discussion result = processor.process(staleDto, createContext());
 
             // Then - should return existing without updating
-            assertThat(result).isNotNull();
+            assertNotNull(result);
             assertThat(result.getTitle()).isEqualTo("Original Title");
 
             // No Updated event published
@@ -955,6 +962,7 @@ class GitHubDiscussionProcessorIntegrationTest extends BaseIntegrationTest {
             );
 
             Discussion result = processor.process(updateDto, createContext());
+            assertNotNull(result);
 
             assertThat(result.getCategory()).isNotNull();
             assertThat(result.getCategory().getName()).isEqualTo("General");
@@ -1003,6 +1011,7 @@ class GitHubDiscussionProcessorIntegrationTest extends BaseIntegrationTest {
             );
 
             Discussion result = processor.processClosed(dto, createContext());
+            assertNotNull(result);
 
             assertThat(result.getState()).isEqualTo(Discussion.State.CLOSED);
             assertThat(result.getStateReason()).isEqualTo(Discussion.StateReason.RESOLVED);
@@ -1075,6 +1084,7 @@ class GitHubDiscussionProcessorIntegrationTest extends BaseIntegrationTest {
             );
 
             Discussion result = processor.processReopened(reopenedDto, createContext());
+            assertNotNull(result);
 
             assertThat(result.getState()).isEqualTo(Discussion.State.OPEN);
 
@@ -1133,7 +1143,7 @@ class GitHubDiscussionProcessorIntegrationTest extends BaseIntegrationTest {
 
             Discussion result = processor.processAnswered(dto, createContext());
 
-            assertThat(result).isNotNull();
+            assertNotNull(result);
 
             // Verify Answered event
             assertThat(eventListener.ofType(ScmDomainEvent.DiscussionAnswered.class))
@@ -1157,6 +1167,7 @@ class GitHubDiscussionProcessorIntegrationTest extends BaseIntegrationTest {
             Long discussionId = FIXTURE_DISCUSSION_ID;
             GitHubDiscussionDTO createDto = createBasicDiscussionDto(discussionId, 27);
             Discussion created = processor.process(createDto, createContext());
+            assertNotNull(created);
             Long syntheticId = created.getId();
 
             assertThat(discussionRepository.findByRepositoryIdAndNumber(testRepository.getId(), 27)).isPresent();
@@ -1219,6 +1230,7 @@ class GitHubDiscussionProcessorIntegrationTest extends BaseIntegrationTest {
             Long discussionId = FIXTURE_DISCUSSION_ID;
             GitHubDiscussionDTO createDto = createBasicDiscussionDto(discussionId, 27);
             Discussion created = processor.process(createDto, createContext());
+            assertNotNull(created);
             Long syntheticId = created.getId();
 
             assertThat(discussionRepository.findByRepositoryIdAndNumber(testRepository.getId(), 27)).isPresent();
@@ -1333,6 +1345,7 @@ class GitHubDiscussionProcessorIntegrationTest extends BaseIntegrationTest {
             );
 
             Discussion result = processor.process(dto, createContext());
+            assertNotNull(result);
 
             // Then - isClosed() returns false for anything other than "closed", so state = OPEN
             assertThat(result.getState()).isEqualTo(Discussion.State.OPEN);
@@ -1367,6 +1380,7 @@ class GitHubDiscussionProcessorIntegrationTest extends BaseIntegrationTest {
             );
 
             Discussion result = processor.process(dto, createContext());
+            assertNotNull(result);
 
             assertThat(result.getStateReason()).isEqualTo(Discussion.StateReason.UNKNOWN);
         }
@@ -1400,6 +1414,7 @@ class GitHubDiscussionProcessorIntegrationTest extends BaseIntegrationTest {
             );
 
             Discussion result = processor.process(dto, createContext());
+            assertNotNull(result);
 
             // Then - unknown lock reason returns null per convertLockReason
             assertThat(result.isLocked()).isTrue();
@@ -1435,8 +1450,15 @@ class GitHubDiscussionProcessorIntegrationTest extends BaseIntegrationTest {
             );
 
             Discussion result = processor.process(dto, createContext());
+            assertNotNull(result);
 
             assertThat(result.getLabels()).isEmpty();
         }
+    }
+
+    private Long providerId() {
+        Long id = githubProvider.getId();
+        assertNotNull(id);
+        return id;
     }
 }

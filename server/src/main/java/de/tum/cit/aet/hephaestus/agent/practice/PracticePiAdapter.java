@@ -50,7 +50,7 @@ public class PracticePiAdapter {
             SandboxLayout.OUTPUT_PATH,
             null,
             plan.networkPolicy(),
-            null,
+            Map.of(),
             plan.promptDigest()
         );
     }

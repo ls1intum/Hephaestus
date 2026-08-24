@@ -8,6 +8,7 @@ import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.net.URI;
+import java.util.Objects;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -48,10 +49,10 @@ public class AccountExportController {
     public ResponseEntity<ExportCreatedDTO> requestExport() {
         Long accountId = CurrentAccount.requireId();
         AccountExport export = exportService.requestExport(accountId);
-        URI location = URI.create("/user/exports/" + export.getId());
+        URI location = URI.create("/user/exports/" + Objects.requireNonNull(export.getId()));
         return ResponseEntity.accepted()
             .location(location)
-            .body(new ExportCreatedDTO(export.getId(), export.getStatus().name()));
+            .body(new ExportCreatedDTO(Objects.requireNonNull(export.getId()), export.getStatus().name()));
     }
 
     @GetMapping("/{id}")

@@ -14,9 +14,9 @@ import org.springframework.stereotype.Component;
 @Component
 public class IntegrationConsumerStats {
 
-    private static final String STATUS_UNINITIALISED = null;
+    private static final @Nullable String STATUS_UNINITIALISED = null;
 
-    private final AtomicReference<String> natsStatus = new AtomicReference<>(STATUS_UNINITIALISED);
+    private final AtomicReference<@Nullable String> natsStatus = new AtomicReference<>(STATUS_UNINITIALISED);
     private final AtomicInteger activeScopeConsumers = new AtomicInteger(0);
     private final AtomicReference<Boolean> installationActive = new AtomicReference<>(Boolean.FALSE);
     private final AtomicReference<Instant> lastDispatchAt = new AtomicReference<>();

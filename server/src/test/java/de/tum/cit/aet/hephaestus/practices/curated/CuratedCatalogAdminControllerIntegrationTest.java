@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.practices.curated;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.contains;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import de.tum.cit.aet.hephaestus.core.event.WorkspacesInitializedEvent;
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
@@ -29,6 +30,7 @@ import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import java.util.List;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -987,29 +989,33 @@ class CuratedCatalogAdminControllerIntegrationTest extends AbstractWorkspaceInte
     }
 
     private CuratedPracticeDTO getPractice(String slug) {
-        return webTestClient
-            .get()
-            .uri(CATALOG + "/practices/" + slug)
-            .headers(headers -> headers.setBearerAuth(ADMIN_TOKEN))
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody(CuratedPracticeDTO.class)
-            .returnResult()
-            .getResponseBody();
+        return required(
+            webTestClient
+                .get()
+                .uri(CATALOG + "/practices/" + slug)
+                .headers(headers -> headers.setBearerAuth(ADMIN_TOKEN))
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody(CuratedPracticeDTO.class)
+                .returnResult()
+                .getResponseBody()
+        );
     }
 
     private CuratedCatalogDTO getCatalog() {
-        return webTestClient
-            .get()
-            .uri(CATALOG)
-            .headers(headers -> headers.setBearerAuth(ADMIN_TOKEN))
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody(CuratedCatalogDTO.class)
-            .returnResult()
-            .getResponseBody();
+        return required(
+            webTestClient
+                .get()
+                .uri(CATALOG)
+                .headers(headers -> headers.setBearerAuth(ADMIN_TOKEN))
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody(CuratedCatalogDTO.class)
+                .returnResult()
+                .getResponseBody()
+        );
     }
 
     private static String quote(String etag) {
@@ -1021,16 +1027,18 @@ class CuratedCatalogAdminControllerIntegrationTest extends AbstractWorkspaceInte
     }
 
     private CuratedAreaDTO getArea(String slug) {
-        return webTestClient
-            .get()
-            .uri(CATALOG + "/areas/" + slug)
-            .headers(headers -> headers.setBearerAuth(ADMIN_TOKEN))
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody(CuratedAreaDTO.class)
-            .returnResult()
-            .getResponseBody();
+        return required(
+            webTestClient
+                .get()
+                .uri(CATALOG + "/areas/" + slug)
+                .headers(headers -> headers.setBearerAuth(ADMIN_TOKEN))
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody(CuratedAreaDTO.class)
+                .returnResult()
+                .getResponseBody()
+        );
     }
 
     private String etagOf(CuratedPracticeDTO practice) {
@@ -1042,24 +1050,28 @@ class CuratedCatalogAdminControllerIntegrationTest extends AbstractWorkspaceInte
     }
 
     private String tag(String uri) {
-        return webTestClient
-            .get()
-            .uri(uri)
-            .headers(headers -> headers.setBearerAuth(ADMIN_TOKEN))
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody()
-            .returnResult()
-            .getResponseHeaders()
-            .getETag();
+        return required(
+            webTestClient
+                .get()
+                .uri(uri)
+                .headers(headers -> headers.setBearerAuth(ADMIN_TOKEN))
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .returnResult()
+                .getResponseHeaders()
+                .getETag()
+        );
     }
 
     private long overrideRows() {
-        return jdbcTemplate.queryForObject(
+        Long rows = jdbcTemplate.queryForObject(
             "SELECT (SELECT count(*) FROM curated_practice_override) + (SELECT count(*) FROM curated_area_override)",
             Long.class
         );
+        assertNotNull(rows);
+        return rows;
     }
 
     private List<String> auditValues(String entityType, String entityId) {
@@ -1074,5 +1086,10 @@ class CuratedCatalogAdminControllerIntegrationTest extends AbstractWorkspaceInte
             entityType,
             entityId
         );
+    }
+
+    private static <T> T required(@Nullable T value) {
+        assertNotNull(value);
+        return value;
     }
 }

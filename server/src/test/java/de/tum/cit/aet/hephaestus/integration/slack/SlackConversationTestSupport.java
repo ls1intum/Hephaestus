@@ -22,6 +22,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import org.jspecify.annotations.Nullable;
 import org.springframework.jdbc.core.JdbcTemplate;
 import tools.jackson.databind.ObjectMapper;
 
@@ -86,7 +87,7 @@ public final class SlackConversationTestSupport {
     public void seedThread(
         long workspaceId,
         String channelId,
-        String threadTs,
+        @Nullable String threadTs,
         String lastTs,
         int messageCount,
         String participantArrayLiteral
@@ -105,7 +106,7 @@ public final class SlackConversationTestSupport {
     }
 
     /** Seed one non-tombstoned message (author {@code U1}). */
-    public void seedMessage(long workspaceId, String channelId, String ts, String threadTs, String text) {
+    public void seedMessage(long workspaceId, String channelId, String ts, @Nullable String threadTs, String text) {
         jdbc.update(
             "INSERT INTO slack_message (workspace_id, slack_team_id, slack_channel_id, slack_ts, slack_thread_ts, author_slack_user_id, text, ingested_at) " +
                 "VALUES (?, 'T1', ?, ?, ?, 'U1', ?, now())",

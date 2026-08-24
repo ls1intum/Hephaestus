@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.scm.github.pullrequest;
 
 import static org.assertj.core.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
@@ -259,7 +260,7 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
             PullRequest result = processor.process(dto, createContext());
 
             // Then - should use databaseId as native_id
-            assertThat(result).isNotNull();
+            assertNotNull(result);
             assertThat(result.getNativeId()).isEqualTo(databaseId);
             assertThat(pullRequestRepository.findByRepositoryIdAndNumber(testRepository.getId(), 1)).isPresent();
         }
@@ -314,7 +315,7 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
             PullRequest result = processor.process(dto, createContext());
 
             // Then - should use id as fallback for native_id
-            assertThat(result).isNotNull();
+            assertNotNull(result);
             assertThat(result.getNativeId()).isEqualTo(webhookId);
             assertThat(pullRequestRepository.findByRepositoryIdAndNumber(testRepository.getId(), 26)).isPresent();
         }
@@ -386,7 +387,7 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
 
             issueRepository.upsertCore(
                 entityId,
-                githubProvider.getId(),
+                providerId(),
                 number,
                 "Original Issue Title",
                 "Original issue body",
@@ -418,7 +419,7 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
             PullRequest result = processor.process(dto, createContext());
 
             // Assert - should succeed (no IllegalStateException) and return a valid PR
-            assertThat(result).isNotNull();
+            assertNotNull(result);
             assertThat(result.getNativeId()).isEqualTo(entityId);
             assertThat(result.getNumber()).isEqualTo(number);
             assertThat(result.getTitle()).isEqualTo("Test PR #" + number);
@@ -442,14 +443,14 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
 
             PullRequest result = processor.process(dto, createContext());
 
-            assertThat(result).isNotNull();
+            assertNotNull(result);
             assertThat(result.getNativeId()).isEqualTo(FIXTURE_PR_ID);
             assertThat(result.getNumber()).isEqualTo(26);
             assertThat(result.getTitle()).isEqualTo("Test PR #26");
             assertThat(result.getState()).isEqualTo(PullRequest.State.OPEN);
             assertThat(result.isDraft()).isFalse();
             assertThat(result.isMerged()).isFalse();
-            assertThat(result.getRepository().getNativeId()).isEqualTo(FIXTURE_REPO_ID);
+            assertThat(result.requireRepository().getNativeId()).isEqualTo(FIXTURE_REPO_ID);
 
             // Verify Created event
             assertThat(eventListener.ofType(ScmDomainEvent.PullRequestCreated.class)).hasSize(1);
@@ -462,12 +463,11 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
             GitHubPullRequestDTO dto = createBasicPullRequestDto(FIXTURE_PR_ID, 26);
 
             PullRequest result = processor.process(dto, createContext());
+            assertNotNull(result);
 
             assertThat(result.getAuthor()).isNotNull();
             assertThat(result.getAuthor().getLogin()).isEqualTo(FIXTURE_AUTHOR_LOGIN);
-            assertThat(
-                userRepository.findByNativeIdAndProviderId(FIXTURE_AUTHOR_ID, githubProvider.getId())
-            ).isPresent();
+            assertThat(userRepository.findByNativeIdAndProviderId(FIXTURE_AUTHOR_ID, providerId())).isPresent();
         }
 
         @Test
@@ -525,11 +525,12 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
             );
 
             PullRequest result = processor.process(dto, createContext());
+            assertNotNull(result);
 
             assertThat(result.getLabels()).hasSize(1);
             Label label = result.getLabels().iterator().next();
             assertThat(label.getName()).isEqualTo(labelName);
-            assertThat(labelRepository.findByNativeIdAndProviderId(labelId, githubProvider.getId())).isPresent();
+            assertThat(labelRepository.findByNativeIdAndProviderId(labelId, providerId())).isPresent();
         }
 
         @Test
@@ -591,12 +592,11 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
             );
 
             PullRequest result = processor.process(dto, createContext());
+            assertNotNull(result);
 
             assertThat(result.getMilestone()).isNotNull();
             assertThat(result.getMilestone().getTitle()).isEqualTo("v1.0");
-            assertThat(
-                milestoneRepository.findByNativeIdAndProviderId(milestoneId, githubProvider.getId())
-            ).isPresent();
+            assertThat(milestoneRepository.findByNativeIdAndProviderId(milestoneId, providerId())).isPresent();
         }
     }
 
@@ -652,6 +652,7 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
             );
 
             PullRequest result = processor.processClosed(closedDto, createContext());
+            assertNotNull(result);
 
             assertThat(result.getState()).isEqualTo(PullRequest.State.CLOSED);
             assertThat(result.isMerged()).isFalse();
@@ -707,6 +708,7 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
             );
 
             PullRequest result = processor.processClosed(mergedDto, createContext());
+            assertNotNull(result);
 
             assertThat(result.getState()).isEqualTo(PullRequest.State.CLOSED);
             assertThat(result.isMerged()).isTrue();
@@ -806,6 +808,7 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
             );
 
             PullRequest result = processor.processReadyForReview(readyDto, createContext());
+            assertNotNull(result);
 
             assertThat(result.isDraft()).isFalse();
             assertThat(eventListener.ofType(ScmDomainEvent.PullRequestReady.class)).hasSize(1);
@@ -864,6 +867,7 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
             );
 
             PullRequest result = processor.processConvertedToDraft(draftDto, createContext());
+            assertNotNull(result);
 
             assertThat(result.isDraft()).isTrue();
             assertThat(eventListener.ofType(ScmDomainEvent.PullRequestDrafted.class)).hasSize(1);
@@ -922,6 +926,7 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
             );
 
             PullRequest result = processor.processSynchronize(syncDto, createContext());
+            assertNotNull(result);
 
             assertThat(result.getCommits()).isEqualTo(3);
             assertThat(eventListener.ofType(ScmDomainEvent.PullRequestSynchronized.class)).hasSize(1);
@@ -1095,5 +1100,11 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
 
             assertThat(eventListener.ofType(ScmDomainEvent.PullRequestUnlabeled.class)).hasSize(1);
         }
+    }
+
+    private Long providerId() {
+        Long id = githubProvider.getId();
+        assertNotNull(id);
+        return id;
     }
 }

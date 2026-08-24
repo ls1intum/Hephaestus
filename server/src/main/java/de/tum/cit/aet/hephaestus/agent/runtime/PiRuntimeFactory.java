@@ -88,6 +88,11 @@ public class PiRuntimeFactory {
         String runtimeFlagsFragment = renderRuntimeFlags(profile.runtimeFlags());
         String runtimeEnvFragment = renderRuntimeEnv(profile.additionalEnv());
 
+        String precomputeStep = spec.precomputeStep();
+        String jobToken = spec.jobToken();
+        if (precomputeStep == null || jobToken == null) {
+            throw new IllegalStateException("validated Pi plan contains null fields");
+        }
         String command =
             "mkdir -p " +
             SandboxLayout.OUTPUT_PATH +
@@ -97,7 +102,7 @@ public class PiRuntimeFactory {
             "ln -sf /opt/pi-sdk/node_modules " +
             workspaceRoot +
             "/node_modules && " +
-            spec.precomputeStep() +
+            precomputeStep +
             runtimeEnvFragment +
             "bun " +
             runtimeFlagsFragment +
@@ -105,7 +110,7 @@ public class PiRuntimeFactory {
             "/" +
             SandboxLayout.RUNNER_SCRIPT_FILENAME;
 
-        NetworkPolicy networkPolicy = buildNetworkPolicy(spec.jobToken(), spec.allowInternet());
+        NetworkPolicy networkPolicy = buildNetworkPolicy(jobToken, spec.allowInternet());
 
         log.debug(
             "Built Pi plan: timeout={}s, apiProtocol={}, model={}, files={}",
@@ -146,7 +151,7 @@ public class PiRuntimeFactory {
      * The settings JSON Pi loads at session start. {@code defaultModel} is the upstream model id
      * verbatim, because Pi looks it up by exact match.
      */
-    public byte[] buildPiSettingsJson(String upstreamModelId) {
+    public byte[] buildPiSettingsJson(@org.jspecify.annotations.Nullable String upstreamModelId) {
         Map<String, Object> settings = new LinkedHashMap<>();
         settings.put("defaultProvider", "hephaestus");
         if (upstreamModelId != null && !upstreamModelId.isBlank()) {

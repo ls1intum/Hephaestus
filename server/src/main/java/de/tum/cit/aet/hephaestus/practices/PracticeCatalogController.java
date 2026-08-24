@@ -30,7 +30,9 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.net.URI;
 import java.util.List;
+import java.util.Objects;
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
@@ -87,7 +89,7 @@ public class PracticeCatalogController {
         WorkspaceContext workspaceContext,
         @RequestParam(name = "autonomy", required = false) @Parameter(
             description = "Keep only the practices whose autonomy IN FORCE is exactly this one, inherited or not"
-        ) PracticeAutonomy autonomy
+        ) @Nullable PracticeAutonomy autonomy
     ) {
         List<PracticeDTO> practices = presenter.presentPractices(
             workspaceContext.id(),
@@ -202,7 +204,11 @@ public class PracticeCatalogController {
         WorkspaceContext workspaceContext,
         @Valid @RequestBody ReorderPracticesRequestDTO request
     ) {
-        practiceService.reorderPractices(workspaceContext, request.areaSlug(), request.orderedSlugs());
+        practiceService.reorderPractices(
+            workspaceContext,
+            Objects.requireNonNull(request.areaSlug()),
+            request.orderedSlugs()
+        );
         List<PracticeDTO> practices = presenter.presentPractices(
             workspaceContext.id(),
             practiceService.listPractices(workspaceContext, null)

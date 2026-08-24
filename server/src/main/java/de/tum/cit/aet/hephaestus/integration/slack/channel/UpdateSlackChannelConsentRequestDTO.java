@@ -5,6 +5,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Request to transition a Slack channel to a target consent state. The transition is a guarded, idempotent switch:
@@ -20,5 +21,6 @@ public record UpdateSlackChannelConsentRequestDTO(
 
     @Size(max = 2000)
     @Schema(description = "Optional free-text reason recorded in the immutable audit trail")
+    @Nullable
     String reason
 ) {}

@@ -23,6 +23,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 @Entity
 @Table(
@@ -43,7 +44,7 @@ public class PullRequestReviewComment extends BaseGitServiceEntity {
     // The diff of the line that the comment refers to.
     // Nullable: GitLab does not expose diff hunks for inline comments.
     @Column(columnDefinition = "TEXT")
-    private String diffHunk;
+    private @Nullable String diffHunk;
 
     // The relative path of the file to which the comment applies.
     @NonNull
@@ -51,11 +52,11 @@ public class PullRequestReviewComment extends BaseGitServiceEntity {
 
     // The SHA of the commit to which the comment applies.
     @NonNull
-    private String commitId;
+    private @Nullable String commitId;
 
     // The SHA of the original commit to which the comment applies.
     @NonNull
-    private String originalCommitId;
+    private @Nullable String originalCommitId;
 
     @Column(columnDefinition = "TEXT")
     @NonNull
@@ -66,7 +67,7 @@ public class PullRequestReviewComment extends BaseGitServiceEntity {
 
     // Nullable: GitLab does not have the concept of author association.
     @Enumerated(EnumType.STRING)
-    private AuthorAssociation authorAssociation;
+    private @Nullable AuthorAssociation authorAssociation;
 
     // The first line of the range for a multi-line comment.
     private Integer startLine;
@@ -84,15 +85,15 @@ public class PullRequestReviewComment extends BaseGitServiceEntity {
     // Derived from GitLab position (RIGHT if new_line set, LEFT if only old_line).
     @Enumerated(EnumType.STRING)
     @Column(length = 16)
-    private Side side;
+    private @Nullable Side side;
 
     // Which side of the diff the start of a multi-line comment range refers to.
     @Enumerated(EnumType.STRING)
     @Column(name = "start_side", length = 16)
-    private Side startSide;
+    private @Nullable Side startSide;
 
     // Whether the comment body content is outdated (i.e., code it refers to has changed)
-    private Boolean outdated;
+    private @Nullable Boolean outdated;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "author_id")
@@ -102,22 +103,25 @@ public class PullRequestReviewComment extends BaseGitServiceEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "review_id")
     @ToString.Exclude
+    @Nullable
     private PullRequestReview review;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "pull_request_id")
     @ToString.Exclude
+    @Nullable
     private PullRequest pullRequest;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "thread_id", nullable = false)
     @ToString.Exclude
+    @Nullable
     private PullRequestReviewThread thread;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "in_reply_to_id")
     @ToString.Exclude
-    private PullRequestReviewComment inReplyTo;
+    private @Nullable PullRequestReviewComment inReplyTo;
 
     @OneToMany(mappedBy = "inReplyTo")
     @ToString.Exclude

@@ -4,6 +4,7 @@ import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import org.jspecify.annotations.Nullable;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -169,14 +170,14 @@ public interface ProjectItemRepository extends JpaRepository<ProjectItem, Long> 
         @Param("nodeId") String nodeId,
         @Param("projectId") Long projectId,
         @Param("contentType") String contentType,
-        @Param("issueId") Long issueId,
-        @Param("contentDatabaseId") Long contentDatabaseId,
-        @Param("draftTitle") String draftTitle,
-        @Param("draftBody") String draftBody,
+        @Param("issueId") @Nullable Long issueId,
+        @Param("contentDatabaseId") @Nullable Long contentDatabaseId,
+        @Param("draftTitle") @Nullable String draftTitle,
+        @Param("draftBody") @Nullable String draftBody,
         @Param("archived") boolean archived,
-        @Param("creatorId") Long creatorId,
-        @Param("createdAt") Instant createdAt,
-        @Param("updatedAt") Instant updatedAt
+        @Param("creatorId") @Nullable Long creatorId,
+        @Param("createdAt") @Nullable Instant createdAt,
+        @Param("updatedAt") @Nullable Instant updatedAt
     );
 
     /**

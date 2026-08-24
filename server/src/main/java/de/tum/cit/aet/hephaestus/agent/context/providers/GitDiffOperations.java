@@ -45,6 +45,7 @@ public class GitDiffOperations {
 
     @FunctionalInterface
     private interface RepoOp<T> {
+        @Nullable
         T apply(Repository repo) throws IOException;
     }
 
@@ -61,8 +62,8 @@ public class GitDiffOperations {
         }
     }
 
-    @Nullable
-    private static ObjectId[] resolveRange(Repository repo, String baseRef, String headRef) throws IOException {
+    private static ObjectId@Nullable [] resolveRange(Repository repo, String baseRef, String headRef)
+        throws IOException {
         ObjectId baseId = repo.resolve(baseRef);
         ObjectId headId = repo.resolve(headRef);
         return (baseId == null || headId == null) ? null : new ObjectId[] { baseId, headId };
@@ -79,8 +80,12 @@ public class GitDiffOperations {
      *       {@code headSha}.</li>
      * </ol>
      */
-    @Nullable
-    public String[] resolveDiffRange(Path repoPath, String targetBranch, String sourceBranch, String headSha) {
+    public String@Nullable [] resolveDiffRange(
+        Path repoPath,
+        String targetBranch,
+        String sourceBranch,
+        @Nullable String headSha
+    ) {
         if (headSha == null || headSha.isBlank()) {
             return null;
         }
@@ -383,6 +388,8 @@ public class GitDiffOperations {
             if (line.startsWith("+")) {
                 out.append("[L").append(newLineNum).append("] ").append(line).append('\n');
                 newLineNum++;
+            } else if (oldLineNum == null) {
+                throw new IllegalStateException("Diff line outside a hunk");
             } else if (line.startsWith("-")) {
                 out.append("[L").append(oldLineNum).append("] ").append(line).append('\n');
                 oldLineNum++;

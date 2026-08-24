@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.feature;
 import java.util.EnumMap;
 import java.util.Map;
 import java.util.Objects;
+import org.jspecify.annotations.Nullable;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -41,7 +42,7 @@ public class FeatureFlagService {
      * @param flag the feature flag to check
      * @return true if enabled
      */
-    public boolean isEnabled(FeatureFlag flag) {
+    public boolean isEnabled(@Nullable FeatureFlag flag) {
         Objects.requireNonNull(flag, "flag must not be null");
         return switch (flag.kind()) {
             case ROLE -> hasAuthority(flag.key());

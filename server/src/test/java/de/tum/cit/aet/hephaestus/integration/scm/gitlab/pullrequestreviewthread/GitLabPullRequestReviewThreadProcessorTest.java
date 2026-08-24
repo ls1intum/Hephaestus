@@ -12,6 +12,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewcomment.PullRequestReviewComment;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewthread.PullRequestReviewThread;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewthread.PullRequestReviewThreadRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.time.Instant;
@@ -54,6 +55,10 @@ class GitLabPullRequestReviewThreadProcessorTest extends BaseUnitTest {
         pr = new PullRequest();
         pr.setId(PR_ID);
         pr.setProvider(provider);
+        Repository repository = new Repository();
+        repository.setId(200L);
+        repository.setNameWithOwner("group/project");
+        pr.setRepository(repository);
     }
 
     // deterministicNativeId

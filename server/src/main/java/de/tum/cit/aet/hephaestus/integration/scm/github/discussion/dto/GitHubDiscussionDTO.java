@@ -23,34 +23,34 @@ import org.jspecify.annotations.Nullable;
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record GitHubDiscussionDTO(
-    @JsonProperty("id") Long id,
-    @JsonProperty("database_id") Long databaseId,
-    @JsonProperty("node_id") String nodeId,
+    @JsonProperty("id") @Nullable Long id,
+    @JsonProperty("database_id") @Nullable Long databaseId,
+    @JsonProperty("node_id") @Nullable String nodeId,
     @JsonProperty("number") int number,
-    @JsonProperty("title") String title,
-    @JsonProperty("body") String body,
-    @JsonProperty("html_url") String htmlUrl,
-    @JsonProperty("state") String state,
-    @JsonProperty("state_reason") String stateReason,
+    @JsonProperty("title") @Nullable String title,
+    @JsonProperty("body") @Nullable String body,
+    @JsonProperty("html_url") @Nullable String htmlUrl,
+    @JsonProperty("state") @Nullable String state,
+    @JsonProperty("state_reason") @Nullable String stateReason,
     @JsonProperty("locked") boolean locked,
-    @JsonProperty("active_lock_reason") String activeLockReason,
+    @JsonProperty("active_lock_reason") @Nullable String activeLockReason,
     @JsonProperty("comments") int commentsCount,
     @JsonProperty("upvote_count") int upvoteCount,
-    @JsonProperty("created_at") Instant createdAt,
-    @JsonProperty("updated_at") Instant updatedAt,
-    @JsonProperty("closed_at") Instant closedAt,
-    @JsonProperty("answer_chosen_at") Instant answerChosenAt,
-    @JsonProperty("user") GitHubUserDTO author,
-    @JsonProperty("answer_chosen_by") GitHubUserDTO answerChosenBy,
-    @JsonProperty("category") GitHubDiscussionCategoryDTO category,
-    @JsonProperty("labels") List<GitHubLabelDTO> labels,
+    @JsonProperty("created_at") @Nullable Instant createdAt,
+    @JsonProperty("updated_at") @Nullable Instant updatedAt,
+    @JsonProperty("closed_at") @Nullable Instant closedAt,
+    @JsonProperty("answer_chosen_at") @Nullable Instant answerChosenAt,
+    @JsonProperty("user") @Nullable GitHubUserDTO author,
+    @JsonProperty("answer_chosen_by") @Nullable GitHubUserDTO answerChosenBy,
+    @JsonProperty("category") @Nullable GitHubDiscussionCategoryDTO category,
+    @JsonProperty("labels") @Nullable List<GitHubLabelDTO> labels,
     // Embedded answer comment for GraphQL sync
-    @JsonProperty("answer") GitHubDiscussionCommentDTO answerComment
+    @JsonProperty("answer") @Nullable GitHubDiscussionCommentDTO answerComment
 ) {
     /**
      * Get the database ID, preferring databaseId over id for GraphQL responses.
      */
-    public Long getDatabaseId() {
+    public @Nullable Long getDatabaseId() {
         return databaseId != null ? databaseId : id;
     }
 

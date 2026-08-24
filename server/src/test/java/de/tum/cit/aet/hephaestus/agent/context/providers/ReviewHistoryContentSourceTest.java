@@ -46,6 +46,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Tag;
@@ -395,7 +396,8 @@ class ReviewHistoryContentSourceTest {
         return provider.capture(prRequest(), Set.of(ReviewHistoryContentSource.FEEDBACK_HISTORY));
     }
 
-    private JsonNode read(byte[] bytes) {
+    private JsonNode read(byte@Nullable [] bytes) {
+        assertThat(bytes).isNotNull();
         return objectMapper.readTree(bytes);
     }
 
@@ -490,8 +492,8 @@ class ReviewHistoryContentSourceTest {
         String practiceSlug,
         String recurrenceKey,
         String title,
-        ArtifactKind artifactKind,
-        Long artifactId
+        @Nullable ArtifactKind artifactKind,
+        @Nullable Long artifactId
     ) {
         Practice practice = new Practice();
         practice.setSlug(practiceSlug);

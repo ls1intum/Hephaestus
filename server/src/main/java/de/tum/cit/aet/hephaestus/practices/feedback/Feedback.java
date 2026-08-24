@@ -18,6 +18,7 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.Immutable;
+import org.jspecify.annotations.Nullable;
 
 @Entity
 @Immutable
@@ -84,10 +85,10 @@ public class Feedback {
     /** Why a unit was withheld. Set iff {@link #deliveryState} is {@code SUPPRESSED}; NULL otherwise. */
     @Enumerated(EnumType.STRING)
     @Column(name = "suppression_reason", length = 32)
-    private FeedbackSuppressionReason suppressionReason;
+    private @Nullable FeedbackSuppressionReason suppressionReason;
 
     @Column(name = "body", columnDefinition = "TEXT")
-    private String body;
+    private @Nullable String body;
 
     @NotNull
     @Enumerated(EnumType.STRING)
@@ -95,11 +96,11 @@ public class Feedback {
     private FeedbackSource source;
 
     @Column(name = "replaces_id", columnDefinition = "UUID")
-    private UUID replacesId;
+    private @Nullable UUID replacesId;
 
     /** Cross-run identity for successive versions of the same feedback. */
     @Column(name = "thread_key", length = 64)
-    private String threadKey;
+    private @Nullable String threadKey;
 
     @NotNull
     @Column(name = "created_at", nullable = false, updatable = false)

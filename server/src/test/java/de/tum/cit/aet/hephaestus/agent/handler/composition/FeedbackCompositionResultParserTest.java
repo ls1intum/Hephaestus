@@ -53,10 +53,13 @@ class FeedbackCompositionResultParserTest extends BaseUnitTest {
             .satisfies(unit -> {
                 assertThat(unit.channel()).isEqualTo(FeedbackChannel.IN_CONTEXT);
                 assertThat(unit.basedOn()).containsExactly("obs-0");
-                assertThat(unit.placement().diffAnchor()).isNotNull();
-                assertThat(unit.placement().diffAnchor().path()).isEqualTo("src/billing/InvoiceTotals.java");
-                assertThat(unit.placement().diffAnchor().side()).isEqualTo("NEW");
-                assertThat(unit.placement().diffAnchor().startLine()).isEqualTo(47);
+                var placement = unit.placement();
+                assertThat(placement).isNotNull();
+                var anchor = placement.diffAnchor();
+                assertThat(anchor).isNotNull();
+                assertThat(anchor.path()).isEqualTo("src/billing/InvoiceTotals.java");
+                assertThat(anchor.side()).isEqualTo("NEW");
+                assertThat(anchor.startLine()).isEqualTo(47);
             });
     }
 
@@ -78,10 +81,10 @@ class FeedbackCompositionResultParserTest extends BaseUnitTest {
         assertThat(units)
             .singleElement()
             .satisfies(unit -> {
-                assertThat(unit.placement().kind()).isEqualTo(
-                    ComposedFeedbackUnit.InContextPlacement.PlacementKind.ARTIFACT
-                );
-                assertThat(unit.placement().diffAnchor()).isNull();
+                var placement = unit.placement();
+                assertThat(placement).isNotNull();
+                assertThat(placement.kind()).isEqualTo(ComposedFeedbackUnit.InContextPlacement.PlacementKind.ARTIFACT);
+                assertThat(placement.diffAnchor()).isNull();
             });
     }
 

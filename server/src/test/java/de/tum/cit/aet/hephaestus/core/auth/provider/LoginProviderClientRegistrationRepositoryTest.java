@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.core.auth.provider;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -98,13 +99,16 @@ class LoginProviderClientRegistrationRepositoryTest extends BaseUnitTest {
 
         // But it IS reachable by registrationId for the account-linking flow, wired to Slack's OIDC endpoints.
         ClientRegistration slack = repository.findByRegistrationId("slack");
+        assertNotNull(slack);
         assertThat(slack.getProviderDetails().getAuthorizationUri()).isEqualTo(
             "https://slack.com/openid/connect/authorize"
         );
+        assertNotNull(slack);
         assertThat(slack.getProviderDetails().getTokenUri()).isEqualTo("https://slack.com/api/openid.connect.token");
         assertThat(slack.getProviderDetails().getUserInfoEndpoint().getUri()).isEqualTo(
             "https://slack.com/api/openid.connect.userInfo"
         );
+        assertNotNull(slack);
         assertThat(slack.getProviderDetails().getJwkSetUri()).isEqualTo("https://slack.com/openid/connect/keys");
         assertThat(slack.getProviderDetails().getUserInfoEndpoint().getUserNameAttributeName()).isEqualTo("sub");
     }
@@ -124,13 +128,16 @@ class LoginProviderClientRegistrationRepositoryTest extends BaseUnitTest {
 
         // Plain OAuth2 (NOT OIDC): endpoints hang off the per-instance base URL; the userinfo URI points
         // at POST /api/auth.info, which OutlineAuthInfoUserService (not the framework default) calls.
+        assertNotNull(outline);
         assertThat(outline.getProviderDetails().getAuthorizationUri()).isEqualTo(
             "https://wiki.example.com/oauth/authorize"
         );
+        assertNotNull(outline);
         assertThat(outline.getProviderDetails().getTokenUri()).isEqualTo("https://wiki.example.com/oauth/token");
         assertThat(outline.getProviderDetails().getUserInfoEndpoint().getUri()).isEqualTo(
             "https://wiki.example.com/api/auth.info"
         );
+        assertNotNull(outline);
         assertThat(outline.getProviderDetails().getJwkSetUri()).isNull(); // no OIDC path
         // nOAuth defence: the principal keys on the immutable Outline user UUID, never name/email.
         assertThat(outline.getProviderDetails().getUserInfoEndpoint().getUserNameAttributeName()).isEqualTo("id");
@@ -165,6 +172,7 @@ class LoginProviderClientRegistrationRepositoryTest extends BaseUnitTest {
             OUTLINE_ORIGINS
         ).findByRegistrationId("gitlab-lrz");
 
+        assertNotNull(reg);
         assertThat(reg.getProviderDetails().getAuthorizationUri()).isEqualTo("https://gitlab.lrz.de/oauth/authorize");
         assertThat(reg.getProviderDetails().getTokenUri()).isEqualTo("https://gitlab.lrz.de/oauth/token");
         assertThat(reg.getProviderDetails().getUserInfoEndpoint().getUri()).isEqualTo(
@@ -186,6 +194,7 @@ class LoginProviderClientRegistrationRepositoryTest extends BaseUnitTest {
             "/api",
             OUTLINE_ORIGINS
         ).findByRegistrationId("github");
+        assertNotNull(prefixed);
         assertThat(prefixed.getRedirectUri()).isEqualTo("{baseUrl}/api/login/oauth2/code/{registrationId}");
 
         ClientRegistration root = new LoginProviderClientRegistrationRepository(
@@ -193,6 +202,7 @@ class LoginProviderClientRegistrationRepositoryTest extends BaseUnitTest {
             "",
             OUTLINE_ORIGINS
         ).findByRegistrationId("github");
+        assertNotNull(root);
         assertThat(root.getRedirectUri()).isEqualTo("{baseUrl}/login/oauth2/code/{registrationId}");
     }
 }

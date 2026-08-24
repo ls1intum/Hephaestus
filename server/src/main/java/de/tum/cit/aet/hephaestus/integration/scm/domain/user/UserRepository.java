@@ -6,6 +6,7 @@ import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import org.jspecify.annotations.Nullable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -247,13 +248,13 @@ public interface UserRepository extends JpaRepository<User, Long> {
         @Param("nativeId") Long nativeId,
         @Param("providerId") Long providerId,
         @Param("login") String login,
-        @Param("name") String name,
-        @Param("avatarUrl") String avatarUrl,
-        @Param("htmlUrl") String htmlUrl,
+        @Param("name") @Nullable String name,
+        @Param("avatarUrl") @Nullable String avatarUrl,
+        @Param("htmlUrl") @Nullable String htmlUrl,
         @Param("type") String type,
-        @Param("email") String email,
-        @Param("createdAt") Instant createdAt,
-        @Param("updatedAt") Instant updatedAt
+        @Param("email") @Nullable String email,
+        @Param("createdAt") @Nullable Instant createdAt,
+        @Param("updatedAt") @Nullable Instant updatedAt
     );
 
     /**

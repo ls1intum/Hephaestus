@@ -26,6 +26,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.IntConsumer;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -168,10 +169,16 @@ class AchievementConcurrencyIntegrationTest extends BaseIntegrationTest {
         );
     }
 
-    private Instant readUnlockedAt(Long userId, String achievementId) {
-        return transactionTemplate.execute(status ->
-            userAchievementRepository.findByUserIdAndAchievementId(userId, achievementId).orElseThrow().getUnlockedAt()
+    private @Nullable Instant readUnlockedAt(Long userId, String achievementId) {
+        Optional<Instant> unlockedAt = transactionTemplate.execute(status ->
+            Optional.ofNullable(
+                userAchievementRepository
+                    .findByUserIdAndAchievementId(userId, achievementId)
+                    .orElseThrow()
+                    .getUnlockedAt()
+            )
         );
+        return unlockedAt == null ? null : unlockedAt.orElse(null);
     }
 
     private User persistUser(String login) {

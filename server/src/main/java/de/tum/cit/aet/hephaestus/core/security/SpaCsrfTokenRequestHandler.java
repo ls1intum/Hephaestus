@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.core.security;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.util.function.Supplier;
+import org.jspecify.annotations.Nullable;
 import org.springframework.security.web.csrf.CsrfToken;
 import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler;
 import org.springframework.security.web.csrf.CsrfTokenRequestHandler;
@@ -44,7 +45,7 @@ public final class SpaCsrfTokenRequestHandler implements CsrfTokenRequestHandler
     }
 
     @Override
-    public String resolveCsrfTokenValue(HttpServletRequest request, CsrfToken csrfToken) {
+    public @Nullable String resolveCsrfTokenValue(HttpServletRequest request, CsrfToken csrfToken) {
         // The SPA sends the raw cookie value in the header → resolve it plainly. Form parameters
         // (legacy) remain XOR-masked.
         if (StringUtils.hasText(request.getHeader(csrfToken.getHeaderName()))) {

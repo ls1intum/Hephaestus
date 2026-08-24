@@ -14,6 +14,7 @@ import de.tum.cit.aet.hephaestus.testconfig.WorkspaceTestFixtures;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.util.List;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -55,7 +56,7 @@ class PracticeRepositoryIntegrationTest extends BaseIntegrationTest {
         return practice;
     }
 
-    private PracticeArea persistArea(String slug, PracticeAutonomy autonomy, int displayOrder) {
+    private PracticeArea persistArea(String slug, @Nullable PracticeAutonomy autonomy, int displayOrder) {
         PracticeArea area = new PracticeArea();
         area.setWorkspace(workspace);
         area.setSlug(slug);

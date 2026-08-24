@@ -9,6 +9,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.cache.annotation.CacheEvict;
@@ -33,7 +34,7 @@ public class ContributorService {
     private static final String GITHUB_API_BASE = "https://api.github.com";
 
     private final WebClient webClient;
-    private final String githubAuthToken;
+    private final @Nullable String githubAuthToken;
 
     public ContributorService(WebClient.Builder webClientBuilder, ContributorProperties contributorProperties) {
         this.webClient = webClientBuilder
@@ -128,7 +129,7 @@ public class ContributorService {
         }
     }
 
-    private String fetchUserFullName(String login) {
+    private @Nullable String fetchUserFullName(@Nullable String login) {
         if (login == null) {
             return null;
         }
@@ -148,7 +149,10 @@ public class ContributorService {
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
-    private record GitHubUserResponse(@JsonProperty("login") String login, @JsonProperty("name") String name) {}
+    private record GitHubUserResponse(
+        @JsonProperty("login") @Nullable String login,
+        @JsonProperty("name") @Nullable String name
+    ) {}
 
     private List<ContributorDTO> sortContributors(Map<Long, ContributorDTO> uniqueContributors) {
         if (uniqueContributors.isEmpty()) {

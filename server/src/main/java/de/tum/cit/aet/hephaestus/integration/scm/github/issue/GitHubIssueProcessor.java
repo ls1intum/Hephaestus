@@ -24,6 +24,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.label.dto.GitHubLabelDTO
 import de.tum.cit.aet.hephaestus.integration.scm.github.user.GitHubUserProcessor;
 import java.time.Instant;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -79,7 +80,7 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
      * use {@link #processStub} instead.
      */
     @Transactional
-    public Issue process(GitHubIssueDTO dto, ProcessingContext context) {
+    public @Nullable Issue process(GitHubIssueDTO dto, ProcessingContext context) {
         return processInternal(dto, context, true, true);
     }
 
@@ -94,7 +95,7 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
      * @return the created or updated Issue entity, or null if creation failed
      */
     @Transactional
-    public Issue processStub(GitHubIssueDTO dto, ProcessingContext context) {
+    public @Nullable Issue processStub(GitHubIssueDTO dto, ProcessingContext context) {
         return processInternal(dto, context, false, false);
     }
 
@@ -107,7 +108,7 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
      * @param publishEvents whether to publish domain events (false for stubs)
      * @return the created or updated Issue entity
      */
-    private Issue processInternal(
+    private @Nullable Issue processInternal(
         GitHubIssueDTO dto,
         ProcessingContext context,
         boolean publishEvents,
@@ -120,7 +121,8 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
             return null;
         }
 
-        Repository repository = context.repository();
+        Repository repository = Objects.requireNonNull(context.repository(), "Issue processing requires a repository");
+        Long providerId = Objects.requireNonNull(context.providerId(), "Issue processing requires a provider");
 
         // Compare by natural key (repository_id, number), not dbId — the same issue can arrive
         // with different provider IDs from different sources.
@@ -128,7 +130,7 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
         boolean isNew = existingOpt.isEmpty();
 
         // Resolve related entities BEFORE the upsert
-        User author = dto.author() != null ? findOrCreateUser(dto.author(), context.providerId()) : null;
+        User author = dto.author() != null ? findOrCreateUser(dto.author(), providerId) : null;
         Milestone milestone = dto.milestone() != null ? findOrCreateMilestone(dto.milestone(), repository) : null;
         IssueType issueType = null;
         if (dto.issueType() != null && repository.getOrganization() != null) {
@@ -140,12 +142,12 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
         Instant now = Instant.now();
         issueRepository.upsertCore(
             dbId,
-            context.providerId(),
+            providerId,
             dto.number(),
-            sanitize(dto.title()),
+            Objects.requireNonNullElse(sanitize(dto.title()), ""),
             sanitize(dto.body()),
-            convertState(dto.state()).name(),
-            convertStateReason(dto.stateReason()) != null ? convertStateReason(dto.stateReason()).name() : null,
+            Objects.requireNonNull(convertState(dto.state()), "Issue state is required").name(),
+            stateReasonName(dto.stateReason()),
             dto.htmlUrl(),
             dto.locked(),
             dto.closedAt(),
@@ -173,7 +175,7 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
             );
 
         // ManyToMany relationships (labels, assignees) can't be handled by the native upsert.
-        boolean relationshipsChanged = updateRelationships(dto, issue, repository, context.providerId());
+        boolean relationshipsChanged = updateRelationships(dto, issue, repository, providerId);
 
         if (relationshipsChanged) {
             issue = issueRepository.save(issue);
@@ -228,8 +230,16 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
      * @return true if any relationships were changed
      */
     private boolean updateRelationships(GitHubIssueDTO dto, Issue issue, Repository repository, Long providerId) {
-        boolean assigneesChanged = updateAssignees(dto.assignees(), issue.getAssignees(), providerId);
-        boolean labelsChanged = updateLabels(dto.labels(), issue.getLabels(), repository);
+        boolean assigneesChanged = updateAssignees(
+            Objects.requireNonNullElse(dto.assignees(), List.of()),
+            issue.getAssignees(),
+            providerId
+        );
+        boolean labelsChanged = updateLabels(
+            Objects.requireNonNullElse(dto.labels(), List.of()),
+            issue.getLabels(),
+            repository
+        );
         return assigneesChanged || labelsChanged;
     }
 
@@ -268,15 +278,16 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
     }
 
     @Transactional
-    public Issue processTyped(
+    public @Nullable Issue processTyped(
         GitHubIssueDTO issueDto,
         GitHubIssueTypeDTO typeDto,
-        String orgLogin,
+        @Nullable String orgLogin,
         ProcessingContext context
     ) {
         Issue issue = processInternal(issueDto, context, true, true);
+        if (issue == null) return null;
 
-        if (typeDto != null) {
+        if (typeDto != null && orgLogin != null) {
             IssueType issueType = findOrCreateIssueType(typeDto, orgLogin);
             if (issueType != null) {
                 issue.setIssueType(issueType);
@@ -296,8 +307,9 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
     }
 
     @Transactional
-    public Issue processUntyped(GitHubIssueDTO issueDto, ProcessingContext context) {
+    public @Nullable Issue processUntyped(GitHubIssueDTO issueDto, ProcessingContext context) {
         Issue issue = processInternal(issueDto, context, true, true);
+        if (issue == null) return null;
 
         IssueType previousType = issue.getIssueType();
         if (previousType != null) {
@@ -317,8 +329,9 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
     }
 
     @Transactional
-    public Issue processClosed(GitHubIssueDTO issueDto, ProcessingContext context) {
+    public @Nullable Issue processClosed(GitHubIssueDTO issueDto, ProcessingContext context) {
         Issue issue = processInternal(issueDto, context, true, false);
+        if (issue == null) return null;
         String stateReason = issueDto.stateReason() != null ? issueDto.stateReason() : "completed";
         eventPublisher.publishEvent(
             new ScmDomainEvent.IssueClosed(
@@ -332,8 +345,9 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
     }
 
     @Transactional
-    public Issue processReopened(GitHubIssueDTO issueDto, ProcessingContext context) {
+    public @Nullable Issue processReopened(GitHubIssueDTO issueDto, ProcessingContext context) {
         Issue issue = processInternal(issueDto, context, true, true);
+        if (issue == null) return null;
         eventPublisher.publishEvent(
             new ScmDomainEvent.IssueReopened(ScmEventPayload.IssueData.from(issue), EventContext.from(context))
         );
@@ -342,9 +356,13 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
     }
 
     @Transactional
-    public Issue processLabeled(GitHubIssueDTO issueDto, GitHubLabelDTO labelDto, ProcessingContext context) {
+    public @Nullable Issue processLabeled(GitHubIssueDTO issueDto, GitHubLabelDTO labelDto, ProcessingContext context) {
         Issue issue = processInternal(issueDto, context, true, true);
-        Label label = findOrCreateLabel(labelDto, context.repository());
+        if (issue == null) return null;
+        Label label = findOrCreateLabel(
+            labelDto,
+            Objects.requireNonNull(context.repository(), "Issue event requires a repository")
+        );
         if (label != null) {
             eventPublisher.publishEvent(
                 new ScmDomainEvent.IssueLabeled(
@@ -359,9 +377,17 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
     }
 
     @Transactional
-    public Issue processUnlabeled(GitHubIssueDTO issueDto, GitHubLabelDTO labelDto, ProcessingContext context) {
+    public @Nullable Issue processUnlabeled(
+        GitHubIssueDTO issueDto,
+        GitHubLabelDTO labelDto,
+        ProcessingContext context
+    ) {
         Issue issue = processInternal(issueDto, context, true, true);
-        Label label = findOrCreateLabel(labelDto, context.repository());
+        if (issue == null) return null;
+        Label label = findOrCreateLabel(
+            labelDto,
+            Objects.requireNonNull(context.repository(), "Issue event requires a repository")
+        );
         if (label != null) {
             eventPublisher.publishEvent(
                 new ScmDomainEvent.IssueUnlabeled(
@@ -392,7 +418,10 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
     @Transactional
     public void processTransferred(GitHubIssueDTO issueDto, ProcessingContext context) {
         issueRepository
-            .findByRepositoryIdAndNumber(context.repository().getId(), issueDto.number())
+            .findByRepositoryIdAndNumber(
+                Objects.requireNonNull(context.repository(), "Issue event requires a repository").getId(),
+                issueDto.number()
+            )
             .ifPresent(issue -> {
                 if (issue.getDeletedAt() != null) {
                     return;
@@ -403,7 +432,7 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
                     "Tombstoned transferred issue: issueId={}, number={}, repoId={}",
                     issue.getId(),
                     issueDto.number(),
-                    context.repository().getId()
+                    Objects.requireNonNull(context.repository(), "Issue event requires a repository").getId()
                 );
             });
     }
@@ -413,7 +442,10 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
         // With synthetic PKs, we cannot use deleteById(nativeId) because the PK is
         // auto-generated and differs from the native provider ID. Look up by natural key instead.
         issueRepository
-            .findByRepositoryIdAndNumber(context.repository().getId(), issueDto.number())
+            .findByRepositoryIdAndNumber(
+                Objects.requireNonNull(context.repository(), "Issue event requires a repository").getId(),
+                issueDto.number()
+            )
             .ifPresent(issue -> {
                 Long syntheticId = issue.getId();
                 issueRepository.delete(issue);
@@ -425,7 +457,7 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
     /**
      * Issues cannot be MERGED - only PRs can. This only handles OPEN/CLOSED.
      */
-    private Issue.State convertState(String state) {
+    private Issue.@Nullable State convertState(@Nullable String state) {
         if (state == null) {
             return Issue.State.OPEN;
         }
@@ -439,7 +471,7 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
      * Returns UNKNOWN for unrecognized values, rather than null or throwing, to preserve data
      * integrity.
      */
-    private Issue.@Nullable StateReason convertStateReason(String stateReason) {
+    private static Issue.@Nullable StateReason convertStateReason(@Nullable String stateReason) {
         if (stateReason == null) {
             return null;
         }
@@ -474,13 +506,18 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
                     return null;
                 }
                 return issueTypeSyncService.findOrCreateFromWebhook(
-                    dto.nodeId(),
-                    dto.name(),
+                    Objects.requireNonNull(dto.nodeId()),
+                    Objects.requireNonNull(dto.name()),
                     dto.description(),
                     dto.color(),
                     dto.isEnabled() != null ? dto.isEnabled() : true,
                     orgOpt.get()
                 );
             });
+    }
+
+    private static @Nullable String stateReasonName(@Nullable String stateReason) {
+        Issue.StateReason converted = convertStateReason(stateReason);
+        return converted == null ? null : converted.name();
     }
 }

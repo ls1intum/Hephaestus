@@ -14,7 +14,9 @@ import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabSyncExcepti
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.graphql.GitLabGroupResponse;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.graphql.GitLabProjectResponse;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.organization.GitLabGroupProcessor;
+import java.util.Objects;
 import java.util.Optional;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -86,16 +88,16 @@ public class GitLabProjectSyncService {
      * @param projectFullPath the full path of the project (e.g., {@code org/my-project})
      * @return the synced Repository entity, or empty if not found or on error
      */
-    public Optional<Repository> syncProject(Long scopeId, String projectFullPath) {
+    public Optional<Repository> syncProject(Long scopeId, @Nullable String projectFullPath) {
         if (projectFullPath == null || projectFullPath.isBlank()) {
             log.warn("Skipped project sync: reason=nullOrBlankProjectPath, scopeId={}", scopeId);
             return Optional.empty();
         }
-        String safeProjectPath = sanitizeForLog(projectFullPath);
+        String safeProjectPath = Objects.requireNonNullElse(sanitizeForLog(projectFullPath), "<unknown>");
 
         try {
             IdentityProvider provider = resolveProvider();
-            Long providerId = provider.getId();
+            Long providerId = Objects.requireNonNull(provider.getId());
             graphQlClientProvider.acquirePermission();
             HttpGraphQlClient client = graphQlClientProvider.forScope(scopeId);
 
@@ -113,7 +115,9 @@ public class GitLabProjectSyncService {
 
             graphQlClientProvider.recordSuccess();
 
-            GitLabProjectResponse project = response.field("project").toEntity(GitLabProjectResponse.class);
+            GitLabProjectResponse project = Objects.requireNonNull(response)
+                .field("project")
+                .toEntity(GitLabProjectResponse.class);
             if (project == null) {
                 log.warn(
                     "Skipped project sync: reason=notFoundOnGitLab, scopeId={}, projectPath={}",

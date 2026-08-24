@@ -7,6 +7,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
 import java.util.Map;
+import org.jspecify.annotations.Nullable;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.JsonNode;
@@ -86,7 +87,7 @@ public class OutlineSubjectKeyDeriver implements SubjectKeyDeriver {
         return value.replace('.', '~');
     }
 
-    private JsonNode tryParse(byte[] body) {
+    private @Nullable JsonNode tryParse(byte@Nullable [] body) {
         if (body == null || body.length == 0) {
             return null;
         }

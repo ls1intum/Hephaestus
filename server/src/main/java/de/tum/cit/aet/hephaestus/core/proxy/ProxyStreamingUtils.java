@@ -234,5 +234,10 @@ public final class ProxyStreamingUtils {
      * @param body    buffered response body (null for SSE)
      * @param sseBody streaming body flux (null for non-SSE)
      */
-    public record UpstreamResult(int status, HttpHeaders headers, byte[] body, Flux<DataBuffer> sseBody) {}
+    public record UpstreamResult(
+        int status,
+        HttpHeaders headers,
+        byte@Nullable [] body,
+        @Nullable Flux<DataBuffer> sseBody
+    ) {}
 }

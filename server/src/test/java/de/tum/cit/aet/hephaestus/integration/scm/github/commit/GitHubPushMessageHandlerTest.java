@@ -31,6 +31,7 @@ import java.lang.reflect.Method;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -101,7 +102,7 @@ class GitHubPushMessageHandlerTest extends BaseUnitTest {
 
     // Test Data Builders
 
-    private static GitHubRepositoryRefDTO createRepoRef(Long id, String fullName) {
+    private static GitHubRepositoryRefDTO createRepoRef(@Nullable Long id, String fullName) {
         return new GitHubRepositoryRefDTO(
             id,
             "node_" + id,

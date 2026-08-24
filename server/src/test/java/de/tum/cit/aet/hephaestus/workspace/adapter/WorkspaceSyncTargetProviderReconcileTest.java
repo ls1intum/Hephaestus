@@ -20,6 +20,7 @@ import de.tum.cit.aet.hephaestus.workspace.WorkspaceScopeFilter;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Consumer;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
@@ -74,7 +75,7 @@ class WorkspaceSyncTargetProviderReconcileTest extends BaseUnitTest {
         );
     }
 
-    private RepositoryToMonitor monitor(Long nativeId, String nameWithOwner) {
+    private RepositoryToMonitor monitor(@Nullable Long nativeId, String nameWithOwner) {
         RepositoryToMonitor rtm = new RepositoryToMonitor();
         rtm.setNativeId(nativeId);
         rtm.setNameWithOwner(nameWithOwner);

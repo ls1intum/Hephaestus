@@ -11,4 +11,5 @@
  * subjects to keys lives in {@code integration/consumer/}.
  */
 @org.springframework.modulith.NamedInterface("handler")
+@org.jspecify.annotations.NullMarked
 package de.tum.cit.aet.hephaestus.integration.core.handler;

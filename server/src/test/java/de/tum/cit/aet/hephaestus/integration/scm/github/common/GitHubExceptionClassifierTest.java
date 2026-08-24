@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.scm.github.common;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -271,7 +272,7 @@ class GitHubExceptionClassifierTest {
             when(response.getErrors()).thenReturn(List.of(error));
 
             ClassificationResult result = classifier.classifyGraphQlResponse(response);
-            assertThat(result).isNotNull();
+            assertNotNull(result);
             assertThat(result.category()).isEqualTo(Category.NOT_FOUND);
         }
 
@@ -285,7 +286,7 @@ class GitHubExceptionClassifierTest {
             when(response.getErrors()).thenReturn(List.of(error));
 
             ClassificationResult result = classifier.classifyGraphQlResponse(response);
-            assertThat(result).isNotNull();
+            assertNotNull(result);
             assertThat(result.category()).isEqualTo(Category.AUTH_ERROR);
         }
 
@@ -299,7 +300,7 @@ class GitHubExceptionClassifierTest {
             when(response.getErrors()).thenReturn(List.of(error));
 
             ClassificationResult result = classifier.classifyGraphQlResponse(response);
-            assertThat(result).isNotNull();
+            assertNotNull(result);
             assertThat(result.category()).isEqualTo(Category.RATE_LIMITED);
         }
 
@@ -313,7 +314,7 @@ class GitHubExceptionClassifierTest {
             when(response.getErrors()).thenReturn(List.of(error));
 
             ClassificationResult result = classifier.classifyGraphQlResponse(response);
-            assertThat(result).isNotNull();
+            assertNotNull(result);
             assertThat(result.category()).isEqualTo(Category.AUTH_ERROR);
         }
 
@@ -327,7 +328,7 @@ class GitHubExceptionClassifierTest {
             when(response.getErrors()).thenReturn(List.of(error));
 
             ClassificationResult result = classifier.classifyGraphQlResponse(response);
-            assertThat(result).isNotNull();
+            assertNotNull(result);
             assertThat(result.category()).isEqualTo(Category.UNKNOWN);
         }
     }

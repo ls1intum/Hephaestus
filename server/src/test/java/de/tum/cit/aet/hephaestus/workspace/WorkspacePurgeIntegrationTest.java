@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.workspace;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import de.tum.cit.aet.hephaestus.activity.ActivityEventRepository;
 import de.tum.cit.aet.hephaestus.activity.ActivityEventType;
@@ -404,7 +405,9 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
         void purgePreservesOrganization() {
             Workspace workspace = createGitLabWorkspaceWithData("org-protect");
             Long workspaceId = workspace.getId();
-            Long orgId = workspace.getOrganization().getId();
+            Organization organization = workspace.getOrganization();
+            assertNotNull(organization);
+            Long orgId = organization.getId();
 
             workspaceLifecycleService.purgeWorkspace(workspace.getWorkspaceSlug());
 

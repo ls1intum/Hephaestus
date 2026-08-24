@@ -5,6 +5,7 @@ import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import java.util.Set;
+import org.jspecify.annotations.Nullable;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.DefaultValue;
 import org.springframework.validation.annotation.Validated;
@@ -170,18 +171,23 @@ public record SyncSchedulerProperties(
     public record ProjectsProperties(@DefaultValue("false") boolean enabled) {}
 
     /** Compact constructor ensuring nested records are never null. */
-    public SyncSchedulerProperties {
-        if (backfill == null) {
-            backfill = new BackfillProperties(false, 50, 100, 60);
-        }
-        if (filters == null) {
-            filters = new FilterProperties(Set.of(), Set.of(), Set.of());
-        }
-        if (discussions == null) {
-            discussions = new DiscussionsProperties(false);
-        }
-        if (projects == null) {
-            projects = new ProjectsProperties(false);
-        }
+    public SyncSchedulerProperties(
+        boolean runOnStartup,
+        int timeframeDays,
+        String cron,
+        int cooldownMinutes,
+        @Nullable BackfillProperties backfill,
+        @Nullable FilterProperties filters,
+        @Nullable DiscussionsProperties discussions,
+        @Nullable ProjectsProperties projects
+    ) {
+        this.runOnStartup = runOnStartup;
+        this.timeframeDays = timeframeDays;
+        this.cron = cron;
+        this.cooldownMinutes = cooldownMinutes;
+        this.backfill = backfill != null ? backfill : new BackfillProperties(false, 50, 100, 60);
+        this.filters = filters != null ? filters : new FilterProperties(Set.of(), Set.of(), Set.of());
+        this.discussions = discussions != null ? discussions : new DiscussionsProperties(false);
+        this.projects = projects != null ? projects : new ProjectsProperties(false);
     }
 }

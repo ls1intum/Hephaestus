@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.agent.sandbox;
 import de.tum.cit.aet.hephaestus.agent.runtime.AgentImageProperties;
 import java.util.Set;
 import java.util.regex.Pattern;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -136,7 +137,7 @@ public class AgentImageReferenceGuard {
     }
 
     /** The reference's tag, or {@code null} when it carries none. A registry port is not a tag. */
-    private static String tagOf(String reference) {
+    private static @Nullable String tagOf(String reference) {
         int separator = reference.lastIndexOf(':');
         return separator > reference.lastIndexOf('/') ? reference.substring(separator + 1) : null;
     }

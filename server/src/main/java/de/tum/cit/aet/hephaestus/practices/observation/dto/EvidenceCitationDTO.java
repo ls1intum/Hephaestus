@@ -45,7 +45,7 @@ public record EvidenceCitationDTO(
         );
     }
 
-    private static EvidenceCitationSide parseSide(@Nullable String side) {
+    private static @Nullable EvidenceCitationSide parseSide(@Nullable String side) {
         return side == null ? null : EvidenceCitationSide.valueOf(side);
     }
 }

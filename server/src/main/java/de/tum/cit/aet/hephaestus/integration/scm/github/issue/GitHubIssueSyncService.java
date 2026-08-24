@@ -45,6 +45,7 @@ import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
@@ -207,16 +208,18 @@ public class GitHubIssueSyncService {
         @Nullable Instant lastSyncTimestamp
     ) {
         // Fetch repository outside of transaction to avoid holding locks during API calls
-        Repository repository = transactionTemplate.execute(status ->
-            repositoryRepository.findById(repositoryId).orElse(null)
+        Optional<Repository> repositoryResult = transactionTemplate.execute(status ->
+            repositoryRepository.findById(repositoryId)
         );
+        @Nullable
+        Repository repository = repositoryResult == null ? null : repositoryResult.orElse(null);
         if (repository == null) {
             log.debug("Skipped issue sync: reason=repositoryNotFound, repoId={}", repositoryId);
             return SyncResult.completed(0);
         }
 
         String nameWithOwner = repository.getNameWithOwner();
-        String safeNameWithOwner = sanitizeForLog(nameWithOwner);
+        String safeNameWithOwner = Objects.requireNonNullElse(sanitizeForLog(nameWithOwner), "");
         Optional<RepositoryOwnerAndName> parsedName = GitHubRepositoryNameParser.parse(nameWithOwner);
         if (parsedName.isEmpty()) {
             log.warn("Skipped issue sync: reason=invalidRepoNameFormat, repoName={}", safeNameWithOwner);
@@ -295,7 +298,7 @@ public class GitHubIssueSyncService {
         final boolean incrementalSync = isIncrementalSync;
         SyncResult.Status abortReason = null; // null means completed successfully
 
-        if (resuming) {
+        if (initialCursor != null) {
             log.info(
                 "Resuming issue sync from checkpoint: repoName={}, cursor={}",
                 safeNameWithOwner,
@@ -619,7 +622,7 @@ public class GitHubIssueSyncService {
                     scopeId,
                     issueWithCursor.nodeId(),
                     false, // Not a pull request
-                    issueWithCursor.issue().getRepository(),
+                    issueWithCursor.issue().requireRepository(),
                     issueWithCursor.projectItemCursor(),
                     issueWithCursor.issue().getId()
                 );
@@ -697,7 +700,9 @@ public class GitHubIssueSyncService {
 
             // Track issues that need additional comment pagination (with cursor for efficient continuation)
             if (embeddedComments.needsPagination()) {
-                issuesNeedingCommentPagination.add(new IssueWithCommentCursor(entity, embeddedComments.endCursor()));
+                issuesNeedingCommentPagination.add(
+                    new IssueWithCommentCursor(entity, Objects.requireNonNull(embeddedComments.endCursor()))
+                );
             }
 
             // Process embedded project items
@@ -710,11 +715,16 @@ public class GitHubIssueSyncService {
 
             // Track issues that need additional project item pagination
             if (embeddedProjectItems.needsPagination()) {
+                String issueNodeId = issueWithComments.issue().nodeId();
+                if (issueNodeId == null) {
+                    log.warn("Skipped project-item pagination: reason=missingIssueNodeId, issueId={}", entity.getId());
+                    continue;
+                }
                 issuesNeedingProjectItemPagination.add(
                     new IssueWithProjectItemCursor(
                         entity,
-                        issueWithComments.issue().nodeId(),
-                        embeddedProjectItems.endCursor()
+                        issueNodeId,
+                        Objects.requireNonNull(embeddedProjectItems.endCursor())
                     )
                 );
             }
@@ -731,7 +741,9 @@ public class GitHubIssueSyncService {
      * to avoid Spring proxy issues with self-invocation.
      */
     private void persistCursorCheckpoint(Long syncTargetId, String cursor) {
-        TransactionTemplate requiresNewTemplate = new TransactionTemplate(transactionTemplate.getTransactionManager());
+        TransactionTemplate requiresNewTemplate = new TransactionTemplate(
+            Objects.requireNonNull(transactionTemplate.getTransactionManager())
+        );
         requiresNewTemplate.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
         requiresNewTemplate.executeWithoutResult(status -> {
             backfillStateProvider.updateSyncCursor(syncTargetId, SyncCursorKind.ISSUE, cursor);
@@ -747,7 +759,9 @@ public class GitHubIssueSyncService {
      * to avoid Spring proxy issues with self-invocation.
      */
     private void clearCursorCheckpoint(Long syncTargetId) {
-        TransactionTemplate requiresNewTemplate = new TransactionTemplate(transactionTemplate.getTransactionManager());
+        TransactionTemplate requiresNewTemplate = new TransactionTemplate(
+            Objects.requireNonNull(transactionTemplate.getTransactionManager())
+        );
         requiresNewTemplate.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
         requiresNewTemplate.executeWithoutResult(status -> {
             backfillStateProvider.updateSyncCursor(syncTargetId, SyncCursorKind.ISSUE, null);

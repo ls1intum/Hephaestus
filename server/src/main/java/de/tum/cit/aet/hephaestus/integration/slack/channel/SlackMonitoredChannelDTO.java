@@ -5,6 +5,7 @@ import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMonitoredChannel.
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Admin control-plane view of one allow-listed Slack channel: its discovery identity, its current consent state,
@@ -16,9 +17,10 @@ public record SlackMonitoredChannelDTO(
     @NonNull @Schema(description = "Internal allow-list row id") Long id,
     @NonNull @Schema(description = "Slack team (workspace) id the channel belongs to") String slackTeamId,
     @NonNull @Schema(description = "Slack channel id (stable C…/G… id; the natural key)") String slackChannelId,
-    @Schema(description = "Human-readable channel name, if known") String channelName,
+    @Schema(description = "Human-readable channel name, if known") @Nullable String channelName,
     @NonNull @Schema(description = "Current per-channel consent lifecycle state") ConsentState consentState,
     @Schema(description = "When the in-channel consent announcement was posted (stamped on first activation)")
+    @Nullable
     Instant consentAnnouncedAt,
     @NonNull
     @Schema(description = "Number of workspace members who have opted out of ingestion (workspace-wide)")

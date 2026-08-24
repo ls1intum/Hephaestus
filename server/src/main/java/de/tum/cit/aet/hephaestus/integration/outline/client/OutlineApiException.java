@@ -1,5 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.outline.client;
 
+import org.jspecify.annotations.Nullable;
+
 /**
  * Raised when a call to the Outline API fails — an unreachable host, a rejected token, or an
  * unexpected response. Carries a human-readable reason suitable for surfacing to the admin who
@@ -18,11 +20,11 @@ public class OutlineApiException extends RuntimeException {
         this.retryable = false;
     }
 
-    public OutlineApiException(String message, Throwable cause) {
+    public OutlineApiException(String message, @Nullable Throwable cause) {
         this(message, cause, false);
     }
 
-    public OutlineApiException(String message, Throwable cause, boolean retryable) {
+    public OutlineApiException(String message, @Nullable Throwable cause, boolean retryable) {
         super(message, cause);
         this.retryable = retryable;
     }

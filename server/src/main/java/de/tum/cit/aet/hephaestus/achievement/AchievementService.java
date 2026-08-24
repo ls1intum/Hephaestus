@@ -197,7 +197,7 @@ public class AchievementService {
             // Get existing progress or create a new record
             UserAchievement uaProgress = existingMap.get(achievementDefinition.id());
             boolean isNew = uaProgress == null;
-            if (isNew) {
+            if (uaProgress == null) {
                 uaProgress = UserAchievement.builder()
                     .user(user)
                     .achievementId(achievementDefinition.id())

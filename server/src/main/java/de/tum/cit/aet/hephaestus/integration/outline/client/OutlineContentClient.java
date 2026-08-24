@@ -5,6 +5,7 @@ import de.tum.cit.aet.hephaestus.integration.outline.client.model.OutlineDocumen
 import de.tum.cit.aet.hephaestus.integration.outline.client.model.OutlineNavigationNode;
 import java.util.List;
 import java.util.Optional;
+import org.jspecify.annotations.Nullable;
 
 public interface OutlineContentClient {
     List<OutlineCollectionModel> listCollections(String serverUrl, String token);
@@ -13,5 +14,7 @@ public interface OutlineContentClient {
     List<OutlineDocumentModel> listDocuments(String serverUrl, String token, String collectionId);
     Optional<OutlineDocumentModel> getDocumentInfo(String serverUrl, String token, String documentId);
     List<OutlineDocumentModel> listArchivedDocuments(String serverUrl, String token, String collectionId);
+
+    @Nullable
     String exportDocument(String serverUrl, String token, String documentId);
 }

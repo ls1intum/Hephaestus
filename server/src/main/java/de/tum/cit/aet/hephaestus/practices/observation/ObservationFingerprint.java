@@ -63,8 +63,8 @@ public final class ObservationFingerprint {
      * @return the lowercase SHA-256 hex digest (exactly 64 characters)
      */
     public static String compute(
-        String practiceSlug,
-        String artifactKind,
+        @Nullable String practiceSlug,
+        @Nullable String artifactKind,
         long artifactId,
         long aboutUserId,
         @Nullable String firstLocationPath

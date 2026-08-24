@@ -1,5 +1,7 @@
 package de.tum.cit.aet.hephaestus.core;
 
+import org.jspecify.annotations.Nullable;
+
 /**
  * Utility class for safe logging operations.
  * Provides methods to sanitize user-controlled input before logging to prevent log injection attacks.
@@ -26,7 +28,7 @@ public final class LoggingUtils {
      * @return the sanitized string with control characters replaced by underscores,
      *         or null if input was null
      */
-    public static String sanitizeForLog(String input) {
+    public static @Nullable String sanitizeForLog(@Nullable String input) {
         if (input == null) {
             return null;
         }

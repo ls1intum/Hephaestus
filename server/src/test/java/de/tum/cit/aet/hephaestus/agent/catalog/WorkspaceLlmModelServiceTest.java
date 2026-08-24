@@ -24,6 +24,7 @@ import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -113,9 +114,9 @@ class WorkspaceLlmModelServiceTest extends BaseUnitTest {
     }
 
     private CreateWorkspaceLlmModelRequestDTO createRequest(
-        PricingMode pricingMode,
-        BigDecimal per1mInputUsd,
-        BigDecimal per1mOutputUsd
+        @Nullable PricingMode pricingMode,
+        @Nullable BigDecimal per1mInputUsd,
+        @Nullable BigDecimal per1mOutputUsd
     ) {
         return new CreateWorkspaceLlmModelRequestDTO(
             "gpt-5",

@@ -196,7 +196,8 @@ public class ExperiencePointCalculator implements ExperiencePointStrategy {
         }
 
         // All reviews are for the same pull request
-        int complexityScore = calculateComplexityScore(reviews.get(0).getPullRequest());
+        PullRequest pullRequest = Objects.requireNonNull(eligibleReviews.get(0).getPullRequest());
+        int complexityScore = calculateComplexityScore(pullRequest);
 
         // Get configurable weights
         double weightApproval = properties.reviewWeights().approval();

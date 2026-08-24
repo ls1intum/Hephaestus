@@ -1,5 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.scm.gitlab.common;
 
+import org.jspecify.annotations.Nullable;
+
 /**
  * Enum representing GitLab webhook event types.
  * Each value corresponds to the {@code object_kind} field in the GitLab webhook payload.
@@ -54,7 +56,7 @@ public enum GitLabEventType {
      * @param eventType the event type string (from {@code object_kind} field)
      * @return the matching enum value, or null if not found
      */
-    public static GitLabEventType fromString(String eventType) {
+    public static @Nullable GitLabEventType fromString(@Nullable String eventType) {
         if (eventType == null || eventType.isBlank()) {
             return null;
         }

@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.core.auth;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
 import de.tum.cit.aet.hephaestus.core.auth.domain.AccountFeature;
@@ -18,6 +19,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -82,7 +84,7 @@ class AccountHardDeleteSweeperIntegrationTest extends BaseIntegrationTest {
     void sweepNow_pastCooldown_purgesChildrenClearsPiiAndFlipsToDeleted() {
         // Arrange: an account soft-deleted well before the cutoff, with one row in every child table.
         Account account = newAccount("Ada Lovelace", "ada@example.com");
-        Long id = account.getId();
+        Long id = persistedId(account.getId());
         seedChildRows(id);
         // deleted_at = now - (cooldown + 1h) → strictly older than the cutoff → must be swept.
         markDeleting(id, clock.instant().minus(authProperties.deleteCooldown()).minus(Duration.ofHours(1)));
@@ -111,7 +113,7 @@ class AccountHardDeleteSweeperIntegrationTest extends BaseIntegrationTest {
     @Test
     void sweepNow_withinCooldown_leavesAccountAndChildrenIntact() {
         Account account = newAccount("Grace Hopper", "grace@example.com");
-        Long id = account.getId();
+        Long id = persistedId(account.getId());
         seedChildRows(id);
         // One hour ago is inside the configured recovery window.
         markDeleting(id, clock.instant().minus(Duration.ofHours(1)));
@@ -133,7 +135,7 @@ class AccountHardDeleteSweeperIntegrationTest extends BaseIntegrationTest {
     @Test
     void sweepNow_alreadyDeleted_isNeverReselected_andSweepIsIdempotent() {
         Account account = newAccount("Alan Turing", "alan@example.com");
-        Long id = account.getId();
+        Long id = persistedId(account.getId());
         seedChildRows(id);
         markDeleting(id, clock.instant().minus(authProperties.deleteCooldown()).minus(Duration.ofHours(1)));
 
@@ -158,11 +160,11 @@ class AccountHardDeleteSweeperIntegrationTest extends BaseIntegrationTest {
     void sweepNow_cutoffIsDrivenByDeleteCooldown_boundaryAccountsSplit() {
         // One account is just past the configured cooldown and one is just inside it.
         Account past = newAccount("Past Cutoff", "past@example.com");
-        Long pastId = past.getId();
+        Long pastId = persistedId(past.getId());
         markDeleting(pastId, clock.instant().minus(authProperties.deleteCooldown()).minus(Duration.ofMinutes(5)));
 
         Account inside = newAccount("Inside Cutoff", "inside@example.com");
-        Long insideId = inside.getId();
+        Long insideId = persistedId(inside.getId());
         markDeleting(insideId, clock.instant().minus(authProperties.deleteCooldown()).plus(Duration.ofMinutes(5)));
 
         int purged = sweeper.sweepNow();
@@ -177,7 +179,7 @@ class AccountHardDeleteSweeperIntegrationTest extends BaseIntegrationTest {
     @Test
     void sweepNow_anonymizesSubjectAndImpersonatorAuditRows() {
         Account account = newAccount("Erased User", "erased@example.com");
-        Long erasedId = account.getId();
+        Long erasedId = persistedId(account.getId());
         // Row A: the erased user is the event SUBJECT. Row B: the erased user is the IMPERSONATOR
         // (acting_account_id) of an event about a different account → both must be redacted.
         seedAuthEvent(9001L, erasedId, null, "LOGIN", "203.0.113.7", "UA-A", "{\"x\":1}");
@@ -215,7 +217,7 @@ class AccountHardDeleteSweeperIntegrationTest extends BaseIntegrationTest {
     private void seedAuthEvent(
         long id,
         Long accountId,
-        Long actingAccountId,
+        @Nullable Long actingAccountId,
         String eventType,
         String ip,
         String userAgent,
@@ -294,5 +296,10 @@ class AccountHardDeleteSweeperIntegrationTest extends BaseIntegrationTest {
             accountId
         );
         return n == null ? 0 : n;
+    }
+
+    private static long persistedId(@Nullable Long id) {
+        assertNotNull(id);
+        return id;
     }
 }

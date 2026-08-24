@@ -8,4 +8,5 @@
  * depend on the DTO shapes without taking a dependency on the workspace module's root.
  */
 @org.springframework.modulith.NamedInterface("dto")
+@org.jspecify.annotations.NullMarked
 package de.tum.cit.aet.hephaestus.workspace.dto;

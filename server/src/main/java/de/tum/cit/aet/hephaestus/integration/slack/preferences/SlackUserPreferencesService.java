@@ -23,6 +23,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import org.jspecify.annotations.Nullable;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -92,9 +93,12 @@ public class SlackUserPreferencesService {
             )
             .stream()
             .filter(connection -> hasText(connection.getInstanceKey()))
-            .filter(connection -> slackLinksByTeam.containsKey(connection.getInstanceKey()))
+            .filter(connection -> slackLinksByTeam.containsKey(Objects.requireNonNull(connection.getInstanceKey())))
             .filter(connection -> workspaceIds.contains(connection.toRef().workspaceId()))
-            .flatMap(connection -> toDto(connection, slackLinksByTeam.get(connection.getInstanceKey()), null).stream())
+            .flatMap(connection -> {
+                String teamId = Objects.requireNonNull(connection.getInstanceKey());
+                return toDto(connection, Objects.requireNonNull(slackLinksByTeam.get(teamId)), null).stream();
+            })
             .sorted(Comparator.comparing(SlackUserWorkspacePreferencesDTO::workspaceName))
             .toList();
         return new SlackUserPreferencesDTO(workspaces);
@@ -117,12 +121,13 @@ public class SlackUserPreferencesService {
         if (!hasText(teamId)) {
             throw notFound("Slack is not connected for this workspace.");
         }
+        String requiredTeamId = Objects.requireNonNull(teamId);
 
         AccountIdentityQuery.IdentityLinkView slackLink = accountIdentityQuery
             .activeLinksForAccount(accountId)
             .stream()
             .filter(link -> Objects.equals(link.gitProviderId(), slackProviderId()))
-            .filter(link -> Objects.equals(link.teamId(), teamId))
+            .filter(link -> Objects.equals(link.teamId(), requiredTeamId))
             .filter(link -> hasText(link.subject()))
             .findFirst()
             .orElseThrow(() -> notFound("Slack account is not linked for this workspace."));
@@ -149,7 +154,7 @@ public class SlackUserPreferencesService {
             .filter(link -> hasText(link.teamId()))
             .collect(
                 Collectors.toMap(
-                    AccountIdentityQuery.IdentityLinkView::teamId,
+                    link -> Objects.requireNonNull(link.teamId()),
                     Function.identity(),
                     (first, ignored) -> first,
                     LinkedHashMap::new
@@ -178,7 +183,7 @@ public class SlackUserPreferencesService {
     private Optional<SlackUserWorkspacePreferencesDTO> toDto(
         Connection connection,
         AccountIdentityQuery.IdentityLinkView slackLink,
-        Boolean channelMessagesAllowed
+        @Nullable Boolean channelMessagesAllowed
     ) {
         long workspaceId = connection.toRef().workspaceId();
         return workspaceSummaryQuery
@@ -189,7 +194,7 @@ public class SlackUserPreferencesService {
     private SlackUserWorkspacePreferencesDTO toDto(
         Connection connection,
         AccountIdentityQuery.IdentityLinkView slackLink,
-        Boolean channelMessagesAllowed,
+        @Nullable Boolean channelMessagesAllowed,
         WorkspaceSummaryQuery.WorkspaceSummary workspace
     ) {
         long workspaceId = workspace.id();
@@ -204,7 +209,7 @@ public class SlackUserPreferencesService {
         return new SlackUserWorkspacePreferencesDTO(
             workspace.slug(),
             workspace.displayName(),
-            connection.getInstanceKey(),
+            Objects.requireNonNull(connection.getInstanceKey()),
             connection.getDisplayName(),
             slackUserId,
             slackLink.displayName() != null ? slackLink.displayName() : slackLink.usernameAtSignup(),
@@ -217,7 +222,7 @@ public class SlackUserPreferencesService {
         return gitProviderRegistry.resolveProviderId("SLACK", SLACK_SERVER_URL);
     }
 
-    private static boolean hasText(String value) {
+    private static boolean hasText(@Nullable String value) {
         return value != null && !value.isBlank();
     }
 

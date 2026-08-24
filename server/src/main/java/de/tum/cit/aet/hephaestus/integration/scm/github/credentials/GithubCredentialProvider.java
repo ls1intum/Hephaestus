@@ -72,7 +72,7 @@ public class GithubCredentialProvider implements ApiCredentialProvider {
                 if (installationId == null) {
                     log.warn(
                         "GitHub App Connection {} is ACTIVE but has no installationId — skipping credential resolution",
-                        connection.getId()
+                        connection.getInstanceKey()
                     );
                     yield Optional.empty();
                 }
@@ -84,7 +84,7 @@ public class GithubCredentialProvider implements ApiCredentialProvider {
                 if (connection.getCredentialsEncrypted() == null) {
                     log.warn(
                         "GitHub PAT Connection {} has no credentials blob — cannot resolve token",
-                        connection.getId()
+                        connection.getInstanceKey()
                     );
                     yield Optional.empty();
                 }

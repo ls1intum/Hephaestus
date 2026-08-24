@@ -16,6 +16,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubEventAction
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubEventType;
 import de.tum.cit.aet.hephaestus.integration.scm.github.team.dto.GitHubMembershipEventDTO;
 import de.tum.cit.aet.hephaestus.integration.scm.github.user.GitHubUserProcessor;
+import java.util.Objects;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -76,10 +77,17 @@ public class GitHubMembershipMessageHandler extends AbstractIntegrationMessageHa
         );
 
         // Resolve GitHub provider ID for user upsert
-        Long providerId = gitProviderRepository
-            .findByTypeAndServerUrl(IdentityProviderType.GITHUB, GITHUB_SERVER_URL)
-            .orElseThrow(() -> new IllegalStateException("IdentityProvider not found for GitHub"))
-            .getId();
+        Long providerId = Objects.requireNonNull(
+            gitProviderRepository
+                .findByTypeAndServerUrl(IdentityProviderType.GITHUB, GITHUB_SERVER_URL)
+                .orElseThrow(() -> new IllegalStateException("IdentityProvider not found for GitHub"))
+                .getId()
+        );
+        Long teamId = teamDto.id();
+        if (teamId == null) {
+            log.warn("Skipped membership event: reason=missingTeamId");
+            return;
+        }
 
         // Ensure user exists via processor
         User user = userProcessor.ensureExists(memberDto, providerId);
@@ -89,7 +97,7 @@ public class GitHubMembershipMessageHandler extends AbstractIntegrationMessageHa
         }
 
         // Get the team
-        Team team = teamRepository.findById(teamDto.id()).orElse(null);
+        Team team = teamRepository.findById(teamId).orElse(null);
         if (team == null) {
             // Team should be created by team webhook
             log.warn("Skipped membership event: reason=unknownTeam, teamId={}", teamDto.id());

@@ -4,4 +4,5 @@
  * incompatible changes negotiate via {@link WorkerHello#supportedVersions()}.
  */
 @org.springframework.modulith.NamedInterface("worker-protocol")
+@org.jspecify.annotations.NullMarked
 package de.tum.cit.aet.hephaestus.core.runtime.worker.protocol;

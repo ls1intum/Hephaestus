@@ -87,7 +87,7 @@ public class ScopedRateLimitTracker implements RateLimitTracker, RateLimitObserv
 
     @Override
     @Nullable
-    public GHRateLimit updateFromResponse(Long scopeId, @Nullable ClientGraphQlResponse response) {
+    public GHRateLimit updateFromResponse(@Nullable Long scopeId, @Nullable ClientGraphQlResponse response) {
         if (scopeId == null || response == null || !response.isValid()) {
             return null;
         }
@@ -107,7 +107,7 @@ public class ScopedRateLimitTracker implements RateLimitTracker, RateLimitObserv
     }
 
     @Override
-    public int getRemaining(Long scopeId) {
+    public int getRemaining(@Nullable Long scopeId) {
         if (scopeId == null) {
             return DEFAULT_LIMIT;
         }
@@ -119,7 +119,7 @@ public class ScopedRateLimitTracker implements RateLimitTracker, RateLimitObserv
     }
 
     @Override
-    public int getLimit(Long scopeId) {
+    public int getLimit(@Nullable Long scopeId) {
         if (scopeId == null) {
             return DEFAULT_LIMIT;
         }
@@ -218,7 +218,7 @@ public class ScopedRateLimitTracker implements RateLimitTracker, RateLimitObserv
 
     @Override
     @Nullable
-    public Instant getResetAt(Long scopeId) {
+    public Instant getResetAt(@Nullable Long scopeId) {
         if (scopeId == null) {
             return null;
         }
@@ -316,7 +316,7 @@ public class ScopedRateLimitTracker implements RateLimitTracker, RateLimitObserv
      * @return the snapshot, or {@code null} if nothing has been observed for this scope yet
      */
     @Nullable
-    public RateLimitSnapshot snapshot(Long scopeId) {
+    public RateLimitSnapshot snapshot(@Nullable Long scopeId) {
         if (scopeId == null) {
             return null;
         }

@@ -62,7 +62,7 @@ class ProxyUsageAccumulatorIntegrationTest extends AbstractWorkspaceIntegrationT
         return jobRepository.saveAndFlush(job);
     }
 
-    private void accumulate(UUID jobId, JsonNode body, boolean responsesProtocol) {
+    private void accumulate(@org.jspecify.annotations.Nullable UUID jobId, JsonNode body, boolean responsesProtocol) {
         accumulateAs(
             jobId == null
                 ? null
@@ -72,7 +72,11 @@ class ProxyUsageAccumulatorIntegrationTest extends AbstractWorkspaceIntegrationT
         );
     }
 
-    private void accumulateAs(ProxyRouting.BilledAttempt attempt, JsonNode body, boolean responsesProtocol) {
+    private void accumulateAs(
+        ProxyRouting.@org.jspecify.annotations.Nullable BilledAttempt attempt,
+        JsonNode body,
+        boolean responsesProtocol
+    ) {
         accumulateAs(
             new ProxyUsageAccumulator(jobRepository, new SimpleMeterRegistry()),
             attempt,
@@ -83,7 +87,7 @@ class ProxyUsageAccumulatorIntegrationTest extends AbstractWorkspaceIntegrationT
 
     private void accumulateAs(
         ProxyUsageAccumulator accumulator,
-        ProxyRouting.BilledAttempt attempt,
+        ProxyRouting.@org.jspecify.annotations.Nullable BilledAttempt attempt,
         JsonNode body,
         boolean responsesProtocol
     ) {

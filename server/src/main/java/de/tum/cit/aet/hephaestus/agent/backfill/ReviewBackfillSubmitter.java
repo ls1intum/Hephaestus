@@ -20,6 +20,7 @@ import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewDetectionGate;
 import de.tum.cit.aet.hephaestus.practices.review.TriggerMode;
 import java.time.Instant;
 import java.util.Optional;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -178,7 +179,7 @@ public class ReviewBackfillSubmitter {
      * the limit of every non-live discovery: the mirror knows the artifact is in this state, not when it
      * got there.
      */
-    private static Instant occurredAt(Instant updatedAt, Instant createdAt) {
+    private static Instant occurredAt(@Nullable Instant updatedAt, @Nullable Instant createdAt) {
         if (updatedAt != null) {
             return updatedAt;
         }

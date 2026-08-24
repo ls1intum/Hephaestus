@@ -10,12 +10,13 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.List;
 import java.util.Set;
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 @Schema(description = "Detailed information about a team including members, repositories, and labels")
 public record TeamInfoDTO(
     @NonNull @Schema(description = "Unique identifier of the team") Long id,
     @NonNull @Schema(description = "Name of the team") String name,
-    @Schema(description = "ID of the parent team, if this is a sub-team") Long parentId,
+    @Nullable @Schema(description = "ID of the parent team, if this is a sub-team") Long parentId,
     @Schema(description = "Description of the team") String description,
     @Schema(description = "Privacy level of the team (SECRET or VISIBLE)") Privacy privacy,
     @Schema(description = "Organization the team belongs to") String organization,

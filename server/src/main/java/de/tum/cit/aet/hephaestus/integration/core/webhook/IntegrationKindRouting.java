@@ -26,7 +26,7 @@ public class IntegrationKindRouting {
         IntegrationKind.OUTLINE
     );
 
-    public Optional<IntegrationKind> resolve(String pathSegment) {
+    public Optional<IntegrationKind> resolve(@org.jspecify.annotations.Nullable String pathSegment) {
         if (pathSegment == null) return Optional.empty();
         return Optional.ofNullable(ROUTES.get(pathSegment.toLowerCase(Locale.ROOT)));
     }

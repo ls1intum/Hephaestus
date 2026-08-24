@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.scm.github.discussioncomment;
 
 import static org.assertj.core.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
@@ -192,7 +193,7 @@ class GitHubDiscussionCommentProcessorIntegrationTest extends BaseIntegrationTes
 
             DiscussionComment result = processor.process(dto, testDiscussion, context);
 
-            assertThat(result).isNotNull();
+            assertNotNull(result);
             assertThat(result.getNativeId()).isEqualTo(TEST_COMMENT_ID);
             assertThat(result.getBody()).isEqualTo("This is a test comment.");
             assertThat(result.getDiscussion().getId()).isEqualTo(testDiscussion.getId());
@@ -253,7 +254,7 @@ class GitHubDiscussionCommentProcessorIntegrationTest extends BaseIntegrationTes
 
             DiscussionComment result = processor.process(dto, testDiscussion, context);
 
-            assertThat(result).isNotNull();
+            assertNotNull(result);
             assertThat(result.getNativeId()).isEqualTo(TEST_COMMENT_ID);
             assertThat(result.getAuthor()).isNull();
             assertThat(eventListener.ofType(ScmDomainEvent.DiscussionCommentCreated.class)).hasSize(1);
@@ -266,7 +267,7 @@ class GitHubDiscussionCommentProcessorIntegrationTest extends BaseIntegrationTes
 
             DiscussionComment result = processor.process(dto, testDiscussion, context);
 
-            assertThat(result).isNotNull();
+            assertNotNull(result);
             assertThat(result.getDiscussion()).isNotNull();
             assertThat(result.getDiscussion().getNativeId()).isEqualTo(TEST_DISCUSSION_ID);
             assertThat(result.getDiscussion().getTitle()).isEqualTo("Test Discussion");
@@ -279,7 +280,7 @@ class GitHubDiscussionCommentProcessorIntegrationTest extends BaseIntegrationTes
 
             DiscussionComment result = processor.process(dto, testDiscussion, context);
 
-            assertThat(result).isNotNull();
+            assertNotNull(result);
             assertThat(result.getAuthorAssociation()).isEqualTo(AuthorAssociation.OWNER);
         }
     }
@@ -307,7 +308,7 @@ class GitHubDiscussionCommentProcessorIntegrationTest extends BaseIntegrationTes
 
             DiscussionComment result = processor.process(dto, testDiscussion, context);
 
-            assertThat(result).isNotNull();
+            assertNotNull(result);
             assertThat(result.getBody()).isEqualTo("Updated body");
 
             // Verify DiscussionCommentEdited event was published
@@ -364,7 +365,7 @@ class GitHubDiscussionCommentProcessorIntegrationTest extends BaseIntegrationTes
 
             DiscussionComment result = processor.process(dto, testDiscussion, context);
 
-            assertThat(result).isNotNull();
+            assertNotNull(result);
             assertThat(result.isAnswer()).isTrue();
 
             // Verify DiscussionCommentEdited event was published with isAnswer change
@@ -402,8 +403,11 @@ class GitHubDiscussionCommentProcessorIntegrationTest extends BaseIntegrationTes
 
             // Process multiple times
             DiscussionComment result1 = processor.process(dto, testDiscussion, context);
+            assertNotNull(result1);
             DiscussionComment result2 = processor.process(dto, testDiscussion, context);
+            assertNotNull(result2);
             DiscussionComment result3 = processor.process(dto, testDiscussion, context);
+            assertNotNull(result3);
 
             // All results should have the same ID and body
             assertThat(result1.getNativeId()).isEqualTo(TEST_COMMENT_ID);
@@ -432,9 +436,7 @@ class GitHubDiscussionCommentProcessorIntegrationTest extends BaseIntegrationTes
             processor.processDeleted(dto, createContext());
 
             // Verify comment is deleted
-            assertThat(
-                commentRepository.findByNativeIdAndProviderId(TEST_COMMENT_ID, githubProvider.getId())
-            ).isEmpty();
+            assertThat(commentRepository.findByNativeIdAndProviderId(TEST_COMMENT_ID, githubProviderId())).isEmpty();
 
             // Verify DiscussionCommentDeleted event was published
             assertThat(eventListener.ofType(ScmDomainEvent.DiscussionCommentDeleted.class))
@@ -472,9 +474,7 @@ class GitHubDiscussionCommentProcessorIntegrationTest extends BaseIntegrationTes
             assertThatCode(() -> processor.processDeleted(dto, createContext())).doesNotThrowAnyException();
 
             // Verify comment is deleted
-            assertThat(
-                commentRepository.findByNativeIdAndProviderId(TEST_COMMENT_ID, githubProvider.getId())
-            ).isEmpty();
+            assertThat(commentRepository.findByNativeIdAndProviderId(TEST_COMMENT_ID, githubProviderId())).isEmpty();
         }
 
         @Test
@@ -547,6 +547,7 @@ class GitHubDiscussionCommentProcessorIntegrationTest extends BaseIntegrationTes
                 "node_id_" + parentId
             );
             DiscussionComment reply = processor.process(replyDto, testDiscussion, createContext());
+            assertNotNull(reply);
 
             // Resolve parent
             processor.resolveParentComment(reply, parent);
@@ -554,11 +555,17 @@ class GitHubDiscussionCommentProcessorIntegrationTest extends BaseIntegrationTes
             // Verify parent was set (wrap in transaction to avoid LazyInitializationException)
             transactionTemplate.executeWithoutResult(status -> {
                 DiscussionComment savedReply = commentRepository
-                    .findByNativeIdAndProviderId(replyId, githubProvider.getId())
+                    .findByNativeIdAndProviderId(replyId, githubProviderId())
                     .orElseThrow();
                 assertThat(savedReply.getParentComment()).isNotNull();
                 assertThat(savedReply.getParentComment().getNativeId()).isEqualTo(parentId);
             });
         }
+    }
+
+    private Long githubProviderId() {
+        Long id = githubProvider.getId();
+        assertNotNull(id);
+        return id;
     }
 }

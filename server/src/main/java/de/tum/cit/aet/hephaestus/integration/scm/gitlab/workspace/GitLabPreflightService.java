@@ -9,6 +9,7 @@ import de.tum.cit.aet.hephaestus.workspace.dto.GitLabGroupDTO;
 import de.tum.cit.aet.hephaestus.workspace.dto.GitLabPreflightResponseDTO;
 import java.time.Duration;
 import java.util.List;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
@@ -58,7 +59,11 @@ public class GitLabPreflightService {
      * @param groupFullPath optional group path for group/project token fallback
      * @return validation result with user/group info on success, or error message on failure
      */
-    public GitLabPreflightResponseDTO validateToken(String token, String serverUrl, String groupFullPath) {
+    public GitLabPreflightResponseDTO validateToken(
+        String token,
+        @Nullable String serverUrl,
+        @Nullable String groupFullPath
+    ) {
         String resolvedUrl = resolveAndValidateServerUrl(serverUrl);
 
         // Try personal token endpoint first
@@ -141,7 +146,7 @@ public class GitLabPreflightService {
      * @param serverUrl custom server URL (nullable, defaults to gitlab.com)
      * @return list of accessible groups
      */
-    public List<GitLabGroupDTO> listAccessibleGroups(String token, String serverUrl) {
+    public List<GitLabGroupDTO> listAccessibleGroups(String token, @Nullable String serverUrl) {
         String resolvedUrl = resolveAndValidateServerUrl(serverUrl);
 
         try {
@@ -171,7 +176,7 @@ public class GitLabPreflightService {
     /**
      * Resolves and validates the server URL, applying SSRF protections.
      */
-    private String resolveAndValidateServerUrl(String serverUrl) {
+    private String resolveAndValidateServerUrl(@Nullable String serverUrl) {
         if (serverUrl == null || serverUrl.isBlank()) {
             return gitLabProperties.defaultServerUrl();
         }
@@ -192,8 +197,8 @@ public class GitLabPreflightService {
         Long id,
         String username,
         String name,
-        @JsonProperty("avatar_url") String avatarUrl,
-        @JsonProperty("web_url") String webUrl
+        @JsonProperty("avatar_url") @Nullable String avatarUrl,
+        @JsonProperty("web_url") @Nullable String webUrl
     ) {}
 
     @JsonIgnoreProperties(ignoreUnknown = true)
@@ -201,8 +206,8 @@ public class GitLabPreflightService {
         Long id,
         String name,
         @JsonProperty("full_path") String fullPath,
-        @JsonProperty("avatar_url") String avatarUrl,
-        @JsonProperty("web_url") String webUrl
+        @JsonProperty("avatar_url") @Nullable String avatarUrl,
+        @JsonProperty("web_url") @Nullable String webUrl
     ) {}
 
     @JsonIgnoreProperties(ignoreUnknown = true)
@@ -210,8 +215,8 @@ public class GitLabPreflightService {
         Long id,
         String name,
         @JsonProperty("full_path") String fullPath,
-        @JsonProperty("avatar_url") String avatarUrl,
-        @JsonProperty("web_url") String webUrl,
-        String visibility
+        @JsonProperty("avatar_url") @Nullable String avatarUrl,
+        @JsonProperty("web_url") @Nullable String webUrl,
+        @Nullable String visibility
     ) {}
 }

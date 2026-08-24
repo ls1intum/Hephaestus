@@ -10,6 +10,7 @@ import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -98,7 +99,7 @@ public class WorkspaceLlmConnectionService {
         return saved;
     }
 
-    private String connectionSlug(Long workspaceId, String requested, String displayName) {
+    private String connectionSlug(Long workspaceId, @Nullable String requested, String displayName) {
         return CatalogSlug.unique(requested, displayName, slug ->
             connectionRepository.findByWorkspaceIdAndSlug(workspaceId, slug).isPresent()
         );

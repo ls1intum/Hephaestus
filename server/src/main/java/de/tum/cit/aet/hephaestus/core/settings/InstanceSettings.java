@@ -10,6 +10,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.hibernate.annotations.ColumnDefault;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Singleton instance-wide settings row (id = {@link #SINGLETON_ID}). Deliberately not
@@ -38,14 +39,14 @@ public class InstanceSettings {
 
     /** Why the brake was engaged; cleared on release. */
     @Column(name = "silent_mode_reason", length = 500)
-    private String silentModeReason;
+    private @Nullable String silentModeReason;
 
     @Column(name = "silent_mode_changed_at")
     private Instant silentModeChangedAt;
 
     /** Login of the admin who last flipped the brake (snapshot, not an FK — survives account deletion). */
     @Column(name = "silent_mode_changed_by", length = 255)
-    private String silentModeChangedBy;
+    private @Nullable String silentModeChangedBy;
 
     static InstanceSettings failSafeDefault() {
         InstanceSettings settings = new InstanceSettings();

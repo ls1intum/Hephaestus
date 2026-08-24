@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.integration.slack.connect;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import de.tum.cit.aet.hephaestus.integration.slack.connect.SlackOAuthClient.OAuthV2Access;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
@@ -10,6 +11,7 @@ import java.io.IOException;
 import mockwebserver3.MockResponse;
 import mockwebserver3.MockWebServer;
 import mockwebserver3.RecordedRequest;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -50,10 +52,10 @@ class SlackOAuthClientTest extends BaseUnitTest {
 
         assertThat(r.ok()).isTrue();
         assertThat(r.accessToken()).isEqualTo("xoxb-abc");
-        assertThat(r.team().id()).isEqualTo("T1");
+        assertThat(required(r.team()).id()).isEqualTo("T1");
 
         RecordedRequest req = slackMock.takeRequest();
-        assertThat(req.getBody().utf8()).contains("client_id=test-client-id");
+        assertThat(required(req.getBody()).utf8()).contains("client_id=test-client-id");
     }
 
     @Test
@@ -132,5 +134,10 @@ class SlackOAuthClientTest extends BaseUnitTest {
         assertThatThrownBy(() -> client.revokeStrict("xoxb-invalid"))
             .isInstanceOf(SlackOAuthException.class)
             .hasMessageContaining("invalid_auth");
+    }
+
+    private static <T> T required(@Nullable T value) {
+        assertNotNull(value);
+        return value;
     }
 }

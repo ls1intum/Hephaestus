@@ -11,6 +11,8 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubEventType;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.ProcessingContextFactory;
 import de.tum.cit.aet.hephaestus.integration.scm.github.milestone.dto.GitHubMilestoneDTO;
 import de.tum.cit.aet.hephaestus.integration.scm.github.milestone.dto.GitHubMilestoneEventDTO;
+import java.util.Objects;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -46,6 +48,7 @@ public class GitHubMilestoneMessageHandler extends AbstractIntegrationMessageHan
 
     @Override
     protected void handleEvent(GitHubMilestoneEventDTO event) {
+        @Nullable
         GitHubMilestoneDTO milestoneDto = event.milestone();
 
         if (milestoneDto == null) {
@@ -66,9 +69,9 @@ public class GitHubMilestoneMessageHandler extends AbstractIntegrationMessageHan
         }
 
         if (event.actionType() == GitHubEventAction.Milestone.DELETED) {
-            milestoneProcessor.delete(milestoneDto.id(), context);
+            milestoneProcessor.delete(Objects.requireNonNull(milestoneDto.id()), context);
         } else {
-            milestoneProcessor.process(milestoneDto, context.repository(), null, context);
+            milestoneProcessor.process(milestoneDto, Objects.requireNonNull(context.repository()), null, context);
         }
     }
 }

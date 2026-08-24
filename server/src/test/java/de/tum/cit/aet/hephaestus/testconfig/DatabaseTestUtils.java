@@ -5,12 +5,14 @@ import jakarta.persistence.PersistenceContext;
 import java.sql.SQLException;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 import jdk.jfr.Category;
 import jdk.jfr.Event;
 import jdk.jfr.Label;
 import jdk.jfr.Name;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
@@ -25,10 +27,10 @@ public class DatabaseTestUtils {
     private static final long RETRY_DELAY_MS = 100;
 
     @PersistenceContext
-    private EntityManager entityManager;
+    private @Nullable EntityManager entityManager;
 
     private final TransactionTemplate transactionTemplate;
-    private String truncateStatement;
+    private @Nullable String truncateStatement;
 
     public DatabaseTestUtils(PlatformTransactionManager transactionManager) {
         transactionTemplate = new TransactionTemplate(transactionManager);
@@ -68,12 +70,13 @@ public class DatabaseTestUtils {
     }
 
     private void truncateTables() {
-        entityManager.flush();
+        EntityManager currentEntityManager = Objects.requireNonNull(entityManager);
+        currentEntityManager.flush();
         String statement = getTruncateStatement();
         if (!statement.isEmpty()) {
-            entityManager.createNativeQuery(statement).executeUpdate();
+            currentEntityManager.createNativeQuery(statement).executeUpdate();
         }
-        entityManager.clear();
+        currentEntityManager.clear();
     }
 
     private boolean isRetryable(Throwable throwable) {
@@ -109,12 +112,12 @@ public class DatabaseTestUtils {
                     )
                 );
         }
-        return truncateStatement;
+        return Objects.requireNonNull(truncateStatement);
     }
 
     @SuppressWarnings("unchecked")
     private List<String> fetchApplicationTables() {
-        List<Object> tables = entityManager
+        List<Object> tables = Objects.requireNonNull(entityManager)
             .createNativeQuery(
                 "SELECT table_name FROM information_schema.tables " +
                     "WHERE table_schema = 'public' AND table_type = 'BASE TABLE' " +

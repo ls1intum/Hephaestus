@@ -18,6 +18,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.annotation.Order;
@@ -279,7 +280,7 @@ public class WorkspaceInventoryContentSource implements EvidenceSource {
     }
 
     /** Append each artifact (focal one excluded) as a compact node; returns how many were emitted. */
-    private int emit(ArrayNode out, List<? extends Issue> items, Integer focalNumber, boolean isPullRequest) {
+    private int emit(ArrayNode out, List<? extends Issue> items, @Nullable Integer focalNumber, boolean isPullRequest) {
         int emitted = 0;
         for (Issue item : items) {
             if (focalNumber != null && item.getNumber() == focalNumber) {
@@ -313,7 +314,7 @@ public class WorkspaceInventoryContentSource implements EvidenceSource {
         return emitted;
     }
 
-    private static AgentJob jobOf(ContextRequest request) {
+    private static @Nullable AgentJob jobOf(ContextRequest request) {
         if (request instanceof ContextRequest.PracticeReviewRequest pr) {
             return pr.job();
         }

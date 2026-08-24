@@ -6,6 +6,7 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.UnknownHostException;
 import java.util.Set;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Validates user-provided server URLs to prevent SSRF attacks.
@@ -53,7 +54,7 @@ public final class ServerUrlValidator {
      * @param url the URL to validate
      * @throws IllegalArgumentException if the URL is unsafe or malformed
      */
-    public static void validate(String url) {
+    public static void validate(@Nullable String url) {
         if (url == null || url.isBlank()) {
             throw new IllegalArgumentException("Server URL must not be blank");
         }

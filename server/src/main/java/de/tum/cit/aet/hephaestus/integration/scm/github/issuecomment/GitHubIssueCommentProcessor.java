@@ -26,6 +26,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.user.GitHubUserProcessor
 import de.tum.cit.aet.hephaestus.integration.scm.github.user.dto.GitHubUserDTO;
 import java.time.Instant;
 import java.util.HashSet;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import org.jspecify.annotations.Nullable;
@@ -90,7 +91,7 @@ public class GitHubIssueCommentProcessor extends BaseGitHubProcessor {
      * @return the persisted IssueComment entity, or null if processing failed
      */
     @Transactional
-    public IssueComment process(GitHubCommentDTO dto, int issueNumber, ProcessingContext context) {
+    public @Nullable IssueComment process(@Nullable GitHubCommentDTO dto, int issueNumber, ProcessingContext context) {
         if (dto == null || dto.id() == null) {
             log.warn("Skipped comment processing: reason=nullOrMissingId");
             return null;
@@ -147,7 +148,7 @@ public class GitHubIssueCommentProcessor extends BaseGitHubProcessor {
      * @return the persisted IssueComment entity, or null if processing failed
      */
     @Transactional
-    public IssueComment processWithParentCreation(
+    public @Nullable IssueComment processWithParentCreation(
         GitHubCommentDTO dto,
         GitHubIssueDTO issueDto,
         ProcessingContext context
@@ -203,10 +204,9 @@ public class GitHubIssueCommentProcessor extends BaseGitHubProcessor {
      */
     private IssueComment processCommentInternal(GitHubCommentDTO dto, Issue issue, ProcessingContext context) {
         Long issueId = issue.getId();
-        Optional<IssueComment> existingOpt = commentRepository.findByNativeIdAndProviderId(
-            dto.id(),
-            context.providerId()
-        );
+        Long commentId = Objects.requireNonNull(dto.id());
+        Long providerId = Objects.requireNonNull(context.providerId());
+        Optional<IssueComment> existingOpt = commentRepository.findByNativeIdAndProviderId(commentId, providerId);
         boolean isNew = existingOpt.isEmpty();
 
         IssueComment comment = existingOpt.orElseGet(IssueComment::new);
@@ -214,8 +214,8 @@ public class GitHubIssueCommentProcessor extends BaseGitHubProcessor {
 
         // Set nativeId and provider for new comments
         if (isNew) {
-            comment.setNativeId(dto.id());
-            comment.setProvider(context.provider());
+            comment.setNativeId(commentId);
+            comment.setProvider(Objects.requireNonNull(context.provider()));
         }
 
         // Update body if changed
@@ -250,7 +250,7 @@ public class GitHubIssueCommentProcessor extends BaseGitHubProcessor {
 
         // Link author if present and not already set
         if (dto.author() != null && comment.getAuthor() == null) {
-            User author = findOrCreateUser(dto.author(), context.providerId());
+            User author = findOrCreateUser(dto.author(), providerId);
             if (author != null) {
                 comment.setAuthor(author);
                 changedFields.add("author");
@@ -296,13 +296,13 @@ public class GitHubIssueCommentProcessor extends BaseGitHubProcessor {
      * @param context processing context
      */
     @Transactional
-    public void delete(Long commentId, ProcessingContext context) {
+    public void delete(@Nullable Long commentId, ProcessingContext context) {
         if (commentId == null) {
             return;
         }
 
         commentRepository
-            .findByNativeIdAndProviderId(commentId, context.providerId())
+            .findByNativeIdAndProviderId(commentId, Objects.requireNonNull(context.providerId()))
             .ifPresent(comment -> {
                 Long issueId = comment.getIssue() != null ? comment.getIssue().getId() : null;
 
@@ -338,6 +338,7 @@ public class GitHubIssueCommentProcessor extends BaseGitHubProcessor {
      */
     @Nullable
     private Issue createMinimalParentEntityWithRetry(GitHubIssueDTO issueDto, ProcessingContext context) {
+        Repository repository = Objects.requireNonNull(context.repository());
         try {
             return createMinimalParentEntity(issueDto, context);
         } catch (DataIntegrityViolationException e) {
@@ -345,16 +346,16 @@ public class GitHubIssueCommentProcessor extends BaseGitHubProcessor {
             // This is expected behavior in concurrent webhook processing
             log.debug(
                 "Concurrent parent creation detected, looking up existing entity: repoId={}, issueNumber={}",
-                context.repository().getId(),
+                repository.getId(),
                 issueDto.number()
             );
             // Try Issue first, then PullRequest (IssueRepository filters by TYPE = Issue)
             Issue found = issueRepository
-                .findByRepositoryIdAndNumber(context.repository().getId(), issueDto.number())
+                .findByRepositoryIdAndNumber(repository.getId(), issueDto.number())
                 .orElse(null);
             if (found != null) return found;
             return pullRequestRepository
-                .findByRepositoryIdAndNumber(context.repository().getId(), issueDto.number())
+                .findByRepositoryIdAndNumber(repository.getId(), issueDto.number())
                 .orElse(null);
         }
     }
@@ -474,12 +475,12 @@ public class GitHubIssueCommentProcessor extends BaseGitHubProcessor {
         Repository repository,
         ProcessingContext context
     ) {
-        issue.setNativeId(dto.getDatabaseId());
-        issue.setProvider(context.provider());
+        issue.setNativeId(Objects.requireNonNull(dto.getDatabaseId()));
+        issue.setProvider(Objects.requireNonNull(context.provider()));
         issue.setNumber(dto.number());
-        issue.setTitle(sanitize(dto.title()));
+        issue.setTitle(Objects.requireNonNullElse(sanitize(dto.title()), "Issue " + dto.number()));
         issue.setBody(sanitize(dto.body()));
-        issue.setState(convertState(dto.state()));
+        issue.setState(Objects.requireNonNull(convertState(dto.state())));
         issue.setHtmlUrl(dto.htmlUrl());
         issue.setCommentsCount(dto.commentsCount());
         issue.setLocked(dto.locked());
@@ -491,14 +492,14 @@ public class GitHubIssueCommentProcessor extends BaseGitHubProcessor {
 
         // Author
         if (dto.author() != null) {
-            User author = findOrCreateUser(dto.author(), context.providerId());
+            User author = findOrCreateUser(dto.author(), Objects.requireNonNull(context.providerId()));
             issue.setAuthor(author);
         }
 
         // Assignees
         if (dto.assignees() != null) {
             for (GitHubUserDTO assigneeDto : dto.assignees()) {
-                User assignee = findOrCreateUser(assigneeDto, context.providerId());
+                User assignee = findOrCreateUser(assigneeDto, Objects.requireNonNull(context.providerId()));
                 if (assignee != null) {
                     issue.getAssignees().add(assignee);
                 }
@@ -525,7 +526,7 @@ public class GitHubIssueCommentProcessor extends BaseGitHubProcessor {
     /**
      * Converts a GitHub API state string to Issue.State enum.
      */
-    private Issue.State convertState(String state) {
+    private Issue.@Nullable State convertState(@Nullable String state) {
         if (state == null) {
             log.warn(
                 "Issue state is null when creating stub from comment webhook, defaulting to OPEN. " +

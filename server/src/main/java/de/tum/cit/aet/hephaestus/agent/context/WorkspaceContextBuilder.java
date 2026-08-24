@@ -447,7 +447,7 @@ public class WorkspaceContextBuilder {
      * Both PR- and issue-review jobs carry {@code repository_id} in metadata; reading it for both
      * spreads concurrent issue builds across the stripes by repo instead of all colliding on stripe 0.
      */
-    private static Long repoKey(ContextRequest request) {
+    private static @Nullable Long repoKey(ContextRequest request) {
         AgentJob job = reviewJob(request);
         if (job == null) {
             return null;

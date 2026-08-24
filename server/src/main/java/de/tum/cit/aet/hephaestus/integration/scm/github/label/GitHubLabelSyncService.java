@@ -24,6 +24,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.label.dto.GitHubLabelDTO
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -240,6 +241,6 @@ public class GitHubLabelSyncService {
      * The processor handles this by using name-based lookup as fallback.
      */
     private GitHubLabelDTO convertToDTO(GHLabel graphQlLabel) {
-        return GitHubLabelDTO.fromLabel(graphQlLabel);
+        return Objects.requireNonNull(GitHubLabelDTO.fromLabel(graphQlLabel));
     }
 }

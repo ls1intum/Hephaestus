@@ -96,7 +96,7 @@ public class GitLabRateLimitTracker {
      * @param scopeId the scope (workspace ID) that made the API call
      * @param headers the HTTP response headers containing rate limit data
      */
-    public void updateFromHeaders(Long scopeId, @Nullable HttpHeaders headers) {
+    public void updateFromHeaders(@Nullable Long scopeId, @Nullable HttpHeaders headers) {
         if (scopeId == null || headers == null) {
             return;
         }
@@ -178,7 +178,7 @@ public class GitLabRateLimitTracker {
      * quota, and GitLab.com's authenticated API throttle is 2,000 requests per minute. Being an
      * assumption, it must never reach {@link #snapshot}, which reports only observed values.
      */
-    public int getRemaining(Long scopeId) {
+    public int getRemaining(@Nullable Long scopeId) {
         if (scopeId == null) {
             return DEFAULT_RATE_LIMIT;
         }
@@ -349,8 +349,7 @@ public class GitLabRateLimitTracker {
      * than a whole invented one. The window-expiry rule is applied centrally by
      * {@link RateLimitSnapshot#observed}.
      */
-    @Nullable
-    public RateLimitSnapshot snapshot(Long scopeId) {
+    public @Nullable RateLimitSnapshot snapshot(@Nullable Long scopeId) {
         if (scopeId == null) {
             return null;
         }

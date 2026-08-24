@@ -7,7 +7,9 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewthread.PullRequestReviewThread;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewthread.PullRequestReviewThreadRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
+import java.util.Objects;
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
@@ -34,14 +36,14 @@ public class GitHubPullRequestReviewThreadProcessor {
     }
 
     @Transactional
-    public boolean resolve(Long threadId, User resolvedBy, @NonNull ProcessingContext context) {
+    public boolean resolve(Long threadId, @Nullable User resolvedBy, @NonNull ProcessingContext context) {
         if (threadId == null) {
             log.debug("Skipped thread resolve: reason=nullThreadId");
             return false;
         }
 
         return threadRepository
-            .findByNativeIdAndProviderId(threadId, context.providerId())
+            .findByNativeIdAndProviderId(threadId, Objects.requireNonNull(context.providerId()))
             .map(thread -> {
                 thread.setState(PullRequestReviewThread.State.RESOLVED);
                 if (resolvedBy != null) {
@@ -74,7 +76,7 @@ public class GitHubPullRequestReviewThreadProcessor {
         }
 
         return threadRepository
-            .findByNativeIdAndProviderId(threadId, context.providerId())
+            .findByNativeIdAndProviderId(threadId, Objects.requireNonNull(context.providerId()))
             .map(thread -> {
                 thread.setState(PullRequestReviewThread.State.UNRESOLVED);
                 thread.setResolvedBy(null);

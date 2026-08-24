@@ -4,6 +4,7 @@ import de.tum.cit.aet.hephaestus.agent.sandbox.SandboxProperties;
 import java.util.List;
 import java.util.UUID;
 import java.util.function.Supplier;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -27,7 +28,7 @@ public class SandboxNetworkManager {
     private final Supplier<String> hostnameSupplier;
 
     /** Resolved once at startup; cached for the lifetime of the bean. */
-    private volatile String appServerContainerId;
+    private volatile @Nullable String appServerContainerId;
 
     public SandboxNetworkManager(DockerNetworkOperations networkOps, SandboxProperties properties) {
         this(networkOps, properties, () -> System.getenv("HOSTNAME"));
@@ -69,7 +70,7 @@ public class SandboxNetworkManager {
      * @param networkId the network to connect to
      * @return the app-server's IP address on the network
      */
-    public String connectAppServer(String networkId) {
+    public @Nullable String connectAppServer(String networkId) {
         String containerId = resolveAppServerContainerId();
         if (containerId == null || containerId.isBlank()) {
             log.warn(

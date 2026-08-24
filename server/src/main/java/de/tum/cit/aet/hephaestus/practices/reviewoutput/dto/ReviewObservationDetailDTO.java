@@ -11,6 +11,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 @Schema(description = "An observation with evidence and linked feedback")
 public record ReviewObservationDetailDTO(
@@ -18,18 +19,21 @@ public record ReviewObservationDetailDTO(
     @NonNull UUID agentJobId,
     @NonNull String practiceSlug,
     @NonNull String practiceName,
-    @Schema(description = "Practice area; null when the practice is Unassigned") ReviewPracticeAreaDTO area,
-    @Schema(description = "Criteria revision selected as of job start, when available") Long practiceRevisionId,
+    @Schema(description = "Practice area; null when the practice is Unassigned") @Nullable ReviewPracticeAreaDTO area,
+    @Schema(description = "Criteria revision selected as of job start, when available")
+    @Nullable
+    Long practiceRevisionId,
     @NonNull ReviewArtifactDTO artifact,
     @Schema(description = "Whose work the observation is about; null when the identity is no longer resolvable")
+    @Nullable
     ReviewSubjectDTO subject,
     @NonNull String summary,
     @NonNull Presence presence,
-    @Schema(description = "Assessment: GOOD or BAD (null when NOT_APPLICABLE)") Assessment assessment,
-    @Schema(description = "Severity band (null unless assessment is BAD)") Severity severity,
-    ObservationEvidenceDTO evidence,
-    String evidenceRationale,
-    @Schema(description = "Cross-run locus key; null when continuity is unavailable") String recurrenceKey,
+    @Schema(description = "Assessment: GOOD or BAD (null when NOT_APPLICABLE)") @Nullable Assessment assessment,
+    @Schema(description = "Severity band (null unless assessment is BAD)") @Nullable Severity severity,
+    @Nullable ObservationEvidenceDTO evidence,
+    @Nullable String evidenceRationale,
+    @Schema(description = "Cross-run locus key; null when continuity is unavailable") @Nullable String recurrenceKey,
     @NonNull ReviewClaimCurrentness claimCurrentness,
     @NonNull Instant observedAt,
     @NonNull @Schema(description = "Linked feedback, newest first") List<ReviewBoundFeedbackDTO> feedback
@@ -37,7 +41,7 @@ public record ReviewObservationDetailDTO(
     public static ReviewObservationDetailDTO from(
         Observation observation,
         ReviewArtifactDTO artifact,
-        ReviewSubjectDTO subject,
+        @Nullable ReviewSubjectDTO subject,
         List<ReviewBoundFeedbackDTO> feedback,
         boolean includeEvidence
     ) {

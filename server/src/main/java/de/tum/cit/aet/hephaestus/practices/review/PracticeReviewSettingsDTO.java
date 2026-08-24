@@ -4,6 +4,7 @@ import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
 import de.tum.cit.aet.hephaestus.workspace.settings.WorkspaceReviewScope;
 import io.swagger.v3.oas.annotations.media.Schema;
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 /**
  * A workspace's practice-review policy.
@@ -17,8 +18,12 @@ public record PracticeReviewSettingsDTO(
     @NonNull
     @Schema(description = "Effective: minimum minutes between reviews for the same PR")
     Integer cooldownMinutes,
-    @Schema(description = "Raw override; null = inheriting the fleet default") Boolean deliverToMergedOverride,
-    @Schema(description = "Raw override; null = inheriting the fleet default") Integer cooldownMinutesOverride,
+    @Schema(description = "Raw override; null = inheriting the fleet default")
+    @Nullable
+    Boolean deliverToMergedOverride,
+    @Schema(description = "Raw override; null = inheriting the fleet default")
+    @Nullable
+    Integer cooldownMinutesOverride,
     @NonNull
     @Schema(
         description = "Which work is reviewed at all, ANDed onto every practice binding. Empty lists mean " +
@@ -33,5 +38,6 @@ public record PracticeReviewSettingsDTO(
     )
     PracticeAutonomy defaultAutonomy,
     @Schema(description = "Raw override; null = this workspace has never chosen, so HUMAN_APPROVAL applies")
+    @Nullable
     PracticeAutonomy defaultAutonomyOverride
 ) {}

@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.scm.gitlab.issuecomment;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
@@ -22,6 +23,7 @@ import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.util.List;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -72,6 +74,7 @@ class GitLabIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
     private RecordingScmEventListener eventListener;
 
     private IdentityProvider gitlabProvider;
+    private long providerId;
     private Repository testRepository;
     private Issue testIssue;
     private Workspace testWorkspace;
@@ -87,7 +90,7 @@ class GitLabIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
     void shouldPersistUpdatedAtVerbatimWhenCreatingNewComment() {
         GitLabIssueCommentProcessor.SyncNoteData data = buildData("First comment", CREATED_AT, UPDATED_AT_LATER);
 
-        IssueComment saved = processor.processFromSync(data, testIssue, gitlabProvider.getId(), testWorkspace.getId());
+        IssueComment saved = processor.processFromSync(data, testIssue, providerId, testWorkspace.getId());
 
         assertThat(saved).isNotNull();
         Instant expectedCreated = OffsetDateTime.parse(CREATED_AT).toInstant();
@@ -103,7 +106,7 @@ class GitLabIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
         processor.processFromSync(
             buildData("Original body", CREATED_AT, UPDATED_AT_SAME),
             testIssue,
-            gitlabProvider.getId(),
+            providerId,
             testWorkspace.getId()
         );
         eventListener.clear();
@@ -112,7 +115,7 @@ class GitLabIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
         IssueComment saved = processor.processFromSync(
             buildData("Original body", CREATED_AT, UPDATED_AT_LATER),
             testIssue,
-            gitlabProvider.getId(),
+            providerId,
             testWorkspace.getId()
         );
 
@@ -129,14 +132,14 @@ class GitLabIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
     @Test
     void shouldNotEmitUpdateEventWhenUpdatedAtUnchangedOnResync() {
         GitLabIssueCommentProcessor.SyncNoteData first = buildData("Body", CREATED_AT, UPDATED_AT_LATER);
-        processor.processFromSync(first, testIssue, gitlabProvider.getId(), testWorkspace.getId());
+        processor.processFromSync(first, testIssue, providerId, testWorkspace.getId());
         eventListener.clear();
 
         // Re-sync with identical body and identical updatedAt — no-op.
         IssueComment saved = processor.processFromSync(
             buildData("Body", CREATED_AT, UPDATED_AT_LATER),
             testIssue,
-            gitlabProvider.getId(),
+            providerId,
             testWorkspace.getId()
         );
 
@@ -152,7 +155,7 @@ class GitLabIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
         processor.processFromSync(
             buildData("Body", CREATED_AT, UPDATED_AT_LATER),
             testIssue,
-            gitlabProvider.getId(),
+            providerId,
             testWorkspace.getId()
         );
         eventListener.clear();
@@ -160,7 +163,7 @@ class GitLabIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
         IssueComment saved = processor.processFromSync(
             buildData("Body", CREATED_AT, null),
             testIssue,
-            gitlabProvider.getId(),
+            providerId,
             testWorkspace.getId()
         );
 
@@ -178,7 +181,7 @@ class GitLabIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
         IssueComment saved = processor.processFromSync(
             buildData("Edited before we saw it", CREATED_AT, UPDATED_AT_LATER_AGAIN),
             testIssue,
-            gitlabProvider.getId(),
+            providerId,
             testWorkspace.getId()
         );
 
@@ -192,7 +195,11 @@ class GitLabIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
 
     // Helpers
 
-    private GitLabIssueCommentProcessor.SyncNoteData buildData(String body, String createdAt, String updatedAt) {
+    private GitLabIssueCommentProcessor.SyncNoteData buildData(
+        String body,
+        String createdAt,
+        @Nullable String updatedAt
+    ) {
         return new GitLabIssueCommentProcessor.SyncNoteData(
             NATIVE_NOTE_ID,
             body,
@@ -213,6 +220,9 @@ class GitLabIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
             .orElseGet(() ->
                 gitProviderRepository.save(new IdentityProvider(IdentityProviderType.GITLAB, "https://gitlab.lrz.de"))
             );
+        Long savedProviderId = gitlabProvider.getId();
+        assertNotNull(savedProviderId);
+        providerId = savedProviderId;
 
         Organization org = new Organization();
         org.setNativeId(1L);

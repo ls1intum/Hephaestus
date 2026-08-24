@@ -23,9 +23,11 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -315,7 +317,11 @@ public class OutlineCollectionAdminService {
     private OutlineInstall requireInstall(long workspaceId) {
         Connection connection = OutlineConnectionResolver.requireActiveConnection(connectionService, workspaceId);
         ConnectionConfig.OutlineConfig config = (ConnectionConfig.OutlineConfig) connection.getConfig();
-        return new OutlineInstall(workspaceId, connection.getId(), config.serverUrl());
+        return new OutlineInstall(
+            workspaceId,
+            connection.getId(),
+            Objects.requireNonNull(config.serverUrl(), "Outline connection must have a server URL")
+        );
     }
 
     /** The install's stored API token; missing credentials read as "not usably connected" (404). */
@@ -326,8 +332,7 @@ public class OutlineCollectionAdminService {
             .orElseThrow(() -> new EntityNotFoundException("Outline connection", Long.toString(workspaceId)));
     }
 
-    /** Truncates a collection description to fit {@code outline_collection.description}'s column width. */
-    private static String truncateDescription(String description) {
+    private static @Nullable String truncateDescription(@Nullable String description) {
         if (description == null) {
             return null;
         }

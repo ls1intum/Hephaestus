@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.scm.github.discussioncomment;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
@@ -157,13 +158,13 @@ class GitHubDiscussionCommentMessageHandlerIntegrationTest extends BaseIntegrati
         GitHubDiscussionCommentEventDTO event = loadPayload("discussion_comment.created");
 
         // Verify comment doesn't exist initially
-        assertThat(commentRepository.findByNativeIdAndProviderId(FIXTURE_COMMENT_ID, gitProvider.getId())).isEmpty();
+        assertThat(commentRepository.findByNativeIdAndProviderId(FIXTURE_COMMENT_ID, gitProviderId())).isEmpty();
 
         handler.handleEvent(event);
 
         // Then - comment should be persisted with correct fields
         transactionTemplate.executeWithoutResult(status -> {
-            assertThat(commentRepository.findByNativeIdAndProviderId(FIXTURE_COMMENT_ID, gitProvider.getId()))
+            assertThat(commentRepository.findByNativeIdAndProviderId(FIXTURE_COMMENT_ID, gitProviderId()))
                 .isPresent()
                 .get()
                 .satisfies(comment -> {
@@ -197,7 +198,7 @@ class GitHubDiscussionCommentMessageHandlerIntegrationTest extends BaseIntegrati
 
         handler.handleEvent(editEvent);
 
-        assertThat(commentRepository.findByNativeIdAndProviderId(FIXTURE_COMMENT_ID, gitProvider.getId()))
+        assertThat(commentRepository.findByNativeIdAndProviderId(FIXTURE_COMMENT_ID, gitProviderId()))
             .isPresent()
             .get()
             .satisfies(comment -> {
@@ -212,7 +213,7 @@ class GitHubDiscussionCommentMessageHandlerIntegrationTest extends BaseIntegrati
         handler.handleEvent(createEvent);
 
         // Verify it exists
-        assertThat(commentRepository.findByNativeIdAndProviderId(FIXTURE_COMMENT_ID, gitProvider.getId())).isPresent();
+        assertThat(commentRepository.findByNativeIdAndProviderId(FIXTURE_COMMENT_ID, gitProviderId())).isPresent();
         eventListener.clear();
 
         // Load deleted event
@@ -220,7 +221,7 @@ class GitHubDiscussionCommentMessageHandlerIntegrationTest extends BaseIntegrati
 
         handler.handleEvent(deleteEvent);
 
-        assertThat(commentRepository.findByNativeIdAndProviderId(FIXTURE_COMMENT_ID, gitProvider.getId())).isEmpty();
+        assertThat(commentRepository.findByNativeIdAndProviderId(FIXTURE_COMMENT_ID, gitProviderId())).isEmpty();
 
         // Domain event published
         assertThat(eventListener.ofType(ScmDomainEvent.DiscussionCommentDeleted.class)).hasSize(1);
@@ -230,5 +231,11 @@ class GitHubDiscussionCommentMessageHandlerIntegrationTest extends BaseIntegrati
         ClassPathResource resource = new ClassPathResource("github/" + filename + ".json");
         String json = resource.getContentAsString(StandardCharsets.UTF_8);
         return objectMapper.readValue(json, GitHubDiscussionCommentEventDTO.class);
+    }
+
+    private Long gitProviderId() {
+        Long id = gitProvider.getId();
+        assertNotNull(id);
+        return id;
     }
 }

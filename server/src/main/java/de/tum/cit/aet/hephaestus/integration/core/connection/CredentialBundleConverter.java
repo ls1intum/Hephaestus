@@ -7,6 +7,7 @@ import jakarta.persistence.AttributeConverter;
 import jakarta.persistence.Converter;
 import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
+import java.util.Objects;
 import javax.crypto.Cipher;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.GCMParameterSpec;
@@ -51,9 +52,9 @@ public class CredentialBundleConverter implements AttributeConverter<CredentialB
     private static final SecureRandom IV_GENERATOR = new SecureRandom();
 
     /** Static so Hibernate's no-arg construction of this @Converter still hits the wired mapper. */
-    private static volatile ObjectMapper sharedMapper;
+    private static volatile @Nullable ObjectMapper sharedMapper;
 
-    private final SecretKey secretKey;
+    private final @Nullable SecretKey secretKey;
     private final boolean enabled;
 
     /**
@@ -133,8 +134,7 @@ public class CredentialBundleConverter implements AttributeConverter<CredentialB
      * silent fall-back to context-less encryption is caught at unit-test time.
      */
     @Override
-    @Nullable
-    public byte[] convertToDatabaseColumn(@Nullable CredentialBundle attribute) {
+    public byte@Nullable [] convertToDatabaseColumn(@Nullable CredentialBundle attribute) {
         if (attribute == null) return null;
         throw new EncryptionException(
             "CredentialBundleConverter.convertToDatabaseColumn requires per-row EncryptionContext — " +
@@ -150,7 +150,7 @@ public class CredentialBundleConverter implements AttributeConverter<CredentialB
      */
     @Override
     @Nullable
-    public CredentialBundle convertToEntityAttribute(@Nullable byte[] dbData) {
+    public CredentialBundle convertToEntityAttribute(byte@Nullable [] dbData) {
         if (dbData == null) return null;
         requireEnabled("decrypt");
         byte version = versionByte(dbData);
@@ -190,7 +190,11 @@ public class CredentialBundleConverter implements AttributeConverter<CredentialB
             Cipher cipher = Cipher.getInstance(ALGORITHM);
             byte[] iv = new byte[GCM_IV_LENGTH];
             IV_GENERATOR.nextBytes(iv);
-            cipher.init(Cipher.ENCRYPT_MODE, secretKey, new GCMParameterSpec(GCM_TAG_LENGTH, iv));
+            cipher.init(
+                Cipher.ENCRYPT_MODE,
+                Objects.requireNonNull(secretKey),
+                new GCMParameterSpec(GCM_TAG_LENGTH, iv)
+            );
             cipher.updateAAD(aad);
             byte[] cipherText = cipher.doFinal(plaintext);
 
@@ -221,7 +225,11 @@ public class CredentialBundleConverter implements AttributeConverter<CredentialB
             System.arraycopy(dbData, headerLen + GCM_IV_LENGTH, cipherText, 0, cipherText.length);
 
             Cipher cipher = Cipher.getInstance(ALGORITHM);
-            cipher.init(Cipher.DECRYPT_MODE, secretKey, new GCMParameterSpec(GCM_TAG_LENGTH, iv));
+            cipher.init(
+                Cipher.DECRYPT_MODE,
+                Objects.requireNonNull(secretKey),
+                new GCMParameterSpec(GCM_TAG_LENGTH, iv)
+            );
             cipher.updateAAD(aad);
             return cipher.doFinal(cipherText);
         } catch (Exception e) {
@@ -275,7 +283,7 @@ public class CredentialBundleConverter implements AttributeConverter<CredentialB
             if (sharedMapper == null) {
                 sharedMapper = JsonMapper.builder().findAndAddModules().build();
             }
-            return sharedMapper;
+            return Objects.requireNonNull(sharedMapper);
         }
     }
 }

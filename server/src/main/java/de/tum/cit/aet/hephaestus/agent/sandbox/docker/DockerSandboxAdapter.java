@@ -19,6 +19,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
@@ -402,7 +403,7 @@ public class DockerSandboxAdapter implements SandboxManager {
      * Best-effort log capture on error paths — container is about to be removed by cleanup, so grab
      * logs while we can. Logs are emitted at WARN for post-mortem debugging.
      */
-    private void captureLogsOnError(String containerId) {
+    private void captureLogsOnError(@Nullable String containerId) {
         if (containerId == null) {
             return;
         }
@@ -434,7 +435,7 @@ public class DockerSandboxAdapter implements SandboxManager {
      * Best-effort cleanup of all resources. Each step is independent — failures are logged but don't
      * prevent other cleanup steps.
      */
-    private void cleanup(UUID jobId, String containerId, String networkId) {
+    private void cleanup(UUID jobId, @Nullable String containerId, @Nullable String networkId) {
         // 1. Remove container
         if (containerId != null) {
             suppressAndLog("remove container", jobId, () -> containerManager.forceRemove(containerId));

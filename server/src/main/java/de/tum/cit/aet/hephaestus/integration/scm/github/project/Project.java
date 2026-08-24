@@ -21,6 +21,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Represents a GitHub Projects V2 project.
@@ -236,7 +237,7 @@ public class Project extends BaseGitServiceEntity {
      * Cleared when item sync completes successfully.
      */
     @Column(name = "item_sync_cursor", length = 256)
-    private String itemSyncCursor;
+    private @Nullable String itemSyncCursor;
 
     /**
      * Timestamp of the last successful item sync for this project.
@@ -254,7 +255,7 @@ public class Project extends BaseGitServiceEntity {
      * Cleared when field sync completes successfully.
      */
     @Column(name = "field_sync_cursor", length = 256)
-    private String fieldSyncCursor;
+    private @Nullable String fieldSyncCursor;
 
     /**
      * Timestamp of the last successful field sync for this project.
@@ -272,7 +273,7 @@ public class Project extends BaseGitServiceEntity {
      * Cleared when status update sync completes successfully.
      */
     @Column(name = "status_update_sync_cursor", length = 256)
-    private String statusUpdateSyncCursor;
+    private @Nullable String statusUpdateSyncCursor;
 
     /**
      * Timestamp of the last successful status update sync for this project.

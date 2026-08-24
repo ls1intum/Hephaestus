@@ -11,7 +11,9 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.label.LabelRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.github.label.dto.GitHubLabelDTO;
 import java.time.Instant;
+import java.util.Objects;
 import java.util.Optional;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
@@ -71,7 +73,7 @@ public class GitHubLabelProcessor {
      * @return the persisted Label entity
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public Label process(GitHubLabelDTO dto, Repository repository, ProcessingContext context) {
+    public @Nullable Label process(@Nullable GitHubLabelDTO dto, Repository repository, ProcessingContext context) {
         if (dto == null || dto.name() == null) {
             log.warn(
                 "Skipped label processing: reason=nullOrMissingName, repoId={}",
@@ -87,7 +89,10 @@ public class GitHubLabelProcessor {
 
         // Fall back to nativeId lookup if name lookup didn't find it (handles label renames)
         if (existingOpt.isEmpty() && dto.id() != null) {
-            existingOpt = labelRepository.findByNativeIdAndProviderId(dto.id(), context.providerId());
+            existingOpt = labelRepository.findByNativeIdAndProviderId(
+                dto.id(),
+                Objects.requireNonNull(context.providerId())
+            );
         }
         boolean isNew = existingOpt.isEmpty();
 
@@ -103,7 +108,7 @@ public class GitHubLabelProcessor {
             // CRITICAL: Use getReferenceById to get a proxy bound to the current session.
             // context.provider() returns a proxy from the outer session (REQUIRES_NEW suspends it),
             // which causes "Illegally attempted to associate proxy with two open sessions".
-            label.setProvider(gitProviderRepository.getReferenceById(context.providerId()));
+            label.setProvider(gitProviderRepository.getReferenceById(Objects.requireNonNull(context.providerId())));
         }
         label.setName(dto.name()); // name is always required
         if (dto.color() != null) {
@@ -154,7 +159,7 @@ public class GitHubLabelProcessor {
      * @param context processing context with scope information
      */
     @Transactional
-    public void delete(Long labelId, ProcessingContext context) {
+    public void delete(@Nullable Long labelId, ProcessingContext context) {
         if (labelId == null) {
             return;
         }
@@ -176,7 +181,7 @@ public class GitHubLabelProcessor {
         }
 
         labelRepository
-            .findByNativeIdAndProviderId(nativeId, context.providerId())
+            .findByNativeIdAndProviderId(nativeId, Objects.requireNonNull(context.providerId()))
             .ifPresent(label -> deleteLabel(label, context));
     }
 

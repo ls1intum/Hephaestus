@@ -6,6 +6,7 @@ import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import org.jspecify.annotations.Nullable;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
@@ -222,7 +223,7 @@ public interface IssueRepository extends JpaRepository<Issue, Long> {
      */
     @Modifying
     @Query("UPDATE Issue i SET i.milestone = null WHERE i.milestone.id = :milestoneId")
-    int clearMilestoneReferences(@Param("milestoneId") Long milestoneId);
+    int clearMilestoneReferences(@Param("milestoneId") @Nullable Long milestoneId);
 
     /**
      * Finds an issue by ID with its blockedBy collection eagerly loaded.
@@ -334,23 +335,23 @@ public interface IssueRepository extends JpaRepository<Issue, Long> {
         @Param("providerId") Long providerId,
         @Param("number") int number,
         @Param("title") String title,
-        @Param("body") String body,
+        @Param("body") @Nullable String body,
         @Param("state") String state,
-        @Param("stateReason") String stateReason,
-        @Param("htmlUrl") String htmlUrl,
-        @Param("isLocked") Boolean isLocked,
-        @Param("closedAt") Instant closedAt,
-        @Param("commentsCount") Integer commentsCount,
+        @Param("stateReason") @Nullable String stateReason,
+        @Param("htmlUrl") @Nullable String htmlUrl,
+        @Param("isLocked") @Nullable Boolean isLocked,
+        @Param("closedAt") @Nullable Instant closedAt,
+        @Param("commentsCount") @Nullable Integer commentsCount,
         @Param("lastSyncAt") Instant lastSyncAt,
-        @Param("createdAt") Instant createdAt,
-        @Param("updatedAt") Instant updatedAt,
-        @Param("authorId") Long authorId,
+        @Param("createdAt") @Nullable Instant createdAt,
+        @Param("updatedAt") @Nullable Instant updatedAt,
+        @Param("authorId") @Nullable Long authorId,
         @Param("repositoryId") Long repositoryId,
-        @Param("milestoneId") Long milestoneId,
-        @Param("issueTypeId") String issueTypeId,
-        @Param("parentIssueId") Long parentIssueId,
-        @Param("subIssuesTotal") Integer subIssuesTotal,
-        @Param("subIssuesCompleted") Integer subIssuesCompleted,
-        @Param("subIssuesPercentCompleted") Integer subIssuesPercentCompleted
+        @Param("milestoneId") @Nullable Long milestoneId,
+        @Param("issueTypeId") @Nullable String issueTypeId,
+        @Param("parentIssueId") @Nullable Long parentIssueId,
+        @Param("subIssuesTotal") @Nullable Integer subIssuesTotal,
+        @Param("subIssuesCompleted") @Nullable Integer subIssuesCompleted,
+        @Param("subIssuesPercentCompleted") @Nullable Integer subIssuesPercentCompleted
     );
 }

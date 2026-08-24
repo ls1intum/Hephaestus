@@ -19,10 +19,10 @@ import org.jspecify.annotations.Nullable;
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record GitHubLabelDTO(
-    @JsonProperty("id") Long id,
+    @JsonProperty("id") @Nullable Long id,
     @JsonProperty("node_id") String nodeId,
     @JsonProperty("name") String name,
-    @JsonProperty("description") String description,
+    @JsonProperty("description") @Nullable String description,
     @JsonProperty("color") String color,
     @Nullable Instant createdAt,
     @Nullable Instant updatedAt

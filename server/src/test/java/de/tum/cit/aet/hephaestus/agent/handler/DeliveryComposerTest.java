@@ -21,6 +21,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -35,7 +36,18 @@ class DeliveryComposerTest extends BaseUnitTest {
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    private JsonNode buildEvidence(List<LocationSpec> locations, List<String> snippets) {
+    private static DeliveryContent content(@Nullable DeliveryContent content) {
+        assertThat(content).isNotNull();
+        return content;
+    }
+
+    private static String note(@Nullable DeliveryContent content) {
+        String note = content(content).mrNote();
+        assertThat(note).isNotNull();
+        return note;
+    }
+
+    private JsonNode buildEvidence(@Nullable List<LocationSpec> locations, @Nullable List<String> snippets) {
         ObjectNode evidence = objectMapper.createObjectNode();
         if (locations != null && !locations.isEmpty()) {
             ArrayNode citations = evidence.putArray("citations");
@@ -65,7 +77,7 @@ class DeliveryComposerTest extends BaseUnitTest {
         return evidence;
     }
 
-    private record LocationSpec(String path, int startLine, Integer endLine, String sourceKind) {
+    private record LocationSpec(String path, int startLine, @Nullable Integer endLine, String sourceKind) {
         LocationSpec(String path, int startLine) {
             this(path, startLine, null, "scm.pull-request.diff");
         }
@@ -91,9 +103,9 @@ class DeliveryComposerTest extends BaseUnitTest {
         String slug,
         String title,
         Severity severity,
-        List<LocationSpec> locations,
-        List<String> snippets,
-        String reasoning
+        @Nullable List<LocationSpec> locations,
+        @Nullable List<String> snippets,
+        @Nullable String reasoning
     ) {
         return new ValidatedObservation(
             slug,
@@ -511,7 +523,10 @@ class DeliveryComposerTest extends BaseUnitTest {
             )
         );
 
-        String mrNote = DeliveryComposer.compose(observations).mrNote();
+        DeliveryContent content = DeliveryComposer.compose(observations);
+        assertThat(content).isNotNull();
+        String mrNote = content.mrNote();
+        assertThat(mrNote).isNotNull();
 
         assertThat(mrNote).startsWith("Nice work ");
         assertThat(mrNote).contains("keeping the change focused and reviewable");
@@ -535,7 +550,10 @@ class DeliveryComposerTest extends BaseUnitTest {
             )
         );
 
-        String mrNote = DeliveryComposer.compose(observations).mrNote();
+        DeliveryContent content = DeliveryComposer.compose(observations);
+        assertThat(content).isNotNull();
+        String mrNote = content.mrNote();
+        assertThat(mrNote).isNotNull();
 
         assertThat(mrNote).doesNotContain("Nice work");
         assertThat(mrNote).contains("Worth keeping: you're keeping the change focused and reviewable.");
@@ -558,7 +576,10 @@ class DeliveryComposerTest extends BaseUnitTest {
             )
         );
 
-        String mrNote = DeliveryComposer.compose(observations).mrNote();
+        DeliveryContent content = DeliveryComposer.compose(observations);
+        assertThat(content).isNotNull();
+        String mrNote = content.mrNote();
+        assertThat(mrNote).isNotNull();
 
         assertThat(mrNote).startsWith("Nice work here");
         assertThat(mrNote).doesNotContain("some uncurated practice xyz");
@@ -940,7 +961,9 @@ class DeliveryComposerTest extends BaseUnitTest {
         );
         var dc = DeliveryComposer.compose(observations, ArtifactKinds.PULL_REQUEST);
         assertThat(dc).isNotNull();
-        assertThat(dc.mrNote()).contains("client/App/Services/APIClient.swift");
+        String mrNote = dc.mrNote();
+        assertThat(mrNote).isNotNull();
+        assertThat(mrNote).contains("client/App/Services/APIClient.swift");
         assertThat(dc.mrNote()).doesNotContain("inputs/sources/scm/repo/client/");
     }
 
@@ -1014,6 +1037,7 @@ class DeliveryComposerTest extends BaseUnitTest {
         );
         var dc = DeliveryComposer.compose(observations, ArtifactKinds.PULL_REQUEST);
         assertThat(dc).isNotNull();
+        assertThat(dc.mrNote()).isNotNull();
         assertThat(dc.diffNotes()).hasSize(2);
         assertThat(dc.diffNotes())
             .extracting(PracticeDetectionResultParser.DiffNote::filePath)
@@ -1086,10 +1110,12 @@ class DeliveryComposerTest extends BaseUnitTest {
         );
         var dc = DeliveryComposer.compose(observations, ArtifactKinds.PULL_REQUEST);
         assertThat(dc).isNotNull();
-        assertThat(dc.mrNote()).doesNotContain("Nice work");
-        assertThat(dc.mrNote()).contains("Worth keeping: you're engaging with the review feedback.");
-        assertThat(dc.mrNote().indexOf("to tighten")).isLessThan(dc.mrNote().indexOf("Worth keeping"));
-        assertThat(dc.mrNote()).doesNotContain("before merging");
+        String mrNote = dc.mrNote();
+        assertThat(mrNote).isNotNull();
+        assertThat(mrNote).doesNotContain("Nice work");
+        assertThat(mrNote).contains("Worth keeping: you're engaging with the review feedback.");
+        assertThat(mrNote.indexOf("to tighten")).isLessThan(mrNote.indexOf("Worth keeping"));
+        assertThat(mrNote).doesNotContain("before merging");
     }
 
     @Test
@@ -1116,10 +1142,12 @@ class DeliveryComposerTest extends BaseUnitTest {
         );
         var dc = DeliveryComposer.compose(observations, ArtifactKinds.PULL_REQUEST);
         assertThat(dc).isNotNull();
-        assertThat(dc.mrNote()).doesNotContain("Nice work");
-        assertThat(dc.mrNote()).contains("Worth keeping:");
-        assertThat(dc.mrNote()).doesNotContain("handles errors instead of swallowing them");
-        assertThat(dc.mrNote().split("Worth keeping:", -1)).hasSize(2);
+        String mrNote = dc.mrNote();
+        assertThat(mrNote).isNotNull();
+        assertThat(mrNote).doesNotContain("Nice work");
+        assertThat(mrNote).contains("Worth keeping:");
+        assertThat(mrNote).doesNotContain("handles errors instead of swallowing them");
+        assertThat(mrNote.split("Worth keeping:", -1)).hasSize(2);
     }
 
     private ValidatedObservation negativeObservation(String slug, String title, Severity severity) {
@@ -1505,8 +1533,8 @@ class DeliveryComposerTest extends BaseUnitTest {
             "Touches three concerns."
         );
 
-        String withoutMap = DeliveryComposer.compose(List.of(f), ArtifactKinds.PULL_REQUEST).mrNote();
-        String withEmptyMap = DeliveryComposer.compose(List.of(f), ArtifactKinds.PULL_REQUEST, Map.of()).mrNote();
+        String withoutMap = note(DeliveryComposer.compose(List.of(f), ArtifactKinds.PULL_REQUEST));
+        String withEmptyMap = note(DeliveryComposer.compose(List.of(f), ArtifactKinds.PULL_REQUEST, Map.of()));
 
         assertThat(withEmptyMap).isEqualTo(withoutMap);
         assertThat(withEmptyMap).doesNotContain("Why this matters");
@@ -1531,11 +1559,13 @@ class DeliveryComposerTest extends BaseUnitTest {
             "Bundles concern B."
         );
 
-        String note = DeliveryComposer.compose(
-            List.of(a, b),
-            ArtifactKinds.PULL_REQUEST,
-            Map.of("scope-one-reviewable-change", SCOPE_WHY)
-        ).mrNote();
+        String note = note(
+            DeliveryComposer.compose(
+                List.of(a, b),
+                ArtifactKinds.PULL_REQUEST,
+                Map.of("scope-one-reviewable-change", SCOPE_WHY)
+            )
+        );
 
         assertThat(note).containsOnlyOnce("_Why this matters:_");
     }
@@ -1583,16 +1613,18 @@ class DeliveryComposerTest extends BaseUnitTest {
             "Touches many files."
         );
 
-        String note = DeliveryComposer.compose(
-            List.of(a, b),
-            ArtifactKinds.PULL_REQUEST,
-            Map.of(
-                "describe-what-and-why",
-                "A clear description lets a reviewer orient before reading the diff.",
-                "scope-one-reviewable-change",
-                SCOPE_WHY
+        String note = note(
+            DeliveryComposer.compose(
+                List.of(a, b),
+                ArtifactKinds.PULL_REQUEST,
+                Map.of(
+                    "describe-what-and-why",
+                    "A clear description lets a reviewer orient before reading the diff.",
+                    "scope-one-reviewable-change",
+                    SCOPE_WHY
+                )
             )
-        ).mrNote();
+        );
 
         assertThat(note).containsOnlyOnce("_Why this matters:_");
     }
@@ -1616,16 +1648,18 @@ class DeliveryComposerTest extends BaseUnitTest {
             "Body is thin."
         );
 
-        String note = DeliveryComposer.compose(
-            List.of(blocking, advisory),
-            ArtifactKinds.PULL_REQUEST,
-            Map.of(
-                "handles-errors-instead-of-swallowing-them",
-                "A swallowed error turns a loud failure into a silent one nobody can debug.",
-                "describe-what-and-why",
-                "A clear description lets a reviewer orient before reading the diff."
+        String note = note(
+            DeliveryComposer.compose(
+                List.of(blocking, advisory),
+                ArtifactKinds.PULL_REQUEST,
+                Map.of(
+                    "handles-errors-instead-of-swallowing-them",
+                    "A swallowed error turns a loud failure into a silent one nobody can debug.",
+                    "describe-what-and-why",
+                    "A clear description lets a reviewer orient before reading the diff."
+                )
             )
-        ).mrNote();
+        );
 
         assertThat(note.split("_Why this matters:_", -1)).hasSize(3); // 2 occurrences => 3 split parts
     }
@@ -1648,11 +1682,13 @@ class DeliveryComposerTest extends BaseUnitTest {
             positiveWithReasoning("scope-one-reviewable-change", "The change stays focused on a single concern.")
         );
 
-        String note = DeliveryComposer.compose(
-            observed,
-            ArtifactKinds.PULL_REQUEST,
-            Map.of("scope-one-reviewable-change", SCOPE_WHY)
-        ).mrNote();
+        String note = note(
+            DeliveryComposer.compose(
+                observed,
+                ArtifactKinds.PULL_REQUEST,
+                Map.of("scope-one-reviewable-change", SCOPE_WHY)
+            )
+        );
 
         assertThat(note).contains("What's working well here");
         assertThat(note).contains("_Why this matters:_ " + SCOPE_WHY);
@@ -1665,11 +1701,13 @@ class DeliveryComposerTest extends BaseUnitTest {
             positiveWithReasoning("scope-one-reviewable-change", "Each commit is scoped.")
         );
 
-        String note = DeliveryComposer.compose(
-            observed,
-            ArtifactKinds.PULL_REQUEST,
-            Map.of("scope-one-reviewable-change", SCOPE_WHY)
-        ).mrNote();
+        String note = note(
+            DeliveryComposer.compose(
+                observed,
+                ArtifactKinds.PULL_REQUEST,
+                Map.of("scope-one-reviewable-change", SCOPE_WHY)
+            )
+        );
 
         assertThat(note).containsOnlyOnce("_Why this matters:_");
     }
@@ -1678,7 +1716,7 @@ class DeliveryComposerTest extends BaseUnitTest {
     void compose_allGoodPath_noPrincipleWhenNoneAuthored() {
         var observed = List.of(positiveWithReasoning("scope-one-reviewable-change", "The change stays focused."));
 
-        String note = DeliveryComposer.compose(observed, ArtifactKinds.PULL_REQUEST, Map.of()).mrNote();
+        String note = note(DeliveryComposer.compose(observed, ArtifactKinds.PULL_REQUEST, Map.of()));
 
         assertThat(note).contains("What's working well here");
         assertThat(note).doesNotContain("_Why this matters:_");
@@ -1853,7 +1891,7 @@ class DeliveryComposerTest extends BaseUnitTest {
             );
         }
 
-        List<WithheldObservation> withheld = DeliveryComposer.compose(sameLocus).withheld();
+        List<WithheldObservation> withheld = content(DeliveryComposer.compose(sameLocus)).withheld();
 
         assertThat(withheld).hasSize(1);
         assertThat(withheld.get(0).occurrenceKey()).startsWith("occ-").isNotEqualTo("shared-locus");

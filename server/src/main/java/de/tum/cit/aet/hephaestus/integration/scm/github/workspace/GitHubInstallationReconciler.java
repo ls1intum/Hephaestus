@@ -17,6 +17,7 @@ import de.tum.cit.aet.hephaestus.workspace.WorkspaceScopeFilter;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceService;
 import java.time.Instant;
 import java.util.List;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
@@ -234,7 +235,7 @@ public class GitHubInstallationReconciler implements WorkspaceProvisioningHook {
         workspaceRepositoryMonitorService.ensureAllInstallationRepositoriesCovered(installationId, null, true);
     }
 
-    private RepositorySelection convertRepositorySelection(String selection) {
+    private @Nullable RepositorySelection convertRepositorySelection(@Nullable String selection) {
         if (selection == null) {
             return null;
         }

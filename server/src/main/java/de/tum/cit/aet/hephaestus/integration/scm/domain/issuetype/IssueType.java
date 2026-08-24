@@ -16,6 +16,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Represents a GitHub Issue Type - an organization-level categorization for
@@ -47,7 +48,7 @@ public class IssueType {
     private String name;
 
     @Column(columnDefinition = "TEXT")
-    private String description;
+    private @Nullable String description;
 
     @NonNull
     @Enumerated(EnumType.STRING)

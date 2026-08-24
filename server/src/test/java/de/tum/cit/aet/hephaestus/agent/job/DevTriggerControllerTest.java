@@ -139,7 +139,7 @@ class DevTriggerControllerTest extends BaseUnitTest {
         // Keyed on the head commit; minting a ledger row without one would assert an occurrence
         // nobody observed.
         PullRequest pr = pullRequest();
-        pr.setHeadRefOid(null);
+        org.springframework.test.util.ReflectionTestUtils.setField(pr, "headRefOid", null);
         when(artifactLoader.findPullRequestForGate(WORKSPACE_ID, PR_ID)).thenReturn(Optional.of(pr));
         when(detectionGate.evaluate(any(), any(), any())).thenReturn(new GateDecision.Skip("no assignee"));
 

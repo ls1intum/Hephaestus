@@ -35,6 +35,7 @@ import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitor;
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitorRepository;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
+import java.time.Duration;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
@@ -117,17 +118,17 @@ class GitLabWorkspaceInitializationServiceTest extends BaseUnitTest {
             true,
             "nats://localhost:4222",
             null,
-            null
+            new NatsConnectionProperties.Consumer(Duration.ofSeconds(60))
         );
         SyncSchedulerProperties syncProps = new SyncSchedulerProperties(
             true,
             7,
             "0 0 3 * * *",
             15,
-            null,
-            null,
-            null,
-            null
+            new SyncSchedulerProperties.BackfillProperties(false, 50, 100, 60),
+            new SyncSchedulerProperties.FilterProperties(Set.of(), Set.of(), Set.of()),
+            new SyncSchedulerProperties.DiscussionsProperties(false),
+            new SyncSchedulerProperties.ProjectsProperties(false)
         );
 
         lenient()
@@ -189,17 +190,17 @@ class GitLabWorkspaceInitializationServiceTest extends BaseUnitTest {
             false,
             "nats://localhost:4222",
             null,
-            null
+            new NatsConnectionProperties.Consumer(Duration.ofSeconds(60))
         );
         SyncSchedulerProperties syncProps = new SyncSchedulerProperties(
             true,
             7,
             "0 0 3 * * *",
             15,
-            null,
-            null,
-            null,
-            null
+            new SyncSchedulerProperties.BackfillProperties(false, 50, 100, 60),
+            new SyncSchedulerProperties.FilterProperties(Set.of(), Set.of(), Set.of()),
+            new SyncSchedulerProperties.DiscussionsProperties(false),
+            new SyncSchedulerProperties.ProjectsProperties(false)
         );
         return new GitLabWorkspaceInitializationService(
             workspaceRepository,
@@ -292,15 +293,6 @@ class GitLabWorkspaceInitializationServiceTest extends BaseUnitTest {
             when(connectionService.findActiveBearerToken(anyLong(), eq(IntegrationKind.GITLAB))).thenReturn(
                 Optional.of(new BearerToken("   ", null))
             );
-
-            initService.initialize(workspace);
-
-            verifyNoInteractions(gitLabSyncServiceHolderProvider);
-        }
-
-        @Test
-        void shouldSkipNullAccountLogin() {
-            workspace.setAccountLogin(null);
 
             initService.initialize(workspace);
 

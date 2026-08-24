@@ -26,7 +26,11 @@ public class AccountRoleQueryService implements AccountRoleQuery {
 
     @Override
     @Transactional(readOnly = true)
-    public boolean hasFeatureFlag(long gitProviderId, String subject, String flag) {
+    public boolean hasFeatureFlag(
+        long gitProviderId,
+        @org.jspecify.annotations.Nullable String subject,
+        @org.jspecify.annotations.Nullable String flag
+    ) {
         if (subject == null || subject.isBlank() || flag == null || flag.isBlank()) {
             return false;
         }

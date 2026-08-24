@@ -21,7 +21,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
-import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Entity representing a comment on a GitHub Discussion.
@@ -47,11 +47,11 @@ public class DiscussionComment extends BaseGitServiceEntity {
 
     @Column(columnDefinition = "TEXT")
     @ToString.Exclude
+    @Nullable
     private String body;
 
     @Column(length = 512)
-    @NonNull
-    private String htmlUrl;
+    private @Nullable String htmlUrl;
 
     /**
      * Whether this comment has been marked as the answer for its discussion.
@@ -67,7 +67,7 @@ public class DiscussionComment extends BaseGitServiceEntity {
      * The reason for minimizing this comment, if minimized.
      */
     @Column(length = 64)
-    private String minimizedReason;
+    private @Nullable String minimizedReason;
 
     /**
      * Author's association with the repository.
@@ -75,6 +75,7 @@ public class DiscussionComment extends BaseGitServiceEntity {
      */
     @Enumerated(EnumType.STRING)
     @Column(length = 32)
+    @Nullable
     private AuthorAssociation authorAssociation;
 
     /**
@@ -92,6 +93,7 @@ public class DiscussionComment extends BaseGitServiceEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "author_id")
     @ToString.Exclude
+    @Nullable
     private User author;
 
     /**

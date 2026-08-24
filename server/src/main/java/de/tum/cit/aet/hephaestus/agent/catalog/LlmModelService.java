@@ -15,6 +15,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -88,7 +89,7 @@ public class LlmModelService {
     }
 
     @Transactional(readOnly = true)
-    public LlmModelPrice currentPrice(Long modelId) {
+    public @Nullable LlmModelPrice currentPrice(Long modelId) {
         return priceRepository.findByModelIdAndEffectiveToIsNull(modelId).orElse(null);
     }
 
@@ -141,7 +142,7 @@ public class LlmModelService {
         return saved;
     }
 
-    private String modelSlug(Long connectionId, String requested, String displayName) {
+    private String modelSlug(Long connectionId, @Nullable String requested, String displayName) {
         return CatalogSlug.unique(requested, displayName, slug ->
             modelRepository.findByConnectionIdAndSlug(connectionId, slug).isPresent()
         );
@@ -322,7 +323,7 @@ public class LlmModelService {
         }
     }
 
-    private static String blankToNull(String value) {
+    private static @Nullable String blankToNull(@Nullable String value) {
         return value != null && value.isBlank() ? null : value;
     }
 

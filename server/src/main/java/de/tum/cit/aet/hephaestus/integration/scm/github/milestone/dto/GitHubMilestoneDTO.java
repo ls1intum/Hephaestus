@@ -17,18 +17,18 @@ import org.jspecify.annotations.Nullable;
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record GitHubMilestoneDTO(
-    @JsonProperty("id") Long id,
+    @JsonProperty("id") @Nullable Long id,
     @JsonProperty("number") int number,
     @JsonProperty("title") String title,
-    @JsonProperty("description") String description,
-    @JsonProperty("state") String state,
-    @JsonProperty("due_on") Instant dueOn,
-    @JsonProperty("html_url") String htmlUrl,
+    @JsonProperty("description") @Nullable String description,
+    @JsonProperty("state") @Nullable String state,
+    @JsonProperty("due_on") @Nullable Instant dueOn,
+    @JsonProperty("html_url") @Nullable String htmlUrl,
     @JsonProperty("open_issues") Integer openIssuesCount,
     @JsonProperty("closed_issues") Integer closedIssuesCount,
-    @JsonProperty("created_at") Instant createdAt,
-    @JsonProperty("updated_at") Instant updatedAt,
-    @JsonProperty("closed_at") Instant closedAt
+    @JsonProperty("created_at") @Nullable Instant createdAt,
+    @JsonProperty("updated_at") @Nullable Instant updatedAt,
+    @JsonProperty("closed_at") @Nullable Instant closedAt
 ) {
     // STATIC FACTORY METHODS FOR GRAPHQL RESPONSES
 

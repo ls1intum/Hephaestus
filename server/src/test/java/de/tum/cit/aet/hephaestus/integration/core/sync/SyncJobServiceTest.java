@@ -113,9 +113,7 @@ class SyncJobServiceTest extends BaseUnitTest {
             .when(syncJobRepository.saveAndFlush(any()))
             .thenAnswer(inv -> {
                 SyncJob job = inv.getArgument(0);
-                if (job.getId() == null) {
-                    job.setId(idSequence.incrementAndGet());
-                }
+                job.setId(idSequence.incrementAndGet());
                 store.put(job.getId(), job);
                 return job;
             });

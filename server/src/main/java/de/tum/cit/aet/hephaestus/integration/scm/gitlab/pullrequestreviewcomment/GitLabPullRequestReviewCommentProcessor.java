@@ -16,6 +16,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabSyncConstants;
 import java.time.Instant;
 import java.util.HashSet;
+import java.util.Objects;
 import java.util.Set;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
@@ -137,7 +138,7 @@ public class GitLabPullRequestReviewCommentProcessor {
             return null;
         }
 
-        Long providerId = context.provider().getId();
+        Long providerId = Objects.requireNonNull(Objects.requireNonNull(context.provider()).getId());
 
         return commentRepository
             .findByNativeIdAndProviderId(nativeId, providerId)
@@ -152,7 +153,7 @@ public class GitLabPullRequestReviewCommentProcessor {
     ) {
         PullRequestReviewThread thread = context.thread();
         PullRequest pr = context.pr();
-        Long scopeId = context.scopeId();
+        Long scopeId = Objects.requireNonNull(context.scopeId());
         Set<String> changedFields = new HashSet<>();
         String sanitizedBody = PostgresStringUtils.sanitize(data.body());
         if (sanitizedBody != null && !sanitizedBody.equals(existing.getBody())) {
@@ -193,7 +194,7 @@ public class GitLabPullRequestReviewCommentProcessor {
     private PullRequestReviewComment createComment(long nativeId, DiffNoteData data, CommentContext context) {
         PullRequestReviewComment comment = new PullRequestReviewComment();
         comment.setNativeId(nativeId);
-        comment.setProvider(context.provider());
+        comment.setProvider(Objects.requireNonNull(context.provider()));
         comment.setPullRequest(context.pr());
         comment.setThread(context.thread());
 
@@ -255,7 +256,7 @@ public class GitLabPullRequestReviewCommentProcessor {
             new ScmDomainEvent.ReviewCommentCreated(
                 ScmEventPayload.ReviewCommentData.from(saved),
                 context.pr().getId(),
-                createSyncContext(context.pr(), context.scopeId())
+                createSyncContext(context.pr(), Objects.requireNonNull(context.scopeId()))
             )
         );
 
@@ -263,8 +264,9 @@ public class GitLabPullRequestReviewCommentProcessor {
     }
 
     private static EventContext createSyncContext(PullRequest pr, Long scopeId) {
-        RepositoryRef repoRef = pr.getRepository() != null ? RepositoryRef.from(pr.getRepository()) : null;
-        return EventContext.forSync(scopeId, repoRef, IdentityProviderType.GITLAB);
+        RepositoryRef repoRef =
+            pr.getRepository() != null ? Objects.requireNonNull(RepositoryRef.from(pr.getRepository())) : null;
+        return EventContext.forSync(scopeId, Objects.requireNonNull(repoRef), IdentityProviderType.GITLAB);
     }
 
     /**

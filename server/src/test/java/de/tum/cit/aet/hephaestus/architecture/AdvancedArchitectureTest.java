@@ -510,7 +510,7 @@ class AdvancedArchitectureTest extends HephaestusArchitectureTest {
      * Returns the top-level module name ({@code activity}, {@code workspace}, …) for a
      * package, or {@code null} if the package is outside {@code BASE_PACKAGE}.
      */
-    private static String topLevelModule(String packageName) {
+    private static @org.jspecify.annotations.Nullable String topLevelModule(String packageName) {
         if (!packageName.startsWith(BASE_PACKAGE + ".")) {
             return null;
         }

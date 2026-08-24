@@ -120,7 +120,7 @@ class ProductionSchemaContractIntegrationTest {
         long providerB = provider("https://provider-b.example");
         Account enabled = accountRepository.save(new Account("Provider A account"));
         Account disabled = accountRepository.save(new Account("Provider B account"));
-        accountFeatureRepository.save(new AccountFeature(enabled.getId(), ACCOUNT_FEATURE));
+        accountFeatureRepository.save(new AccountFeature(Objects.requireNonNull(enabled.getId()), ACCOUNT_FEATURE));
         link(enabled, providerA);
         link(disabled, providerB);
 
@@ -142,7 +142,7 @@ class ProductionSchemaContractIntegrationTest {
     void disabledIdentityDoesNotCarryAccountFeature() {
         long provider = provider("https://disabled-provider.example");
         Account account = accountRepository.save(new Account("Disabled identity account"));
-        accountFeatureRepository.save(new AccountFeature(account.getId(), ACCOUNT_FEATURE));
+        accountFeatureRepository.save(new AccountFeature(Objects.requireNonNull(account.getId()), ACCOUNT_FEATURE));
         IdentityLink identity = link(account, provider);
 
         assertThat(
@@ -167,7 +167,9 @@ class ProductionSchemaContractIntegrationTest {
     }
 
     private long provider(String serverUrl) {
-        return identityProviderRepository.save(new IdentityProvider(IdentityProviderType.GITHUB, serverUrl)).getId();
+        return Objects.requireNonNull(
+            identityProviderRepository.save(new IdentityProvider(IdentityProviderType.GITHUB, serverUrl)).getId()
+        );
     }
 
     @Test
@@ -373,7 +375,7 @@ class ProductionSchemaContractIntegrationTest {
             String.class,
             constraintName
         );
-        List<String> accepted = Arrays.stream(definition.split("'"))
+        List<String> accepted = Arrays.stream(Objects.requireNonNull(definition).split("'"))
             .filter(part -> part.matches("[A-Z_]{2,}"))
             .distinct()
             .toList();

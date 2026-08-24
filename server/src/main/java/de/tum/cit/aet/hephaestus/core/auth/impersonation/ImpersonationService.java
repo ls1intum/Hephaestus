@@ -14,7 +14,9 @@ import jakarta.servlet.http.HttpServletRequest;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -72,7 +74,7 @@ public class ImpersonationService {
     }
 
     /** Result of begin/exit — the freshly-minted token the controller writes to the cookie. */
-    public record Result(HephaestusJwtIssuer.Token token, Long targetAccountId, Long actingAccountId) {}
+    public record Result(HephaestusJwtIssuer.Token token, Long targetAccountId, @Nullable Long actingAccountId) {}
 
     /**
      * Begin impersonating {@code targetAccountId} as {@code operatorAccountId}. The operator
@@ -80,7 +82,12 @@ public class ImpersonationService {
      * we re-check here as defence in depth). A {@code reason} is mandatory and audited.
      */
     @Transactional
-    public Result begin(Long operatorAccountId, Long targetAccountId, String reason, HttpServletRequest request) {
+    public Result begin(
+        Long operatorAccountId,
+        Long targetAccountId,
+        String reason,
+        @Nullable HttpServletRequest request
+    ) {
         if (reason == null || reason.isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "impersonation reason is required");
         }
@@ -93,7 +100,7 @@ public class ImpersonationService {
         Account target = accountRepository
             .findById(targetAccountId)
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "target account not found"));
-        if (target.getId().equals(operator.getId())) {
+        if (Objects.requireNonNull(target.getId()).equals(operator.getId())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "cannot impersonate yourself");
         }
         // Privilege-escalation / repudiation guard: an APP_ADMIN must not impersonate another
@@ -134,7 +141,12 @@ public class ImpersonationService {
      * validated JWT).
      */
     @Transactional
-    public Result exit(Long operatorAccountId, Long targetAccountId, UUID currentJti, HttpServletRequest request) {
+    public Result exit(
+        Long operatorAccountId,
+        Long targetAccountId,
+        UUID currentJti,
+        @Nullable HttpServletRequest request
+    ) {
         issuedJwtRepository.revoke(currentJti, clock.instant(), IssuedJwt.RevokedReason.IMPERSONATION_EXIT);
         HephaestusJwtIssuer.Token token = jwtIssuer.issue(
             principalFactory.forAccountId(operatorAccountId),

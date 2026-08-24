@@ -41,14 +41,14 @@ public record GitHubIssueCommentEventDTO(
      */
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record GitHubCommentDTO(
-        @JsonProperty("id") Long id,
+        @JsonProperty("id") @Nullable Long id,
         @JsonProperty("node_id") String nodeId,
-        @JsonProperty("html_url") String htmlUrl,
+        @JsonProperty("html_url") @Nullable String htmlUrl,
         @JsonProperty("body") String body,
-        @JsonProperty("user") GitHubUserDTO author,
-        @JsonProperty("author_association") String authorAssociation,
-        @JsonProperty("created_at") Instant createdAt,
-        @JsonProperty("updated_at") Instant updatedAt
+        @JsonProperty("user") @Nullable GitHubUserDTO author,
+        @JsonProperty("author_association") @Nullable String authorAssociation,
+        @JsonProperty("created_at") @Nullable Instant createdAt,
+        @JsonProperty("updated_at") @Nullable Instant updatedAt
     ) {
         // STATIC FACTORY METHODS FOR GRAPHQL RESPONSES
 

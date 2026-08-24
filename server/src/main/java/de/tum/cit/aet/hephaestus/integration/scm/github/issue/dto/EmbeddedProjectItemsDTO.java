@@ -88,7 +88,7 @@ public record EmbeddedProjectItemsDTO(
      * This includes the project info needed to link the item to the correct project
      * without requiring additional API calls.
      */
-    public record EmbeddedProjectItem(GitHubProjectItemDTO item, @Nullable EmbeddedProjectReference project) {
+    public record EmbeddedProjectItem(@Nullable GitHubProjectItemDTO item, @Nullable EmbeddedProjectReference project) {
         /**
          * Creates an EmbeddedProjectItem from a GraphQL GHProjectV2Item.
          *

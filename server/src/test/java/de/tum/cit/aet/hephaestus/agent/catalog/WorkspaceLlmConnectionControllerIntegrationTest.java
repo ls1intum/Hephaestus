@@ -10,6 +10,7 @@ import de.tum.cit.aet.hephaestus.workspace.AbstractWorkspaceIntegrationTest;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembership.WorkspaceRole;
+import java.util.Objects;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
@@ -40,18 +41,20 @@ class WorkspaceLlmConnectionControllerIntegrationTest extends AbstractWorkspaceI
             "sk-workspace-secret-9999",
             true
         );
-        return webTestClient
-            .post()
-            .uri("/workspaces/{slug}/llm/connections", workspace.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(request)
-            .exchange()
-            .expectStatus()
-            .isCreated()
-            .expectBody(WorkspaceLlmConnectionDTO.class)
-            .returnResult()
-            .getResponseBody();
+        return Objects.requireNonNull(
+            webTestClient
+                .post()
+                .uri("/workspaces/{slug}/llm/connections", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(request)
+                .exchange()
+                .expectStatus()
+                .isCreated()
+                .expectBody(WorkspaceLlmConnectionDTO.class)
+                .returnResult()
+                .getResponseBody()
+        );
     }
 
     @Test

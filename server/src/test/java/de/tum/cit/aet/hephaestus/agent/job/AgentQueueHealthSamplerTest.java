@@ -71,7 +71,7 @@ class AgentQueueHealthSamplerTest extends BaseUnitTest {
 
     private static AgentJobRepository.QueueHealthSnapshot snapshot(
         long depth,
-        Instant oldestAvailableAt,
+        @org.jspecify.annotations.Nullable Instant oldestAvailableAt,
         long held,
         long running
     ) {
@@ -82,7 +82,7 @@ class AgentQueueHealthSamplerTest extends BaseUnitTest {
             }
 
             @Override
-            public Instant getOldestAvailableAt() {
+            public @org.jspecify.annotations.Nullable Instant getOldestAvailableAt() {
                 return oldestAvailableAt;
             }
 

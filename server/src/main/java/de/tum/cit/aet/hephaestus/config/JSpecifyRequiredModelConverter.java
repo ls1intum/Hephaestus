@@ -13,6 +13,7 @@ import java.lang.reflect.RecordComponent;
 import java.lang.reflect.Type;
 import java.util.Iterator;
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
 
 /**
@@ -55,7 +56,11 @@ public class JSpecifyRequiredModelConverter implements ModelConverter {
     private static final String BASE_PACKAGE = "de.tum.cit.aet.hephaestus";
 
     @Override
-    public Schema<?> resolve(AnnotatedType type, ModelConverterContext context, Iterator<ModelConverter> chain) {
+    public @Nullable Schema<?> resolve(
+        AnnotatedType type,
+        ModelConverterContext context,
+        Iterator<ModelConverter> chain
+    ) {
         Schema<?> resolved = chain.hasNext() ? chain.next().resolve(type, context, chain) : null;
         if (resolved == null) {
             return null;
@@ -103,7 +108,7 @@ public class JSpecifyRequiredModelConverter implements ModelConverter {
         }
     }
 
-    private static Schema<?> referencedModel(Schema<?> resolved, ModelConverterContext context) {
+    private static @Nullable Schema<?> referencedModel(Schema<?> resolved, ModelConverterContext context) {
         if (resolved.get$ref() == null || context.getDefinedModels() == null) {
             return null;
         }
@@ -111,7 +116,7 @@ public class JSpecifyRequiredModelConverter implements ModelConverter {
         return context.getDefinedModels().get(ref.substring(ref.lastIndexOf('/') + 1));
     }
 
-    private static Class<?> rawClass(Type type) {
+    private static @Nullable Class<?> rawClass(Type type) {
         if (type instanceof Class<?> c) {
             return c;
         }

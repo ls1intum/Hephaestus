@@ -28,20 +28,20 @@ import org.springframework.stereotype.Component;
 @ConditionalOnProperty(name = "hephaestus.integration.gitlab.enabled", havingValue = "true", matchIfMissing = false)
 public class GitLabSyncServiceHolder {
 
-    private final GitLabGroupSyncService groupSyncService;
-    private final GitLabGroupMemberSyncService groupMemberSyncService;
-    private final GitLabLabelSyncService labelSyncService;
-    private final GitLabMilestoneSyncService milestoneSyncService;
-    private final GitLabIssueSyncService issueSyncService;
-    private final GitLabMergeRequestSyncService mergeRequestSyncService;
-    private final GitLabTeamSyncService teamSyncService;
-    private final GitLabCollaboratorSyncService collaboratorSyncService;
-    private final GitLabIssueTypeSyncService issueTypeSyncService;
-    private final GitLabCommitSyncService commitSyncService;
-    private final GitLabCommitBackfillService commitBackfillService;
-    private final GitLabCommitMergeRequestLinker commitMergeRequestLinker;
-    private final GitLabSubIssueSyncService subIssueSyncService;
-    private final GitLabIssueDependencySyncService issueDependencySyncService;
+    private final @Nullable GitLabGroupSyncService groupSyncService;
+    private final @Nullable GitLabGroupMemberSyncService groupMemberSyncService;
+    private final @Nullable GitLabLabelSyncService labelSyncService;
+    private final @Nullable GitLabMilestoneSyncService milestoneSyncService;
+    private final @Nullable GitLabIssueSyncService issueSyncService;
+    private final @Nullable GitLabMergeRequestSyncService mergeRequestSyncService;
+    private final @Nullable GitLabTeamSyncService teamSyncService;
+    private final @Nullable GitLabCollaboratorSyncService collaboratorSyncService;
+    private final @Nullable GitLabIssueTypeSyncService issueTypeSyncService;
+    private final @Nullable GitLabCommitSyncService commitSyncService;
+    private final @Nullable GitLabCommitBackfillService commitBackfillService;
+    private final @Nullable GitLabCommitMergeRequestLinker commitMergeRequestLinker;
+    private final @Nullable GitLabSubIssueSyncService subIssueSyncService;
+    private final @Nullable GitLabIssueDependencySyncService issueDependencySyncService;
 
     public GitLabSyncServiceHolder(
         @Nullable GitLabGroupSyncService groupSyncService,

@@ -156,7 +156,7 @@ public class AuthAuditController {
      * Excel/Sheets/LibreOffice. Prefix those with a single quote so they render as inert text.
      * See <a href="https://owasp.org/www-community/attacks/CSV_Injection">OWASP CSV Injection</a>.
      */
-    private static void appendCsvRow(StringBuilder out, String... fields) {
+    private static void appendCsvRow(StringBuilder out, @Nullable String... fields) {
         for (int i = 0; i < fields.length; i++) {
             if (i > 0) {
                 out.append(',');

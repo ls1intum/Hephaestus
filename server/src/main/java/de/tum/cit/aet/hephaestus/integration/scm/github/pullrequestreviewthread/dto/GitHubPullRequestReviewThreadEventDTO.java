@@ -8,6 +8,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.pullrequest.dto.GitHubPu
 import de.tum.cit.aet.hephaestus.integration.scm.github.repository.dto.GitHubRepositoryRefDTO;
 import de.tum.cit.aet.hephaestus.integration.scm.github.user.dto.GitHubUserDTO;
 import java.util.List;
+import org.jspecify.annotations.Nullable;
 
 /**
  * DTO for GitHub pull_request_review_thread webhook events.
@@ -54,7 +55,7 @@ public record GitHubPullRequestReviewThreadEventDTO(
          *
          * @return the first comment's ID, or null if no comments exist
          */
-        public Long getFirstCommentId() {
+        public @Nullable Long getFirstCommentId() {
             if (comments == null || comments.isEmpty()) {
                 return null;
             }

@@ -55,13 +55,13 @@ import tools.jackson.databind.json.JsonMapper;
 @JsonIgnoreProperties(ignoreUnknown = true)
 @Slf4j
 public record GitHubProjectFieldValueDTO(
-    @JsonProperty("field_id") String fieldId,
+    @JsonProperty("field_id") @Nullable String fieldId,
     @JsonProperty("field_type") String fieldType,
-    @JsonProperty("text_value") String textValue,
-    @JsonProperty("number_value") Double numberValue,
-    @JsonProperty("date_value") LocalDate dateValue,
-    @JsonProperty("single_select_option_id") String singleSelectOptionId,
-    @JsonProperty("iteration_id") String iterationId
+    @JsonProperty("text_value") @Nullable String textValue,
+    @JsonProperty("number_value") @Nullable Double numberValue,
+    @JsonProperty("date_value") @Nullable LocalDate dateValue,
+    @JsonProperty("single_select_option_id") @Nullable String singleSelectOptionId,
+    @JsonProperty("iteration_id") @Nullable String iterationId
 ) {
     // Trivial serialization (List<String> → JSON string column); no global mapper config needed.
     private static final ObjectMapper OBJECT_MAPPER = JsonMapper.builder().build();
@@ -76,8 +76,7 @@ public record GitHubProjectFieldValueDTO(
      * @param fieldValue the GraphQL field value (may be null)
      * @return GitHubProjectFieldValueDTO or null if fieldValue is null or cannot be extracted
      */
-    @Nullable
-    public static GitHubProjectFieldValueDTO fromFieldValue(@Nullable GHProjectV2ItemFieldValue fieldValue) {
+    public static @Nullable GitHubProjectFieldValueDTO fromFieldValue(@Nullable GHProjectV2ItemFieldValue fieldValue) {
         if (fieldValue == null) {
             return null;
         }
@@ -111,7 +110,7 @@ public record GitHubProjectFieldValueDTO(
         return null;
     }
 
-    private static GitHubProjectFieldValueDTO fromTextValue(GHProjectV2ItemFieldTextValue value) {
+    private static @Nullable GitHubProjectFieldValueDTO fromTextValue(GHProjectV2ItemFieldTextValue value) {
         String fieldId = extractFieldId(value.getField());
         if (fieldId == null) {
             return null;
@@ -119,7 +118,7 @@ public record GitHubProjectFieldValueDTO(
         return new GitHubProjectFieldValueDTO(fieldId, "TEXT", value.getText(), null, null, null, null);
     }
 
-    private static GitHubProjectFieldValueDTO fromNumberValue(GHProjectV2ItemFieldNumberValue value) {
+    private static @Nullable GitHubProjectFieldValueDTO fromNumberValue(GHProjectV2ItemFieldNumberValue value) {
         String fieldId = extractFieldId(value.getField());
         if (fieldId == null) {
             return null;
@@ -127,7 +126,7 @@ public record GitHubProjectFieldValueDTO(
         return new GitHubProjectFieldValueDTO(fieldId, "NUMBER", null, value.getNumber(), null, null, null);
     }
 
-    private static GitHubProjectFieldValueDTO fromDateValue(GHProjectV2ItemFieldDateValue value) {
+    private static @Nullable GitHubProjectFieldValueDTO fromDateValue(GHProjectV2ItemFieldDateValue value) {
         String fieldId = extractFieldId(value.getField());
         if (fieldId == null) {
             return null;
@@ -143,7 +142,9 @@ public record GitHubProjectFieldValueDTO(
         return new GitHubProjectFieldValueDTO(fieldId, "DATE", null, null, date, null, null);
     }
 
-    private static GitHubProjectFieldValueDTO fromSingleSelectValue(GHProjectV2ItemFieldSingleSelectValue value) {
+    private static @Nullable GitHubProjectFieldValueDTO fromSingleSelectValue(
+        GHProjectV2ItemFieldSingleSelectValue value
+    ) {
         String fieldId = extractFieldId(value.getField());
         if (fieldId == null) {
             return null;
@@ -151,7 +152,7 @@ public record GitHubProjectFieldValueDTO(
         return new GitHubProjectFieldValueDTO(fieldId, "SINGLE_SELECT", null, null, null, value.getOptionId(), null);
     }
 
-    private static GitHubProjectFieldValueDTO fromIterationValue(GHProjectV2ItemFieldIterationValue value) {
+    private static @Nullable GitHubProjectFieldValueDTO fromIterationValue(GHProjectV2ItemFieldIterationValue value) {
         String fieldId = extractFieldId(value.getField());
         if (fieldId == null) {
             return null;
@@ -159,8 +160,7 @@ public record GitHubProjectFieldValueDTO(
         return new GitHubProjectFieldValueDTO(fieldId, "ITERATION", null, null, null, null, value.getIterationId());
     }
 
-    @Nullable
-    private static GitHubProjectFieldValueDTO fromLabelValue(GHProjectV2ItemFieldLabelValue value) {
+    private static @Nullable GitHubProjectFieldValueDTO fromLabelValue(GHProjectV2ItemFieldLabelValue value) {
         String fieldId = extractFieldId(value.getField());
         if (fieldId == null) {
             return null;
@@ -186,8 +186,7 @@ public record GitHubProjectFieldValueDTO(
         return new GitHubProjectFieldValueDTO(fieldId, "LABELS", jsonValue, null, null, null, null);
     }
 
-    @Nullable
-    private static GitHubProjectFieldValueDTO fromUserValue(GHProjectV2ItemFieldUserValue value) {
+    private static @Nullable GitHubProjectFieldValueDTO fromUserValue(GHProjectV2ItemFieldUserValue value) {
         String fieldId = extractFieldId(value.getField());
         if (fieldId == null) {
             return null;
@@ -213,8 +212,7 @@ public record GitHubProjectFieldValueDTO(
         return new GitHubProjectFieldValueDTO(fieldId, "ASSIGNEES", jsonValue, null, null, null, null);
     }
 
-    @Nullable
-    private static GitHubProjectFieldValueDTO fromReviewerValue(GHProjectV2ItemFieldReviewerValue value) {
+    private static @Nullable GitHubProjectFieldValueDTO fromReviewerValue(GHProjectV2ItemFieldReviewerValue value) {
         String fieldId = extractFieldId(value.getField());
         if (fieldId == null) {
             return null;
@@ -250,8 +248,7 @@ public record GitHubProjectFieldValueDTO(
         return null;
     }
 
-    @Nullable
-    private static GitHubProjectFieldValueDTO fromMilestoneValue(GHProjectV2ItemFieldMilestoneValue value) {
+    private static @Nullable GitHubProjectFieldValueDTO fromMilestoneValue(GHProjectV2ItemFieldMilestoneValue value) {
         String fieldId = extractFieldId(value.getField());
         if (fieldId == null) {
             return null;
@@ -264,8 +261,7 @@ public record GitHubProjectFieldValueDTO(
         return new GitHubProjectFieldValueDTO(fieldId, "MILESTONE", milestoneTitle, null, null, null, null);
     }
 
-    @Nullable
-    private static GitHubProjectFieldValueDTO fromRepositoryValue(GHProjectV2ItemFieldRepositoryValue value) {
+    private static @Nullable GitHubProjectFieldValueDTO fromRepositoryValue(GHProjectV2ItemFieldRepositoryValue value) {
         String fieldId = extractFieldId(value.getField());
         if (fieldId == null) {
             return null;
@@ -278,8 +274,9 @@ public record GitHubProjectFieldValueDTO(
         return new GitHubProjectFieldValueDTO(fieldId, "REPOSITORY", repoNameWithOwner, null, null, null, null);
     }
 
-    @Nullable
-    private static GitHubProjectFieldValueDTO fromPullRequestValue(GHProjectV2ItemFieldPullRequestValue value) {
+    private static @Nullable GitHubProjectFieldValueDTO fromPullRequestValue(
+        GHProjectV2ItemFieldPullRequestValue value
+    ) {
         String fieldId = extractFieldId(value.getField());
         if (fieldId == null) {
             return null;
@@ -313,8 +310,7 @@ public record GitHubProjectFieldValueDTO(
         }
     }
 
-    @Nullable
-    private static String extractFieldId(@Nullable GHProjectV2FieldConfiguration field) {
+    private static @Nullable String extractFieldId(@Nullable GHProjectV2FieldConfiguration field) {
         if (field == null) {
             return null;
         }

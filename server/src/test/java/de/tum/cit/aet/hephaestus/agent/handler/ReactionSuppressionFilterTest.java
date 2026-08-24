@@ -29,6 +29,7 @@ import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.testconfig.TestEntities;
 import java.util.List;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
@@ -170,7 +171,7 @@ class ReactionSuppressionFilterTest extends BaseUnitTest {
         verify(feedbackLedgerRecorder, never()).recordSuppressed(any(), any(), any(), anyInt());
     }
 
-    private static ValidatedObservation secretScannerObservation(String recurrenceKey) {
+    private static ValidatedObservation secretScannerObservation(@Nullable String recurrenceKey) {
         var evidence = tools.jackson.databind.node.JsonNodeFactory.instance
             .objectNode()
             .put("detector", "secret-diff-scanner");
@@ -247,11 +248,16 @@ class ReactionSuppressionFilterTest extends BaseUnitTest {
         return vf(slug, presence, CK);
     }
 
-    private static ValidatedObservation vf(String slug, Presence presence, String recurrenceKey, String occurrenceKey) {
+    private static ValidatedObservation vf(
+        String slug,
+        Presence presence,
+        @Nullable String recurrenceKey,
+        String occurrenceKey
+    ) {
         return vf(slug, presence, recurrenceKey).withKeys(new ObservationKeys(occurrenceKey, recurrenceKey));
     }
 
-    private static ValidatedObservation vf(String slug, Presence presence, String recurrenceKey) {
+    private static ValidatedObservation vf(String slug, Presence presence, @Nullable String recurrenceKey) {
         Assessment assessment =
             presence == Presence.NOT_APPLICABLE
                 ? null
@@ -272,11 +278,11 @@ class ReactionSuppressionFilterTest extends BaseUnitTest {
         );
     }
 
-    private Observation pf(String recurrenceKey) {
+    private Observation pf(@Nullable String recurrenceKey) {
         return pf(recurrenceKey, "occ-" + recurrenceKey);
     }
 
-    private Observation pf(String recurrenceKey, String occurrenceKey) {
+    private Observation pf(@Nullable String recurrenceKey, String occurrenceKey) {
         Observation pf = org.mockito.Mockito.mock(Observation.class);
         // aboutUserId is always populated; for author-side observations it equals the contributor.
         lenient().when(pf.getRecurrenceKey()).thenReturn(recurrenceKey);

@@ -19,6 +19,7 @@ import io.nats.client.Connection;
 import io.nats.client.Dispatcher;
 import io.nats.client.Message;
 import io.nats.client.MessageHandler;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
@@ -153,7 +154,7 @@ class SyncPushServiceTest extends BaseUnitTest {
     }
 
     @SuppressWarnings("unchecked")
-    private static ObjectProvider<Connection> objectProviderReturning(Connection connection) {
+    private static ObjectProvider<Connection> objectProviderReturning(@Nullable Connection connection) {
         ObjectProvider<Connection> provider = mock(ObjectProvider.class);
         when(provider.getIfAvailable()).thenReturn(connection);
         return provider;

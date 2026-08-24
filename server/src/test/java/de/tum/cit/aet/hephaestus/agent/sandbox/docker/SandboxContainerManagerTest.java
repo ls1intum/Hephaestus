@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -81,7 +82,7 @@ class SandboxContainerManagerTest extends BaseUnitTest {
                 null,
                 null,
                 Map.of(),
-                null,
+                mock(DockerOperations.HostConfigSpec.class),
                 List.of()
             );
             when(containerOps.createContainer(spec)).thenReturn(CONTAINER_ID);

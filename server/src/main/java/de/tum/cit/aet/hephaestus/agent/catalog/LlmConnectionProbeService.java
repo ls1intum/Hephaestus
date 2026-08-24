@@ -7,6 +7,7 @@ import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.MediaType;
@@ -80,11 +81,11 @@ public class LlmConnectionProbeService {
     }
 
     /** The caller (workspace BYO) must have egress-validated {@code baseUrl} itself. */
-    public LlmProbeResultDTO probeCredential(String baseUrl, LlmAuthMode authMode, String apiKey) {
+    public LlmProbeResultDTO probeCredential(String baseUrl, LlmAuthMode authMode, @Nullable String apiKey) {
         return probe(baseUrl, authMode, apiKey);
     }
 
-    private LlmProbeResultDTO probe(String baseUrl, LlmAuthMode authMode, String apiKey) {
+    private LlmProbeResultDTO probe(String baseUrl, LlmAuthMode authMode, @Nullable String apiKey) {
         String url = stripTrailingSlash(baseUrl) + "/models";
         try {
             return restClient

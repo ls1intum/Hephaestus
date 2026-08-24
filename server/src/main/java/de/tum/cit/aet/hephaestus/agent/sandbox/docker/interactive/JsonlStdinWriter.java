@@ -13,6 +13,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
@@ -52,7 +53,7 @@ final class JsonlStdinWriter {
     private final AtomicLong writeStartedNanos = new AtomicLong(IDLE);
 
     private volatile boolean terminated = false;
-    private volatile Thread writerThread;
+    private volatile @Nullable Thread writerThread;
 
     private final Runnable onTerminalFailure;
 

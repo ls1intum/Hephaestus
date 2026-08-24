@@ -6,4 +6,5 @@
  * through its own connected provider. They are never added together. Both totals exclude usage whose
  * price is not yet known; {@code unpricedEventCount} states that exclusion once, for both.
  */
+@org.jspecify.annotations.NullMarked
 package de.tum.cit.aet.hephaestus.agent.usage;

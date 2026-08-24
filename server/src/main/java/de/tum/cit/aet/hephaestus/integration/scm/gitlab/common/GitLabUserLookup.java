@@ -11,8 +11,8 @@ import org.jspecify.annotations.Nullable;
  * have access to the {@code GitLabUserFields} GraphQL fragment.
  */
 public record GitLabUserLookup(
-    String globalId,
-    String username,
+    @Nullable String globalId,
+    @Nullable String username,
     @Nullable String name,
     @Nullable String avatarUrl,
     @Nullable String webUrl,
@@ -20,8 +20,8 @@ public record GitLabUserLookup(
 ) {
     /** Convenience factory for callers that do not resolve {@code publicEmail}. */
     public static GitLabUserLookup of(
-        String globalId,
-        String username,
+        @Nullable String globalId,
+        @Nullable String username,
         @Nullable String name,
         @Nullable String avatarUrl,
         @Nullable String webUrl
