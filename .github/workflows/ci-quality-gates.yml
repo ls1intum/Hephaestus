@@ -117,10 +117,20 @@ jobs:
           FMT_OK=true; PMD_OK=true; LINT_OK=true; PIN_OK=true; TESTS_OK=true; TYPES_OK=true; SCRIPT_TYPES_OK=true; CONTRACTS_OK=true; ENV_OK=true; DOCS_OK=true; DIAGRAMS_OK=true; INSTRUCTIONS_OK=true
 
           pnpm run format:java:check || { FMT_OK=false; ISSUES_FOUND+=("Java formatting failed. Run: pnpm run format:java"); }
-          # PMD only fails a build while `failOnViolation` is true in server/pom.xml; `lint:java`
-          # passes `-q`, so with it off pmd:check prints nothing and exits 0. Read the comment
-          # beside that flag before touching it.
           pnpm run lint:java || { PMD_OK=false; ISSUES_FOUND+=("PMD found violations. Run: pnpm run lint:java:report"); }
+          # Verify the public lint command rejects a representative violation.
+          if [ "$PMD_OK" = "true" ]; then
+            PMD_CANARY=server/src/main/java/de/tum/cit/aet/hephaestus/Application.java
+            cp "$PMD_CANARY" "$RUNNER_TEMP/Application.java"
+            trap 'cp "$RUNNER_TEMP/Application.java" "$PMD_CANARY"' EXIT
+            sed -i '/public class Application {/a\    private int deliberatelyUnusedPmdCanary;' "$PMD_CANARY"
+            if pnpm run lint:java; then
+              PMD_OK=false
+              ISSUES_FOUND+=("PMD accepted a planted UnusedPrivateField violation; the gate is not analyzing current main sources")
+            fi
+            cp "$RUNNER_TEMP/Application.java" "$PMD_CANARY"
+            trap - EXIT
+          fi
           # Runs before the Biome step so a version skew is reported as a version skew rather than
           # as a wall of formatting diffs from the wrong release.
           pnpm run check:biome-pin \
