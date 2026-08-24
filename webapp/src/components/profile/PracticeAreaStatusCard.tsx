@@ -155,7 +155,7 @@ export function PracticeAreaStatusCard({
 		areas
 			.flatMap((area) => statuses[area.slug]?.sources ?? [])
 			.filter((sourceCount) => sourceCount.count > 0)
-			.map((sourceCount) => sourceCount.source),
+			.map((sourceCount) => sourceCount.artifactKind),
 	);
 	const sourceNouns = Object.entries(PRACTICE_AREA_SOURCE_META)
 		.filter(([source]) => presentSources.has(source))
@@ -218,7 +218,7 @@ export function PracticeAreaStatusCard({
 					const sources = (status?.sources ?? [])
 						.map((sourceCount) => ({
 							sourceCount,
-							meta: PRACTICE_AREA_SOURCE_META[sourceCount.source],
+							meta: PRACTICE_AREA_SOURCE_META[sourceCount.artifactKind],
 						}))
 						.filter((entry) => entry.meta !== undefined);
 					const totalSourceCount = sources.reduce(
@@ -332,7 +332,7 @@ export function PracticeAreaStatusCard({
 																if (!meta) return null;
 																const noun = sourceCount.count === 1 ? meta.singular : meta.plural;
 																return (
-																	<Tooltip key={sourceCount.source}>
+																	<Tooltip key={sourceCount.artifactKind}>
 																		<TooltipTrigger
 																			render={
 																				<button

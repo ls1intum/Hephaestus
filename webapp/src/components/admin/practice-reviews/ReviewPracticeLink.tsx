@@ -2,7 +2,6 @@ import { Link } from "@tanstack/react-router";
 import type { Practice, ReviewPracticeGroup } from "@/api/types.gen";
 import { GroupPill } from "@/components/admin/practice-catalog/GroupPill";
 import { PracticeDetailHoverCard } from "@/components/admin/practice-catalog/PracticeDetailHoverCard";
-import { getAreaVisual } from "@/components/shared/area-visuals";
 import { cn } from "@/lib/utils";
 
 export interface ReviewPracticeLinkProps {

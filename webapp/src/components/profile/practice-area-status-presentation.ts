@@ -77,13 +77,17 @@ export const PRACTICE_AREA_STATUS_BADGE: Record<
  */
 export const PRACTICE_AREA_SOURCE_META: Partial<
 	Record<
-		FeedbackSourceCount["source"],
+		FeedbackSourceCount["artifactKind"],
 		{ Icon: OcticonComponent | BrandIcon; singular: string; plural: string }
 	>
 > = {
-	PULL_REQUEST: { Icon: GitPullRequestIcon, singular: "pull request", plural: "pull requests" },
-	ISSUE: { Icon: IssueOpenedIcon, singular: "issue", plural: "issues" },
-	CONVERSATION_THREAD: {
+	"scm.pull_request": {
+		Icon: GitPullRequestIcon,
+		singular: "pull request",
+		plural: "pull requests",
+	},
+	"scm.issue": { Icon: IssueOpenedIcon, singular: "issue", plural: "issues" },
+	"chat.conversation_thread": {
 		Icon: SlackIcon,
 		singular: "Slack conversation",
 		plural: "Slack conversations",

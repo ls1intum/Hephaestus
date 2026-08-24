@@ -72,17 +72,18 @@ const statuses: Record<string, PracticeAreaStatus> = {
 			{
 				observationId: "0b54c9f2-8f4e-4a53-9be1-0e6a35a1c001",
 				title: "Change bundles two unrelated concerns",
+				outcome: "COMMISSION_PROBLEM",
 				deliveredFeedback:
 					"Split the refactoring from the feature change so each can be reviewed alone.",
 				severity: "MINOR",
-				artifactKind: "PULL_REQUEST",
+				artifactKind: "scm.pull_request",
 				artifactId: 41,
 				origin: "LIVE",
 			},
 		],
 		sources: [
-			{ source: "PULL_REQUEST", count: 12 },
-			{ source: "ISSUE", count: 3 },
+			{ artifactKind: "scm.pull_request", count: 12 },
+			{ artifactKind: "scm.issue", count: 3 },
 		],
 	},
 	"acting-on-review-feedback": {
@@ -98,13 +99,14 @@ const statuses: Record<string, PracticeAreaStatus> = {
 			{
 				observationId: "0b54c9f2-8f4e-4a53-9be1-0e6a35a1c002",
 				title: "Every review thread answered",
+				outcome: "DEMONSTRATED_STRENGTH",
 				deliveredFeedback: "You consistently close the loop on review threads — keep it up.",
-				artifactKind: "PULL_REQUEST",
+				artifactKind: "scm.pull_request",
 				artifactId: 42,
 				origin: "LIVE",
 			},
 		],
-		sources: [{ source: "PULL_REQUEST", count: 9 }],
+		sources: [{ artifactKind: "scm.pull_request", count: 9 }],
 	},
 	"testing-discipline": {
 		areaSlug: "testing-discipline",
@@ -121,16 +123,17 @@ const statuses: Record<string, PracticeAreaStatus> = {
 			{
 				observationId: "0b54c9f2-8f4e-4a53-9be1-0e6a35a1c003",
 				title: "Behaviour change shipped without a test",
+				outcome: "OMISSION_GAP",
 				deliveredFeedback: "Add a test that fails without this fix so the behaviour stays covered.",
 				severity: "MAJOR",
-				artifactKind: "PULL_REQUEST",
+				artifactKind: "scm.pull_request",
 				artifactId: 43,
 				origin: "LIVE",
 			},
 		],
 		sources: [
-			{ source: "PULL_REQUEST", count: 4 },
-			{ source: "ISSUE", count: 1 },
+			{ artifactKind: "scm.pull_request", count: 4 },
+			{ artifactKind: "scm.issue", count: 1 },
 		],
 	},
 };
@@ -194,7 +197,7 @@ const moreStatuses: Record<string, PracticeAreaStatus> = {
 		feedbackSpanDays: 27,
 		feedbackSince: new Date("2026-07-01T09:00:00Z"),
 		items: [],
-		sources: [{ source: "PULL_REQUEST", count: 6 }],
+		sources: [{ artifactKind: "scm.pull_request", count: 6 }],
 	},
 	"code-craftsmanship": {
 		areaSlug: "code-craftsmanship",
@@ -208,7 +211,7 @@ const moreStatuses: Record<string, PracticeAreaStatus> = {
 		feedbackSpanDays: 19,
 		feedbackSince: new Date("2026-07-09T09:00:00Z"),
 		items: [],
-		sources: [{ source: "PULL_REQUEST", count: 5 }],
+		sources: [{ artifactKind: "scm.pull_request", count: 5 }],
 	},
 	// No feedback at all: the card falls back to its badge and draws no ring.
 	communication: {
@@ -297,7 +300,7 @@ export const WithSlackFeedback: Story = {
 				...statuses["review-ready-work"],
 				sources: [
 					...statuses["review-ready-work"].sources,
-					{ source: "CONVERSATION_THREAD", count: 5 },
+					{ artifactKind: "chat.conversation_thread", count: 5 },
 				],
 			},
 		},

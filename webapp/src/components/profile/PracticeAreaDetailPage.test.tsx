@@ -25,7 +25,7 @@ const status: PracticeAreaStatus = {
 	areaSlug: area.slug,
 	areaName: area.name,
 	status: "DEVELOPING",
-	sources: [{ source: "PULL_REQUEST", count: 2 }],
+	sources: [{ artifactKind: "scm.pull_request", count: 2 }],
 	guidance:
 		"Your recent feedback points to “Scope the change to one concern” as the next practice to focus on.",
 	guidanceSource: "RULE_BASED",

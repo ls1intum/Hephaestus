@@ -52,11 +52,11 @@ import { SEVERITY_ORDER, SEVERITY_PRESENTATION, type SeverityKey } from "./sever
 /**
  * A single practice's standing in the selection list.
  *
- * <p>Keyed by the PRACTICE standing vocabulary plus one local absent marker — deliberately NOT by the area
- * status. The reflection surface only ever reports the three verdicts for a practice; the area's no-verdict
- * reasons (`NOT_OBSERVED`/`NO_OPPORTUNITY`) are aggregate facts and cannot be attributed to
- * an individual practice from this payload. Sharing one map made a practice inherit area-level wording it
- * has no evidence for.
+ * <p>Keyed by the PRACTICE standing vocabulary plus one local absent marker. The no-verdict reasons used to
+ * be area-only facts that could not be attributed to a single practice, which is what the local marker stood
+ * in for; the reflection payload now carries them per practice, so they are rendered from the practice's own
+ * evidence rather than inherited from its area. `UNMEASURED` remains for the one case the payload still
+ * cannot answer: a practice absent from the standings map entirely.
  */
 type PracticeStandingKey = NonNullable<ReflectionPractice["standing"]> | "UNMEASURED";
 
@@ -81,6 +81,18 @@ const STANDING_NODE: Record<
 		circleClass: "border-success/60 text-success",
 		textClass: "text-success",
 		label: "Going well",
+	},
+	NOT_OBSERVED: {
+		Icon: CircleDashedIcon,
+		circleClass: "border-border text-muted-foreground",
+		textClass: "text-muted-foreground",
+		label: "Not observed yet",
+	},
+	NO_OPPORTUNITY: {
+		Icon: CircleDashedIcon,
+		circleClass: "border-border text-muted-foreground",
+		textClass: "text-muted-foreground",
+		label: "No occasion yet",
 	},
 	UNMEASURED: {
 		Icon: CircleDashedIcon,
@@ -309,7 +321,10 @@ export function PracticeAreaDetailPage({
 		if (standing === "STRENGTH" && practice.whatGoodLooksLike) {
 			return `Keep doing this: ${practice.whatGoodLooksLike}`;
 		}
-		if (standing === "UNMEASURED") {
+		if (standing === "NO_OPPORTUNITY") {
+			return "Nothing to act on yet — the reviews ran and your work offered no occasion for this practice.";
+		}
+		if (standing === "NOT_OBSERVED" || standing === "UNMEASURED") {
 			return "No focused next step yet. It will appear after this practice is observed in reviewed work.";
 		}
 		return practice.whatGoodLooksLike;
