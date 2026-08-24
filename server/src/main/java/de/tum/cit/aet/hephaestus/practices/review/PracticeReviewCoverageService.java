@@ -8,21 +8,16 @@ import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembership;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembershipRepository;
 import de.tum.cit.aet.hephaestus.workspace.settings.PracticeReviewPersonTarget;
 import de.tum.cit.aet.hephaestus.workspace.settings.PracticeReviewPersonTargetRepository;
-import de.tum.cit.aet.hephaestus.workspace.settings.PracticeReviewRepositoryBranch;
-import de.tum.cit.aet.hephaestus.workspace.settings.PracticeReviewRepositoryBranchRepository;
 import de.tum.cit.aet.hephaestus.workspace.settings.PracticeReviewRepositoryTarget;
 import de.tum.cit.aet.hephaestus.workspace.settings.PracticeReviewRepositoryTargetRepository;
 import de.tum.cit.aet.hephaestus.workspace.settings.ReviewPersonMode;
 import de.tum.cit.aet.hephaestus.workspace.settings.ReviewRepositoryMode;
 import de.tum.cit.aet.hephaestus.workspace.settings.ReviewRepositoryTarget;
 import de.tum.cit.aet.hephaestus.workspace.settings.WorkspaceReviewScope;
-import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -36,7 +31,6 @@ public class PracticeReviewCoverageService {
     private final RepositoryToMonitorRepository monitorRepository;
     private final WorkspaceMembershipRepository membershipRepository;
     private final PracticeReviewRepositoryTargetRepository repositoryTargetRepository;
-    private final PracticeReviewRepositoryBranchRepository branchRepository;
     private final PracticeReviewPersonTargetRepository personTargetRepository;
 
     @Transactional(readOnly = true)
@@ -51,17 +45,13 @@ public class PracticeReviewCoverageService {
             .findByWorkspaceId(workspaceId)
             .stream()
             .collect(Collectors.toMap(RepositoryToMonitor::getId, Function.identity()));
-        Map<UUID, List<String>> branchesByTarget = branchesByTarget(workspaceId, targets);
         List<ReviewRepositoryTarget> repositories = targets
             .stream()
             .map(target -> {
                 RepositoryToMonitor monitor = monitorsById.get(target.getRepositoryMonitorId());
                 return monitor == null
                     ? null
-                    : new ReviewRepositoryTarget(
-                          monitor.getNameWithOwner(),
-                          branchesByTarget.getOrDefault(target.getId(), List.of())
-                      );
+                    : new ReviewRepositoryTarget(monitor.getNameWithOwner(), target.getBaseBranches());
             })
             .filter(java.util.Objects::nonNull)
             .sorted(java.util.Comparator.comparing(ReviewRepositoryTarget::nameWithOwner))
@@ -314,42 +304,31 @@ public class PracticeReviewCoverageService {
             );
         }
 
-        branchRepository.deleteByWorkspaceId(workspaceId);
         repositoryTargetRepository.deleteByWorkspaceId(workspaceId);
         personTargetRepository.deleteByWorkspaceId(workspaceId);
 
         if (requested.repositoryMode() == ReviewRepositoryMode.SELECTED) {
-            List<PracticeReviewRepositoryBranch> branches = new ArrayList<>();
             for (ReviewRepositoryTarget selection : requestedRepositories.values()) {
-                PracticeReviewRepositoryTarget target = new PracticeReviewRepositoryTarget();
-                target.setId(UUID.randomUUID());
-                target.setWorkspaceId(workspaceId);
-                target.setRepositoryMonitorId(monitorsByName.get(selection.nameWithOwner()).getId());
-                repositoryTargetRepository.save(target);
                 for (String branchName : selection.baseBranches()) {
                     if (branchName.length() > 255) {
                         throw new InvalidReviewCoverageException("A base branch must not exceed 255 characters");
                     }
-                    PracticeReviewRepositoryBranch branch = new PracticeReviewRepositoryBranch();
-                    branch.setWorkspaceId(workspaceId);
-                    branch.setRepositoryTargetId(target.getId());
-                    branch.setBaseBranch(branchName);
-                    branches.add(branch);
                 }
+                repositoryTargetRepository.save(
+                    new PracticeReviewRepositoryTarget(
+                        workspaceId,
+                        monitorsByName.get(selection.nameWithOwner()).getId(),
+                        selection.baseBranches()
+                    )
+                );
             }
-            branchRepository.saveAll(branches);
         }
 
         if (requested.personMode() == ReviewPersonMode.SELECTED) {
             personTargetRepository.saveAll(
                 requestedPeople
                     .stream()
-                    .map(userId -> {
-                        PracticeReviewPersonTarget target = new PracticeReviewPersonTarget();
-                        target.setWorkspaceId(workspaceId);
-                        target.setUserId(userId);
-                        return target;
-                    })
+                    .map(userId -> new PracticeReviewPersonTarget(workspaceId, userId))
                     .toList()
             );
         }
@@ -362,20 +341,5 @@ public class PracticeReviewCoverageService {
             .stream()
             .filter(WorkspaceMembership::hasHumanUser)
             .toList();
-    }
-
-    private Map<UUID, List<String>> branchesByTarget(long workspaceId, List<PracticeReviewRepositoryTarget> targets) {
-        if (targets.isEmpty()) return Map.of();
-        Map<UUID, List<String>> result = new HashMap<>();
-        for (PracticeReviewRepositoryBranch branch : branchRepository.findByWorkspaceIdAndRepositoryTargetIdIn(
-            workspaceId,
-            targets.stream().map(PracticeReviewRepositoryTarget::getId).toList()
-        )) {
-            result
-                .computeIfAbsent(branch.getRepositoryTargetId(), ignored -> new ArrayList<>())
-                .add(branch.getBaseBranch());
-        }
-        result.values().forEach(values -> values.sort(String::compareTo));
-        return result;
     }
 }

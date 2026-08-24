@@ -3,47 +3,55 @@ package de.tum.cit.aet.hephaestus.workspace.settings;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
-import jakarta.persistence.Index;
-import jakarta.persistence.PrePersist;
+import jakarta.persistence.IdClass;
 import jakarta.persistence.Table;
-import jakarta.persistence.UniqueConstraint;
-import java.util.UUID;
+import java.io.Serializable;
+import java.util.List;
+import lombok.AllArgsConstructor;
+import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
+/**
+ * One monitored repository a workspace reviews, and the base branches of it that are in scope. Keyed by
+ * the pair it means rather than by a surrogate, so the row cannot exist twice for one repository.
+ */
 @Entity
-@Table(
-    name = "practice_review_repository_target",
-    uniqueConstraints = {
-        @UniqueConstraint(
-            name = "uk_practice_review_repository_target",
-            columnNames = { "workspace_id", "repository_monitor_id" }
-        ),
-        @UniqueConstraint(
-            name = "uk_practice_review_repository_target_workspace_id",
-            columnNames = { "workspace_id", "id" }
-        ),
-    },
-    indexes = @Index(name = "idx_practice_review_repository_target_workspace", columnList = "workspace_id")
-)
+@Table(name = "practice_review_repository_target")
+@IdClass(PracticeReviewRepositoryTarget.Key.class)
 @Getter
 @Setter
 @NoArgsConstructor
 public class PracticeReviewRepositoryTarget {
 
     @Id
-    @Column(columnDefinition = "UUID")
-    private UUID id;
-
     @Column(name = "workspace_id", nullable = false)
     private Long workspaceId;
 
+    @Id
     @Column(name = "repository_monitor_id", nullable = false)
     private Long repositoryMonitorId;
 
-    @PrePersist
-    void prePersist() {
-        if (id == null) id = UUID.randomUUID();
+    /** Empty admits every branch, which is what naming none of them means. */
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "base_branches", nullable = false, columnDefinition = "jsonb")
+    private List<String> baseBranches = List.of();
+
+    public PracticeReviewRepositoryTarget(Long workspaceId, Long repositoryMonitorId, List<String> baseBranches) {
+        this.workspaceId = workspaceId;
+        this.repositoryMonitorId = repositoryMonitorId;
+        this.baseBranches = List.copyOf(baseBranches);
+    }
+
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @EqualsAndHashCode
+    public static class Key implements Serializable {
+
+        private Long workspaceId;
+        private Long repositoryMonitorId;
     }
 }

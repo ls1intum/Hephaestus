@@ -909,22 +909,14 @@ erDiagram
     }
 
     PracticeReviewPersonTarget {
-        UUID id PK
-        BIGINT workspace_id FK,UK "NOT NULL"
-        BIGINT user_id FK,UK "NOT NULL"
-    }
-
-    PracticeReviewRepositoryBranch {
-        UUID id PK
-        BIGINT workspace_id FK,UK "NOT NULL"
-        UUID repository_target_id FK,UK "NOT NULL"
-        VARCHAR(255) base_branch UK "NOT NULL"
+        BIGINT workspace_id PK,FK
+        BIGINT user_id PK,FK
     }
 
     PracticeReviewRepositoryTarget {
-        UUID id PK,UK
-        BIGINT workspace_id FK,UK "NOT NULL"
-        BIGINT repository_monitor_id FK,UK "NOT NULL"
+        BIGINT workspace_id PK,FK
+        BIGINT repository_monitor_id PK,FK
+        JSONB base_branches "NOT NULL"
     }
 
     PracticeRevision {
@@ -1665,8 +1657,6 @@ erDiagram
     Label }o--o{ IssueLabel : labeled
     LlmModel }o--o{ LlmModelWorkspaceGrant : has
     Workspace }o--o{ LlmModelWorkspaceGrant : has
-    PracticeReviewRepositoryTarget }o--o{ PracticeReviewRepositoryBranch : reviewed
-    Workspace }o--o{ PracticeReviewRepositoryBranch : reviewed
     RepositoryToMonitor }o--o{ PracticeReviewRepositoryTarget : reviewed
     Workspace }o--o{ PracticeReviewRepositoryTarget : reviewed
     Issue }o--o{ PullRequestRequestedReviewer : reviewed

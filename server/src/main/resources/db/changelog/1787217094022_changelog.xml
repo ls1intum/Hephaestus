@@ -22,36 +22,26 @@
             ALTER TABLE workspace ADD CONSTRAINT chk_workspace_practice_delivery_status
                 CHECK (practice_delivery_status IN ('ACTIVE', 'PAUSED'));
         ]]></sql>
+        <!-- Keyed by what they mean rather than by a surrogate: a workspace covers a monitored repository
+             once, and a person once. Base branches are an owned list nothing points into, so they ride on
+             the row they qualify instead of in a table of their own. -->
         <createTable tableName="practice_review_repository_target">
-            <column name="id" type="UUID"><constraints nullable="false" primaryKey="true" primaryKeyName="pk_practice_review_repository_target"/></column>
-            <column name="workspace_id" type="BIGINT"><constraints nullable="false"/></column>
-            <column name="repository_monitor_id" type="BIGINT"><constraints nullable="false"/></column>
+            <column name="workspace_id" type="BIGINT"><constraints nullable="false" primaryKey="true" primaryKeyName="pk_practice_review_repository_target"/></column>
+            <column name="repository_monitor_id" type="BIGINT"><constraints nullable="false" primaryKey="true" primaryKeyName="pk_practice_review_repository_target"/></column>
+            <column name="base_branches" type="JSONB" defaultValue="[]"><constraints nullable="false"/></column>
         </createTable>
-        <addUniqueConstraint tableName="practice_review_repository_target" columnNames="workspace_id,repository_monitor_id" constraintName="uk_practice_review_repository_target"/>
         <addUniqueConstraint tableName="repository_to_monitor" columnNames="workspace_id,id" constraintName="uk_repository_to_monitor_workspace_id"/>
         <addForeignKeyConstraint baseTableName="practice_review_repository_target" baseColumnNames="workspace_id" referencedTableName="workspace" referencedColumnNames="id" constraintName="sfk_practice_review_repository_target_workspace" onDelete="CASCADE"/>
         <addForeignKeyConstraint baseTableName="practice_review_repository_target" baseColumnNames="workspace_id,repository_monitor_id" referencedTableName="repository_to_monitor" referencedColumnNames="workspace_id,id" constraintName="sfk_practice_review_repository_target_monitor" onDelete="CASCADE"/>
-        <createIndex tableName="practice_review_repository_target" indexName="idx_practice_review_repository_target_workspace"><column name="workspace_id"/></createIndex>
-        <createTable tableName="practice_review_repository_branch">
-            <column name="id" type="UUID"><constraints nullable="false" primaryKey="true" primaryKeyName="pk_practice_review_repository_branch"/></column>
-            <column name="workspace_id" type="BIGINT"><constraints nullable="false"/></column>
-            <column name="repository_target_id" type="UUID"><constraints nullable="false"/></column>
-            <column name="base_branch" type="VARCHAR(255)"><constraints nullable="false"/></column>
-        </createTable>
-        <addUniqueConstraint tableName="practice_review_repository_branch" columnNames="workspace_id,repository_target_id,base_branch" constraintName="uk_practice_review_repository_branch"/>
-        <addUniqueConstraint tableName="practice_review_repository_target" columnNames="workspace_id,id" constraintName="uk_practice_review_repository_target_workspace_id"/>
-        <addForeignKeyConstraint baseTableName="practice_review_repository_branch" baseColumnNames="workspace_id" referencedTableName="workspace" referencedColumnNames="id" constraintName="sfk_practice_review_repository_branch_workspace" onDelete="CASCADE"/>
-        <addForeignKeyConstraint baseTableName="practice_review_repository_branch" baseColumnNames="workspace_id,repository_target_id" referencedTableName="practice_review_repository_target" referencedColumnNames="workspace_id,id" constraintName="sfk_practice_review_repository_branch_target" onDelete="CASCADE"/>
-        <createIndex tableName="practice_review_repository_branch" indexName="idx_practice_review_repository_branch_target"><column name="repository_target_id"/></createIndex>
-        <createIndex tableName="practice_review_repository_branch" indexName="idx_practice_review_repository_branch_workspace"><column name="workspace_id"/></createIndex>
+        <sql splitStatements="true" endDelimiter=";"><![CDATA[
+            ALTER TABLE practice_review_repository_target ADD CONSTRAINT chk_practice_review_repository_target_branches
+                CHECK (jsonb_typeof(base_branches) = 'array');
+        ]]></sql>
         <createTable tableName="practice_review_person_target">
-            <column name="id" type="UUID"><constraints nullable="false" primaryKey="true" primaryKeyName="pk_practice_review_person_target"/></column>
-            <column name="workspace_id" type="BIGINT"><constraints nullable="false"/></column>
-            <column name="user_id" type="BIGINT"><constraints nullable="false"/></column>
+            <column name="workspace_id" type="BIGINT"><constraints nullable="false" primaryKey="true" primaryKeyName="pk_practice_review_person_target"/></column>
+            <column name="user_id" type="BIGINT"><constraints nullable="false" primaryKey="true" primaryKeyName="pk_practice_review_person_target"/></column>
         </createTable>
-        <addUniqueConstraint tableName="practice_review_person_target" columnNames="workspace_id,user_id" constraintName="uk_practice_review_person_target"/>
         <addForeignKeyConstraint baseTableName="practice_review_person_target" baseColumnNames="workspace_id,user_id" referencedTableName="workspace_membership" referencedColumnNames="workspace_id,user_id" constraintName="sfk_practice_review_person_target_membership" onDelete="CASCADE"/>
-        <createIndex tableName="practice_review_person_target" indexName="idx_practice_review_person_target_workspace"><column name="workspace_id"/></createIndex>
         <sql splitStatements="true" endDelimiter=";"><![CDATA[
             UPDATE workspace
                SET practice_repository_coverage_mode = 'SELECTED'
@@ -59,19 +49,15 @@
                AND (jsonb_array_length(COALESCE(practice_review_scope -> 'repositories', '[]'::jsonb)) > 0
                     OR jsonb_array_length(COALESCE(practice_review_scope -> 'targetBranches', '[]'::jsonb)) > 0);
 
-            INSERT INTO practice_review_repository_target (id, workspace_id, repository_monitor_id)
-            SELECT gen_random_uuid(), w.id, r.id
+            -- The old shape held one branch list for the whole workspace; every selected repository
+            -- inherits it, which is what it meant.
+            INSERT INTO practice_review_repository_target (workspace_id, repository_monitor_id, base_branches)
+            SELECT w.id, r.id, COALESCE(w.practice_review_scope -> 'targetBranches', '[]'::jsonb)
               FROM workspace w
               JOIN repository_to_monitor r ON r.workspace_id = w.id
              WHERE w.practice_repository_coverage_mode = 'SELECTED'
                AND (jsonb_array_length(COALESCE(w.practice_review_scope -> 'repositories', '[]'::jsonb)) = 0
                     OR r.name_with_owner IN (SELECT jsonb_array_elements_text(w.practice_review_scope -> 'repositories')));
-
-            INSERT INTO practice_review_repository_branch (id, workspace_id, repository_target_id, base_branch)
-            SELECT gen_random_uuid(), t.workspace_id, t.id, branch.value
-              FROM practice_review_repository_target t
-              JOIN workspace w ON w.id = t.workspace_id
-              CROSS JOIN LATERAL jsonb_array_elements_text(COALESCE(w.practice_review_scope -> 'targetBranches', '[]'::jsonb)) branch(value);
 
             ALTER TABLE workspace DROP CONSTRAINT IF EXISTS chk_workspace_review_scope;
             ALTER TABLE workspace DROP COLUMN practice_review_scope;
@@ -83,13 +69,14 @@
                     'repositories', COALESCE((SELECT jsonb_agg(r.name_with_owner ORDER BY r.name_with_owner)
                         FROM practice_review_repository_target t JOIN repository_to_monitor r ON r.id = t.repository_monitor_id
                         WHERE t.workspace_id = w.id), '[]'::jsonb),
-                    'targetBranches', COALESCE((SELECT jsonb_agg(DISTINCT b.base_branch)
-                        FROM practice_review_repository_branch b WHERE b.workspace_id = w.id), '[]'::jsonb)
+                    'targetBranches', COALESCE((SELECT jsonb_agg(DISTINCT branch.value)
+                        FROM practice_review_repository_target t
+                        CROSS JOIN LATERAL jsonb_array_elements_text(t.base_branches) branch(value)
+                        WHERE t.workspace_id = w.id), '[]'::jsonb)
                 ) WHERE w.practice_repository_coverage_mode = 'SELECTED';
                 ALTER TABLE workspace ADD CONSTRAINT chk_workspace_review_scope CHECK (practice_review_scope IS NULL OR jsonb_typeof(practice_review_scope) = 'object');
             ]]></sql>
             <dropTable tableName="practice_review_person_target"/>
-            <dropTable tableName="practice_review_repository_branch"/>
             <dropTable tableName="practice_review_repository_target"/>
             <dropUniqueConstraint tableName="repository_to_monitor" constraintName="uk_repository_to_monitor_workspace_id"/>
             <dropColumn tableName="workspace" columnName="practice_rollout_revision"/>

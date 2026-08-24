@@ -13,7 +13,6 @@ import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembership;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembershipRepository;
 import de.tum.cit.aet.hephaestus.workspace.settings.PracticeReviewPersonTargetRepository;
-import de.tum.cit.aet.hephaestus.workspace.settings.PracticeReviewRepositoryBranchRepository;
 import de.tum.cit.aet.hephaestus.workspace.settings.PracticeReviewRepositoryTargetRepository;
 import de.tum.cit.aet.hephaestus.workspace.settings.ReviewPersonMode;
 import de.tum.cit.aet.hephaestus.workspace.settings.ReviewRepositoryMode;
@@ -37,9 +36,6 @@ class PracticeReviewCoverageServiceTest extends BaseUnitTest {
     private PracticeReviewRepositoryTargetRepository repositoryTargets;
 
     @Mock
-    private PracticeReviewRepositoryBranchRepository branches;
-
-    @Mock
     private PracticeReviewPersonTargetRepository people;
 
     private PracticeReviewCoverageService service;
@@ -47,7 +43,7 @@ class PracticeReviewCoverageServiceTest extends BaseUnitTest {
 
     @BeforeEach
     void setUp() {
-        service = new PracticeReviewCoverageService(monitors, memberships, repositoryTargets, branches, people);
+        service = new PracticeReviewCoverageService(monitors, memberships, repositoryTargets, people);
         workspace = new Workspace();
         workspace.setId(1L);
     }
