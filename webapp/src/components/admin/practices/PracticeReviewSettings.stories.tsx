@@ -269,7 +269,7 @@ export const AddingATargetBranch: Story = {
 	},
 };
 
-export const AddingASecondBranchWidens: Story = {
+export const AddingASecondBranchAppliesImmediately: Story = {
 	args: {
 		policy: {
 			...policy,
@@ -292,8 +292,15 @@ export const AddingASecondBranchWidens: Story = {
 			canvas.getByRole("button", { name: "Add to base branches for acme/widgets" }),
 		);
 
-		await screen.findByRole("alertdialog");
-		await expect(args.policy.onUpdate).not.toHaveBeenCalled();
+		await expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+		await expect(args.policy.onUpdate).toHaveBeenCalledWith({
+			reviewScope: {
+				repositoryMode: "SELECTED",
+				personMode: "ALL_ELIGIBLE",
+				repositories: [{ nameWithOwner: "acme/widgets", baseBranches: ["main", "dev"] }],
+				personUserIds: [],
+			},
+		});
 	},
 };
 
@@ -331,7 +338,7 @@ export const RemovingOneOfTwoBranchesNarrows: Story = {
 	},
 };
 
-export const ClearingEveryBranchWidens: Story = {
+export const ClearingEveryBranchAppliesImmediately: Story = {
 	args: {
 		policy: {
 			...policy,
@@ -353,8 +360,15 @@ export const ClearingEveryBranchWidens: Story = {
 			canvas.getByRole("button", { name: "Remove main from base branches for acme/widgets" }),
 		);
 
-		await screen.findByRole("alertdialog");
-		await expect(args.policy.onUpdate).not.toHaveBeenCalled();
+		await expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+		await expect(args.policy.onUpdate).toHaveBeenCalledWith({
+			reviewScope: {
+				repositoryMode: "SELECTED",
+				personMode: "ALL_ELIGIBLE",
+				repositories: [{ nameWithOwner: "acme/widgets", baseBranches: [] }],
+				personUserIds: [],
+			},
+		});
 	},
 };
 
@@ -421,12 +435,40 @@ export const SendingPaused: Story = {
 		await expect(canvas.getByText("Sending is paused")).toBeVisible();
 		await expect(canvas.getByRole("switch", { name: /Send feedback/ })).not.toBeChecked();
 		await expect(
-			canvas.getByText(/Nothing prepared while this is paused is sent when you resume/),
+			canvas.getByText(/developers can still read their own feedback in Hephaestus/),
 		).toBeVisible();
 	},
 };
 
-export const WideningRequiresConfirmation: Story = {
+/**
+ * Building the pilot population is the common path and every step of it is an increment the counters
+ * already report, so none of it interrupts. Only opening a dimension back up to everyone asks.
+ */
+export const BuildingThePopulationNeverInterrupts: Story = {
+	args: {
+		policy: {
+			...policy,
+			onUpdate: fn(),
+			settings: {
+				...settings,
+				reviewScope: {
+					repositoryMode: "SELECTED",
+					personMode: "SELECTED",
+					repositories: [{ nameWithOwner: "acme/widgets", baseBranches: [] }],
+					personUserIds: [7],
+				},
+			},
+		},
+	},
+	play: async ({ args, canvas }) => {
+		await userEvent.click(canvas.getByLabelText("Choose repositories"));
+		await userEvent.click(await screen.findByRole("option", { name: "acme/gadgets" }));
+		await expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+		await expect(args.policy.onUpdate).toHaveBeenCalledTimes(1);
+	},
+};
+
+export const OpeningToEveryoneAsksFirst: Story = {
 	args: {
 		policy: {
 			...policy,
@@ -465,7 +507,7 @@ export const WideningRequiresConfirmation: Story = {
 		);
 		await expect(args.coverage.preview.onPreview).toHaveBeenCalled();
 
-		await userEvent.click(dialog.getByRole("button", { name: "Widen coverage" }));
+		await userEvent.click(dialog.getByRole("button", { name: "Review everyone" }));
 		await expect(args.policy.onUpdate).toHaveBeenCalledWith({
 			reviewScope: {
 				repositoryMode: "ALL_MONITORED",
@@ -479,7 +521,7 @@ export const WideningRequiresConfirmation: Story = {
 
 export const CoveragePreviewLoading: Story = {
 	args: {
-		...WideningRequiresConfirmation.args,
+		...OpeningToEveryoneAsksFirst.args,
 		coverage: {
 			...coverage,
 			preview: { data: undefined, isPending: true, isError: false, onPreview: fn() },
@@ -490,13 +532,13 @@ export const CoveragePreviewLoading: Story = {
 
 		const dialog = within(await screen.findByRole("alertdialog"));
 		await expectSettledVisible(dialog.getByText("Calculating the proposed coverage…"));
-		await expect(dialog.getByRole("button", { name: "Widen coverage" })).toBeDisabled();
+		await expect(dialog.getByRole("button", { name: "Review everyone" })).toBeDisabled();
 	},
 };
 
 export const CoveragePreviewUnavailable: Story = {
 	args: {
-		...WideningRequiresConfirmation.args,
+		...OpeningToEveryoneAsksFirst.args,
 		coverage: {
 			...coverage,
 			preview: { data: undefined, isPending: false, isError: true, onPreview: fn() },
@@ -506,8 +548,8 @@ export const CoveragePreviewUnavailable: Story = {
 		await userEvent.click(canvas.getByRole("radio", { name: "All monitored repositories" }));
 
 		const dialog = within(await screen.findByRole("alertdialog"));
-		await expectSettledVisible(dialog.getByText("Couldn't preview this change"));
-		await expect(dialog.getByRole("button", { name: "Widen coverage" })).toBeDisabled();
+		await expectSettledVisible(dialog.getByText("Couldn't estimate the new coverage"));
+		await expect(dialog.getByRole("button", { name: "Review everyone" })).toBeEnabled();
 
 		await userEvent.click(dialog.getByRole("button", { name: "Retry" }));
 		await expect(args.coverage.preview.onPreview).toHaveBeenCalledTimes(2);

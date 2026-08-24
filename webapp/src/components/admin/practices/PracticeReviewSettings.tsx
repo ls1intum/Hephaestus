@@ -365,11 +365,15 @@ function ReviewedWorkSection({
 			.filter((id) => !coverage.people.options.some((option) => option.value === id))
 			.map((id) => ({ value: id, label: `Member ${id} (unavailable)` })),
 	];
-	const requestScope = (next: WorkspaceReviewScope, widens: boolean) => {
-		if (widens) {
-			setPendingScope(next);
-			coverage.preview.onPreview(next);
-		} else policy.onUpdate({ reviewScope: next });
+	const applyScope = (next: WorkspaceReviewScope) => policy.onUpdate({ reviewScope: next });
+	/**
+	 * Opening a dimension to everyone is the one coverage change that is a step change rather than an
+	 * increment, so it is the one that asks. Adding a repository or a person moves a counter already on
+	 * screen and is undone by removing it again.
+	 */
+	const confirmOpeningToEveryone = (next: WorkspaceReviewScope) => {
+		setPendingScope(next);
+		coverage.preview.onPreview(next);
 	};
 	const replaceRepositories = (names: string[]) => {
 		const byName = new Map(
@@ -381,16 +385,8 @@ function ReviewedWorkSection({
 				(name) => byName.get(name) ?? { nameWithOwner: name, baseBranches: [] },
 			),
 		};
-		requestScope(
-			next,
-			names.some((name) => !repositoryNames.includes(name)),
-		);
+		applyScope(next);
 	};
-	const admitsEveryBranch = (branches: string[]) => branches.length === 0;
-	const widensBranches = (before: string[], after: string[]) =>
-		admitsEveryBranch(after)
-			? !admitsEveryBranch(before)
-			: !admitsEveryBranch(before) && after.some((branch) => !before.includes(branch));
 	const summary = settings.coverageSummary;
 	const preview = coverage.preview.data;
 	const coversNobody =
@@ -444,9 +440,11 @@ function ReviewedWorkSection({
 					aria-labelledby="repositories-covered-label"
 					value={scope.repositoryMode}
 					disabled={policy.isSaving}
-					onValueChange={(mode) =>
-						requestScope({ ...scope, repositoryMode: mode }, mode === "ALL_MONITORED")
-					}
+					onValueChange={(mode) => {
+						const next = { ...scope, repositoryMode: mode };
+						if (mode === "ALL_MONITORED") confirmOpeningToEveryone(next);
+						else applyScope(next);
+					}}
 				>
 					<label className="flex items-center gap-2" htmlFor="repositories-all">
 						<RadioGroupItem id="repositories-all" value="ALL_MONITORED" />
@@ -503,7 +501,7 @@ function ReviewedWorkSection({
 														: entry,
 												),
 											};
-											requestScope(next, widensBranches(repository.baseBranches, baseBranches));
+											applyScope(next);
 										}}
 									/>
 								))}
@@ -529,9 +527,11 @@ function ReviewedWorkSection({
 					aria-labelledby="people-covered-label"
 					value={scope.personMode}
 					disabled={policy.isSaving}
-					onValueChange={(mode) =>
-						requestScope({ ...scope, personMode: mode }, mode === "ALL_ELIGIBLE")
-					}
+					onValueChange={(mode) => {
+						const next = { ...scope, personMode: mode };
+						if (mode === "ALL_ELIGIBLE") confirmOpeningToEveryone(next);
+						else applyScope(next);
+					}}
 				>
 					<label className="flex items-center gap-2" htmlFor="people-all">
 						<RadioGroupItem id="people-all" value="ALL_ELIGIBLE" />
@@ -550,12 +550,7 @@ function ReviewedWorkSection({
 							variant="field"
 							options={personOptions}
 							selected={scope.personUserIds}
-							onChange={(personUserIds) =>
-								requestScope(
-									{ ...scope, personUserIds },
-									personUserIds.some((id) => !scope.personUserIds.includes(id)),
-								)
-							}
+							onChange={(personUserIds) => applyScope({ ...scope, personUserIds })}
 							disabled={policy.isSaving || coverage.people.isLoading}
 							emptyLabel={coverage.people.isError ? "Members unavailable" : "No workspace members"}
 						/>
@@ -584,13 +579,10 @@ function ReviewedWorkSection({
 											} from covered people`}
 											disabled={policy.isSaving}
 											onRemove={() =>
-												requestScope(
-													{
-														...scope,
-														personUserIds: scope.personUserIds.filter((id) => id !== userId),
-													},
-													false,
-												)
+												applyScope({
+													...scope,
+													personUserIds: scope.personUserIds.filter((id) => id !== userId),
+												})
 											}
 										/>
 									</li>
@@ -607,11 +599,12 @@ function ReviewedWorkSection({
 			>
 				<AlertDialogContent>
 					<AlertDialogHeader>
-						<AlertDialogTitle>Widen practice-review coverage?</AlertDialogTitle>
+						<AlertDialogTitle>Review everyone's work here?</AlertDialogTitle>
 						<AlertDialogDescription>
-							New work that matches will be reviewed from now on. Reviews that already finished are
-							not released, and any review still running is discarded and starts again under the new
-							coverage.
+							This stops the pilot being a pilot: work outside your chosen population starts being
+							reviewed, and its authors start receiving feedback. Reviews admitted under the old
+							coverage are not released and are not run again — that work is reviewed again only
+							when it next changes.
 						</AlertDialogDescription>
 					</AlertDialogHeader>
 					{coverage.preview.isPending ? (
@@ -621,8 +614,9 @@ function ReviewedWorkSection({
 					) : coverage.preview.isError ? (
 						<Alert variant="warning">
 							<AlertCircle />
-							<AlertTitle>Couldn't preview this change</AlertTitle>
+							<AlertTitle>Couldn't estimate the new coverage</AlertTitle>
 							<AlertDescription>
+								You can still go ahead — the estimate is context, not a precondition.
 								<Button
 									variant="outline"
 									size="sm"
@@ -655,15 +649,15 @@ function ReviewedWorkSection({
 						</div>
 					) : null}
 					<AlertDialogFooter>
-						<AlertDialogCancel>Keep current coverage</AlertDialogCancel>
+						<AlertDialogCancel>Keep my chosen population</AlertDialogCancel>
 						<AlertDialogAction
-							disabled={!preview || coverage.preview.isPending || coverage.preview.isError}
+							disabled={coverage.preview.isPending}
 							onClick={() => {
 								if (pendingScope) policy.onUpdate({ reviewScope: pendingScope });
 								setPendingScope(undefined);
 							}}
 						>
-							Widen coverage
+							Review everyone
 						</AlertDialogAction>
 					</AlertDialogFooter>
 				</AlertDialogContent>
@@ -691,8 +685,9 @@ function FeedbackDeliverySection({ policy }: Pick<PracticeReviewSettingsProps, "
 					<AlertCircle />
 					<AlertTitle>Sending is paused</AlertTitle>
 					<AlertDescription>
-						Reviews still run and you can still read them here. Nothing prepared while this is
-						paused is sent when you resume — only work reviewed afterwards.
+						Reviews still run, and developers can still read their own feedback in Hephaestus.
+						Nothing reaches a pull request or the mentor while this is paused, and resuming sends
+						only work reviewed afterwards — it does not release what was withheld.
 					</AlertDescription>
 				</Alert>
 			) : null}
@@ -703,8 +698,8 @@ function FeedbackDeliverySection({ policy }: Pick<PracticeReviewSettingsProps, "
 						<Badge variant={paused ? "warning" : "success"}>{paused ? "Paused" : "Active"}</Badge>
 					</FieldLabel>
 					<FieldDescription>
-						Turning this off stops every message and comment at once. Coverage and practice settings
-						are kept.
+						Turning this off stops every comment and mentor message at once, without stopping the
+						reviews themselves. Coverage and practice settings are kept.
 					</FieldDescription>
 				</FieldContent>
 				<Switch

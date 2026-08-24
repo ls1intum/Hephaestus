@@ -68,11 +68,22 @@ class PracticeFeedbackDeliveryPolicyTest extends BaseUnitTest {
     }
 
     @Test
-    void silentModeStillStopsComposition() {
+    void silentModeStopsWhatLeavesTheInstanceAndLeavesTheDevelopersOwnPageAlone() {
         AgentJob job = conversationJob();
         when(silentModeQuery.isSilentModeEngaged()).thenReturn(true);
 
-        assertThat(policy().allowsComposition(job, DeliveryPolicySurface.IN_APP)).isFalse();
+        assertThat(policy().allowsComposition(job, DeliveryPolicySurface.CONVERSATION)).isFalse();
+        assertThat(policy().allowsComposition(job, DeliveryPolicySurface.IN_APP)).isTrue();
+    }
+
+    @Test
+    void pausingSendingLeavesTheDevelopersOwnPageReadable() {
+        AgentJob job = conversationJob();
+        job.getWorkspace().getReviewSettings().setDeliveryStatus(PracticeDeliveryStatus.PAUSED);
+        job.setPracticeRolloutRevision(job.getWorkspace().getReviewSettings().getRolloutRevision());
+
+        assertThat(policy().allowsComposition(job, DeliveryPolicySurface.CONVERSATION)).isFalse();
+        assertThat(policy().allowsComposition(job, DeliveryPolicySurface.IN_APP)).isTrue();
     }
 
     @Test
@@ -94,7 +105,7 @@ class PracticeFeedbackDeliveryPolicyTest extends BaseUnitTest {
         job.getWorkspace().getReviewSettings().setDeliveryStatus(PracticeDeliveryStatus.PAUSED);
         job.setPracticeRolloutRevision(job.getWorkspace().getReviewSettings().getRolloutRevision());
 
-        assertThat(policy().allowsComposition(job, DeliveryPolicySurface.IN_APP)).isFalse();
+        assertThat(policy().allowsComposition(job, DeliveryPolicySurface.CONVERSATION)).isFalse();
         assertThat(recordedRefusal()).isEqualTo(FeedbackSuppressionReason.WORKSPACE_DELIVERY_PAUSED);
     }
 
@@ -104,7 +115,7 @@ class PracticeFeedbackDeliveryPolicyTest extends BaseUnitTest {
         job.getWorkspace().getReviewSettings().setDeliveryStatus(PracticeDeliveryStatus.ACTIVE);
         job.setPracticeRolloutRevision(job.getWorkspace().getReviewSettings().getRolloutRevision() - 1);
 
-        assertThat(policy().allowsComposition(job, DeliveryPolicySurface.IN_APP)).isFalse();
+        assertThat(policy().allowsComposition(job, DeliveryPolicySurface.CONVERSATION)).isFalse();
         assertThat(recordedRefusal()).isEqualTo(FeedbackSuppressionReason.STALE_ROLLOUT_REVISION);
     }
 

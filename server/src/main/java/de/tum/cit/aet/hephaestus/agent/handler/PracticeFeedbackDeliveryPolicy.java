@@ -109,6 +109,7 @@ public class PracticeFeedbackDeliveryPolicy {
         if (!instanceMayDeliver) {
             Resolution resolution = resolve(
                 job,
+                surface,
                 instanceMayDeliver,
                 workspace,
                 null,
@@ -128,6 +129,7 @@ public class PracticeFeedbackDeliveryPolicy {
         if (workspace == null) {
             Resolution resolution = resolve(
                 job,
+                surface,
                 instanceMayDeliver,
                 null,
                 null,
@@ -170,6 +172,7 @@ public class PracticeFeedbackDeliveryPolicy {
                   );
         Resolution resolution = resolve(
             job,
+            surface,
             instanceMayDeliver,
             workspace,
             coverage,
@@ -226,6 +229,7 @@ public class PracticeFeedbackDeliveryPolicy {
         if (!instanceMayDeliver) {
             Resolution resolution = resolve(
                 job,
+                surface,
                 instanceMayDeliver,
                 workspace,
                 null,
@@ -245,6 +249,7 @@ public class PracticeFeedbackDeliveryPolicy {
         if (workspace == null) {
             Resolution resolution = resolve(
                 job,
+                surface,
                 instanceMayDeliver,
                 null,
                 null,
@@ -292,6 +297,7 @@ public class PracticeFeedbackDeliveryPolicy {
                   );
         Resolution resolution = resolve(
             job,
+            surface,
             instanceMayDeliver,
             workspace,
             coverage,
@@ -327,6 +333,7 @@ public class PracticeFeedbackDeliveryPolicy {
         Workspace workspace = activePracticeWorkspace(workspaceId);
         Resolution resolution = resolve(
             job,
+            surface,
             !silentModeQuery.isSilentModeEngaged(),
             workspace,
             null,
@@ -389,6 +396,7 @@ public class PracticeFeedbackDeliveryPolicy {
 
     private Resolution resolve(
         AgentJob job,
+        DeliveryPolicySurface surface,
         boolean instanceMayDeliver,
         @Nullable Workspace workspace,
         @Nullable CoverageAssessment coverage,
@@ -407,12 +415,12 @@ public class PracticeFeedbackDeliveryPolicy {
         AutonomyAssessment autonomy = autonomy(workspace, stage, feedbackId, contributingPracticeSlugs);
         DeliveryPolicyResolver.Result result = DeliveryPolicyResolver.resolve(
             new DeliveryPolicyResolver.Facts(
-                instanceMayDeliver,
+                egressBrakesApply(surface) ? FactAnswer.of(instanceMayDeliver) : FactAnswer.NOT_APPLICABLE,
                 workspace != null,
                 workspace == null
                     ? FactAnswer.NOT_APPLICABLE
                     : FactAnswer.of(admittedRevision != null && admittedRevision.longValue() == evaluatedRevision),
-                workspace == null
+                workspace == null || !egressBrakesApply(surface)
                     ? FactAnswer.NOT_APPLICABLE
                     : FactAnswer.of(workspace.getReviewSettings().getDeliveryStatus() == PracticeDeliveryStatus.ACTIVE),
                 coverage == null ? FactAnswer.NOT_APPLICABLE : FactAnswer.of(coverage.admitted()),
@@ -495,6 +503,15 @@ public class PracticeFeedbackDeliveryPolicy {
             case DENIES -> Boolean.FALSE;
             case NOT_APPLICABLE -> null;
         };
+    }
+
+    /**
+     * Silent Mode and the workspace pause stop what leaves Hephaestus. An in-app unit is read by the
+     * developer on their own page here and leaves nothing, so neither brake has anything to say about
+     * it — gating it would blank that page as a side effect of quietening a pull request.
+     */
+    private static boolean egressBrakesApply(DeliveryPolicySurface surface) {
+        return surface != DeliveryPolicySurface.IN_APP;
     }
 
     private static DeliveryPolicyFactsSnapshot.SubjectStatus subjectStatus(

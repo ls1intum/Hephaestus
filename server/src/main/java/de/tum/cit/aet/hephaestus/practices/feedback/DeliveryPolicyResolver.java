@@ -24,7 +24,7 @@ public final class DeliveryPolicyResolver {
         List<Candidate> candidates = List.of(
             new Candidate(
                 DeliveryPolicyCheck.INSTANCE_SILENT_MODE,
-                FactAnswer.of(facts.instanceMayDeliver()),
+                facts.instanceMayDeliver(),
                 FeedbackSuppressionReason.INSTANCE_SILENCED
             ),
             new Candidate(
@@ -88,7 +88,7 @@ public final class DeliveryPolicyResolver {
     }
 
     public record Facts(
-        boolean instanceMayDeliver,
+        FactAnswer instanceMayDeliver,
         boolean workspaceEnabled,
         FactAnswer rolloutCurrent,
         FactAnswer deliveryActive,

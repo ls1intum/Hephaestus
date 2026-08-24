@@ -25,7 +25,7 @@ class DeliveryPolicyResolverTest extends BaseUnitTest {
     @Test
     void firstDenialWinsAndLeavesACompleteTrace() {
         DeliveryPolicyResolver.Facts facts = new DeliveryPolicyResolver.Facts(
-            true,
+            FactAnswer.PASSES,
             true,
             FactAnswer.PASSES,
             FactAnswer.PASSES,
@@ -107,7 +107,7 @@ class DeliveryPolicyResolverTest extends BaseUnitTest {
             Arrays.fill(checks, FactAnswer.PASSES);
             checks[denied] = FactAnswer.DENIES;
             DeliveryPolicyResolver.Facts facts = new DeliveryPolicyResolver.Facts(
-                checks[0] == FactAnswer.PASSES,
+                checks[0],
                 checks[1] == FactAnswer.PASSES,
                 checks[2],
                 checks[3],
@@ -133,7 +133,7 @@ class DeliveryPolicyResolverTest extends BaseUnitTest {
         @Nullable FeedbackSuppressionReason artifactReason
     ) {
         return new DeliveryPolicyResolver.Facts(
-            true,
+            FactAnswer.PASSES,
             true,
             FactAnswer.PASSES,
             FactAnswer.PASSES,

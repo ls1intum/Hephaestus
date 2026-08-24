@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -12,6 +13,7 @@ import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSource;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
 import de.tum.cit.aet.hephaestus.practices.feedback.approval.dto.DecideFeedbackProposalRequestDTO;
 import java.util.Optional;
 import java.util.UUID;
@@ -65,6 +67,64 @@ class FeedbackApprovalServiceTest {
         lenient()
             .when(approvalRepository.save(any()))
             .thenAnswer(invocation -> invocation.getArgument(0));
+    }
+
+    /**
+     * Approving is the one decision a reviewer cannot take back — the proposal leaves the queue whatever
+     * happens next. A brake the operator can lift must therefore refuse the decision rather than let it
+     * report success and be discarded on the way out.
+     */
+    @Test
+    void shouldRefuseApprovalWhileSendingIsPausedAndLeaveTheProposalDecidable() {
+        when(eligibility.brakeOnDelivery(7L)).thenReturn(FeedbackSuppressionReason.WORKSPACE_DELIVERY_PAUSED);
+
+        assertThatThrownBy(() ->
+            service.decide(
+                7L,
+                feedbackId,
+                42L,
+                new DecideFeedbackProposalRequestDTO(FeedbackApprovalDecision.APPROVED, null, null)
+            )
+        ).isInstanceOf(ResponseStatusException.class);
+
+        verify(feedbackRepository, never()).decideProposal(any(), any(), any());
+        verify(feedbackRepository, never()).suppressProposal(any(), any(), any());
+    }
+
+    @Test
+    void shouldRefuseApprovalUnderInstanceSilence() {
+        when(eligibility.brakeOnDelivery(7L)).thenReturn(FeedbackSuppressionReason.INSTANCE_SILENCED);
+
+        assertThatThrownBy(() ->
+            service.decide(
+                7L,
+                feedbackId,
+                42L,
+                new DecideFeedbackProposalRequestDTO(FeedbackApprovalDecision.APPROVED, null, null)
+            )
+        ).isInstanceOf(ResponseStatusException.class);
+
+        verify(feedbackRepository, never()).decideProposal(any(), any(), any());
+    }
+
+    /** Rejecting sends nothing, so a brake has no opinion about it. */
+    @Test
+    void shouldStillAllowRejectionWhileSendingIsPaused() {
+        lenient().when(eligibility.brakeOnDelivery(7L)).thenReturn(FeedbackSuppressionReason.WORKSPACE_DELIVERY_PAUSED);
+        when(feedbackRepository.decideProposal(7L, feedbackId, "DISCARDED")).thenReturn(1);
+
+        service.decide(
+            7L,
+            feedbackId,
+            42L,
+            new DecideFeedbackProposalRequestDTO(
+                FeedbackApprovalDecision.REJECTED,
+                FeedbackRejectionReason.UNHELPFUL,
+                null
+            )
+        );
+
+        verify(feedbackRepository).decideProposal(7L, feedbackId, "DISCARDED");
     }
 
     @Test

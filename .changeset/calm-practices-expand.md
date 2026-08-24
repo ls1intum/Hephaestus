@@ -6,8 +6,10 @@ Practice reviews can now be rolled out to part of a workspace instead of all of 
 monitored repositories are reviewed and, for each of them, which base branches; choose whether
 everybody's work is reviewed or only selected people's. Before a change widens either list, a preview
 says how many repositories and people it would cover, so a pilot can be checked before it starts.
-Sending feedback is now its own switch: pause it and reviews keep running and stay readable while
-nothing reaches anybody, and resuming does not release what was held back.
+Sending feedback is now its own switch: pause it and reviews keep running, developers can still read
+their own feedback in Hephaestus, and nothing reaches a pull request or the mentor. Resuming sends only
+work reviewed afterwards; it does not release what was withheld. Pausing leaves reviews already under way
+alone, so it is safe to use during an incident and undo afterwards.
 
 Every delivery decision now keeps its reasoning. On a piece of work under Review activity, a workspace
 administrator can see, for each attempt, which checks ran and in what order, which one stopped it, and
