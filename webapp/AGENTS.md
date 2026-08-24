@@ -90,8 +90,15 @@ is spelled `cd .. && oxlint webapp`. What follows is what no diagnostic will eve
   permission.
 - **The one exception `jsx-a11y/no-autofocus` earns** is the first field of an overlay the user just
   opened. Suppress that case inline with the reason; everything else is the bug the rule describes.
-- **Re-derive an off rule's findings with `pnpm exec oxlint -D <rule>`** before trusting or changing
-  the reason written beside it.
+- **Re-derive an off rule's findings before trusting or changing the reason beside it** — but run it
+  from the **repo root**, `oxlint -A all -D <rule> webapp`. Started from inside `webapp/` this config
+  becomes the one oxlint treats as the root, and `options` is only ever read from that config: this
+  file declares none, so `typeAware` goes off and every type-aware rule reports nothing while
+  exiting 0. `-A all` is what keeps the rest of the rule set out of the answer.
+- **An `off` entry only means something when a category would otherwise switch the rule on.** Every
+  category but `correctness` and `suspicious` is off here, so `"off"` on a `pedantic`, `perf` or
+  `style` rule documents a decision the config does not need to make. Confirm before adding one:
+  delete the entry, re-run, and see whether anything reports.
 
 ## Which admin console a component belongs to
 

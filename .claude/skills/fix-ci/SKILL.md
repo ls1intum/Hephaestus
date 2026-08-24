@@ -8,8 +8,8 @@ disable-model-invocation: true
 allowed-tools:
   - Bash(gh *)
   - Bash(git *)
-  - Bash(npm *)
-  - Bash(mvn *)
+  - Bash(pnpm *)
+  - Bash(./mvnw *)
   - Read
   - Grep
   - Glob
@@ -20,10 +20,10 @@ metadata:
 
 # Fix CI
 
-Diagnose and fix ALL failing CI checks in ONE pass. Never push until all
-known issues are resolved.
+Diagnose every failing check in one pass, then push once. Fixing 2 of 5 failures burns a push cycle
+and a full CI run.
 
-## 1. Ensure All Checks Are Complete
+## 1. Wait for the run to finish
 
 ```bash
 PAGER=cat gh pr view --json number,statusCheckRollup --jq '{
@@ -33,114 +33,71 @@ PAGER=cat gh pr view --json number,statusCheckRollup --jq '{
 }'
 ```
 
-If there are pending checks, wait for all checks to complete before diagnosing.
-Fixing 2 of 5 failures wastes a push cycle.
+Anything pending means you do not yet know the failure set.
 
-## 2. Get ALL Failed Job IDs At Once
+## 2. Read the job summaries before the logs
 
-```bash
-RUN_ID=$(PAGER=cat gh run list --branch $(git branch --show-current) --limit 1 --json databaseId,conclusion --jq '[.[] | select(.conclusion == "failure")][0].databaseId')
-echo "Run ID: $RUN_ID"
-```
-
-Then get all failed jobs:
+The quality and test workflows write a markdown table to `$GITHUB_STEP_SUMMARY` naming, per failed
+check, the exact command that fixes it, and emit the same text as `::error::` annotations. That table
+is the prescription. Logs are only for what it cannot express — a test assertion, a type error.
 
 ```bash
-PAGER=cat gh api repos/{owner}/{repo}/actions/runs/$RUN_ID/jobs --jq '[.jobs[] | select(.conclusion == "failure" and (.name | test("CI Status|all-ci") | not)) | {id, name}]'
+RUN_ID=$(PAGER=cat gh run list --branch "$(git branch --show-current)" --limit 1 \
+  --json databaseId,conclusion --jq '[.[] | select(.conclusion == "failure")][0].databaseId')
+PAGER=cat gh api "repos/{owner}/{repo}/actions/runs/$RUN_ID/jobs" \
+  --jq '[.jobs[] | select(.conclusion == "failure" and (.name | test("CI Status|all-ci") | not)) | {id, name}]'
 ```
 
-## 3. Get ALL Job Logs At Once
-
-For EACH failed job ID from step 2, get logs in a single loop:
+Then per failed job id:
 
 ```bash
-for JOB_ID in <SPACE_SEPARATED_JOB_IDS>; do
-  echo "=== JOB $JOB_ID ==="
-  PAGER=cat gh api repos/{owner}/{repo}/actions/jobs/$JOB_ID/logs 2>&1 | tail -80
-  echo ""
-done
+PAGER=cat gh api "repos/{owner}/{repo}/actions/jobs/$JOB_ID/logs" 2>&1 | tail -80
 ```
 
-Read ALL output before making any fixes.
+Read every failure before changing anything.
 
-## 4. Classify ALL Failures
+## 3. Fix in dependency order
 
-Before fixing anything, categorize every failure into this table.
-**Fix in this order** (earlier fixes often resolve later issues):
+Formatting, then lint, then types, then behaviour — an earlier fix routinely erases a later failure.
+Each leg's annotation names its own command; this table is only what the annotation cannot tell you.
 
-| Priority | Category | Symptoms | Fix Command |
-|----------|----------|----------|-------------|
-| 1 | Formatting | "Formatting failed", biome/prettier diff | `pnpm run format` |
-| 2 | Lint | oxlint errors | `pnpm run check:webapp:fix` |
-| 3 | TypeScript | TS2xxx errors, type mismatch | Fix the type error in source |
-| 4 | Build failure | Compilation errors, missing exports | Fix imports/exports, verify with `pnpm run build:webapp` |
-| 5 | Webapp tests | "FAIL" in webapp test output | Fix test or source, verify with `pnpm run test:webapp` |
-| 5 | App server tests | Maven test failures, assertion errors | Fix test or source, verify with `cd server && ./mvnw test -Dsurefire.includedGroups="unit" -Dmaven.test.skip=false -T 2C --batch-mode -q` |
-| 6 | OpenAPI sync | "OpenAPI out of sync" | `pnpm run generate:api` |
-| 6 | DB schema | "Schema drift detected" | `pnpm run db:draft-changelog` |
-| 6 | DB ERD | "ERD outdated" | `pnpm run db:generate-erd-docs` |
+| Failure | What it actually means |
+|---|---|
+| `routeTree.gen.ts is stale` | Only a Vite build writes it. `cd webapp && pnpm run build`, then commit the file. |
+| `README images are stale` | The storybook job runs `export:readme-assets` *after* `test:storybook`, so the job goes red having printed a clean pass line. Run `pnpm --filter webapp run export:readme-assets` and commit `docs/images/readme`. |
+| Biome version skew | `check:biome-pin` compares `package.json`, `node_modules` and the `$schema` URLs in both `biome.jsonc` files. Fix the pin; do not reformat. |
+| Migrations gate | A changelog that reached `main` was edited, renamed or deleted, or a `master.xml` `<include>` was not appended at the end. Fix forward with a new changeset; never edit the released file. |
+| `verify-changesets` | The PR touches shipped code with no `.changeset/*.md`. `/land-pr` step 9 has the rules. |
+| App Server leg red on a docs-only PR | Expected, not a misconfiguration: `docs/**` is inside the `application-server` paths filter, because `docs:lint` and `check:diagrams` run on that leg. |
 
-## 5. Fix ALL Issues
-
-Work through the entire list. Fix root causes, not symptoms.
-
-IMPORTANT: Do NOT push after fixing only one failure if multiple exist.
-Fix everything first.
-
-## 6. Validate Locally Before Pushing
-
-After ALL fixes are applied, run local validation:
+## 4. Reproduce locally before pushing
 
 ```bash
 pnpm run format
 pnpm run check
 ```
 
-Then run tests for ALL components that had failures:
+`check` runs every leg CI runs except those needing Docker or a live credential — `docs:lint`
+included. If `check` is green and CI is not, the difference is one of those.
+
+Server tests need `-P'!quick'`. The `quick` profile is activated by the presence of generated GraphQL
+sources and sets `maven.test.skip=true`, so a plain `./mvnw test` prints BUILD SUCCESS having run
+nothing:
 
 ```bash
-# If webapp tests failed:
-pnpm run test:webapp
-
-# If app-server tests failed:
-cd server && ./mvnw test -Dsurefire.includedGroups="unit" -Dmaven.test.skip=false -T 2C --batch-mode -q && cd ../..
+cd server && ./mvnw test -P'!quick' -Dsurefire.includedGroups=unit -T 2C --batch-mode -q
 ```
 
-ALL must pass locally before pushing.
+`-Dgroups` is ignored: the POM binds `${surefire.includedGroups}`, and a POM element beats the
+`-Dgroups` user property. `server/AGENTS.md` § Build traps has the other three tiers.
 
-## 7. Regenerate If Needed
-
-If any OpenAPI or DB validation failed:
-
-```bash
-pnpm run generate:api
-pnpm run db:generate-erd-docs
-```
-
-Run format + check again after regeneration:
-
-```bash
-pnpm run format
-pnpm run check
-```
-
-## 8. Commit and Push (ONCE)
+## 5. Commit and push once
 
 ```bash
 git add -A
 git commit -m "fix(<scope>): resolve ci failures"
 git push
+PAGER=cat gh pr checks --watch
 ```
 
-## 9. Monitor
-
-```bash
-PAGER=cat gh pr checks $(PAGER=cat gh pr view --json number -q .number) --watch
-```
-
-## Rules
-
-1. NEVER push after fixing only one failure if multiple failures exist
-2. ALWAYS run local validation (format + check + affected tests) before pushing
-3. If step 1 shows pending checks, wait for all checks to complete first
-4. If the same CI check fails twice in a row, investigate deeper - do not retry the same approach
+If the same check fails twice with the same diagnosis, re-read the log rather than retrying the fix.

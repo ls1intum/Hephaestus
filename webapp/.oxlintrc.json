@@ -339,18 +339,14 @@
 		// -- Off -------------------------------------------------------------------------------------
 		// React 19's automatic JSX runtime.
 		"react/react-in-jsx-scope": "off",
-		// The inverse of `prefer-strict-boolean-matchers` above: these rewrite `toBe(true)` into
-		// `toBeTruthy()`, which also passes on `1`, `"false"` and `{}`. Both cannot be on.
-		"vitest/prefer-to-be-truthy": "off",
-		"vitest/prefer-to-be-falsy": "off",
 		// Every effect it reports here lists a value it deliberately does not read — a ref reset keyed on
 		// the location, focus keyed on the wizard step — which reads to the rule as an extra dependency.
 		// Dropping one changes when the effect fires, which is the reason it is listed.
 		"react/exhaustive-effect-dependencies": "off",
-		// It maps a role to a tag without asking whether that tag's other semantics fit. Most of what it
-		// reports is one of two shapes: `<output>` for `role="status"`, which carries a form association
-		// a live region does not, and `<img>` for `role="img"` on an inline SVG, which is how you name
-		// one. The rest — `group`, `listitem`, `region` — are wrong the same way.
+		// It maps a role to a tag without asking whether that tag's other semantics fit: `<output>` for
+		// `role="status"` carries a form association a live region does not, `<li>` for `role="listitem"`
+		// is only valid inside a list, and `<img>` for `role="img"` would replace the inline SVG that role
+		// exists to name. Every role it reports here fails the same way.
 		"jsx-a11y/prefer-tag-over-role": "off",
 		// Base UI passes the control through `render=` and keeps the label in the wrapper's children,
 		// where no jsx-a11y rule can see it. It also does not model `<datalist>`, where a valueless
@@ -358,17 +354,16 @@
 		"jsx-a11y/control-has-associated-label": "off",
 		// Same shape, plus `renderPageLink`: the `<a>`'s content comes from whoever renders it.
 		"jsx-a11y/anchor-has-content": "off",
-		// Skeleton rows, decorative layers and rendered strings have no identity but their position, and
-		// even a composite `${id}:${index}` key still trips it.
-		"react/no-array-index-key": "off",
-		// `rows.length ? … : …` on a value that is only ever an array reads fine.
-		"unicorn/explicit-length-check": "off",
-		// Both want ES2023 `toSorted`/`toReversed`, which `tsconfig.json`'s `lib` does not declare. Copy
-		// before sorting an array a caller can observe — that mutation is the bug they describe.
+		// Both want ES2023 `toSorted`/`toReversed`, which this package's `tsconfig.json` does not declare
+		// — its `lib` is `ES2022`. (The Bun trees are on `ES2023`, so this reason does not travel to the
+		// root config.) Copy before sorting an array a caller can observe — that mutation is the bug they
+		// describe.
 		"unicorn/no-array-sort": "off",
 		"unicorn/no-array-reverse": "off",
-		// Its two shapes here: an effect that bails early and otherwise returns a cleanup, which is
-		// React's idiom, and an annotated exhaustive `switch`, which TypeScript already fails (TS2366).
+		// Its two shapes here are both things TypeScript has already settled: an effect that bails early
+		// and otherwise returns a cleanup, which is React's idiom, and an annotated `switch` that returns
+		// from every arm of a union. TS2366 is what catches a return that is genuinely missing, and it
+		// stays silent on an exhaustive switch — so every report here is one TypeScript declined to make.
 		"typescript/consistent-return": "off",
 		// `toHaveBeenCalledWith` is not type-narrowed by this Vitest/TS setup — a wrong argument against
 		// `vi.fn<(open: boolean) => void>()` type-checks clean — so the parameter buys nothing.
@@ -377,9 +372,10 @@
 		// module-level icons. `react/no-unstable-nested-components` still catches a component defined
 		// inside another's body.
 		"react/static-components": "off",
-		// It reports the enclosing function, not the helper, and most of what it finds is a helper
-		// deliberately scoped to the block that owns it — a test's `describe` more often than anything
-		// else. Hoisting those widens what they are visible to and buys nothing.
+		// The diagnostic names the helper but points at the *enclosing* function, so the line it sends you
+		// to is a component or a `describe` that is not the thing to change. What it finds is a helper
+		// deliberately scoped to the block that owns it; hoisting one widens what it is visible to and
+		// buys nothing.
 		"unicorn/consistent-function-scoping": "off",
 		// Server field names (`_id`), test hooks (`__resetSessionRecoveryForTests`), the runtime config
 		// global (`__ENV__`), exhaustiveness bindings (`_exhaustive`) and XSS sentinels a test has to name.

@@ -254,7 +254,6 @@ public class GitLabPullRequestReviewThreadProcessor {
         PullRequestReviewThread saved = threadRepository.save(existing);
         log.debug("Updated thread: id={}, state={}", saved.getId(), newState);
 
-        // Publish domain events on state transitions
         if (previousState != newState) {
             publishThreadStateEvent(saved, pr, scopeId);
         }

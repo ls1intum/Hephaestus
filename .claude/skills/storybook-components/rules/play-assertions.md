@@ -4,8 +4,8 @@
 
 A render test — a story that mounts and nothing else — is a sanctioned shape: *"A render test is a
 simple version of an interaction test that only tests the ability of a component to render successfully
-in a given state. That works fine for relatively simple, static components like a Button"*. Grade the
-component, not the file.
+in a given state. That works fine for relatively simple, static components like a Button."*
+(storybook.js.org/docs/writing-tests/interaction-testing). Grade the component, not the file.
 
 Likewise an `fn()` spy that no play function triggers is **correct**: `fn()` in `args` also drives the
 Actions panel. Only a spy the play *does* trigger and does not assert is a finding.
@@ -29,7 +29,7 @@ produced, a count it computed, a disabled state, a URL — not text the story it
 that the DOM still contains the thing you clicked has not tested the interaction.
 
 For "is this really disabled", use `expectGenuinelyDisabled` / `expectUnavailable`
-(`src/test/controls.ts`) — they check focus behaviour, not just the attribute, so a look-alike fails.
+(`webapp/src/test/controls.ts`) — they check focus behaviour, not just the attribute, so a look-alike fails.
 
 ## Portals: query with `screen`, not the canvas
 

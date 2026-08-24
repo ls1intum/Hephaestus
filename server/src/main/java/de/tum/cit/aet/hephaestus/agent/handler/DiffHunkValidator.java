@@ -84,9 +84,9 @@ class DiffHunkValidator {
 
             if (newLineNum == 0 || currentFile == null) continue;
 
-            // Added ("+") and context (" ") lines are both valid diff-note anchors and both advance the
-            // new-file counter. A deleted line ("-") is neither, and neither is an empty/unknown line
-            // (trailing newline, "No newline at end of file") — both fall through untouched.
+            // Everything else — a deleted line, the "\ No newline at end of file" marker, a trailing
+            // blank — is invisible on the new side and must not advance the counter, or every note
+            // after it anchors a line too low.
             if (effectiveLine.startsWith("+") || effectiveLine.startsWith(" ")) {
                 result.get(currentFile).add(newLineNum);
                 newLineNum++;

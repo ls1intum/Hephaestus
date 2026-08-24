@@ -13,8 +13,7 @@ metadata:
 
 # Storybook + component API
 
-Load the one file that answers your question. Nothing here restates React or Storybook docs; it
-records what this repo decided, and what it has already been burned by.
+Load the one file that answers your question.
 
 | File | The question it answers |
 |---|---|
@@ -59,8 +58,8 @@ Beyond oxlint:
   or an `order` entry no story claims.
 - `scripts/check-presentational-components.ts` (`check:components`) — a component importing the
   query layer, and a story installing MSW handlers. Its allowlist is shrink-only.
-- `.storybook/preview.tsx` sets `a11y: { test: "error" }` project-wide, with zero per-story
-  overrides across the whole tree. Adding one is a finding, not a fix.
+- `webapp/.storybook/preview.tsx` sets `a11y: { test: "error" }` project-wide. Adding a per-story
+  override is a finding, not a fix.
 
 ## Not here
 

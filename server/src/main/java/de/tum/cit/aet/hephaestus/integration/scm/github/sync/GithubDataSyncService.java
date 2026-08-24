@@ -493,7 +493,6 @@ public class GithubDataSyncService {
                                 "Sync interrupted while waiting for rate limit",
                                 ie
                             );
-                            // Keep the rate-limited failure we were backing off from.
                             interrupted.addSuppressed(e);
                             throw interrupted;
                         }
@@ -1332,7 +1331,6 @@ public class GithubDataSyncService {
                             "Interrupted while retrying " + description,
                             ie
                         );
-                        // Keep the transient failure the retry was for.
                         interrupted.addSuppressed(e);
                         throw interrupted;
                     }

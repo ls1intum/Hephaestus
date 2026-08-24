@@ -22,8 +22,8 @@ function values(url: URL | undefined, name: string): string[] {
 
 /**
  * Every request the two list routes make, with the observation and feedback URLs recorded. The
- * screens they feed take their rows as props now, so the request is no longer visible from a story —
- * this is the only place left that can see what actually went on the wire.
+ * screens they feed take their rows as props, so a story mounts them without ever issuing the
+ * request — this route test is the only place that can see what went on the wire.
  */
 function recordRequests() {
 	const observationUrls: URL[] = [];

@@ -17,45 +17,47 @@ metadata:
 Comprehensive performance optimization guide for React applications, maintained by Vercel.
 Contains 45 rules across 8 categories, prioritized by impact.
 
-## Applicability Warning
+## Applicability
 
-**This codebase uses Vite + TanStack Router (client-side SPA), NOT Next.js.**
+**This codebase is a client-side SPA: Vite + TanStack Router, React 19, TanStack Query, a Spring Boot
+backend. There is no Next.js, no RSC and no SSR.** The pack is written for Next.js, so read this
+section before any rule file.
 
-### Rules to SKIP (Not Applicable)
+### Skip — the API or the runtime does not exist here
 
-These rules reference Next.js-specific APIs or SSR patterns that don't exist in this SPA:
-
-| Rule | Why Skip |
-|------|----------|
-| `async-api-routes` | Next.js API routes - we use Spring Boot backend |
-| `async-suspense-boundaries` | RSC streaming - not applicable to CSR SPA |
+| Rule | Why |
+|------|-----|
+| `async-api-routes` | Next.js API routes; the backend is Spring Boot |
+| `async-suspense-boundaries` | About streaming an RSC tree; nothing in the SPA renders on a server |
 | `server-cache-react` | `React.cache()` is RSC-only |
-| `server-cache-lru` | Server-side caching - backend handles this |
-| `server-serialization` | RSC serialization - not applicable |
-| `server-parallel-fetching` | RSC data fetching - we use TanStack Query |
-| `server-after-nonblocking` | `next/server` after() - Next.js only |
-| `rendering-hydration-no-flicker` | SSR hydration - Vite is pure CSR |
-| `rerender-memo` | **React Compiler handles this automatically** |
-| `bundle-dynamic-imports` | Use `React.lazy()` instead of `next/dynamic` |
-| `client-swr-dedup` | We use TanStack Query, not SWR |
+| `server-cache-lru` | Server-side caching, which is the backend's problem |
+| `server-serialization` | RSC client/server boundary |
+| `server-parallel-fetching` | RSC data fetching; TanStack Query is the equivalent here |
+| `server-after-nonblocking` | `after()` from `next/server` |
+| `rendering-hydration-no-flicker` | SSR hydration; the build is pure CSR |
+| `client-swr-dedup` | SWR; this repo uses TanStack Query, which dedups by query key |
+| `rerender-memo` | React Compiler is on — see below |
 
-### Rules to APPLY
+### Apply, with the API substituted
 
-| Category | Applicable Rules |
-|----------|------------------|
-| `async-*` | `async-defer-await`, `async-parallel`, `async-dependencies` |
-| `bundle-*` | `bundle-barrel-imports`, `bundle-defer-third-party`, `bundle-conditional`, `bundle-preload` |
-| `client-*` | `client-event-listeners` |
-| `rerender-*` | All EXCEPT `rerender-memo` (compiler handles it) |
-| `rendering-*` | `rendering-animate-svg-wrapper`, `rendering-content-visibility`, `rendering-hoist-jsx`, `rendering-svg-precision`, `rendering-conditional-render` |
-| `js-*` | All rules fully applicable |
-| `advanced-*` | All rules fully applicable |
+| Rule | Read it as |
+|------|-----------|
+| `bundle-dynamic-imports` | The reasoning holds and the repo has the rule's own example (`@monaco-editor/react`); the mechanism is `React.lazy()` plus TanStack Router's `autoCodeSplitting`, not `next/dynamic` |
 
-### React Compiler Note
+### Apply as written
 
-This codebase has React Compiler enabled.
-**Do NOT add manual memoization** (`useMemo`, `useCallback`, `React.memo`) for new code.
-The compiler handles memoization automatically.
+`async-defer-await`, `async-parallel`, `async-dependencies`; `bundle-barrel-imports`,
+`bundle-defer-third-party`, `bundle-conditional`, `bundle-preload`; `client-event-listeners`;
+every `rerender-*` except `rerender-memo`; every `rendering-*` except `rendering-hydration-no-flicker`
+(this includes `rendering-activity` — React is 19.2+, so `<Activity>` exists); every `js-*`; every
+`advanced-*`.
+
+### React Compiler
+
+`webapp/vite.shared.ts` passes `compiler: true` to `@vitejs/plugin-react` for every build of app
+source, so **do not add `useMemo`, `useCallback` or `React.memo`**. A hand-written one that survives
+in the tree is load-bearing; deleting it breaks something that still type-checks
+(`webapp/AGENTS.md` § React Compiler).
 
 ## When to Apply
 

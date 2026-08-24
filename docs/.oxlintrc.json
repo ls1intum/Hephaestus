@@ -242,23 +242,9 @@
 				"considerDefaultExhaustiveForUnions": true
 			}
 		],
-		"typescript/only-throw-error": [
-			"error",
-			{
-				"allow": [
-					{
-						"from": "package",
-						"package": "@tanstack/router-core",
-						"name": "Redirect"
-					},
-					{
-						"from": "package",
-						"package": "@tanstack/router-core",
-						"name": "NotFoundError"
-					}
-				]
-			}
-		],
+		// No allowance: the SPA's is for TanStack Router's thrown `Redirect`/`NotFoundError`, and
+		// `@tanstack/router-core` is not a dependency of this package.
+		"typescript/only-throw-error": "error",
 		"unicorn/error-message": "error",
 		"unicorn/throw-new-error": "error",
 		"unicorn/no-array-method-this-argument": "error",
@@ -278,13 +264,11 @@
 		"unicorn/prefer-string-trim-start-end": "error",
 		"unicorn/consistent-template-literal-escape": "error",
 		"unicorn/text-encoding-identifier-case": "error",
+		// React 19's automatic JSX runtime; Docusaurus compiles MDX against it.
 		"react/react-in-jsx-scope": "off",
-		"jsx-a11y/no-autofocus": [
-			"error",
-			{
-				"ignoreNonDOM": true
-			}
-		],
+		// No `ignoreNonDOM`: there is no component kit here to hide an `autoFocus` behind, so the rule
+		// is left at its strictest reading.
+		"jsx-a11y/no-autofocus": "error",
 		"react/no-unstable-nested-components": [
 			"error",
 			{
@@ -297,13 +281,13 @@
 				"ignoreLastCallback": true
 			}
 		],
+		// Only CSS: the SPA also allows `@tanstack/react-router` and `react` for module augmentation, and
+		// neither is a dependency of this package.
 		"import/no-unassigned-import": [
 			"error",
 			{
 				"allow": [
-					"**/*.css",
-					"@tanstack/react-router",
-					"react"
+					"**/*.css"
 				]
 			}
 		],

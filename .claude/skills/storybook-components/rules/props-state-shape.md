@@ -28,16 +28,15 @@ identity counts.
 branch. Parallel `isLoading` + `items` + `error` can express "loading with an error and three rows",
 and a story then has to reproduce a combination production never sends.
 
-**Scope, and this is the correction that matters.** "An async surface" was read as "every component
-that renders during a fetch", and 43 components ignore it. A **list shell** whose toolbar renders
-through every branch legitimately takes the query result as three fields — forcing a page-level union
-would drag the filter toolbar into every branch. Only the component that owns the region that swaps
-takes the union.
+**Scope, and it is narrow.** This is not "every component that renders during a fetch" — read that
+way it condemns most of the tree. A **list shell** whose toolbar renders through every branch
+legitimately takes the query result as three fields; forcing a page-level union would drag the filter
+toolbar into every branch. Only the component that owns the region that *swaps* takes the union.
 
-Exemplar: `admin/practice-reviews/ReviewOutputSections.tsx:26-30` — four branches, and `onRetry`
-lives *inside* the error branch so no caller can hand you a retry with nothing to retry.
-Anti-exemplar: `FeedbackResultsState`, a `loading | empty | ready` union with no error branch — this
-rule broken while appearing to follow it.
+Exemplar: `ReviewSectionState` in `webapp/src/components/admin/practice-reviews/ReviewOutputSections.tsx`
+— four branches, and `onRetry` lives *inside* the error branch so no caller can hand you a retry with
+nothing to retry. Anti-exemplar: `FeedbackResultsState` in the same directory's `FeedbackResults.tsx`,
+a `loading | empty | ready` union with no error branch — this rule broken while appearing to follow it.
 
 <https://react.dev/learn/choosing-the-state-structure> — *"Since `isSending` and `isSent` should never
 be true at the same time, it is better to replace them with one `status` state variable that may take
@@ -75,8 +74,7 @@ not accept it, require it — so a caller cannot ship an unnamed control. Same f
 disambiguate two instances on one screen.
 
 The obligation is normative: WCAG 2.2 SC 4.1.2 (Name, Role, Value). Putting it in the TypeScript type
-is ours. (`https://react-aria.adobe.com/quality` was pulled and read; it is a three-principle overview
-and says nothing about props types. It is not a citation for this.)
+is ours, and no source states that mechanism — argue with the mechanism in review, not with the SC.
 
 ## 6. Controlled or uncontrolled is a decision you state
 
@@ -87,9 +85,9 @@ its story. Say which it is in the doc comment.
 <https://react.dev/learn/sharing-state-between-components>
 
 **Naming.** `value`/`onValueChange` **only** when the component is a thin wrapper over a Base UI
-primitive that already uses that pair. Everything we write uses `value`/`onChange`. (The previous rule
-mandated `onValueChange` everywhere and had a 0% adoption rate across the reviewed directories — nine
-counterexamples. A rule nothing follows is not a rule.)
+primitive that already uses that pair. Everything we write uses `value`/`onChange`. A blanket
+`onValueChange` mandate has been proposed and rejected: nothing in the tree followed it, and a rule
+nothing follows is not a rule.
 
 ## 7. A change callback has two sanctioned shapes, and you pick by who owns the value
 
@@ -101,8 +99,8 @@ Not a third spelling. `onSearchChange` taking a patch is the patch shape wearing
 
 ## 8. The filter component never touches `page`
 
-Pagination reset belongs to the screen that owns the URL, not to the toolbar that emits a patch.
-One directory currently has both contracts under the same prop name; the screen wins.
+Pagination reset belongs to the screen that owns the URL, not to the toolbar that emits a patch. Where
+a directory carries both contracts under one prop name, the screen wins.
 
 ## 9. No prop the component can derive from a prop it already has
 
@@ -122,7 +120,7 @@ The same test applies to a whole component: delete it and inline it.
    (`composition-and-slots.md`), and are exempt.
 2. One caller justifies a prop when that caller *derives* the value from data rather than typing a
    literal — deleting it just moves the branch somewhere worse.
-3. **Registry code is out of scope.** `src/components/ui/` is re-vendored from upstream, so this
+3. **Registry code is out of scope.** `webapp/src/components/ui/` is re-vendored from upstream, so this
    rule cannot fire there however many call sites a prop has. Curtis, cited for the direction,
    explicitly *retains* `state`/`appearance`/`size` as *"the component's essential, top-level API"* —
    a two-call-site test applied to `size` contradicts its own source.

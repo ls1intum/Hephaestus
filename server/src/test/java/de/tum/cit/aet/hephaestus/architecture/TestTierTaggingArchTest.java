@@ -22,32 +22,28 @@ import org.junit.jupiter.api.Test;
 /**
  * Durable guard against a test that belongs to no tier.
  *
- * <p><b>Why this rule exists.</b> Surefire runs {@code groups=unit}, Failsafe runs
+ * <p><b>What breaks without it.</b> Surefire runs {@code groups=unit}, Failsafe runs
  * {@code groups=integration}, and both set {@code excludedGroups=live}; the {@code architecture-tests}
  * and {@code live-tests} profiles swap the included group (see {@code pom.xml}). A test class carrying
  * none of the four tier tags therefore matches no runner's group filter — it executes in no tier, fails
  * no build, and reports no skip. It is indistinguishable from a passing test.
  *
- * <p><b>Why a naive grep gets this wrong.</b> A tag is usually inherited rather than written:
+ * <p><b>Why the scan is not a grep.</b> A tier tag is usually inherited rather than written:
  * {@code BaseUnitTest} is {@code @Tag("unit")} and {@code BaseIntegrationTest} is
- * {@code @Tag("integration")}, so barely 190 of the ~870 test files spell one out. Tags also arrive
- * through <em>meta-annotations</em> — {@code @LiveGitHubTest} is itself {@code @Tag("live")}. The scan
- * below resolves both routes: the {@code extends} chain transitively, and any annotation declared in
- * this tree that carries a {@code @Tag}. Miss either and the resolver invents orphans that are fine and
- * misses the one that is not.
+ * {@code @Tag("integration")}. Tags also arrive through <em>meta-annotations</em> —
+ * {@code @LiveGitHubTest} is itself {@code @Tag("live")}. Resolve only one of the two routes and the
+ * answer is wrong in both directions: orphans invented for classes that are fine, and the one real
+ * orphan missed. Carrying more than one tier is legal and deliberate — the GitHub live suite is
+ * {@code integration} from {@code BaseIntegrationTest} <em>and</em> {@code live} from
+ * {@code @LiveGitHubTest}, and Failsafe's {@code excludedGroups=live} is what keeps it out of
+ * {@code mvn verify} — so the rule is "at least one", not "exactly one".
  *
- * <p>More than one tier on a class is legal and deliberate: the GitHub live suite is
- * {@code integration} (from {@code BaseIntegrationTest}) <em>and</em> {@code live} (from
- * {@code @LiveGitHubTest}), and Failsafe's {@code excludedGroups=live} is what keeps it out of
- * {@code mvn verify}. The rule is therefore "at least one", not "exactly one".
- *
- * <p>This is a source scan rather than an ArchUnit class scan for the same reason as its neighbour:
- * half of the invariant is about <em>file names</em>, which Failsafe matches and a compiled class graph
- * cannot see. {@link #anIntegrationTaggedTestIsNamedSoFailsafeRunsIt()} generalises
- * {@link IntegrationTestNamingConventionTest}, which only follows chains rooted at
- * {@code BaseIntegrationTest} — that is why the one real orphan in this tree
- * ({@code HephaestusApplicationTests}, which wrote {@code @Tag("integration")} literally and extended
- * nothing) went unnoticed for so long. The narrower rule is kept because its message names the chain.
+ * <p><b>Why it reads source rather than the compiled class graph.</b> Half of the invariant is about
+ * <em>file names</em>, which Failsafe matches and a class graph cannot see.
+ * {@link #anIntegrationTaggedTestIsNamedSoFailsafeRunsIt()} generalises
+ * {@link IntegrationTestNamingConventionTest}, which follows only chains rooted at
+ * {@code BaseIntegrationTest} and so is blind to a class that spells its tag out and extends nothing.
+ * The narrower rule is kept because its failure message names the chain.
  */
 @Tag("architecture")
 class TestTierTaggingArchTest {

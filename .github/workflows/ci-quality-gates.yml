@@ -8,7 +8,6 @@ on:
         required: false
         type: string
         default: "false"
-      # Path-based change detection inputs for selective execution
       webapp_changed:
         description: "Whether webapp files changed (or should run for other reasons)"
         required: false
@@ -52,7 +51,6 @@ jobs:
               echo "run=${{ inputs.application_server_changed }}" >> $GITHUB_OUTPUT
               ;;
             *)
-              # Unknown check type - fail explicitly to catch missing case statements
               echo "::error::Unknown check type '${{ matrix.check }}' in ci-quality-gates.yml matrix."
               echo "::error::Please add a case for this check in the 'Determine if check should run' step."
               echo "run=false" >> $GITHUB_OUTPUT
@@ -68,10 +66,11 @@ jobs:
         if: steps.should_run.outputs.run == 'true'
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
-          # Database checks need full history for git diff on schema/migrations
-          # Other quality checks only need HEAD for faster checkout.
-          # NOTE: the depths are QUOTED. Unquoted, `cond && 0 || 1` always yields 1, because the
-          # number 0 is falsy in GitHub expressions; the non-empty string '0' is truthy.
+          # Full history for the three legs that compare against a base commit: check:contracts
+          # resolves `git merge-base HEAD origin/<base>`, and both database legs diff the changelog
+          # tree. The rest only need HEAD.
+          # The depths are QUOTED. Unquoted, `cond && 0 || 1` always yields 1, because the number 0
+          # is falsy in GitHub expressions; the non-empty string '0' is truthy.
           fetch-depth: ${{ contains(fromJSON('["application-server-quality", "database-validation", "database-migrations"]'), matrix.check) && '0' || '1' }}
 
       - name: Setup pnpm + Node.js
@@ -112,45 +111,41 @@ jobs:
         run: |
           pnpm install --frozen-lockfile
 
+          # Every gate below is also in `pnpm run check`, which the pre-push hook runs and
+          # `--no-verify` skips. This step is the only place they are mandatory.
           ISSUES_FOUND=()
           FMT_OK=true; PMD_OK=true; LINT_OK=true; PIN_OK=true; TESTS_OK=true; TYPES_OK=true; SCRIPT_TYPES_OK=true; CONTRACTS_OK=true; ENV_OK=true; DOCS_OK=true; DIAGRAMS_OK=true
 
           pnpm run format:java:check || { FMT_OK=false; ISSUES_FOUND+=("Java formatting failed. Run: pnpm run format:java"); }
-          # The only rule engine with an opinion about the Java source — 28 rules over server/**,
-          # none of which any other leg re-checks. It was reachable only from the pre-push hook,
-          # which --no-verify skips, so a rule it flags could reach main under a green build.
+          # PMD only fails a build while `failOnViolation` is true in server/pom.xml; `lint:java`
+          # passes `-q`, so with it off pmd:check prints nothing and exits 0. Read the comment
+          # beside that flag before touching it.
           pnpm run lint:java || { PMD_OK=false; ISSUES_FOUND+=("PMD found violations. Run: pnpm run lint:java:report"); }
           # Runs before the Biome step so a version skew is reported as a version skew rather than
           # as a wall of formatting diffs from the wrong release.
           pnpm run check:biome-pin \
             || { PIN_OK=false; ISSUES_FOUND+=("Biome version skew between package.json, node_modules and the \$schema URLs."); }
-          # Every TypeScript tree outside the webapp: the Bun agent runtime, its specs, both
-          # precompute trees, scripts/, docs/ and the repo-root config files. oxlint lints
-          # (.oxlintrc.json) and Biome formats (biome.jsonc). Both emit GitHub annotations, so
-          # findings land on the diff rather than only in this log.
+          # `ci:agents` rather than `check:agents`: its Biome and oxlint reporters emit GitHub
+          # annotations, so findings land on the diff instead of only in this log. It runs no
+          # typecheck — those are the two separate legs below.
           pnpm run ci:agents \
             || { LINT_OK=false; ISSUES_FOUND+=("Lint or formatting failed outside the webapp. Run: pnpm run check:agents:fix"); }
-          # Directory arguments, not a file list: a new spec is picked up without editing this file.
           pnpm run test:agents \
             || { TESTS_OK=false; ISSUES_FOUND+=("Agent runtime test(s) failed. Run: pnpm run test:agents"); }
-          # Both typecheck legs run here because both trees are behind this job's path filter, and
-          # `&&` inside check:agents would hide the second one behind a lint failure.
           pnpm run typecheck:agents \
             || { TYPES_OK=false; ISSUES_FOUND+=("Agent TypeScript errors. Run: pnpm run typecheck:agents"); }
           pnpm run typecheck:scripts \
             || { SCRIPT_TYPES_OK=false; ISSUES_FOUND+=("scripts/ TypeScript errors. Run: pnpm run typecheck:scripts"); }
           pnpm run check:contracts || { CONTRACTS_OK=false; ISSUES_FOUND+=("Artifact-source contract validation failed. Run: pnpm run check:contracts"); }
-          # Reads application.yml against the compose files, both behind this job's path filter. It
-          # was reachable only from the pre-push hook, which --no-verify skips, so the gate written
-          # for a defect that reached production could not fail a required build.
+          # Reads server/application.yml against docker/compose.{app,core}.yaml — the deployment that
+          # has to deliver each setting. Both sides are behind this job's path filter.
           pnpm run check:env || { ENV_OK=false; ISSUES_FOUND+=("A setting does not reach a container that can read it. Run: pnpm run check:env"); }
-          # `decisions/` and `runbooks/` are mounted by no Docusaurus plugin, so the docs build never
-          # compiles them and never link-checks them. This is the only gate they have.
+          # docs/decisions/ and docs/runbooks/ are mounted by no Docusaurus plugin, so the site build
+          # never compiles or link-checks them. Markdown lint is the only gate they have.
           pnpm run docs:lint || { DOCS_OK=false; ISSUES_FOUND+=("docs/ markdown or typecheck failed. Run: pnpm run docs:lint"); }
           # Docusaurus renders mermaid in the browser, so a diagram it cannot parse builds green and
           # publishes as an error box — the docs deployment can never be the gate for it. This leg
-          # owns the check because docs/** is already behind its path filter (it is the tree
-          # lint:agents lints) and because the generated ERD it also parses is produced here.
+          # owns the check because docs/** is behind this job's path filter and no other job's.
           pnpm run check:diagrams \
             || { DIAGRAMS_OK=false; ISSUES_FOUND+=("A committed Mermaid diagram does not parse. Run: pnpm run check:diagrams"); }
 
@@ -181,12 +176,11 @@ jobs:
           pnpm install --frozen-lockfile
           cd webapp
 
+          # These gates also run in `pnpm run check`, which the pre-push hook runs and `--no-verify`
+          # skips — except the Vite build and the routeTree comparison, which run only here.
           ISSUES_FOUND=()
           LINT_OK=true
           TYPES_OK=true
-          # The webapp-scoped tree gates run here as well as in the pre-push hook, because a hook is
-          # skippable and a merge is not. check:env runs on the App Server leg, which has the server
-          # and compose files it reads.
           COMPONENTS_OK=true
           STORIES_OK=true
           SORT_OK=true
@@ -197,17 +191,13 @@ jobs:
           pnpm run typecheck || { TYPES_OK=false; ISSUES_FOUND+=("TypeScript errors found. Run: cd webapp && pnpm run typecheck"); }
           node ../scripts/check-presentational-components.ts || { COMPONENTS_OK=false; ISSUES_FOUND+=("Components must take data as props. Run: pnpm run check:components"); }
           node ../scripts/check-story-prose.ts || { STORIES_OK=false; ISSUES_FOUND+=("Story prose renders HTML paragraphs. Run: pnpm run check:stories"); }
-          # A story tree whose top-level segment `storySort.order` does not name sorts *below* every
-          # one it does — it never disappears, so no rendering test and no reviewer notices. Neither
-          # half of this is a property of a single file, so it can only be a whole-tree gate.
           node ../scripts/check-story-sort.ts || { SORT_OK=false; ISSUES_FOUND+=("Storybook sidebar order is stale. Run: pnpm run check:story-sort"); }
 
           # src/routeTree.gen.ts is written by the TanStack Router Vite plugin, so a build is the
-          # only thing that can say whether the committed copy is current — and until now the only
-          # build in CI happened inside the webapp image layer, where nothing could compare the
-          # result. A stale tree type-checks and tests green; the route it is missing simply 404s.
-          # This is also the only place CI compiles the SPA outside the Docker job, which does not
-          # run for a fork.
+          # only thing that can say whether the committed copy is current. The webapp image build
+          # regenerates it too but has nothing to compare it against, and it is skipped whenever
+          # webapp/ itself did not change. A stale tree type-checks and tests green; the route it is
+          # missing simply 404s.
           pnpm exec vite build || { BUILD_OK=false; ISSUES_FOUND+=("The webapp does not build. Run: cd webapp && pnpm run build"); }
           if [ "$BUILD_OK" = "true" ] && ! git diff --exit-code -- src/routeTree.gen.ts; then
             ROUTES_OK=false
@@ -254,16 +244,15 @@ jobs:
       - name: Database validation (schema + ERD + models)
         if: steps.should_run.outputs.run == 'true' && matrix.check == 'database-validation'
         run: |
-          # Install dependencies (pnpm + platform binaries needed for models check)
           pnpm install --frozen-lockfile
 
-          # Start a single shared Postgres instance for all DB checks
-          # pg_partman-enabled image: the auth_event changelog calls partman.create_parent.
+          # The pg_partman image, not stock Postgres: the auth_event changeset that calls
+          # partman.create_parent is preconditioned onFail="MARK_RAN" on the extension being
+          # available, so on a stock image the chain replays with that changeset never executed.
           docker build -t hephaestus-postgres:ci docker/postgres
           docker run -d --name postgres-db \
             -e POSTGRES_DB=hephaestus -e POSTGRES_PASSWORD=root -e POSTGRES_USER=root \
             -p 5432:5432 hephaestus-postgres:ci
-          # Guarantee cleanup regardless of how the step exits
           trap 'docker stop postgres-db 2>/dev/null; docker rm postgres-db 2>/dev/null' EXIT
           until docker exec postgres-db pg_isready -U root -d hephaestus; do sleep 2; done
 
@@ -271,7 +260,6 @@ jobs:
           export SPRING_DATASOURCE_USERNAME="root"
           export SPRING_DATASOURCE_PASSWORD="root"
 
-          # Compile application-server once (shared across all checks)
           if ! (cd server && mvn compile -DskipTests --quiet -Dmaven.build.cache.enabled=true); then
             echo "::error::Maven compilation failed. This blocks all database validation checks. Fix compilation errors first."
             echo "### Database Validation" >> $GITHUB_STEP_SUMMARY
@@ -283,9 +271,9 @@ jobs:
 
           ISSUES_FOUND=()
 
-          # Check 1: Schema drift. draft-changelog first applies the full master.xml chain to the
-          # empty DB via liquibase:update — so this step is ALSO the empty→head migration-chain
-          # replay gate (a changelog that doesn't apply fails here). Keep that apply intact.
+          # draft-changelog first applies the full master.xml chain to the empty DB via
+          # liquibase:update — so this step is ALSO the empty→head migration-chain replay gate (a
+          # changelog that doesn't apply fails here). Keep that apply intact.
           scripts/db-utils.sh draft-changelog || ISSUES_FOUND+=("Schema check / migration-chain apply failed. Run: pnpm run db:draft-changelog")
           if [ -f "server/src/main/resources/db/changelog_new.xml" ]; then
             echo "::error::Schema drift detected. Run: pnpm run db:draft-changelog"
@@ -293,7 +281,6 @@ jobs:
             ISSUES_FOUND+=("Schema drift detected")
           fi
 
-          # Check 2: ERD documentation
           scripts/db-utils.sh generate-erd || ISSUES_FOUND+=("ERD generation failed. Run: pnpm run db:generate-erd-docs")
           git add docs/contributor/erd/schema.mmd
           if ! git diff --cached --quiet docs/contributor/erd/schema.mmd; then
@@ -307,7 +294,6 @@ jobs:
             echo "|-------|--------|-----|" >> $GITHUB_STEP_SUMMARY
             for issue in "${ISSUES_FOUND[@]}"; do
               echo "::error::$issue"
-              # Extract fix command from "...Run: <command>" format, or show issue directly
               if [[ "$issue" == *"Run:"* ]]; then
                 echo "| ${issue%%.*} | :x: Failed | \`${issue##*Run: }\` |" >> $GITHUB_STEP_SUMMARY
               else
@@ -393,7 +379,6 @@ jobs:
           fi
           echo "No released changeset was touched; master.xml stays append-only."
 
-  # Needle built at runtime so this guard file doesn't self-match.
   legacy-cleanup-guard:
     name: "No legacy agent image"
     if: inputs.should_skip != 'true'
@@ -406,6 +391,7 @@ jobs:
       - name: Assert no legacy agent-image references
         run: |
           set -euo pipefail
+          # Needle built at runtime so this guard file doesn't self-match.
           NEEDLE="agent-$(printf 'open\x63ode')"
           if grep -rEnI "$NEEDLE" \
                 --exclude-dir=node_modules --exclude-dir=target --exclude-dir=.git \
@@ -416,11 +402,11 @@ jobs:
           fi
       # The defect ADR 0031 removed: a reference that floats on the release channel resolves to
       # whatever released most recently, which is a pair no release ever built. The reference is
-      # derived from the deployment's own image tag now, so nothing may name a channel again.
-      # Needle built at runtime so this guard file doesn't self-match.
+      # derived from the deployment's own image tag, so nothing may name a channel again.
       - name: Assert no release-channel agent image references
         run: |
           set -euo pipefail
+          # Needle built at runtime so this guard file doesn't self-match.
           NEEDLE="agent-pi:$(printf 'lat\x65st')"
           if grep -rEnI "$NEEDLE" \
                 --exclude-dir=node_modules --exclude-dir=target --exclude-dir=.git \

@@ -125,7 +125,7 @@ function AreaDetailsForm({
 								autoComplete="off"
 								disabled={pending}
 								aria-describedby={helpId}
-								// oxlint-disable-next-line jsx-a11y/no-autofocus -- The first field of an overlay the reader just opened to type in, which is the one case the rule's usability argument does not cover.
+								// oxlint-disable-next-line jsx-a11y/no-autofocus -- The picker above comes first in the DOM but seeds itself from the name, so a dialog that opened onto it would put focus on the one control with nothing to do yet. The name is also the only required field.
 								autoFocus
 							/>
 						</div>

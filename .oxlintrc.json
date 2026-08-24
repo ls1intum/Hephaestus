@@ -211,23 +211,9 @@
 		"considerDefaultExhaustiveForUnions": true
 		}
 		],
-		"typescript/only-throw-error": [
-		"error",
-		{
-		"allow": [
-		{
-		"from": "package",
-		"package": "@tanstack/router-core",
-		"name": "Redirect"
-		},
-		{
-		"from": "package",
-		"package": "@tanstack/router-core",
-		"name": "NotFoundError"
-		}
-		]
-		}
-		],
+		// No allowance: the SPA's is for TanStack Router's thrown `Redirect`/`NotFoundError`, and nothing
+		// under this config depends on `@tanstack/router-core`. Out here an Error is the only thing to throw.
+		"typescript/only-throw-error": "error",
 		"unicorn/error-message": "error",
 		"unicorn/throw-new-error": "error",
 		"unicorn/no-array-method-this-argument": "error",
@@ -247,11 +233,9 @@
 		"unicorn/prefer-string-trim-start-end": "error",
 		"unicorn/consistent-template-literal-escape": "error",
 		"unicorn/text-encoding-identifier-case": "error",
-		// Reads as a truthiness test on a count that is genuinely being tested for emptiness —
-		// `if (!findings.length) return` says what it means without naming a comparison.
-		"unicorn/explicit-length-check": "off",
-		// It reports the *enclosing* function, not the helper, and what it finds here is a helper
-		// deliberately scoped to the practice script that owns it — hoisting would widen its reach.
+		// The diagnostic names the helper but points at the *enclosing* function, so the line it sends you
+		// to is the exported entry point rather than the thing to change. What it finds is a helper
+		// deliberately scoped to the script or spec that owns it; hoisting one widens its reach.
 		"unicorn/consistent-function-scoping": "off",
 		// GraphQL introspection names its own fields: a schema query asks for `__schema`.
 		"no-underscore-dangle": "off",
@@ -261,16 +245,9 @@
 		"ignoreLastCallback": true
 		}
 		],
-		"import/no-unassigned-import": [
-		"error",
-		{
-		"allow": [
-		"**/*.css",
-		"@tanstack/react-router",
-		"react"
-		]
-		}
-		],
+		// No allowance: the SPA's covers CSS side effects and module augmentation, neither of which a Bun
+		// CLI or a build script has. An import here is for what it binds.
+		"import/no-unassigned-import": "error",
 		"no-unused-vars": [
 		"error",
 		{

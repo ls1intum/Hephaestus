@@ -186,6 +186,8 @@ public class MentorChatService implements MentorTurnRunner {
                 channel.completeWithConflict();
             }
         } catch (Throwable t) {
+            // Anything short of an Error is logged and swallowed: one turn's failure must not take the
+            // dispatch loop down with it.
             log.error(
                 "Mentor dispatchTurn escaped: workspaceId={}, threadId={}: {}",
                 key.workspaceId(),
@@ -200,10 +202,7 @@ public class MentorChatService implements MentorTurnRunner {
                 // Best-effort: the channel may already be closed.
             }
             // Re-throw Error subclasses (OOME, StackOverflowError) — JVM stability over metrics tidy-up.
-            // NOPMD PreserveStackTrace: `err` IS `t`, which PMD does not follow through the pattern
-            // binding. A non-Error escapee is logged above WITH the throwable and then deliberately
-            // swallowed — one turn's failure must not kill the dispatch loop.
-            if (t instanceof Error err) throw err; // NOPMD
+            if (t instanceof Error) throw (Error) t;
         }
     }
 

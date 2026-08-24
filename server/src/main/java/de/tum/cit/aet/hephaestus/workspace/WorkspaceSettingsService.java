@@ -248,8 +248,7 @@ public class WorkspaceSettingsService {
 
     private void validateTimeFormat(String time) {
         try {
-            // Intentional: the parse IS the validation — it is called for the exception, not the value,
-            // and there is no isValid()-shaped alternative on DateTimeFormatter.
+            // Called for the exception, not the value: DateTimeFormatter offers no isValid() predicate.
             LocalTime.parse(time, DateTimeFormatter.ofPattern("HH:mm")); // NOPMD
         } catch (DateTimeParseException e) {
             throw new IllegalArgumentException("Invalid time format. Expected HH:mm", e);

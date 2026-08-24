@@ -2,20 +2,6 @@ import { useRouter } from "@tanstack/react-router";
 import { useSearchState } from "@/lib/search-params";
 import { type DetailStackEntry, encodeDetailStack } from "./detail-stack";
 
-/**
- * Whether this visit is what pushed the top level. Read off the history entry rather than declared
- * on it: `HistoryState` lives in `@tanstack/history`, which this workspace cannot name in a
- * `declare module`, so the stamp is checked where it is read.
- */
-function wasPushedHere(state: unknown): boolean {
-	return (
-		typeof state === "object" &&
-		state !== null &&
-		"detailPush" in state &&
-		state.detailPush === true
-	);
-}
-
 export interface DetailStackControls {
 	/** Prefer {@link import("./DetailStackLink").DetailStackLink}; this is for openers that cannot be links. */
 	open: (entry: DetailStackEntry) => void;
@@ -43,7 +29,7 @@ export function useDetailStack(stack: DetailStackEntry[]): DetailStackControls {
 		open: (entry) => goToStack([...stack, entry], true),
 		close: (depth) => {
 			// Only the top level: the entries below it are not known to be ours.
-			if (wasPushedHere(router.state.location.state) && depth === stack.length - 1) {
+			if (router.state.location.state.detailPush === true && depth === stack.length - 1) {
 				router.history.back();
 				return;
 			}

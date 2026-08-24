@@ -55,9 +55,9 @@ describe("review route", () => {
 	});
 
 	/**
-	 * The three pages this replaced were in the sidebar, in the admin docs, and in bookmarks. Each
-	 * lands on the section that absorbed it — and the autonomy screen's overrides filter, the one deep
-	 * link into it anybody had reason to save, survives the move.
+	 * Three URLs that have been in the sidebar, in the admin docs and in people's bookmarks, so each
+	 * has to keep resolving to the section that holds its subject. The autonomy screen's overrides
+	 * filter travels too: it is the one deep link into these anybody had reason to save.
 	 */
 	it.each([
 		["/w/acme/admin/practices/autonomy", "/w/acme/admin/practices/review"],

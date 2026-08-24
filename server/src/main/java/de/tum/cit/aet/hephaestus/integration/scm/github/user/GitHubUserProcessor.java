@@ -212,7 +212,6 @@ public class GitHubUserProcessor {
                         Thread.sleep(delay);
                     } catch (InterruptedException ie) {
                         Thread.currentThread().interrupt();
-                        // Propagate the original deadlock exception, carrying the interrupt that cut the backoff short.
                         e.addSuppressed(ie);
                         throw e;
                     }

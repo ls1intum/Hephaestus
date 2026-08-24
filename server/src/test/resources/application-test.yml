@@ -111,12 +111,13 @@ hephaestus:
     practice-review:
         cooldown-minutes: 0
 
-# Logging configuration for tests
+# Logging configuration for tests.
+# One flat key, not a nested tree: the package this raises above `root: WARN` was spelled out branch by
+# branch and kept pointing at the pre-rename `de.tum.in.www1` long after it stopped existing, matching
+# nothing. Because Spring's LoggingSystem reconfigures Logback for the whole JVM, the first
+# context-booting test in a Surefire fork left every later test in that fork at WARN — which is how a
+# unit test asserting on an INFO line passed alone and failed in the tier.
 logging:
     level:
         root: WARN
-        de:
-            tum:
-                in:
-                    www1:
-                        hephaestus: INFO
+        "de.tum.cit.aet.hephaestus": INFO

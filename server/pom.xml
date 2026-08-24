@@ -1140,23 +1140,21 @@
                     <linkXRef>false</linkXRef>
                     <printFailingErrors>true</printFailingErrors>
                     <!--
-                        The gate is armed. It was false from the day PMD was added, and `lint:java` adds
-                        -q, so `pmd:check` logged its findings at WARNING and returned BUILD SUCCESS —
-                        `pnpm run check` reported a clean Java lint over 234 real violations, 53 of them
-                        catch blocks that dropped the original cause. Do not set this back to false;
-                        argue the rule in pmd-ruleset.xml instead.
-                    -->
-                    <!--
-                        PMD needs the compiled classes on its auxclasspath to resolve types. Without
-                        them it cannot see that an enum switch is exhaustive or that a wildcard import
-                        is used, and reports both as violations — so `lint:java` compiles first.
+                        Never set this to false. `lint:java` runs pmd:check with -q, so with the gate
+                        disarmed PMD logs its findings at WARNING and still returns BUILD SUCCESS: the
+                        whole Java lint reports clean while violating whatever it likes. Argue a rule in
+                        pmd-ruleset.xml instead of disarming the gate.
+
+                        `lint:java` also runs `compile` first, because PMD resolves types off the
+                        compiled classes on its auxclasspath. Without them it cannot tell that an enum
+                        switch is exhaustive or that a wildcard import is used, and reports both.
                     -->
                     <failOnViolation>true</failOnViolation>
                     <!--
-                        Every generated root, not a list of the three we happen to know about: the
-                        annotation processors write Java under generated-sources/annotations during a
-                        real compile, which a local run with the `quick` profile never produces, so an
-                        enumerated list passes here and fails in CI.
+                        The generated roots wholesale, not an enumerated list: annotation processors
+                        write Java under generated-sources/annotations, which a local run with the
+                        `quick` profile never produces — so a list that names only the codegen plugins'
+                        output passes locally and fails in CI.
                     -->
                     <excludeRoots>
                         <excludeRoot>${project.build.directory}/generated-sources</excludeRoot>

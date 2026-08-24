@@ -134,7 +134,6 @@ final class SecretDiffScanner {
                     scanLine(currentPath, newLine, content, hits);
                 }
             }
-            // An added line, a context line (leading space) and an empty separator all advance the new side.
             newLine++;
         }
         return hits;

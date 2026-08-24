@@ -46,7 +46,6 @@ public record WebhookProperties(
         message = "hephaestus.webhook.stream.max-bytes, and every max-bytes-by-stream entry, must be at least " +
             "4 x hephaestus.webhook.http.max-payload-bytes; a smaller stream rejects payloads the receiver accepted"
     )
-    // Invoked reflectively by Jakarta Bean Validation, so PMD sees no caller.
     @SuppressWarnings("PMD.UnusedPrivateMethod")
     private boolean isStreamAbleToHoldWhatTheReceiverAccepts() {
         if (stream == null || http == null) {

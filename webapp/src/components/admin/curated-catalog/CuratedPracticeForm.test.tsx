@@ -246,9 +246,10 @@ describe("CuratedPracticeForm", () => {
 		await user.click(screen.getByRole("button", { name: "Save changes" }));
 
 		expect(onSubmit).not.toHaveBeenCalled();
-		// Two alerts now: the summary at the top of the form listing every refusal, and this one at
-		// the field it is about. The inline one is what this test is for — a summary alone would put
-		// the message a screenful away from the control that fixes it.
+		// A refusal raises two alerts: the summary at the top of the form listing every one, and this
+		// one at the field it is about — hence `getAllByRole` and the `some`. The inline alert is what
+		// this test is for; a summary alone would put the message a screenful from the control that
+		// fixes it.
 		expect(
 			screen
 				.getAllByRole("alert")

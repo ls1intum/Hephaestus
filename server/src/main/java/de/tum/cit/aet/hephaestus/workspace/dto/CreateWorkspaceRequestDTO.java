@@ -72,7 +72,6 @@ public record CreateWorkspaceRequestDTO(
 ) {
     @AssertTrue(message = "Personal access token is required")
     @Schema(hidden = true)
-    // Invoked reflectively by Jakarta Bean Validation, so PMD sees no caller.
     @SuppressWarnings("PMD.UnusedPrivateMethod")
     private boolean isTokenProvided() {
         return personalAccessToken != null && !personalAccessToken.isBlank();
@@ -80,7 +79,6 @@ public record CreateWorkspaceRequestDTO(
 
     @AssertTrue(message = "kind must be GITHUB or GITLAB; SLACK flows through OAuth")
     @Schema(hidden = true)
-    // Invoked reflectively by Jakarta Bean Validation, so PMD sees no caller.
     @SuppressWarnings("PMD.UnusedPrivateMethod")
     private boolean isKindSupported() {
         return kind == IntegrationKind.GITHUB || kind == IntegrationKind.GITLAB;
@@ -88,7 +86,6 @@ public record CreateWorkspaceRequestDTO(
 
     @AssertTrue(message = "Server URL must use HTTPS and must not point to private/reserved addresses")
     @Schema(hidden = true)
-    // Invoked reflectively by Jakarta Bean Validation, so PMD sees no caller.
     @SuppressWarnings("PMD.UnusedPrivateMethod")
     private boolean isServerUrlSafe() {
         if (serverUrl == null || serverUrl.isBlank()) {

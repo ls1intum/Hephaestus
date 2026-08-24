@@ -56,7 +56,6 @@ client.interceptors.response.use((response) => {
 	return response;
 });
 
-// Create a new router instance
 const router = createRouter({
 	routeTree,
 	context: {
@@ -144,18 +143,14 @@ function Root() {
 	return app;
 }
 
-// Render the app
 const rootElement = document.getElementById("app");
 if (rootElement && !rootElement.innerHTML) {
 	const root = ReactDOM.createRoot(rootElement, {
-		// Callback called when an error is thrown and not caught by an ErrorBoundary.
 		onUncaughtError: Sentry.reactErrorHandler((error, errorInfo) => {
 			// oxlint-disable-next-line no-console -- Supplying `onUncaughtError` replaces React's own console report, so without this line an uncaught render error leaves nothing in the browser console for a developer with devtools open; the component stack is available nowhere else on the page.
 			console.warn("Uncaught error", error, errorInfo.componentStack);
 		}),
-		// Callback called when React catches an error in an ErrorBoundary.
 		onCaughtError: Sentry.reactErrorHandler(),
-		// Callback called when React automatically recovers from errors.
 		onRecoverableError: Sentry.reactErrorHandler(),
 	});
 	root.render(

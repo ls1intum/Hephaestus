@@ -165,7 +165,6 @@ public class GitRepositoryManager {
                             "Failed to delete local git clone: " + repositoryId,
                             forced
                         );
-                        // Keep the recursive-delete failure that sent us down the forced path.
                         failure.addSuppressed(e);
                         throw failure;
                     }
@@ -1053,8 +1052,8 @@ public class GitRepositoryManager {
     private void deleteRecursively(Path path) throws IOException {
         List<Path> deepestFirst;
         try (var stream = Files.walk(path)) {
-            // Sort in reverse order so files are deleted before their parent directories. Collected
-            // rather than consumed in a lambda so Files.delete can throw IOException straight out.
+            // Collected rather than deleted inside the stream so Files.delete can throw IOException
+            // straight out, instead of being wrapped and unwrapped through UncheckedIOException.
             deepestFirst = stream.sorted(Comparator.reverseOrder()).toList();
         }
         for (Path p : deepestFirst) {

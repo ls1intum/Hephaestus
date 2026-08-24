@@ -526,8 +526,8 @@ public class ConnectionService {
         boolean fenceOnActiveSyncJob,
         boolean propagateRevokeFailure
     ) {
-        // Everything below reads `connection`: for a persisted argument that is the row re-read under
-        // the lifecycle lock, never the caller's possibly-stale instance.
+        // For a persisted argument the row transitioned below is the one re-read under the lifecycle
+        // lock, never the caller's possibly-stale instance.
         Connection connection = requested;
         if (requested.getId() != null) {
             long connectionId = requested.getId();

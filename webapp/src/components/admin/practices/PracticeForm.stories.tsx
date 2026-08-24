@@ -73,8 +73,8 @@ export const Create: Story = {
 		chromatic: { viewports: [320, 1440] },
 	},
 	play: async () => {
-		// The level is the full viewport at 320px, so the form has to fit it: 43 controls that scroll
-		// down, never across.
+		// The level is the full viewport at 320px, so the longest form in the app has to fit it by
+		// scrolling down and never across.
 		await expectNoPanelOverflow(await settledDrawerPanel());
 	},
 };

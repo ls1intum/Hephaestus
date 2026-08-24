@@ -131,17 +131,7 @@ public record WorkspaceProperties(
         }
     }
 
-    /**
-     * Validates that credentials are provided when default workspace initialization is enabled.
-     *
-     * <p>This method is invoked by JSR-380 bean validation. The validation ensures that
-     * when {@code initDefault} is {@code true}, both {@code login} and {@code token} in
-     * {@link DefaultProperties} are non-blank.
-     *
-     * @return {@code true} if the configuration is valid; {@code false} otherwise
-     */
     @AssertTrue(message = "When init-default is true, default.login and default.token must not be blank")
-    // Invoked reflectively by Jakarta Bean Validation, so PMD sees no caller.
     @SuppressWarnings("PMD.UnusedPrivateMethod")
     private boolean isCredentialsValidWhenInitDefaultEnabled() {
         if (!initDefault) {
@@ -159,7 +149,6 @@ public record WorkspaceProperties(
     @AssertTrue(
         message = "When init-gitlab-default is true, gitlab-default.login and gitlab-default.token must not be blank"
     )
-    // Invoked reflectively by Jakarta Bean Validation, so PMD sees no caller.
     @SuppressWarnings("PMD.UnusedPrivateMethod")
     private boolean isGitLabCredentialsValidWhenInitGitlabDefaultEnabled() {
         if (!initGitlabDefault) {

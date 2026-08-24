@@ -52,9 +52,10 @@ Naming: `format` applies, `format:check` verifies read-only for CI, `lint` lints
 comprehensive verification. A `:webapp`, `:server` or `:agents` suffix scopes any of them; `:java`
 scopes `format` and `lint` only — the Java leg of `check` is `check:server`.
 
-**Every leg of `check` now runs in CI**, so a green build and a green `check` agree. The one thing
-CI cannot run is anything needing Docker or a live credential. Run `check` yourself before claiming
-it anyway — it is the same command, and it fails faster than a workflow does.
+**Every leg of `check` also runs in CI**, so a green build and a green `check` agree. CI adds two
+gates `check` does not have — the Vite build and the `routeTree.gen.ts` comparison that only a build
+can make — and cannot run anything needing Docker or a live credential. Run `check` yourself before
+claiming it: it is the same command, and it fails faster than a workflow does.
 
 ### Lint and format scopes
 

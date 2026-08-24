@@ -20,19 +20,23 @@ function MentorContainer() {
 	const slug = workspaceSlug ?? "";
 	const hasStartedRef = useRef(false);
 
-	// Auto-start a new conversation when the page loads
+	// The id is minted here and nothing announces it: no endpoint creates a thread, so this one does
+	// not exist server-side until the first message is sent. Both cache writes below stand in for the
+	// reads that would otherwise 404 — the thread page fetches this key on mount.
+	//
+	// Once per mount, guarded by a ref rather than by the dependency list, which cannot promise it:
+	// a second run would mint a second id and strand an empty "New chat" in the list.
 	useEffect(() => {
 		if (!workspaceSlug || hasStartedRef.current) return;
 		hasStartedRef.current = true;
 
 		const threadId = uuidv4();
 
-		// Pre-populate thread cache
 		queryClient.setQueryData(getThreadQueryKey({ path: { workspaceSlug: slug, threadId } }), {
 			messages: [],
 		});
 
-		// Add to thread list (flat list; NavMentorThreads buckets by createdAt)
+		// Flat: `NavMentorThreads` buckets by `createdAt`, so ordering here is not load-bearing.
 		queryClient.setQueryData<Array<ChatThreadSummary>>(
 			listThreadsQueryKey({ path: { workspaceSlug: slug } }),
 			(prev) => {
@@ -47,8 +51,9 @@ function MentorContainer() {
 			},
 		);
 
-		// Navigate to thread page — the static <Greeting /> there renders on empty messages,
-		// then the user's first message starts the real chat turn.
+		// `replace`, so Back leaves the mentor rather than landing here and minting another thread.
+		// The seeded empty transcript is what makes the thread page render its static greeting; the
+		// first message is what starts a real chat turn.
 		void navigate({
 			to: "/w/$workspaceSlug/mentor/$threadId",
 			params: { workspaceSlug: slug, threadId },
@@ -60,7 +65,6 @@ function MentorContainer() {
 		return <NoWorkspace />;
 	}
 
-	// Show greeting animation while redirecting
 	return (
 		<div className="flex h-full min-h-0 flex-1 flex-col">
 			<Greeting />

@@ -16,37 +16,39 @@ matches, and forcing every duration to 1ms does not fix it. Use `expectSettledVi
 animation routinely. Any settle helper must `.catch()` the rejection and treat it as an outcome
 (`webapp/src/test/overlay.ts`). Without the catch the helper throws on the ordinary path.
 
-## 3. A hook suppression lands on the wrong line, and the legacy rule name takes the pass with it
+## 3. A hook suppression aimed at the `useEffect` line suppresses nothing
 
 `react/set-state-in-effect` reports on the **`setState` call inside the effect body**, not on the
 `useEffect` line. So the obvious placement — a `disable-next-line` above the effect — points at the
-`useEffect` and suppresses nothing; the diagnostic still fires and the directive is additionally
-reported as `Unused oxlint-disable directive`. Put the directive above the reported line, or, better,
-fix the effect.
+`useEffect`: the diagnostic still fires, and the directive is additionally reported as
+`Unused oxlint-disable directive` because `options.reportUnusedDisableDirectives` is `error` in the
+repo-root `.oxlintrc.json`. The build fails complaining about the directive while the diagnostic you
+meant to silence is still there. Put the directive above the reported line, or fix the effect.
 
-Spelling it as the legacy `react-hooks/…` name is worse. One such directive anywhere in a component
-body suppresses **every** React hook diagnostic in that component, whichever line it sits above —
-neighbouring components in the same file keep reporting, so the file does not look disabled.
+One `setState` in an effect usually trips **two** rules at once — `react/set-state-in-effect` and
+`react/no-deriving-state-in-effects` — so a directive naming one leaves the other reporting on the
+same line and looks like the suppression failed. Name both, or fix the effect.
 
-`options.reportUnusedDisableDirectives` does catch both shapes: either way the run exits 1. The cost
-is not a silent pass, it is a misleading one — the build fails complaining about an unused directive
-while the diagnostic you meant to suppress has quietly gone somewhere else.
+Naming `react/rules-of-hooks` instead is the dangerous spelling: oxlint routes the hook rules through
+that one name, so a directive naming it **anywhere in a component body** silences every hook
+diagnostic in that component, whichever line it sits above. A sibling component in the same file keeps
+reporting, so the file does not look disabled. The directive is itself reported unused, so the build
+fails — but it fails about the directive, and the diagnostics it swallowed are simply gone.
 
 ## 4. One story's MSW handlers answer for the whole Docs page
 
 Autodocs mounts every story of a file into **one** document, and `msw-storybook-addon` installs on a
 single global worker — so the last story's handlers serve every story on that page. One error story
 silently breaks its siblings' Docs page while every isolated story, and therefore every test and every
-snapshot, stays green. That is not hypothetical: it is what made a screen's Docs page read
-"Couldn't load this feedback". A story file installs no handlers at all;
-`scripts/check-presentational-components.ts` enforces it.
+snapshot, stays green; the symptom is a Docs page that renders every sibling as the error state. A
+story file installs no handlers at all, and `scripts/check-presentational-components.ts` enforces it.
 
 ## 5. `test:storybook` does not run the README-export check — CI does, right after
 
-`.github/workflows/ci-tests.yml` runs `pnpm run export:readme-assets` after `test:storybook` and fails
-the job if `docs/images/readme` is dirty. So the storybook job can go red having printed a clean pass line. If a
-change moves or renames a story that exports a README asset, run
-`pnpm --filter webapp run export:readme-assets` and commit the result.
+`.github/workflows/ci-tests.yml` runs the webapp package's `export:readme-assets` immediately after
+`test:storybook`, and fails the job if `docs/images/readme` is dirty afterwards. So the storybook job can go red
+having printed a clean pass line. If a change moves or renames a story that exports a README asset,
+run `pnpm --filter webapp run export:readme-assets` and commit the result.
 
 ## 6. A hand-rolled stateful wrapper swallows the spy in `meta.args`
 

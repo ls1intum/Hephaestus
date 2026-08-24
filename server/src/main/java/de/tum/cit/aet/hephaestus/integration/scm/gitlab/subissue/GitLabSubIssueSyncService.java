@@ -138,7 +138,13 @@ public class GitLabSubIssueSyncService {
                 List<Map<String, Object>> nodes = (List<Map<String, Object>>) (List<?>) response
                     .field("project.workItems.nodes")
                     .toEntityList(Map.class);
-                if (nodes == null || nodes.isEmpty()) break;
+                if (nodes == null) {
+                    // A response the handler passed but whose nodes field is missing is a page we did
+                    // not read, not an empty project.
+                    partialView = true;
+                    break;
+                }
+                if (nodes.isEmpty()) break;
 
                 for (Map<String, Object> node : nodes) {
                     int linked = processWorkItemNode(node, issueByIid, issuesWithParentInGitLab, repository);
@@ -159,10 +165,11 @@ public class GitLabSubIssueSyncService {
                 page++;
             } while (cursor != null);
 
-            // Stale parent cleanup: clear parentIssue for issues that no longer have a parent in GitLab.
-            // Only safe on a COMPLETE walk — issuesWithParentInGitLab is built page by page, so on a run
-            // that stopped early every issue whose parent lived on an unfetched page looks parentless and
-            // would have its real link deleted. An incomplete walk leaves the existing links alone.
+            // Clearing parentIssue for issues GitLab no longer reports a parent for is only safe on a
+            // COMPLETE walk: issuesWithParentInGitLab is built page by page, so after a run that stopped
+            // early every issue whose parent lived on an unfetched page looks parentless and would have
+            // its real link deleted. Anything that can end the loop before the last page therefore has
+            // to set partialView.
             int staleCleared = partialView ? 0 : clearStaleParents(issues, issuesWithParentInGitLab);
             if (partialView) {
                 log.warn("Skipping stale-parent cleanup after an incomplete walk: project={}", safeProjectPath);
