@@ -78,14 +78,14 @@ export function PracticeDefinitionSkeleton() {
 export function ReviewSettingsSkeleton() {
 	return (
 		<div className="space-y-8" aria-hidden>
-			{Array.from({ length: 3 }, (_, section) => (
+			{["status", "timing", "coverage"].map((section) => (
 				<div key={section} className="space-y-4">
 					<div className="space-y-2">
 						<Skeleton className="h-6 w-48" />
 						<Skeleton className="h-4 w-full max-w-lg" />
 					</div>
-					{Array.from({ length: 2 }, (_, row) => (
-						<Skeleton key={row} className="h-10 w-full" />
+					{["first", "second"].map((row) => (
+						<Skeleton key={`${section}-${row}`} className="h-10 w-full" />
 					))}
 				</div>
 			))}

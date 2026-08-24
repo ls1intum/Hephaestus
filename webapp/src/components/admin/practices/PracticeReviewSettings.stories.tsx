@@ -294,7 +294,7 @@ export const AddingASecondBranchWidens: Story = {
 			canvas.getByRole("button", { name: "Add to base branches for acme/widgets" }),
 		);
 
-		await expect(await screen.findByRole("alertdialog")).toBeInTheDocument();
+		await screen.findByRole("alertdialog");
 		await expect(args.policy.onUpdate).not.toHaveBeenCalled();
 	},
 };
@@ -356,7 +356,7 @@ export const ClearingEveryBranchWidens: Story = {
 			canvas.getByRole("button", { name: "Remove main from base branches for acme/widgets" }),
 		);
 
-		await expect(await screen.findByRole("alertdialog")).toBeInTheDocument();
+		await screen.findByRole("alertdialog");
 		await expect(args.policy.onUpdate).not.toHaveBeenCalled();
 	},
 };

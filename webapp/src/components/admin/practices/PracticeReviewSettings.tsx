@@ -453,10 +453,9 @@ function ReviewedWorkSection({
 					aria-labelledby="repositories-covered-label"
 					value={scope.repositoryMode}
 					disabled={policy.isSaving}
-					onValueChange={(value) => {
-						const mode = value as WorkspaceReviewScope["repositoryMode"];
-						requestScope({ ...scope, repositoryMode: mode }, mode === "ALL_MONITORED");
-					}}
+					onValueChange={(mode) =>
+						requestScope({ ...scope, repositoryMode: mode }, mode === "ALL_MONITORED")
+					}
 				>
 					<label className="flex items-center gap-2" htmlFor="repositories-all">
 						<RadioGroupItem id="repositories-all" value="ALL_MONITORED" />
@@ -539,10 +538,9 @@ function ReviewedWorkSection({
 					aria-labelledby="people-covered-label"
 					value={scope.personMode}
 					disabled={policy.isSaving}
-					onValueChange={(value) => {
-						const mode = value as WorkspaceReviewScope["personMode"];
-						requestScope({ ...scope, personMode: mode }, mode === "ALL_ELIGIBLE");
-					}}
+					onValueChange={(mode) =>
+						requestScope({ ...scope, personMode: mode }, mode === "ALL_ELIGIBLE")
+					}
 				>
 					<label className="flex items-center gap-2" htmlFor="people-all">
 						<RadioGroupItem id="people-all" value="ALL_ELIGIBLE" />

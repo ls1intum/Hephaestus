@@ -308,13 +308,20 @@ function WhenAndWhereSection({ workspaceSlug }: { workspaceSlug: string }) {
 							isError: repositoriesQuery.isError,
 						},
 						people: {
-							options: (membersQuery.data ?? [])
-								.filter((member) => member.userId != null)
-								.map((member) => ({
-									value: member.userId as number,
-									label: member.userName || member.userLogin || `Member ${member.userId}`,
-									description: member.userLogin ? `@${member.userLogin}` : undefined,
-								})),
+							options: (membersQuery.data ?? []).flatMap((member) =>
+								member.userId == null
+									? []
+									: [
+											{
+												value: member.userId,
+												label:
+													[member.userName, member.userLogin].find(
+														(name) => name != null && name.trim() !== "",
+													) ?? `Member ${member.userId}`,
+												description: member.userLogin ? `@${member.userLogin}` : undefined,
+											},
+										],
+							),
 							isLoading: membersQuery.isLoading,
 							isError: membersQuery.isError,
 						},

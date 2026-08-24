@@ -1,15 +1,13 @@
-import type { Meta, StoryObj } from "@storybook/react-vite";
-import { expect, userEvent, type within } from "storybook/test";
+import type { Meta, StoryContext, StoryObj } from "@storybook/react-vite";
+import { expect, userEvent } from "storybook/test";
 import type { DeliveryPolicyTrace as DeliveryPolicyTraceData } from "@/api/types.gen";
 import { expectNoPageOverflow } from "@/test/reflow";
 import { DeliveryPolicyTrace } from "./DeliveryPolicyTrace";
-import { artifactTrace } from "./story-mock-data";
-
-const [deniedEvaluation] = artifactTrace.deliveryPolicy;
+import { artifactTrace, deniedDeliveryPolicyEvaluation } from "./story-mock-data";
 
 const allowedEvaluation: DeliveryPolicyTraceData = {
-	...deniedEvaluation,
-	evaluatedRevision: deniedEvaluation.admittedRevision,
+	...deniedDeliveryPolicyEvaluation,
+	evaluatedRevision: deniedDeliveryPolicyEvaluation.admittedRevision,
 	allowed: true,
 	decisiveReason: undefined,
 	checks: [
@@ -25,13 +23,13 @@ const allowedEvaluation: DeliveryPolicyTraceData = {
 };
 
 const openScopeEvaluation: DeliveryPolicyTraceData = {
-	...deniedEvaluation,
+	...deniedDeliveryPolicyEvaluation,
 	surface: "IN_APP",
 	stage: "AUTOMATIC",
 	evaluatedRevision: undefined,
 	decisiveReason: "OUTSIDE_CURRENT_COVERAGE",
 	facts: {
-		...deniedEvaluation.facts,
+		...deniedDeliveryPolicyEvaluation.facts,
 		repositoryMode: "ALL_MONITORED",
 		personMode: "ALL_ELIGIBLE",
 		subject: "UNLINKED",
@@ -50,7 +48,7 @@ const openScopeEvaluation: DeliveryPolicyTraceData = {
 
 /** A conversation carries no repository, so every scope axis is absent rather than open or narrow. */
 const conversationEvaluation: DeliveryPolicyTraceData = {
-	...deniedEvaluation,
+	...deniedDeliveryPolicyEvaluation,
 	surface: "CONVERSATION",
 	stage: "COMPOSITION",
 	evaluatedRevision: undefined,
@@ -72,9 +70,7 @@ const conversationEvaluation: DeliveryPolicyTraceData = {
 	],
 };
 
-type Canvas = ReturnType<typeof within>;
-
-async function openTrace(canvas: Canvas) {
+async function openTrace(canvas: StoryContext["canvas"]) {
 	await userEvent.click(canvas.getByRole("button", { name: "Technical delivery policy trace" }));
 }
 

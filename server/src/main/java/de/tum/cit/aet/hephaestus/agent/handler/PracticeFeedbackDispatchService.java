@@ -13,7 +13,6 @@ import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDispatchInsert;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDispatchRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDispatchState;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
-import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Duration;
 import java.time.Instant;
