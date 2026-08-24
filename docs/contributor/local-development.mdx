@@ -12,7 +12,8 @@ Hephaestus supports full-stack development across Java and TypeScript. This guid
 Install and configure the following tools before you attempt a local build:
 
 1. **Java JDK 21** – Required for the Spring Boot application server.
-2. **Docker Desktop** – Used for PostgreSQL and NATS containers.
+2. **Docker and Docker Compose** – Required for PostgreSQL and NATS. Verify both with `docker info`
+   and `docker compose version`.
 3. **Node.js LTS (>= 24)** and **pnpm (>= 11)** (enable via `corepack enable`) – For the React client and root scripts.
 4. **Bun** – Runs the agent runtime and precompute tests (`pnpm run test:agents`). `corepack` does not
    provide it; install it separately. Match the version the agent image pins — the `ARG BUN_VERSION`
@@ -64,8 +65,7 @@ they are used.
 
 They are **not** Maven profiles — `./mvnw -Plocal` warns that the profile does not exist and changes
 nothing. Maven passes the active Spring profile through the `app.profiles` property, so the override
-is `-Dapp.profiles=…` (this is what `pnpm dev:server:e2e` does). Maven's own profiles are a separate,
-smaller set: `live-tests`, `architecture-tests`, `quick`, `pitest`, `aot` and `local-db-timeout`.
+is `-Dapp.profiles=…` (this is what `pnpm dev:server:e2e` does).
 
 Create `server/src/main/resources/application-local.yml` to override defaults. This file is gitignored.
 
@@ -75,7 +75,7 @@ Never commit `application-local.yml`. It may contain secrets and machine-specifi
 
 ### Running the stack
 
-1. Start Docker Desktop.
+1. Ensure the Docker daemon is running with `docker info`.
 2. From the repo root, start everything with one command:
 
    ```bash

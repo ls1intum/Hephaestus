@@ -10,17 +10,12 @@ import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
-/**
- * Base class for integration tests requiring full Spring Boot context.
- * Uses shared PostgreSQL container for 60-75% faster execution.
- */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("test")
 @AutoConfigureWebTestClient
 @Import(
     {
         TestSecurityConfig.class,
-        GitHubIntegrationPostgresShutdown.class,
         TestAsyncConfiguration.class,
         RecordingScmEventListener.class,
         WorkspaceEchoControllers.ScopedEchoController.class,
@@ -41,10 +36,7 @@ public abstract class BaseIntegrationTest {
         registry.add("spring.datasource.username", postgres::getUsername);
         registry.add("spring.datasource.password", postgres::getPassword);
 
-        // HikariCP pool must be large enough for REQUIRES_NEW nested transactions
-        // when Surefire runs with -T 2C (parallel threads). Each @Transactional test
-        // holds one connection; REQUIRES_NEW (e.g. GitHubUserProcessor.executeUpsertWithDeadlockRetry,
-        // DatabaseTestUtils.doCleanDatabase) needs an additional one.
+        // Nested REQUIRES_NEW transactions need a second connection while the outer transaction remains open.
         registry.add("spring.datasource.hikari.maximum-pool-size", () -> "10");
         registry.add("spring.datasource.hikari.minimum-idle", () -> "1");
         registry.add("spring.datasource.hikari.max-lifetime", () -> "300000"); // 5 minutes
