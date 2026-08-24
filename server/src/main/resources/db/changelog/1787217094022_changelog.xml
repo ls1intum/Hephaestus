@@ -26,10 +26,14 @@
              once, and a person once. Base branches are an owned list nothing points into, so they ride on
              the row they qualify instead of in a table of their own. -->
         <createTable tableName="practice_review_repository_target">
-            <column name="workspace_id" type="BIGINT"><constraints nullable="false" primaryKey="true" primaryKeyName="pk_practice_review_repository_target"/></column>
-            <column name="repository_monitor_id" type="BIGINT"><constraints nullable="false" primaryKey="true" primaryKeyName="pk_practice_review_repository_target"/></column>
+            <column name="workspace_id" type="BIGINT"><constraints nullable="false"/></column>
+            <column name="repository_monitor_id" type="BIGINT"><constraints nullable="false"/></column>
             <column name="base_branches" type="JSONB" defaultValue="[]"><constraints nullable="false"/></column>
         </createTable>
+        <!-- Column order follows Hibernate's, which sorts an @IdClass alphabetically; the index below is
+             what serves the workspace lookups, since the key does not lead with the tenant. -->
+        <addPrimaryKey tableName="practice_review_repository_target" columnNames="repository_monitor_id,workspace_id" constraintName="pk_practice_review_repository_target"/>
+        <createIndex tableName="practice_review_repository_target" indexName="idx_practice_review_repository_target_workspace"><column name="workspace_id"/></createIndex>
         <addUniqueConstraint tableName="repository_to_monitor" columnNames="workspace_id,id" constraintName="uk_repository_to_monitor_workspace_id"/>
         <addForeignKeyConstraint baseTableName="practice_review_repository_target" baseColumnNames="workspace_id" referencedTableName="workspace" referencedColumnNames="id" constraintName="sfk_practice_review_repository_target_workspace" onDelete="CASCADE"/>
         <addForeignKeyConstraint baseTableName="practice_review_repository_target" baseColumnNames="workspace_id,repository_monitor_id" referencedTableName="repository_to_monitor" referencedColumnNames="workspace_id,id" constraintName="sfk_practice_review_repository_target_monitor" onDelete="CASCADE"/>
@@ -38,9 +42,11 @@
                 CHECK (jsonb_typeof(base_branches) = 'array');
         ]]></sql>
         <createTable tableName="practice_review_person_target">
-            <column name="workspace_id" type="BIGINT"><constraints nullable="false" primaryKey="true" primaryKeyName="pk_practice_review_person_target"/></column>
-            <column name="user_id" type="BIGINT"><constraints nullable="false" primaryKey="true" primaryKeyName="pk_practice_review_person_target"/></column>
+            <column name="workspace_id" type="BIGINT"><constraints nullable="false"/></column>
+            <column name="user_id" type="BIGINT"><constraints nullable="false"/></column>
         </createTable>
+        <addPrimaryKey tableName="practice_review_person_target" columnNames="user_id,workspace_id" constraintName="pk_practice_review_person_target"/>
+        <createIndex tableName="practice_review_person_target" indexName="idx_practice_review_person_target_workspace"><column name="workspace_id"/></createIndex>
         <addForeignKeyConstraint baseTableName="practice_review_person_target" baseColumnNames="workspace_id,user_id" referencedTableName="workspace_membership" referencedColumnNames="workspace_id,user_id" constraintName="sfk_practice_review_person_target_membership" onDelete="CASCADE"/>
         <sql splitStatements="true" endDelimiter=";"><![CDATA[
             UPDATE workspace
