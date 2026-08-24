@@ -660,6 +660,9 @@
 				// so anything counted there is counted here. A literal cannot be shared across JSON and
 				// TypeScript, so it is that relation `play-must-assert.test.ts` pins.
 				"hephaestus/play-must-assert": "error",
+				// The file path is the component tree's source of truth. An explicit title is only for a
+				// deliberate reader-facing relocation, never a differently-cased copy of that path.
+				"hephaestus/prefer-auto-story-title": "error",
 				// One story quietly exempting itself leaves the whole suite green.
 				"hephaestus/no-story-a11y-override": "error",
 				"hephaestus/no-within-canvas-element": "error",

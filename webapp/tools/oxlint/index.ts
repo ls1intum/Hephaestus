@@ -6,6 +6,7 @@ import { noRedundantInTheDocument } from "./rules/no-redundant-in-the-document.t
 import { noStoryA11yOverride } from "./rules/no-story-a11y-override.ts";
 import { noWithinCanvasElement } from "./rules/no-within-canvas-element.ts";
 import { playMustAssert } from "./rules/play-must-assert.ts";
+import { preferAutoStoryTitle } from "./rules/prefer-auto-story-title.ts";
 import { svgNeedsAccessibleName } from "./rules/svg-needs-accessible-name.ts";
 import { typedStoryMeta } from "./rules/typed-story-meta.ts";
 
@@ -19,6 +20,7 @@ export default definePlugin({
 		"no-story-a11y-override": noStoryA11yOverride,
 		"no-within-canvas-element": noWithinCanvasElement,
 		"play-must-assert": playMustAssert,
+		"prefer-auto-story-title": preferAutoStoryTitle,
 		"svg-needs-accessible-name": svgNeedsAccessibleName,
 		"typed-story-meta": typedStoryMeta,
 	},

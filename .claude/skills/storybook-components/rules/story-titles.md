@@ -5,6 +5,8 @@ Two conventions live side by side, and which one applies is a property of the co
 - **Omit `title` by default.** `webapp/.storybook/main.ts` globs `../src/**` with no `titlePrefix`, so
   a story with no title is filed by its path under `src` — `components/admin/ai/ModelPicker`. Most
   stories belong here: the file tree *is* the grouping, and it cannot go stale.
+  `hephaestus/prefer-auto-story-title` rejects an explicit title that only repeats this derived path,
+  including copies that differ only in case or punctuation.
 
 - **Declare a `title` when the file layout cannot express where a reader looks for the thing.** A
   product surface assembled from several directories, or one an admin knows by the screen it is on,
