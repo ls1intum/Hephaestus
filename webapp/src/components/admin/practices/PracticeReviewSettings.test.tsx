@@ -106,7 +106,6 @@ describe("PracticeReviewSettings", () => {
 
 		const change = await screen.findByRole("link", { name: "Change the review model" });
 		expect(change.getAttribute("href")).toBe("/w/acme/admin/models");
-		// Readiness is the page banner's sentence, so this surface deliberately does not repeat it.
 		expect(screen.queryByText("Ready to run")).toBeNull();
 	});
 

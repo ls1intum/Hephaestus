@@ -222,7 +222,6 @@ export const PilotPopulation: Story = {
 	play: async ({ canvas }) => {
 		await expect(canvas.getByText("3 of 12 monitored")).toBeVisible();
 		await expect(canvas.getByText("5 of 24 members")).toBeVisible();
-		// A repository the workspace stopped syncing stays named in the scope and covers nothing.
 		await expect(canvas.getByText("Not monitored")).toBeVisible();
 		await expectNoPageOverflow();
 	},
@@ -270,7 +269,6 @@ export const AddingATargetBranch: Story = {
 	},
 };
 
-/** A repository already limited to one branch admits more work when a second is named. */
 export const AddingASecondBranchWidens: Story = {
 	args: {
 		policy: {
@@ -333,7 +331,6 @@ export const RemovingOneOfTwoBranchesNarrows: Story = {
 	},
 };
 
-/** Naming no branch means every branch, so emptying the list is the widest this axis goes. */
 export const ClearingEveryBranchWidens: Story = {
 	args: {
 		policy: {
@@ -416,7 +413,6 @@ export const SelectedEmptyMeansNobody: Story = {
 	},
 };
 
-/** Feedback composed while paused is dropped, not queued — the banner has to say so. */
 export const SendingPaused: Story = {
 	args: {
 		policy: { ...policy, settings: { ...settings, deliveryStatus: "PAUSED" } },
@@ -424,6 +420,9 @@ export const SendingPaused: Story = {
 	play: async ({ canvas }) => {
 		await expect(canvas.getByText("Sending is paused")).toBeVisible();
 		await expect(canvas.getByRole("switch", { name: /Send feedback/ })).not.toBeChecked();
+		await expect(
+			canvas.getByText(/Nothing prepared while this is paused is sent when you resume/),
+		).toBeVisible();
 	},
 };
 

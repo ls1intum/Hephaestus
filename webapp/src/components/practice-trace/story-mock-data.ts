@@ -289,7 +289,6 @@ export const practiceTraceEntries = [
 	},
 ] satisfies PracticeTraceEntry[];
 
-/** The one evaluation the trace stories build their variants from. */
 export const deniedDeliveryPolicyEvaluation: DeliveryPolicyTrace = {
 	reviewId: "22222222-2222-2222-2222-222222222222",
 	admittedRevision: 4,

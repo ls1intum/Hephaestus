@@ -46,8 +46,6 @@ export function DeliveryPolicyTrace({ evaluations }: DeliveryPolicyTraceProps) {
 					{evaluations.map((evaluation, index) => (
 						<li
 							key={`${evaluation.reviewId}-${evaluation.evaluatedAt.toISOString()}-${index}`}
-							// Bordered rather than `bg-muted`-filled: the tint drops the 12px label of the
-							// `destructive` badge these rows carry below 4.5:1.
 							className="space-y-2 rounded-md border p-3"
 						>
 							<p className="font-medium">
@@ -80,10 +78,6 @@ export function DeliveryPolicyTrace({ evaluations }: DeliveryPolicyTraceProps) {
 	);
 }
 
-/**
- * Every axis names itself even when it has no value, because a snapshot carrying no mode at all is a
- * real state and a bare "not applicable" would not say which axis it belongs to.
- */
 function scopeSentence(facts: DeliveryPolicyFactsSnapshot): string {
 	const NOT_APPLICABLE = "not applicable";
 	const where = facts.baseBranch

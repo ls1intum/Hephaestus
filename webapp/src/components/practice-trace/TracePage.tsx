@@ -117,8 +117,8 @@ export function TracePage({
 				artifactKind={trace.artifactKind}
 			/>
 
-			{/* Hides the surface, not the data: the endpoint serves this trace to every member, so this
-			    gate is a relevance filter and never an authorization boundary. */}
+			{/* A relevance filter, never an authorization boundary: the endpoint serves this trace to
+			    every member. */}
 			{canAdminister && <DeliveryPolicyTrace evaluations={trace.deliveryPolicy} />}
 
 			<p className="flex items-center gap-1.5 text-xs text-muted-foreground">

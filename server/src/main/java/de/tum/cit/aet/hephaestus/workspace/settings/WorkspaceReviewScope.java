@@ -4,7 +4,6 @@ import java.util.List;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
-/** Selected mode with no targets admits nobody; a selected repository with no branches admits every branch. */
 public record WorkspaceReviewScope(
     @NonNull ReviewRepositoryMode repositoryMode,
     @NonNull ReviewPersonMode personMode,

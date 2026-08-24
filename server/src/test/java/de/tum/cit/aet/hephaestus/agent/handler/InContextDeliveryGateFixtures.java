@@ -13,11 +13,6 @@ import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.util.Optional;
 
-/**
- * Holds the workspace side of {@link InContextDeliveryGate} still, so a handler test turns on practice
- * autonomy and run provenance alone; a test of the rollout fence itself must name its own revision with
- * {@link #workspacesAtRevision}.
- */
 final class InContextDeliveryGateFixtures {
 
     private InContextDeliveryGateFixtures() {}
@@ -27,7 +22,13 @@ final class InContextDeliveryGateFixtures {
         ObservationRepository observations,
         FeedbackLedgerRecorder ledger
     ) {
-        return new InContextDeliveryGate(practices, observations, ledger, workspaceDefaults(), workspaces());
+        return new InContextDeliveryGate(
+            practices,
+            observations,
+            ledger,
+            workspaceDefaults(),
+            workspacesAtTheDefaultJobRevision()
+        );
     }
 
     static WorkspaceReviewDefaultsProvider workspaceDefaults() {
@@ -36,9 +37,8 @@ final class InContextDeliveryGateFixtures {
         return provider;
     }
 
-    /** Revision 0 for every workspace: the revision a test {@link AgentJob} is admitted under. */
-    static WorkspaceRepository workspaces() {
-        return workspacesAtRevision(0L);
+    static WorkspaceRepository workspacesAtTheDefaultJobRevision() {
+        return workspacesAtRevision(new AgentJob().getPracticeRolloutRevision());
     }
 
     static WorkspaceRepository workspacesAtRevision(long rolloutRevision) {

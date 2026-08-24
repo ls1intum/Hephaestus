@@ -316,8 +316,6 @@ public class PracticeFeedbackDeliveryPolicy {
             job,
             workspace,
             null,
-            // Consent is not asked here: a kind without an artifact reaches nobody unsolicited, only the
-            // developer's own page or a conversation they opened.
             null,
             null,
             null,
@@ -405,9 +403,6 @@ public class PracticeFeedbackDeliveryPolicy {
                 workspace == null
                     ? null
                     : workspace.getReviewSettings().getDeliveryStatus() == PracticeDeliveryStatus.ACTIVE,
-                // No assessment means there is no artifact to judge, never an artifact left unjudged: the
-                // artifact paths assess coverage whenever the workspace resolves, and a missing workspace
-                // is already denied by WORKSPACE_ENABLED.
                 coverage == null ? null : coverage.admitted(),
                 autonomy.authorized(),
                 consent,
@@ -440,8 +435,6 @@ public class PracticeFeedbackDeliveryPolicy {
         Collection<String> contributingPracticeSlugs
     ) {
         if (workspace == null) return new AutonomyAssessment(false, List.of());
-        // Composition runs before the contributing practices are known, so authority is not yet askable.
-        // Answering false instead of null here refuses every composition and closes the lanes outright.
         if (feedbackId == null && contributingPracticeSlugs.isEmpty()) {
             return new AutonomyAssessment(null, List.of());
         }
@@ -512,7 +505,6 @@ public class PracticeFeedbackDeliveryPolicy {
         );
     }
 
-    /** {@code authorized} is null when there is no practice set to judge yet — see {@link #autonomy}. */
     private record AutonomyAssessment(
         @Nullable Boolean authorized,
         List<DeliveryPolicyFactsSnapshot.PracticeFact> facts

@@ -338,6 +338,26 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
             assertThat(((GateDecision.Skip) decision).reason()).isEqualTo("practices disabled for workspace");
             verifyNoInteractions(practiceDetectionReadiness, practiceRepository);
         }
+
+        @Test
+        void practicesDisabledOutranksAnOutOfCoverageSkip() {
+            PullRequest pr = createPullRequest();
+            Workspace workspace = createWorkspace();
+            workspace.getFeatures().setPracticesEnabled(false);
+            when(workspaceResolver.resolveForRepository("ls1intum/Hephaestus")).thenReturn(Optional.of(workspace));
+            when(
+                coverageService.admits(
+                    any(Workspace.class),
+                    nullable(String.class),
+                    nullable(String.class),
+                    nullable(ReviewSubject.class)
+                )
+            ).thenReturn(false);
+
+            GateDecision decision = gate.evaluate(pr, SIGNAL, TriggerMode.AUTO);
+
+            assertThat(((GateDecision.Skip) decision).reason()).isEqualTo("practices disabled for workspace");
+        }
     }
 
     @Nested

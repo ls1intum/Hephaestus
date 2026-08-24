@@ -46,7 +46,6 @@ const openScopeEvaluation: DeliveryPolicyTraceData = {
 	],
 };
 
-/** A conversation carries no repository, so every scope axis is absent rather than open or narrow. */
 const conversationEvaluation: DeliveryPolicyTraceData = {
 	...deniedDeliveryPolicyEvaluation,
 	surface: "CONVERSATION",
@@ -113,10 +112,6 @@ export const Allowed: Story = {
 	},
 };
 
-/**
- * Every scope axis must read as words: a wire constant like `ALL_MONITORED` reaching the page
- * verbatim is the regression this story catches.
- */
 export const OpenScope: Story = {
 	args: { evaluations: [openScopeEvaluation] },
 	play: async ({ canvas }) => {

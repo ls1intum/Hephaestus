@@ -145,7 +145,6 @@ class PracticeDetectionGateIntegrationTest extends BaseIntegrationTest {
 
         assignee = TestUserFactory.createUser(400L, "assignee-user", provider);
         assignee = userRepository.save(assignee);
-        // Coverage admits only work whose author is a linked member, so every check past it needs this link.
         workspaceMembershipService.createMembership(
             workspace,
             assignee.getId(),

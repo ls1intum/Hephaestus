@@ -4,10 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 import org.jspecify.annotations.Nullable;
 
-/**
- * Resolves a delivery decision from facts. A null fact means the question is not applicable at this
- * decision point, which is not a denial — pass null rather than false for a question you cannot yet ask.
- */
+/** A null fact passes its check as {@link DeliveryPolicyCheckStatus#NOT_APPLICABLE}; only {@code false} denies. */
 public final class DeliveryPolicyResolver {
 
     public static final String VERSION = "1";

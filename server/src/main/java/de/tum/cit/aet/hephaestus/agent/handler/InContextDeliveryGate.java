@@ -79,7 +79,10 @@ class InContextDeliveryGate {
             return observations;
         }
         long workspaceId = job.getWorkspace().getId();
-        FeedbackSuppressionReason rolloutRefusal = rolloutRefusal(job.getPracticeRolloutRevision(), workspaceId);
+        FeedbackSuppressionReason rolloutRefusal = refusalIfRolloutRevisionMoved(
+            job.getPracticeRolloutRevision(),
+            workspaceId
+        );
         if (rolloutRefusal != null) {
             recordWithheld(job, observations, rolloutRefusal);
             return List.of();
@@ -141,7 +144,7 @@ class InContextDeliveryGate {
             observations.isEmpty() || job.getWorkspace() == null || job.getWorkspace().getId() == null
         ) return List.of();
         long workspaceId = job.getWorkspace().getId();
-        if (rolloutRefusal(job.getPracticeRolloutRevision(), workspaceId) != null) return List.of();
+        if (refusalIfRolloutRevisionMoved(job.getPracticeRolloutRevision(), workspaceId) != null) return List.of();
         ObservationOrigin origin = PracticeDetectionDeliveryService.originOf(job.getMetadata());
         if (!origin.delivers(FeedbackChannel.IN_CONTEXT)) return List.of();
         WorkspaceReviewDefaults defaults = workspaceDefaults.forWorkspace(workspaceId);
@@ -191,16 +194,19 @@ class InContextDeliveryGate {
         }
     }
 
-    /**
-     * Compares the job's admitting revision against the one in force <em>now</em>, never the one loaded
-     * with the job: a rollout the operator has since changed is exactly what this refuses to post under.
-     */
-    private @Nullable FeedbackSuppressionReason rolloutRefusal(@Nullable Long admitted, long workspaceId) {
-        Long current = workspaceRepository
+    private @Nullable FeedbackSuppressionReason refusalIfRolloutRevisionMoved(
+        @Nullable Long admittedRevision,
+        long workspaceId
+    ) {
+        Long revisionInForceNow = workspaceRepository
             .findById(workspaceId)
             .map(workspace -> workspace.getReviewSettings().getRolloutRevision())
             .orElse(null);
-        if (admitted == null || current == null || admitted.longValue() != current.longValue()) {
+        if (
+            admittedRevision == null ||
+            revisionInForceNow == null ||
+            admittedRevision.longValue() != revisionInForceNow.longValue()
+        ) {
             return FeedbackSuppressionReason.STALE_ROLLOUT_REVISION;
         }
         return null;

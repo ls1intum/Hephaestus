@@ -84,9 +84,4 @@ export const DELIVERY_SUBJECT_LABELS = {
 	UNLINKED: "author is not a workspace member",
 } satisfies Record<Subject, string>;
 
-/**
- * The explicit annotation is the exhaustiveness check: `Reason` is generated separately from
- * `WithholdingReason`, so a policy reason the registry has no sentence for fails typechecking here
- * instead of rendering as a blank on the page.
- */
-export const DELIVERY_REASON_SENTENCES: Record<Reason, string> = WITHHOLDING_REASON_DEFS;
+export const DELIVERY_REASON_SENTENCES = WITHHOLDING_REASON_DEFS satisfies Record<Reason, string>;

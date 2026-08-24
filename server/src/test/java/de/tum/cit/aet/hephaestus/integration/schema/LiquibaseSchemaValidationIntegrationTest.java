@@ -110,35 +110,42 @@ class LiquibaseSchemaValidationIntegrationTest {
         assertIndexExists("idx_slack_message_ingest"); // drives the bounded-retention sweep
     }
 
-    /**
-     * A mode the code cannot name is a mode every gate guesses at, so the CHECK constraints are what refuse
-     * the write. Only the Liquibase-built schema carries them: the shared test profile builds the schema
-     * with Hibernate {@code ddl-auto: create} and never runs a changeset.
-     */
+    private enum CoverageColumn {
+        REPOSITORY_MODE("practice_repository_coverage_mode"),
+        PERSON_MODE("practice_person_coverage_mode"),
+        DELIVERY_STATUS("practice_delivery_status");
+
+        private final String columnName;
+
+        CoverageColumn(String columnName) {
+            this.columnName = columnName;
+        }
+    }
+
     @Test
     @DisplayName("The coverage-mode columns refuse a mode the vocabulary does not have")
     void coverageModeColumnsRefuseAnythingOutsideTheirVocabulary() {
         long workspaceId = insertWorkspace("coverage-mode-check");
 
-        assertThatCode(() -> setCoverageMode(workspaceId, "practice_repository_coverage_mode", "SELECTED"))
+        assertThatCode(() -> setCoverageMode(workspaceId, CoverageColumn.REPOSITORY_MODE, "SELECTED"))
             .as("a declared mode is what the entity writes")
             .doesNotThrowAnyException();
 
-        assertThatThrownBy(() -> setCoverageMode(workspaceId, "practice_repository_coverage_mode", "ALL"))
+        assertThatThrownBy(() -> setCoverageMode(workspaceId, CoverageColumn.REPOSITORY_MODE, "ALL"))
             .isInstanceOf(DataIntegrityViolationException.class)
             .hasMessageContaining("chk_workspace_practice_repository_coverage");
 
-        assertThatThrownBy(() -> setCoverageMode(workspaceId, "practice_person_coverage_mode", "EVERYONE"))
+        assertThatThrownBy(() -> setCoverageMode(workspaceId, CoverageColumn.PERSON_MODE, "EVERYONE"))
             .isInstanceOf(DataIntegrityViolationException.class)
             .hasMessageContaining("chk_workspace_practice_person_coverage");
 
-        assertThatThrownBy(() -> setCoverageMode(workspaceId, "practice_delivery_status", "STOPPED"))
+        assertThatThrownBy(() -> setCoverageMode(workspaceId, CoverageColumn.DELIVERY_STATUS, "STOPPED"))
             .isInstanceOf(DataIntegrityViolationException.class)
             .hasMessageContaining("chk_workspace_practice_delivery_status");
 
         assertThat(
             jdbcTemplate.queryForObject(
-                "SELECT practice_repository_coverage_mode FROM workspace WHERE id = ?",
+                "SELECT " + CoverageColumn.REPOSITORY_MODE.columnName + " FROM workspace WHERE id = ?",
                 String.class,
                 workspaceId
             )
@@ -160,9 +167,8 @@ class LiquibaseSchemaValidationIntegrationTest {
         return Objects.requireNonNull(id, "workspace insert returned no id");
     }
 
-    private void setCoverageMode(long workspaceId, String column, String mode) {
-        // Postgres takes no parameter where a column name belongs; every caller passes a literal from here.
-        jdbcTemplate.update("UPDATE workspace SET " + column + " = ? WHERE id = ?", mode, workspaceId);
+    private void setCoverageMode(long workspaceId, CoverageColumn column, String mode) {
+        jdbcTemplate.update("UPDATE workspace SET " + column.columnName + " = ? WHERE id = ?", mode, workspaceId);
     }
 
     private void assertIndexExists(String indexName) {

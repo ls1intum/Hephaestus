@@ -41,10 +41,10 @@ class PracticeFeedbackDispatchRecovery {
             PageRequest.of(0, BATCH_SIZE)
         )) {
             try {
-                terminalize(exhausted, "Dispatch retry limit exhausted");
+                failUnlessProviderWriteMayHaveLanded(exhausted, "Dispatch retry limit exhausted");
             } catch (RuntimeException exception) {
                 log.warn(
-                    "Exhausted practice feedback dispatch could not be terminalized: dispatchId={}",
+                    "Exhausted practice feedback dispatch could not be failed: dispatchId={}",
                     exhausted.getId(),
                     exception
                 );
@@ -64,7 +64,7 @@ class PracticeFeedbackDispatchRecovery {
                     .findByIdAndWorkspaceId(dispatch.getAgentJobId(), dispatch.getWorkspaceId())
                     .orElse(null);
                 if (job == null) {
-                    terminalize(dispatch, "Dispatch job no longer exists");
+                    failUnlessProviderWriteMayHaveLanded(dispatch, "Dispatch job no longer exists");
                     continue;
                 }
                 if (dispatch.getDestination() == FeedbackDispatchDestination.APPROVED_ARTIFACT_COMMENT) {
@@ -74,7 +74,10 @@ class PracticeFeedbackDispatchRecovery {
                     if (
                         feedback == null || feedback.getBody() == null || !feedback.getBody().equals(dispatch.getBody())
                     ) {
-                        terminalize(dispatch, "Approved feedback is missing or no longer matches its immutable body");
+                        failUnlessProviderWriteMayHaveLanded(
+                            dispatch,
+                            "Approved feedback is missing or no longer matches its immutable body"
+                        );
                         continue;
                     }
                 }
@@ -122,17 +125,10 @@ class PracticeFeedbackDispatchRecovery {
         }
     }
 
-    /**
-     * Gives up on a dispatch that never began its provider write.
-     *
-     * <p>Once {@code write_started} is set the comment may already be live, and no lookup can settle that
-     * reliably; recording FAILED would tell a developer their feedback was lost while it sits on their pull
-     * request, and clear the comment id the next review has to edit in place. Those keep retrying instead.
-     */
-    private void terminalize(FeedbackDispatch dispatch, String error) {
+    private void failUnlessProviderWriteMayHaveLanded(FeedbackDispatch dispatch, String error) {
         if (Boolean.TRUE.equals(dispatch.getWriteStarted())) {
             log.warn(
-                "Dispatch exhausted after a provider write may have landed; leaving it for reconciliation: dispatchId={}, error={}",
+                "Dispatch not failed because its provider write may already be live; leaving it to keep retrying: dispatchId={}, error={}",
                 dispatch.getId(),
                 error
             );

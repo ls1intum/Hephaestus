@@ -165,7 +165,6 @@ class ReviewSweepSpendGuardIntegrationTest extends BaseIntegrationTest {
                 gitProviderRepository.save(new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com"))
             );
         User author = userRepository.save(TestUserFactory.createUser(5001L, "sweep-author", provider));
-        // Coverage admits work by linked members only; without the membership the sweep finds nothing to pay for.
         workspaceMembershipService.createMembership(
             workspace,
             author.getId(),

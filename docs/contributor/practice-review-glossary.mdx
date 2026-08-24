@@ -89,7 +89,7 @@ signal. `ObservationOrigin` is the population any resulting observation belongs 
 | A confirmed campaign over past work             | `BACKFILL`                    | Backfill of past work      | `BACKFILL`         | yes                                  |
 | A recurring sweep schedule                      | `SWEEP`                       | Found by a recurring check | `LIVE`             | yes                                  |
 
-Two consequences follow from the table rather than from any enum, so state them rather than letting a
+Four consequences follow from the table rather than from any enum, so state them rather than letting a
 reader infer them:
 
 - **The comment command and the button are indistinguishable afterwards.** Both record `MANUAL`; nothing
@@ -111,8 +111,8 @@ every behavioural read. A `BACKFILL` observation is additionally entitled only t
 developer's own practice feedback — and that entitlement is a ceiling, not an instruction: the in-app
 router refuses a cluster made entirely of backfilled measurements (`BACKFILL_HELD`), so a backfill
 observation is measured and never delivered, by construction rather than by configuration. Do not write
-*profile* for this channel: **Profile** is the public page at `/user/{username}`, and the two are
-different surfaces with different audiences.
+*profile* for this channel: **Profile** is the page at `/w/{workspaceSlug}/user/{username}` that the rest
+of the workspace can read, and the two are different surfaces with different audiences.
 
 ## Practice autonomy
 
@@ -183,10 +183,11 @@ requests; issues have no base branch and are matched by repository and person on
 there are no glob or path rules.
 
 **`ALL_ELIGIBLE` means every human `WorkspaceMembership`, and that is the only definition.** Eligibility is
-a membership row plus `User.Type.USER`; nothing consults accounts, sign-ins or identity links, so do not
-write that a person must have signed in. Membership itself arrives from the organization or group roster
-sync, the team graph, an administrator, or workspace activity. `SELECTED` is validated against the same
-population, so a person who is not an eligible member cannot be selected.
+a membership row plus `User.Type.USER`; nothing consults accounts, sign-ins or identity links, so never
+write that a person must have signed in — an operator will believe it and go looking for a screen that
+enrols people. How a membership row comes to exist is
+[Who counts as a person](/admin/practice-review#who-counts-as-a-person). `SELECTED` is validated against
+the same population, so a person who is not an eligible member cannot be selected.
 
 The review subject for pull requests, merge requests, and issues is their author, and
 `PracticeReviewCoverageService.SubjectStatus` records which of four things it turned out to be:
@@ -313,7 +314,8 @@ another chat product is still `IN_CHAT`.
 
 The level is **derived from the channel and never stored**: there is no `level` column, and a stored copy
 would be a second truth that can disagree. Three words are close enough to be tempting and are still
-wrong. Do not write *profile* for `IN_APP` — **Profile** is the public page at `/user/{username}` — and
+wrong. Do not write *profile* for `IN_APP` — **Profile** is the workspace-readable page at
+`/w/{workspaceSlug}/user/{username}` — and
 do not write *reflection* either: it named what the developer was meant to do rather than where the
 message lands, and it is the name this lane was renamed away from
 ([ADR 0029](https://github.com/ls1intum/Hephaestus/blob/main/docs/decisions/0029-measurement-intervention-seam-and-channel-levels.md)).

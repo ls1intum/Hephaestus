@@ -63,7 +63,7 @@ class InContextDeliveryGateTest extends BaseUnitTest {
             observationRepository,
             feedbackLedgerRecorder,
             InContextDeliveryGateFixtures.workspaceDefaults(),
-            InContextDeliveryGateFixtures.workspaces()
+            InContextDeliveryGateFixtures.workspacesAtTheDefaultJobRevision()
         );
     }
 

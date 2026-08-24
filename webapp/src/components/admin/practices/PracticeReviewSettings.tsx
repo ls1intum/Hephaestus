@@ -342,8 +342,6 @@ function CooldownField({
 }
 
 /**
- * Both lists must admit a piece of work before a review opens: the two are an AND, not an either.
- *
  * Matches are exact: a wildcard language here would be a promise the gate cannot keep, since it
  * holds the pull request row and not the diff.
  */
@@ -388,28 +386,21 @@ function ReviewedWorkSection({
 			names.some((name) => !repositoryNames.includes(name)),
 		);
 	};
-	// An empty branch list means "every base branch", so emptying one widens while every other
-	// removal narrows.
+	const admitsEveryBranch = (branches: string[]) => branches.length === 0;
 	const widensBranches = (before: string[], after: string[]) =>
-		after.length === 0
-			? before.length > 0
-			: before.length > 0 && after.some((branch) => !before.includes(branch));
+		admitsEveryBranch(after)
+			? !admitsEveryBranch(before)
+			: !admitsEveryBranch(before) && after.some((branch) => !before.includes(branch));
 	const summary = settings.coverageSummary;
 	const preview = coverage.preview.data;
 	const coversNobody =
 		(scope.repositoryMode === "SELECTED" && scope.repositories.length === 0) ||
 		(scope.personMode === "SELECTED" && scope.personUserIds.length === 0);
-	// Undefined until the monitored list is actually known, because a pending or failed load holds no
-	// repositories either and "unknown" must not be reported as "unmonitored".
-	const monitoredNames =
-		coverage.repositories.isLoading || coverage.repositories.isError
-			? undefined
-			: new Set(coverage.repositories.options.map((option) => option.value));
-	// A repository can leave the monitored set while the scope still names it, and then it covers
-	// nothing.
-	const monitoredNow = (nameWithOwner: string) => monitoredNames?.has(nameWithOwner) ?? true;
-	// Counted off the scope on screen rather than `summary.coveredRepositories`: the summary is a
-	// server read that lands after the write, so it reports the count from before the edit.
+	const monitoredListKnown = !coverage.repositories.isLoading && !coverage.repositories.isError;
+	const monitoredNames = new Set(coverage.repositories.options.map((option) => option.value));
+	const monitoredNow = (nameWithOwner: string) =>
+		!monitoredListKnown || monitoredNames.has(nameWithOwner);
+	// Not `summary.coveredRepositories`: the summary is a server read from before this edit.
 	const coveredRepositories =
 		scope.repositoryMode === "ALL_MONITORED"
 			? summary.monitoredRepositories
@@ -531,8 +522,8 @@ function ReviewedWorkSection({
 					noun="members"
 				/>
 				<FieldDescription>
-					Only members of this workspace are reviewed. Members come from the connected organisation
-					or group, from the team graph, or from someone adding them on the Members screen.
+					Only members of this workspace are reviewed. Membership follows the connected organization
+					or group and the team graph; signing in to Hephaestus does not by itself grant it.
 				</FieldDescription>
 				<RadioGroup
 					aria-labelledby="people-covered-label"
@@ -861,8 +852,6 @@ function BaseBranchEditor({
 
 	return (
 		<Field data-invalid={duplicate || undefined} className="border-t pt-3">
-			{/* One of these editors exists per covered repository, so the sr-only suffix is what keeps
-			    them apart when a screen reader lists the form's fields out of context. */}
 			<FieldLabel htmlFor={id}>
 				Only these base branches
 				<span className="sr-only"> for {nameWithOwner}</span>
@@ -892,8 +881,7 @@ function BaseBranchEditor({
 						disabled={disabled || trimmed.length === 0 || duplicate}
 						onClick={add}
 					>
-						{/* Suffixed rather than replaced by an `aria-label`, so the accessible name still starts
-						    with the visible word a voice-control user says (WCAG 2.2 SC 2.5.3). */}
+						{/* The visible word opens the accessible name, so voice control can say it (WCAG 2.2 SC 2.5.3). */}
 						Add
 						<span className="sr-only"> to base branches for {nameWithOwner}</span>
 					</InputGroupButton>

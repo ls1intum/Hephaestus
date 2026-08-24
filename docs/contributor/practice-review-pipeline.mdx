@@ -239,18 +239,14 @@ is dropped and logged without failing the completed measurement.
 practiceSlug)`; the rest are dropped.
 
 Staying quiet is the fourth action, not a gap: `action: "WITHHOLD"` with `NO_MATERIAL_CHANGE`,
-`ALREADY_SAID` or `BELOW_BAR`. That enum is deliberately **not** `FeedbackSuppressionReason` — a
-withhold reason is the composer's own judgement, and `FeedbackSuppressionReason` is a database check
-constraint listing reasons the *server* refused. Merging them would make "we had nothing worth saying"
-indistinguishable from "delivery policy refused it".
+`ALREADY_SAID` or `BELOW_BAR`. Those three are the composer's own vocabulary and are deliberately not
+`FeedbackSuppressionReason` values — the glossary says
+[why the two must never be merged](./practice-review-glossary.mdx#measurement-and-intervention).
 
-### Supersession preserves read feedback
-
-A thread identifies one continuing topic for one recipient and channel. Longitudinal lanes key it by
-practice; in-context feedback keys it by artifact. New feedback supersedes a queued unread row, continues
-an already-read row without changing it, or starts a new thread. The ledger permits a history of rows but
-at most one live `PREPARED` row per thread. Provider comments differ only because editing in place makes
-the old text no longer visible, so the ledger retires it.
+Supersession is likewise the glossary's, under
+[Thread key and supersession](./practice-review-glossary.mdx#thread-key-and-supersession). The only part
+this stage owns is that composition proposes the thread action; the server, not the model, decides whether
+the named thread may be superseded at all.
 
 ### When composition does not run
 
@@ -265,33 +261,19 @@ Composition creates immutable feedback units before release authority is applied
 means there was nothing useful to say and creates no feedback row. A policy refusal is instead persisted as
 `SUPPRESSED` with a server-owned reason. These outcomes must not be conflated with a human rejection.
 
-Autonomy is only the authority step, and the glossary owns it in full: the resolution chain and the three
-values are in [Practice autonomy](./practice-review-glossary.mdx#practice-autonomy), and the ordered list of
-gates every delivery walks is
-[the delivery policy check order](./practice-review-glossary.mdx#the-delivery-policy-check-order). Do not
-restate either here. Four facts belong to this stage rather than to that vocabulary.
+Autonomy is only the authority step, and the glossary owns it in full — the resolution chain and the three
+values in [Practice autonomy](./practice-review-glossary.mdx#practice-autonomy), the approval lifecycle
+alongside them, and the ordered list of gates every delivery walks in
+[the delivery policy check order](./practice-review-glossary.mdx#the-delivery-policy-check-order). Read
+those before changing anything here, and do not restate them.
 
-**One resolver, four stages.** `DeliveryPolicyResolver` runs the same ordered list at `COMPOSITION`,
-`AUTOMATIC`, `APPROVED` and `EGRESS`, so a lane cannot acquire a gate the others do not have, and a
-question that cannot be asked yet is recorded as `NOT_APPLICABLE` instead of being answered `false`. The
-difference between the stages is only which facts are knowable, never which rules apply.
-
-**`PracticeAutonomyPolicy` is a second, narrower predicate, and each channel's router applies it itself.**
-It admits a unit only when the observation's immutable `ObservationOrigin` entitles it to that channel *and*
-the effective autonomy is `AUTOMATIC`. That is why a backfilled observation can never reach the artifact or a
-mentor turn whatever anybody configures: the entitlement is a property of how the measurement was obtained.
-The two halves answer different questions — origin asks what a provenance may *ever* be said on, and the
-lane asks whether today is the day.
-
-**Prospective by construction.** Existing `AWAITING_APPROVAL` rows stay proposals when autonomy changes, so a
-promotion to `AUTOMATIC` cannot release historical output; demoting to `HUMAN_APPROVAL` keeps measurement
-running while returning new interventions to supervised release. Missing effective autonomy denies automatic
-delivery.
-
-**Approval is not a bypass.** Release re-verifies the approved content against what is about to be sent
-(`APPROVAL_STALE`) and that the contributing practices still require approval
-(`APPROVAL_NO_LONGER_ELIGIBLE`), then walks the whole check order again at the `APPROVED` stage, then
-reconciles a deterministic provider marker so a retried dispatch cannot post twice.
+One fact belongs to this stage rather than to that vocabulary: **`PracticeAutonomyPolicy` is a second,
+narrower predicate, and each channel's router applies it itself.** It admits a unit only when the
+observation's immutable `ObservationOrigin` entitles it to that channel *and* the effective autonomy is
+`AUTOMATIC`. That is why a backfilled observation can never reach the artifact or a mentor turn whatever
+anybody configures: the entitlement is a property of how the measurement was obtained, not of what the
+workspace currently permits. The two halves answer different questions — origin asks what a provenance may
+*ever* be said on, and `DeliveryPolicyResolver` asks whether today is the day.
 
 ## Runtime and extension points
 
@@ -309,14 +291,20 @@ it is what the **Review activity** screen renders for every member. It is derive
 The trace separates two axes on purpose, and reading it wrongly is the fastest way to misdiagnose a quiet
 workspace:
 
-- **`outcome` is about the measurement.** `REVIEWED`, `NOT_OCCASIONED`, `TURNED_OFF`, `NOT_ASSESSABLE`,
-  `DORMANT`, `LAPSED`, and so on.
+- **`outcome` is about the measurement**, and is one of exactly ten values: `REVIEWED`, `RUNNING`,
+  `PENDING`, `SKIPPED`, `NOT_ASSESSABLE`, `TURNED_OFF`, `NOT_OCCASIONED`, `DORMANT`, `LAPSED`, `FAILED`.
 - **`observationCount`, `deliveredCount` and `withheldReasons` are about the intervention.**
 
 At `HUMAN_APPROVAL`, `REVIEWED` and a positive observation count describe the measurement; the proposal's
-`AWAITING_APPROVAL`, `PREPARED`, `DISCARDED`, or eventual `DELIVERED` state describes the intervention.
-`TURNED_OFF` remains the explicit `OFF` outcome and is checked before mechanical review failures. Do not
-represent a pending human decision as suppression: it is an actionable workflow state.
+`AWAITING_APPROVAL`, `PREPARED`, `DISCARDED`, or eventual `DELIVERED` state describes the intervention. Do
+not represent a pending human decision as suppression: it is an actionable workflow state.
+
+The precedence rule is not "configuration beats mechanics" — it is **what a run recorded beats what today's
+configuration implies.** A verdict a run wrote against this practice by name (`REVIEWED`, `SKIPPED`,
+`NOT_ASSESSABLE`) is returned even after the practice is switched off, because it happened. `TURNED_OFF`
+comes next, and therefore outranks everything merely re-derived from the occurrence ledger — `FAILED`,
+`LAPSED`, `PENDING` — so a practice the workspace switched off reads as switched off rather than as broken.
+A new outcome has to be placed on the right side of that line, not ranked against the others by severity.
 
 Operator-facing guidance for reading the same screen is on
 [Practice review](/admin/practice-review); the vocabulary both pages use is defined in the

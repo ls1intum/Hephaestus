@@ -73,30 +73,31 @@ monitored repositories take pull requests from outside the organization.
 **Before**: a review ran on any pull request or issue in a monitored repository, whoever wrote it.
 
 **After**: coverage has two dimensions — repositories and people — and both must admit the work. The
-people dimension is workspace membership. Work whose author is not a member of the workspace is not
-reviewed and no feedback is prepared about it; the same holds when the work has no identifiable author
-or the author is a bot. This is deliberate: feedback nobody will read still costs a model run, and it
-widens the privacy radius to a person the workspace never enrolled.
-
-Membership is what the **Members** screen lists. Hephaestus fills it in from the connected GitHub
-organization or GitLab group roster and from the team graph, an admin can add or remove a member there,
-and workspace activity can add one. Signing in to Hephaestus does not by itself make somebody a member.
+people dimension is workspace membership: work whose author is not a member is not reviewed and no
+feedback is prepared about it, and the same holds when the work has no identifiable author or the author
+is a bot. This is deliberate. Feedback nobody will read still costs a model run, and preparing it widens
+the privacy radius to a person the workspace never enrolled.
 
 **Migration**: nothing to change before upgrading.
 
 Afterwards, open **Practices → Review → When and where** and read the two counts under **What gets
-reviewed**. **People** is how many members are in scope and **Repositories** how many monitored
-repositories are. If **People** is lower than the set of contributors you expect to be reviewed, add the
-missing ones on the **Members** screen, or add them to the connected organization or group and let the
-next roster sync pick them up. Existing members need no action.
+reviewed**: **People** is how many members are in scope, **Repositories** how many monitored repositories
+are. Existing members need no action.
 
-To roll out more narrowly than everybody, switch either dimension to **Selected** and name the
-repositories, base branches and people yourself. An empty selection covers nobody, never everybody — the
-screen warns you when a selected list is empty.
+If **People** is lower than the set of contributors you expect to be reviewed, the difference is people
+who are not members. Signing in to Hephaestus does not make somebody a member, and the **Members** screen
+has no *Add member* button — add them to the connected GitHub organization or GitLab group and the next
+roster sync will pick them up. [Who counts as a
+person](https://ls1intum.github.io/Hephaestus/admin/practice-review#who-counts-as-a-person) has the full
+rule.
 
-Every change to coverage advances the workspace's rollout revision, and that is prospective in both
-directions: feedback admitted under the previous coverage is not released afterwards, and widening
-coverage does not go back and review work that was already refused.
+Narrowing further is optional: switch either dimension to **Selected** and name the repositories, base
+branches and people yourself. An empty selection covers nobody, never everybody, and the screen warns you
+when a selected list is empty.
+
+One thing to know before you start tuning: every change to coverage discards whatever has been reviewed
+but not yet sent. It does not go back and review work that was already refused either. Get the population
+right in as few edits as you can.
 
 ### v0.74.0
 

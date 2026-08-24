@@ -159,7 +159,6 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
 
         User developer = TestUserFactory.createUser(500L, "pipeline-author", provider);
         developer = userRepository.save(developer);
-        // Delivery re-checks coverage, which admits work about linked members only.
         workspaceMembershipService.createMembership(
             workspace,
             developer.getId(),

@@ -63,7 +63,7 @@ class PracticeFeedbackDispatchService {
         Set<String> contributingPracticeSlugs
     ) {
         return dispatch(
-            ensure(
+            insertIfAbsentAndLoad(
                 job,
                 null,
                 "summary:" + job.getId(),
@@ -78,7 +78,7 @@ class PracticeFeedbackDispatchService {
 
     Result dispatchApproved(AgentJob job, Feedback feedback) {
         return dispatch(
-            ensure(
+            insertIfAbsentAndLoad(
                 job,
                 feedback.getId(),
                 "approved:" + feedback.getId(),
@@ -91,7 +91,7 @@ class PracticeFeedbackDispatchService {
         );
     }
 
-    private FeedbackDispatch ensure(
+    private FeedbackDispatch insertIfAbsentAndLoad(
         AgentJob job,
         @Nullable UUID feedbackId,
         String key,
@@ -122,9 +122,6 @@ class PracticeFeedbackDispatchService {
         if (dispatch.getDestination() != destination) {
             throw new JobDeliveryException("Dispatch key was reused for a different destination: " + key);
         }
-        // The row that won the insert is the body of record and the caller's is discarded: a retry
-        // recomposes the summary and legitimately differs, so refusing a body mismatch would strand the
-        // delivery permanently.
         return dispatch;
     }
 

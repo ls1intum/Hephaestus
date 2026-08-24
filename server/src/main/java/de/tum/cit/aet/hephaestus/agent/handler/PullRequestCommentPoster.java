@@ -164,12 +164,14 @@ class PullRequestCommentPoster {
         return postFormattedBody(job, formattedBody, "<!-- hephaestus:approved-feedback:" + feedbackId + " -->");
     }
 
-    /**
-     * Posts a comment that is not the job's summary. {@code marker} must not be the summary marker, or
-     * reconciliation will adopt this comment as the summary and edit it in place on the next review.
-     */
     @Nullable
     String postAside(AgentJob job, String formattedBody, String marker) {
+        if (summaryMarkerFor(job).equals(marker)) {
+            throw new IllegalArgumentException(
+                "An aside carrying the summary marker would be adopted as the summary and edited in place: jobId=" +
+                    job.getId()
+            );
+        }
         return postFormattedBody(job, formattedBody, marker);
     }
 

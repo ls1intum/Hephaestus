@@ -14,10 +14,6 @@ import org.jspecify.annotations.Nullable;
  * Per-workspace overrides for practice-review trigger/delivery policy. Embedded on
  * {@link de.tum.cit.aet.hephaestus.workspace.Workspace}.
  *
- * <p>A nullable scalar means "this workspace has not decided" and resolves to the fleet default
- * ({@code hephaestus.practice-review.*}) through its {@code resolveX(fallback)} accessor. Coverage
- * targets live in their own tables; only the modes are here.
- *
  * <p>PATCH {@code null} means "no change"; to reset a field back to inherit, name it in the PATCH
  * {@code reset} set (see {@link #reset(java.util.Set)}).
  */
@@ -57,12 +53,10 @@ public class PracticeReviewSettings {
     @Column(name = "practice_delivery_status", nullable = false, length = 16)
     private PracticeDeliveryStatus deliveryStatus = PracticeDeliveryStatus.ACTIVE;
 
-    /** Monotonic admission provenance; never reuse a revision after reverting configuration. */
     @ColumnDefault("0")
     @Column(name = "practice_rollout_revision", nullable = false)
     private long rolloutRevision;
 
-    /** Optimistic-concurrency version, independent of rollout provenance. */
     @ColumnDefault("0")
     @Column(name = "practice_config_version", nullable = false)
     private long configVersion;

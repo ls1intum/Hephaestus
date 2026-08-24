@@ -19,10 +19,12 @@ those inventories into another deployment manifest from this page.
 A working deployment must:
 
 - enable the agent runtime on both the submitting server and claiming worker;
-- enable practice review for the intended population;
 - make repository checkout and the shared fabric volume available to every worker that captures repository
   evidence;
 - set campaign, request-rate, retry, and retention limits appropriate to its budget and governance policy.
+
+Who gets practice review is **not** among them. There is no instance-wide population flag: each workspace
+turns itself on, and decides its own coverage.
 
 See the
 [server configuration](https://github.com/ls1intum/Hephaestus/blob/main/server/src/main/resources/application.yml)
@@ -37,12 +39,11 @@ Source authorization is not a deployment toggle. The shipped artifact-source con
 sources each purpose may use; integrations only determine which authorized sources are available. See
 [Artifact-source governance](./dsms/artifact-source-governance.md).
 
-## Workspace controls
+## Running instance
 
-Workspace administrators configure model readiness under **AI models**, review coverage, delivery status, and autonomy under
-**Practices**, and spend under **AI usage**. **Review activity** explains what happened to an individual
-piece of work. These product-level destinations are intentionally broader than a click-by-click path so the
-guide survives navigation changes; [Practice review](./practice-review.mdx) gives the task sequence.
+Nothing on this page configures a workspace. Model readiness, coverage, delivery status, autonomy, spend
+and the per-artifact trace are all workspace-administrator screens, and
+[Practice review](./practice-review.mdx) is the guide to them.
 
 ### Queue health
 
@@ -77,21 +78,26 @@ visible in **Review activity** and the refusal counter; they do not remove the w
 Gauges are sampled periodically; timers and counters are recorded when the corresponding event occurs.
 Metric names in the instrumented code are the source of truth for dashboards and alerts.
 
-**Retention.** Terminal job payloads are stripped before their rows are deleted. Row retention must not be
-shorter than payload retention. Set both against the approved retention policy, verify them in the effective
-application configuration, and treat the fabric root as sensitive storage. Delivery-policy evaluations and
-dispatch intents are deleted with their owning job or workspace; selected coverage targets are deleted with
-their workspace membership or monitored repository.
+**Retention.** Terminal job payloads are stripped before their rows are deleted, so row retention shorter
+than payload retention is incoherent — the application refuses to start rather than accept it. Treat the
+fabric root as sensitive storage. Nothing else needs a retention setting of its own: delivery-policy
+evaluations and dispatch intents are deleted with their owning job or workspace, and selected coverage
+targets with their workspace membership or monitored repository.
 
-**Dispatch recovery.** Automatic summaries and approved artifact comments first persist an immutable
-destination and body, then claim it in a short transaction. Immediately before provider I/O, the dispatcher
-persists `write_started`. Recovery always checks the deterministic provider marker first. If the marker is
-found, it records the existing comment as sent. If lookup is inconclusive—or lookup reports no marker after
-a write began—it does not post again; it retries reconciliation until the bounded attempt limit ends in the
-terminal `FAILED` state. A dispatch with no prior write may post after a definitive not-found result. Provider
-I/O runs without a database lock.
+**Dispatch recovery.** A dispatch whose provider outcome is unknown is never re-posted on a guess. Before
+writing, the dispatcher looks for a deterministic marker on the provider: if the comment is already there
+it is recorded as sent, and only a definitive not-found lets a first write proceed. An interrupted write
+therefore stalls in `UNCERTAIN` rather than duplicating, and reconciles or gives up on its own.
 
-Do not mutate dispatch rows manually. The state, write fence, attempt count, next-attempt time, and lease
+Two consequences to plan for:
+
+- **Sustained `UNCERTAIN` means the provider is not answering the lookup**, not that feedback is queued.
+  Fix provider connectivity or credentials; nothing in Hephaestus will clear it.
+- **A dispatch interrupted mid-write can outlive its retry budget without reaching `FAILED`.** It is
+  deliberately not failed, because the comment may be live, and it will log a warning until somebody
+  confirms on the provider which it is. Treat a row warning on repeat as an operator task, not a bug.
+
+Do not mutate dispatch rows manually. Their state, write fence, attempt count, next-attempt time and lease
 owner jointly prevent an uncertain provider outcome from becoming a duplicate write.
 
 ## Limits you should know about
@@ -114,10 +120,9 @@ behaviors matter independently of their exact defaults:
   review resolves documents *linked from* the work first and only tops up a small number by search; the
   mentor searches the whole corpus and truncates each document. Neither path can report that it found
   everything, and neither is a substitute for the other when you are diagnosing missing context.
-- **Observation and feedback wording come from different turns in one agent session.** The first turn
-  records evidence-backed observations. After Java admits them, a second turn composes lane-specific
-  feedback from those observations and their evidence. Practice criteria affect what is observed; the
-  composition contract affects what is said. Nothing on the administration screens edits either prompt.
+- **No screen edits what the model is told.** What Hephaestus observes is shaped by each practice's
+  criteria; the wording it then chooses is shaped by a prompt that ships with the release. Changing the
+  latter is a code change, so a complaint about tone is an issue to file, not a setting to find.
 
 ## Rollback
 

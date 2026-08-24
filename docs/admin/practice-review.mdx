@@ -17,20 +17,22 @@ Every refusal is recorded; **Review activity**, available to every member, is th
 
 ## First successful review
 
-Use this short path before tuning campaigns, scopes, or per-practice overrides:
+Use this short path before tuning coverage, campaigns, or per-practice overrides:
 
 1. Connect GitHub or GitLab and confirm a recent pull or merge request appears under **Review activity**.
    If it does not, fix ingestion first; practice-review settings cannot make missing work appear.
 2. Under **AI models**, assign a ready model to practice reviews.
-3. On **Practices → Review → When and where**, turn on **Start practice reviews**.
+3. On **Practices → Review → When and where**, turn on **Start practice reviews**, then turn on at least
+   one way in under **How reviews start** — **Reviews the work starts**, **Reviews somebody asks for**, or
+   both. The screen says *"Nothing can start a review"* when both are off.
 4. On **Practices → Review → How much**, set the **Workspace default** to **Review before sending** for the
-   first test. Back on **When and where**, keep coverage at **All monitored repositories** and **Everyone
-   who has signed in**, and leave **Send feedback** on.
+   first test. Back on **When and where**, keep coverage at **All monitored repositories** and **Every
+   member of this workspace**, and leave **Send feedback** on.
 5. Open a small pull or merge request whose author is a workspace member, then follow it in **Review
    activity**. The trace distinguishes ingestion, admission, observation, composition, withholding, and
    delivery; do not use the presence of a provider comment as the success test.
 
-Once that works, narrow the scope, add practice overrides, or configure past-work reviews. The rest of
+Once that works, narrow coverage, add practice overrides, or configure past-work reviews. The rest of
 this page is reference and troubleshooting for those decisions.
 
 ### Follow one review end to end
@@ -38,8 +40,8 @@ this page is reference and troubleshooting for those decisions.
 Suppose a developer opens **Update dependencies** with no explanation in its description:
 
 1. The provider event creates an occurrence visible under **Review activity**.
-2. Coverage decides whether to look at all: the repository, the base branch and the author must all be in
-   scope. Then the review gate selects practices whose occasions match that pull request, and capture must
+2. Coverage decides whether to look at all: the repository, the base branch and the author must all be
+   admitted. Then the review gate selects practices whose occasions match that pull request, and capture must
    satisfy each selected practice's evidence requirements before that practice can run.
 3. A practice about explaining why a change is needed can record that the explanation is absent, bounded
    to the description it searched. This is the observation; it is retained even if nobody is contacted.
@@ -98,46 +100,37 @@ diagram directly. Two things in it will bite you if you assume otherwise:
   it later would spend money on a stale event. (Settled Slack threads are the exception — the thread sweep
   both records and starts.)
 
-| Door                                                       | Who may use it                                                                              | Rate limit                                                       | Spends from               |
-| ---------------------------------------------------------- | --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ | ------------------------- |
-| Live event                                                 | Nobody — it is automatic, per the practices' occasions                                      | The per-workspace cooldown between reviews of the same work      | The workspace's AI budget |
-| `/hephaestus review` in a **GitLab merge request** comment | The work's author or assignees, or a workspace admin                                        | Per-person hourly allowance, **and** the same per-work cooldown  | The workspace's AI budget |
-| **Review this now** on Review activity                     | The same people. Every member sees the button; anyone else is refused with a toast saying so | Per-person hourly allowance, **and** the same per-work cooldown  | The workspace's AI budget |
-| **Past work** campaign                                     | A workspace admin, and only after confirming a priced estimate                              | Bounded by the campaign's own scope                              | The workspace's AI budget |
-| **Keep checking new work** schedule                        | A workspace admin                                                                           | One campaign at a time per workspace                             | The workspace's AI budget |
+All five spend from the workspace's AI budget.
+
+| Door                                                       | Who may use it                                                                            | Rate limit                                                      |
+| ---------------------------------------------------------- | ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| Live event                                                 | Nobody — it is automatic, per the practices' occasions                                    | The per-workspace cooldown between reviews of the same work     |
+| `/hephaestus review` in a **GitLab merge request** comment | The work's author or assignees, or a workspace admin                                      | Per-person hourly allowance, **and** the same per-work cooldown |
+| **Review this now** on Review activity                     | The same people. Every member sees the button; anyone else is refused with a toast saying so | Per-person hourly allowance, **and** the same per-work cooldown |
+| **Past work** campaign                                     | A workspace admin, and only after confirming a priced estimate                            | Bounded by the campaign's own scope                             |
+| **Keep checking new work** schedule                        | A workspace admin                                                                         | One campaign at a time per workspace                            |
+
+Two switches sit in front of the whole table. **Reviews the work starts** governs the first row;
+**Reviews somebody asks for** governs the other four together, so turning it off silently stops the button,
+the comment command, campaigns and schedules at once.
 
 Every door goes through coverage. Asking by hand does not widen it: a review requested on work whose author
-is not a covered person is refused just as a live event would be.
+is not a covered person is refused just as a live event would be. The button appears only on pull request
+and issue traces — documents and Slack threads are reviewed on the occasion their source produces, with
+nothing to point at and ask about — and there is no comment command on GitHub pull requests at all.
 
-There is no equivalent comment command on GitHub pull requests. Reviews there start from live events, from
-the button, or from a campaign.
+## Deployment
 
-## Turn it on
-
-Practice review is not one switch. It needs a deployment part and a per-workspace part, and a workspace is
-quiet until both are done.
-
-### Deployment
-
-Enable the agent runtime on both server and worker roles, enable repository checkout where evidence capture
-runs, and expose the practice-review feature. Variables, Compose forwarding, storage requirements, queue
-metrics, retention, and fixed limits are in
+The workspace steps are the five above, and they are not enough on their own. The deployment must enable
+the agent runtime on both the submitting server and the claiming worker, and enable repository checkout
+wherever evidence capture runs; until it does, every workspace on the instance is quiet however it is
+configured. There is no instance-wide switch for practice review beyond those two — a workspace's own
+**Start practice reviews** is the only other one. Variables, Compose forwarding, storage requirements,
+queue metrics, retention, and fixed limits are in
 [Practice review operations](./practice-review-operations.mdx).
 
-### Workspace setup
-
-Configure the workspace in this order:
-
-1. Under **AI models**, assign a ready model to practice reviews.
-2. On **Review → When and where**, turn on **Start practice reviews** and enable the desired live or manual
-   doors.
-3. On the same screen, choose repository and people coverage. The defaults cover every monitored repository
-   and every member; switching either mode to **Selected** with nothing selected deliberately covers nobody.
-4. On **Review → How much**, set the **Workspace default**, then add area or practice overrides only where
-   the inherited value is wrong.
-
-Draft eligibility belongs to each practice because it changes when that practice has a meaningful occasion;
-it is not a workspace-wide switch.
+Draft eligibility is the one thing you will look for on the workspace screens and not find: it belongs to
+each practice, because it changes when that practice has a meaningful occasion.
 
 ## Autonomy, coverage, and delivery
 
@@ -149,29 +142,30 @@ Three independent controls answer different questions; confusing them is the mos
   proceed without that decision, subject to the same delivery policy. Changing the setting never releases
   an existing proposal.
 - **Coverage**, under **What gets reviewed**, is one workspace-wide intersection: all or selected monitored
-  repositories × all or selected people. Selected-empty means nobody. Exact base branches can narrow each
-  selected repository independently; exact names only, no patterns. An issue has no base branch, so a
-  selected repository's branch restriction is relevant only to pull and merge requests. The people side is
-  workspace membership — see [Who counts as a person](#who-counts-as-a-person).
+  repositories × all or selected people. A selected list left empty covers nobody, which is why the screen
+  warns you when one is. The people side is workspace membership — see
+  [Who counts as a person](#who-counts-as-a-person).
 - **Send feedback**, under **Sending feedback**, controls whether newly admitted feedback may leave the
   review pipeline. Pausing does not stop measurement and does not discard configuration. Paused feedback is
-  terminally withheld; resuming applies only to work admitted under the new rollout revision and never
-  flushes old work.
+  terminally withheld; resuming applies only to work reviewed afterwards and never flushes old work.
 
-All three are prospective. **Any** change to coverage, to **Send feedback**, to **Post feedback after
-merge**, or to the workspace default autonomy advances the rollout revision — narrowing as much as widening
-— so a result admitted under the former configuration can no longer be released. Changing the cooldown does
-not. Area and practice autonomy overrides do not advance it either; they take effect through the approval
-authority check instead, which is why demoting a practice back to **Review before sending** leaves existing
-proposals exactly where they were.
+All three are prospective, and the price is worth knowing before you touch them: changing coverage,
+**Send feedback**, **Post feedback after merge**, or the workspace default autonomy discards whatever was
+already reviewed and not yet sent — narrowing as much as widening. Changing the cooldown does not, and
+neither does a group or practice override, which is why demoting one practice back to **Review before
+sending** leaves existing proposals exactly where they were.
 
 ### Who counts as a person
 
 The people side of coverage is **workspace membership**, and the count beside **People** on the review
-screen is how many members are in scope. A member is somebody with a row on the **Members** screen:
-Hephaestus fills that in from the connected GitHub organization or GitLab group roster and from the team
-graph, an admin can add or remove one there, and workspace activity can add one. Signing in to Hephaestus
-does not by itself create one.
+screen is how many members are in scope. A member is somebody with a row on the **Members** screen, and
+rows arrive in exactly three ways: the connected GitHub organization or GitLab group roster sync, the team
+sync (which is what catches a GitLab user who is only in a subgroup and so never appears in the
+organization roster), and workspace creation, which enrols the owner and any provisioned administrators.
+
+Signing in to Hephaestus is not one of them, and the **Members** screen has no *Add member* button. To
+cover somebody who is missing, add them to the connected organization or group and let the next sync pick
+them up.
 
 This is the change most likely to surprise you: an outside contributor who opens a pull request but is not
 in the organization roster is not a covered person, so their work is not reviewed and no feedback is
@@ -181,25 +175,24 @@ contributor list, the difference is the people who are not members.
 
 ### You set this once, not a hundred times
 
-**Autonomy** is answered once for the **workspace**, and every area and every practice follows that answer
-until you say otherwise. An area can override the workspace, and a practice can override its area:
+**Autonomy** is answered once for the **workspace**, and every group and every practice follows that
+answer until you say otherwise. A group can override the workspace, and a practice can override its group:
 
-> practice → its area → the workspace
+> practice → its group → the workspace
 
 Anything you have not decided shows as **inherited**, with the level it came from, and can be reset back to
-inheriting at any time. Start with the one workspace answer, then override the handful of areas where it is
-wrong; a workspace runs dozens of practices across a dozen areas, and a setting you have to apply per row is
-a setting nobody applies. (Coverage is not inherited — it is one workspace-wide repository/person policy,
-and it lives on the other tab.)
+inheriting at any time. Start with the one workspace answer, then override the handful of groups where it
+is wrong; a workspace runs dozens of practices across a dozen groups, and a setting you have to apply per
+row is a setting nobody applies. Coverage does not work this way and is not inherited — it is set once for
+the whole workspace, on **When and where**.
 
 **Review → How much** shows, above the list, how many practices sit at each setting — once for the
-workspace and again on each area. Read that line before changing anything; it is the fastest way to see
+workspace and again on each group. Read that line before changing anything; it is the fastest way to see
 whether an override somebody made long ago is still doing what you think. **Set by hand** filters the list
 down to the overrides.
 
-All three controls are defined in full, with their refusal semantics and the exact order the delivery gates
-run in, in the [practice review glossary](/contributor/practice-review-glossary). Do not re-derive them
-from this page.
+The exact refusal semantics of all three controls, and the order the delivery gates run in, are in the
+[practice review glossary](/contributor/practice-review-glossary).
 
 ## What costs money
 
@@ -241,7 +234,7 @@ cost. Nothing is reviewed until you confirm. It is one bounded, priced, named de
 check reaches. This exists because work that never raised a notification is otherwise never reviewed and
 nothing says so.
 
-:::warning A recurring check authorises spending *and* speaking
+:::warning A recurring check authorizes spending *and* speaking
 A schedule opens each of its campaigns **directly in a running state**, using the authority of whoever
 created the schedule. A cost estimate is still computed for each run, but nobody is asked to approve it,
 and there is no cap specific to sweeping — the only thing that stops it is the workspace's AI budget, the
@@ -267,8 +260,8 @@ past work and does not contact the people whose work it measured.
 
 ## When a workspace goes quiet
 
-Work down this list. Step 0 usually ends the investigation; steps 1 to 6 are per workspace and
-7 to 9 are instance-wide, so if several workspaces went quiet at once, start at the bottom.
+Work down this list. Step 0 usually ends the investigation; steps 1 to 7 are per workspace and
+8 to 10 are instance-wide, so if several workspaces went quiet at once, start at the bottom.
 
 **0. Open Review activity and read the trace.** **Review activity** in the workspace sidebar lists every
 piece of work Hephaestus recorded. Open one and you get two things: what was recorded about it and how it
@@ -283,31 +276,34 @@ upstream of practice review — check the integration's sync.
 
 1. **Is a review model bound and enabled?** Administration → **AI models**, the **Practice reviews** card.
 2. **Is the bound model still usable?** A model is usable only if the model *and* its connection are
-   enabled, the protocol is supported, and — for a shared instance model — the workspace still has a grant.
-   Revoking a grant or disabling a connection stops every workspace bound to it, and the binding stays in
-   place looking correct.
+   enabled, the protocol is supported, and — for a shared instance model offered to *selected* workspaces
+   rather than to all of them — this workspace still has a grant. Revoking a grant or disabling a
+   connection stops every workspace bound to it, and the binding stays in place looking correct.
 3. **Is a budget exhausted?** Administration → **AI usage** names which purse paused the workspace and who
    can lift it. `agent.queue.held` counts jobs parked on a cap; `agent.queue.depth` counts only what a
    worker could claim now, so alert on held rather than reading depth.
 4. **Is practice review, or the workspace, switched off?** The switch is **Start practice reviews** on
    Administration → Practices → **Review → When and where** — *not* on the Workspace settings page. A paused
    workspace runs nothing regardless of its AI configuration.
-5. **Is the work covered?** Same screen, **What gets reviewed**. Both counts have to be non-zero, and the
+5. **Can anything still start a review?** Same screen, **How reviews start**. With both **Reviews the work
+   starts** and **Reviews somebody asks for** off, the workspace is on and nothing reaches it; the screen
+   says *"Nothing can start a review"*.
+6. **Is the work covered?** Same screen, **What gets reviewed**. Both counts have to be non-zero, and the
    author of the quiet work has to be one of the covered people. The trace prints one reason for the whole
-   of coverage and words it as *"outside the workspace's review scope"* — read that as repository **or**
-   base branch **or** author, and check all three before changing a repository list. A separate reason,
-   *"the author has not linked their account"*, means the work had no identifiable author at all.
-6. **Is sending paused?** Same screen, **Sending feedback**. Reviews still run and **Review activity** still
+   of coverage — *"The author, repository, or base branch is outside the workspace's review coverage"* — so
+   check all three before changing a repository list. A separate reason, *"Hephaestus could not tell whose
+   work this is"*, means the work had no identifiable author at all.
+7. **Is sending paused?** Same screen, **Sending feedback**. Reviews still run and **Review activity** still
    fills up, so the symptom is specifically that nothing reaches anybody. Resuming does not release what was
    withheld while it was paused.
-7. **Is `AGENT_ENABLED=true` on every role that needs it?** It defaults to `false` and gates submission,
+8. **Is `AGENT_ENABLED=true` on every role that needs it?** It defaults to `false` and gates submission,
    execution *and* orphan recovery independently of the worker role. Set on the worker only, nothing is
    submitted; set on the server only, jobs queue and are never claimed. Confirm by presence, not value: if
    the flag never reached a pod, `agent.queue.depth`, `agent.queue.oldest_age_seconds` and
    `agent.queue.running` are **absent** from that pod's metrics rather than reading zero.
-8. **Are jobs being claimed at all?** Watch `agent.queue.oldest_age_seconds`. It should rise and fall.
+9. **Are jobs being claimed at all?** Watch `agent.queue.oldest_age_seconds`. It should rise and fall.
    Climbing monotonically means the server is submitting and no worker is claiming.
-9. **Is instance-wide silent mode engaged?** Instance admin → **Instance settings**. While it is on, every
+10. **Is instance-wide silent mode engaged?** Instance admin → **Instance settings**. While it is on, every
    workspace's feedback is suppressed across the instance, and a banner says so on every instance-admin
    page.
 
