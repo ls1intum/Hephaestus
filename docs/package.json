@@ -31,13 +31,12 @@
   },
   "devDependencies": {
     "@docusaurus/module-type-aliases": "3.10.1",
-    "@docusaurus/tsconfig": "3.10.1",
     "@docusaurus/types": "3.10.1",
     "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",
     "markdownlint-cli2": "0.22.1",
     "raw-loader": "4.0.2",
-    "typescript": "6.0.3"
+    "typescript": "7.0.2"
   },
   "browserslist": {
     "production": [
