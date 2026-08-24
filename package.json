@@ -53,6 +53,7 @@
 		"db:draft-changelog": "scripts/db-utils.sh draft-changelog",
 		"db:generate-erd-docs": "scripts/db-utils.sh generate-erd",
 		"check:ports": "scripts/check-ports.sh",
+		"format:achievements": "pnpm exec tsx scripts/format-achievements.ts",
 		"github:update-schema": "pnpm exec tsx scripts/update-github-schema.ts",
 		"gitlab:update-schema": "pnpm exec tsx scripts/update-gitlab-schema.ts",
 		"outline:update-spec": "pnpm exec tsx scripts/update-outline-spec.ts",
