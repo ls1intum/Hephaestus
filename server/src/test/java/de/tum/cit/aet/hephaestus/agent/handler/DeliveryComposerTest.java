@@ -516,7 +516,9 @@ class DeliveryComposerTest extends BaseUnitTest {
         assertThat(mrNote).startsWith("Nice work ");
         assertThat(mrNote).contains("keeping the change focused and reviewable");
         assertThat(mrNote).contains("linking the change to its issue");
-        assertThat(mrNote).contains("to tighten:");
+        assertThat(mrNote)
+            .as("the counted header owns the count, so the opener must not announce it too")
+            .doesNotContain("to tighten:");
         assertThat(mrNote).contains("1 suggestion for improvement");
     }
 
@@ -562,7 +564,7 @@ class DeliveryComposerTest extends BaseUnitTest {
 
         assertThat(mrNote).startsWith("Nice work here");
         assertThat(mrNote).doesNotContain("some uncurated practice xyz");
-        assertThat(mrNote).contains("to tighten:");
+        assertThat(mrNote).doesNotContain("to tighten:");
     }
 
     @Test
@@ -828,7 +830,7 @@ class DeliveryComposerTest extends BaseUnitTest {
     }
 
     @Test
-    void compose_acknowledgementCount_reflectsImprovementsNotStrengths() {
+    void compose_opener_leavesTheCountToTheHeaderBelowIt() {
         List<ValidatedObservation> observations = List.of(
             positiveObservation("issue-scoped-to-single-concern"),
             negativeObservation(
@@ -852,8 +854,10 @@ class DeliveryComposerTest extends BaseUnitTest {
         DeliveryContent dc = DeliveryComposer.compose(observations, ArtifactKinds.ISSUE);
 
         assertThat(dc).isNotNull();
-        assertThat(dc.mrNote()).contains("a couple of things to tighten:");
-        assertThat(dc.mrNote()).doesNotContain("one thing to tighten:");
+        // The header below the opener carries the count and any collapsed remainder with it. An opener that
+        // counted too would state the same number twice, and disagree with it whenever the list was capped.
+        assertThat(dc.mrNote()).contains("2 suggestions for improvement");
+        assertThat(dc.mrNote()).doesNotContain("to tighten:");
     }
 
     @Test

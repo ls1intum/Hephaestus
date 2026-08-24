@@ -413,7 +413,7 @@ class DeliveryComposer {
             // same thing.
             String forward = clampToSentenceBudget(note == null ? "" : note.nextStep(), STRENGTH_BUDGET);
             if (!forward.isBlank() && !forward.replace(".", "").equalsIgnoreCase("No change needed")) {
-                bullets.append(' ').append(forward);
+                bullets.append(endSentence(summary)).append(' ').append(forward);
             }
             bullets.append("\n");
             if (!principleShown) {
@@ -481,7 +481,7 @@ class DeliveryComposer {
         Map.entry("triages-the-issue-with-labels-and-ownership", "triaging the issue with a clear type label")
     );
 
-    static String composeAcknowledgement(List<ValidatedObservation> positives, int improvementCount) {
+    static String composeAcknowledgement(List<ValidatedObservation> positives) {
         if (positives == null || positives.isEmpty()) {
             return "";
         }
@@ -494,16 +494,13 @@ class DeliveryComposer {
             .distinct()
             .limit(2)
             .toList();
-        // Counts the IMPROVEMENTS that follow, not the strengths named — a single strength in front of two
-        // suggestions must not read "one thing to tighten:" above a list of two.
-        String tail = improvementCount > 1 ? " — a couple of things to tighten:" : " — one thing to tighten:";
         if (phrases.isEmpty()) {
             // A real GOOD strength exists but none has a curated phrase — acknowledge generically rather
             // than drop the opener or dump the raw slug into the "Nice work <gerund>" frame.
-            return "Nice work here" + tail;
+            return "Nice work here.";
         }
         String strengths = phrases.size() == 1 ? phrases.get(0) : phrases.get(0) + " and " + phrases.get(1);
-        return "Nice work " + strengths + tail;
+        return "Nice work " + strengths + ".";
     }
 
     static String composeSubordinatePositive(List<ValidatedObservation> positives) {
@@ -558,6 +555,15 @@ class DeliveryComposer {
         return text.substring(0, maxLen) + "...";
     }
 
+    /**
+     * The separator between a composed title and the step that follows it. Both are model prose and only
+     * one of them reliably ends in a stop, so joining on a space alone runs two sentences together.
+     */
+    private static String endSentence(String text) {
+        String trimmed = text.strip();
+        return trimmed.isEmpty() || ".!?:".indexOf(trimmed.charAt(trimmed.length() - 1)) >= 0 ? "" : ".";
+    }
+
     private static String capitalize(String s) {
         if (s == null || s.isEmpty()) return s;
         return Character.toUpperCase(s.charAt(0)) + s.substring(1);
@@ -588,7 +594,7 @@ class DeliveryComposer {
             .stream()
             .anyMatch(f -> f.severity() == Severity.CRITICAL || f.severity() == Severity.MAJOR);
         if (!hasBlocking) {
-            String acknowledgement = composeAcknowledgement(positives, allNegatives.size());
+            String acknowledgement = composeAcknowledgement(positives);
             if (!acknowledgement.isEmpty()) {
                 sb.append(acknowledgement).append("\n\n");
             }
