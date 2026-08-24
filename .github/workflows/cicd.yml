@@ -87,6 +87,16 @@ jobs:
               # check:env compares application.yml against the deployment that has to deliver it.
               - 'docker/compose.app.yaml'
               - 'docker/compose.core.yaml'
+              # check:instructions runs on this leg and reads every one of these. The two markdown
+              # globs are named even though webapp/** and server/** already carry them, because
+              # webapp/** is behind the *webapp* filter — a PR touching only webapp/CLAUDE.md would
+              # otherwise run the leg that does not hold this gate.
+              - '**/AGENTS.md'
+              - '**/CLAUDE.md'
+              - '.claude/**'
+              - '.opencode/**'
+              - '.agents/**'
+              - 'opencode.json'
             agent-images:
               - 'docker/agents/**'
             docs:
