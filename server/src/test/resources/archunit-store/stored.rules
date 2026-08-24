@@ -1,0 +1,4 @@
+#
+#Mon Aug 24 10:55:39 CEST 2026
+methods\ should\ have\ @Valid\ on\ every\ @RequestBody\ parameter,\ because\ bean\ validation\ is\ not\ applied\ to\ a\ request\ body\ unless\ the\ parameter\ is\ @Valid=c4b5d4a7-ac45-44c3-9040-0009166ff5b4
+methods\ should\ not\ call\ a\ transactional\ method\ on\ the\ same\ class,\ because\ self-invocation\ bypasses\ Spring's\ transactional\ proxy=87830125-237b-4bc0-a610-028912d6f8d2
