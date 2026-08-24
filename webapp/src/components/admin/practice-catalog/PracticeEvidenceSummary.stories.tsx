@@ -2,9 +2,9 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect } from "storybook/test";
 import {
 	mockMergeBinding,
-	mockPracticeDefinitionOptions,
 	mockPullRequestBinding,
 	mockPullRequestPolicy,
+	mockPullRequestWorkType,
 } from "@/mocks/fixtures/practice";
 import { expectNoOverflowingElement } from "@/test/reflow";
 import { PracticeEvidenceSummary } from "./PracticeEvidenceSummary";
@@ -15,8 +15,8 @@ const meta = {
 	args: {
 		policy: mockPullRequestPolicy,
 		bindings: [mockPullRequestBinding, mockMergeBinding],
-		sources: mockPracticeDefinitionOptions.workTypes[0].allowedSources,
-		signals: mockPracticeDefinitionOptions.workTypes[0].signals,
+		sources: mockPullRequestWorkType.allowedSources,
+		signals: mockPullRequestWorkType.signals,
 		workTypeLabel: "Pull or merge request",
 		validation: {
 			status: "AUTHOR_DECLARED",

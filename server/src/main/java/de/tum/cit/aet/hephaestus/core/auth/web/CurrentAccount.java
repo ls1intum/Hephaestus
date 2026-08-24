@@ -29,7 +29,7 @@ public final class CurrentAccount {
         try {
             return Long.parseLong(jwt.getSubject());
         } catch (NumberFormatException e) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "token subject is not an account id");
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "token subject is not an account id", e);
         }
     }
 
@@ -67,7 +67,7 @@ public final class CurrentAccount {
         try {
             return UUID.fromString(id);
         } catch (IllegalArgumentException e) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "token jti is malformed");
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "token jti is malformed", e);
         }
     }
 

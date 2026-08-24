@@ -77,7 +77,7 @@ export const UpdateChangesReviewBehavior: Story = {
 		// whole, which is what licenses a claim that nobody ever resolved one.
 		await expect(canvas.getAllByText("Merged").length).toBeGreaterThan(0);
 		await expect(canvas.getAllByText("· captured whole").length).toBeGreaterThan(0);
-		expect(canvas.getAllByText("AI-supported mentoring").length).toBeGreaterThan(0);
+		await expect(canvas.getAllByText("AI-supported mentoring").length).toBeGreaterThan(0);
 		await expect(canvas.getAllByText("Pull request details").length).toBeGreaterThan(0);
 		await expect(
 			canvas.getByText(/Nobody has measured how often this practice is right/),

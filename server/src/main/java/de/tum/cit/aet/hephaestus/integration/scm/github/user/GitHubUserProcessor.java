@@ -212,7 +212,8 @@ public class GitHubUserProcessor {
                         Thread.sleep(delay);
                     } catch (InterruptedException ie) {
                         Thread.currentThread().interrupt();
-                        throw e; // Propagate the original deadlock exception
+                        e.addSuppressed(ie);
+                        throw e;
                     }
                 } else {
                     log.error(

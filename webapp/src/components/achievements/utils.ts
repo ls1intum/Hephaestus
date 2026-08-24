@@ -84,10 +84,10 @@ export function generateSkillTreeData(
 			y: 0,
 		},
 		data: {
-			level: user?.level ?? 0,
-			leaguePoints: user?.leaguePoints ?? 0,
-			avatarUrl: user?.avatarUrl ?? "",
-			name: user?.name ?? "",
+			level: user.level,
+			leaguePoints: user.leaguePoints,
+			avatarUrl: user.avatarUrl,
+			name: user.name,
 			className: undefined,
 		},
 		type: "avatar",
@@ -334,12 +334,9 @@ export function calculateStats(achievementList: Achievement[]) {
 		if (a.status === "unlocked") unlocked++;
 		else if (a.status === "available") available++;
 
-		const cat = a.category ?? "milestones";
-		const entry = byCategory[cat];
-		if (entry) {
-			entry.total++;
-			if (a.status === "unlocked") entry.unlocked++;
-		}
+		const entry = byCategory[a.category];
+		entry.total++;
+		if (a.status === "unlocked") entry.unlocked++;
 	}
 
 	return {

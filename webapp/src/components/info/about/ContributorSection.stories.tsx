@@ -27,14 +27,16 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
+const ALICE_DEVELOPER = {
+	id: 1,
+	login: "contributor1",
+	name: "Alice Developer",
+	avatarUrl: "https://i.pravatar.cc/150?img=1",
+	htmlUrl: "https://github.com/contributor1",
+};
+
 const MOCK_CONTRIBUTORS = [
-	{
-		id: 1,
-		login: "contributor1",
-		name: "Alice Developer",
-		avatarUrl: "https://i.pravatar.cc/150?img=1",
-		htmlUrl: "https://github.com/contributor1",
-	},
+	ALICE_DEVELOPER,
 	{
 		id: 2,
 		login: "contributor2",
@@ -96,7 +98,7 @@ export const IsError: Story = {
  */
 export const SingleContributor: Story = {
 	args: {
-		contributors: [MOCK_CONTRIBUTORS[0]],
+		contributors: [ALICE_DEVELOPER],
 		isLoading: false,
 		isError: false,
 	},

@@ -21,9 +21,7 @@ function tick(now: number) {
 }
 
 function startLoop() {
-	if (rafId === null) {
-		rafId = requestAnimationFrame(tick);
-	}
+	rafId ??= requestAnimationFrame(tick);
 }
 
 function stopLoop() {

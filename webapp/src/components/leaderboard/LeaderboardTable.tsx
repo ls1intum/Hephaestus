@@ -60,6 +60,7 @@ export function LeaderboardTable({
 	}
 
 	const isTeam = variant === "TEAM";
+	const entries: LeaderboardEntry[] = leaderboard;
 
 	return (
 		<Table>
@@ -79,9 +80,9 @@ export function LeaderboardTable({
 				</TableRow>
 			</TableHeader>
 			<TableBody>
-				{(leaderboard as LeaderboardEntry[]).map((entry) => {
+				{entries.map((entry) => {
 					if (isTeam) {
-						const team = (entry as TeamLeaderboardEntry).team;
+						const team = entry.team;
 						if (!team) return null;
 						const displayName = teamLabelsById?.[team.id] ?? team.name;
 						const teamIdentity = (

@@ -6,7 +6,7 @@ import { BudgetPaceAlert } from "./BudgetPaceAlert";
 const eur: FxRateInfo = {
 	currencyCode: "EUR",
 	ratePerUsd: 0.88,
-	rateDate: "2026-07-24" as unknown as Date,
+	rateDate: new Date("2026-07-24"),
 	source: "ECB",
 };
 

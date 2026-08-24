@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { RefreshCw } from "lucide-react";
+import { STORY_NOW } from "@/components/common/story-clock";
 import { Button } from "@/components/ui/button";
 import { withProvider } from "@/stories/decorators";
 import { IssueCard } from "./IssueCard";
@@ -96,7 +97,7 @@ export const OpenPullRequest: Story = {
 		deletions: 50,
 		htmlUrl: "https://github.com/ls1intum/Hephaestus/pull/42",
 		repositoryName: "Hephaestus",
-		createdAt: new Date(),
+		createdAt: new Date(STORY_NOW),
 		state: "OPEN",
 		isDraft: false,
 		isMerged: false,
@@ -119,7 +120,7 @@ export const DraftPullRequest: Story = {
 		deletions: 280,
 		htmlUrl: "https://github.com/ls1intum/Artemis/pull/87",
 		repositoryName: "Artemis",
-		createdAt: new Date(),
+		createdAt: new Date(STORY_NOW),
 		state: "OPEN",
 		isDraft: true,
 		isMerged: false,
@@ -142,7 +143,7 @@ export const MergedPullRequest: Story = {
 		deletions: 5,
 		htmlUrl: "https://github.com/ls1intum/Athena/pull/103",
 		repositoryName: "Athena",
-		createdAt: new Date(),
+		createdAt: new Date(STORY_NOW),
 		state: "CLOSED",
 		isDraft: false,
 		isMerged: true,
@@ -165,7 +166,7 @@ export const ClosedPullRequest: Story = {
 		deletions: 0,
 		htmlUrl: "https://github.com/ls1intum/ExampleRepo/pull/75",
 		repositoryName: "ExampleRepo",
-		createdAt: new Date(),
+		createdAt: new Date(STORY_NOW),
 		state: "CLOSED",
 		isDraft: false,
 		isMerged: false,

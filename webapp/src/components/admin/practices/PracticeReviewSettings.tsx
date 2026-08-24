@@ -307,14 +307,14 @@ function CooldownField({
  * section, because every one of them answers the same question, and three headings over four fields
  * made the reader look for a difference that was not there.
  *
- * <p>Matches are exact: a wildcard language here would be a promise the gate cannot keep, since it
+ * Matches are exact: a wildcard language here would be a promise the gate cannot keep, since it
  * holds the pull request row and not the diff.
  */
 function ReviewedWorkSection({ policy }: Pick<PracticeReviewSettingsProps, "policy">) {
 	const settings = policy.settings;
 	const scope = settings.reviewScope;
-	const targetBranches = scope?.targetBranches ?? [];
-	const repositories = scope?.repositories ?? [];
+	const targetBranches = scope.targetBranches ?? [];
+	const repositories = scope.repositories ?? [];
 	const restricted = targetBranches.length > 0 || repositories.length > 0;
 
 	const update = (next: { targetBranches?: string[]; repositories?: string[] }) =>

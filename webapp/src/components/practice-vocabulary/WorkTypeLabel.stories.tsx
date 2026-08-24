@@ -29,7 +29,7 @@ export const EveryKind: Story = {
 	play: async ({ canvas }) => {
 		// Every kind gets its own wording. A missing case falls through to the neutral label, which
 		// reads fine on its own and is only wrong because another kind already says it.
-		const labels = canvas.getAllByRole("listitem").map((item) => item.textContent?.trim());
+		const labels = canvas.getAllByRole("listitem").map((item) => item.textContent.trim());
 		await expect(new Set(labels).size).toBe(ARTIFACT_KIND_VALUES.length);
 	},
 };

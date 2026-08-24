@@ -260,6 +260,7 @@ spec and schema-evolution guidance; Databricks medallion (bronze/silver/gold) ar
 guidance; W3C PROV-O provenance ontology. Internal: ADR 0015 (integration framework),
 ADR 0004 (SQL-layer tenancy), ADR 0007 (sandbox/ContentSource seam), ADR 0014 (per-row
 AAD), and internal mentor-quality evaluation.
+
 ## Update — 2026-08-04 (issue #1430)
 
 The status moves from **Proposed** to **Accepted**: revisit triggers §3 and §8 above have both fired,

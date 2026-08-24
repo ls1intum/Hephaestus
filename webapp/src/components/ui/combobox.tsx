@@ -2,7 +2,7 @@
 
 import { Combobox as ComboboxPrimitive } from "@base-ui/react/combobox";
 import { CheckIcon, SearchIcon } from "lucide-react";
-import type * as React from "react";
+import type { AccessibleNameProps } from "@/components/ui/accessible-name";
 import { InputGroup, InputGroupAddon } from "@/components/ui/input-group";
 import { cn } from "@/lib/utils";
 
@@ -113,7 +113,14 @@ function ComboboxSearchInput({
 	);
 }
 
-function ComboboxList({ className, ...props }: ComboboxPrimitive.List.Props) {
+/**
+ * The listbox itself, which is why the accessible name is required here and not on `ComboboxContent`:
+ * that popup is `role="presentation"` unless it holds the input, so a name on it lands on nothing.
+ */
+type ComboboxListProps = Omit<ComboboxPrimitive.List.Props, "aria-label" | "aria-labelledby"> &
+	AccessibleNameProps;
+
+function ComboboxList({ className, ...props }: ComboboxListProps) {
 	return (
 		<ComboboxPrimitive.List
 			data-slot="combobox-list"
@@ -200,11 +207,16 @@ function ComboboxItemIndicator({ className, ...props }: ComboboxPrimitive.ItemIn
 	);
 }
 
-function ComboboxSeparator({ className, ...props }: React.ComponentProps<"div">) {
+/**
+ * Presentational, not `role="separator"`: `separator` is not an allowed child of `listbox`, so a
+ * divider between items would make the list itself invalid. Base UI's part renders the same `<div>`
+ * with `role="presentation"`, which is also the right answer for a purely decorative rule outside
+ * the list.
+ */
+function ComboboxSeparator({ className, ...props }: ComboboxPrimitive.Separator.Props) {
 	return (
-		<div
+		<ComboboxPrimitive.Separator
 			data-slot="combobox-separator"
-			role="separator"
 			className={cn("bg-border -mx-1 my-1 h-px pointer-events-none", className)}
 			{...props}
 		/>

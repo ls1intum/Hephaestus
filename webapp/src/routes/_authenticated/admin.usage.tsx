@@ -20,6 +20,7 @@ import {
 	usageSearchSchema,
 } from "@/components/admin/usage/usage-search";
 import { canStepForwardFrom, isCurrentMonthUtc } from "@/components/admin/usage/usage-utils";
+import { useNow } from "@/components/common/use-now";
 import { PageHeader } from "@/components/core/PageHeader";
 import { PageLayout } from "@/components/core/PageLayout";
 import { instanceAdminHead } from "@/lib/page-title";
@@ -63,8 +64,8 @@ function AdminInstanceUsagePage() {
 	const updateBudget = useMutation({
 		...adminUpdateWorkspaceLlmBudgetMutation(),
 		onSuccess: (_data, variables) => {
-			queryClient.invalidateQueries({ queryKey: adminGetLlmUsageReportQueryKey() });
-			queryClient.invalidateQueries({
+			void queryClient.invalidateQueries({ queryKey: adminGetLlmUsageReportQueryKey() });
+			void queryClient.invalidateQueries({
 				queryKey: getLlmUsageReportQueryKey({
 					path: { workspaceSlug: variables.path.workspaceSlug },
 				}),
@@ -85,6 +86,7 @@ function AdminInstanceUsagePage() {
 
 	const canGoNext = canStepForwardFrom(month);
 	const isCurrentMonth = isCurrentMonthUtc(month);
+	const now = new Date(useNow());
 
 	const handleSubmitBudget = (monthlyBudgetUsd: number | null) => {
 		if (!editing) {
@@ -120,16 +122,17 @@ function AdminInstanceUsagePage() {
 			<AdminInstanceLlmUsageTable
 				rows={rows}
 				month={month}
+				now={now}
 				fx={fx}
 				isCurrentMonth={isCurrentMonth}
 				isLoading={listQuery.isLoading}
 				error={listQuery.error}
-				onRetry={() => listQuery.refetch()}
+				onRetry={() => void listQuery.refetch()}
 				expandedWorkspaceSlug={expanded?.workspaceSlug ?? null}
 				detailReport={detailQuery.data}
 				isDetailLoading={detailQuery.isLoading}
 				detailError={detailQuery.error}
-				onRetryDetail={() => detailQuery.refetch()}
+				onRetryDetail={() => void detailQuery.refetch()}
 				onToggleDetails={(workspace) =>
 					setExpanded((current) =>
 						current?.workspaceSlug === workspace.workspaceSlug ? null : workspace,

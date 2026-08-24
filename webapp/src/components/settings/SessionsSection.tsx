@@ -88,11 +88,10 @@ export function SessionsSection() {
 	const revokeOne = useMutation({
 		...revokeSessionMutation(),
 		onSuccess: () => {
-			invalidateSessions();
+			void invalidateSessions();
 			toast.success("Session revoked");
 		},
-		onError: (error) => {
-			console.error("Failed to revoke session:", error);
+		onError: () => {
 			toast.error("Failed to revoke session. Please try again later.");
 		},
 	});
@@ -100,11 +99,10 @@ export function SessionsSection() {
 	const revokeOthers = useMutation({
 		...revokeOtherSessionsMutation(),
 		onSuccess: () => {
-			invalidateSessions();
+			void invalidateSessions();
 			toast.success("Signed out of all other sessions");
 		},
-		onError: (error) => {
-			console.error("Failed to revoke other sessions:", error);
+		onError: () => {
 			toast.error("Failed to sign out other sessions. Please try again later.");
 		},
 	});
@@ -184,7 +182,7 @@ export function SessionsSection() {
 						// Scope the pending state to the row actually being revoked so a single revoke
 						// doesn't disable/spin every other session's button.
 						const isRevokingThis =
-							revokeOne.isPending && revokeOne.variables?.path.jti === session.jti;
+							revokeOne.isPending && revokeOne.variables.path.jti === session.jti;
 						return (
 							<div
 								key={session.jti ?? `${session.userAgent}:${session.ip}`}

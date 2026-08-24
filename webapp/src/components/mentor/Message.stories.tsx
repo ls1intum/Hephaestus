@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { fn } from "storybook/test";
+import { STORY_NOW } from "@/components/common/story-clock";
 import type { ChatMessage } from "@/lib/types";
 import { PreviewMessage, ThinkingMessage } from "./Message";
 
@@ -199,7 +200,7 @@ export const UpvotedMessage: Story = {
 		vote: {
 			messageId: "msg-2",
 			isUpvoted: true,
-			updatedAt: new Date(),
+			updatedAt: new Date(STORY_NOW),
 		},
 	},
 };
@@ -215,7 +216,7 @@ export const DownvotedMessage: Story = {
 		vote: {
 			messageId: "msg-2",
 			isUpvoted: false,
-			updatedAt: new Date(),
+			updatedAt: new Date(STORY_NOW),
 		},
 	},
 };

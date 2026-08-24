@@ -4,7 +4,6 @@ import static de.tum.cit.aet.hephaestus.agent.handler.spi.JobMetadataReader.requ
 import static de.tum.cit.aet.hephaestus.agent.handler.spi.JobMetadataReader.requireLong;
 import static de.tum.cit.aet.hephaestus.agent.handler.spi.JobMetadataReader.requireText;
 
-import de.tum.cit.aet.hephaestus.agent.context.ContentSource;
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
 import de.tum.cit.aet.hephaestus.agent.context.EvidenceContribution;
 import de.tum.cit.aet.hephaestus.agent.context.EvidenceLimits;

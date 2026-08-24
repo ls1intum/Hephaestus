@@ -22,7 +22,6 @@ export function MetaRow({ captions = [], badges, className }: MetaRowProps) {
 			{shown.length > 0 && (
 				<span className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
 					{shown.map((caption, index) => (
-						// biome-ignore lint/suspicious/noArrayIndexKey: captions are positional, not identified.
 						<span key={index} className="flex items-center gap-x-2">
 							{index > 0 && (
 								<span aria-hidden className="text-muted-foreground/50">

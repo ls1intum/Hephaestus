@@ -150,7 +150,7 @@ export function PracticeForm(props: PracticeFormProps) {
 			definitionOptions={definitionOptions}
 			cancelAction={cancel}
 			afterFields={reviewResults}
-			evidenceOutcome={props.mode === "edit" ? props.evidenceOutcome : undefined}
+			evidenceOutcome={props.evidenceOutcome}
 			onSubmit={submit}
 		/>
 	);

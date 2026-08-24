@@ -4,7 +4,6 @@ import { AchievementTooltip } from "@/components/achievements/AchievementTooltip
 import {
 	apolloClarity,
 	aresConflict,
-	asUI,
 	hadesSecret,
 	hephaestusInit,
 	poseidonTrident,
@@ -58,7 +57,7 @@ const Trigger = (
  */
 export const CommonUnlocked: Story = {
 	args: {
-		achievement: asUI(hephaestusInit),
+		achievement: hephaestusInit,
 		open: true,
 		children: Trigger,
 	},
@@ -70,7 +69,7 @@ export const CommonUnlocked: Story = {
  */
 export const RareLocked: Story = {
 	args: {
-		achievement: asUI({ ...aresConflict, status: "locked" }),
+		achievement: { ...aresConflict, status: "locked" },
 		open: true,
 		children: Trigger,
 	},
@@ -81,7 +80,7 @@ export const RareLocked: Story = {
  */
 export const EpicAvailable: Story = {
 	args: {
-		achievement: asUI(apolloClarity),
+		achievement: apolloClarity,
 		open: true,
 		children: Trigger,
 	},
@@ -92,7 +91,7 @@ export const EpicAvailable: Story = {
  */
 export const LegendaryUnlocked: Story = {
 	args: {
-		achievement: asUI(poseidonTrident),
+		achievement: poseidonTrident,
 		open: true,
 		children: Trigger,
 	},
@@ -103,7 +102,7 @@ export const LegendaryUnlocked: Story = {
  */
 export const MythicAvailable: Story = {
 	args: {
-		achievement: asUI(zeusThunderbolt),
+		achievement: zeusThunderbolt,
 		open: true,
 		children: Trigger,
 	},
@@ -111,7 +110,7 @@ export const MythicAvailable: Story = {
 
 export const HiddenAchievement: Story = {
 	args: {
-		achievement: asUI(hadesSecret),
+		achievement: hadesSecret,
 		open: true,
 		children: Trigger,
 	},
@@ -119,7 +118,7 @@ export const HiddenAchievement: Story = {
 
 export const LongTextOverflow: Story = {
 	args: {
-		achievement: asUI(prometheusLongName),
+		achievement: prometheusLongName,
 		open: true,
 		children: Trigger,
 	},

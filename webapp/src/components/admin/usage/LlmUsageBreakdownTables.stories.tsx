@@ -11,23 +11,25 @@ import { LlmUsageByDayTable, LlmUsageByJobTypeTable } from "./LlmUsageBreakdownT
 const eur: FxRateInfo = {
 	currencyCode: "EUR",
 	ratePerUsd: 0.88,
-	rateDate: "2026-07-24" as unknown as Date,
+	rateDate: new Date("2026-07-24"),
 	source: "ECB",
 };
 
+const pullRequestReviewRow: LlmUsageByJobType = {
+	jobType: "PULL_REQUEST_REVIEW",
+	events: 128,
+	inputTokens: 4_210_000,
+	outputTokens: 318_000,
+	cacheReadTokens: 1_900_000,
+	cacheWriteTokens: 210_000,
+	totalCalls: 402,
+	instanceTotalCostUsd: 12.4,
+	ownProviderTotalCostUsd: 0,
+	unpricedEventCount: 0,
+};
+
 const jobTypeRows: LlmUsageByJobType[] = [
-	{
-		jobType: "PULL_REQUEST_REVIEW",
-		events: 128,
-		inputTokens: 4_210_000,
-		outputTokens: 318_000,
-		cacheReadTokens: 1_900_000,
-		cacheWriteTokens: 210_000,
-		totalCalls: 402,
-		instanceTotalCostUsd: 12.4,
-		ownProviderTotalCostUsd: 0,
-		unpricedEventCount: 0,
-	},
+	pullRequestReviewRow,
 	{
 		jobType: "MENTOR_TURN",
 		events: 61,
@@ -44,21 +46,21 @@ const jobTypeRows: LlmUsageByJobType[] = [
 
 const dayRows: LlmUsageByDay[] = [
 	{
-		day: "2026-07-20" as unknown as Date,
+		day: new Date("2026-07-20"),
 		events: 42,
 		instanceTotalCostUsd: 4.1,
 		ownProviderTotalCostUsd: 0.9,
 		unpricedEventCount: 0,
 	},
 	{
-		day: "2026-07-21" as unknown as Date,
+		day: new Date("2026-07-21"),
 		events: 77,
 		instanceTotalCostUsd: 6.3,
 		ownProviderTotalCostUsd: 1.25,
 		unpricedEventCount: 2,
 	},
 	{
-		day: "2026-07-22" as unknown as Date,
+		day: new Date("2026-07-22"),
 		events: 70,
 		instanceTotalCostUsd: 2.0,
 		ownProviderTotalCostUsd: 1.0,
@@ -108,7 +110,7 @@ export const ByJobType: Story = {
 };
 
 export const SingleRowHasNoTotals: Story = {
-	args: { report: report({ byJobType: [jobTypeRows[0]] }) },
+	args: { report: report({ byJobType: [pullRequestReviewRow] }) },
 };
 
 export const Loading: Story = {

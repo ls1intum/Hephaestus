@@ -20,7 +20,7 @@ import { LoginProvidersTable } from "@/components/admin/login-providers/LoginPro
 import { PageHeader } from "@/components/core/PageHeader";
 import { PageLayout } from "@/components/core/PageLayout";
 import { Button } from "@/components/ui/button";
-import { filedUnder, usePendingMutationIds } from "@/hooks/use-pending-mutation-ids";
+import { filedUnder, pathString, usePendingMutationIds } from "@/hooks/use-pending-mutation-ids";
 import { instanceAdminHead } from "@/lib/page-title";
 import { problemDetailOf } from "@/lib/problem-detail";
 
@@ -45,7 +45,7 @@ function AdminLoginProvidersPage() {
 	const createMutation = useMutation({
 		...adminCreateLoginProviderMutation(),
 		onSuccess: () => {
-			invalidate();
+			void invalidate();
 			setDialogOpen(false);
 			toast.success("Login provider added");
 		},
@@ -55,7 +55,7 @@ function AdminLoginProvidersPage() {
 	const updateMutation = useMutation({
 		...filedUnder(PROVIDER_WRITE_MUTATION_KEY, adminUpdateLoginProviderMutation()),
 		onSuccess: () => {
-			invalidate();
+			void invalidate();
 			setDialogOpen(false);
 			toast.success("Login provider updated");
 		},
@@ -65,15 +65,14 @@ function AdminLoginProvidersPage() {
 	const deleteMutation = useMutation({
 		...filedUnder(PROVIDER_WRITE_MUTATION_KEY, adminDeleteLoginProviderMutation()),
 		onSuccess: () => {
-			invalidate();
+			void invalidate();
 			toast.success("Login provider deleted");
 		},
 		onError: (error) => toast.error(problemDetailOf(error, "Could not delete the login provider")),
 	});
 
-	const mutatingIds = usePendingMutationIds<{ path: { registrationId: string } }, string>(
-		PROVIDER_WRITE_MUTATION_KEY,
-		(variables) => variables.path.registrationId,
+	const mutatingIds = usePendingMutationIds(PROVIDER_WRITE_MUTATION_KEY, (variables) =>
+		pathString(variables, "registrationId"),
 	);
 
 	const openCreate = () => {
@@ -115,7 +114,7 @@ function AdminLoginProvidersPage() {
 				isLoading={listQuery.isLoading}
 				isError={listQuery.isError}
 				error={listQuery.error}
-				onRetry={() => listQuery.refetch()}
+				onRetry={() => void listQuery.refetch()}
 				mutatingIds={mutatingIds}
 				onEdit={openEdit}
 				onToggleEnabled={handleToggleEnabled}

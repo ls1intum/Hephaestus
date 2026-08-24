@@ -14,6 +14,7 @@ import {
 	SelectValue,
 } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
+import { firstNonBlank } from "@/lib/text";
 import { type ConnectionFormData, connectionSchema } from "./schemas";
 import { useWizard } from "./wizard-context";
 
@@ -22,6 +23,11 @@ export interface GitLabInstanceOption {
 	displayName: string;
 	baseUrl: string;
 }
+
+const CONNECTION_FIELDS = [
+	"serverUrl",
+	"personalAccessToken",
+] as const satisfies readonly (keyof ConnectionFormData)[];
 
 export function ConnectGitLabStep({ instances = [] }: { instances?: GitLabInstanceOption[] }) {
 	const { state, dispatch } = useWizard();
@@ -35,8 +41,9 @@ export function ConnectGitLabStep({ instances = [] }: { instances?: GitLabInstan
 	useEffect(() => {
 		if (!multipleInstances) return;
 		const matches = selectableInstances.some((i) => i.baseUrl === state.serverUrl);
-		if (!matches) {
-			dispatch({ type: "SET_SERVER_URL", value: selectableInstances[0].baseUrl });
+		const [firstInstance] = selectableInstances;
+		if (!matches && firstInstance) {
+			dispatch({ type: "SET_SERVER_URL", value: firstInstance.baseUrl });
 		}
 	}, [multipleInstances, selectableInstances, state.serverUrl, dispatch]);
 	const [showToken, setShowToken] = useState(false);
@@ -49,12 +56,6 @@ export function ConnectGitLabStep({ instances = [] }: { instances?: GitLabInstan
 		onSuccess: (data) => {
 			dispatch({ type: "SET_PREFLIGHT_RESULT", result: data });
 		},
-		onError: (error) => {
-			console.error("GitLab preflight failed:", {
-				serverUrl: state.serverUrl,
-				message: error instanceof Error ? error.message : "Unknown error",
-			});
-		},
 	});
 
 	const handleValidate = () => {
@@ -66,8 +67,10 @@ export function ConnectGitLabStep({ instances = [] }: { instances?: GitLabInstan
 		if (!result.success) {
 			const errors: Partial<Record<keyof ConnectionFormData, string>> = {};
 			for (const issue of result.error.issues) {
-				const key = issue.path[0] as keyof ConnectionFormData;
-				errors[key] = issue.message;
+				const field = CONNECTION_FIELDS.find((candidate) => candidate === issue.path[0]);
+				if (field) {
+					errors[field] = issue.message;
+				}
 			}
 			setFieldErrors(errors);
 			return;
@@ -91,20 +94,22 @@ export function ConnectGitLabStep({ instances = [] }: { instances?: GitLabInstan
 	return (
 		<div className="flex flex-col gap-4">
 			<Field data-invalid={fieldErrors.serverUrl ? "true" : undefined}>
-				<FieldLabel htmlFor="gitlab-server-url">GitLab Instance</FieldLabel>
+				<FieldLabel id="gitlab-server-url-label" htmlFor="gitlab-server-url">
+					GitLab Instance
+				</FieldLabel>
 				{multipleInstances ? (
 					<Select
 						items={selectableInstances.map((instance) => ({
 							value: instance.baseUrl,
 							label: `${instance.displayName} (${instance.baseUrl})`,
 						}))}
-						value={state.serverUrl || selectableInstances[0]?.baseUrl || ""}
+						value={firstNonBlank(state.serverUrl, selectableInstances[0]?.baseUrl) ?? ""}
 						onValueChange={(value) => dispatch({ type: "SET_SERVER_URL", value: value ?? "" })}
 					>
 						<SelectTrigger id="gitlab-server-url">
 							<SelectValue />
 						</SelectTrigger>
-						<SelectContent>
+						<SelectContent aria-labelledby="gitlab-server-url-label">
 							{selectableInstances.map((instance) => (
 								<SelectItem key={instance.registrationId} value={instance.baseUrl}>
 									{instance.displayName} ({instance.baseUrl})
@@ -203,7 +208,7 @@ export function ConnectGitLabStep({ instances = [] }: { instances?: GitLabInstan
 					<OctagonXIcon aria-hidden="true" />
 					<AlertTitle>Validation failed</AlertTitle>
 					<AlertDescription>
-						{state.preflightResult.error ||
+						{firstNonBlank(state.preflightResult.error) ??
 							"The token could not be validated. Check your token and try again."}
 					</AlertDescription>
 				</Alert>

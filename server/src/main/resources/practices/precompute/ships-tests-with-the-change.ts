@@ -9,7 +9,7 @@ const isTest = (p: string) => TEST.test(p);
 const isExcluded = (p: string) =>
 	p.split("/").some((seg) => seg === "node_modules" || seg === ".build" || seg.startsWith("."));
 
-export default async function (
+export default function shipsTestsWithTheChange(
 	repoPath: string,
 	diffFiles: Map<string, DiffFile>,
 	_m: PullRequestMetadata,

@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { expect, fn, screen, userEvent, within } from "storybook/test";
+import { daysAfter, daysBefore } from "@/components/common/story-clock";
 import { OutlineConnectCard } from "./OutlineConnectCard";
 
 /**
@@ -23,16 +24,13 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-const inDays = (days: number) => new Date(Date.now() + days * 24 * 60 * 60 * 1000);
-const daysAgo = (days: number) => new Date(Date.now() - days * 24 * 60 * 60 * 1000);
-
 /** A token Outline accepts, whose key metadata it also lets us read. */
 const healthyToken = {
 	accepted: true,
 	name: "Hephaestus mirror",
 	last4: "9f2c",
-	lastActiveAt: daysAgo(1),
-	expiresAt: inDays(120),
+	lastActiveAt: daysBefore(1),
+	expiresAt: daysAfter(120),
 };
 
 /** Cold start — no prefilled server URL (a prefill would ship a self-host token to Outline Cloud). */
@@ -139,7 +137,7 @@ export const TokenExpiringSoon: Story = {
 	args: {
 		connected: true,
 		connectionLabel: "Acme Wiki",
-		tokenStatus: { ...healthyToken, expiresAt: inDays(5) },
+		tokenStatus: { ...healthyToken, expiresAt: daysAfter(5) },
 	},
 	play: async ({ canvas }) => {
 		canvas.getByText(/this api key expires in [45] days/i);

@@ -63,9 +63,7 @@ describe("AdminSlackNotificationSettings — digest channel combobox", () => {
 		setup([], true);
 
 		screen.getByText(/choose a channel before enabling/i);
-		expect((screen.getByRole("button", { name: /^save$/i }) as HTMLButtonElement).disabled).toBe(
-			true,
-		);
+		expect(screen.getByRole<HTMLButtonElement>("button", { name: /^save$/i }).disabled).toBe(true);
 	});
 
 	it("does not let admins pick a digest channel before the bot is a member", () => {
@@ -88,7 +86,7 @@ describe("AdminSlackNotificationSettings — digest channel combobox", () => {
 		});
 
 		expect(
-			(screen.getByRole("button", { name: /send test message/i }) as HTMLButtonElement).disabled,
+			screen.getByRole<HTMLButtonElement>("button", { name: /send test message/i }).disabled,
 		).toBe(false);
 	});
 });

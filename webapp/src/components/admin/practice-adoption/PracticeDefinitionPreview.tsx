@@ -25,7 +25,7 @@ export interface PracticeDefinitionPreviewProps {
  * able to read its rule is worse.
  */
 export function PracticeDefinitionPreview({ definition, options }: PracticeDefinitionPreviewProps) {
-	const workType = options.workTypes?.find(
+	const workType = options.workTypes.find(
 		(candidate) => candidate.artifactKind === definition.artifactKind,
 	);
 

@@ -50,7 +50,7 @@ function IntegrationsOverview() {
 				<QueryErrorAlert
 					error={catalogQuery.error}
 					title="We couldn't load the integration catalog"
-					onRetry={() => catalogQuery.refetch()}
+					onRetry={() => void catalogQuery.refetch()}
 				/>
 			) : (
 				<div className="grid items-stretch gap-4 sm:grid-cols-2">
@@ -87,7 +87,7 @@ function IntegrationOverviewCardContainer({
 		...triggerSyncJobMutation(),
 		onSuccess: () => {
 			if (connectionId == null) return;
-			queryClient.invalidateQueries({
+			void queryClient.invalidateQueries({
 				queryKey: getConnectionSyncStatusQueryKey({ path: { workspaceSlug, connectionId } }),
 			});
 			toast.success(`${entry.displayName} sync started`);
@@ -107,7 +107,7 @@ function IntegrationOverviewCardContainer({
 			isStatusLoading={statusQuery.isLoading}
 			isStatusError={statusQuery.isError}
 			statusError={statusQuery.error}
-			onRetryStatus={() => statusQuery.refetch()}
+			onRetryStatus={() => void statusQuery.refetch()}
 			isTriggering={triggerSync.isPending}
 			onSync={() => {
 				if (connectionId == null) return;

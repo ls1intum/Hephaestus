@@ -12,6 +12,7 @@ import {
 	type VisibilityState,
 } from "@tanstack/react-table";
 import { ArrowUpDown, ChevronDown, RefreshCw, Search, Sparkles, Users } from "lucide-react";
+// oxlint-disable-next-line no-restricted-imports -- The compiler skips this component (see `useReactTable` below), so the memo on `columns` is written by hand.
 import { useMemo, useState } from "react";
 import { TablePagination } from "@/components/common/TablePagination";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -63,6 +64,8 @@ export function AdminAchievementsTable({
 	const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
 	const [globalFilter, setGlobalFilter] = useState("");
 
+	// TanStack Table caches its column model — and every row model derived from it — against the
+	// identity of this array, so a fresh one each render rebuilds all of them.
 	const columns = useMemo<ColumnDef<ExtendedUserTeams>[]>(
 		() => [
 			{
@@ -143,11 +146,12 @@ export function AdminAchievementsTable({
 		[onRecalculate, recalculatingUsers, workspaceSlug],
 	);
 
-	const pageSizeItems = useMemo(
-		() => [10, 20, 30, 40, 50].map((size) => ({ value: `${size}`, label: `${size}` })),
-		[],
-	);
+	const pageSizeItems = [10, 20, 30, 40, 50].map((size) => ({
+		value: `${size}`,
+		label: `${size}`,
+	}));
 
+	// oxlint-disable-next-line react/incompatible-library -- TanStack Table is a deliberate dependency; the compiler bail-out it causes is why `columns` above is memoised by hand.
 	const table = useReactTable({
 		data: users,
 		columns,
@@ -210,7 +214,7 @@ export function AdminAchievementsTable({
 												key={column.id}
 												className="capitalize"
 												checked={column.getIsVisible()}
-												onCheckedChange={(value) => column.toggleVisibility(!!value)}
+												onCheckedChange={(value) => column.toggleVisibility(value)}
 											>
 												{column.id}
 											</DropdownMenuCheckboxItem>
@@ -249,7 +253,7 @@ export function AdminAchievementsTable({
 									</div>
 								</TableCell>
 							</TableRow>
-						) : table.getRowModel().rows?.length > 0 ? (
+						) : table.getRowModel().rows.length > 0 ? (
 							table.getRowModel().rows.map((row) => (
 								<TableRow
 									key={row.id}
@@ -292,7 +296,11 @@ export function AdminAchievementsTable({
 				</div>
 				<div className="flex flex-col sm:flex-row items-center space-y-4 sm:space-y-0 sm:space-x-6 lg:space-x-8 order-1 sm:order-2">
 					<div className="flex items-center space-x-2">
-						<Label htmlFor="achievement-rows-per-page" className="whitespace-nowrap">
+						<Label
+							id="achievement-rows-per-page-label"
+							htmlFor="achievement-rows-per-page"
+							className="whitespace-nowrap"
+						>
 							Rows per page
 						</Label>
 						<Select
@@ -305,7 +313,7 @@ export function AdminAchievementsTable({
 							<SelectTrigger id="achievement-rows-per-page" className="h-8 w-17.5">
 								<SelectValue />
 							</SelectTrigger>
-							<SelectContent side="top">
+							<SelectContent side="top" aria-labelledby="achievement-rows-per-page-label">
 								{[10, 20, 30, 40, 50].map((pageSize) => (
 									<SelectItem key={pageSize} value={`${pageSize}`}>
 										{pageSize}

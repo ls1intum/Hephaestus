@@ -43,14 +43,17 @@ export function FilterToggle<TValue extends string>({
 		<div className={cn("min-w-0", className)}>
 			{/* `items` is what lets `SelectValue` render the chosen label without a render prop. */}
 			<Select
-				items={options.map(({ value: optionValue, label }) => ({ value: optionValue, label }))}
+				items={options.map(({ value: optionValue, label: optionLabel }) => ({
+					value: optionValue,
+					label: optionLabel,
+				}))}
 				value={value}
-				onValueChange={(next) => next && onChange(next as TValue)}
+				onValueChange={(next) => next && onChange(next)}
 			>
 				<SelectTrigger className="w-full sm:hidden" aria-label={label}>
 					<SelectValue />
 				</SelectTrigger>
-				<SelectContent>
+				<SelectContent aria-label={label}>
 					{options.map((option) => (
 						<SelectItem key={option.value} value={option.value}>
 							{option.label}
@@ -63,7 +66,7 @@ export function FilterToggle<TValue extends string>({
 				value={[value]}
 				onValueChange={(next) => {
 					const chosen = next[0];
-					if (chosen) onChange(chosen as TValue);
+					if (chosen) onChange(chosen);
 				}}
 				variant="outline"
 				size="sm"

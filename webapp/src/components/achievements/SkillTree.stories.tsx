@@ -27,7 +27,7 @@ const meta = {
 			</ReactFlowProvider>
 		),
 	],
-} as Meta<typeof SkillTree>;
+} satisfies Meta<typeof SkillTree>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
@@ -78,13 +78,17 @@ export const FullSkillTree: Story = {
  * Helper story to visualize the raw data being generated for React Flow.
  */
 export const GeneratedDataPreview: Story = {
-	render: () => (
+	args: {
+		user: mockUser,
+		achievements: mythicAchievementsUI,
+	},
+	render: ({ user, achievements }) => (
 		<div className="p-8 font-mono bg-background text-muted-foreground min-h-screen overflow-auto">
 			<h4 className="text-xl font-bold mb-4 text-foreground">
 				Skill Tree Generation Data (Raw Output)
 			</h4>
 			<pre className="text-xs">
-				{JSON.stringify(generateSkillTreeData(mockUser, mythicAchievementsUI), null, 2)}
+				{JSON.stringify(generateSkillTreeData(user, achievements), null, 2)}
 			</pre>
 		</div>
 	),

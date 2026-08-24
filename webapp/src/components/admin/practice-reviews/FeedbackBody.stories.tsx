@@ -57,9 +57,9 @@ export const SwitchToSource: Story = {
 		await expect(rendered).toHaveAttribute("aria-selected", "false");
 		// The view left behind goes: one panel, and no heading from the Markdown it was showing.
 		// Awaited because the primitive keeps the closing panel until its transition finishes.
-		await waitFor(() => {
-			expect(canvas.queryByRole("heading", { level: 4 })).not.toBeInTheDocument();
-			expect(canvas.getAllByRole("tabpanel")).toHaveLength(1);
+		await waitFor(async () => {
+			await expect(canvas.queryByRole("heading", { level: 4 })).not.toBeInTheDocument();
+			await expect(canvas.getAllByRole("tabpanel")).toHaveLength(1);
 		});
 
 		// The arrow keys walk the views and Enter opens one, which is what a tab list promises a

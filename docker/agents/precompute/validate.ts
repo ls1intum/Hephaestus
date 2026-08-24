@@ -33,7 +33,7 @@ if (!values.repo) {
 	process.exit(2);
 }
 
-const scriptsDir = values.scripts ?? DEFAULT_SCRIPTS_DIR;
+const scriptsDir = values.scripts;
 
 const work = `/tmp/pc-validate.${process.pid}`;
 await rm(work, { recursive: true, force: true });

@@ -1,10 +1,11 @@
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { delay, HttpResponse, http } from "msw";
+import { delay, HttpResponse, http, type PathParams } from "msw";
 import { describe, expect, it, vi } from "vitest";
 import type { CuratedPracticeRequest } from "@/api/types.gen";
 import {
 	mockAuthorDeclaredEvidenceValidation,
+	mockConversationWorkType,
 	mockPracticeDefinitionOptions,
 	mockPullRequestBinding,
 	mockPullRequestPolicy,
@@ -13,6 +14,10 @@ import { server } from "@/mocks/server";
 import { ROUTE_RENDER_WAIT, renderRouteAt } from "@/test/router-harness";
 
 vi.setConfig({ testTimeout: 20_000 });
+
+function precedes(earlier: Node, later: Node) {
+	return Boolean(earlier.compareDocumentPosition(later) & Node.DOCUMENT_POSITION_FOLLOWING);
+}
 
 const status = (overrides: Record<string, unknown> = {}) => ({
 	etag: "tag-1",
@@ -84,7 +89,7 @@ describe("instance catalog routes", () => {
 		await screen.findByText("1 Hephaestus change needs review", undefined, ROUTE_RENDER_WAIT);
 		screen.getByText("1 update would change review rules");
 		fireEvent.click(screen.getByRole("button", { name: "Review changes" }));
-		expect(await screen.findByRole("button", { name: "Show all entries" })).toBeTruthy();
+		await screen.findByRole("button", { name: "Show all entries" });
 	});
 
 	it("opens the practice editor from the catalog", async () => {
@@ -158,7 +163,7 @@ describe("instance catalog routes", () => {
 		fireEvent.click(await screen.findByRole("menuitem", { name: "Move down" }));
 
 		await waitFor(() => expect(ifMatch).toBe('"structure-1"'));
-		expect(body).toEqual({ orderedSlugs: ["delivery", "packaging"] });
+		expect(body).toStrictEqual({ orderedSlugs: ["delivery", "packaging"] });
 	});
 
 	it("restores the Hephaestus order with the catalog tag", async () => {
@@ -208,9 +213,7 @@ describe("instance catalog routes", () => {
 			ROUTE_RENDER_WAIT,
 		);
 		const deliveryHeading = screen.getByText("Delivery");
-		expect(
-			packagingHeading.compareDocumentPosition(deliveryHeading) & Node.DOCUMENT_POSITION_FOLLOWING,
-		).toBeTruthy();
+		expect(precedes(packagingHeading, deliveryHeading)).toBe(true);
 		const trigger = await screen.findByRole(
 			"button",
 			{ name: "More actions for Packaging work" },
@@ -219,10 +222,7 @@ describe("instance catalog routes", () => {
 		fireEvent.click(trigger);
 		fireEvent.click(await screen.findByRole("menuitem", { name: "Move down" }));
 		await waitFor(() =>
-			expect(
-				screen.getByText("Delivery").compareDocumentPosition(screen.getByText("Packaging work")) &
-					Node.DOCUMENT_POSITION_FOLLOWING,
-			).toBeTruthy(),
+			expect(precedes(screen.getByText("Delivery"), screen.getByText("Packaging work"))).toBe(true),
 		);
 
 		await screen.findByText(
@@ -230,10 +230,7 @@ describe("instance catalog routes", () => {
 			undefined,
 			ROUTE_RENDER_WAIT,
 		);
-		expect(
-			screen.getByText("Packaging work").compareDocumentPosition(screen.getByText("Delivery")) &
-				Node.DOCUMENT_POSITION_FOLLOWING,
-		).toBeTruthy();
+		expect(precedes(screen.getByText("Packaging work"), screen.getByText("Delivery"))).toBe(true);
 		await waitFor(() => expect(document.activeElement).toBe(trigger));
 	});
 
@@ -406,7 +403,7 @@ describe("instance catalog routes", () => {
 		fireEvent.click(screen.getByRole("button", { name: "Stop offering" }));
 
 		await waitFor(() => expect(ifMatch).toBe('"tag-1"'));
-		expect(body).toEqual({ status: "RETIRED" });
+		expect(body).toStrictEqual({ status: "RETIRED" });
 	});
 
 	it("uses the status response tag when an inactive editor is reopened", async () => {
@@ -592,24 +589,29 @@ describe("instance catalog routes", () => {
 
 	it("preserves the draft and refreshes the tag after an edit conflict", async () => {
 		mockCatalog();
-		let latest = false;
-		let updates = 0;
-		let retriedIfMatch: string | null = null;
+		let currentEtag = "tag-1";
+		let lastIfMatch: string | null = null;
+		const PRACTICE_PATH = "*/admin/practice-catalog/practices/:slug";
 		server.use(
-			http.get("*/admin/practice-catalog/practices/:slug", () =>
+			http.get(PRACTICE_PATH, () =>
 				HttpResponse.json({
 					slug: "describe-what-and-why",
 					definition: practiceDefinition,
-					status: status({ etag: latest ? "tag-2" : "tag-1" }),
+					status: status({ etag: currentEtag }),
 				}),
 			),
-			http.put("*/admin/practice-catalog/practices/:slug", ({ request }) => {
-				updates++;
-				if (updates === 1) {
-					latest = true;
+			http.put(
+				PRACTICE_PATH,
+				({ request }) => {
+					lastIfMatch = request.headers.get("if-match");
+					// Somebody else's write landed first, and it is their tag the reload has to pick up.
+					currentEtag = "tag-2";
 					return HttpResponse.json({ status: 412, title: "Stale" }, { status: 412 });
-				}
-				retriedIfMatch = request.headers.get("if-match");
+				},
+				{ once: true },
+			),
+			http.put(PRACTICE_PATH, ({ request }) => {
+				lastIfMatch = request.headers.get("if-match");
 				return HttpResponse.json({
 					slug: "describe-what-and-why",
 					definition: { ...practiceDefinition, name: "My unsaved draft" },
@@ -626,26 +628,28 @@ describe("instance catalog routes", () => {
 
 		fireEvent.click(screen.getByRole("button", { name: "Continue with my draft" }));
 		await waitFor(() =>
-			expect((screen.getByRole("textbox", { name: /Name/ }) as HTMLInputElement).value).toBe(
+			expect(screen.getByRole<HTMLInputElement>("textbox", { name: /Name/ }).value).toBe(
 				"My unsaved draft",
 			),
 		);
 		fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
 
-		await waitFor(() => expect(retriedIfMatch).toBe('"tag-2"'));
+		await waitFor(() => expect(lastIfMatch).toBe('"tag-2"'));
 	});
 
 	it.each([
-		["unchanged", false, mockPullRequestPolicy, mockPullRequestBinding.signals],
+		["unchanged", async () => {}, mockPullRequestPolicy, mockPullRequestBinding.signals],
 		[
 			"changed",
-			true,
-			mockPracticeDefinitionOptions.workTypes[2].recommendedPolicy,
+			async () => {
+				await userEvent.setup().click(screen.getByRole("radio", { name: /Conversation/ }));
+			},
+			mockConversationWorkType.recommendedPolicy,
 			["chat.conversation_thread.settled"],
 		],
 	] as const)(
 		"%s artifact sends the visible review rule",
-		async (_label, changeArtifact, expectedPolicy, expectedSignals) => {
+		async (_label, chooseArtifact, expectedPolicy, expectedSignals) => {
 			mockCatalog();
 			let requestBody: CuratedPracticeRequest | undefined;
 			server.use(
@@ -656,29 +660,29 @@ describe("instance catalog routes", () => {
 						status: status(),
 					}),
 				),
-				http.put("*/admin/practice-catalog/practices/:slug", async ({ request }) => {
-					requestBody = (await request.json()) as CuratedPracticeRequest;
-					return HttpResponse.json({
-						slug: "describe-what-and-why",
-						definition: practiceDefinition,
-						status: status({ etag: "tag-2" }),
-					});
-				}),
+				http.put<PathParams, CuratedPracticeRequest>(
+					"*/admin/practice-catalog/practices/:slug",
+					async ({ request }) => {
+						requestBody = await request.json();
+						return HttpResponse.json({
+							slug: "describe-what-and-why",
+							definition: practiceDefinition,
+							status: status({ etag: "tag-2" }),
+						});
+					},
+				),
 			);
 			renderRouteAt("/admin/catalog/practices/describe-what-and-why");
 
 			await screen.findByRole("button", { name: "Save changes" }, ROUTE_RENDER_WAIT);
-			if (changeArtifact) {
-				const user = userEvent.setup();
-				await user.click(screen.getByRole("radio", { name: /Conversation/ }));
-			}
+			await chooseArtifact();
 			fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
 
 			await waitFor(() => expect(requestBody).toBeDefined());
-			expect(requestBody?.automatedReviewPolicy).toEqual(expectedPolicy);
+			expect(requestBody?.automatedReviewPolicy).toStrictEqual(expectedPolicy);
 			// The kind of work is read off the signals, so switching it has to rewrite the occasions
 			// rather than send a kind alongside bindings that still name the old one.
-			expect(requestBody?.bindings.map((binding) => binding.signals)).toEqual([
+			expect(requestBody?.bindings.map((binding) => binding.signals)).toStrictEqual([
 				[...expectedSignals],
 			]);
 		},

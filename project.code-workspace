@@ -88,6 +88,7 @@
 	"extensions": {
 		"recommendations": [
 			"biomejs.biome",
+			"oxc.oxc-vscode",
 			"esbenp.prettier-vscode",
 			"editorconfig.editorconfig",
 			"github.copilot",

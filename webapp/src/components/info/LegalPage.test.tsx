@@ -1,5 +1,5 @@
 import { render, waitFor } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { assert, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/environment", () => ({
 	default: { legal: { profile: "" } },
@@ -12,6 +12,17 @@ import {
 	type resolveLegalContent,
 } from "@/lib/legal";
 import { LegalPage } from "./LegalPage";
+
+declare global {
+	interface Window {
+		/** Set by the `<script>` in the hostile fixture, if the sanitiser ever lets one run. */
+		__xss_executed__?: true;
+		/** Set from inside the fixture's `<iframe srcdoc>`, if the frame ever renders. */
+		__xss_frame__?: 1;
+		/** Set by the fixture image's `onerror`, if an event handler ever survives. */
+		__xss_onerror__?: 1;
+	}
+}
 
 // Operator-supplied Markdown is untrusted. These fixtures inject every
 // attack primitive we promised to strip: raw HTML, javascript: hrefs,
@@ -62,7 +73,7 @@ describe("LegalPage — XSS guardrail", () => {
 
 		const article = await waitFor(() => {
 			const el = container.querySelector("article");
-			if (!el) throw new Error("article not rendered yet");
+			assert(el, "article not rendered yet");
 			return el;
 		});
 
@@ -77,15 +88,16 @@ describe("LegalPage — XSS guardrail", () => {
 
 		const anchors = Array.from(article.querySelectorAll("a"));
 		expect(anchors.length).toBeGreaterThan(0);
-		for (const a of anchors) {
-			const href = a.getAttribute("href") ?? "";
-			expect({ href, safe: isSafeLegalHref(href) }).toEqual({ href, safe: true });
+		// The raw attribute, with no `?? ""` stand-in: a link with no href at all has to fail too.
+		for (const anchor of anchors) {
+			const href = anchor.getAttribute("href");
+			expect({ href, safe: isSafeLegalHref(href) }).toStrictEqual({ href, safe: true });
 		}
 
 		const images = Array.from(article.querySelectorAll("img"));
-		for (const img of images) {
-			const src = img.getAttribute("src") ?? "";
-			expect({ src, safe: isSafeLegalImageSrc(src) }).toEqual({ src, safe: true });
+		for (const image of images) {
+			const src = image.getAttribute("src");
+			expect({ src, safe: isSafeLegalImageSrc(src) }).toStrictEqual({ src, safe: true });
 		}
 
 		// Markdown titles (`[x](u "title")`, `![x](u "title")`) are a UI-spoof
@@ -94,9 +106,9 @@ describe("LegalPage — XSS guardrail", () => {
 			expect(el.hasAttribute("title")).toBe(false);
 		}
 
-		expect((window as unknown as { __xss_executed__?: true }).__xss_executed__).toBeUndefined();
-		expect((window as unknown as { __xss_frame__?: true }).__xss_frame__).toBeUndefined();
-		expect((window as unknown as { __xss_onerror__?: true }).__xss_onerror__).toBeUndefined();
+		expect(window.__xss_executed__).toBeUndefined();
+		expect(window.__xss_frame__).toBeUndefined();
+		expect(window.__xss_onerror__).toBeUndefined();
 	});
 
 	it("external links get noopener/noreferrer + target=_blank", async () => {
@@ -109,10 +121,12 @@ describe("LegalPage — XSS guardrail", () => {
 		);
 		const article = await waitFor(() => {
 			const el = container.querySelector("article");
-			if (!el) throw new Error("not rendered");
+			assert(el, "article not rendered");
 			return el;
 		});
 		const [ext, int] = Array.from(article.querySelectorAll("a"));
+		assert(ext);
+		assert(int);
 		expect(ext.getAttribute("target")).toBe("_blank");
 		expect(ext.getAttribute("rel")).toBe("noopener noreferrer");
 		expect(int.getAttribute("target")).toBeNull();
@@ -126,10 +140,13 @@ describe("LegalPage — XSS guardrail", () => {
 			source: "disclaimer",
 			profile: "",
 		});
-		const { findByTestId } = render(
+		const { findByRole } = render(
 			<LegalPage page="imprint" title={LEGAL_PAGE_TITLES.imprint} resolver={resolver} />,
 		);
-		await findByTestId("legal-disclaimer-banner");
+		// Asserted on the copy: a bare "an alert rendered" passes just as happily on the "unable to
+		// load" alert, which says the opposite about the deployment.
+		const banner = await findByRole("alert");
+		expect(banner.textContent).toMatch(/has not been configured with a legal profile/i);
 		expect(warn).toHaveBeenCalled();
 		warn.mockRestore();
 	});

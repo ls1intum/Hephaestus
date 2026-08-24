@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.integration.core.sync;
 
 import java.io.Serial;
 import java.util.Map;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Thrown for a genuine state conflict that should surface as {@code 409 Conflict} — a manual sync
@@ -29,7 +30,11 @@ public class SyncStateConflictException extends RuntimeException {
     }
 
     public SyncStateConflictException(String message, Map<String, Object> properties) {
-        super(message);
+        this(message, properties, null);
+    }
+
+    public SyncStateConflictException(String message, Map<String, Object> properties, @Nullable Throwable cause) {
+        super(message, cause);
         this.properties = Map.copyOf(properties);
     }
 

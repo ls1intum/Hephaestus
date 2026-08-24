@@ -78,16 +78,21 @@ function AreaDetailsForm({
 	const [icon, setIcon] = useState<string | null>(area?.icon ?? null);
 	const [color, setColor] = useState<string | null>(area?.color ?? null);
 	const trimmed = name.trim();
+	// Matching the name proves there is an area to compare the rest against.
 	const unchanged =
-		trimmed === area?.name && icon === (area?.icon ?? null) && color === (area?.color ?? null);
+		trimmed === area?.name && icon === (area.icon ?? null) && color === (area.color ?? null);
+
+	const saveDetails = async () => {
+		// Re-submitting untouched details is a deliberate "never mind".
+		if (unchanged) return onOpenChange(false);
+		if (await onSubmit({ name: trimmed, icon, color })) onOpenChange(false);
+	};
 
 	return (
 		<DialogForm
-			onSubmit={async (event) => {
+			onSubmit={(event) => {
 				event.preventDefault();
-				// Re-submitting untouched details is a deliberate "never mind".
-				if (unchanged) return onOpenChange(false);
-				if (await onSubmit({ name: trimmed, icon, color })) onOpenChange(false);
+				void saveDetails();
 			}}
 		>
 			<DialogHeader>
@@ -120,6 +125,7 @@ function AreaDetailsForm({
 								autoComplete="off"
 								disabled={pending}
 								aria-describedby={helpId}
+								// oxlint-disable-next-line jsx-a11y/no-autofocus -- The picker above comes first in the DOM but seeds itself from the name, so a dialog that opened onto it would put focus on the one control with nothing to do yet. The name is also the only required field.
 								autoFocus
 							/>
 						</div>

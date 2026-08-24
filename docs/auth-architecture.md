@@ -6,7 +6,7 @@ How Hephaestus authenticates users after the Keycloak removal (ADR 0017). Compan
 
 ## One picture
 
-```
+```text
  Browser                          Hephaestus (Spring Boot 4 / Security 7)            Postgres / NATS
  ───────                          ──────────────────────────────────────            ───────────────
                                                                                     
@@ -115,5 +115,5 @@ Spring Security — integration may not reach into `core.auth.provider`). The in
 `GitProviderRegistry` SPI) and the reusable `IssuerDiscoveryProbe`; `ImpersonationGuard` lives in
 `core.security`.
 
-Boundaries: `workspace` / `integration.scm` / `notification` depend on `core.auth` (read model
-+ events), never the reverse. ArchUnit forbids any `org.keycloak.*` import.
+Boundaries: `workspace` / `integration.scm` / `notification` depend on `core.auth` (read model +
+events), never the reverse. ArchUnit forbids any `org.keycloak.*` import.

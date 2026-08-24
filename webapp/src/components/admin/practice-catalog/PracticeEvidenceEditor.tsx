@@ -45,12 +45,14 @@ const EVIDENCE_ROLE_OPTIONS = [
 	// majority would hide the few that are on.
 	{ value: "NOT_USED", label: "Off", selected: "bg-muted text-foreground hover:bg-muted" },
 ] satisfies Array<{
-	value: Exclude<EvidenceRole, "EXHAUSTIVE">;
+	value: SegmentedRole;
 	label: string;
 	selected: string;
 }>;
 
-function selectedRole(role: EvidenceRole): string {
+type SegmentedRole = Exclude<EvidenceRole, "EXHAUSTIVE">;
+
+function selectedRole(role: EvidenceRole): SegmentedRole {
 	return role === "EXHAUSTIVE" ? "REQUIRED" : role;
 }
 
@@ -232,9 +234,7 @@ function SourceRow({ source, role, idPrefix, disabled, onRoleChange }: SourceRow
 				disabled={disabled}
 				aria-label={`How ${source.displayName} is used`}
 				value={selectedRole(role)}
-				onValueChange={(next) => {
-					if (next) onRoleChange(next as EvidenceRole);
-				}}
+				onValueChange={(next) => onRoleChange(next)}
 			>
 				{EVIDENCE_ROLE_OPTIONS.map((option) => (
 					<label
@@ -293,7 +293,7 @@ function AbsenceClaim({ source, role, controlId, disabled, onRoleChange }: Absen
 				id={checkboxId}
 				disabled={disabled}
 				checked={claimed}
-				onCheckedChange={(checked) => onRoleChange(checked === true ? "EXHAUSTIVE" : "REQUIRED")}
+				onCheckedChange={(checked) => onRoleChange(checked ? "EXHAUSTIVE" : "REQUIRED")}
 				aria-describedby={scopeId}
 			/>
 			{/* Label and description are siblings, never nested: a `<label>` takes phrasing content only,

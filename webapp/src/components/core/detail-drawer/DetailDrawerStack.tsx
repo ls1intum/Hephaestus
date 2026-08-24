@@ -1,5 +1,4 @@
-import type { ReactNode } from "react";
-import { useLayoutEffect, useState } from "react";
+import { type ReactNode, useLayoutEffect, useState } from "react";
 import { Drawer, DrawerContent } from "@/components/ui/drawer";
 import { type DetailStackEntry, detailStackKey } from "./detail-stack";
 
@@ -138,6 +137,7 @@ function DetailDrawerLevelView<TKind extends string>({
  */
 function useArrived(): boolean {
 	const [arrived, setArrived] = useState(false);
+	// oxlint-disable-next-line react/set-state-in-effect -- The extra render is the point: the closed frame has to be committed before the level opens, which is the only way Base UI runs its enter transition.
 	useLayoutEffect(() => setArrived(true), []);
 	return arrived;
 }

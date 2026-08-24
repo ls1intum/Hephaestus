@@ -1,11 +1,13 @@
 import type { Meta, StoryObj } from "@storybook/react";
+import type * as React from "react";
 import { useState } from "react";
 import { fn } from "storybook/test";
+import { STORY_NOW } from "@/components/common/story-clock";
 import { DEFAULT_SCHEDULE, formatDateRangeForApi, getDateRangeForPreset } from "@/lib/timeframe";
 import { TimeframeFilter } from "./TimeframeFilter";
 
 // Calculate default dates using the shared timeframe utilities
-const defaultRange = getDateRangeForPreset("this-week", DEFAULT_SCHEDULE);
+const defaultRange = getDateRangeForPreset(new Date(STORY_NOW), "this-week", DEFAULT_SCHEDULE);
 const { after: defaultAfter, before: defaultBefore } = formatDateRangeForApi(defaultRange);
 
 /**
@@ -131,7 +133,7 @@ export const ThisWeekSelected: Story = {
  */
 export const LastWeekSelected: Story = {
 	args: (() => {
-		const range = getDateRangeForPreset("last-week", DEFAULT_SCHEDULE);
+		const range = getDateRangeForPreset(new Date(STORY_NOW), "last-week", DEFAULT_SCHEDULE);
 		const { after, before } = formatDateRangeForApi(range);
 		return {
 			initialAfterDate: after,
@@ -178,42 +180,42 @@ export const OpenEndedMode: Story = {
 	},
 };
 
-/**
- * Interactive stateful story to test the component behavior.
- */
-export const Interactive: Story = {
-	render: (props) => {
-		const [afterDate, setAfterDate] = useState<string | undefined>(props.initialAfterDate);
-		const [beforeDate, setBeforeDate] = useState<string | undefined>(props.initialBeforeDate);
-		const [timeframe, setTimeframe] = useState<string | undefined>();
+function InteractiveHarness(props: React.ComponentProps<typeof TimeframeFilter>) {
+	const [afterDate, setAfterDate] = useState<string | undefined>(props.initialAfterDate);
+	const [beforeDate, setBeforeDate] = useState<string | undefined>(props.initialBeforeDate);
+	const [timeframe, setTimeframe] = useState<string | undefined>();
 
-		return (
-			<div className="flex flex-col gap-4 w-64">
-				<TimeframeFilter
-					{...props}
-					initialAfterDate={afterDate}
-					initialBeforeDate={beforeDate}
-					onTimeframeChange={(after, before, tf) => {
-						setAfterDate(after);
-						setBeforeDate(before);
-						setTimeframe(tf);
-						props.onTimeframeChange?.(after, before, tf);
-					}}
-				/>
-				<div className="text-sm text-muted-foreground font-mono bg-muted p-3 rounded-md">
-					<div>
-						<strong>timeframe:</strong> {timeframe ?? "undefined"}
-					</div>
-					<div>
-						<strong>after:</strong> {afterDate ?? "undefined"}
-					</div>
-					<div>
-						<strong>before:</strong> {beforeDate ?? "undefined"}
-					</div>
+	return (
+		<div className="flex flex-col gap-4 w-64">
+			<TimeframeFilter
+				{...props}
+				initialAfterDate={afterDate}
+				initialBeforeDate={beforeDate}
+				onTimeframeChange={(after, before, tf) => {
+					setAfterDate(after);
+					setBeforeDate(before);
+					setTimeframe(tf);
+					props.onTimeframeChange?.(after, before, tf);
+				}}
+			/>
+			<div className="text-sm text-muted-foreground font-mono bg-muted p-3 rounded-md">
+				<div>
+					<strong>timeframe:</strong> {timeframe ?? "undefined"}
+				</div>
+				<div>
+					<strong>after:</strong> {afterDate ?? "undefined"}
+				</div>
+				<div>
+					<strong>before:</strong> {beforeDate ?? "undefined"}
 				</div>
 			</div>
-		);
-	},
+		</div>
+	);
+}
+
+/** Driven by local state, so picking a preset feeds the dates back in the way a page does. */
+export const Interactive: Story = {
+	render: (props) => <InteractiveHarness {...props} />,
 	args: {
 		leaderboardSchedule: {
 			day: 1,

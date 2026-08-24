@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { addDays, addHours, subDays } from "date-fns";
+import { daysAfter, daysBefore, minutesAfter, STORY_NOW } from "@/components/common/story-clock";
 import { LeaderboardOverview } from "./LeaderboardOverview";
 
 /**
@@ -108,7 +108,7 @@ export const Default: Story = {
 	args: {
 		leaderboardEntry: mockLeaderboardEntry,
 		leaguePoints: 750,
-		leaderboardEnd: new Date().toISOString(),
+		leaderboardEnd: new Date(STORY_NOW).toISOString(),
 		leaguePointsChange: 25,
 	},
 };
@@ -120,7 +120,7 @@ export const WithFutureEnd: Story = {
 	args: {
 		leaderboardEntry: mockLeaderboardEntry,
 		leaguePoints: 750,
-		leaderboardEnd: addDays(new Date(), 5).toISOString(),
+		leaderboardEnd: daysAfter(5).toISOString(),
 		leaguePointsChange: 25,
 	},
 };
@@ -133,7 +133,7 @@ export const WithEndingSoon: Story = {
 	args: {
 		leaderboardEntry: mockLeaderboardEntry,
 		leaguePoints: 750,
-		leaderboardEnd: addHours(new Date(), 10).toISOString(),
+		leaderboardEnd: minutesAfter(10 * 60).toISOString(),
 		leaguePointsChange: 25,
 	},
 };
@@ -145,7 +145,7 @@ export const WithNegativeChange: Story = {
 	args: {
 		leaderboardEntry: mockLeaderboardEntry,
 		leaguePoints: 720,
-		leaderboardEnd: addDays(new Date(), 3).toISOString(),
+		leaderboardEnd: daysAfter(3).toISOString(),
 		leaguePointsChange: -30,
 	},
 };
@@ -154,7 +154,7 @@ export const WithPastEnd: Story = {
 	args: {
 		leaderboardEntry: mockLeaderboardEntry,
 		leaguePoints: 750,
-		leaderboardEnd: subDays(new Date(), 1).toISOString(),
+		leaderboardEnd: daysBefore(1).toISOString(),
 		leaguePointsChange: -10,
 	},
 };
@@ -163,7 +163,7 @@ export const WithNegativePointsChange: Story = {
 	args: {
 		leaderboardEntry: mockLeaderboardEntry,
 		leaguePoints: 750,
-		leaderboardEnd: addDays(new Date(), 2).toISOString(),
+		leaderboardEnd: daysAfter(2).toISOString(),
 		leaguePointsChange: -15,
 	},
 };
@@ -172,7 +172,7 @@ export const WithNoPointsChange: Story = {
 	args: {
 		leaderboardEntry: mockLeaderboardEntry,
 		leaguePoints: 750,
-		leaderboardEnd: addDays(new Date(), 2).toISOString(),
+		leaderboardEnd: daysAfter(2).toISOString(),
 		leaguePointsChange: 0,
 	},
 };

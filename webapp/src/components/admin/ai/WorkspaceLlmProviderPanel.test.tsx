@@ -70,9 +70,9 @@ describe("WorkspaceLlmProviderPanel", () => {
 		);
 		renderPanel();
 
-		expect(await screen.findByText("OpenAI production")).toBeTruthy();
+		await screen.findByText("OpenAI production");
 		screen.getByText("Local GPU");
-		expect(await screen.findByText("GPT shared endpoint")).toBeTruthy();
+		await screen.findByText("GPT shared endpoint");
 		screen.getByText("GPU coder");
 	});
 
@@ -104,15 +104,15 @@ describe("WorkspaceLlmProviderPanel", () => {
 		);
 		fireEvent.click(within(gpuCard).getByRole("button", { name: "Test connection to Local GPU" }));
 
-		expect(await within(gpuCard).findByText(/1 model available/)).toBeTruthy();
+		await within(gpuCard).findByText(/1 model available/);
 
-		const slowButton = within(openAiCard).getByRole("button", {
+		const slowButton = within(openAiCard).getByRole<HTMLButtonElement>("button", {
 			name: "Testing… OpenAI production",
 		});
-		expect((slowButton as HTMLButtonElement).disabled).toBe(true);
+		expect(slowButton.disabled).toBe(true);
 
 		releaseSlowProbe?.();
-		expect(await within(openAiCard).findByText(/3 models available/)).toBeTruthy();
+		await within(openAiCard).findByText(/3 models available/);
 	});
 
 	it("keeps each model's delete pending independently when two run at once", async () => {
@@ -148,8 +148,10 @@ describe("WorkspaceLlmProviderPanel", () => {
 		await confirmDelete("Fast model");
 		await waitFor(() => expect(screen.queryByText("Fast model")).not.toBeNull());
 
-		const slowRowDelete = screen.getByRole("button", { name: "Delete Slow model" });
-		expect((slowRowDelete as HTMLButtonElement).disabled).toBe(true);
+		const slowRowDelete = screen.getByRole<HTMLButtonElement>("button", {
+			name: "Delete Slow model",
+		});
+		expect(slowRowDelete.disabled).toBe(true);
 
 		releaseSlowDelete?.();
 		await waitFor(() => expect(slowDeleteCalls).toBe(1));
@@ -176,7 +178,7 @@ describe("WorkspaceLlmProviderPanel", () => {
 	it("explains the instance policy and hides registration when own-provider connections are disabled", async () => {
 		server.use(http.get("*/workspaces/demo/llm/connections", () => HttpResponse.json([])));
 		renderPanel(false);
-		expect(await screen.findByText("New workspace providers and models are disabled")).toBeTruthy();
+		await screen.findByText("New workspace providers and models are disabled");
 		expect(screen.queryByRole("button", { name: "Connect provider" })).toBeNull();
 	});
 
@@ -189,7 +191,7 @@ describe("WorkspaceLlmProviderPanel", () => {
 		);
 		renderPanel();
 
-		expect(await screen.findByText("Could not load your provider models")).toBeTruthy();
+		await screen.findByText("Could not load your provider models");
 		expect(screen.queryByText("No models yet")).toBeNull();
 	});
 
@@ -202,7 +204,7 @@ describe("WorkspaceLlmProviderPanel", () => {
 		);
 		renderPanel(false);
 
-		expect(await screen.findByText("Existing model")).toBeTruthy();
+		await screen.findByText("Existing model");
 		expect(screen.queryByRole("button", { name: "Add provider" })).toBeNull();
 		expect(screen.queryByRole("button", { name: "Add model" })).toBeNull();
 		screen.getByRole("button", { name: "Edit OpenAI production" });

@@ -48,14 +48,12 @@ describe("instance settings route", () => {
 
 	it("keeps release disabled when stale settings cannot be reloaded", async () => {
 		const user = userEvent.setup();
-		let reads = 0;
 		server.use(
-			http.get("*/admin/settings", () => {
-				reads++;
-				return reads === 1
-					? HttpResponse.json(settings(1))
-					: HttpResponse.json({ title: "Unavailable" }, { status: 503 });
-			}),
+			http.get("*/admin/settings", () => HttpResponse.json(settings(1)), { once: true }),
+			// The reload the 412 triggers is the one that has to fail.
+			http.get("*/admin/settings", () =>
+				HttpResponse.json({ title: "Unavailable" }, { status: 503 }),
+			),
 			http.patch("*/admin/settings/silent-mode", () =>
 				HttpResponse.json({ status: 412, title: "Instance settings changed" }, { status: 412 }),
 			),

@@ -16,6 +16,7 @@ import { AreaVisualPicker } from "@/components/admin/practice-catalog/AreaVisual
 import { WORK_TYPE_FILTER_OPTIONS } from "@/components/admin/practice-catalog/constants";
 import { automatedReviewUnavailableLabel } from "@/components/admin/practice-catalog/evidence-presentation";
 import {
+	type ActionTriggerRef,
 	type CatalogEntryMoveActions,
 	type CatalogMoveActions,
 	SortableCatalogTree,
@@ -23,7 +24,7 @@ import {
 } from "@/components/admin/practice-catalog/SortableCatalogTree";
 import { PracticeListSkeleton } from "@/components/admin/practices/PracticeSkeletons";
 import { practiceFormLevel } from "@/components/admin/practices/practice-search";
-import { type FilterOption, FilterToggle } from "@/components/common/FilterToggle";
+import { FilterToggle } from "@/components/common/FilterToggle";
 import { MetaRow } from "@/components/common/MetaRow";
 import type { PanelState } from "@/components/common/panel-state";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
@@ -227,10 +228,11 @@ export function PracticeCatalog({
 						<CatalogOriginBadge origin={area.catalogOrigin} kind="area" />
 					</>
 				)}
-				renderAreaActions={(area, move) => (
+				renderAreaActions={(area, move, actionTriggerRef) => (
 					<AreaActions
 						area={area}
 						move={move}
+						actionTriggerRef={actionTriggerRef}
 						pending={pending.areaSlugs.has(area.slug)}
 						structurePending={pending.areaStructure}
 						onRename={() => setNamingArea(area)}
@@ -254,12 +256,13 @@ export function PracticeCatalog({
 						}
 					/>
 				)}
-				renderEntryActions={(practice, move) => (
+				renderEntryActions={(practice, move, actionTriggerRef) => (
 					<PracticeActions
 						practice={practice}
 						workspaceSlug={workspaceSlug}
 						areas={areas}
 						move={move}
+						actionTriggerRef={actionTriggerRef}
 						pending={pending.practiceSlugs.has(practice.slug)}
 						onDelete={onDeletePractice}
 					/>
@@ -354,7 +357,7 @@ function CatalogToolbar({
 		<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
 			<FilterToggle
 				label="Filter by work type"
-				options={WORK_TYPE_FILTER_OPTIONS as FilterOption<FocusFilter>[]}
+				options={WORK_TYPE_FILTER_OPTIONS}
 				value={focusFilter}
 				onChange={onFocusFilterChange}
 			/>
@@ -390,6 +393,7 @@ function CatalogToolbar({
 function AreaActions({
 	area,
 	move,
+	actionTriggerRef,
 	pending,
 	structurePending,
 	onRename,
@@ -398,6 +402,7 @@ function AreaActions({
 }: {
 	area: PracticeArea;
 	move: CatalogMoveActions;
+	actionTriggerRef: ActionTriggerRef;
 	pending: boolean;
 	structurePending: boolean;
 	onRename: () => void;
@@ -419,7 +424,7 @@ function AreaActions({
 				<DropdownMenuTrigger
 					render={
 						<Button
-							ref={move.actionTriggerRef}
+							ref={actionTriggerRef}
 							variant="ghost"
 							size="icon-sm"
 							aria-label={`More actions for ${area.name}`}
@@ -470,6 +475,7 @@ function PracticeActions({
 	workspaceSlug,
 	areas,
 	move,
+	actionTriggerRef,
 	pending,
 	onDelete,
 }: {
@@ -477,6 +483,7 @@ function PracticeActions({
 	workspaceSlug: string;
 	areas: PracticeArea[];
 	move: CatalogEntryMoveActions;
+	actionTriggerRef: ActionTriggerRef;
 	pending: boolean;
 	onDelete: (practice: Practice) => void;
 }) {
@@ -485,7 +492,7 @@ function PracticeActions({
 			<DropdownMenuTrigger
 				render={
 					<Button
-						ref={move.actionTriggerRef}
+						ref={actionTriggerRef}
 						variant="ghost"
 						size="icon-sm"
 						aria-label={`More actions for ${practice.name}`}

@@ -84,12 +84,12 @@ jobs:
       - name: Assert the pinned release version has not drifted
         run: |
           set -euo pipefail
-          # scripts/sync-selfhost-version.mjs keeps these equal to the release on
+          # scripts/sync-selfhost-version.ts keeps these equal to the release on
           # every Version PR; a mismatch means someone edited one by hand.
           pkg=$(node -p "require('./package.json').version")
           env_tag=$(grep -m1 '^IMAGE_TAG=' docker/self-host/.env.example | cut -d= -f2)
           [ "$pkg" = "$env_tag" ] || {
-            echo "::error::IMAGE_TAG=$env_tag in .env.example != package.json $pkg (run scripts/sync-selfhost-version.mjs)"; exit 1; }
+            echo "::error::IMAGE_TAG=$env_tag in .env.example != package.json $pkg (run scripts/sync-selfhost-version.ts)"; exit 1; }
 
       - name: Render the reference deployment
         working-directory: docker

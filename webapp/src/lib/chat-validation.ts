@@ -1,79 +1,44 @@
-/**
- * Chat message validation utilities.
- *
- * Provides runtime validation for chat messages received from the server.
- * Uses Zod schemas to safely parse and validate data before type assertion.
- */
-
 import { z } from "zod";
 import type { ChatMessage } from "@/lib/types";
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Message Validation Schema
-// ─────────────────────────────────────────────────────────────────────────────
-
 /**
- * Message part schema with passthrough for forward compatibility.
- * Allows any part with a `type` field through.
+ * Unknown keys survive: the mentor streams part kinds this client does not model, and stripping
+ * their payload would leave the renderer nothing to narrow on. `text` is the one payload checked,
+ * because the AI SDK types it as always present and the renderer reads it unguarded — a text part
+ * that omitted it would throw mid-transcript rather than render short.
  */
-const messagePartSchema = z.object({ type: z.string() }).passthrough();
+const messagePartSchema = z
+	.looseObject({ type: z.string() })
+	.refine((part) => part.type !== "text" || typeof part.text === "string", {
+		message: "A text part must carry its text",
+	});
 
-/**
- * Chat message schema matching the ThreadDetail.messages structure.
- * Uses passthrough at the message level for additional AI SDK fields.
- */
-const chatMessageSchema = z
-	.object({
-		id: z.string().uuid(),
-		role: z.enum(["system", "user", "assistant"]),
-		parts: z.array(messagePartSchema),
-		createdAt: z.string().datetime().optional(),
-	})
-	.passthrough();
+/** Loose again: the AI SDK hangs its own bookkeeping off a message and the chat UI passes it back. */
+const chatMessageSchema = z.looseObject({
+	id: z.uuid(),
+	role: z.enum(["system", "user", "assistant"]),
+	parts: z.array(messagePartSchema),
+	createdAt: z.iso.datetime().optional(),
+});
 
 const chatMessagesArraySchema = z.array(chatMessageSchema);
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Validation Functions
-// ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * Safely parse and validate an array of chat messages.
- * Returns validated messages or undefined if validation fails.
- *
- * @param messages - Unknown messages array from server response
- * @returns Validated ChatMessage[] or undefined
- */
-export function parseThreadMessages(messages: unknown): ChatMessage[] | undefined {
-	const result = chatMessagesArraySchema.safeParse(messages);
-	if (!result.success) {
-		console.warn("[parseThreadMessages] Validation failed:", result.error);
-		return undefined;
-	}
-	// Schema validated the structure, safe to cast to ChatMessage[]
-	return result.data as unknown as ChatMessage[];
+function isChatMessageArray(value: unknown): value is ChatMessage[] {
+	return chatMessagesArraySchema.safeParse(value).success;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Vote Validation
-// ─────────────────────────────────────────────────────────────────────────────
+export function parseThreadMessages(messages: unknown): ChatMessage[] | undefined {
+	return isChatMessageArray(messages) ? messages : undefined;
+}
 
-/**
- * Vote schema for validating votes from thread detail.
- */
 const voteSchema = z.object({
-	messageId: z.string().uuid().optional(),
+	messageId: z.uuid().optional(),
 	isUpvoted: z.boolean().optional(),
 });
 
 const votesArraySchema = z.array(voteSchema);
 
-/**
- * Safely extract votes from thread detail.
- *
- * @param threadDetail - Thread detail object that may contain votes
- * @returns Array of vote objects with messageId and isUpvoted
- */
+/** Votes are decoration, so anything unreadable degrades to "no votes" and the transcript still renders. */
 export function extractVotesFromThreadDetail(
 	threadDetail: unknown,
 ): Array<{ messageId?: string; isUpvoted?: boolean }> {
@@ -81,16 +46,10 @@ export function extractVotesFromThreadDetail(
 		return [];
 	}
 
-	const detail = threadDetail as Record<string, unknown>;
-	if (!("votes" in detail) || !Array.isArray(detail.votes)) {
+	if (!("votes" in threadDetail) || !Array.isArray(threadDetail.votes)) {
 		return [];
 	}
 
-	const result = votesArraySchema.safeParse(detail.votes);
-	if (!result.success) {
-		console.warn("[extractVotesFromThreadDetail] Validation failed:", result.error);
-		return [];
-	}
-
-	return result.data;
+	const result = votesArraySchema.safeParse(threadDetail.votes);
+	return result.success ? result.data : [];
 }

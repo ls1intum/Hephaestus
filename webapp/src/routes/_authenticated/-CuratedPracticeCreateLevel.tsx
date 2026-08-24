@@ -49,8 +49,8 @@ export function CuratedPracticeCreateLevel({ nested, onDone }: CuratedPracticeCr
 						error={catalogQuery.error ?? definitionOptionsQuery.error}
 						title="Couldn't load the practice editor"
 						onRetry={() => {
-							catalogQuery.refetch();
-							definitionOptionsQuery.refetch();
+							void catalogQuery.refetch();
+							void definitionOptionsQuery.refetch();
 						}}
 					/>
 				</DrawerBody>

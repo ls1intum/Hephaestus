@@ -63,7 +63,7 @@ public class LlmConnectionService {
         try {
             saved = connectionRepository.save(connection);
         } catch (DataIntegrityViolationException e) {
-            throw new LlmConnectionSlugConflictException(slug);
+            throw new LlmConnectionSlugConflictException(slug, e);
         }
         llmConnectionAudit.connectionCreated(saved.getId(), saved.getSlug());
         return saved;

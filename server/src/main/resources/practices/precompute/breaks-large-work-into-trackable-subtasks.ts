@@ -12,7 +12,11 @@ interface IssueMeta {
 	sub_issues_completed?: number;
 }
 
-export default async function (_repo: string, _diff: Map<string, unknown>, m: IssueMeta) {
+export default function breaksLargeWorkIntoTrackableSubtasks(
+	_repo: string,
+	_diff: Map<string, unknown>,
+	m: IssueMeta,
+) {
 	const body = (m.body ?? "").trim();
 	const labels = (m.labels ?? []).map((l) => l.toLowerCase());
 
@@ -27,13 +31,10 @@ export default async function (_repo: string, _diff: Map<string, unknown>, m: Is
 	const hasBreakdown = checkboxes > 0 || childRefs > 0 || subTotal > 0;
 	const looksLarge = isEpic || bigBody || headingSections >= 4 || childRefs >= 2;
 
-	const directions: string[] = [];
-	directions.push(
+	const directions: string[] = [
 		`Largeness signals: epicLabel=${isEpic}, bodyChars=${body.length}, headingSections=${headingSections}, childIssueRefs=${childRefs}. This practice only applies to LEGITIMATELY large/multi-part work — confirm largeness before judging decomposition.`,
-	);
-	directions.push(
 		`Breakdown facts: taskCheckboxes=${checkboxes}, childIssueRefs=${childRefs}, subIssuesTotal=${subTotal} (completed=${subDone}). hasAnyBreakdown=${hasBreakdown}.`,
-	);
+	];
 	if (looksLarge && !hasBreakdown)
 		directions.push(
 			`Signals suggest large work with NO explicit breakdown — a strong candidate for a decomposition finding; verify the body really bundles multiple trackable parts.`,

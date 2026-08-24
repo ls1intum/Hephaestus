@@ -13,7 +13,7 @@ describe("validateLlmConnectionForm", () => {
 	it("accepts a plain provider endpoint", () => {
 		expect(
 			validateLlmConnectionForm({ displayName: "OpenAI", baseUrl: "https://api.openai.com/v1" }),
-		).toEqual({});
+		).toStrictEqual({});
 	});
 
 	it("rejects a base URL that is not a URL", () => {
@@ -30,20 +30,21 @@ describe("validateLlmConnectionForm", () => {
 	});
 
 	it("skips the base URL on edit, where the form cannot change it", () => {
-		expect(validateLlmConnectionForm({ displayName: "OpenAI" })).toEqual({});
+		expect(validateLlmConnectionForm({ displayName: "OpenAI" })).toStrictEqual({});
 	});
 
 	it("requires a display name", () => {
-		expect(
-			validateLlmConnectionForm({ displayName: "   ", baseUrl: "https://api.openai.com/v1" })
-				.displayName,
-		).toBeTruthy();
+		const errors = validateLlmConnectionForm({
+			displayName: "   ",
+			baseUrl: "https://api.openai.com/v1",
+		});
+		expect(errors.displayName).toMatch(/display name is required/);
 	});
 });
 
 describe("validateLlmModelForm", () => {
 	it("accepts an unpriced model with no token limits", () => {
-		expect(validateLlmModelForm(validModel)).toEqual({});
+		expect(validateLlmModelForm(validModel)).toStrictEqual({});
 	});
 
 	it("rejects a negative token limit, which the number input's min alone cannot", () => {
@@ -52,9 +53,8 @@ describe("validateLlmModelForm", () => {
 	});
 
 	it("rejects a fractional token limit", () => {
-		expect(
-			validateLlmModelForm({ ...validModel, contextWindow: "1.5" }).contextWindow,
-		).toBeTruthy();
+		const errors = validateLlmModelForm({ ...validModel, contextWindow: "1.5" });
+		expect(errors.contextWindow).toMatch(/whole number/);
 	});
 
 	it("rejects a token count the server's int column cannot hold", () => {
@@ -104,16 +104,15 @@ describe("validateLlmModelForm", () => {
 				per1mInputUsd: 0,
 				per1mOutputUsd: 3,
 			}),
-		).toEqual({});
+		).toStrictEqual({});
 	});
 
 	it("requires a note for a no-charge model", () => {
-		expect(
-			validateLlmModelForm({ ...validModel, pricingMode: "NO_CHARGE", note: " " }).note,
-		).toBeTruthy();
+		const errors = validateLlmModelForm({ ...validModel, pricingMode: "NO_CHARGE", note: " " });
+		expect(errors.note).toMatch(/why no metered API rate applies/);
 	});
 
 	it("skips the upstream id on edit, where the form cannot change it", () => {
-		expect(validateLlmModelForm({ ...validModel, upstreamModelId: undefined })).toEqual({});
+		expect(validateLlmModelForm({ ...validModel, upstreamModelId: undefined })).toStrictEqual({});
 	});
 });

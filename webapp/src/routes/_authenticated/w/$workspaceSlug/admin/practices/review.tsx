@@ -82,7 +82,7 @@ function ReviewRoute() {
 			// The default section is left out of the URL rather than written into it, so the sidebar's
 			// link and a tab click on the first section produce the same address.
 			onSectionChange={(next) =>
-				navigate({
+				void navigate({
 					search: (previous) => ({
 						...previous,
 						section: next === DEFAULT_REVIEW_SECTION ? undefined : next,
@@ -96,7 +96,7 @@ function ReviewRoute() {
 						workspaceSlug={workspaceSlug}
 						overridesOnly={overrides === true}
 						onOverridesOnlyChange={(next) =>
-							navigate({
+							void navigate({
 								search: (previous) => ({ ...previous, overrides: next ? true : undefined }),
 							})
 						}

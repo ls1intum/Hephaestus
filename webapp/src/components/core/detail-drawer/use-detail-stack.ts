@@ -2,11 +2,6 @@ import { useRouter } from "@tanstack/react-router";
 import { useSearchState } from "@/lib/search-params";
 import { type DetailStackEntry, encodeDetailStack } from "./detail-stack";
 
-/** `HistoryState` lives in `@tanstack/history`, which this workspace cannot name in a `declare module`. */
-interface DetailHistoryState {
-	detailPush?: boolean;
-}
-
 export interface DetailStackControls {
 	/** Prefer {@link import("./DetailStackLink").DetailStackLink}; this is for openers that cannot be links. */
 	open: (entry: DetailStackEntry) => void;
@@ -24,7 +19,7 @@ export function useDetailStack(stack: DetailStackEntry[]): DetailStackControls {
 	const router = useRouter();
 
 	const goToStack = (next: DetailStackEntry[], detailPush: boolean) => {
-		setSearch(
+		void setSearch(
 			(previous) => ({ ...previous, detail: encodeDetailStack(next) }),
 			(previous) => ({ ...previous, detailPush }),
 		);
@@ -34,8 +29,7 @@ export function useDetailStack(stack: DetailStackEntry[]): DetailStackControls {
 		open: (entry) => goToStack([...stack, entry], true),
 		close: (depth) => {
 			// Only the top level: the entries below it are not known to be ours.
-			const current = router.state.location.state as DetailHistoryState;
-			if (current.detailPush === true && depth === stack.length - 1) {
+			if (router.state.location.state.detailPush === true && depth === stack.length - 1) {
 				router.history.back();
 				return;
 			}

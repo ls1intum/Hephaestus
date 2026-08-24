@@ -4,11 +4,15 @@
 
 A render test — a story that mounts and nothing else — is a sanctioned shape: *"A render test is a
 simple version of an interaction test that only tests the ability of a component to render successfully
-in a given state. That works fine for relatively simple, static components like a Button"*. Grade the
-component, not the file.
+in a given state. That works fine for relatively simple, static components like a Button."*
+(storybook.js.org/docs/writing-tests/interaction-testing). Grade the component, not the file.
 
 Likewise an `fn()` spy that no play function triggers is **correct**: `fn()` in `args` also drives the
 Actions panel. Only a spy the play *does* trigger and does not assert is a finding.
+
+`hephaestus/play-must-assert` holds the floor a linter can see — a play that asserts *nothing*. It reads
+a `getBy*` used as a click target as an assertion, exactly as `vitest/expect-expect` does, so whether the
+play checks the **outcome** is still the reviewer's call.
 
 ## An expectation must not be recomputed from what it is checking
 
@@ -25,7 +29,7 @@ produced, a count it computed, a disabled state, a URL — not text the story it
 that the DOM still contains the thing you clicked has not tested the interaction.
 
 For "is this really disabled", use `expectGenuinelyDisabled` / `expectUnavailable`
-(`src/test/controls.ts`) — they check focus behaviour, not just the attribute, so a look-alike fails.
+(`webapp/src/test/controls.ts`) — they check focus behaviour, not just the attribute, so a look-alike fails.
 
 ## Portals: query with `screen`, not the canvas
 
@@ -48,12 +52,12 @@ from the same module when you need the panel itself — the measuring assertions
 
 ## Published prose above a story is documentation, not a comment
 
-255 of 256 story files carry `tags: ["autodocs"]`, so a JSDoc block above `meta` or above an exported
+Nearly every story file carries `tags: ["autodocs"]`, so a JSDoc block above `meta` or above an exported
 story **is** the component's Docs page. It earns its place only if it records a rejected alternative, a
 real trap, or a why the reader cannot derive from the code below it — and it is addressed to somebody
 reading the *component*, not the test. Restating the story's name is the common failure; notes about
 how the assertion reaches the DOM are the other, and those belong in a `//` inside the play function.
 
 Storybook renders these blocks with `markdown-to-jsx`. Separate paragraphs with a blank comment line; a
-Java-style `<p>` emits a stray empty paragraph, and `scripts/check-story-prose.mjs` fails the build on
+Java-style `<p>` emits a stray empty paragraph, and `scripts/check-story-prose.ts` fails the build on
 one.

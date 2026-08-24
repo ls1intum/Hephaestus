@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { expect } from "storybook/test";
 import type { ChatThreadSummary } from "@/api/types.gen";
+import { minutesBefore, STORY_NOW } from "@/components/common/story-clock";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "./AppSidebar";
 
@@ -130,17 +131,17 @@ export const MentorContext: Story = {
 			{
 				id: "1",
 				title: "React Hooks Best Practices",
-				createdAt: new Date(),
+				createdAt: new Date(STORY_NOW),
 			},
 			{
 				id: "2",
 				title: "TypeScript Generic Types",
-				createdAt: new Date(),
+				createdAt: new Date(STORY_NOW),
 			},
 			{
 				id: "3",
 				title: "API Architecture Review",
-				createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000 - 60_000),
+				createdAt: minutesBefore(24 * 60 + 1),
 			},
 		] satisfies ChatThreadSummary[],
 		mentorThreadsLoading: false,

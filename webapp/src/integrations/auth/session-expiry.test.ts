@@ -1,5 +1,5 @@
 import { QueryClient } from "@tanstack/react-query";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, assert, beforeEach, describe, expect, it, vi } from "vitest";
 import { __resetSessionRecoveryForTests, handlePossibleSessionExpiry } from "./session-expiry";
 import { refreshAccessToken } from "./session-refresh";
 
@@ -20,7 +20,7 @@ function stubLocation(pathname: string, search = ""): { assigned: string[] } {
 		pathname,
 		search,
 		origin: "http://localhost",
-	} as unknown as Location;
+	};
 	Object.defineProperty(window, "location", { configurable: true, value: stub });
 	return { assigned };
 }
@@ -46,7 +46,10 @@ function res(status: number, url: string): Response {
 }
 
 // The 401 recovery is async (a silent refresh attempt); let its microtasks/timer settle.
-const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
+const flush = () =>
+	new Promise((resolve) => {
+		setTimeout(resolve, 0);
+	});
 
 describe("handlePossibleSessionExpiry", () => {
 	it("recovers a mid-session 401 via a silent refresh — no redirect", async () => {
@@ -82,7 +85,9 @@ describe("handlePossibleSessionExpiry", () => {
 		await flush();
 		expect(refreshMock).toHaveBeenCalledOnce();
 		expect(assigned).toHaveLength(1);
-		const url = new URL(assigned[0]);
+		const [target] = assigned;
+		assert(target);
+		const url = new URL(target);
 		expect(url.pathname).toBe("/login");
 		expect(url.searchParams.get("returnTo")).toBe("/w/acme/overview?tab=prs");
 	});
@@ -105,7 +110,9 @@ describe("handlePossibleSessionExpiry", () => {
 		await flush();
 		expect(refreshMock).toHaveBeenCalledOnce(); // NO second refresh — no storm
 		expect(assigned).toHaveLength(1);
-		expect(new URL(assigned[0]).pathname).toBe("/login");
+		const [target] = assigned;
+		assert(target);
+		expect(new URL(target).pathname).toBe("/login");
 	});
 
 	it("collapses concurrent 401s into a single refresh and handles all of them in place", async () => {
@@ -122,7 +129,7 @@ describe("handlePossibleSessionExpiry", () => {
 		];
 		await flush();
 
-		expect(handled).toEqual([true, true, true]);
+		expect(handled).toStrictEqual([true, true, true]);
 		expect(refreshMock).toHaveBeenCalledOnce();
 		expect(assigned).toHaveLength(0);
 	});
@@ -191,7 +198,9 @@ describe("handlePossibleSessionExpiry", () => {
 			makeQueryClient(),
 		);
 		await flush();
-		const url = new URL(assigned[0]);
+		const [target] = assigned;
+		assert(target);
+		const url = new URL(target);
 		expect(url.searchParams.get("returnTo")).toBe("/");
 	});
 

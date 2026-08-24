@@ -1,11 +1,13 @@
 import type { Meta, StoryObj } from "@storybook/react";
+import type * as React from "react";
 import { useState } from "react";
 import { fn } from "storybook/test";
+import { STORY_NOW } from "@/components/common/story-clock";
 import { DEFAULT_SCHEDULE, formatDateRangeForApi, getDateRangeForPreset } from "@/lib/timeframe";
 import { ProfileTimeframePicker } from "./ProfileTimeframePicker";
 
 // Calculate default dates using the shared timeframe utilities
-const defaultRange = getDateRangeForPreset("this-week", DEFAULT_SCHEDULE);
+const defaultRange = getDateRangeForPreset(new Date(STORY_NOW), "this-week", DEFAULT_SCHEDULE);
 const { after: defaultAfter, before: defaultBefore } = formatDateRangeForApi(defaultRange);
 
 /**
@@ -81,7 +83,7 @@ export const AllTime: Story = {
  */
 export const LastWeek: Story = {
 	args: (() => {
-		const range = getDateRangeForPreset("last-week", DEFAULT_SCHEDULE);
+		const range = getDateRangeForPreset(new Date(STORY_NOW), "last-week", DEFAULT_SCHEDULE);
 		const { after, before } = formatDateRangeForApi(range);
 		return { afterDate: after, beforeDate: before };
 	})(),
@@ -92,7 +94,7 @@ export const LastWeek: Story = {
  */
 export const ThisMonth: Story = {
 	args: (() => {
-		const range = getDateRangeForPreset("this-month", DEFAULT_SCHEDULE);
+		const range = getDateRangeForPreset(new Date(STORY_NOW), "this-month", DEFAULT_SCHEDULE);
 		const { after, before } = formatDateRangeForApi(range);
 		return { afterDate: after, beforeDate: before };
 	})(),
@@ -103,7 +105,7 @@ export const ThisMonth: Story = {
  */
 export const LastMonth: Story = {
 	args: (() => {
-		const range = getDateRangeForPreset("last-month", DEFAULT_SCHEDULE);
+		const range = getDateRangeForPreset(new Date(STORY_NOW), "last-month", DEFAULT_SCHEDULE);
 		const { after, before } = formatDateRangeForApi(range);
 		return { afterDate: after, beforeDate: before };
 	})(),
@@ -120,38 +122,40 @@ export const CustomRange: Story = {
 	},
 };
 
+function InteractiveHarness(props: React.ComponentProps<typeof ProfileTimeframePicker>) {
+	const [afterDate, setAfterDate] = useState<string | undefined>(props.afterDate);
+	const [beforeDate, setBeforeDate] = useState<string | undefined>(props.beforeDate);
+
+	return (
+		<div className="flex flex-col gap-4 items-start">
+			<ProfileTimeframePicker
+				{...props}
+				afterDate={afterDate}
+				beforeDate={beforeDate}
+				onTimeframeChange={(after, before) => {
+					setAfterDate(after);
+					setBeforeDate(before);
+					props.onTimeframeChange?.(after, before);
+				}}
+			/>
+			<div className="text-sm text-muted-foreground font-mono bg-muted p-3 rounded-md">
+				<div>
+					<strong>after:</strong> {afterDate ?? "undefined"}
+				</div>
+				<div>
+					<strong>before:</strong> {beforeDate ?? "undefined"}
+				</div>
+			</div>
+		</div>
+	);
+}
+
 /**
  * Interactive stateful story to test label updates live.
  * Demonstrates how the component responds to user interactions.
  */
 export const Interactive: Story = {
-	render: (props) => {
-		const [afterDate, setAfterDate] = useState<string | undefined>(props.afterDate);
-		const [beforeDate, setBeforeDate] = useState<string | undefined>(props.beforeDate);
-
-		return (
-			<div className="flex flex-col gap-4 items-start">
-				<ProfileTimeframePicker
-					{...props}
-					afterDate={afterDate}
-					beforeDate={beforeDate}
-					onTimeframeChange={(after, before) => {
-						setAfterDate(after);
-						setBeforeDate(before);
-						props.onTimeframeChange?.(after, before);
-					}}
-				/>
-				<div className="text-sm text-muted-foreground font-mono bg-muted p-3 rounded-md">
-					<div>
-						<strong>after:</strong> {afterDate ?? "undefined"}
-					</div>
-					<div>
-						<strong>before:</strong> {beforeDate ?? "undefined"}
-					</div>
-				</div>
-			</div>
-		);
-	},
+	render: (props) => <InteractiveHarness {...props} />,
 };
 
 /**
@@ -201,19 +205,19 @@ export const AllPresets: Story = {
 		const presets = [
 			{
 				label: "This Week",
-				...formatDateRangeForApi(getDateRangeForPreset("this-week")),
+				...formatDateRangeForApi(getDateRangeForPreset(new Date(STORY_NOW), "this-week")),
 			},
 			{
 				label: "Last Week",
-				...formatDateRangeForApi(getDateRangeForPreset("last-week")),
+				...formatDateRangeForApi(getDateRangeForPreset(new Date(STORY_NOW), "last-week")),
 			},
 			{
 				label: "This Month",
-				...formatDateRangeForApi(getDateRangeForPreset("this-month")),
+				...formatDateRangeForApi(getDateRangeForPreset(new Date(STORY_NOW), "this-month")),
 			},
 			{
 				label: "Last Month",
-				...formatDateRangeForApi(getDateRangeForPreset("last-month")),
+				...formatDateRangeForApi(getDateRangeForPreset(new Date(STORY_NOW), "last-month")),
 			},
 			{
 				label: "All Time",

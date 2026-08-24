@@ -52,19 +52,17 @@ export const EntryMovesFocusToItsField: Story = {
 	},
 };
 
+const collapsedSlugError = {
+	fieldId: "hidden-field",
+	message: "The identifier must be lowercase letters, numbers and hyphens.",
+	reveal: fn(),
+};
+
 export const EntryRevealsACollapsedSectionFirst: Story = {
-	args: {
-		errors: [
-			{
-				fieldId: "hidden-field",
-				message: "The identifier must be lowercase letters, numbers and hyphens.",
-				reveal: fn(),
-			},
-		],
-	},
-	play: async ({ args, canvas }) => {
+	args: { errors: [collapsedSlugError] },
+	play: async ({ canvas }) => {
 		await userEvent.click(canvas.getByRole("link", { name: /identifier/ }));
-		await expect(args.errors[0].reveal).toHaveBeenCalledOnce();
+		await expect(collapsedSlugError.reveal).toHaveBeenCalledOnce();
 	},
 };
 

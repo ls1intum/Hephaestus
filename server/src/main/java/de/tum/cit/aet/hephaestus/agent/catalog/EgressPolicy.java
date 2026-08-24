@@ -27,6 +27,11 @@ import org.springframework.stereotype.Component;
 @WorkspaceAgnostic("Instance egress policy reads the global instance_llm_settings singleton, not tenant data")
 public class EgressPolicy {
 
+    /**
+     * One message for every rejection reason — malformed URL, wrong scheme, host that does not resolve,
+     * host that resolves to a private address. Distinguishing them would let an admin use this endpoint
+     * to map the internal network. The specific cause is chained onto the exception for the log only.
+     */
     private static final String NOT_PUBLIC_HTTPS = "Provider host must be a public HTTPS URL";
     private static final String NO_CREDENTIALS_OR_QUERY =
         "Provider URLs must not contain credentials or query parameters.";
@@ -79,7 +84,7 @@ public class EgressPolicy {
         try {
             return new URI(baseUrl.trim());
         } catch (URISyntaxException e) {
-            throw new IllegalArgumentException(NOT_PUBLIC_HTTPS);
+            throw new IllegalArgumentException(NOT_PUBLIC_HTTPS, e);
         }
     }
 
@@ -88,7 +93,7 @@ public class EgressPolicy {
         try {
             addresses = InetAddress.getAllByName(host);
         } catch (UnknownHostException e) {
-            throw new IllegalArgumentException(NOT_PUBLIC_HTTPS);
+            throw new IllegalArgumentException(NOT_PUBLIC_HTTPS, e);
         }
         for (InetAddress address : addresses) {
             if (PrivateAddressGuard.isNonPublic(address)) {

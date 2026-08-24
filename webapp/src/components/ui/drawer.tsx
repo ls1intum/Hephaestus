@@ -2,7 +2,8 @@
 
 import { Drawer as DrawerPrimitive } from "@base-ui/react/drawer";
 import { cva, type VariantProps } from "class-variance-authority";
-import * as React from "react";
+import type * as React from "react";
+import { createContext, useContext } from "react";
 import { cn } from "@/lib/utils";
 
 type DrawerContextProps = {
@@ -12,10 +13,10 @@ type DrawerContextProps = {
 	swipeDirection: NonNullable<DrawerPrimitive.Root.Props["swipeDirection"]>;
 };
 
-const DrawerContext = React.createContext<DrawerContextProps | null>(null);
+const DrawerContext = createContext<DrawerContextProps | null>(null);
 
 function useDrawer() {
-	const context = React.useContext(DrawerContext);
+	const context = useContext(DrawerContext);
 	if (!context) {
 		throw new Error("useDrawer must be used within a Drawer.");
 	}
@@ -206,7 +207,7 @@ function DrawerBody({ className, ...props }: React.ComponentProps<"div">) {
 			className={cn("min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 pb-6", className)}
 			// A form disables every control while it submits, and then nothing in here is focusable —
 			// but the panel's overflow still has to be readable to the end. Same call as `ui/table`.
-			// biome-ignore lint/a11y/noNoninteractiveTabindex: the scroll region must stay keyboard-reachable.
+			// oxlint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- The scroll region must stay keyboard-reachable when nothing inside it is.
 			tabIndex={0}
 			{...props}
 		/>

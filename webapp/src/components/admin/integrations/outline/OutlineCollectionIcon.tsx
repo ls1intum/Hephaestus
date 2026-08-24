@@ -1,4 +1,3 @@
-import type { LucideIcon } from "lucide-react";
 import {
 	Beaker,
 	Bike,
@@ -26,6 +25,7 @@ import {
 	Lightbulb,
 	LineChart,
 	Lock,
+	type LucideIcon,
 	Mail,
 	MessageSquare,
 	Moon,

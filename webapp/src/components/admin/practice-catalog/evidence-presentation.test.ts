@@ -18,7 +18,7 @@ describe("groupEvidenceSources", () => {
 				.flatMap((group) => group.sources.map((source) => source.sourceKind)),
 		);
 
-		expect(orphans).toEqual([]);
+		expect(orphans).toStrictEqual([]);
 	});
 
 	// The vocabulary and the family table live in different directories, and a kind added to one and
@@ -39,7 +39,7 @@ describe("groupEvidenceSources", () => {
 				])[0]?.family === "other",
 		);
 
-		expect(unfiled).toEqual([]);
+		expect(unfiled).toStrictEqual([]);
 	});
 
 	// Both ways grouping can stop being a partition are silent: a source filed under no family
@@ -48,8 +48,8 @@ describe("groupEvidenceSources", () => {
 		const groups = groupEvidenceSources(mockPullRequestWorkType.allowedSources);
 		const filed = groups.flatMap((group) => group.sources.map((source) => source.sourceKind));
 
-		expect(groups.map((group) => group.family)).toEqual(["work", "around", "history"]);
-		expect([...filed].sort()).toEqual(
+		expect(groups.map((group) => group.family)).toStrictEqual(["work", "around", "history"]);
+		expect([...filed].sort()).toStrictEqual(
 			mockPullRequestWorkType.allowedSources.map((source) => source.sourceKind).sort(),
 		);
 	});
@@ -57,7 +57,7 @@ describe("groupEvidenceSources", () => {
 	it("drops a family the work type has no source for", () => {
 		expect(
 			groupEvidenceSources(mockDocumentWorkType.allowedSources).map((group) => group.family),
-		).toEqual(["work", "history"]);
+		).toStrictEqual(["work", "history"]);
 	});
 
 	it("keeps a source this build has not been taught, under its own heading", () => {
@@ -73,7 +73,7 @@ describe("groupEvidenceSources", () => {
 			},
 		]);
 
-		expect(groups.map((group) => group.family)).toEqual(["other"]);
+		expect(groups.map((group) => group.family)).toStrictEqual(["other"]);
 	});
 });
 

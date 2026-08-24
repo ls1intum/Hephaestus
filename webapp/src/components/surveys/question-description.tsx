@@ -19,7 +19,7 @@ export function QuestionDescription({
 		return (
 			<FieldDescription
 				className={className}
-				/** biome-ignore lint/security/noDangerouslySetInnerHtml: HTML content comes from PostHog */
+				// oxlint-disable-next-line react/no-danger -- Authored by whoever operates the PostHog project this deployment points at, never by a workspace member and never by a respondent, whose answers render as text.
 				dangerouslySetInnerHTML={{ __html: description }}
 			/>
 		);

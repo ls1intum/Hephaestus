@@ -61,6 +61,7 @@ This ADR supersedes ADR 0016 Stage A only on the column placement and lookup mec
 ## Consequences
 
 **Positive**
+
 - Net production complexity decreases: one container, one realm JSON, one SDK, one JS library deleted. New code is all in-tree, in our language, debuggable via our existing tools.
 - Single ubiquitous-language story for identity (Account / IdentityLink / ExternalActor / AuthEvent — see [`docs/auth-glossary.md`](../auth-glossary.md)).
 - Per-workspace OAuth providers land on the established `Connection` aggregate — zero parallel infrastructure.
@@ -69,11 +70,13 @@ This ADR supersedes ADR 0016 Stage A only on the column placement and lookup mec
 - Stateless-chain posture from ADR 0010 preserved end-to-end.
 
 **Negative**
+
 - We now own a JWT issuer, JWK rotation, and revocation propagation. Mitigation: implementation is a thin wrapper over Spring's `NimbusJwtEncoder` + DB-backed `JWKSource`; we are not hand-rolling crypto.
 - Migration carries a data-shape change (`account` + `identity_link` populated from existing `user` rows). Idempotent Liquibase customChange + pre-migration assertion guards against orphans.
 - Contributors must configure real GitHub/GitLab OAuth credentials for local dev. Same friction as Keycloak's realm-JSON seed users today; documented in `docs/contributor/local-development.mdx`.
 
 **Reversible escape hatch**
+
 - The cutover commit is identified by hash and intentionally `git revert`-able for 30 days post-launch. The revert restores the inline Keycloak compose service blocks and the resource-server chain in one step.
 
 ## Out of scope (named follow-up issues)

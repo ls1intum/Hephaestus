@@ -36,7 +36,6 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.team.GitHubTeamSyncServi
 import jakarta.annotation.PostConstruct;
 import java.time.Instant;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { assert, describe, expect, it } from "vitest";
 import type { CatalogEntryStatus, CuratedCatalog } from "@/api/types.gen";
 import {
 	orderedPracticeSlugs,
@@ -73,22 +73,26 @@ const catalog = {
 describe("curated catalog cache", () => {
 	it("reorders areas without changing their definitions", () => {
 		const updated = reorderCuratedAreas(catalog, ["b", "a"]);
-		expect(updated.areas.map(({ slug, position }) => ({ slug, position }))).toEqual([
+		expect(updated.areas.map(({ slug, position }) => ({ slug, position }))).toStrictEqual([
 			{ slug: "a", position: 1 },
 			{ slug: "b", position: 0 },
 		]);
-		expect(updated.areas[0].definition).toBe(catalog.areas[0].definition);
+		const [reordered] = updated.areas;
+		const [original] = catalog.areas;
+		assert(reordered);
+		assert(original);
+		expect(reordered.definition).toBe(original.definition);
 	});
 
 	it("moves a practice and normalizes both buckets", () => {
 		const updated = placeCuratedPractice(catalog, "two", "b", 0);
-		expect(orderedPracticeSlugs(updated, "a")).toEqual(["one"]);
-		expect(orderedPracticeSlugs(updated, "b")).toEqual(["two", "three"]);
+		expect(orderedPracticeSlugs(updated, "a")).toStrictEqual(["one"]);
+		expect(orderedPracticeSlugs(updated, "b")).toStrictEqual(["two", "three"]);
 		expect(updated.practices.find(({ slug }) => slug === "two")?.effectivelyOffered).toBe(false);
 	});
 
 	it("reorders within one area", () => {
 		const updated = reorderCuratedPractices(catalog, "a", ["two", "one"]);
-		expect(orderedPracticeSlugs(updated, "a")).toEqual(["two", "one"]);
+		expect(orderedPracticeSlugs(updated, "a")).toStrictEqual(["two", "one"]);
 	});
 });

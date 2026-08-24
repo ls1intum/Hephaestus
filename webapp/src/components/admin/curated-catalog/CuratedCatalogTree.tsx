@@ -3,6 +3,7 @@ import type { CuratedArea, CuratedPracticeSummary } from "@/api/types.gen";
 import { AreaPill } from "@/components/admin/practice-catalog/AreaPill";
 import { automatedReviewLimitationLabel } from "@/components/admin/practice-catalog/evidence-presentation";
 import {
+	type ActionTriggerRef,
 	type CatalogEntryMoveActions,
 	type CatalogMoveActions,
 	SortableCatalogTree,
@@ -107,10 +108,11 @@ export function CuratedCatalogTree({
 			onPlaceEntry={onPlacePractice}
 			renderAreaLeading={(area) => <AreaIcon area={area} />}
 			renderAreaMeta={(area) => <CuratedEntryBadges status={area.status} kind="area" />}
-			renderAreaActions={(area, move) => (
+			renderAreaActions={(area, move, actionTriggerRef) => (
 				<AreaActions
 					area={area}
 					move={move}
+					actionTriggerRef={actionTriggerRef}
 					pending={pendingAreaSlugs.has(area.slug)}
 					disabled={writePending}
 					onStatusChange={onAreaStatusChange}
@@ -118,11 +120,12 @@ export function CuratedCatalogTree({
 				/>
 			)}
 			renderEntryContent={(practice) => <PracticeDetails practice={practice} />}
-			renderEntryActions={(practice, move) => (
+			renderEntryActions={(practice, move, actionTriggerRef) => (
 				<PracticeActions
 					practice={practice}
 					areas={treeAreas}
 					move={move}
+					actionTriggerRef={actionTriggerRef}
 					pending={pendingPracticeSlugs.has(practice.slug)}
 					disabled={writePending}
 					onStatusChange={onPracticeStatusChange}
@@ -152,6 +155,7 @@ function AreaIcon({ area }: { area: TreeArea }) {
 function AreaActions({
 	area,
 	move,
+	actionTriggerRef,
 	pending,
 	disabled,
 	onStatusChange,
@@ -159,6 +163,7 @@ function AreaActions({
 }: {
 	area: TreeArea;
 	move: CatalogMoveActions;
+	actionTriggerRef: ActionTriggerRef;
 	pending: boolean;
 	disabled: boolean;
 	onStatusChange: (area: CuratedArea, offered: boolean) => void;
@@ -181,7 +186,7 @@ function AreaActions({
 				<DropdownMenuTrigger
 					render={
 						<Button
-							ref={move.actionTriggerRef}
+							ref={actionTriggerRef}
 							variant="ghost"
 							size="icon-sm"
 							disabled={disabled}
@@ -255,6 +260,7 @@ function PracticeActions({
 	practice,
 	areas,
 	move,
+	actionTriggerRef,
 	pending,
 	disabled,
 	onStatusChange,
@@ -263,6 +269,7 @@ function PracticeActions({
 	practice: TreePractice;
 	areas: readonly TreeArea[];
 	move: CatalogEntryMoveActions;
+	actionTriggerRef: ActionTriggerRef;
 	pending: boolean;
 	disabled: boolean;
 	onStatusChange: (practice: CuratedPracticeSummary, offered: boolean) => void;
@@ -306,7 +313,7 @@ function PracticeActions({
 				<DropdownMenuTrigger
 					render={
 						<Button
-							ref={move.actionTriggerRef}
+							ref={actionTriggerRef}
 							variant="ghost"
 							size="icon-sm"
 							disabled={disabled}

@@ -111,12 +111,12 @@ write good changesets, and what a version number promises all live in the
 **Infrastructure scopes** (tooling and process):
 
 - `ci`: CI/CD workflows
-- `config`: Tooling configuration (renovate, eslint, tsconfig, etc.)
+- `config`: Tooling configuration (renovate, biome, oxlint, tsconfig, etc.)
 - `deps-dev`: Dev dependencies only
 - `scripts`: Helper scripts
 - `release`: Release engineering (also used by the automated Version PR)
 
-> ⚠️ **`config` scope warning:** Only use for tooling config files like `.prettierrc`, `renovate.json`, `eslint.config.js`. Do NOT use for:
+> ⚠️ **`config` scope warning:** Only use for tooling config files like `renovate.json`, `biome.jsonc`, `webapp/.oxlintrc.json`. Do NOT use for:
 > - Runtime config (`application.yml`) → use `server`
 > - Dockerfiles → use service scope (`webapp`, `server`, etc.)
 > - Production compose files → use `docker`

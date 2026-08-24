@@ -56,7 +56,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  * per-repository skip conditions (incremental sync pending, cooldown, rate limits,
  * already complete), and progress tracking records.
  */
-class HistoricalBackfillServiceTest extends BaseUnitTest {
+class GitHubHistoricalBackfillServiceTest extends BaseUnitTest {
 
     @Mock
     private SyncTargetProvider syncTargetProvider;

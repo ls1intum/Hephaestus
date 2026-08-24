@@ -51,7 +51,7 @@ export const EveryOutcome: Story = {
 	render: everyOutcome,
 	play: async ({ canvas }) => {
 		const badges = canvas.getAllByRole("listitem");
-		await expect(badges.map((badge) => badge.textContent?.trim())).toEqual(EVERY_LABEL);
+		await expect(badges.map((badge) => badge.textContent.trim())).toEqual(EVERY_LABEL);
 		// WCAG 2.2 SC 1.4.1: every outcome is told apart by an icon as well as words, never by colour.
 		for (const badge of badges) {
 			await expect(badge.querySelector("svg")).not.toBeNull();

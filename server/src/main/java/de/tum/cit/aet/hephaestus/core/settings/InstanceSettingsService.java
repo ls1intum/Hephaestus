@@ -115,7 +115,7 @@ public class InstanceSettingsService implements SilentModeQuery {
         try {
             return repository.saveAndFlush(settings);
         } catch (ObjectOptimisticLockingFailureException exception) {
-            throw new StaleInstanceSettingsException();
+            throw new StaleInstanceSettingsException(exception);
         }
     }
 

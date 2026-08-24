@@ -1139,12 +1139,26 @@
                     <includeTests>false</includeTests>
                     <linkXRef>false</linkXRef>
                     <printFailingErrors>true</printFailingErrors>
-                    <failOnViolation>false</failOnViolation>
-                    <!-- Exclude generated code -->
+                    <!--
+                        Never set this to false. `lint:java` runs pmd:check with -q, so with the gate
+                        disarmed PMD logs its findings at WARNING and still returns BUILD SUCCESS: the
+                        whole Java lint reports clean while violating whatever it likes. Argue a rule in
+                        pmd-ruleset.xml instead of disarming the gate.
+
+                        `lint:java` also runs `compile` first, because PMD resolves types off the
+                        compiled classes on its auxclasspath. Without them it cannot tell that an enum
+                        switch is exhaustive or that a wildcard import is used, and reports both.
+                    -->
+                    <failOnViolation>true</failOnViolation>
+                    <!--
+                        The generated roots wholesale, not an enumerated list: annotation processors
+                        write Java under generated-sources/annotations, which a local run with the
+                        `quick` profile never produces — so a list that names only the codegen plugins'
+                        output passes locally and fails in CI.
+                    -->
                     <excludeRoots>
-                        <excludeRoot>${project.build.directory}/generated-sources/graphql-github</excludeRoot>
-                        <excludeRoot>${project.build.directory}/generated-sources/graphql-gitlab</excludeRoot>
-                        <excludeRoot>${project.build.directory}/generated-sources/openapi-outline</excludeRoot>
+                        <excludeRoot>${project.build.directory}/generated-sources</excludeRoot>
+                        <excludeRoot>${project.build.directory}/generated-test-sources</excludeRoot>
                     </excludeRoots>
                 </configuration>
             </plugin>

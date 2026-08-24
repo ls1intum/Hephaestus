@@ -35,8 +35,28 @@ import {
 	getMiniMapNodeColor,
 } from "@/components/achievements/utils";
 
+function isRegisteredAchievementId(id: string): id is AchievementId {
+	return Object.hasOwn(ACHIEVEMENT_REGISTRY, id);
+}
+
 const FIT_VIEW_OPTIONS = { padding: 0.15 } as const;
 const PRO_OPTIONS = { hideAttribution: true } as const;
+
+/** Where each node sits on the skill-tree canvas, keyed by achievement id. */
+type NodeCoordinates = Record<string, { x: number; y: number }>;
+
+/**
+ * Hand the laid-out positions to the `save-achievement-layout` Vite middleware (`vite.config.ts`),
+ * which writes them into `coordinates.json` beside this file. Editing a source file makes this a
+ * design-time tool rather than a feature, so the middleware is mounted only while `vite` serves.
+ */
+async function postCoordinatesToDevServer(coordinates: NodeCoordinates): Promise<void> {
+	// oxlint-disable-next-line no-restricted-globals -- A dev-server middleware, not an application-server route: `openapi.yaml` has no operation to generate a client from, and there is no server state to cache.
+	await fetch("/__save-coordinates", {
+		method: "POST",
+		body: JSON.stringify(coordinates, null, 2),
+	});
+}
 
 export interface SkillTreeDesignerProps {
 	user: {
@@ -87,7 +107,7 @@ export function SkillTreeDesigner({ user, allDefinitions }: SkillTreeDesignerPro
 	}
 
 	async function saveLayout() {
-		const layoutMap = nodes.reduce<Record<string, { x: number; y: number }>>((coords, node) => {
+		const layoutMap = nodes.reduce<NodeCoordinates>((coords, node) => {
 			if (node.type === "avatar") coords.avatar = { x: 0, y: 0 };
 			if (node.type === "categoryLabel") {
 				coords[node.id] = {
@@ -105,12 +125,8 @@ export function SkillTreeDesigner({ user, allDefinitions }: SkillTreeDesignerPro
 			return coords;
 		}, {});
 
-		// Dev-only: saves layout to coordinates.json via Vite dev server plugin
 		if (import.meta.env.DEV) {
-			await fetch("/__save-coordinates", {
-				method: "POST",
-				body: JSON.stringify(layoutMap, null, 2),
-			});
+			await postCoordinatesToDevServer(layoutMap);
 			toast.success("Layout saved to coordinates.json!");
 		}
 	}
@@ -124,18 +140,21 @@ export function SkillTreeDesigner({ user, allDefinitions }: SkillTreeDesignerPro
 				status: "unlocked" as const,
 			}));
 		} else {
-			displayAchievements = Object.entries(ACHIEVEMENT_REGISTRY).map(
-				([id, def]) =>
-					({
-						...def,
-						id: id as AchievementId,
-						status: "unlocked" as const,
-						category: "milestones" as const,
-						rarity: "common" as const,
-						isHidden: false,
-						progressData: { type: "BinaryAchievementProgress" as const, unlocked: true },
-						unlockedAt: new Date(),
-					}) satisfies UIAchievement,
+			displayAchievements = Object.entries(ACHIEVEMENT_REGISTRY).flatMap(([id, def]) =>
+				isRegisteredAchievementId(id)
+					? [
+							{
+								...def,
+								id,
+								status: "unlocked" as const,
+								category: "milestones" as const,
+								rarity: "common" as const,
+								isHidden: false,
+								progressData: { type: "BinaryAchievementProgress" as const, unlocked: true },
+								unlockedAt: new Date(),
+							} satisfies UIAchievement,
+						]
+					: [],
 			);
 		}
 
@@ -163,25 +182,25 @@ export function SkillTreeDesigner({ user, allDefinitions }: SkillTreeDesignerPro
 				onSnapSizeChange={setSnapSize}
 				showTooltips={showTooltips}
 				onShowTooltipsChange={setShowTooltips}
-				onSave={saveLayout}
+				onSave={() => void saveLayout()}
 				edgeDisplayMode={edgeDisplayMode}
 				onEdgeDisplayModeChange={setEdgeDisplayMode}
 			/>
 
 			<ReactFlow
 				nodes={nodes.map((n) => {
-					if (n.type === "categoryLabel") return n;
-					return {
-						...n,
-						data: { ...n.data, showTooltips },
-					} as AchievementNode | AvatarNode;
+					// The two bodies look mergeable and are not: spreading the union collapses the two
+					// `data` shapes into one that fits neither.
+					if (n.type === "achievement") return { ...n, data: { ...n.data, showTooltips } };
+					if (n.type === "avatar") return { ...n, data: { ...n.data, showTooltips } };
+					return n;
 				})}
 				edges={edges}
 				onNodesChange={handleNodesChange}
 				onEdgesChange={onEdgesChange}
 				nodeTypes={nodeTypes}
 				edgeTypes={edgeTypes}
-				onInit={(instance) => instance.fitView(FIT_VIEW_OPTIONS)}
+				onInit={(instance) => void instance.fitView(FIT_VIEW_OPTIONS)}
 				fitView={true}
 				fitViewOptions={FIT_VIEW_OPTIONS}
 				minZoom={0.15}

@@ -12,6 +12,7 @@ consumer to capture messages that exceeded `maxRedeliver` instead of letting
 it (commit `b6970db0b`). This ADR records *why* the revert is the standing design.
 
 The original argument for a DLQ stream:
+
 - Operator visibility into the actual bytes that failed (rather than only
   `integration.consumer.poison` Micrometer counter).
 - Replay-after-fix workflow without re-running the upstream vendor delivery.
@@ -19,6 +20,7 @@ The original argument for a DLQ stream:
   long-running agent jobs whose container died mid-execution).
 
 What the revert noticed:
+
 - **The failure modes don't want a DLQ.** `IntegrationPoisonHandler` NAKs with
   exponential backoff up to `maxRedeliver` (default 10), then ACKs + bumps
   `integration.consumer.poison`. The failures it sees are DB constraint races on
@@ -68,12 +70,14 @@ exists. No `integration_consumer_dlq` table exists in Liquibase.
 ## Consequences
 
 **Positive:**
+
 - Zero operational overhead for the DLQ surface that no one queries.
 - Counter-based alerting is the right granularity for the actual failure modes.
 - Vendors handle their own retry; we don't duplicate vendor's persistence.
 - Simpler infrastructure (one fewer JetStream stream, one fewer Liquibase table).
 
 **Negative:**
+
 - If a future use case actually needs replay-from-DLQ semantics (e.g. a regulatory
   audit requirement: "prove every webhook was processed"), this design has to be
   revisited. The trigger condition is documented below.

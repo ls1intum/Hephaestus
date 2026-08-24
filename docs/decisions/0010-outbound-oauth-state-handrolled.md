@@ -95,6 +95,7 @@ nothing and reduce future drift:
 ## Consequences
 
 **Positive:**
+
 - Workspace-keyed credential persistence keeps the `Connection` aggregate as the single
   authoritative store. No second source of truth via `OAuth2AuthorizedClient`.
 - Multi-minute, multi-tab flows work because the nonce row is persistent (DB-backed,
@@ -104,11 +105,13 @@ nothing and reduce future drift:
   bean per tenant.
 
 **Neutral:**
+
 - Vocabulary aligned with Spring Security where it overlaps: `StateBinding` follows
   Spring naming so future migration (if the OSS landscape closes the multi-tenant gap)
   is a refactor, not a rewrite.
 
 **Negative:**
+
 - Maintain ~600 LOC of OAuth state plumbing that Spring would have provided for the
   session-bound case. We accept this cost to keep workspace-binding clean.
 - Future engineers will ask "why don't we use `spring-boot-starter-oauth2-client`?".
@@ -117,6 +120,7 @@ nothing and reduce future drift:
 ## Revisit trigger
 
 Any of:
+
 - Spring Security ships first-class multi-tenant `ClientRegistrationRepository` + a
   per-tenant `OAuth2AuthorizedClientService` schema that keys on something other than
   `principal_name` (track [issue #12862](https://github.com/spring-projects/spring-security/issues/12862)).

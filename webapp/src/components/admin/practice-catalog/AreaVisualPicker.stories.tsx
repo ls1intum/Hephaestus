@@ -86,7 +86,7 @@ export const DisabledWhileOpen: Story = {
 
 export const NarrowViewport: Story = {
 	parameters: { viewport: { defaultViewport: "reflow" }, chromatic: { viewports: [320] } },
-	play: async ({ canvas, userEvent }) => {
+	play: async ({ canvas }) => {
 		// The seven-column icon grid is the only thing here that can outgrow 320px, and it is
 		// portalled, so the assertion has to look at the document rather than the canvas.
 		await userEvent.click(

@@ -114,7 +114,6 @@ public class JobTypeHandlerConfiguration {
         FeedbackDeliveryService feedbackService,
         SecretDiffScanner secretDiffScanner,
         InContextDeliveryGate inContextDeliveryGate,
-        ApplicationEventPublisher eventPublisher,
         ObservationRepository observationRepository
     ) {
         return new PullRequestReviewHandler(
@@ -130,7 +129,6 @@ public class JobTypeHandlerConfiguration {
             secretDiffScanner,
             reactionSuppressionFilter,
             inContextDeliveryGate,
-            eventPublisher,
             observationRepository
         );
     }

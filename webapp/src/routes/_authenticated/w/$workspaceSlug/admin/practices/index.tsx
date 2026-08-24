@@ -32,7 +32,7 @@ import {
 	PracticeTreeSkeleton,
 } from "@/components/admin/practices/PracticeSkeletons";
 import {
-	type DETAIL_LEVEL_KINDS,
+	DETAIL_LEVEL_KINDS,
 	GUARDED_LEVEL_KINDS,
 	PRACTICE_SEARCH_PARAMS,
 	practiceSetupSearchSchema,
@@ -63,15 +63,6 @@ import { workspaceAdminHead } from "@/lib/page-title";
 import { problemStatusOf } from "@/lib/problem-detail";
 import { useSearchState } from "@/lib/search-params";
 
-type DetailKind = (typeof DETAIL_LEVEL_KINDS)[number];
-
-/** The payload each level kind resolves to, so a panel can ask for its own and get `undefined` else. */
-type LevelPayload<TKind extends DetailKind> = TKind extends "catalog-area"
-	? CatalogAreaAdoptionPreview
-	: TKind extends "catalog-practice"
-		? CatalogPracticePreview
-		: Practice;
-
 export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/practices/")({
 	head: workspaceAdminHead("Practices"),
 	validateSearch: practiceSetupSearchSchema,
@@ -92,7 +83,7 @@ function PracticeCatalogRoute() {
 
 	// Every open level owns its own preview query, keyed by that level's slug. Sharing one query per
 	// kind would let `?detail=practice:a&detail=practice:b` show a's definition while adding b.
-	const detailStack = parseDetailStack<(typeof DETAIL_LEVEL_KINDS)[number]>(detail);
+	const detailStack = parseDetailStack(detail, DETAIL_LEVEL_KINDS);
 	const stackControls = useDetailStack(detailStack);
 
 	const areasQuery = useQuery({
@@ -130,6 +121,7 @@ function PracticeCatalogRoute() {
 				};
 			}
 			if (entry.kind === "practice-new") {
+				// oxlint-disable-next-line hephaestus/no-manual-query-key -- A practice that does not exist yet has nothing on the server to key against; this placeholder only keeps `levelQueries` the same length as the stack.
 				return { queryKey: ["practice-new", entry.id], queryFn: () => null, staleTime: Infinity };
 			}
 			return {
@@ -142,13 +134,23 @@ function PracticeCatalogRoute() {
 	/** The groups the editor offers. A hidden group still holds practices but is not a destination. */
 	const editableAreas = areasQuery.data?.filter((area) => area.visibleInPracticeDashboards);
 
-	/** Reads a level's payload only when it is the kind the caller is rendering. */
-	const levelData = <TKind extends DetailKind>(
-		query: (typeof levelQueries)[number] | undefined,
-		kind: TKind,
-	) => {
+	/**
+	 * Reads a level's payload only when it is the kind the caller is rendering. One reader per kind
+	 * rather than one that takes the kind: a `===` against a value typed by a type parameter narrows
+	 * nothing, so a shared reader would have to assert back what the tag already proves.
+	 */
+	type LevelQuery = (typeof levelQueries)[number] | undefined;
+	const areaAdoptionAt = (query: LevelQuery) => {
 		const tagged = query?.data;
-		return tagged?.kind === kind ? (tagged.data as LevelPayload<TKind>) : undefined;
+		return tagged?.kind === "catalog-area" ? tagged.data : undefined;
+	};
+	const practiceAdoptionAt = (query: LevelQuery) => {
+		const tagged = query?.data;
+		return tagged?.kind === "catalog-practice" ? tagged.data : undefined;
+	};
+	const workspacePracticeAt = (query: LevelQuery) => {
+		const tagged = query?.data;
+		return tagged?.kind === "practice" ? tagged.data : undefined;
 	};
 
 	const refreshCatalog = () =>
@@ -183,8 +185,8 @@ function PracticeCatalogRoute() {
 	const adoptReviewedPractice = async (depth: number) => {
 		const entry = detailStack[depth];
 		const query = levelQueries[depth];
-		const preview = levelData(query, "catalog-practice");
-		if (!entry || !preview) return;
+		const preview = practiceAdoptionAt(query);
+		if (!entry || !query || !preview) return;
 		setStaleLevelKey(null);
 		try {
 			await adoptCatalogPractice.mutateAsync({
@@ -241,9 +243,9 @@ function PracticeCatalogRoute() {
 					error={areasQuery.error ?? practicesQuery.error ?? definitionOptionsQuery.error}
 					title="Couldn't load practices"
 					onRetry={() => {
-						areasQuery.refetch();
-						practicesQuery.refetch();
-						definitionOptionsQuery.refetch();
+						void areasQuery.refetch();
+						void practicesQuery.refetch();
+						void definitionOptionsQuery.refetch();
 					}}
 				/>
 			) : (
@@ -264,19 +266,19 @@ function PracticeCatalogRoute() {
 					library={{
 						open: library === true,
 						onOpenChange: (open) =>
-							setSearch((previous) => ({ ...previous, library: open || undefined })),
+							void setSearch((previous) => ({ ...previous, library: open || undefined })),
 						state: catalogQuery.isError
 							? {
 									status: "error",
 									error: catalogQuery.error,
-									onRetry: () => catalogQuery.refetch(),
+									onRetry: () => void catalogQuery.refetch(),
 								}
 							: catalogQuery.data
 								? { status: "ready", practices: catalogQuery.data }
 								: { status: "loading" },
 					}}
 					onFocusFilterChange={(next: FocusFilter) =>
-						setSearch((previous) => ({
+						void setSearch((previous) => ({
 							...previous,
 							focus: next === "ALL" ? undefined : next,
 						}))
@@ -317,7 +319,7 @@ function PracticeCatalogRoute() {
 						})
 					}
 					onDeleteArea={(areaSlug) =>
-						setDeletingArea(areasQuery.data?.find((area) => area.slug === areaSlug) ?? null)
+						setDeletingArea(areasQuery.data.find((area) => area.slug === areaSlug) ?? null)
 					}
 					onReorderAreas={(orderedSlugs) =>
 						catalog.reorderAreas.mutate({ path: { workspaceSlug }, body: { orderedSlugs } })
@@ -341,17 +343,40 @@ function PracticeCatalogRoute() {
 				onClose={stackControls.close}
 			>
 				{(entry, level) => {
+					// `levelQueries` is derived from the same stack this callback walks, so index and depth
+					// agree. A level read before its query exists is a frame between two states rather than a
+					// state of its own, and it reads as loading.
 					const query = levelQueries[level.depth];
+					const levelPending = query === undefined || query.isPending;
+					const levelError = query?.isError === true ? query.error : undefined;
+					const refetchLevel = () => void query?.refetch();
 					if (entry.kind === "catalog-area") {
-						const areaPreview = levelData(query, "catalog-area");
+						const areaPreview = areaAdoptionAt(query);
+						const adoptGroup = async () => {
+							const preview = areaAdoptionAt(query);
+							if (!query || !preview) return;
+							setStaleLevelKey(null);
+							try {
+								await adoptCatalogArea.mutateAsync({
+									path: { workspaceSlug, slug: entry.id },
+									headers: { "If-Match": preview.etag },
+								});
+							} catch (error) {
+								// Same failure as a practice's, so the same recovery: refresh in place.
+								if (problemStatusOf(error) !== 412) return;
+								const refreshed = await query.refetch();
+								if (refreshed.isSuccess) setStaleLevelKey(detailStackKey(entry));
+								else toast.error("The group plan changed but couldn't be refreshed");
+							}
+						};
 						return (
 							<AreaAdoptionPanel
 								nested={level.nested}
 								state={
-									areaPreview === undefined || query.isPending
+									areaPreview === undefined || levelPending
 										? { status: "loading" }
-										: query.isError
-											? { status: "error", error: query.error, onRetry: () => query.refetch() }
+										: levelError !== undefined
+											? { status: "error", error: levelError, onRetry: refetchLevel }
 											: {
 													status: "ready",
 													preview: areaPreview,
@@ -366,43 +391,27 @@ function PracticeCatalogRoute() {
 								onOpenPractice={(catalogSlug) =>
 									stackControls.open({ kind: "catalog-practice", id: catalogSlug })
 								}
-								onConfirm={async () => {
-									const preview = levelData(query, "catalog-area");
-									if (!preview) return;
-									setStaleLevelKey(null);
-									try {
-										await adoptCatalogArea.mutateAsync({
-											path: { workspaceSlug, slug: entry.id },
-											headers: { "If-Match": preview.etag },
-										});
-									} catch (error) {
-										// Same failure as a practice's, so the same recovery: refresh in place.
-										if (problemStatusOf(error) !== 412) return;
-										const refreshed = await query.refetch();
-										if (refreshed.isSuccess) setStaleLevelKey(detailStackKey(entry));
-										else toast.error("The group plan changed but couldn't be refreshed");
-									}
-								}}
+								onConfirm={() => void adoptGroup()}
 							/>
 						);
 					}
 					if (entry.kind === "practice") {
-						const workspacePractice = levelData(query, "practice");
+						const workspacePractice = workspacePracticeAt(query);
 						return (
 							<WorkspacePracticePanel
 								nested={level.nested}
 								state={
 									workspacePractice === undefined ||
-									query.isPending ||
+									levelPending ||
 									definitionOptionsQuery.isPending
 										? { status: "loading" }
-										: query.isError || definitionOptionsQuery.isError
+										: levelError !== undefined || definitionOptionsQuery.isError
 											? {
 													status: "error",
-													error: query.error ?? definitionOptionsQuery.error,
+													error: levelError ?? definitionOptionsQuery.error,
 													onRetry: () => {
-														query.refetch();
-														definitionOptionsQuery.refetch();
+														refetchLevel();
+														void definitionOptionsQuery.refetch();
 													},
 												}
 											: {
@@ -419,7 +428,7 @@ function PracticeCatalogRoute() {
 					}
 					if (entry.kind === "practice-edit" || entry.kind === "practice-new") {
 						const creating = entry.kind === "practice-new";
-						const editing = creating ? undefined : levelData(query, "practice");
+						const editing = creating ? undefined : workspacePracticeAt(query);
 						// The form saves and then leaves. It must reject on failure, or the unsaved-changes
 						// guard lifts and the draft goes with the level.
 						const saved = async (work: Promise<unknown>) => {
@@ -435,15 +444,18 @@ function PracticeCatalogRoute() {
 										<PracticeDefinitionSkeleton />
 									</DrawerBody>
 								) : (
+									// Split on the loaded practice rather than on `creating`: the guard above has
+									// already sent every other way of having none to the skeleton, so no practice
+									// here means this level is writing a new one.
 									<PracticeForm
-										{...(creating
+										{...(editing === undefined
 											? {
 													mode: "create" as const,
 													onSubmit: (data, areaSlug) => saved(editor.create(data, areaSlug)),
 												}
 											: {
 													mode: "edit" as const,
-													initialData: editing as Practice,
+													initialData: editing,
 													onSubmit: (slug, data, areaSlug) =>
 														saved(editor.update(slug, data, areaSlug)),
 													evidenceOutcome: evidenceOutcomesQuery.data?.find(
@@ -460,20 +472,20 @@ function PracticeCatalogRoute() {
 							</PracticeFormLevel>
 						);
 					}
-					const catalogPreview = levelData(query, "catalog-practice");
+					const catalogPreview = practiceAdoptionAt(query);
 					return (
 						<PracticeAdoptionPanel
 							nested={level.nested}
 							state={
-								catalogPreview === undefined || query.isPending || definitionOptionsQuery.isPending
+								catalogPreview === undefined || levelPending || definitionOptionsQuery.isPending
 									? { status: "loading" }
-									: query.isError || definitionOptionsQuery.isError
+									: levelError !== undefined || definitionOptionsQuery.isError
 										? {
 												status: "error",
-												error: query.error ?? definitionOptionsQuery.error,
+												error: levelError ?? definitionOptionsQuery.error,
 												onRetry: () => {
-													query.refetch();
-													definitionOptionsQuery.refetch();
+													refetchLevel();
+													void definitionOptionsQuery.refetch();
 												},
 											}
 										: {
@@ -488,7 +500,7 @@ function PracticeCatalogRoute() {
 															: "idle",
 											}
 							}
-							onAdopt={() => adoptReviewedPractice(level.depth)}
+							onAdopt={() => void adoptReviewedPractice(level.depth)}
 						/>
 					);
 				}}

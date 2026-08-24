@@ -44,12 +44,12 @@ function AuthCallbackPage() {
 		// straight to /login rather than optimistically navigating into a protected target and
 		// relying on the `_authenticated` guard to bounce us back.
 		if (isError) {
-			navigate({ to: "/login", replace: true });
+			void navigate({ to: "/login", replace: true });
 			return;
 		}
 		// `href` (not `to`) carries the runtime-validated internal path while keeping the typed
 		// navigate API: safeReturnTo only returns relative paths, so this stays an SPA navigation.
-		navigate({ href: safeReturnTo(returnTo), replace: true });
+		void navigate({ href: safeReturnTo(returnTo), replace: true });
 	}, [isLoading, isError, returnTo, navigate]);
 
 	return (

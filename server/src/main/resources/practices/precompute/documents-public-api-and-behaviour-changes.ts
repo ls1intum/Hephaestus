@@ -112,7 +112,7 @@ function isComment(trimmed: string): boolean {
 	);
 }
 
-export default async function (
+export default async function documentsPublicApiAndBehaviourChanges(
 	repoPath: string,
 	diffFiles: Map<string, DiffFile>,
 	_m: PullRequestMetadata,
@@ -121,7 +121,7 @@ export default async function (
 	let hasPublicProduct = false;
 	for (const ext of MANIFEST_NAMES) {
 		if (hasPublicProduct) break;
-		for (const manifestPath of await findFiles(repoPath, ext)) {
+		for (const manifestPath of findFiles(repoPath, ext)) {
 			const matcher = PRODUCT_MANIFESTS.find(([re]) => re.test(manifestPath));
 			if (!matcher) continue;
 			const lines = await readFileLines(manifestPath);

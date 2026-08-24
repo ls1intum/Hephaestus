@@ -15,12 +15,43 @@ import {
 } from "@/api/@tanstack/react-query.gen";
 import type { ConnectionSummary, IntegrationCatalogEntry } from "@/api/types.gen";
 import environment from "@/environment";
+import { isRecord } from "@/lib/is-record";
+import { queryOperationId } from "@/lib/query-operation-id";
 
 type SyncEventScope = "job" | "resources" | "connection" | "activity";
 
 interface SyncEventHint {
 	scope: SyncEventScope;
 	connectionId: number;
+}
+
+const SYNC_EVENT_SCOPES = {
+	job: true,
+	resources: true,
+	connection: true,
+	activity: true,
+} satisfies Record<SyncEventScope, true>;
+
+function isSyncEventScope(value: unknown): value is SyncEventScope {
+	return typeof value === "string" && Object.hasOwn(SYNC_EVENT_SCOPES, value);
+}
+
+/**
+ * Drops a hint whose shape does not match. Dropping is not free: `syncPollInterval` turns polling
+ * off entirely while the stream is healthy and no job is running, so nothing refetches the queries
+ * that hint would have refreshed until the next hint, or a navigation.
+ */
+function parseHint(payload: string): SyncEventHint | undefined {
+	let decoded: unknown;
+	try {
+		decoded = JSON.parse(payload);
+	} catch {
+		return undefined;
+	}
+	if (!isRecord(decoded)) return undefined;
+	const { scope, connectionId } = decoded;
+	if (!isSyncEventScope(scope) || typeof connectionId !== "number") return undefined;
+	return { scope, connectionId };
 }
 
 /** Backoff ladder for manual reconnects: 1s, 2s, 4s … capped, each scaled by 0.5–1.0× jitter. */
@@ -86,10 +117,17 @@ export function useSyncEvents(workspaceSlug: string | undefined): boolean {
 	const queryClient = useQueryClient();
 	const [livePushUnavailable, setLivePushUnavailable] = useState(false);
 
+	// Each workspace gets its own stream, so the previous one's failures say nothing about this one.
+	// Reset during render rather than in the effect below, which would report the old stream degraded
+	// for one paint after the switch.
+	const [streamedSlug, setStreamedSlug] = useState(workspaceSlug);
+	if (streamedSlug !== workspaceSlug) {
+		setStreamedSlug(workspaceSlug);
+		setLivePushUnavailable(false);
+	}
+
 	useEffect(() => {
 		if (!workspaceSlug) return;
-
-		setLivePushUnavailable(false);
 
 		let source: EventSource | null = null;
 		let reconnectTimer: ReturnType<typeof setTimeout> | undefined;
@@ -110,19 +148,13 @@ export function useSyncEvents(workspaceSlug: string | undefined): boolean {
 		 */
 		const resyncIntegrationQueries = () => {
 			const familyIds = integrationQueryFamilyIds(workspaceSlug);
-			queryClient.invalidateQueries({
+			void queryClient.invalidateQueries({
 				predicate: ({ queryKey }) => {
+					const id = queryOperationId(queryKey);
+					if (id === undefined || !familyIds.has(id)) return false;
 					const [key] = queryKey;
-					if (!key || typeof key !== "object" || !("_id" in key)) return false;
-					const { _id: id } = key as { _id?: unknown };
-					if (typeof id !== "string" || !familyIds.has(id)) return false;
-					const path = "path" in key ? (key as { path?: unknown }).path : undefined;
-					return (
-						typeof path === "object" &&
-						path !== null &&
-						"workspaceSlug" in path &&
-						(path as { workspaceSlug?: unknown }).workspaceSlug === workspaceSlug
-					);
+					if (!isRecord(key) || !isRecord(key.path)) return false;
+					return key.path.workspaceSlug === workspaceSlug;
 				},
 			});
 		};
@@ -130,22 +162,28 @@ export function useSyncEvents(workspaceSlug: string | undefined): boolean {
 		const applyHint = ({ scope, connectionId }: SyncEventHint) => {
 			switch (scope) {
 				case "job":
-					invalidate(getConnectionSyncStatusQueryKey({ path: { workspaceSlug, connectionId } }));
-					invalidate(listConnectionSyncJobsQueryKey({ path: { workspaceSlug, connectionId } }));
+					void invalidate(
+						getConnectionSyncStatusQueryKey({ path: { workspaceSlug, connectionId } }),
+					);
+					void invalidate(
+						listConnectionSyncJobsQueryKey({ path: { workspaceSlug, connectionId } }),
+					);
 					break;
 				case "resources": {
-					invalidate(
+					void invalidate(
 						listConnectionSyncResourcesQueryKey({ path: { workspaceSlug, connectionId } }),
 					);
-					invalidate(getConnectionSyncStatusQueryKey({ path: { workspaceSlug, connectionId } }));
+					void invalidate(
+						getConnectionSyncStatusQueryKey({ path: { workspaceSlug, connectionId } }),
+					);
 					// Only the catalog for this connection's integration changed; a GitHub repo-sync
 					// hint says nothing about Slack channels or Outline collections.
 					const kind = connectionKindOf(queryClient, workspaceSlug, connectionId);
 					if (kind === "OUTLINE" || kind === undefined) {
-						invalidate(listOutlineCollectionsQueryKey({ path: { workspaceSlug } }));
+						void invalidate(listOutlineCollectionsQueryKey({ path: { workspaceSlug } }));
 					}
 					if (kind === "SLACK" || kind === undefined) {
-						invalidate(listSlackChannelsQueryKey({ path: { workspaceSlug } }));
+						void invalidate(listSlackChannelsQueryKey({ path: { workspaceSlug } }));
 					}
 					break;
 				}
@@ -155,7 +193,9 @@ export function useSyncEvents(workspaceSlug: string | undefined): boolean {
 					resyncIntegrationQueries();
 					break;
 				case "activity":
-					invalidate(getConnectionSyncStatusQueryKey({ path: { workspaceSlug, connectionId } }));
+					void invalidate(
+						getConnectionSyncStatusQueryKey({ path: { workspaceSlug, connectionId } }),
+					);
 					break;
 				default:
 					break;
@@ -163,14 +203,8 @@ export function useSyncEvents(workspaceSlug: string | undefined): boolean {
 		};
 
 		const handleHint = (event: MessageEvent<string>) => {
-			let hint: SyncEventHint;
-			try {
-				hint = JSON.parse(event.data);
-			} catch {
-				// A malformed hint is safely ignored: the periodic poll backstop still refreshes state.
-				console.debug("Ignoring malformed sync-event hint payload");
-				return;
-			}
+			const hint = parseHint(event.data);
+			if (!hint) return;
 
 			// A running job emits progress hints far faster than a human can read them; collapse each
 			// burst to one refetch per scope per connection.
@@ -186,10 +220,16 @@ export function useSyncEvents(workspaceSlug: string | undefined): boolean {
 			);
 		};
 
+		/**
+		 * One controller per connection, not one per hook: an `AbortSignal` is one-shot, and
+		 * `addEventListener(…, { signal })` with an already-aborted signal attaches nothing at all,
+		 * silently. Reusing a controller across reconnects leaves every stream after the first deaf.
+		 */
+		const controllers = new WeakMap<EventSource, AbortController>();
+
 		const detach = (target: EventSource) => {
-			target.removeEventListener("sync", handleHint);
-			target.onopen = null;
-			target.onerror = null;
+			controllers.get(target)?.abort();
+			controllers.delete(target);
 			target.close();
 		};
 
@@ -199,49 +239,61 @@ export function useSyncEvents(workspaceSlug: string | undefined): boolean {
 				{ withCredentials: true },
 			);
 			source = current;
+			const controller = new AbortController();
+			controllers.set(current, controller);
+			const { signal } = controller;
 
-			current.onopen = () => {
-				consecutiveFailures = 0;
-				setLivePushUnavailable(false);
+			current.addEventListener(
+				"open",
+				() => {
+					consecutiveFailures = 0;
+					setLivePushUnavailable(false);
 
-				const now = Date.now();
-				// The first open races the page's own mount fetches, which are already loading this
-				// data — resyncing here would cancel and restart them. Record the timestamp anyway so
-				// an immediate re-open is throttled against the mount.
-				const isFirstOpen = !hasEverOpened;
-				hasEverOpened = true;
-				if (isFirstOpen || now - lastResyncAt < RESYNC_THROTTLE_MS) {
-					if (isFirstOpen) lastResyncAt = now;
-					return;
-				}
-				lastResyncAt = now;
-				resyncIntegrationQueries();
-			};
+					// oxlint-disable-next-line no-restricted-properties -- Measures RESYNC_THROTTLE_MS from the previous open, inside a DOM listener; `useNow`'s shared tick is the same order as that window and could not resolve it.
+					const now = Date.now();
+					// The first open races the page's own mount fetches, which are already loading this
+					// data — resyncing here would cancel and restart them. Record the timestamp anyway so
+					// an immediate re-open is throttled against the mount.
+					const isFirstOpen = !hasEverOpened;
+					hasEverOpened = true;
+					if (isFirstOpen || now - lastResyncAt < RESYNC_THROTTLE_MS) {
+						if (isFirstOpen) lastResyncAt = now;
+						return;
+					}
+					lastResyncAt = now;
+					resyncIntegrationQueries();
+				},
+				{ signal },
+			);
 
-			current.addEventListener("sync", handleHint);
+			current.addEventListener("sync", handleHint, { signal });
 
-			current.onerror = () => {
-				// Only act on CLOSED. CONNECTING means the browser is already auto-retrying a network
-				// error (the HTML spec makes that automatic), so stay out of it. CLOSED means the
-				// connection failed — the spec reaches it for any non-200 or wrong Content-Type — and
-				// the browser never retries that: one 502 during a deploy or one 401 on an expired
-				// session ends live updates for the session unless we reconnect ourselves.
-				if (current.readyState !== EventSource.CLOSED) return;
+			current.addEventListener(
+				"error",
+				() => {
+					// Only act on CLOSED. CONNECTING means the browser is already auto-retrying a network
+					// error (the HTML spec makes that automatic), so stay out of it. CLOSED means the
+					// connection failed — the spec reaches it for any non-200 or wrong Content-Type — and
+					// the browser never retries that: one 502 during a deploy or one 401 on an expired
+					// session ends live updates for the session unless we reconnect ourselves.
+					if (current.readyState !== EventSource.CLOSED) return;
 
-				consecutiveFailures += 1;
-				if (consecutiveFailures >= FAILURES_BEFORE_DEGRADED) setLivePushUnavailable(true);
+					consecutiveFailures += 1;
+					if (consecutiveFailures >= FAILURES_BEFORE_DEGRADED) setLivePushUnavailable(true);
 
-				detach(current);
-				if (disposed) return;
+					detach(current);
+					if (disposed) return;
 
-				const backoff = Math.min(
-					RECONNECT_CAP_MS,
-					RECONNECT_BASE_MS * 2 ** (consecutiveFailures - 1),
-				);
-				// Jitter keeps every admin tab from re-storming the server on the same tick after a
-				// shared outage.
-				reconnectTimer = setTimeout(connect, backoff * (0.5 + Math.random() * 0.5));
-			};
+					const backoff = Math.min(
+						RECONNECT_CAP_MS,
+						RECONNECT_BASE_MS * 2 ** (consecutiveFailures - 1),
+					);
+					// Jitter keeps every admin tab from re-storming the server on the same tick after a
+					// shared outage.
+					reconnectTimer = setTimeout(connect, backoff * (0.5 + Math.random() * 0.5));
+				},
+				{ signal },
+			);
 		};
 
 		connect();

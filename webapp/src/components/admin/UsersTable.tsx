@@ -11,8 +11,8 @@ import {
 	type VisibilityState,
 } from "@tanstack/react-table";
 import { ArrowUpDown, ChevronDown, EyeIcon, EyeOffIcon, Filter, Search, Users } from "lucide-react";
-import type { ComponentProps, ReactElement } from "react";
-import { useEffect, useMemo, useState } from "react";
+// oxlint-disable-next-line no-restricted-imports -- The compiler skips this component (see `useReactTable` below), so the memos on `columns` and `filteredData` are written by hand.
+import { type ComponentProps, type ReactElement, useEffect, useMemo, useState } from "react";
 import type { TeamInfo } from "@/api/types.gen";
 import { TablePagination } from "@/components/common/TablePagination";
 import { Button } from "@/components/ui/button";
@@ -74,6 +74,8 @@ export function UsersTable({
 	const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
 	const sorting: SortingState = [{ id: view.sort, desc: view.desc }];
 
+	// TanStack Table caches its column model — and every row model derived from it — against the
+	// identity of this array, so a fresh one each render rebuilds all of them.
 	const columns = useMemo<ColumnDef<ExtendedUserTeams>[]>(
 		() => [
 			{
@@ -140,33 +142,30 @@ export function UsersTable({
 		[onToggleHidden],
 	);
 
+	// The table's `data`, keyed the same way `columns` is: the core row model is cached against this
+	// array's identity.
 	const filteredData = useMemo(
 		() =>
 			users.filter((user) => {
 				if (view.team === "all") return true;
-				return user.teams?.some((team) => team.id.toString() === view.team) || false;
+				return user.teams.some((team) => team.id.toString() === view.team);
 			}),
 		[users, view.team],
 	);
 
-	const sortedTeams = useMemo(
-		() => [...teams].sort((a, b) => a.name.localeCompare(b.name)),
-		[teams],
-	);
+	const sortedTeams = [...teams].sort((a, b) => a.name.localeCompare(b.name));
 
-	const teamFilterItems = useMemo(
-		() => [
-			{ value: "all", label: "All teams" },
-			...sortedTeams.map((team) => ({ value: team.id.toString(), label: team.name })),
-		],
-		[sortedTeams],
-	);
+	const teamFilterItems = [
+		{ value: "all", label: "All teams" },
+		...sortedTeams.map((team) => ({ value: team.id.toString(), label: team.name })),
+	];
 
 	const pageSizeItems = [10, 20, 30, 40, 50].map((size) => ({
 		value: `${size}`,
 		label: `${size}`,
 	}));
 
+	// oxlint-disable-next-line react/incompatible-library -- TanStack Table is a deliberate dependency; the compiler bail-out it causes is why `columns` and `filteredData` above are memoised by hand.
 	const table = useReactTable({
 		data: filteredData,
 		columns,
@@ -230,7 +229,7 @@ export function UsersTable({
 							<Filter className="mr-2 h-4 w-4" />
 							<SelectValue placeholder="Filter by team" />
 						</SelectTrigger>
-						<SelectContent>
+						<SelectContent aria-label="Filter members by team">
 							<SelectItem value="all">
 								<div className="flex items-center space-x-2">
 									<div className="w-3 h-3 rounded-full bg-muted" />
@@ -275,7 +274,7 @@ export function UsersTable({
 												key={column.id}
 												className="capitalize"
 												checked={column.getIsVisible()}
-												onCheckedChange={(value) => column.toggleVisibility(!!value)}
+												onCheckedChange={(value) => column.toggleVisibility(value)}
 											>
 												{column.id}
 											</DropdownMenuCheckboxItem>
@@ -314,7 +313,7 @@ export function UsersTable({
 									</div>
 								</TableCell>
 							</TableRow>
-						) : table.getRowModel().rows?.length > 0 ? (
+						) : table.getRowModel().rows.length > 0 ? (
 							table.getRowModel().rows.map((row) => (
 								<TableRow
 									key={row.id}
@@ -357,7 +356,11 @@ export function UsersTable({
 				</div>
 				<div className="flex flex-col sm:flex-row items-center space-y-4 sm:space-y-0 sm:space-x-6 lg:space-x-8 order-1 sm:order-2">
 					<div className="flex items-center space-x-2">
-						<Label htmlFor="member-rows-per-page" className="whitespace-nowrap">
+						<Label
+							id="member-rows-per-page-label"
+							htmlFor="member-rows-per-page"
+							className="whitespace-nowrap"
+						>
 							Rows per page
 						</Label>
 						<Select
@@ -370,7 +373,7 @@ export function UsersTable({
 							<SelectTrigger id="member-rows-per-page" className="h-8 w-[70px]">
 								<SelectValue />
 							</SelectTrigger>
-							<SelectContent side="top">
+							<SelectContent side="top" aria-labelledby="member-rows-per-page-label">
 								{[10, 20, 30, 40, 50].map((pageSize) => (
 									<SelectItem key={pageSize} value={`${pageSize}`}>
 										{pageSize}

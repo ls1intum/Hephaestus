@@ -14,9 +14,6 @@ export interface ReviewRunCardProps {
 /**
  * On the page rather than behind a disclosure: the model and the token count are what an operator
  * checks when a review costs more than it should or answers worse than it used to.
- *
- * <p>The configuration snapshot is copied and never rendered — it is a machine artefact, so the
- * useful action on it is putting it where a machine can read it.
  */
 export function ReviewRunCard({ job }: ReviewRunCardProps) {
 	const copyConfiguration = async () => {
@@ -34,7 +31,7 @@ export function ReviewRunCard({ job }: ReviewRunCardProps) {
 				<h3 id="run-card-heading" className="text-lg font-semibold">
 					How this review ran
 				</h3>
-				<Button variant="outline" size="sm" onClick={copyConfiguration}>
+				<Button variant="outline" size="sm" onClick={() => void copyConfiguration()}>
 					<CopyIcon aria-hidden />
 					Copy configuration
 				</Button>

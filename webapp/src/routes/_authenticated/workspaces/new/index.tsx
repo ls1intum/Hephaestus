@@ -1,9 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import type { LucideIcon } from "lucide-react";
-import { ArrowLeftIcon, OctagonXIcon } from "lucide-react";
+import { ArrowLeftIcon, type LucideIcon, OctagonXIcon } from "lucide-react";
 import { getProvidersOptions } from "@/api/@tanstack/react-query.gen";
-import { GithubIcon, GitlabIcon } from "@/components/icons/brand";
+import { type BrandIcon, GithubIcon, GitlabIcon } from "@/components/icons/brand";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
@@ -17,7 +16,11 @@ interface Provider {
 	id: string;
 	name: string;
 	description: string;
-	icon: LucideIcon;
+	/**
+	 * Lucide and the in-house brand glyphs are separate component types, and this slot takes either.
+	 * All it asks of a glyph is that it render from `className`, which both do.
+	 */
+	icon: LucideIcon | BrandIcon;
 	to: string;
 }
 

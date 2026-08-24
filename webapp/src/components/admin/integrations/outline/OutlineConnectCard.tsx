@@ -2,7 +2,13 @@ import { differenceInCalendarDays, format } from "date-fns";
 import { CheckIcon, CircleAlertIcon, KeyRoundIcon, TriangleAlertIcon } from "lucide-react";
 import { useState } from "react";
 import type { OutlineTokenStatus } from "@/api/types.gen";
+import { IntegrationCardHeading } from "@/components/admin/integrations/IntegrationCardHeading";
+import {
+	CONNECTION_STATE_LABEL,
+	type ConnectionState,
+} from "@/components/admin/integrations/sync-format";
 import { RelativeTime } from "@/components/common/RelativeTime";
+import { useNow } from "@/components/common/use-now";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
 	AlertDialog,
@@ -21,8 +27,7 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { asDate } from "@/lib/dates";
-import { IntegrationCardHeading } from "../IntegrationCardHeading";
-import { CONNECTION_STATE_LABEL, type ConnectionState } from "../sync-format";
+import { hasText } from "@/lib/text";
 
 export interface OutlineConnectInput {
 	serverUrl: string;
@@ -62,9 +67,8 @@ const EXPIRY_WARNING_DAYS = 14;
  * When disconnected it is the connect form (server URL + API token). When connected it names the
  * linked instance and shows the stored token's health plus a guarded disconnect; the connection plane
  * itself — health, freshness, webhook diagnostics, running-job progress and the Sync/Cancel controls —
- * lives in the shared {@link import("../SyncStatusHeader").SyncStatusHeader} above this card, and which
- * collections are mirrored is managed in {@link import("./OutlineCollectionsSection").OutlineCollectionsSection}
- * below it. Pure presentation.
+ * lives in the shared `SyncStatusHeader` above this card, and which collections are mirrored is
+ * managed in `OutlineCollectionsSection` below it. Pure presentation.
  */
 export function OutlineConnectCard({
 	connected,
@@ -244,6 +248,7 @@ interface OutlineTokenPanelProps {
  * is warn early. Rejection and imminent expiry both silently kill the mirror, so both are alerts, not muted text.
  */
 function OutlineTokenPanel({ tokenStatus, isLoading }: OutlineTokenPanelProps) {
+	const now = useNow();
 	if (isLoading) {
 		return <Skeleton className="h-5 w-64" />;
 	}
@@ -274,7 +279,7 @@ function OutlineTokenPanel({ tokenStatus, isLoading }: OutlineTokenPanelProps) {
 		expiresAt != null ||
 		lastActiveAt != null;
 
-	const daysLeft = expiresAt ? differenceInCalendarDays(expiresAt, new Date()) : undefined;
+	const daysLeft = expiresAt ? differenceInCalendarDays(expiresAt, new Date(now)) : undefined;
 	const expiringSoon = daysLeft != null && daysLeft <= EXPIRY_WARNING_DAYS;
 
 	return (
@@ -284,7 +289,7 @@ function OutlineTokenPanel({ tokenStatus, isLoading }: OutlineTokenPanelProps) {
 					<KeyRoundIcon className="size-4 text-success" aria-hidden />
 					Outline accepts this token
 				</span>
-				{hasMetadata && (tokenStatus.name || tokenStatus.last4) && (
+				{hasMetadata && (hasText(tokenStatus.name) || hasText(tokenStatus.last4)) && (
 					<span>
 						{tokenStatus.name ?? "API key"}
 						{tokenStatus.last4 ? ` (…${tokenStatus.last4})` : ""}
@@ -308,7 +313,7 @@ function OutlineTokenPanel({ tokenStatus, isLoading }: OutlineTokenPanelProps) {
 				<Alert variant="warning">
 					<TriangleAlertIcon />
 					<AlertTitle>
-						{daysLeft != null && daysLeft <= 0
+						{daysLeft <= 0
 							? `This API key expired on ${format(expiresAt, "d MMM yyyy")}`
 							: `This API key expires in ${daysLeft} day${daysLeft === 1 ? "" : "s"} (on ${format(expiresAt, "d MMM yyyy")})`}
 					</AlertTitle>

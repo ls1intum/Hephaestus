@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { Gauge } from "lucide-react";
 import type { InstanceSettings } from "@/api/types.gen";
+import { minutesBefore } from "@/components/common/story-clock";
 import { PageHeader } from "@/components/core/PageHeader";
 import { SilentModeBanner } from "./SilentModeBanner";
 
@@ -8,7 +9,7 @@ const engaged: InstanceSettings = {
 	etag: '"0"',
 	silentModeEngaged: true,
 	silentModeReason: "Investigating incident #42 — bad feedback going out",
-	silentModeChangedAt: new Date(Date.now() - 45 * 60_000),
+	silentModeChangedAt: minutesBefore(45),
 	silentModeChangedBy: "felixtjdietrich",
 };
 

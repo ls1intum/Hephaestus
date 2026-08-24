@@ -70,7 +70,7 @@ export function ChannelHistorySheet({
 						<QueryErrorAlert
 							error={error}
 							title="Could not load the consent history"
-							onRetry={() => refetch()}
+							onRetry={() => void refetch()}
 						/>
 					)}
 
@@ -103,6 +103,8 @@ export function ChannelHistorySheet({
 }
 
 function HistoryEntry({ event }: { event: SlackChannelConsentEvent }) {
+	// `null` drops the date and keeps the transition: a stand-in instant would read as a recorded one.
+	const createdAt = asDate(event.createdAt);
 	return (
 		<Item
 			render={<li />}
@@ -119,7 +121,7 @@ function HistoryEntry({ event }: { event: SlackChannelConsentEvent }) {
 					)}
 					<ConsentStateBadge state={event.toState} />
 				</ItemTitle>
-				<ItemDescription>{format(asDate(event.createdAt) ?? new Date(), "PPpp")}</ItemDescription>
+				{createdAt && <ItemDescription>{format(createdAt, "PPpp")}</ItemDescription>}
 				{event.reason && (
 					<ItemDescription className="text-foreground">{event.reason}</ItemDescription>
 				)}

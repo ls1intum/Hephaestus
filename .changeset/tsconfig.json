@@ -1,0 +1,17 @@
+// changesets loads its changelog plugin by `require`, so that one file stays CommonJS JavaScript.
+// oxlint's type-aware rules resolve a file's project by looking for the nearest `tsconfig.json`, and
+// without one that opts JavaScript in, the plugin's JSDoc types are ignored and its single argument
+// reads as `any`. Nothing compiles against this; it exists so the plugin is checked at all.
+{
+	"compilerOptions": {
+		"target": "ES2023",
+		"module": "CommonJS",
+		"lib": ["ES2023"],
+		"allowJs": true,
+		"checkJs": true,
+		"strict": true,
+		"noEmit": true,
+		"types": ["node"]
+	},
+	"include": ["./*.cjs"]
+}

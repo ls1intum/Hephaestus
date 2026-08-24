@@ -6,25 +6,25 @@ const parse = (detail: unknown) => detailStackSchema(KINDS).parse({ detail }).de
 
 describe("detailStackSchema", () => {
 	it("coerces the single-value form a hand-written URL produces", () => {
-		expect(parse("area:code-review")).toEqual(["area:code-review"]);
+		expect(parse("area:code-review")).toStrictEqual(["area:code-review"]);
 	});
 
 	it("keeps an id containing a colon, splitting only at the first one", () => {
-		expect(parseDetailStack(parse("practice:scm:pull-request"))).toEqual([
+		expect(parseDetailStack(parse("practice:scm:pull-request"), KINDS)).toStrictEqual([
 			{ kind: "practice", id: "scm:pull-request" },
 		]);
 	});
 
 	it("drops kinds the surface cannot render, rather than passing them on", () => {
-		expect(parse(["practice:a", "sabotage:b", "area:c"])).toEqual(["practice:a", "area:c"]);
+		expect(parse(["practice:a", "sabotage:b", "area:c"])).toStrictEqual(["practice:a", "area:c"]);
 	});
 
 	it.each([[":x"], ["x:"], ["nocolon"], [""]])("drops the malformed entry %j", (value) => {
-		expect(parse([value])).toEqual([]);
+		expect(parse([value])).toStrictEqual([]);
 	});
 
 	it("drops a repeat, because the same thing twice is never a stack", () => {
-		expect(parse(["practice:a", "practice:a"])).toEqual(["practice:a"]);
+		expect(parse(["practice:a", "practice:a"])).toStrictEqual(["practice:a"]);
 	});
 
 	it("caps depth so a hand-written URL cannot mount an unbounded number of drawers", () => {
@@ -33,7 +33,7 @@ describe("detailStackSchema", () => {
 	});
 
 	it("reads an absent param as a closed stack", () => {
-		expect(parseDetailStack(parse(undefined))).toEqual([]);
+		expect(parseDetailStack(parse(undefined), KINDS)).toStrictEqual([]);
 	});
 });
 
@@ -43,11 +43,11 @@ describe("encodeDetailStack", () => {
 			{ kind: "area", id: "code-review" },
 			{ kind: "practice", id: "describe-what-and-why" },
 		];
-		expect(encodeDetailStack(stack)).toEqual([
+		expect(encodeDetailStack(stack)).toStrictEqual([
 			"area:code-review",
 			"practice:describe-what-and-why",
 		]);
-		expect(parseDetailStack(parse(encodeDetailStack(stack)))).toEqual(stack);
+		expect(parseDetailStack(parse(encodeDetailStack(stack)), KINDS)).toStrictEqual(stack);
 	});
 
 	it("omits the param entirely when nothing is open, so a closed stack leaves no URL trace", () => {

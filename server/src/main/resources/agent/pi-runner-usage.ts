@@ -21,6 +21,16 @@ export type SessionState = AgentSession["state"];
 export type SessionMessage = SessionState["messages"][number];
 export type AssistantMessage = Extract<SessionMessage, { role: "assistant" }>;
 
+/**
+ * A message as the ledger is really handed one.
+ *
+ * <p>`AssistantMessage` marks `usage`, `model` and `stopReason` required, and a turn that failed before
+ * the provider answered arrives without the usage block. Naming that as a shape of its own is what lets
+ * the checks below be checks: read against the declared type they are dead code, and removing them
+ * would bill a turn that never reached a provider.
+ */
+export type ReportedMessage = SessionMessage | Partial<AssistantMessage>;
+
 /** What one session has spent, in the buckets usage.json reports and the server bills from. */
 export interface UsageLedger {
 	model: string | null;
@@ -68,12 +78,12 @@ export function newUsageLedger(): UsageLedger {
 
 export function addAssistantUsage(
 	ledger: UsageLedger,
-	msg: SessionMessage | null | undefined,
+	msg: ReportedMessage | null | undefined,
 ): void {
 	if (msg?.role !== "assistant") return;
-	// AssistantMessage declares `usage` required, but a turn that failed before the provider answered
-	// arrives without one, and billing from it unchecked would throw rather than skip.
-	const usage: AssistantMessage["usage"] | undefined = msg.usage;
+	// A turn that failed before the provider answered arrives without a usage block, and billing from
+	// it unchecked would throw rather than skip.
+	const usage = msg.usage;
 	if (!usage) return;
 	// message_end fires once per message, so this is belt and braces — but a redelivered event would
 	// otherwise double a real bill, and over-billing is the one error direction this whole change exists
@@ -85,19 +95,21 @@ export function addAssistantUsage(
 	}
 	ledger.assistantMessages++;
 	ledger.totalCalls++;
-	ledger.model = msg.model || ledger.model;
-	ledger.inputTokens += Number(usage.input || 0);
-	ledger.outputTokens += Number(usage.output || 0);
+	ledger.model = msg.model ?? ledger.model;
+	ledger.inputTokens += usage.input || 0;
+	ledger.outputTokens += usage.output || 0;
 	// reasoningTokens has no source and is left at zero. Every pi-ai provider builds Usage as a fresh
 	// {input, output, cacheRead, cacheWrite, totalTokens, cost}, so a reasoning bucket never arrives —
 	// and for the responses path it would double-count anyway, because OpenAI's completion_tokens
 	// (which lands in `output`) already includes reasoning tokens. The bucket stays in the report
 	// because usage.json is a contract with the server.
-	ledger.cacheReadTokens += Number(usage.cacheRead || 0);
-	ledger.cacheWriteTokens += Number(usage.cacheWrite || 0);
-	ledger.costUsd += Number(usage.cost?.total || 0);
-	const sr = msg.stopReason || "unknown";
-	ledger.stopReasons[sr] = (ledger.stopReasons[sr] || 0) + 1;
+	ledger.cacheReadTokens += usage.cacheRead || 0;
+	ledger.cacheWriteTokens += usage.cacheWrite || 0;
+	// Every pi-ai provider builds the cost block alongside the token counts, so a usage block that
+	// arrived at all has one.
+	ledger.costUsd += usage.cost.total || 0;
+	const sr = msg.stopReason ?? "unknown";
+	ledger.stopReasons[sr] = (ledger.stopReasons[sr] ?? 0) + 1;
 }
 
 /**
@@ -115,7 +127,7 @@ export function extractUsageFromSession(
 	session: { messages?: SessionMessage[] },
 	streamLedger: UsageLedger | null = null,
 ): UsageReport {
-	const messages = session.messages || [];
+	const messages = session.messages ?? [];
 	const walked = newUsageLedger();
 	for (const msg of messages) {
 		addAssistantUsage(walked, msg);
@@ -123,7 +135,7 @@ export function extractUsageFromSession(
 	const source = streamLedger ?? walked;
 
 	return {
-		model: source.model || walked.model,
+		model: source.model ?? walked.model,
 		inputTokens: Math.max(walked.inputTokens, source.inputTokens),
 		outputTokens: Math.max(walked.outputTokens, source.outputTokens),
 		reasoningTokens: Math.max(walked.reasoningTokens, source.reasoningTokens),

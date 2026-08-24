@@ -41,7 +41,7 @@ const meta = {
 			</ReactFlowProvider>
 		),
 	],
-} as Meta<typeof EqualizerEdge>;
+} satisfies Meta<typeof EqualizerEdge>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
@@ -78,10 +78,11 @@ export const Default: Story = {
  * Comparison of Enabled (Traveling Neon) vs Disabled (Muted Wire) states.
  */
 export const States: Story = {
-	render: () => (
+	args: createEdgeProps("disabled", 20, { isEnabled: false }),
+	render: (args) => (
 		<>
 			{/* Disabled State */}
-			<EqualizerEdge {...createEdgeProps("disabled", 20, { isEnabled: false })} />
+			<EqualizerEdge {...args} />
 			<text x="40" y="10" className="fill-muted-foreground text-[10px] uppercase font-mono">
 				Disabled
 			</text>

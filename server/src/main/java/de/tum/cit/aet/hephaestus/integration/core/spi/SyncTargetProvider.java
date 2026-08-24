@@ -44,12 +44,6 @@ public interface SyncTargetProvider extends SyncTimestampProvider, BackfillState
     void updateSyncTimestamp(Long syncTargetId, SyncType syncType, Instant syncedAt);
 
     /**
-     * Removes a sync target. Called when a repository no longer exists upstream (NOT_FOUND)
-     * to stop perpetual sync retries for a deleted repository.
-     */
-    void removeSyncTarget(Long syncTargetId);
-
-    /**
      * Gets sync sessions for batch synchronization, scoped to a single provider kind.
      * Each session contains all sync targets for a scope with its sync context.
      * <p>

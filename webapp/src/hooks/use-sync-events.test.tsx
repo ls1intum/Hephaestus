@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, renderHook } from "@testing-library/react";
 import type { ReactNode } from "react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, assert, beforeEach, describe, expect, it, vi } from "vitest";
 import {
 	getConnectionSyncStatusQueryKey,
 	getIntegrationCatalogQueryKey,
@@ -18,50 +18,55 @@ const WORKSPACE = "test-workspace";
 const CONNECTION_ID = 42;
 const HINT_DEBOUNCE_MS = 300;
 
-class FakeEventSource {
+/**
+ * Extends `EventTarget`, so listener bookkeeping — including `{ signal }` removal, which the hook
+ * relies on to detach a connection — is the platform's rather than this double's.
+ */
+class FakeEventSource extends EventTarget {
 	static readonly CONNECTING = 0;
 	static readonly OPEN = 1;
 	static readonly CLOSED = 2;
 	static instances: FakeEventSource[] = [];
 
 	readyState = 1;
-	onopen: (() => void) | null = null;
-	onerror: (() => void) | null = null;
 	closed = false;
-	private syncListener?: (event: MessageEvent<string>) => void;
 
-	constructor(
-		readonly url: string,
-		readonly options?: EventSourceInit,
-	) {
+	readonly url: string;
+	readonly options?: EventSourceInit;
+
+	constructor(url: string, options?: EventSourceInit) {
+		super();
+		this.url = url;
+		this.options = options;
 		FakeEventSource.instances.push(this);
-	}
-
-	addEventListener(type: string, listener: EventListenerOrEventListenerObject) {
-		if (type === "sync") this.syncListener = listener as (event: MessageEvent<string>) => void;
-	}
-
-	removeEventListener(type: string) {
-		if (type === "sync") this.syncListener = undefined;
 	}
 
 	close() {
 		this.closed = true;
 	}
 
+	open() {
+		this.dispatchEvent(new Event("open"));
+	}
+
 	emit(scope: string, connectionId = CONNECTION_ID) {
-		this.syncListener?.({ data: JSON.stringify({ scope, connectionId }) } as MessageEvent<string>);
+		this.emitRaw(JSON.stringify({ scope, connectionId }));
 	}
 
 	/** Deliver a raw (possibly non-JSON) payload, to exercise the malformed-hint guard. */
 	emitRaw(data: string) {
-		this.syncListener?.({ data } as MessageEvent<string>);
+		this.dispatchEvent(new MessageEvent("sync", { data }));
+	}
+
+	/** An `error` event without moving `readyState` — a CONNECTING stream the browser is retrying. */
+	error() {
+		this.dispatchEvent(new Event("error"));
 	}
 
 	/** The spec's "fail the connection" path: any non-200 or wrong Content-Type. No browser retry. */
 	fail() {
 		this.readyState = FakeEventSource.CLOSED;
-		this.onerror?.();
+		this.error();
 	}
 }
 
@@ -113,7 +118,7 @@ describe("useSyncEvents", () => {
 
 		expect(FakeEventSource.instances).toHaveLength(1);
 		expect(latestSource().url).toBe(`http://localhost:8080/workspaces/${WORKSPACE}/sync/events`);
-		expect(latestSource().options).toEqual({ withCredentials: true });
+		expect(latestSource().options).toStrictEqual({ withCredentials: true });
 	});
 
 	it("does not resync on the first open, because that would cancel the page's own mount fetches", () => {
@@ -121,7 +126,7 @@ describe("useSyncEvents", () => {
 		const invalidate = vi.spyOn(queryClient, "invalidateQueries");
 		renderHook(() => useSyncEvents(WORKSPACE), { wrapper: wrapper(queryClient) });
 
-		act(() => latestSource().onopen?.());
+		act(() => latestSource().open());
 
 		expect(invalidate).not.toHaveBeenCalled();
 	});
@@ -129,19 +134,20 @@ describe("useSyncEvents", () => {
 	it("resyncs on re-open, scoped to this workspace's integration queries and nothing else", () => {
 		const queryClient = new QueryClient();
 		renderHook(() => useSyncEvents(WORKSPACE), { wrapper: wrapper(queryClient) });
-		act(() => latestSource().onopen?.());
+		act(() => latestSource().open());
 
 		const invalidate = vi.spyOn(queryClient, "invalidateQueries");
 		act(() => latestSource().fail());
 		runReconnectBackoff();
 		// A re-open more than the throttle window after the first one must catch up on whatever the
 		// stream dropped while it was down.
+		// oxlint-disable-next-line no-restricted-properties -- Reads the faked clock to move it forward: `setSystemTime` takes an absolute instant, so the jump has to be measured from the current one.
 		vi.setSystemTime(Date.now() + 60_000);
-		act(() => latestSource().onopen?.());
+		act(() => latestSource().open());
 
 		const filter = invalidate.mock.calls[0]?.[0]?.predicate;
 		expect(filter).toBeTypeOf("function");
-		if (!filter) throw new Error("Expected a scoped predicate");
+		assert(filter, "Expected a scoped predicate");
 
 		const included = listConnectionSyncJobsQueryKey({
 			path: { workspaceSlug: WORKSPACE, connectionId: CONNECTION_ID },
@@ -155,7 +161,7 @@ describe("useSyncEvents", () => {
 
 		const find = (key: readonly unknown[]) => {
 			const query = queryClient.getQueryCache().find({ queryKey: key, exact: true });
-			if (!query) throw new Error("Expected a cached query");
+			assert(query, "Expected a cached query");
 			return query;
 		};
 		expect(filter(find(included))).toBe(true);
@@ -166,14 +172,14 @@ describe("useSyncEvents", () => {
 	it("throttles catch-up resyncs so a flapping stream cannot storm the cache", () => {
 		const queryClient = new QueryClient();
 		renderHook(() => useSyncEvents(WORKSPACE), { wrapper: wrapper(queryClient) });
-		act(() => latestSource().onopen?.());
+		act(() => latestSource().open());
 
 		const invalidate = vi.spyOn(queryClient, "invalidateQueries");
 		// Two reconnects back to back, both well inside the 30s throttle window.
 		for (let i = 0; i < 2; i += 1) {
 			act(() => latestSource().fail());
 			runReconnectBackoff();
-			act(() => latestSource().onopen?.());
+			act(() => latestSource().open());
 		}
 
 		expect(invalidate).not.toHaveBeenCalled();
@@ -181,7 +187,7 @@ describe("useSyncEvents", () => {
 
 	it("reconnects itself after a failed connection, which the browser never retries", () => {
 		renderHook(() => useSyncEvents(WORKSPACE), { wrapper: wrapper(new QueryClient()) });
-		act(() => latestSource().onopen?.());
+		act(() => latestSource().open());
 		const first = latestSource();
 
 		act(() => first.fail());
@@ -192,26 +198,46 @@ describe("useSyncEvents", () => {
 		expect(latestSource()).not.toBe(first);
 	});
 
-	it("waits out an exponential, jittered backoff that grows after each successive failure", () => {
+	it("stops listening to a superseded stream, so a late event from it cannot move the UI", () => {
+		const { result } = renderHook(() => useSyncEvents(WORKSPACE), {
+			wrapper: wrapper(new QueryClient()),
+		});
+		act(() => latestSource().open());
+		const first = latestSource();
+
+		// Fail twice to reach the degraded state, then let the replacement connect.
+		act(() => first.fail());
+		runReconnectBackoff();
+		act(() => latestSource().fail());
+		runReconnectBackoff();
+		expect(result.current).toBe(true);
+
+		// The dead stream reporting success must not clear the flag its replacement still owns.
+		act(() => first.open());
+
+		expect(result.current).toBe(true);
+	});
+
+	it("waits out an exponential, jittered backoff that grows after each successive failure", async () => {
 		// Pin the jitter so the rungs are deterministic: delay = rung * (0.5 + 0.5·random) = rung · 0.75.
 		const randomSpy = vi.spyOn(Math, "random").mockReturnValue(0.5);
 		renderHook(() => useSyncEvents(WORKSPACE), { wrapper: wrapper(new QueryClient()) });
-		act(() => latestSource().onopen?.());
+		act(() => latestSource().open());
 
 		// First failure sits on the 1s rung → 750ms; the 500ms checkpoint proves the delay is a real
 		// backoff, not a flat setTimeout(connect, 0) that would reopen after any advance at all.
 		act(() => latestSource().fail());
-		act(() => vi.advanceTimersByTime(500));
+		await act(() => vi.advanceTimersByTime(500));
 		expect(FakeEventSource.instances).toHaveLength(1);
-		act(() => vi.advanceTimersByTime(250));
+		await act(() => vi.advanceTimersByTime(250));
 		expect(FakeEventSource.instances).toHaveLength(2);
 
 		// The reconnect fails again before it can open, so the exponent climbs: 2s rung → 1500ms, which
 		// is strictly longer than the first delay — 750ms is no longer enough.
 		act(() => latestSource().fail());
-		act(() => vi.advanceTimersByTime(750));
+		await act(() => vi.advanceTimersByTime(750));
 		expect(FakeEventSource.instances).toHaveLength(2);
-		act(() => vi.advanceTimersByTime(750));
+		await act(() => vi.advanceTimersByTime(750));
 		expect(FakeEventSource.instances).toHaveLength(3);
 
 		randomSpy.mockRestore();
@@ -220,10 +246,10 @@ describe("useSyncEvents", () => {
 	it("leaves a CONNECTING stream alone — the browser is already retrying that one", () => {
 		renderHook(() => useSyncEvents(WORKSPACE), { wrapper: wrapper(new QueryClient()) });
 		const source = latestSource();
-		act(() => source.onopen?.());
+		act(() => source.open());
 
 		source.readyState = FakeEventSource.CONNECTING;
-		act(() => source.onerror?.());
+		act(() => source.error());
 		runReconnectBackoff();
 
 		expect(FakeEventSource.instances).toHaveLength(1);
@@ -234,7 +260,7 @@ describe("useSyncEvents", () => {
 		const { result } = renderHook(() => useSyncEvents(WORKSPACE), {
 			wrapper: wrapper(new QueryClient()),
 		});
-		act(() => latestSource().onopen?.());
+		act(() => latestSource().open());
 
 		// One blip is not worth telling the admin about — the reconnect usually wins within a second.
 		act(() => latestSource().fail());
@@ -245,7 +271,7 @@ describe("useSyncEvents", () => {
 		expect(result.current).toBe(true);
 
 		runReconnectBackoff();
-		act(() => latestSource().onopen?.());
+		act(() => latestSource().open());
 		expect(result.current).toBe(false);
 	});
 
@@ -340,12 +366,12 @@ describe("useSyncEvents", () => {
 
 		const predicate = invalidate.mock.calls[0]?.[0]?.predicate;
 		expect(predicate).toBeTypeOf("function");
-		if (!predicate) throw new Error("Expected a scoped predicate");
+		assert(predicate, "Expected a scoped predicate");
 
 		const workspaceKey = getWorkspaceQueryKey({ path: { workspaceSlug: WORKSPACE } });
 		queryClient.setQueryData(workspaceKey, {});
 		const query = queryClient.getQueryCache().find({ queryKey: workspaceKey, exact: true });
-		if (!query) throw new Error("Expected a cached query");
+		assert(query, "Expected a cached query");
 		expect(predicate(query)).toBe(true);
 	});
 
@@ -370,19 +396,37 @@ describe("useSyncEvents", () => {
 		});
 	});
 
-	it("swallows a malformed hint payload without throwing or invalidating anything", () => {
+	// The dangerous shape of contract drift: the scope alone picks a branch, so an unchecked hint
+	// would refetch under a connection id that identifies nothing.
+	it("drops a hint whose connection id came over as a string instead of acting on half of it", () => {
 		const queryClient = new QueryClient();
 		const invalidate = vi.spyOn(queryClient, "invalidateQueries");
-		const debug = vi.spyOn(console, "debug").mockImplementation(() => {});
+		renderHook(() => useSyncEvents(WORKSPACE), { wrapper: wrapper(queryClient) });
+
+		act(() => latestSource().emitRaw(JSON.stringify({ scope: "job", connectionId: "42" })));
+		flushHintDebounce();
+
+		expect(invalidate).not.toHaveBeenCalled();
+	});
+
+	it("swallows a malformed hint payload and keeps acting on the next readable one", () => {
+		const queryClient = new QueryClient();
+		const invalidate = vi.spyOn(queryClient, "invalidateQueries");
 		renderHook(() => useSyncEvents(WORKSPACE), { wrapper: wrapper(queryClient) });
 
 		act(() => latestSource().emitRaw("}{ not json"));
 		flushHintDebounce();
 
-		expect(debug).toHaveBeenCalled();
 		expect(invalidate).not.toHaveBeenCalled();
 
-		debug.mockRestore();
+		act(() => latestSource().emit("activity"));
+		flushHintDebounce();
+
+		expect(invalidate).toHaveBeenCalledWith({
+			queryKey: getConnectionSyncStatusQueryKey({
+				path: { workspaceSlug: WORKSPACE, connectionId: CONNECTION_ID },
+			}),
+		});
 	});
 
 	it("closes the stream and stops reconnecting on unmount", () => {
@@ -390,7 +434,7 @@ describe("useSyncEvents", () => {
 			wrapper: wrapper(new QueryClient()),
 		});
 		const source = latestSource();
-		act(() => source.onopen?.());
+		act(() => source.open());
 		act(() => source.fail());
 
 		unmount();

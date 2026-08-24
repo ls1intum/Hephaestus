@@ -20,15 +20,15 @@ export function AchievementDesignerHeader({
 	const reactFlow = useReactFlow();
 
 	const handleZoomIn = () => {
-		reactFlow.zoomIn();
+		void reactFlow.zoomIn();
 	};
 
 	const handleZoomOut = () => {
-		reactFlow.zoomOut();
+		void reactFlow.zoomOut();
 	};
 
 	const handleFitView = () => {
-		reactFlow.fitView({ padding: 0.15 });
+		void reactFlow.fitView({ padding: 0.15 });
 	};
 
 	return (

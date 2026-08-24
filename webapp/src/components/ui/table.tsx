@@ -13,7 +13,7 @@ function Table({
 		<div
 			data-slot="table-container"
 			className={cn("relative w-full overflow-x-auto", containerClassName)}
-			// biome-ignore lint/a11y/noNoninteractiveTabindex: Horizontal overflow must remain keyboard-scrollable.
+			// oxlint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- A scrollable region has to be keyboard-reachable; axe's `scrollable-region-focusable` fails without it, and the Storybook a11y addon runs axe at error.
 			tabIndex={0}
 		>
 			<table

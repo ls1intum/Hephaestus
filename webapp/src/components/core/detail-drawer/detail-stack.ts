@@ -17,7 +17,7 @@ export const DETAIL_STACK_MAX_DEPTH = 4;
  * `multiValue` is what dedupes: the same entry twice is never a stack, and appending is one
  * double-click away from producing it.
  */
-export function detailStackSchema<TKind extends string>(kinds: readonly TKind[]) {
+export function detailStackSchema(kinds: readonly string[]) {
 	const known = new Set<string>(kinds);
 	return z.object({
 		detail: multiValue.transform((values) =>
@@ -33,12 +33,19 @@ export function detailStackSchema<TKind extends string>(kinds: readonly TKind[])
 	});
 }
 
+/**
+ * The kinds are passed in rather than claimed by a type argument: the URL is untrusted, and a value
+ * matched against the caller's own list arrives as that kind rather than as a promise about it.
+ */
 export function parseDetailStack<TKind extends string>(
 	raw: string[] | undefined,
+	kinds: readonly TKind[],
 ): DetailStackEntry<TKind>[] {
-	return (raw ?? []).map((value) => {
+	return (raw ?? []).flatMap((value) => {
 		const separator = value.indexOf(":");
-		return { kind: value.slice(0, separator) as TKind, id: value.slice(separator + 1) };
+		const prefix = value.slice(0, separator);
+		const kind = kinds.find((candidate) => candidate === prefix);
+		return kind === undefined ? [] : [{ kind, id: value.slice(separator + 1) }];
 	});
 }
 

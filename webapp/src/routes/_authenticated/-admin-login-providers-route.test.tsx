@@ -62,12 +62,12 @@ describe("instance login providers route", () => {
 		expect(screen.getByRole("switch", { name: "Disable GitHub" }).getAttribute("aria-busy")).toBe(
 			"true",
 		);
-		expect(
-			(screen.getByRole("button", { name: "Delete GitHub" }) as HTMLButtonElement).disabled,
-		).toBe(true);
-		expect(
-			(screen.getByRole("button", { name: "Delete GitLab" }) as HTMLButtonElement).disabled,
-		).toBe(false);
+		expect(screen.getByRole<HTMLButtonElement>("button", { name: "Delete GitHub" }).disabled).toBe(
+			true,
+		);
+		expect(screen.getByRole<HTMLButtonElement>("button", { name: "Delete GitLab" }).disabled).toBe(
+			false,
+		);
 
 		releaseSlowToggle?.();
 		await waitFor(() => expect(slowToggleCalls).toBe(1));

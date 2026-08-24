@@ -4,18 +4,32 @@ import type { SyncJob } from "@/api/types.gen";
 import { expectSettledVisible } from "@/test/overlay";
 import { SyncJobsTable } from "./SyncJobsTable";
 
+const runningJob: SyncJob = {
+	id: 3,
+	type: "RECONCILIATION",
+	trigger: "MANUAL",
+	status: "RUNNING",
+	cancelRequested: false,
+	createdAt: new Date("2026-07-14T10:00:00Z"),
+	startedAt: new Date("2026-07-14T10:00:05Z"),
+	itemsProcessed: 4,
+	itemsTotal: 12,
+};
+
+const failedJob: SyncJob = {
+	id: 1,
+	type: "INITIAL",
+	trigger: "LIFECYCLE",
+	status: "FAILED",
+	cancelRequested: false,
+	createdAt: new Date("2026-07-01T09:00:00Z"),
+	startedAt: new Date("2026-07-01T09:00:00Z"),
+	finishedAt: new Date("2026-07-01T09:01:12Z"),
+	errorSummary: "GitHub API rate limit exceeded after 3 retries",
+};
+
 const jobs: SyncJob[] = [
-	{
-		id: 3,
-		type: "RECONCILIATION",
-		trigger: "MANUAL",
-		status: "RUNNING",
-		cancelRequested: false,
-		createdAt: new Date("2026-07-14T10:00:00Z"),
-		startedAt: new Date("2026-07-14T10:00:05Z"),
-		itemsProcessed: 4,
-		itemsTotal: 12,
-	},
+	runningJob,
 	{
 		id: 2,
 		type: "RECONCILIATION",
@@ -28,17 +42,7 @@ const jobs: SyncJob[] = [
 		itemsProcessed: 40,
 		itemsTotal: 40,
 	},
-	{
-		id: 1,
-		type: "INITIAL",
-		trigger: "LIFECYCLE",
-		status: "FAILED",
-		cancelRequested: false,
-		createdAt: new Date("2026-07-01T09:00:00Z"),
-		startedAt: new Date("2026-07-01T09:00:00Z"),
-		finishedAt: new Date("2026-07-01T09:01:12Z"),
-		errorSummary: "GitHub API rate limit exceeded after 3 retries",
-	},
+	failedJob,
 ];
 
 /** One row per job status, including the duration edges (a queued PENDING row has no duration). */
@@ -151,7 +155,9 @@ export const TypeCarriesTrigger: Story = {
 export const StartedRevealsAbsoluteTime: Story = {
 	args: { jobs },
 	play: async ({ canvas }) => {
-		await userEvent.hover(canvas.getAllByText(/ago$/)[0]);
+		const [firstRelativeStart] = canvas.getAllByText(/ago$/);
+		if (!firstRelativeStart) throw new Error("No row rendered a relative start time");
+		await userEvent.hover(firstRelativeStart);
 		await expectSettledVisible(await screen.findByText(/\d{4}, \d{2}:\d{2}:\d{2}$/));
 	},
 };
@@ -170,7 +176,7 @@ export const ExpandProgressDetail: Story = {
 	args: {
 		jobs: [
 			{
-				...jobs[0],
+				...runningJob,
 				progress: {
 					phase: "pullRequests",
 					currentStep: "Backfilling ls1intum/Artemis — issues #4812 → #3200",
@@ -179,7 +185,7 @@ export const ExpandProgressDetail: Story = {
 					unitsTotal: 4_812,
 				},
 			},
-			jobs[2],
+			failedJob,
 		],
 	},
 	play: async ({ canvas }) => {

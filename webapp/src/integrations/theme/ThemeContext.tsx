@@ -1,6 +1,13 @@
 import { createContext, useContext, useEffect, useState } from "react";
 
-type Theme = "dark" | "light" | "system";
+const THEMES = ["dark", "light", "system"] as const;
+
+type Theme = (typeof THEMES)[number];
+
+/** The stored theme is user-writable, so anything unrecognised falls back to the default. */
+function isTheme(value: string | null): value is Theme {
+	return THEMES.some((theme) => theme === value);
+}
 
 type ThemeProviderProps = {
 	children?: React.ReactNode;
@@ -13,12 +20,16 @@ type ThemeProviderState = {
 	setTheme: (theme: Theme) => void;
 };
 
-const initialState: ThemeProviderState = {
+/**
+ * A working default rather than a sentinel `useTheme` would throw on: a theme-aware component has to
+ * render on its own in a test or a story, with no shell around it.
+ */
+const NO_PROVIDER: ThemeProviderState = {
 	theme: "system",
-	setTheme: () => null,
+	setTheme: () => {},
 };
 
-const ThemeProviderContext = createContext<ThemeProviderState>(initialState);
+const ThemeProviderContext = createContext<ThemeProviderState>(NO_PROVIDER);
 
 export function ThemeProvider({
 	children,
@@ -26,9 +37,10 @@ export function ThemeProvider({
 	storageKey = "theme",
 	...props
 }: ThemeProviderProps) {
-	const [theme, setTheme] = useState<Theme>(
-		() => (localStorage.getItem(storageKey) as Theme) || defaultTheme,
-	);
+	const [theme, setTheme] = useState<Theme>(() => {
+		const stored = localStorage.getItem(storageKey);
+		return isTheme(stored) ? stored : defaultTheme;
+	});
 
 	useEffect(() => {
 		const root = window.document.documentElement;
@@ -39,7 +51,7 @@ export function ThemeProvider({
 		if (theme === "system") {
 			appliedTheme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
 		} else {
-			appliedTheme = theme as "light" | "dark";
+			appliedTheme = theme;
 		}
 
 		root.classList.add(appliedTheme);
@@ -67,10 +79,4 @@ export function ThemeProvider({
 	);
 }
 
-export const useTheme = () => {
-	const context = useContext(ThemeProviderContext);
-
-	if (context === undefined) throw new Error("useTheme must be used within a ThemeProvider");
-
-	return context;
-};
+export const useTheme = () => useContext(ThemeProviderContext);

@@ -17,17 +17,17 @@ const ORDER: readonly ActivityBadgeKey[] = [
 describe("getActivityBadgeMetadata", () => {
 	it("returns all badges in render order for GitHub", () => {
 		const keys = getActivityBadgeMetadata("GITHUB").map((b) => b.key);
-		expect(keys).toEqual(ORDER);
+		expect(keys).toStrictEqual(ORDER);
 	});
 
 	it("returns all badges in render order for GitLab", () => {
 		const keys = getActivityBadgeMetadata("GITLAB").map((b) => b.key);
-		expect(keys).toEqual(ORDER);
+		expect(keys).toStrictEqual(ORDER);
 	});
 
 	it("scores the first four badges and leaves the rest visible-only", () => {
 		const flags = getActivityBadgeMetadata("GITHUB").map((b) => b.countsTowardScore);
-		expect(flags).toEqual([true, true, true, true, false, false, false, false, false, false]);
+		expect(flags).toStrictEqual([true, true, true, true, false, false, false, false, false, false]);
 	});
 
 	it("threads provider terminology through labels and tooltips", () => {

@@ -19,7 +19,8 @@ Node is pinned in `.node-version` and drives the repo's own tooling; the repo is
 the per-practice precompute scripts (`server/src/main/resources/practices/precompute/`) are
 TypeScript executed directly by Bun, whose version the agent image pins in
 `docker/agents/pi/Dockerfile`. They are type-checked as one project via `tsconfig.agents.json` and
-linted and formatted via the root `biome.jsonc`. JDK 21, and Docker for the database helpers.
+linted by the root `.oxlintrc.json` and formatted by the root `biome.jsonc`. JDK 21, and Docker
+for the database helpers.
 
 ## Skills
 
@@ -30,7 +31,7 @@ Load these rather than reasoning from scratch.
 | `/storybook-components` | Component props, stories, play functions, a11y posture; grading a webapp diff |
 | `/composition-patterns` | Compound components, render props, React 19 API shape |
 | `/web-design-guidelines` | UI accessibility and UX review |
-| `/react-best-practices` | Frontend performance (~40% Next.js-specific — check applicability) |
+| `/react-best-practices` | Frontend performance — a vendored Vercel pack; read its applicability table first, since much of it is Next.js-only |
 | `/fix-ci`, `/land-pr`, `/resolve-review` | CI triage, opening a PR, answering review comments |
 | `/gh-stack` | Creating and maintaining stacked pull requests |
 
@@ -42,28 +43,49 @@ reflect the final state. Document any skipped gate in the PR description.
 | Command | Does |
 |---|---|
 | `pnpm run format` / `format:check` | Apply / verify formatting (Java + TypeScript) |
-| `pnpm run check` | The full gate: `check:biome-pin` + `check:server` + `check:client` + `check:agents` + `check:stories` + `check:components` + `check:diagrams` + `check:env` + `check:contracts` |
+| `pnpm run check` | The full gate — every leg it runs is listed as `check` in the root `package.json` |
 | `pnpm run test:webapp` | Vitest |
 | `pnpm run test:agents` | Agent runtime and precompute specs, on Bun |
 | `mvn test -P'!quick'` | Server unit tests — see `server/AGENTS.md` for the four tiers and why `!quick` is mandatory |
 
 Naming: `format` applies, `format:check` verifies read-only for CI, `lint` lints, `check` is the
-comprehensive verification. A `:webapp` or `:agents` suffix scopes any of them; `:java` scopes
-`format` and `lint` only — the Java check is `check:server`.
+comprehensive verification. A `:webapp`, `:server` or `:agents` suffix scopes any of them; `:java`
+scopes `format` and `lint` only — the Java leg of `check` is `check:server`.
 
-### Biome scopes
+**Every leg of `check` also runs in CI**, so a green build and a green `check` agree. CI adds two
+gates `check` does not have — the Vite build and the `routeTree.gen.ts` comparison that only a build
+can make — and cannot run anything needing Docker or a live credential. Run `check` yourself before
+claiming it: it is the same command, and it fails faster than a workflow does.
 
-Two Biome configurations, one per tree, both on the pinned `@biomejs/biome` in the root
-`package.json`:
+### Lint and format scopes
 
-| Config | Covers | Scripts |
-|---|---|---|
-| `webapp/biome.json` | the SPA (`webapp/src/**`) | `format:webapp`, `lint:webapp`, `check:webapp` |
-| `biome.jsonc` (root) | the Bun agent runtime, its specs, both precompute trees, `scripts/**` | `format:agents`, `lint:agents`, `check:agents` |
+**oxlint lints every TypeScript tree in the repo; Biome formats and sorts imports.**
 
-`biome.jsonc` is the monorepo root config and `webapp/biome.json` declares `"root": false`, so each
-tree keeps its own rules. The root file documents why each non-default rule is on; `check:agents`
-also runs `typecheck:agents` and `typecheck:scripts`. `pnpm run check:agents:fix` applies every safe fix.
+| Tree | oxlint config | Formatted by | Scripts |
+|---|---|---|---|
+| the SPA (`webapp/`) | `webapp/.oxlintrc.json` | Biome (`webapp/biome.jsonc`) | `format:webapp`, `lint:webapp`, `check:webapp` |
+| the docs site (`docs/`) | `docs/.oxlintrc.json` | nothing — only `.editorconfig` | linted by `lint:agents`, which passes `docs` as a path |
+| the Bun agent runtime and specs, both precompute trees, `scripts/**`, `.changeset/`, `.github/` and the root config files | `.oxlintrc.json` | Biome (`biome.jsonc`) | `format:agents`, `lint:agents`, `check:agents` |
+
+`docs:lint` is **not** the oxlint leg — it is the docs package's own `typecheck` plus
+`markdownlint-cli2`, configured by `docs/.markdownlint-cli2.jsonc`, which states both the file scope
+and the rules. It is the last leg of `pnpm run check` and runs on the App Server CI leg, which
+`docs/**` already triggers.
+
+**Start every oxlint run from the repo root.** A nested config *replaces* the root's rules for the
+files under it rather than merging, so each tree states its rule set in full — but `options`,
+including `typeAware` and `reportUnusedDisableDirectives`, is honoured only from the config oxlint
+discovers as the *root*. Start it inside `webapp/` and every type-aware rule reads as enabled and
+checks nothing.
+
+Type-aware rules need a project, and oxlint finds one by looking for a file named exactly
+`tsconfig.json`. The root stub exists only so the Bun trees — configured by `tsconfig.agents.json` —
+have one; without it every ambient global resolves to an error type there.
+
+Each config carries the reasoning for its own deltas; read it before switching a rule either way. The
+house rules are oxlint JS plugins under `webapp/tools/oxlint/`, registered by its `index.ts`. They
+live under `webapp/` but all three configs load that one plugin and each chooses which to turn on, so
+adding a rule there enables it nowhere. `webapp/AGENTS.md` § Linting has the rest.
 
 ## Generated artefacts — never hand-edit, regenerate
 
@@ -102,27 +124,22 @@ rest.
 
 ### Stacked pull requests
 
-For dependent work that is easier to review in coherent layers, follow `CONTRIBUTING.md` § Stacked Pull
-Requests. Plan the dependency order before creating layers, put foundations below their dependants,
-and do not create a layer that cannot satisfy the normal PR, release, and quality requirements on its
-own.
-
-When `gh stack` manages a stack, use `/gh-stack` instead of manually retargeting its
-branches. Restack descendants after changing a lower layer. Do not stage, commit, push, submit, or
-merge without explicit user permission.
+`CONTRIBUTING.md` § Stacked Pull Requests has the process; `/gh-stack` drives `gh stack` rather than
+retargeting branches by hand, and descendants get restacked after a lower layer changes. The one
+constraint worth stating twice: **a layer that cannot satisfy the normal PR, release and quality
+requirements on its own is not a layer.**
 
 ### Changesets (release notes)
 
 `.changeset/*.md` files that become `CHANGELOG.md` and drive the version bump. **Not** the same thing
 as a Liquibase `<changeSet>` — a schema change needs both. Full flow:
-`docs/contributor/release-management.mdx`.
+`docs/contributor/release-management.mdx`; the file's shape is in `.changeset/README.md`.
 
 - **Every PR that changes shipped code** (`server/`, `webapp/`, `docker/`, excluding tests and in-tree
-  docs) ships one. `pnpm changeset` is interactive; with no TTY, hand-write `.changeset/<slug>.md` with
-  frontmatter `"hephaestus": <bump>` and the summary as the body (shape in `.changeset/README.md`).
-  This is the one sanctioned hand-write — never hand-edit `CHANGELOG.md`. If the change is invisible to
-  operators and users, `pnpm changeset --empty` and say why in the body. CI (`verify-changesets`) fails
-  a shipped-code PR with neither.
+  docs) ships one, and `verify-changesets` fails the PR otherwise. `pnpm changeset` is interactive;
+  with no TTY, hand-writing `.changeset/<slug>.md` is the one sanctioned hand-write — never hand-edit
+  `CHANGELOG.md`. If the change is invisible to operators and users, `pnpm changeset --empty` and say
+  why in the body.
 - **The summary lands in `CHANGELOG.md` verbatim, in the operator's or user's voice.** Lead with what
   they can now do, or the symptom a fix removes. No class names, hook names or file paths. No
   co-authored-by or agent-attribution trailers.
@@ -152,5 +169,3 @@ Each of these fails *quietly* — the command reports success and leaves you wit
 - Everything `mvn`-shaped — the `quick` profile silently skipping every test, `mvn clean` wiping the
   generated GraphQL sources, two Maven runs sharing one `target/`, `server/.env` leaking into test
   JVMs — is in `server/AGENTS.md` § Build traps. Read it before your first server test run.
-
-Prefer improving the structure over ad-hoc shortcuts, and write code that reads like the code around it.

@@ -35,10 +35,7 @@ export function NavDashboards({
 						tooltip="Profile"
 						isActive={onProfile}
 						render={
-							<Link
-								to="/w/$workspaceSlug/user/$username"
-								params={{ username: username ?? "", workspaceSlug }}
-							/>
+							<Link to="/w/$workspaceSlug/user/$username" params={{ username, workspaceSlug }} />
 						}
 					>
 						<User />

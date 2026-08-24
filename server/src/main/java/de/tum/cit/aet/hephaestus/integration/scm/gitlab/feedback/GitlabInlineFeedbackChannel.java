@@ -8,8 +8,6 @@ import de.tum.cit.aet.hephaestus.integration.core.egress.OutboundEgressGuard;
 import de.tum.cit.aet.hephaestus.integration.core.egress.OutboundEgressSuppressedException;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackAnchor;
 import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFeedbackChannel;
-import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFeedbackChannel.DeliveredSignal;
-import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFeedbackChannel.Disposition;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SummaryChannel;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabGraphQlClientProvider;
@@ -300,7 +298,7 @@ public class GitlabInlineFeedbackChannel implements InlineFeedbackChannel {
             throw e;
         } catch (Exception e) {
             if (isRateLimitError(e)) {
-                throw new RateLimitHit();
+                throw new RateLimitHit(e);
             }
             log.warn(
                 "GitLab diff note failed: workspaceId={}, file={}, line={}",
@@ -344,7 +342,7 @@ public class GitlabInlineFeedbackChannel implements InlineFeedbackChannel {
             throw e;
         } catch (Exception e) {
             if (isRateLimitError(e)) {
-                throw new RateLimitHit();
+                throw new RateLimitHit(e);
             }
             log.warn(
                 "GitLab diff note edit failed: workspaceId={}, file={}, line={}",
@@ -508,7 +506,12 @@ public class GitlabInlineFeedbackChannel implements InlineFeedbackChannel {
     }
 
     /** Signals the per-finding loop to stop and fail the rest of the batch on a rate-limit hit. */
-    private static final class RateLimitHit extends RuntimeException {}
+    private static final class RateLimitHit extends RuntimeException {
+
+        private RateLimitHit(Throwable cause) {
+            super(cause);
+        }
+    }
 
     private static Map<String, Object> buildPosition(FeedbackAnchor.DiffAnchor diff, MrInfo mrInfo) {
         Map<String, Object> position = new HashMap<>();

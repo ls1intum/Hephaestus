@@ -1,5 +1,4 @@
 import { Search, Users } from "lucide-react";
-import { useMemo } from "react";
 import type { LabelInfo, TeamInfo } from "@/api/types.gen";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { PageHeader } from "@/components/core/PageHeader";
@@ -25,6 +24,47 @@ export interface TeamsTableProps {
 	onRemoveLabelFromTeam?: (teamId: number, labelId: number) => Promise<void>;
 }
 
+/**
+ * The ids the tree still shows: a team whose own name matches, plus every ancestor down to it, so a
+ * deep match stays reachable inside its branch. An empty search shows everything.
+ */
+function teamsMatchingSearch(
+	search: string,
+	teams: TeamInfo[],
+	roots: TeamInfo[],
+	childrenMap: Map<number, TeamInfo[]>,
+): Set<number> {
+	const normalizedSearch = search.trim().toLowerCase();
+	if (!normalizedSearch) return new Set(teams.map((t) => t.id));
+
+	const result = new Set<number>();
+	const memo = new Map<number, boolean>();
+	const hasMatchInSubtree = (team: TeamInfo): boolean => {
+		const cached = memo.get(team.id);
+		if (cached !== undefined) return cached;
+		if (team.name.toLowerCase().includes(normalizedSearch)) {
+			memo.set(team.id, true);
+			return true;
+		}
+		for (const child of childrenMap.get(team.id) ?? []) {
+			if (hasMatchInSubtree(child)) {
+				memo.set(team.id, true);
+				return true;
+			}
+		}
+		memo.set(team.id, false);
+		return false;
+	};
+
+	const traverse = (node: TeamInfo) => {
+		if (!hasMatchInSubtree(node)) return;
+		result.add(node.id);
+		for (const child of childrenMap.get(node.id) ?? []) traverse(child);
+	};
+	for (const root of roots) traverse(root);
+	return result;
+}
+
 export function AdminTeamsTable({
 	teams,
 	isLoading = false,
@@ -37,85 +77,38 @@ export function AdminTeamsTable({
 	onAddLabelToTeam,
 	onRemoveLabelFromTeam,
 }: TeamsTableProps) {
-	const allTeamsById = useMemo(() => {
-		const map = new Map<number, TeamInfo>();
-		for (const t of teams) map.set(t.id, t);
-		return map;
-	}, [teams]);
+	const allTeamsById = new Map(teams.map((t) => [t.id, t]));
 
-	const childrenMap = useMemo(() => {
-		const map = new Map<number, TeamInfo[]>();
-		for (const t of teams) {
-			const pid = t.parentId;
-			if (pid !== undefined && allTeamsById.has(pid)) {
-				const arr = map.get(pid) ?? [];
-				arr.push(t);
-				map.set(pid, arr);
-			}
+	const childrenMap = new Map<number, TeamInfo[]>();
+	for (const t of teams) {
+		const pid = t.parentId;
+		if (pid !== undefined && allTeamsById.has(pid)) {
+			const siblings = childrenMap.get(pid) ?? [];
+			siblings.push(t);
+			childrenMap.set(pid, siblings);
 		}
-		for (const [k, arr] of map.entries()) {
-			arr.sort((a, b) => a.name.localeCompare(b.name));
-			map.set(k, arr);
-		}
-		return map;
-	}, [teams, allTeamsById]);
+	}
+	for (const siblings of childrenMap.values()) {
+		siblings.sort((a, b) => a.name.localeCompare(b.name));
+	}
 
-	const rootsAll = useMemo(
-		() =>
-			[...teams]
-				.filter((t) => t.parentId === undefined || !allTeamsById.has(t.parentId))
-				.sort((a, b) => a.name.localeCompare(b.name)),
-		[teams, allTeamsById],
-	);
+	// A team whose parent is missing from the page is a root here rather than an orphan nobody renders.
+	const rootsAll = teams
+		.filter((t) => t.parentId === undefined || !allTeamsById.has(t.parentId))
+		.sort((a, b) => a.name.localeCompare(b.name));
 
-	const displaySet = useMemo(() => {
-		const normalizedSearch = search.trim().toLowerCase();
-		if (!normalizedSearch) return new Set<number>(teams.map((t) => t.id));
-		const result = new Set<number>();
-		const memo = new Map<number, boolean>();
-		const matches = (t: TeamInfo): boolean => t.name.toLowerCase().includes(normalizedSearch);
-		const hasMatchInSubtree = (t: TeamInfo): boolean => {
-			const cached = memo.get(t.id);
-			if (cached !== undefined) return cached;
-			if (matches(t)) {
-				memo.set(t.id, true);
-				return true;
-			}
-			const children = childrenMap.get(t.id) ?? [];
-			for (const c of children) {
-				if (hasMatchInSubtree(c)) {
-					memo.set(t.id, true);
-					return true;
-				}
-			}
-			memo.set(t.id, false);
-			return false;
-		};
-		for (const r of rootsAll) {
-			const traverse = (node: TeamInfo) => {
-				if (hasMatchInSubtree(node)) {
-					result.add(node.id);
-					for (const c of childrenMap.get(node.id) ?? []) traverse(c);
-				}
-			};
-			traverse(r);
-		}
-		return result;
-	}, [search, teams, childrenMap, rootsAll]);
+	const displaySet = teamsMatchingSearch(search, teams, rootsAll, childrenMap);
 
-	const repoLabelCatalog = useMemo(() => {
-		const map = new Map<number, Map<number, LabelInfo>>();
-		for (const t of teams) {
-			for (const repo of t.repositories ?? []) {
-				const byId = map.get(repo.id) ?? new Map<number, LabelInfo>();
-				for (const lbl of repo.labels ?? []) {
-					byId.set(lbl.id, lbl);
-				}
-				map.set(repo.id, byId);
+	const repoLabelCatalog = new Map<number, Map<number, LabelInfo>>();
+	for (const t of teams) {
+		for (const repo of t.repositories) {
+			const byId = repoLabelCatalog.get(repo.id) ?? new Map<number, LabelInfo>();
+			for (const lbl of repo.labels ?? []) {
+				byId.set(lbl.id, lbl);
 			}
+			repoLabelCatalog.set(repo.id, byId);
 		}
-		return map;
-	}, [teams]);
+	}
 
 	const getCatalogLabels = (repoId: number): LabelInfo[] => {
 		const byId = repoLabelCatalog.get(repoId);

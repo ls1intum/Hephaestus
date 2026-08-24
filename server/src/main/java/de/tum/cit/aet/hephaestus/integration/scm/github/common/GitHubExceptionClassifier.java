@@ -545,11 +545,7 @@ public class GitHubExceptionClassifier {
         }
 
         // Check for Spring GraphQL transport exceptions
-        if (className.contains("GraphQlTransportException")) {
-            return true;
-        }
-
-        return false;
+        return className.contains("GraphQlTransportException");
     }
 
     /**

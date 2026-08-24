@@ -1,7 +1,8 @@
 import { format, isSameYear, parseISO, subDays } from "date-fns";
 import { CalendarDays, CalendarIcon, CalendarRange, Clock } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { DateRange } from "react-day-picker";
+import { useNow } from "@/components/common/use-now";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -55,11 +56,14 @@ export function ProfileTimeframePicker({
 	enableAllActivity = true,
 	schedule = DEFAULT_SCHEDULE,
 }: ProfileTimeframePickerProps) {
-	const [userInteracted, setUserInteracted] = useState(false);
+	const [chosenPreset, setChosenPreset] = useState<TimeframePreset>();
+	// Ticks, so a week or month boundary crossed with the page open rolls the emitted range over
+	// instead of stranding it in the period that ended.
+	const nowMs = useNow();
+	const now = new Date(nowMs);
 
-	const [selectedPreset, setSelectedPreset] = useState<TimeframePreset>(() =>
-		detectPresetFromDates(afterDate, beforeDate, schedule, enableAllActivity),
-	);
+	const selectedPreset =
+		chosenPreset ?? detectPresetFromDates(now, afterDate, beforeDate, schedule, enableAllActivity);
 
 	const [customRange, setCustomRange] = useState<DateRange | undefined>(() => {
 		if (selectedPreset === "custom" && afterDate) {
@@ -72,63 +76,51 @@ export function ProfileTimeframePicker({
 
 	const lastEmittedRef = useRef<{ after: string; before?: string } | null>(null);
 
-	const items = useMemo(() => {
-		const baseItems = [
-			{ value: "this-week", label: formatDropdownLabel("this-week") },
-			{ value: "last-week", label: formatDropdownLabel("last-week") },
-			{ value: "this-month", label: formatDropdownLabel("this-month") },
-			{ value: "last-month", label: formatDropdownLabel("last-month") },
-			{ value: "custom", label: formatDropdownLabel("custom") },
-		];
-		if (enableAllActivity) {
-			return [{ value: "all-activity", label: formatDropdownLabel("all-activity") }, ...baseItems];
-		}
-		return baseItems;
-	}, [enableAllActivity]);
-
-	useEffect(() => {
-		if (userInteracted) return;
-		const detected = detectPresetFromDates(afterDate, beforeDate, schedule, enableAllActivity);
-		if (detected !== selectedPreset) {
-			setSelectedPreset(detected);
-		}
-	}, [afterDate, beforeDate, schedule, enableAllActivity, userInteracted, selectedPreset]);
+	const baseItems: { value: TimeframePreset; label: string }[] = [
+		{ value: "this-week", label: formatDropdownLabel("this-week") },
+		{ value: "last-week", label: formatDropdownLabel("last-week") },
+		{ value: "this-month", label: formatDropdownLabel("this-month") },
+		{ value: "last-month", label: formatDropdownLabel("last-month") },
+		{ value: "custom", label: formatDropdownLabel("custom") },
+	];
+	const items = enableAllActivity
+		? [{ value: "all-activity", label: formatDropdownLabel("all-activity") }, ...baseItems]
+		: baseItems;
 
 	useEffect(() => {
 		if (!onTimeframeChange) return;
 
 		let range: { after: string; before: string | undefined };
 
+		const at = new Date(nowMs);
+
 		if (selectedPreset === "custom") {
 			if (!customRange?.from) return;
-			const dateRange = getDateRangeForPreset(selectedPreset, schedule, {
+			const dateRange = getDateRangeForPreset(at, selectedPreset, schedule, {
 				from: customRange.from,
 				to: customRange.to,
 			});
 			range = formatDateRangeForApi(dateRange);
 		} else {
-			const dateRange = getDateRangeForPreset(selectedPreset, schedule);
+			const dateRange = getDateRangeForPreset(at, selectedPreset, schedule);
 			range = formatDateRangeForApi(dateRange);
 		}
 
 		if (
 			lastEmittedRef.current?.after === range.after &&
-			lastEmittedRef.current?.before === range.before
+			lastEmittedRef.current.before === range.before
 		) {
 			return;
 		}
 
 		lastEmittedRef.current = range;
 		onTimeframeChange(range.after, range.before);
-	}, [selectedPreset, customRange, schedule, onTimeframeChange]);
+	}, [nowMs, selectedPreset, customRange, schedule, onTimeframeChange]);
 
-	const handlePresetChange = (value: string) => {
-		const preset = value as TimeframePreset;
-		setUserInteracted(true);
-		setSelectedPreset(preset);
+	const handlePresetChange = (preset: TimeframePreset) => {
+		setChosenPreset(preset);
 
 		if (preset === "custom" && !customRange?.from) {
-			const now = new Date();
 			if (afterDate) {
 				const fromDate = parseISO(afterDate);
 				setCustomRange({
@@ -146,7 +138,7 @@ export function ProfileTimeframePicker({
 
 	const handleCustomRangeChange = (range: DateRange | undefined) => {
 		if (range) {
-			setUserInteracted(true);
+			setChosenPreset("custom");
 			setCustomRange(range);
 		}
 	};
@@ -179,7 +171,7 @@ export function ProfileTimeframePicker({
 				<SelectTrigger className="w-65" aria-label="Timeframe">
 					<SelectValue placeholder="Select timeframe" />
 				</SelectTrigger>
-				<SelectContent>
+				<SelectContent aria-label="Timeframe">
 					{enableAllActivity && (
 						<SelectItem value="all-activity">
 							<PresetIcon preset="all-activity" />
@@ -227,6 +219,7 @@ export function ProfileTimeframePicker({
 					/>
 					<PopoverContent className="w-auto p-0" align="start">
 						<Calendar
+							// oxlint-disable-next-line jsx-a11y/no-autofocus -- Choosing "custom" opens this popover for the sole purpose of picking a range, so the day grid takes focus with it.
 							autoFocus
 							mode="range"
 							defaultMonth={customRange?.from}

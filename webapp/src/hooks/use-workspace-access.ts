@@ -31,6 +31,6 @@ export function useWorkspaceAccess() {
 		userLogin: membershipQuery.data?.userLogin,
 		userName: membershipQuery.data?.userName,
 		isLoading: workspacesLoading || membershipQuery.isLoading,
-		error: membershipQuery.error as Error | null,
+		error: membershipQuery.error,
 	};
 }

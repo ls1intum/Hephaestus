@@ -8,7 +8,7 @@
 .github/                         @ls1intum/hephaestus-maintainers
 .changeset/                      @ls1intum/hephaestus-maintainers
 CHANGELOG.md                     @ls1intum/hephaestus-maintainers
-commitlint.config.mjs            @ls1intum/hephaestus-maintainers
+commitlint.config.ts             @ls1intum/hephaestus-maintainers
 renovate.json                    @ls1intum/hephaestus-maintainers
 
 # Application Server (Java/Spring)

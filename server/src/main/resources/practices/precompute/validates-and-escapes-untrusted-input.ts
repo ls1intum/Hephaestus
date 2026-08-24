@@ -187,7 +187,7 @@ function firstMatch(rows: PatternRows, content: string): string | null {
 	return null;
 }
 
-export default async function (
+export default function validatesAndEscapesUntrustedInput(
 	_repo: string,
 	diffFiles: Map<string, DiffFile>,
 	_m: PullRequestMetadata,

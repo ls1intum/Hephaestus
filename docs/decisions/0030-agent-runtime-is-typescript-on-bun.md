@@ -48,7 +48,8 @@ image contains no Node and no npm: the base is `debian:bookworm-slim`, the Pi SD
 
 Type-checking, linting and formatting cover the runner and the precompute trees as one project:
 `tsconfig.agents.json` (strict, plus `noUncheckedIndexedAccess`) with the Pi SDK as a devDependency
-pinned to the version the image installs, and the root `biome.jsonc`.
+pinned to the version the image installs, the root `.oxlintrc.json` for lint, and the root
+`biome.jsonc` for format.
 
 ## Consequences
 
@@ -130,5 +131,5 @@ pinned to the version the image installs, and the root `biome.jsonc`.
 ## Contract locations
 
 - [Pi agent workspace ABI](../contributor/agent/workspace-abi.mdx)
-- `docker/agents/pi/Dockerfile`, `tsconfig.agents.json`, `biome.jsonc`
+- `docker/agents/pi/Dockerfile`, `tsconfig.agents.json`, `.oxlintrc.json`, `biome.jsonc`
 - `PiRuntimeFactory`, `PiRunnerProfile`, `MentorRunnerProfile`, `PracticeRunnerProfile`

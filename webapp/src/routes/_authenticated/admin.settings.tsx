@@ -59,7 +59,7 @@ function AdminSettingsPage() {
 						<QueryErrorAlert
 							error={settingsQuery.error}
 							title="Couldn't verify the current instance settings"
-							onRetry={() => settingsQuery.refetch()}
+							onRetry={() => void settingsQuery.refetch()}
 						/>
 					) : null}
 					<SilentModeCard
@@ -80,7 +80,7 @@ function AdminSettingsPage() {
 				<QueryErrorAlert
 					error={settingsQuery.error}
 					title="Couldn't load instance settings"
-					onRetry={() => settingsQuery.refetch()}
+					onRetry={() => void settingsQuery.refetch()}
 				/>
 			) : (
 				<Skeleton className="h-52 w-full rounded-xl" />

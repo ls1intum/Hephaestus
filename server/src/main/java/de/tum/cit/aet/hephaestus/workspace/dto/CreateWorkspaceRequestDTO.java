@@ -72,18 +72,21 @@ public record CreateWorkspaceRequestDTO(
 ) {
     @AssertTrue(message = "Personal access token is required")
     @Schema(hidden = true)
+    @SuppressWarnings("PMD.UnusedPrivateMethod")
     private boolean isTokenProvided() {
         return personalAccessToken != null && !personalAccessToken.isBlank();
     }
 
     @AssertTrue(message = "kind must be GITHUB or GITLAB; SLACK flows through OAuth")
     @Schema(hidden = true)
+    @SuppressWarnings("PMD.UnusedPrivateMethod")
     private boolean isKindSupported() {
         return kind == IntegrationKind.GITHUB || kind == IntegrationKind.GITLAB;
     }
 
     @AssertTrue(message = "Server URL must use HTTPS and must not point to private/reserved addresses")
     @Schema(hidden = true)
+    @SuppressWarnings("PMD.UnusedPrivateMethod")
     private boolean isServerUrlSafe() {
         if (serverUrl == null || serverUrl.isBlank()) {
             return true;

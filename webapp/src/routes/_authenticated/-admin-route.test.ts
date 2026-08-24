@@ -18,9 +18,12 @@ function newRouter(url?: string) {
 	});
 }
 
-const adminUrls = Object.values(newRouter().routesById)
-	.filter((route) => route.fullPath?.startsWith("/admin/"))
-	.map((route) => route.fullPath);
+// `Object.values(routesById)` is `any[]`; the loose map's is `AnyRoute[]`. `fullPath` is untyped on
+// both, so it is checked on the way out.
+const adminUrls = Object.values(newRouter().looseRoutesById)
+	.map((route): unknown => route.fullPath)
+	.filter((fullPath): fullPath is string => typeof fullPath === "string")
+	.filter((fullPath) => fullPath.startsWith("/admin/"));
 
 function mockAppRole(appRole: "APP_ADMIN" | "APP_USER") {
 	server.use(http.get("*/user", () => HttpResponse.json({ ...currentUser, appRole })));

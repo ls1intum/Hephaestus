@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useState } from "react";
+import { STORY_NOW } from "@/components/common/story-clock";
 import Header from "@/components/core/Header";
 import { useSurveyNotificationStore } from "@/stores/survey-notification-store";
 import type { PostHogSurvey } from "@/types/survey";
@@ -35,11 +36,11 @@ const mockSurvey: PostHogSurvey = {
 		},
 	],
 	conditions: null,
-	start_date: new Date().toISOString(),
+	start_date: new Date(STORY_NOW).toISOString(),
 	end_date: null,
 	enable_partial_responses: true,
 	current_iteration: 1,
-	current_iteration_start_date: new Date().toISOString(),
+	current_iteration_start_date: new Date(STORY_NOW).toISOString(),
 };
 
 /**
@@ -50,25 +51,29 @@ export const FullPagePreview: Story = {
 	render: () => {
 		const Demo = () => {
 			const [visible, setVisible] = useState(false);
-			const shouldShow = useSurveyNotificationStore((s) => s.shouldShowSurvey);
 			const pending = useSurveyNotificationStore((s) => s.pendingSurvey);
 			const setPending = useSurveyNotificationStore((s) => s.setPendingSurvey);
 			const clear = useSurveyNotificationStore((s) => s.clearPendingSurvey);
-			const clearSignal = useSurveyNotificationStore((s) => s.clearShowSignal);
 
 			useEffect(() => {
-				if (!pending) {
-					const t = setTimeout(() => setVisible(true), 400);
-					return () => clearTimeout(t);
-				}
+				if (pending) return;
+				const t = setTimeout(() => setVisible(true), 400);
+				return () => clearTimeout(t);
 			}, [pending]);
 
 			useEffect(() => {
-				if (shouldShow) {
-					clearSignal();
+				const consumeShowSignal = () => {
+					const { shouldShowSurvey, clearShowSignal } = useSurveyNotificationStore.getState();
+					if (!shouldShowSurvey) {
+						return;
+					}
+					clearShowSignal();
 					setVisible(true);
-				}
-			}, [shouldShow, clearSignal]);
+				};
+
+				consumeShowSignal();
+				return useSurveyNotificationStore.subscribe(consumeShowSignal);
+			}, []);
 
 			return (
 				<div className="min-h-screen bg-background">

@@ -1,40 +1,47 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { fn } from "storybook/test";
-import type { TeamInfo } from "@/api/types.gen";
+import type { LabelInfo, RepositoryInfo, TeamInfo } from "@/api/types.gen";
 import { withStandardPage } from "@/stories/decorators";
 import { expectNoPageOverflow } from "@/test/reflow";
 import { AdminTeamsTable } from "./AdminTeamsTable";
 
-const repos = [
-	{
-		id: 1,
-		name: "hephaestus",
-		nameWithOwner: "org/hephaestus",
-		htmlUrl: "https://github.com/org/hephaestus",
-		hiddenFromContributions: false,
-	},
-	{
-		id: 2,
-		name: "web-app",
-		nameWithOwner: "org/web-app",
-		htmlUrl: "https://github.com/org/web-app",
-		hiddenFromContributions: false,
-	},
-	{
-		id: 3,
-		name: "server",
-		nameWithOwner: "org/server",
-		htmlUrl: "https://github.com/org/server",
-		hiddenFromContributions: false,
-	},
-];
+const hephaestusRepo: RepositoryInfo = {
+	id: 1,
+	name: "hephaestus",
+	nameWithOwner: "org/hephaestus",
+	htmlUrl: "https://github.com/org/hephaestus",
+	hiddenFromContributions: false,
+};
 
-const labels = [
-	{ id: 101, name: "bug", color: "d73a4a", repository: repos[0] },
-	{ id: 102, name: "enhancement", color: "a2eeef", repository: repos[1] },
-	{ id: 103, name: "help wanted", color: "008672", repository: repos[0] },
-	{ id: 104, name: "good first issue", color: "7057ff", repository: repos[2] },
-];
+const webAppRepo: RepositoryInfo = {
+	id: 2,
+	name: "web-app",
+	nameWithOwner: "org/web-app",
+	htmlUrl: "https://github.com/org/web-app",
+	hiddenFromContributions: false,
+};
+
+const serverRepo: RepositoryInfo = {
+	id: 3,
+	name: "server",
+	nameWithOwner: "org/server",
+	htmlUrl: "https://github.com/org/server",
+	hiddenFromContributions: false,
+};
+
+const bugLabel: LabelInfo = { id: 101, name: "bug", color: "d73a4a", repository: hephaestusRepo };
+const helpWantedLabel: LabelInfo = {
+	id: 103,
+	name: "help wanted",
+	color: "008672",
+	repository: hephaestusRepo,
+};
+const goodFirstIssueLabel: LabelInfo = {
+	id: 104,
+	name: "good first issue",
+	color: "7057ff",
+	repository: serverRepo,
+};
 
 const teams: TeamInfo[] = [
 	{
@@ -47,8 +54,8 @@ const teams: TeamInfo[] = [
 		membershipCount: 2,
 		repoPermissionCount: 2,
 		hidden: false,
-		repositories: [repos[0], repos[1]],
-		labels: [labels[0], labels[2]],
+		repositories: [hephaestusRepo, webAppRepo],
+		labels: [bugLabel, helpWantedLabel],
 		members: [
 			{
 				id: 1,
@@ -77,8 +84,8 @@ const teams: TeamInfo[] = [
 		repoPermissionCount: 2,
 		hidden: false,
 		parentId: 1,
-		repositories: [repos[2]],
-		labels: [labels[3]],
+		repositories: [serverRepo],
+		labels: [goodFirstIssueLabel],
 		members: [
 			{
 				id: 3,
@@ -100,7 +107,7 @@ const teams: TeamInfo[] = [
 		repoPermissionCount: 1,
 		hidden: true,
 		parentId: 1,
-		repositories: [repos[1]],
+		repositories: [webAppRepo],
 		labels: [],
 		members: [],
 	},

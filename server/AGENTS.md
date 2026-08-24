@@ -70,8 +70,8 @@ pnpm run generate:api:application-server:client
 **Ask first** — schema changes · security configuration · a new `pom.xml` dependency · workspace
 authorization logic.
 
-**Never** — commit credentials · `System.out.println` (use `@Slf4j` with `{}` placeholders, and never
-log tokens) · `@Transactional` on a controller (service layer only) · expose an entity from a
+**Never** — commit credentials · `System.out.println` (log through SLF4J with `{}` placeholders, and
+never log a token) · `@Transactional` on a controller (service layer only) · expose an entity from a
 controller.
 
 ## Test tiers
@@ -85,6 +85,11 @@ controller.
 
 Live tests need GitHub App credentials in `application-live-local.yml` (gitignored); the Maven profile
 is the only guard.
+
+**An integration test's *filename* decides whether it ever runs.** Failsafe includes
+`**/*IntegrationTest.java` and `**/*LiquibaseTest.java` and nothing else, so a `@Tag("integration")`
+class named anything else is silently never executed by `mvn verify` — it fails no build and reports
+no skip.
 
 Name tests `should[ExpectedBehavior]When[Condition]`. Controller-level integration tests extend
 `AbstractWorkspaceIntegrationTest` (or a domain-specific base) and exercise access control through
@@ -101,12 +106,13 @@ annotation. Assume data from previous tests may exist; do not write cleanup that
   `DATABASECHANGELOG` references unknown ids, so deleting is safe **only** when the changeset's schema
   effect is enforced by a later changeset (a NOT NULL constraint makes its own backfill validator
   obsolete). Never delete one whose effect is not enforced elsewhere. Released changelogs are otherwise
-  immutable and CI-enforced — root `AGENTS.md` §5.
+  immutable and CI-enforced — root `AGENTS.md` § Database changes.
 - **The changelog is untested by the suite.** Tests run against `ddl-auto: create`, so a broken
   changelog passes every tier. Validate with `mvn liquibase:update` against real Postgres.
 - **A native `@Query` may not contain an apostrophe inside a `--` comment.** Hibernate reads it as the
   start of a string literal and the whole `ApplicationContext` fails to build, naming something else.
-  `IssueRepository.java:325` and `PullRequestRepository.java:218` carry the warning in place.
+  `NativeQueryCommentArchTest` enforces it, so the failure arrives as a named test rather than as a
+  mystery at boot; the two queries that were bitten carry the warning in place.
 - **`EntityManager` is injected as a `@PersistenceContext` field**, not through the constructor
   (`WorkspaceMembershipService`, `GitHubUserProcessor`). Everything else is constructor injection via
   `@RequiredArgsConstructor`.
@@ -132,15 +138,20 @@ annotation. Assume data from previous tests may exist; do not write cleanup that
   `OpenAPIConfiguration.ALLOWED_DOMAIN_OBJECTS`. The webapp client then simply has no type for it, with
   no error anywhere. Domain types the API deliberately exposes (`ProblemDetail`, `PracticeBinding`, …)
   are there for this reason.
-- DTOs are records. Annotate a component `@NonNull` (`org.jspecify.annotations`) when the API requires
-  it and leave optional fields bare — that is what keeps the generated OpenAPI schema minimal.
+- DTOs are records, and `@NonNull` (`org.jspecify.annotations`) on a component is what puts it in the
+  generated schema's `required` list. A component the API may omit is left off that list — annotate it
+  `@Nullable` or leave it bare; neither changes the spec.
+- **Never wrap a DTO component in `Optional<>`.** springdoc unwraps it to the value type but still marks
+  it required, so the generated TypeScript declares it non-optional and its response transformer
+  converts it unconditionally — a value the server never sends is typed as one it always sends. Use
+  `@Nullable T`.
 
 ## Schema changes
 
 1. Modify the JPA entities.
 2. `pnpm run db:draft-changelog`, then prune the diff to the real deltas.
 3. Rename to `<epoch-ms-timestamp>_changelog.xml`; `changeSet` ids are `<timestamp>-1`, `-2`, …
-   One consolidated changelog per branch. Full rules in root `AGENTS.md` §5.
+   One consolidated changelog per branch. Full rules in root `AGENTS.md` § Database changes.
 4. `pnpm run db:generate-erd-docs`.
 5. `pnpm changeset` — a user-facing summary. Touching `db/changelog/` without touching `.changeset/`
    is always wrong. These are two unrelated things both called "changeset".

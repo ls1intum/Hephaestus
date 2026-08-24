@@ -1,43 +1,47 @@
 /**
- * Update GitLab GraphQL schema via introspection
+ * Refreshes the vendored GitLab GraphQL schema. GitLab publishes no schema file, so it is asked for
+ * one by introspection and the JSON that comes back is printed as SDL — which is the form the Maven
+ * codegen reads, and the only form a person can review as a diff.
  *
- * Usage: pnpm run gitlab:update-schema [-- --url <other-gitlab-url>]
- *
- * Fetches the GitLab GraphQL schema via introspection and converts it to SDL format.
- * Default instance: https://gitlab.lrz.de (public introspection, no auth needed)
+ * The default instance answers introspection without a token; `--token` exists for one that does not.
  */
 
 import { mkdirSync, renameSync, statSync, unlinkSync, writeFileSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join, resolve } from "node:path";
 import {
 	buildClientSchema,
 	getIntrospectionQuery,
 	type IntrospectionQuery,
 	printSchema,
 } from "graphql";
+import { isRecord, parseJson } from "./lib/json.ts";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-
-const SCHEMA_DIR = resolve(__dirname, "../server/src/main/resources/graphql/gitlab");
+const SCHEMA_DIR = resolve(import.meta.dirname, "../server/src/main/resources/graphql/gitlab");
 const SCHEMA_FILE = join(SCHEMA_DIR, "schema.gitlab.graphql");
 const DEFAULT_GITLAB_URL = "https://gitlab.lrz.de";
 
-// Validation constants
-const MIN_SIZE_BYTES = 500_000; // 500KB minimum
-const MAX_SIZE_BYTES = 50_000_000; // 50MB maximum
-const REQUEST_TIMEOUT_MS = 60_000; // 60 seconds
+// The printed schema runs to megabytes, so size alone rejects an error page or a login redirect.
+const MIN_SIZE_BYTES = 500_000;
+const MAX_SIZE_BYTES = 50_000_000;
+// `fetch` waits indefinitely on a server that accepts the connection and never answers, and
+// introspecting a whole GitLab instance is slow enough that a person would keep waiting with it.
+const REQUEST_TIMEOUT_MS = 60_000;
 
-// GraphQL schema validation patterns
 const HAS_TYPE = /^type\s+\w+/m;
 const HAS_INPUT = /^input\s+\w+/m;
 const HAS_QUERY = /^type\s+Query\s*\{/m;
 
 interface IntrospectionResponse {
 	data?: IntrospectionQuery;
-	errors?: Array<{ message: string; locations?: unknown }>;
+	errors?: { message: string; locations?: unknown }[];
 }
+
+/**
+ * An introspection payload is a whole GraphQL schema, far too large to check field by field. This
+ * establishes only that a JSON object came back; `buildClientSchema` below is what rejects a payload
+ * that is not really a schema, and the caller reports that.
+ */
+const isIntrospectionResponse = (value: unknown): value is IntrospectionResponse => isRecord(value);
 
 function parseArgs(): { url: string; token?: string } {
 	const args = process.argv.slice(2);
@@ -57,7 +61,9 @@ Options:
 	}
 
 	let url = DEFAULT_GITLAB_URL;
-	let token: string | undefined = process.env.GITLAB_TOKEN?.trim() || undefined;
+	const environmentToken = process.env.GITLAB_TOKEN?.trim();
+	// An empty GITLAB_TOKEN reads as "not set" rather than as a token that will be rejected.
+	let token: string | undefined = environmentToken === "" ? undefined : environmentToken;
 
 	for (let i = 0; i < args.length; i++) {
 		const nextArg = args[i + 1];
@@ -110,7 +116,7 @@ function validateGraphQLSchema(content: string): { valid: boolean; reason?: stri
 async function main(): Promise<void> {
 	const { url, token } = parseArgs();
 
-	// Normalize URL
+	// `--url` is given as an instance, so the endpoint is appended — unless the caller already did.
 	let graphqlEndpoint = url.replace(/\/+$/, "");
 	if (!graphqlEndpoint.endsWith("/api/graphql")) {
 		graphqlEndpoint = `${graphqlEndpoint}/api/graphql`;
@@ -124,7 +130,7 @@ async function main(): Promise<void> {
 	};
 
 	if (token) {
-		// GitLab uses PRIVATE-TOKEN header for Personal Access Tokens
+		// GitLab takes a Personal Access Token here, not as a bearer.
 		headers["PRIVATE-TOKEN"] = token;
 	}
 
@@ -156,14 +162,20 @@ async function main(): Promise<void> {
 	}
 
 	const responseText = await response.text();
-	let result: IntrospectionResponse;
+	let parsed: unknown;
 	try {
-		result = JSON.parse(responseText) as IntrospectionResponse;
+		parsed = parseJson(responseText);
 	} catch {
 		console.error("Failed to parse response as JSON");
 		console.error(`Response preview: ${responseText.substring(0, 200)}`);
 		process.exit(1);
 	}
+	if (!isIntrospectionResponse(parsed)) {
+		console.error("Invalid response: expected a JSON object");
+		console.error(`Response preview: ${responseText.substring(0, 200)}`);
+		process.exit(1);
+	}
+	const result = parsed;
 
 	if (result.errors) {
 		console.error("GraphQL errors:", JSON.stringify(result.errors, null, 2));
@@ -197,7 +209,7 @@ async function main(): Promise<void> {
 
 	const tempFile = `${SCHEMA_FILE}.tmp`;
 	try {
-		writeFileSync(tempFile, sdlContent, "utf-8");
+		writeFileSync(tempFile, sdlContent, "utf8");
 		const stats = statSync(tempFile);
 		console.log(`Downloaded ${Math.round(stats.size / 1_048_576)}MB`);
 		renameSync(tempFile, SCHEMA_FILE);
@@ -207,7 +219,7 @@ async function main(): Promise<void> {
 		try {
 			unlinkSync(tempFile);
 		} catch {
-			/* ignore */
+			// The write is the failure worth reporting; a failed cleanup must not replace it.
 		}
 		throw error;
 	}

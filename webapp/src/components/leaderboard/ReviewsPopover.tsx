@@ -29,14 +29,12 @@ export function ReviewsPopover({
 	const { icon: PrIcon } = getPullRequestStateIcon(providerType, "OPEN");
 
 	// Sort reviewed PRs by repository name and PR number
-	const sortedReviewedPullRequests = reviewedPullRequests
-		? [...reviewedPullRequests].sort((a, b) => {
-				if (a.repository?.name === b.repository?.name) {
-					return a.number - b.number;
-				}
-				return (a.repository?.name ?? "").localeCompare(b.repository?.name ?? "");
-			})
-		: [];
+	const sortedReviewedPullRequests = [...reviewedPullRequests].sort((a, b) => {
+		if (a.repository?.name === b.repository?.name) {
+			return a.number - b.number;
+		}
+		return (a.repository?.name ?? "").localeCompare(b.repository?.name ?? "");
+	});
 
 	// Helper function to copy PR URLs to clipboard
 	const copyPullRequests = () => {
@@ -69,11 +67,11 @@ export function ReviewsPopover({
 
 			navigator.clipboard.write([clipboardItem]).catch(() => {
 				// Fallback to plain text if html copying fails
-				navigator.clipboard.writeText(plainText);
+				void navigator.clipboard.writeText(plainText);
 			});
 		} catch (_e) {
 			// Basic fallback for older browsers
-			navigator.clipboard.writeText(plainText);
+			void navigator.clipboard.writeText(plainText);
 		}
 
 		setShowCopySuccess(true);

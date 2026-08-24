@@ -159,8 +159,9 @@ export function PracticeAdoptionPanel({ state, onAdopt, nested }: PracticeAdopti
 }
 
 /**
- * A level that has not resolved still owes the drawer a title — Base UI requires one, and a panel
- * with no accessible name is unreachable by anything but sight.
+ * A level that has not resolved still owes the drawer a title. Base UI does not enforce one: with no
+ * `Title` it drops `aria-labelledby` and the panel renders silently with no accessible name, so the
+ * failure surfaces only in an axe run, or in a screen reader announcing an unnamed dialog.
  */
 function PracticeAdoptionPlaceholder({
 	state,

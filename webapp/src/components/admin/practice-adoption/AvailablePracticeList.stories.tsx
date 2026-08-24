@@ -10,33 +10,35 @@ import { AvailablePracticeList } from "./AvailablePracticeList";
 const detailParamOf = (link: HTMLElement) =>
 	new URL(link.getAttribute("href") ?? "", "https://example.test").searchParams.get("detail");
 
-const practices: CatalogPracticeSummary[] = [
-	{
-		slug: "describe-what-and-why",
-		name: "Describe what changed and why",
-		artifactKind: "scm.pull_request",
-		areaSlug: "review-ready-work",
-		areaName: "Review-ready work",
-		availability: "AVAILABLE",
-		automatedReviewValidation: mockAuthorDeclaredEvidenceValidation,
-	},
-	{
-		slug: "review-scope",
-		name: "Keep pull requests focused",
-		artifactKind: "scm.pull_request",
-		areaSlug: "review-ready-work",
-		areaName: "Review-ready work",
-		availability: "ADOPTED",
-		automatedReviewValidation: mockAuthorDeclaredEvidenceValidation,
-	},
-	{
-		slug: "issue-context",
-		name: "Include enough issue context",
-		artifactKind: "scm.issue",
-		availability: "SLUG_CONFLICT",
-		automatedReviewValidation: mockAuthorDeclaredEvidenceValidation,
-	},
-];
+const describeWhatAndWhy: CatalogPracticeSummary = {
+	slug: "describe-what-and-why",
+	name: "Describe what changed and why",
+	artifactKind: "scm.pull_request",
+	areaSlug: "review-ready-work",
+	areaName: "Review-ready work",
+	availability: "AVAILABLE",
+	automatedReviewValidation: mockAuthorDeclaredEvidenceValidation,
+};
+
+const reviewScope: CatalogPracticeSummary = {
+	slug: "review-scope",
+	name: "Keep pull requests focused",
+	artifactKind: "scm.pull_request",
+	areaSlug: "review-ready-work",
+	areaName: "Review-ready work",
+	availability: "ADOPTED",
+	automatedReviewValidation: mockAuthorDeclaredEvidenceValidation,
+};
+
+const issueContext: CatalogPracticeSummary = {
+	slug: "issue-context",
+	name: "Include enough issue context",
+	artifactKind: "scm.issue",
+	availability: "SLUG_CONFLICT",
+	automatedReviewValidation: mockAuthorDeclaredEvidenceValidation,
+};
+
+const practices: CatalogPracticeSummary[] = [describeWhatAndWhy, reviewScope, issueContext];
 
 /**
  * Grouping is not optional and adopted entries are not shown twice, so the list has no display
@@ -80,14 +82,14 @@ export const DeletedAreaStillHasSomethingToAdd: Story = {
 };
 
 export const DeletedAreaCanOnlyBeRestored: Story = {
-	args: { practices: [practices[1]], existingAreaSlugs: new Set() },
+	args: { practices: [reviewScope], existingAreaSlugs: new Set() },
 	play: async ({ canvas }) => {
 		await expect(canvas.getByRole("link", { name: /Restore group · 1 practice/ })).toBeVisible();
 	},
 };
 
 export const EverythingAdded: Story = {
-	args: { practices: [practices[1]] },
+	args: { practices: [reviewScope] },
 	play: async ({ canvas }) => {
 		await expect(canvas.getByText("Everything is already added")).toBeVisible();
 	},
@@ -104,7 +106,7 @@ export const LongContent: Story = {
 	args: {
 		practices: [
 			{
-				...practices[0],
+				...describeWhatAndWhy,
 				name: "Explain architectural trade-offs, operational constraints, and the evidence behind the chosen implementation",
 				areaName: "Decisions, documentation, and long-lived operational knowledge",
 			},

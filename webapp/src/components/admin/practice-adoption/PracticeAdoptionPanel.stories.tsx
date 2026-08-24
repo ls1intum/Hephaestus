@@ -11,7 +11,7 @@ import {
 import { withPageBehind } from "@/stories/decorators";
 import { Stateful } from "@/stories/stateful";
 import { expectGenuinelyDisabled } from "@/test/controls";
-import { expectSettledVisible } from "@/test/overlay";
+import { expectSettledVisible, settledDrawerPanel } from "@/test/overlay";
 import { expectNoPanelOverflow } from "@/test/reflow";
 import { PracticeAdoptionPanel, type PracticeAdoptionState } from "./PracticeAdoptionPanel";
 
@@ -162,9 +162,8 @@ export const Loading: Story = {
 	play: async () => {
 		// A skeleton holding the shape the definition will take, so nothing jumps when it lands.
 		// It is `aria-hidden`, so the proof is the DOM, not a role.
-		const panel = document.querySelector<HTMLElement>('[data-slot="drawer-popup"]');
-		await expectSettledVisible(panel as HTMLElement);
-		await expect(panel?.querySelectorAll('[data-slot="skeleton"]').length).toBeGreaterThan(0);
+		const panel = await settledDrawerPanel();
+		await expect(panel.querySelectorAll('[data-slot="skeleton"]').length).toBeGreaterThan(0);
 		await expect(screen.queryByRole("status")).not.toBeInTheDocument();
 	},
 };
@@ -200,9 +199,7 @@ export const LongContent: Story = {
 export const NarrowViewport: Story = {
 	parameters: { viewport: { defaultViewport: "reflow" }, chromatic: { viewports: [320] } },
 	play: async () => {
-		const [panel] = document.querySelectorAll<HTMLElement>('[data-slot="drawer-popup"]');
-		await expectSettledVisible(panel);
-		await expectNoPanelOverflow(panel);
+		await expectNoPanelOverflow(await settledDrawerPanel());
 	},
 };
 

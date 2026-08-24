@@ -17,4 +17,8 @@ public class AgentJobStateConflictException extends RuntimeException {
     public AgentJobStateConflictException(String message) {
         super(message);
     }
+
+    public AgentJobStateConflictException(String message, Throwable cause) {
+        super(message, cause);
+    }
 }

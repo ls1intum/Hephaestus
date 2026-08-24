@@ -14,7 +14,7 @@ pnpm run start
 To build this application for production:
 
 ```bash
-pnpm run build:prod
+pnpm run build
 ```
 
 ## Testing
@@ -31,26 +31,24 @@ This project uses [Tailwind CSS](https://tailwindcss.com/) for styling.
 
 ## Linting & Formatting
 
-This project uses [Biome](https://biomejs.dev/) for linting and formatting. The following scripts are available:
+This project uses [oxlint](https://oxc.rs/docs/guide/usage/linter) for linting and
+[Biome](https://biomejs.dev/) for formatting and import sorting. The following scripts are available:
 
 ```bash
-# Formatting
-pnpm run format          # Apply formatting fixes
-pnpm run format:check    # Check formatting (read-only)
+# Formatting and import order (Biome)
+pnpm run format          # Apply
+pnpm run format:check    # Verify, read-only
 
-# Linting
-pnpm run lint            # Run linting checks only
-pnpm run lint:fix        # Apply lint fixes
+# Linting (oxlint)
+pnpm run lint            # Verify
+pnpm run lint:fix        # Apply the safe fixes
 
-# Comprehensive (format + lint + imports)
-pnpm run check           # Check all (formatting, linting, import organization)
-pnpm run check:fix       # Apply all fixes
+# Both, and what CI runs. Neither leg short-circuits the other.
+pnpm run check
+pnpm run check:fix
 
 # Type checking
-pnpm run typecheck       # Run TypeScript type checking
-
-# CI-optimized
-pnpm run ci              # Run all checks with CI-friendly output
+pnpm run typecheck
 ```
 
 ## Shadcn

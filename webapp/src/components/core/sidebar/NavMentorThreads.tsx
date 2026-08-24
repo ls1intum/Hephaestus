@@ -1,6 +1,6 @@
 import { Link, useLocation } from "@tanstack/react-router";
-import { useMemo } from "react";
 import type { ChatThreadSummary } from "@/api/types.gen";
+import { useNow } from "@/components/common/use-now";
 import {
 	SidebarGroup,
 	SidebarGroupContent,
@@ -22,6 +22,8 @@ interface ThreadGroupData {
 	threads: ChatThreadSummary[];
 }
 
+type BucketName = "Today" | "Yesterday" | "Last 7 days" | "Last 30 days" | "Older";
+
 /**
  * Group thread summaries by their createdAt bucket: Today, Yesterday,
  * Last 7 days, Last 30 days, Older. Preserves arrival order (newest first
@@ -29,8 +31,8 @@ interface ThreadGroupData {
  *
  * The Pi mentor returns a flat list, so we bucket locally for the same UX.
  */
-function bucketThreads(threads: ChatThreadSummary[]): ThreadGroupData[] {
-	const buckets: Record<string, ChatThreadSummary[]> = {
+function bucketThreads(threads: ChatThreadSummary[], now: number): ThreadGroupData[] {
+	const buckets: Record<BucketName, ChatThreadSummary[]> = {
 		Today: [],
 		Yesterday: [],
 		"Last 7 days": [],
@@ -38,13 +40,12 @@ function bucketThreads(threads: ChatThreadSummary[]): ThreadGroupData[] {
 		Older: [],
 	};
 
-	const now = Date.now();
 	const day = 24 * 60 * 60 * 1000;
 
 	for (const thread of threads) {
 		const createdAt = thread.createdAt ? new Date(thread.createdAt).getTime() : now;
 		const ageDays = (now - createdAt) / day;
-		let bucket: string;
+		let bucket: BucketName;
 		if (ageDays < 1) bucket = "Today";
 		else if (ageDays < 2) bucket = "Yesterday";
 		else if (ageDays < 7) bucket = "Last 7 days";
@@ -68,7 +69,8 @@ export function NavMentorThreads({
 	error,
 	workspaceSlug,
 }: NavMentorThreadsProps) {
-	const threadGroups = useMemo(() => bucketThreads(threads ?? []), [threads]);
+	const now = useNow();
+	const threadGroups = bucketThreads(threads, now);
 
 	if (isLoading) {
 		return (

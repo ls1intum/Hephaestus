@@ -11,6 +11,20 @@ import { DetailDrawerStack } from "./DetailDrawerStack";
 const popups = () =>
 	Array.from(document.querySelectorAll<HTMLElement>('[data-slot="drawer-popup"]'));
 
+/** The level at `depth`, so a story that has fewer open than it expects says which. */
+const popupAt = (depth: number): HTMLElement => {
+	const popup = popups()[depth];
+	if (!popup) throw new Error(`Expected at least ${depth + 1} open drawer level(s).`);
+	return popup;
+};
+
+/** The page beside the panel, which is what a dismissing press lands on. */
+const pageBesideThePanel = (): Element => {
+	const page = document.elementFromPoint(20, 200);
+	if (!page) throw new Error("Nothing is under the point beside the panel.");
+	return page;
+};
+
 const meta = {
 	component: DetailDrawerStack,
 	parameters: { layout: "fullscreen" },
@@ -76,7 +90,7 @@ export const OneLevel: Story = {
 export const DismissedLevelSlidesOut: Story = {
 	play: async () => {
 		await expectSettledVisible(await screen.findByText("practice · describe-what-and-why"));
-		const [popup] = popups();
+		const popup = popupAt(0);
 		await userEvent.click(screen.getByRole("button", { name: "Close" }));
 		// Still mounted and still carrying its content, animating out. Dropping it on the URL change
 		// makes a dismissal vanish in one frame instead.
@@ -102,7 +116,7 @@ export const PerLevelDataSurvivesDismissal: Story = {
 						{(_entry, level) => (
 							<>
 								<DetailDrawerHeader nested={level.nested}>
-									<DrawerTitle>{perLevel[level.depth].heading}</DrawerTitle>
+									<DrawerTitle>{perLevel[level.depth]?.heading}</DrawerTitle>
 								</DetailDrawerHeader>
 								<DrawerBody>
 									<p className="text-sm text-muted-foreground">Level content.</p>
@@ -128,7 +142,7 @@ export const PressingThePageDismisses: Story = {
 		// A press on the page beside the panel is the fastest way out, and the reason the panel is
 		// narrower than the viewport.
 		await userEvent.pointer({
-			target: document.elementFromPoint(20, 200) as Element,
+			target: pageBesideThePanel(),
 			coords: { clientX: 20, clientY: 200 },
 			keys: "[MouseLeft]",
 		});
@@ -149,7 +163,7 @@ export const GuardedLevelLeavesTheSameWays: Story = {
 		// level; what protects a draft is the prompt the navigation raises, which this level has none
 		// of. It skips the exit animation, so `onClose` lands without one.
 		await userEvent.pointer({
-			target: document.elementFromPoint(20, 200) as Element,
+			target: pageBesideThePanel(),
 			coords: { clientX: 20, clientY: 200 },
 			keys: "[MouseLeft]",
 		});
@@ -216,7 +230,7 @@ export const DetailSizeKeepsItsPeek: Story = {
 		// forced `prefers-reduced-motion`, so the computed value proves nothing. The bug was upstream
 		// of the cascade anyway — `cn()` dedupes an arbitrary custom property by name and keeps the
 		// last, so a `--peek` default declared after the size variant silently replaced it.
-		await expect(popups()[0].className).toContain("[--peek:6rem]");
+		await expect(popupAt(0).className).toContain("[--peek:6rem]");
 	},
 };
 
@@ -248,7 +262,7 @@ export const DismissedLevelDoesNotComeBack: Story = {
 	),
 	play: async () => {
 		await expectSettledVisible(await screen.findByText("practice · describe-what-and-why"));
-		const parent = popups()[0];
+		const parent = popupAt(0);
 		await userEvent.click(screen.getByRole("button", { name: "Back" }));
 
 		// Watch every frame until the level is gone. Clearing the closing depth on the completion
@@ -256,7 +270,9 @@ export const DismissedLevelDoesNotComeBack: Story = {
 		// level snapped to its stepped-back position and animated forward a second time.
 		const nested: string[] = [];
 		for (let frame = 0; frame < 40 && popups().length > 1; frame++) {
-			await new Promise((resolve) => requestAnimationFrame(resolve));
+			await new Promise((resolve) => {
+				requestAnimationFrame(resolve);
+			});
 			nested.push(getComputedStyle(parent).getPropertyValue("--nested-drawers").trim());
 		}
 		await waitFor(() => expect(popups()).toHaveLength(1));
@@ -292,7 +308,7 @@ export const RegionsReachThePanelEdges: Story = {
 	},
 	play: async () => {
 		await expectSettledVisible(await screen.findByText("describe-what-and-why"));
-		const [popup] = popups();
+		const popup = popupAt(0);
 		const panel = popup.getBoundingClientRect();
 		const region = (slot: string) =>
 			popup.querySelector<HTMLElement>(`[data-slot="${slot}"]`)?.getBoundingClientRect();
@@ -333,7 +349,8 @@ export const TwoLevels: Story = {
 	},
 	play: async ({ args }) => {
 		await expectSettledVisible(await screen.findByText("practice · describe-what-and-why"));
-		const [parent, frontmost] = popups();
+		const parent = popupAt(0);
+		const frontmost = popupAt(1);
 		// The level behind knows it is behind, which is what drives the step-back and dim.
 		await expect(parent).toHaveAttribute("data-nested-drawer-open");
 		await expect(getComputedStyle(parent).getPropertyValue("--nested-drawers").trim()).toBe("1");
@@ -355,7 +372,7 @@ export const NarrowViewport: Story = {
 	parameters: { viewport: { defaultViewport: "reflow" }, chromatic: { viewports: [320] } },
 	play: async () => {
 		await expectSettledVisible(await screen.findByText("practice · describe-what-and-why"));
-		const [, frontmost] = popups();
+		const frontmost = popupAt(1);
 		await expect(frontmost.getBoundingClientRect().width).toBe(window.innerWidth);
 	},
 };

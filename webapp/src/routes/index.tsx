@@ -39,7 +39,7 @@ function LandingContainer() {
 	const handleGoToDashboard = () => {
 		const targetSlug = workspaceSlug ?? workspaces[0]?.workspaceSlug;
 		if (targetSlug) {
-			navigate({ to: "/w/$workspaceSlug", params: { workspaceSlug: targetSlug } });
+			void navigate({ to: "/w/$workspaceSlug", params: { workspaceSlug: targetSlug } });
 		}
 	};
 

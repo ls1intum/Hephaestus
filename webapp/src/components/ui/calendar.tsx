@@ -1,7 +1,8 @@
 "use client";
 
 import { ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
-import * as React from "react";
+import type * as React from "react";
+import { useEffect, useRef } from "react";
 import { type DayButton, DayPicker, getDefaultClassNames, type Locale } from "react-day-picker";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -116,24 +117,30 @@ function Calendar({
 				...classNames,
 			}}
 			components={{
-				Root: ({ className, rootRef, ...props }) => {
-					return <div data-slot="calendar" ref={rootRef} className={cn(className)} {...props} />;
+				Root: ({ className: rootClassName, rootRef, ...rootProps }) => {
+					return (
+						<div data-slot="calendar" ref={rootRef} className={cn(rootClassName)} {...rootProps} />
+					);
 				},
-				Chevron: ({ className, orientation, ...props }) => {
+				Chevron: ({ className: chevronClassName, orientation, ...chevronProps }) => {
 					if (orientation === "left") {
-						return <ChevronLeftIcon className={cn("size-4", className)} {...props} />;
+						return <ChevronLeftIcon className={cn("size-4", chevronClassName)} {...chevronProps} />;
 					}
 
 					if (orientation === "right") {
-						return <ChevronRightIcon className={cn("size-4", className)} {...props} />;
+						return (
+							<ChevronRightIcon className={cn("size-4", chevronClassName)} {...chevronProps} />
+						);
 					}
 
-					return <ChevronDownIcon className={cn("size-4", className)} {...props} />;
+					return <ChevronDownIcon className={cn("size-4", chevronClassName)} {...chevronProps} />;
 				},
-				DayButton: ({ ...props }) => <CalendarDayButton locale={locale} {...props} />,
-				WeekNumber: ({ children, ...props }) => {
+				DayButton: ({ ...dayButtonProps }) => (
+					<CalendarDayButton locale={locale} {...dayButtonProps} />
+				),
+				WeekNumber: ({ children, ...weekNumberProps }) => {
 					return (
-						<td {...props}>
+						<td {...weekNumberProps}>
 							<div className="flex size-(--cell-size) items-center justify-center text-center">
 								{children}
 							</div>
@@ -156,8 +163,8 @@ function CalendarDayButton({
 }: React.ComponentProps<typeof DayButton> & { locale?: Partial<Locale> }) {
 	const defaultClassNames = getDefaultClassNames();
 
-	const ref = React.useRef<HTMLButtonElement>(null);
-	React.useEffect(() => {
+	const ref = useRef<HTMLButtonElement>(null);
+	useEffect(() => {
 		if (modifiers.focused) ref.current?.focus();
 	}, [modifiers.focused]);
 

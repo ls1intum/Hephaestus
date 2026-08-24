@@ -1,5 +1,4 @@
 import { Eye, EyeOff, Settings } from "lucide-react";
-import { useMemo } from "react";
 import type { LabelInfo, RepositoryInfo, TeamInfo } from "@/api/types.gen";
 import { LabelBadge } from "@/components/shared/LabelBadge";
 import { Button } from "@/components/ui/button";
@@ -25,19 +24,16 @@ export function RepositoryCard({
 	onRemoveLabel,
 	onToggleVisibility,
 }: RepositoryCardProps) {
-	const repoLabels = useMemo(() => {
-		const byName = new Map<string, LabelInfo>();
-		for (const label of team.labels ?? []) {
-			if (label.repository?.id !== repository.id) continue;
-			const key = (label.name ?? "").toLowerCase();
-			if (key && !byName.has(key)) byName.set(key, label);
-		}
-		return [...byName.values()];
-	}, [team.labels, repository.id]);
+	// Keyed by lower-cased name so two labels differing only in case read as the one label they are.
+	const repoLabelsByName = new Map<string, LabelInfo>();
+	for (const label of team.labels) {
+		if (label.repository?.id !== repository.id) continue;
+		const key = label.name.toLowerCase();
+		if (key && !repoLabelsByName.has(key)) repoLabelsByName.set(key, label);
+	}
 
-	const filteredRepoLabels = useMemo(
-		() => [...repoLabels].sort((a, b) => a.name.localeCompare(b.name)),
-		[repoLabels],
+	const filteredRepoLabels = [...repoLabelsByName.values()].sort((a, b) =>
+		a.name.localeCompare(b.name),
 	);
 
 	return (
@@ -84,7 +80,7 @@ export function RepositoryCard({
 								variant="ghost"
 								size="sm"
 								className="h-7 w-7 p-0"
-								onClick={() => onToggleVisibility(!repository.hiddenFromContributions)}
+								onClick={() => void onToggleVisibility(!repository.hiddenFromContributions)}
 								title={
 									repository.hiddenFromContributions
 										? "Show repository contributions"

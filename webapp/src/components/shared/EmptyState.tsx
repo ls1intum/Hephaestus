@@ -1,10 +1,24 @@
-import type { LucideIcon } from "lucide-react";
 import React, { type ComponentType, type ReactNode } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 
+/** Kept to what Lucide and Octicons both accept. */
+interface IconProps {
+	className?: string;
+	size?: number;
+}
+
+/** Lucide icons are `forwardRef` objects, not plain functions, so both shapes count. */
+function isIconComponent(
+	icon: ReactNode | ComponentType<IconProps>,
+): icon is ComponentType<IconProps> {
+	if (typeof icon === "function") return true;
+	if (typeof icon !== "object" || icon === null || !("render" in icon)) return false;
+	return typeof icon.render === "function";
+}
+
 export interface EmptyStateProps {
 	/** The icon to display at the top of the empty state */
-	icon: LucideIcon | ReactNode | ComponentType<{ className?: string; size?: number }>;
+	icon: ReactNode | ComponentType<IconProps>;
 	/** The title to display as the main message */
 	title: string;
 	/** Optional description text to provide more context */
@@ -35,22 +49,8 @@ export function EmptyState({
 			return icon;
 		}
 
-		if (typeof icon === "function") {
-			return React.createElement(icon, {
-				className: "h-6 w-6 text-muted-foreground",
-				size: 24,
-			});
-		}
-
-		// Handle Lucide icons which are objects with a render method
-		if (icon && typeof icon === "object" && "render" in icon && typeof icon.render === "function") {
-			// Cast to unknown first to avoid TypeScript errors
-			// Use a specific interface for Lucide icon props
-			interface IconProps {
-				className?: string;
-				size?: number;
-			}
-			const IconComponent = icon as unknown as React.ComponentType<IconProps>;
+		if (isIconComponent(icon)) {
+			const IconComponent = icon;
 			return <IconComponent className="h-6 w-6 text-muted-foreground" size={24} />;
 		}
 
@@ -58,7 +58,7 @@ export function EmptyState({
 	};
 
 	return (
-		<Card className={`border-dashed ${height} ${className || ""}`}>
+		<Card className={`border-dashed ${height} ${className ?? ""}`}>
 			<CardContent className="flex flex-col items-center justify-center py-8 px-4 text-center h-full">
 				<div className="rounded-full bg-muted p-3 mb-3">{renderIcon()}</div>
 				<h3 className="font-medium text-lg mb-1">{title}</h3>

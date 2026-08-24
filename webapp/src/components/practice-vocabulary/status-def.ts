@@ -45,16 +45,18 @@ export function statusToneClass(variant: BadgeVariant): string {
 }
 
 /**
- * The registry's values in declaration order, which is the order a reader should meet them in.
- *
- * <p>Typed as a non-empty tuple so it drops straight into `z.enum(...)`, which will not take a plain
- * array. The assertion holds by construction: `StatusDefs` is a total `Record` over a union of
- * string literals, and no such union is empty.
+ * The registry's values in declaration order, typed as a non-empty tuple: a registry with no values
+ * is a programming error, and the throw below is what backs that type up at runtime.
  */
 export function statusValues<TValue extends string>(
 	defs: StatusDefs<TValue>,
 ): [TValue, ...TValue[]] {
-	return Object.keys(defs) as [TValue, ...TValue[]];
+	const isValue = (key: string): key is TValue => Object.hasOwn(defs, key);
+	const [first, ...rest] = Object.keys(defs).filter(isValue);
+	if (first === undefined) {
+		throw new Error("A status registry must define at least one value.");
+	}
+	return [first, ...rest];
 }
 
 /** Every value as a facet option, in registry order. A facet wanting fewer filters the result. */

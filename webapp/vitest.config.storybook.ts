@@ -1,5 +1,4 @@
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 
 import { storybookTest } from "@storybook/addon-vitest/vitest-plugin";
 import { playwright } from "@vitest/browser-playwright";
@@ -7,16 +6,13 @@ import { defineConfig } from "vitest/config";
 import pkg from "./package.json" with { type: "json" };
 import { appSourcePlugins } from "./vite.shared.ts";
 
-const dirname =
-	typeof __dirname !== "undefined" ? __dirname : path.dirname(fileURLToPath(import.meta.url));
-
 const runtimeDeps = Object.keys(pkg.dependencies);
 
 export default defineConfig({
 	plugins: [
 		...appSourcePlugins(),
 		storybookTest({
-			configDir: path.join(dirname, ".storybook"),
+			configDir: path.join(import.meta.dirname, ".storybook"),
 			storybookScript: "pnpm run storybook -- --ci",
 		}),
 	],
@@ -24,9 +20,9 @@ export default defineConfig({
 		alias: [
 			{
 				find: "@monaco-editor/react",
-				replacement: path.resolve(dirname, "./src/test/monaco-editor-react.mock.tsx"),
+				replacement: path.resolve(import.meta.dirname, "./src/test/monaco-editor-react.mock.tsx"),
 			},
-			{ find: "@", replacement: path.resolve(dirname, "./src") },
+			{ find: "@", replacement: path.resolve(import.meta.dirname, "./src") },
 		],
 	},
 	optimizeDeps: {
@@ -45,7 +41,7 @@ export default defineConfig({
 			enabled: true,
 			headless: true,
 			// Stories read the real window through useIsMobile(), so the width decides which branch
-			// they render. Matches the Chromatic viewport in .storybook/preview.ts, so a play
+			// they render. Matches the Chromatic viewport in .storybook/preview.tsx, so a play
 			// function and its snapshot are asserting about the same layout.
 			viewport: { width: 1440, height: 900 },
 			provider: playwright({

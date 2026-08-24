@@ -28,24 +28,18 @@ export function useAchievementNotifications(achievements: UIAchievement[], enabl
 			// On initial load, just record all currently unlocked achievements
 			// Don't show toasts for achievements that were already unlocked
 			for (const achievement of unlockedAchievements) {
-				if (achievement.id) {
-					notifiedIdsRef.current.add(achievement.id);
-				}
+				notifiedIdsRef.current.add(achievement.id);
 			}
 			isInitialLoadRef.current = false;
 			return;
 		}
 
 		// Find newly unlocked achievements (not in our notified set)
-		const newlyUnlocked = unlockedAchievements.filter(
-			(a) => a.id && !notifiedIdsRef.current.has(a.id),
-		);
+		const newlyUnlocked = unlockedAchievements.filter((a) => !notifiedIdsRef.current.has(a.id));
 
 		// Show toast for each newly unlocked achievement
 		for (const achievement of newlyUnlocked) {
-			if (achievement.id) {
-				notifiedIdsRef.current.add(achievement.id);
-			}
+			notifiedIdsRef.current.add(achievement.id);
 
 			toast.success(`Achievement Unlocked: ${achievement.name}`, {
 				description: achievement.description,

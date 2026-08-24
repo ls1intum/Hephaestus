@@ -53,11 +53,13 @@ The partial unique index is the correct uniqueness contract for the seeded colum
 ## Consequences
 
 **Positive:**
+
 - The server gains the stable IdP identifier it should have had all along. Keycloak username renames stop silently breaking authorization once Stage B lands.
 - ~600 lines of dead code disappear. Every future reader of `integration/` sees the model we actually run, not the model we partly tried.
 - The Liquibase delta for #1198 is smaller and more honest.
 
 **Negative:**
+
 - Stage A only seeds the column. Authorization still goes through `login` until Stage B lands; the stable-id property is dormant. Honest scoping of Stage B: a single resolver flip transitively re-routes ~12 services (workspace, mentor, practices, findings) and needs a behavioural test per auth-path service — call that a medium PR, not a small one.
 - The webapp still surfaces `UserProfile.githubId` / `UserProfile.gitlabId` and resolves the avatar via raw provider ID; ADR-driven "sub is the stable join key" only becomes a frontend reality after the avatar + linked-accounts code routes through the server's authenticated-user response. Stage B should close that loop too.
 - Anyone holding a branch off #1198 with a dependency on `IntegrationIdentity` will need to rebase. There are zero such branches today.

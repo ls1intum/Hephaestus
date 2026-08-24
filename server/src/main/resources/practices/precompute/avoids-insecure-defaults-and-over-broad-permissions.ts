@@ -41,7 +41,7 @@ function isComment(t: string): boolean {
 	return t.startsWith("//") || t.startsWith("#") || t.startsWith("*") || t.startsWith("/*");
 }
 
-export default async function (
+export default function avoidsInsecureDefaultsAndOverBroadPermissions(
 	_repo: string,
 	diffFiles: Map<string, DiffFile>,
 	_m: PullRequestMetadata,

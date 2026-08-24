@@ -131,11 +131,12 @@ export function CuratedAreaForm(props: CuratedAreaFormProps) {
 	const updateAvailable = mode === "edit" && initialData.status.state === "UPDATE_WAITING";
 	const resetLabel = updateAvailable ? "Apply Hephaestus update" : "Restore Hephaestus default";
 
-	const submit = (event: React.FormEvent) => {
+	const submit = (event: React.SubmitEvent<HTMLFormElement>) => {
 		event.preventDefault();
 		if (!valid) {
 			setRefusals((count) => count + 1);
-			requestAnimationFrame(() => document.getElementById(errorSummary[0].fieldId)?.focus());
+			const [first] = errorSummary;
+			if (first) requestAnimationFrame(() => document.getElementById(first.fieldId)?.focus());
 			return;
 		}
 		onSubmit({

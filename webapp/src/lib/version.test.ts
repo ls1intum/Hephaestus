@@ -4,7 +4,7 @@ import { resolveHeaderBadge } from "./version";
 describe("resolveHeaderBadge", () => {
 	it("shows a production semver as a release linking to its GitHub tag", () => {
 		const badge = resolveHeaderBadge("0.73.2", "Production", true);
-		expect(badge).toEqual({
+		expect(badge).toStrictEqual({
 			kind: "release",
 			label: "v0.73.2",
 			href: "https://github.com/ls1intum/Hephaestus/releases/tag/v0.73.2",
@@ -15,14 +15,14 @@ describe("resolveHeaderBadge", () => {
 
 	it("shows an environment pill for staging, never the version", () => {
 		const badge = resolveHeaderBadge("c46f9f8", "Staging", false);
-		expect(badge).toEqual({ kind: "environment", label: "Staging", tone: "staging" });
+		expect(badge).toStrictEqual({ kind: "environment", label: "Staging", tone: "staging" });
 	});
 
 	it.each([
 		["Preview", "preview"],
 		["Local", "local"],
 	] as const)("tones the %s pill as %s", (name, tone) => {
-		expect(resolveHeaderBadge("anything", name, false)).toEqual({
+		expect(resolveHeaderBadge("anything", name, false)).toStrictEqual({
 			kind: "environment",
 			label: name,
 			tone,

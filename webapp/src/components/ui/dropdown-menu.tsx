@@ -176,7 +176,14 @@ function DropdownMenuCheckboxItem({
 	);
 }
 
-function DropdownMenuRadioGroup({ ...props }: MenuPrimitive.RadioGroup.Props) {
+/** Base UI types the selected value as `any`; the parameter carries the items' type to `onValueChange`. */
+function DropdownMenuRadioGroup<Value>({
+	...props
+}: Omit<MenuPrimitive.RadioGroup.Props, "value" | "defaultValue" | "onValueChange"> & {
+	value?: Value;
+	defaultValue?: Value;
+	onValueChange?: (value: Value, eventDetails: MenuPrimitive.RadioGroup.ChangeEventDetails) => void;
+}) {
 	return <MenuPrimitive.RadioGroup data-slot="dropdown-menu-radio-group" {...props} />;
 }
 

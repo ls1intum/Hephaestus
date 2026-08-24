@@ -173,7 +173,7 @@ export function CuratedPracticeForm(props: CuratedPracticeFormProps) {
 					isPending={isPending}
 					definitionOptions={definitionOptions}
 					disabled={formDisabled}
-					isSubmitDisabled={conflict || isResetPending || isKeepPending}
+					isSubmitDisabled={(conflict ?? false) || isResetPending || isKeepPending}
 					cancelAction={cancel}
 					afterFields={
 						<>

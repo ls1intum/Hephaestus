@@ -373,9 +373,9 @@ public class WorkerControlClient {
             );
             ws.sendText(codec.encode(hello), true).toCompletableFuture().get(5, TimeUnit.SECONDS);
         } catch (ExecutionException e) {
-            throw new IOException("WSS open failed: " + e.getCause().getMessage(), e.getCause());
+            throw new IOException("WSS open failed: " + e.getCause().getMessage(), e);
         } catch (TimeoutException e) {
-            throw new IOException("WSS open timed out");
+            throw new IOException("WSS open timed out", e);
         }
     }
 

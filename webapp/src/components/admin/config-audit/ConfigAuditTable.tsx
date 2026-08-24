@@ -1,6 +1,7 @@
 import { Bot, History, UserCog } from "lucide-react";
 import { useState } from "react";
 import type { ConfigAuditEntryView } from "@/api/types.gen";
+import { FilterLink } from "@/components/admin/audit-shared/FilterLink";
 import { TableRowsSkeleton } from "@/components/admin/integrations/TableRowsSkeleton";
 import { RelativeTime } from "@/components/common/RelativeTime";
 import { Badge } from "@/components/ui/badge";
@@ -23,7 +24,6 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
-import { FilterLink } from "../audit-shared/FilterLink";
 import { ConfigAuditDetailSheet } from "./ConfigAuditDetailSheet";
 import {
 	ACTION_BADGE,
@@ -232,14 +232,15 @@ function ActorCell({
 			</span>
 		);
 	}
+	const { filterId } = actor;
 	return (
 		<span className="flex items-center gap-1.5">
 			{actor.kind === "IMPERSONATED" && <UserCog className="size-3.5 shrink-0" aria-hidden />}
-			{onFilterActor && actor.filterId != null ? (
+			{onFilterActor && filterId != null ? (
 				<FilterLink
 					label={actor.primary}
 					title={actor.primaryEmail ?? `Filter by ${actor.primary}`}
-					onSelect={() => onFilterActor(actor.filterId as number)}
+					onSelect={() => onFilterActor(filterId)}
 				/>
 			) : (
 				<span className="truncate" title={actor.primaryEmail ?? undefined}>

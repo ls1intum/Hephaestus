@@ -13,8 +13,7 @@ metadata:
 
 # Storybook + component API
 
-Load the one file that answers your question. Nothing here restates React or Storybook docs; it
-records what this repo decided, and what it has already been burned by.
+Load the one file that answers your question.
 
 | File | The question it answers |
 |---|---|
@@ -33,15 +32,34 @@ records what this repo decided, and what it has already been burned by.
 These fail `pnpm run check`. Treat a violation as a build error, not a style opinion, and do not
 write a guideline that repeats one.
 
-- `webapp/.biome/typed-story-meta.grit` — a `meta` naming a `component` must be
-  `satisfies Meta<typeof X>`; a gallery meta naming no component may be bare `Meta`.
-- `webapp/.biome/no-redundant-in-the-document.grit` — `expect(getBy…).toBeInTheDocument()` and
-  bare `await expect(getBy…)`.
-- `scripts/check-story-prose.mjs` (`check:stories`) — `<p>` in a comment Storybook publishes.
-- `scripts/check-presentational-components.mjs` (`check:components`) — a component importing the
+The house rules are registered in `webapp/tools/oxlint/index.ts` — read it rather than trusting a
+list, since a rule can be added without this file changing. Those that reach a story file:
+
+- `hephaestus/typed-story-meta` — a `meta` naming a `component` must be `satisfies Meta<typeof X>`; a
+  gallery meta naming no component may be bare `Meta`.
+- `hephaestus/play-must-assert` — a `play` that never reaches an assertion. It reads a `getBy*` used
+  as a click target as an assertion, so it holds only the floor; whether the play checks the
+  **outcome** is still a review question.
+- `hephaestus/no-story-a11y-override` — `parameters.a11y` or `globals.a11y` on a meta or a story.
+  Either one alone takes the component out of the accessibility suite while it still reports green.
+- `hephaestus/no-redundant-in-the-document` — `expect(getBy…).toBeInTheDocument()`. A bare
+  `await expect(getBy…)` is `vitest/valid-expect`, which catches it for every subject.
+- `hephaestus/no-within-canvas-element` — `within(canvasElement)` when the play function was handed
+  `canvas`.
+
+The ones that only make sense in a story file are scoped to `**/*.stories.tsx` in the `overrides`
+block of `webapp/.oxlintrc.json` rather than named in its top-level `rules`. A house rule missing
+from both is simply off, and nothing reports that.
+
+Beyond oxlint:
+
+- `scripts/check-story-prose.ts` (`check:stories`) — `<p>` in a comment Storybook publishes.
+- `scripts/check-story-sort.ts` (`check:story-sort`) — a title segment missing from `storySort.order`,
+  or an `order` entry no story claims.
+- `scripts/check-presentational-components.ts` (`check:components`) — a component importing the
   query layer, and a story installing MSW handlers. Its allowlist is shrink-only.
-- `.storybook/preview.tsx` sets `a11y: { test: "error" }` project-wide, with zero per-story
-  overrides across the whole tree. Adding one is a finding, not a fix.
+- `webapp/.storybook/preview.tsx` sets `a11y: { test: "error" }` project-wide. Adding a per-story
+  override is a finding, not a fix.
 
 ## Not here
 

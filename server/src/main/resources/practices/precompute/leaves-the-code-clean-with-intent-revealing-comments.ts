@@ -62,7 +62,7 @@ function langFor(path: string): string | null {
 	return EXT_TO_LANG[ext] ?? null;
 }
 
-export default async function (
+export default function leavesTheCodeCleanWithIntentRevealingComments(
 	_repo: string,
 	diffFiles: Map<string, DiffFile>,
 	_m: PullRequestMetadata,

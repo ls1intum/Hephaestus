@@ -4,6 +4,7 @@ import {
 	getCurrentUserOptions,
 } from "@/api/@tanstack/react-query.gen";
 import type { CurrentUserView, WorkspaceMembership } from "@/api/types.gen";
+import { isRecord } from "@/lib/is-record";
 
 /**
  * Shared by the route guards and `AuthContext` so both read one cache entry on one schedule. A 401
@@ -55,7 +56,8 @@ export function isAppAdmin(
 
 /** A "not a member" answer, as opposed to a transport failure, which carries no status at all. */
 function isServerRefusal(error: unknown): boolean {
-	const status = (error as { status?: unknown } | null)?.status;
+	if (!isRecord(error)) return false;
+	const status = error.status;
 	return typeof status === "number" && status >= 400 && status < 500;
 }
 
@@ -128,13 +130,13 @@ export function safeReturnTo(value: string | undefined): string {
 	const decoded = fullyDecode(value);
 	// Whitespace (incl. space/tab) and control chars (NUL, newline, DEL, …) can defeat downstream
 	// parsers or hide an escape — reject outright on the decoded value.
-	// biome-ignore lint/suspicious/noControlCharactersInRegex: rejecting control chars is the point
-	if (/[\s\x00-\x1f\x7f]/.test(decoded)) return "/";
+	if (/[\s\p{Cc}]/u.test(decoded)) return "/";
 	// Must be a rooted path and not a protocol-relative `//host` escape.
 	if (!decoded.startsWith("/") || decoded.startsWith("//")) return "/";
 	// Reject a leading-segment that smuggles a scheme ("/javascript:"), a backslash escape
 	// ("/\evil", which browsers normalise to "//evil"), or a userinfo `@` host trick ("/@evil").
-	if (/^\/[\\]/.test(decoded) || /^\/+[a-z]+:/i.test(decoded) || /^\/@/.test(decoded)) return "/";
+	if (/^\/[\\]/.test(decoded) || /^\/+[a-z]+:/i.test(decoded) || decoded.startsWith("/@"))
+		return "/";
 	// Validation ran on the fully-decoded value; return the ORIGINAL so legitimate encoded
 	// segments (e.g. a `%26` in a query string) are preserved exactly as the caller intended.
 	return value;

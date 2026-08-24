@@ -1,4 +1,5 @@
 import type { ReviewSubject } from "@/api/types.gen";
+import { firstNonBlank } from "@/lib/text";
 
 /**
  * Formatters over values that are not enums. A label map, badge variant or icon for an enum value
@@ -7,5 +8,5 @@ import type { ReviewSubject } from "@/api/types.gen";
  */
 export function subjectLabel(subject: ReviewSubject | undefined): string {
 	if (!subject) return "Unavailable developer";
-	return subject.name || subject.login || `#${subject.id}`;
+	return firstNonBlank(subject.name, subject.login) ?? `#${subject.id}`;
 }

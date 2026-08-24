@@ -2,8 +2,12 @@ import type { Meta, StoryObj } from "@storybook/react";
 import { SelectGroupStep } from "./SelectGroupStep";
 import { makeGroup, withWizardState } from "./stories-utils";
 
+const hephaestusGroup = makeGroup(1, "Hephaestus", "ls1intum/hephaestus", {
+	visibility: "public",
+});
+
 const sampleGroups = [
-	makeGroup(1, "Hephaestus", "ls1intum/hephaestus", { visibility: "public" }),
+	hephaestusGroup,
 	makeGroup(2, "Artemis", "ls1intum/artemis", { visibility: "internal" }),
 	makeGroup(3, "Athena", "ls1intum/athena"),
 	makeGroup(4, "IRIS", "ls1intum/iris", { visibility: "public" }),
@@ -49,7 +53,7 @@ export const Default: Story = {};
  * A group is pre-selected (highlighted row).
  */
 export const WithSelection: Story = {
-	decorators: [withWizardState({ step: 2, groups: sampleGroups, selectedGroup: sampleGroups[0] })],
+	decorators: [withWizardState({ step: 2, groups: sampleGroups, selectedGroup: hephaestusGroup })],
 };
 
 /**
@@ -63,7 +67,7 @@ export const EmptyGroups: Story = {
  * Single group available.
  */
 export const SingleGroup: Story = {
-	decorators: [withWizardState({ step: 2, groups: [sampleGroups[0]] })],
+	decorators: [withWizardState({ step: 2, groups: [hephaestusGroup] })],
 };
 
 /**

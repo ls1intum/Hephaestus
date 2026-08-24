@@ -1,47 +1,9 @@
 import { format, formatDistance } from "date-fns";
 import { ClockAlertIcon, TriangleAlertIcon } from "lucide-react";
-import { useSyncExternalStore } from "react";
+import { useNow } from "@/components/common/use-now";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { asDate } from "@/lib/dates";
 import { cn } from "@/lib/utils";
-
-/** The finest phrase printed is a minute, so this keeps every label within half a step. */
-const TICK_MS = 30_000;
-
-const listeners = new Set<() => void>();
-let intervalId: ReturnType<typeof setInterval> | undefined;
-let now = Date.now();
-
-function subscribe(onStoreChange: () => void): () => void {
-	listeners.add(onStoreChange);
-	if (intervalId === undefined) {
-		// The clock may have been parked for hours since the last unsubscribe.
-		now = Date.now();
-		intervalId = setInterval(() => {
-			now = Date.now();
-			for (const listener of listeners) listener();
-		}, TICK_MS);
-	}
-	return () => {
-		listeners.delete(onStoreChange);
-		if (listeners.size === 0 && intervalId !== undefined) {
-			clearInterval(intervalId);
-			intervalId = undefined;
-		}
-	};
-}
-
-/**
- * Must stay the millisecond `now` rather than a tick counter: it is a real input to the rendered
- * phrase, and React Compiler would otherwise memoise the label and freeze it on screen.
- */
-function getSnapshot(): number {
-	return now;
-}
-
-function useNow(): number {
-	return useSyncExternalStore(subscribe, getSnapshot);
-}
 
 /** `unknown` is a timestamp with no known cadence; `never` is no timestamp at all. */
 export type FreshnessTone = "never" | "unknown" | "fresh" | "stale" | "veryStale";

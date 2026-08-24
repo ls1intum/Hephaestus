@@ -5,7 +5,7 @@ import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
 import environment from "@/environment";
 import { sanitizeBoolean } from "@/integrations/posthog/config";
 
-const isTanstackDevtoolsEnabled = sanitizeBoolean(environment.devtools?.tanstack);
+const isTanstackDevtoolsEnabled = sanitizeBoolean(environment.devtools.tanstack);
 
 interface TanstackDevtoolsProps {
 	router?: AnyRouter;

@@ -8,7 +8,6 @@
   "webapp/**/*.sass",
   "webapp/tailwind.config.*",
   "webapp/vite.*",
-  "webapp/biome.json",
   "webapp/components.json"
   ],
   "ignoreLastBuildOnBranch": "renovate/**",
@@ -24,6 +23,9 @@
     "**/*.stories.mdx",
   "webapp/.storybook/addons.ts",
   "webapp/.storybook/manager.ts",
+  "webapp/.oxlintrc.json",
+  "webapp/biome.jsonc",
+  "webapp/tools/**",
     "docs/**"
   ],
   "zip": true

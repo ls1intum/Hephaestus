@@ -5,7 +5,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -85,18 +84,13 @@ class DiffHunkValidator {
 
             if (newLineNum == 0 || currentFile == null) continue;
 
-            if (effectiveLine.startsWith("+")) {
-                // Added line — valid for diff notes
-                result.get(currentFile).add(newLineNum);
-                newLineNum++;
-            } else if (effectiveLine.startsWith("-")) {
-                // Deleted line — doesn't increment new-file counter, not valid for notes
-            } else if (effectiveLine.startsWith(" ")) {
-                // Context line — valid for diff notes (within hunk)
+            // Everything else — a deleted line, the "\ No newline at end of file" marker, a trailing
+            // blank — is invisible on the new side and must not advance the counter, or every note
+            // after it anchors a line too low.
+            if (effectiveLine.startsWith("+") || effectiveLine.startsWith(" ")) {
                 result.get(currentFile).add(newLineNum);
                 newLineNum++;
             }
-            // else: skip empty/unknown lines (e.g. trailing newline, "No newline at end of file")
         }
 
         return result;

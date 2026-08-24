@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-
+import { useState } from "react";
+import { QuestionDescription } from "@/components/surveys/question-description";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
 	Field,
@@ -13,7 +13,6 @@ import {
 } from "@/components/ui/field";
 import { Textarea } from "@/components/ui/textarea";
 import type { SurveyQuestion, SurveyResponse } from "@/types/survey";
-import { QuestionDescription } from "../question-description";
 
 type QuestionMultipleChoiceQuestion = Pick<
 	SurveyQuestion,
@@ -55,29 +54,25 @@ export function QuestionMultipleChoice({
 	const [customSelected, setCustomSelected] = useState(Boolean(derivedCustomValue));
 	const [customValue, setCustomValue] = useState(derivedCustomValue ?? "");
 
-	useEffect(() => {
-		if (!hasCustomOption) {
-			if (customSelected || customValue !== "") {
-				setCustomSelected(false);
-				setCustomValue("");
-			}
-			return;
+	// Reconciled during render so an answer arriving from outside (restored draft, question swapped
+	// in) never paints one the parent no longer holds.
+	if (!hasCustomOption) {
+		if (customSelected) {
+			setCustomSelected(false);
 		}
-
-		if (derivedCustomValue !== undefined) {
-			if (!customSelected) {
-				setCustomSelected(true);
-			}
-			if (customValue !== derivedCustomValue) {
-				setCustomValue(derivedCustomValue);
-			}
-			return;
-		}
-
-		if (!customSelected && customValue !== "") {
+		if (customValue !== "") {
 			setCustomValue("");
 		}
-	}, [customSelected, customValue, derivedCustomValue, hasCustomOption]);
+	} else if (derivedCustomValue !== undefined) {
+		if (!customSelected) {
+			setCustomSelected(true);
+		}
+		if (customValue !== derivedCustomValue) {
+			setCustomValue(derivedCustomValue);
+		}
+	} else if (!customSelected && customValue !== "") {
+		setCustomValue("");
+	}
 
 	const baseSelections = selectedValues.filter((choice) => baseChoices.includes(choice));
 
@@ -132,16 +127,16 @@ export function QuestionMultipleChoice({
 			/>
 			<FieldGroup data-slot="checkbox-group">
 				{baseChoices.map((choice, index) => {
-					const id = `${groupId}-choice-${index}`;
+					const choiceId = `${groupId}-choice-${index}`;
 					const isChecked = selectedValues.includes(choice);
 					return (
-						<FieldLabel key={id} htmlFor={id}>
+						<FieldLabel key={choiceId} htmlFor={choiceId}>
 							<Field orientation="horizontal">
 								<FieldContent>
 									<FieldTitle>{choice}</FieldTitle>
 								</FieldContent>
 								<Checkbox
-									id={id}
+									id={choiceId}
 									checked={isChecked}
 									onCheckedChange={(checked) => toggleChoice(choice, checked)}
 								/>

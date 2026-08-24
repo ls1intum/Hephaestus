@@ -18,30 +18,45 @@ import {
 	mockUnassignedPractice,
 } from "./story-mock-data";
 
-const areas = [
-	{
-		...mockAreas[0],
-		name: "Packaging work so reviewers can understand its purpose without reconstructing context",
-		visibleInPracticeDashboards: false,
-	},
-	mockAreas[1],
-];
+const [reviewReadyArea, issueAuthoringArea] = mockAreas;
+const [prDescriptionPractice, reviewThoroughnessPractice, testCoveragePractice] = mockPractices;
+if (
+	!reviewReadyArea ||
+	!issueAuthoringArea ||
+	!prDescriptionPractice ||
+	!reviewThoroughnessPractice ||
+	!testCoveragePractice
+) {
+	throw new Error("The shared practice fixtures no longer cover two areas and three practices");
+}
+
+const longNamedArea = {
+	...reviewReadyArea,
+	name: "Packaging work so reviewers can understand its purpose without reconstructing context",
+	visibleInPracticeDashboards: false,
+};
+
+const areas = [longNamedArea, issueAuthoringArea];
+
+const longTextPractice = {
+	...mockPracticeLongText,
+	areaSlug: longNamedArea.slug,
+	precomputeScript: "export default {};",
+};
+
+const issuePractice = {
+	...mockUnassignedPractice,
+	artifactKind: "scm.issue" as const,
+};
 
 const practices = [
+	longTextPractice,
 	{
-		...mockPracticeLongText,
-		areaSlug: areas[0].slug,
-		precomputeScript: "export default {};",
-	},
-	{
-		...mockPractices[2],
-		areaSlug: areas[0].slug,
+		...testCoveragePractice,
+		areaSlug: longNamedArea.slug,
 		displayOrder: 1,
 	},
-	{
-		...mockUnassignedPractice,
-		artifactKind: "scm.issue" as const,
-	},
+	issuePractice,
 ];
 
 // The size a workspace installs the shipped catalogue at.
@@ -55,7 +70,7 @@ const scaleAreas = [
 	"Talking about work in the open",
 	"Dependencies and supply chain",
 ].map((name, index) => ({
-	...mockAreas[0],
+	...reviewReadyArea,
 	id: 100 + index,
 	slug: `scale-area-${index}`,
 	name,
@@ -69,7 +84,7 @@ const scalePractices = scaleAreas.flatMap((area, areaIndex) =>
 		"lists the steps a reviewer ran",
 		"keeps the change reviewable in one sitting",
 	].map((suffix, practiceIndex) => ({
-		...mockPractices[0],
+		...prDescriptionPractice,
 		id: 1000 + areaIndex * 10 + practiceIndex,
 		slug: `${area.slug}-${practiceIndex}`,
 		name: `${area.name}: ${suffix}`,
@@ -180,11 +195,11 @@ export const WithInstanceCatalog: Story = {
 						automatedReviewValidation: mockAuthorDeclaredEvidenceValidation,
 					},
 					{
-						slug: practices[0].slug,
-						name: practices[0].name,
-						artifactKind: practices[0].artifactKind,
-						areaSlug: practices[0].areaSlug,
-						areaName: areas[0].name,
+						slug: longTextPractice.slug,
+						name: longTextPractice.name,
+						artifactKind: longTextPractice.artifactKind,
+						areaSlug: longTextPractice.areaSlug,
+						areaName: longNamedArea.name,
 						availability: "ADOPTED",
 						automatedReviewValidation: mockAuthorDeclaredEvidenceValidation,
 					},
@@ -216,7 +231,7 @@ export const InstanceCatalogFailed: Story = {
 	},
 	play: async ({ args, canvas, userEvent }) => {
 		// The workspace's own practices are still readable beside the failed library.
-		await expect(canvas.getByRole("link", { name: practices[0].name })).toBeVisible();
+		await expect(canvas.getByRole("link", { name: longTextPractice.name })).toBeVisible();
 		await userEvent.click(canvas.getByRole("button", { name: "Retry" }));
 		const state = args.library?.state;
 		await expect(state?.status === "error" && state.onRetry).toHaveBeenCalledOnce();
@@ -264,13 +279,13 @@ export const AtScale: Story = {
 export const PracticeNameOpensTheDetailLevel: Story = {
 	args: {
 		practices: [
-			{ ...mockPractices[0], areaSlug: areas[0].slug, displayOrder: 0 },
-			{ ...mockUnassignedPractice, areaSlug: areas[0].slug, displayOrder: 1 },
+			{ ...prDescriptionPractice, areaSlug: longNamedArea.slug, displayOrder: 0 },
+			{ ...mockUnassignedPractice, areaSlug: longNamedArea.slug, displayOrder: 1 },
 		],
 	},
 	parameters: { chromatic: { disableSnapshot: true } },
 	play: async ({ canvas }) => {
-		const link = canvas.getByRole("link", { name: mockPractices[0].name });
+		const link = canvas.getByRole("link", { name: prDescriptionPractice.name });
 		await expect(
 			new URL(link.getAttribute("href") ?? "", "https://example.test").searchParams.get("detail"),
 		).toBe('["practice:pr-description-quality"]');
@@ -285,9 +300,11 @@ export const Filtered: Story = {
 		// The row the filter keeps loses its handle; the group's own handle stays, because only entry
 		// handles are gated on the filter.
 		await expect(
-			canvas.queryByRole("button", { name: `Reorder ${practices[2].name}` }),
+			canvas.queryByRole("button", { name: `Reorder ${issuePractice.name}` }),
 		).not.toBeInTheDocument();
-		await expect(canvas.getByRole("button", { name: `Reorder ${areas[0].name}` })).toBeVisible();
+		await expect(
+			canvas.getByRole("button", { name: `Reorder ${longNamedArea.name}` }),
+		).toBeVisible();
 	},
 };
 
@@ -311,7 +328,7 @@ export const MoveWithoutDragging: Story = {
 		await userEvent.click(await screen.findByRole("menuitem", { name: "Move down" }));
 		await expect(args.onPlacePractice).toHaveBeenCalledWith(
 			mockPracticeLongText.slug,
-			areas[0].slug,
+			longNamedArea.slug,
 			1,
 		);
 	},
@@ -321,10 +338,13 @@ export const MoveAreaWithoutDragging: Story = {
 	parameters: { chromatic: { disableSnapshot: true } },
 	play: async ({ args, canvas, userEvent }) => {
 		await userEvent.click(
-			canvas.getByRole("button", { name: `More actions for ${areas[0].name}` }),
+			canvas.getByRole("button", { name: `More actions for ${longNamedArea.name}` }),
 		);
 		await userEvent.click(await screen.findByRole("menuitem", { name: "Move down" }));
-		await expect(args.onReorderAreas).toHaveBeenCalledWith([areas[1].slug, areas[0].slug]);
+		await expect(args.onReorderAreas).toHaveBeenCalledWith([
+			issueAuthoringArea.slug,
+			longNamedArea.slug,
+		]);
 	},
 };
 
@@ -344,7 +364,7 @@ export const KeyboardReordering: Story = {
 		handle.dispatchEvent(new KeyboardEvent("keydown", { key: " ", code: "Space", bubbles: true }));
 		await expect(args.onPlacePractice).toHaveBeenCalledWith(
 			mockPracticeLongText.slug,
-			areas[0].slug,
+			longNamedArea.slug,
 			1,
 		);
 	},
@@ -354,7 +374,7 @@ export const Reordering: Story = {
 	args: {
 		pending: {
 			...idlePending,
-			blockedPracticeOrderBuckets: new Set([areas[0].slug]),
+			blockedPracticeOrderBuckets: new Set([longNamedArea.slug]),
 		},
 	},
 	play: async ({ canvas }) => {
@@ -375,10 +395,10 @@ export const DeletingArea: Story = {
 	args: {
 		pending: {
 			...idlePending,
-			areaSlugs: new Set([areas[0].slug]),
+			areaSlugs: new Set([longNamedArea.slug]),
 			areaStructure: true,
-			blockedMoveDestinationSlugs: new Set([areas[0].slug]),
-			blockedPracticeOrderBuckets: new Set([areas[0].slug, "__unassigned__"]),
+			blockedMoveDestinationSlugs: new Set([longNamedArea.slug]),
+			blockedPracticeOrderBuckets: new Set([longNamedArea.slug, "__unassigned__"]),
 		},
 	},
 	play: async ({ canvas, userEvent }) => {
@@ -386,8 +406,10 @@ export const DeletingArea: Story = {
 			name: `More actions for ${mockUnassignedPractice.name}`,
 		});
 		await userEvent.click(actions);
-		await expect(await screen.findByRole("menuitemradio", { name: areas[1].name })).toBeEnabled();
-		await expect(screen.getByRole("menuitemradio", { name: areas[0].name })).toHaveAttribute(
+		await expect(
+			await screen.findByRole("menuitemradio", { name: issueAuthoringArea.name }),
+		).toBeEnabled();
+		await expect(screen.getByRole("menuitemradio", { name: longNamedArea.name })).toHaveAttribute(
 			"aria-disabled",
 			"true",
 		);
@@ -422,14 +444,13 @@ export const EmptyDestinations: Story = {
 export const CrossAreaDrag: Story = {
 	args: {
 		areas: mockAreas,
-		practices: [{ ...mockPractices[0], areaSlug: mockAreas[0].slug }],
+		practices: [{ ...prDescriptionPractice, areaSlug: reviewReadyArea.slug }],
 	},
 	parameters: { chromatic: { disableSnapshot: true } },
 	play: async ({ args, canvas, userEvent }) => {
-		const practice = mockPractices[0];
-		const handle = canvas.getByRole("button", { name: `Reorder ${practice.name}` });
+		const handle = canvas.getByRole("button", { name: `Reorder ${prDescriptionPractice.name}` });
 		const destinationArea = canvas
-			.getByText(mockAreas[1].name)
+			.getByText(issueAuthoringArea.name)
 			.closest('[data-slot="accordion-item"]');
 		if (!(destinationArea instanceof HTMLElement)) throw new Error("Destination area not rendered");
 		const destination = within(destinationArea).getByText("No practices here.");
@@ -450,15 +471,17 @@ export const CrossAreaDrag: Story = {
 			},
 		]);
 		await expect(handle).toBeVisible();
-		const preview = await waitFor(() => {
+		const preview = await waitFor(async () => {
 			const rows = screen
-				.getAllByText(practice.name)
+				.getAllByText(prDescriptionPractice.name)
 				.map((name) => name.closest('[data-slot="item"]'))
 				.filter((row): row is HTMLElement => row instanceof HTMLElement && row !== sourceRow);
-			expect(rows).toHaveLength(1);
-			return rows[0];
+			await expect(rows).toHaveLength(1);
+			const [previewRow] = rows;
+			if (!previewRow) throw new Error("The drag preview row disappeared");
+			return previewRow;
 		});
-		expect(
+		await expect(
 			Math.abs(preview.getBoundingClientRect().width - sourceRow.getBoundingClientRect().width),
 		).toBeLessThan(1);
 		await userEvent.pointer([
@@ -469,7 +492,11 @@ export const CrossAreaDrag: Story = {
 			{ target: destination, keys: "[/MouseLeft]" },
 		]);
 
-		await expect(args.onPlacePractice).toHaveBeenCalledWith(practice.slug, mockAreas[1].slug, 0);
+		await expect(args.onPlacePractice).toHaveBeenCalledWith(
+			prDescriptionPractice.slug,
+			issueAuthoringArea.slug,
+			0,
+		);
 	},
 };
 
@@ -477,15 +504,15 @@ export const BetweenRowsDrag: Story = {
 	args: {
 		areas: mockAreas,
 		practices: [
-			{ ...mockPractices[0], areaSlug: mockAreas[0].slug },
-			{ ...mockPractices[1], areaSlug: mockAreas[1].slug, displayOrder: 0 },
-			{ ...mockPractices[2], areaSlug: mockAreas[1].slug, displayOrder: 1 },
+			{ ...prDescriptionPractice, areaSlug: reviewReadyArea.slug },
+			{ ...reviewThoroughnessPractice, areaSlug: issueAuthoringArea.slug, displayOrder: 0 },
+			{ ...testCoveragePractice, areaSlug: issueAuthoringArea.slug, displayOrder: 1 },
 		],
 	},
 	parameters: { chromatic: { disableSnapshot: true } },
 	play: async ({ args, canvas, userEvent }) => {
-		const source = mockPractices[0];
-		const anchor = mockPractices[2];
+		const source = prDescriptionPractice;
+		const anchor = testCoveragePractice;
 		const handle = canvas.getByRole("button", { name: `Reorder ${source.name}` });
 		const anchorRow = canvas.getByText(anchor.name).closest<HTMLElement>('[data-slot="item"]');
 		if (!anchorRow) throw new Error("Destination practice row not rendered");
@@ -509,25 +536,28 @@ export const BetweenRowsDrag: Story = {
 			{ target: anchorRow, keys: "[/MouseLeft]" },
 		]);
 
-		await expect(args.onPlacePractice).toHaveBeenCalledWith(source.slug, mockAreas[1].slug, 1);
+		await expect(args.onPlacePractice).toHaveBeenCalledWith(
+			source.slug,
+			issueAuthoringArea.slug,
+			1,
+		);
 	},
 };
 
 export const BlockedDestinationDrag: Story = {
 	args: {
 		areas: mockAreas,
-		practices: [{ ...mockPractices[0], areaSlug: undefined }],
+		practices: [{ ...prDescriptionPractice, areaSlug: undefined }],
 		pending: {
 			...idlePending,
-			blockedMoveDestinationSlugs: new Set([mockAreas[1].slug]),
+			blockedMoveDestinationSlugs: new Set([issueAuthoringArea.slug]),
 		},
 	},
 	parameters: { chromatic: { disableSnapshot: true } },
 	play: async ({ args, canvas, userEvent }) => {
-		const practice = mockPractices[0];
-		const handle = canvas.getByRole("button", { name: `Reorder ${practice.name}` });
+		const handle = canvas.getByRole("button", { name: `Reorder ${prDescriptionPractice.name}` });
 		const destinationArea = canvas
-			.getByText(mockAreas[1].name)
+			.getByText(issueAuthoringArea.name)
 			.closest<HTMLElement>('[data-slot="accordion-item"]');
 		if (!destinationArea) throw new Error("Blocked destination area not rendered");
 		const destination = within(destinationArea).getByText("No practices here.");
@@ -560,33 +590,33 @@ export const AutonomyLevels: Story = {
 		areas: mockAreas,
 		practices: [
 			{
-				...mockPractices[0],
+				...prDescriptionPractice,
 				slug: "from-workspace",
 				name: "Nobody has touched this one",
 				autonomy: inheritedAutonomy("AUTOMATIC"),
 			},
 			{
-				...mockPractices[0],
+				...prDescriptionPractice,
 				slug: "from-area",
 				name: "Its area decided",
 				autonomy: areaAutonomy("HUMAN_APPROVAL"),
 			},
 			{
-				...mockPractices[0],
+				...prDescriptionPractice,
 				slug: "held",
 				name: "Singled out",
 				autonomy: chosenAutonomy("OFF"),
 			},
-		].map((practice) => ({ ...practice, areaSlug: mockAreas[0].slug })),
+		].map((practice) => ({ ...practice, areaSlug: reviewReadyArea.slug })),
 	},
 	play: async ({ canvas }) => {
 		// Scoped row by row: asserting that all three sentences exist somewhere on the page would pass
 		// just as well if every row carried the same one, which is the mix-up this story is about.
 		const expected = [
 			["Nobody has touched this one", "Send automatically", "Follows the workspace default"],
-			["Its area decided", "Review before sending", `Follows ${mockAreas[0].name}`],
+			["Its area decided", "Review before sending", `Follows ${reviewReadyArea.name}`],
 			["Singled out", "Off", "Set for this practice"],
-		];
+		] as const;
 
 		for (const [name, autonomy, decidedBy] of expected) {
 			const listitem = canvas.getByText(name).closest('[role="listitem"]');
@@ -604,12 +634,12 @@ export const AutonomyIsReadOnlyHere: Story = {
 		areas: mockAreas,
 		practices: [
 			{
-				...mockPractices[0],
+				...prDescriptionPractice,
 				slug: "held",
 				name: "Set here",
 				autonomy: chosenAutonomy("HUMAN_APPROVAL"),
 			},
-		].map((practice) => ({ ...practice, areaSlug: mockAreas[0].slug })),
+		].map((practice) => ({ ...practice, areaSlug: reviewReadyArea.slug })),
 	},
 	parameters: {
 		chromatic: { disableSnapshot: true },

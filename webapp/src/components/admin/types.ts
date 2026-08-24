@@ -21,7 +21,7 @@ export const adaptApiUserTeams = (apiUserTeams: ApiUserTeams): ExtendedUserTeams
 		user: {
 			id: apiUserTeams.id,
 			name: apiUserTeams.name,
-			login: String(apiUserTeams.login ?? ""),
+			login: apiUserTeams.login,
 			email: apiUserTeams.email,
 		},
 	};

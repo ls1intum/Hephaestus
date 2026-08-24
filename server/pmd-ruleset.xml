@@ -54,7 +54,26 @@
          DESIGN - Encourage maintainable code
          ==================================================================== -->
 
-    <rule ref="category/java/design.xml/SimplifyBooleanReturns"/>
+    <!--
+        SimplifyBooleanReturns is NOT enabled, deliberately.
+
+        The rule's original target is `if (c) { return true; } else { return false; }`. PMD 7 also
+        applies it to a guard clause followed by a return — `if (c) { return false; } return other;` —
+        and demands `return !c && other;`. Every site it flags in this tree is that second shape; the
+        two that were genuine tautologies (WorkspaceAccessService#canManageRole,
+        GitHubExceptionClassifier) were rewritten rather than excluded.
+
+        The sites that decide it are the guard TABLES: PrivateAddressGuard lists the non-public IPv4
+        ranges one per line, each with its CIDR in a trailing comment, and LogSafe does the same for
+        the Unicode control ranges. The rule flags only the last row of such a table and wants it fused
+        into the final `return`, which orphans a comment and breaks the alignment that makes the table
+        checkable against the RFC. Doing that inside an SSRF guard buys nothing and costs review
+        confidence. The rest are the same shape at smaller scale: a null check, an "unlimited means no
+        limit" check, an @AssertTrue whose constraint does not apply unless a flag is on.
+
+        Enable it again only if PMD narrows it back to the if/else form. To re-derive all of this, add
+        the rule and run `./mvnw pmd:pmd`; target/pmd.xml then lists every site it would fail on.
+    -->
     <rule ref="category/java/design.xml/UselessOverridingMethod"/>
 
     <!-- ====================================================================

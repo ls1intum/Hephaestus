@@ -2,14 +2,13 @@ import type { Meta, StoryObj } from "@storybook/react";
 import { expect, screen, userEvent } from "storybook/test";
 import { expectSettledVisible } from "@/test/overlay";
 import { RelativeTime } from "./RelativeTime";
-
-const minutesAgo = (minutes: number) => new Date(Date.now() - minutes * 60_000);
+import { minutesBefore } from "./story-clock";
 
 const meta = {
 	component: RelativeTime,
 	parameters: { layout: "centered" },
 	tags: ["autodocs"],
-	args: { value: minutesAgo(4) },
+	args: { value: minutesBefore(4) },
 } satisfies Meta<typeof RelativeTime>;
 
 export default meta;
@@ -26,23 +25,23 @@ export const HoverRevealsAbsoluteTime: Story = {
 	},
 };
 
-export const Fresh: Story = { args: { value: minutesAgo(4), tone: "fresh" } };
+export const Fresh: Story = { args: { value: minutesBefore(4), tone: "fresh" } };
 
 export const Stale: Story = {
-	args: { value: minutesAgo(180), tone: "stale" },
+	args: { value: minutesBefore(180), tone: "stale" },
 	play: async ({ canvas }) => {
 		canvas.getByRole("button", { name: /stale/i });
 	},
 };
 
 export const VeryStale: Story = {
-	args: { value: minutesAgo(60 * 24 * 9), tone: "veryStale" },
+	args: { value: minutesBefore(60 * 24 * 9), tone: "veryStale" },
 	play: async ({ canvas }) => {
 		canvas.getByRole("button", { name: /very stale/i });
 	},
 };
 
-export const UnknownCadence: Story = { args: { value: minutesAgo(600), tone: "unknown" } };
+export const UnknownCadence: Story = { args: { value: minutesBefore(600), tone: "unknown" } };
 
 export const Never: Story = {
 	args: { value: undefined },
@@ -69,7 +68,7 @@ export const WireString: Story = {
 export const InvalidValue: Story = { args: { value: "not-a-date" } };
 
 export const WithoutTooltip: Story = {
-	args: { value: minutesAgo(45), tooltip: false, tone: "stale" },
+	args: { value: minutesBefore(45), tooltip: false, tone: "stale" },
 };
 
 export const AllTones: Story = {
@@ -79,19 +78,19 @@ export const AllTones: Story = {
 		<dl className="grid grid-cols-[8rem_1fr] gap-x-6 gap-y-2 text-sm">
 			<dt className="text-muted-foreground">fresh</dt>
 			<dd>
-				<RelativeTime value={minutesAgo(3)} tone="fresh" />
+				<RelativeTime value={minutesBefore(3)} tone="fresh" />
 			</dd>
 			<dt className="text-muted-foreground">stale</dt>
 			<dd>
-				<RelativeTime value={minutesAgo(200)} tone="stale" />
+				<RelativeTime value={minutesBefore(200)} tone="stale" />
 			</dd>
 			<dt className="text-muted-foreground">veryStale</dt>
 			<dd>
-				<RelativeTime value={minutesAgo(60 * 24 * 12)} tone="veryStale" />
+				<RelativeTime value={minutesBefore(60 * 24 * 12)} tone="veryStale" />
 			</dd>
 			<dt className="text-muted-foreground">unknown</dt>
 			<dd>
-				<RelativeTime value={minutesAgo(90)} tone="unknown" />
+				<RelativeTime value={minutesBefore(90)} tone="unknown" />
 			</dd>
 			<dt className="text-muted-foreground">never</dt>
 			<dd>

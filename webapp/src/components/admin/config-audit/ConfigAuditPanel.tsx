@@ -32,13 +32,10 @@ import { narrowToEnum, nonEmpty } from "@/lib/search-params";
 
 const PAGE_SIZE = 50;
 
-type EntityType = NonNullable<ConfigAuditEntryView["entityType"]>;
-type Action = NonNullable<ConfigAuditEntryView["action"]>;
-
 const ENTITY_TYPE_OPTIONS = toFacetOptions(ENTITY_TYPE_LABELS);
 const ACTION_OPTIONS = toFacetOptions(ACTION_LABELS);
-const ENTITY_TYPES = Object.keys(ENTITY_TYPE_LABELS) as EntityType[];
-const ACTIONS = Object.keys(ACTION_LABELS) as Action[];
+const ENTITY_TYPES = ENTITY_TYPE_OPTIONS.map((option) => option.value);
+const ACTIONS = ACTION_OPTIONS.map((option) => option.value);
 
 function toQuery(search: ConfigAuditSearch) {
 	const dateRange = toDateRange(search);
@@ -95,7 +92,7 @@ export function WorkspaceConfigAuditPanel({
 	return <ConfigAuditView search={search} onSearchChange={onSearchChange} listQuery={listQuery} />;
 }
 
-type ConfigAuditListQuery = UseInfiniteQueryResult<InfiniteData<PageConfigAuditEntryView>, Error>;
+type ConfigAuditListQuery = UseInfiniteQueryResult<InfiniteData<PageConfigAuditEntryView>>;
 
 function ConfigAuditView({
 	search,
@@ -113,9 +110,11 @@ function ConfigAuditView({
 	);
 	const total = listQuery.data?.pages[0]?.totalElements;
 	const query = toQuery(search);
-	const hasAppliedFilter = Boolean(
-		query.entityType || query.action || query.actorId !== undefined || query.from,
-	);
+	const hasAppliedFilter =
+		(query.entityType?.length ?? 0) > 0 ||
+		(query.action?.length ?? 0) > 0 ||
+		query.actorId !== undefined ||
+		query.from !== undefined;
 
 	const reset = () =>
 		onSearchChange({
@@ -166,8 +165,8 @@ function ConfigAuditView({
 				onResetFilters={reset}
 				hasNextPage={listQuery.hasNextPage}
 				isFetchingNextPage={listQuery.isFetchingNextPage}
-				onLoadMore={() => listQuery.fetchNextPage()}
-				onRetry={() => listQuery.refetch()}
+				onLoadMore={() => void listQuery.fetchNextPage()}
+				onRetry={() => void listQuery.refetch()}
 				onFilterActor={(actorId) => onSearchChange({ actorId })}
 				showWorkspace={showWorkspace}
 				resolveWorkspaceName={resolveWorkspaceName}

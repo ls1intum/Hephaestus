@@ -1,16 +1,16 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn, screen, userEvent } from "storybook/test";
-import type { Practice } from "@/api/types.gen";
 import { mockPractices } from "@/components/admin/practices/story-mock-data";
 import { DetailDrawerStack } from "@/components/core/detail-drawer/DetailDrawerStack";
 import { mockPracticeDefinitionOptions } from "@/mocks/fixtures/practice";
 import { withPageBehind } from "@/stories/decorators";
 import { Stateful } from "@/stories/stateful";
-import { expectSettledVisible } from "@/test/overlay";
+import { expectSettledVisible, settledDrawerPanel } from "@/test/overlay";
 import { expectNoPanelOverflow } from "@/test/reflow";
 import { WorkspacePracticePanel, type WorkspacePracticeState } from "./WorkspacePracticePanel";
 
-const practice = mockPractices[0] as Practice;
+const [practice] = mockPractices;
+if (!practice) throw new Error("The shared practice fixtures no longer hold a practice to show");
 
 type ReadyState = Extract<WorkspacePracticeState, { status: "ready" }>;
 
@@ -88,9 +88,8 @@ export const Loading: Story = {
 	play: async () => {
 		// A skeleton holding the shape the definition will take, so nothing jumps when it lands.
 		// It is `aria-hidden`, so the proof is the DOM, not a role.
-		const panel = document.querySelector<HTMLElement>('[data-slot="drawer-popup"]');
-		await expectSettledVisible(panel as HTMLElement);
-		await expect(panel?.querySelectorAll('[data-slot="skeleton"]').length).toBeGreaterThan(0);
+		const panel = await settledDrawerPanel();
+		await expect(panel.querySelectorAll('[data-slot="skeleton"]').length).toBeGreaterThan(0);
 		await expect(screen.queryByRole("status")).not.toBeInTheDocument();
 	},
 };
@@ -109,9 +108,7 @@ export const FailedToLoad: Story = {
 export const NarrowViewport: Story = {
 	parameters: { viewport: { defaultViewport: "reflow" }, chromatic: { viewports: [320] } },
 	play: async () => {
-		const [panel] = document.querySelectorAll<HTMLElement>('[data-slot="drawer-popup"]');
-		await expectSettledVisible(panel);
-		await expectNoPanelOverflow(panel);
+		await expectNoPanelOverflow(await settledDrawerPanel());
 	},
 };
 

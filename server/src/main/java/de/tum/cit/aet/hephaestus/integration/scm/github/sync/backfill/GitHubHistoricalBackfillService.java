@@ -617,10 +617,11 @@ public class GitHubHistoricalBackfillService {
         Long repositoryId,
         String repoNameForLog,
         Long syncTargetId,
-        String cursor,
+        String startCursor,
         int maxPages,
         BackfillPageObserver observer
     ) {
+        String cursor = startCursor;
         int totalIssuesSynced = 0;
         int totalCommentsSynced = 0;
         int batchMinNumber = Integer.MAX_VALUE;
@@ -825,10 +826,11 @@ public class GitHubHistoricalBackfillService {
         Long repositoryId,
         String repoNameForLog,
         Long syncTargetId,
-        String cursor,
+        String startCursor,
         int maxPages,
         BackfillPageObserver observer
     ) {
+        String cursor = startCursor;
         int totalPRsSynced = 0;
         int totalReviewsSynced = 0;
         int totalReviewCommentsSynced = 0;

@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { fn } from "storybook/test";
 import type { ChatMessageVote } from "@/api/types.gen";
+import { STORY_NOW } from "@/components/common/story-clock";
 import type { ChatMessage } from "@/lib/types";
 import { Chat } from "./Chat";
 
@@ -249,17 +250,17 @@ const CONVERSATION_VOTES: ChatMessageVote[] = [
 	{
 		messageId: "msg-2",
 		isUpvoted: true,
-		updatedAt: new Date(),
+		updatedAt: new Date(STORY_NOW),
 	},
 	{
 		messageId: "msg-6",
 		isUpvoted: true,
-		updatedAt: new Date(),
+		updatedAt: new Date(STORY_NOW),
 	},
 	{
 		messageId: "msg-8",
 		isUpvoted: true,
-		updatedAt: new Date(),
+		updatedAt: new Date(STORY_NOW),
 	},
 ];
 

@@ -53,9 +53,9 @@ export function CuratedPracticeEditLevel({
 						error={practiceQuery.error ?? catalogQuery.error ?? definitionOptionsQuery.error}
 						title="Couldn't load the practice"
 						onRetry={() => {
-							practiceQuery.refetch();
-							catalogQuery.refetch();
-							definitionOptionsQuery.refetch();
+							void practiceQuery.refetch();
+							void catalogQuery.refetch();
+							void definitionOptionsQuery.refetch();
 						}}
 					/>
 				</DrawerBody>
@@ -199,7 +199,7 @@ function LoadedCuratedPracticeEditor({
 			isResetPending={deleteOverride.isPending}
 			isKeepPending={keepCurrentDefinition.isPending}
 			conflict={conflict}
-			onContinueWithDraft={continueWithDraft}
+			onContinueWithDraft={() => void continueWithDraft()}
 			onUseHephaestusVersion={() => {
 				setConflict(false);
 				deleteOverride.mutate({

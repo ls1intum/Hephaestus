@@ -1,6 +1,8 @@
 import type { Meta, StoryObj } from "@storybook/react";
+import type * as React from "react";
 import { useState } from "react";
 import { fn } from "storybook/test";
+import { STORY_NOW } from "@/components/common/story-clock";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import type { PostHogSurvey } from "@/types/survey";
@@ -70,7 +72,7 @@ const branchingSurvey: PostHogSurvey = {
 	end_date: null,
 	enable_partial_responses: true,
 	current_iteration: 1,
-	current_iteration_start_date: new Date().toISOString(),
+	current_iteration_start_date: new Date(STORY_NOW).toISOString(),
 };
 
 const hephaestusFeedbackSurvey: PostHogSurvey = {
@@ -125,7 +127,7 @@ const hephaestusFeedbackSurvey: PostHogSurvey = {
 	end_date: null,
 	enable_partial_responses: true,
 	current_iteration: 1,
-	current_iteration_start_date: new Date().toISOString(),
+	current_iteration_start_date: new Date(STORY_NOW).toISOString(),
 };
 
 const meta = {
@@ -161,46 +163,48 @@ export const HephaestusFeedback: Story = {
 	},
 };
 
+function InPagePopoverHarness(args: React.ComponentProps<typeof SurveyContainer>) {
+	const [open, setOpen] = useState(true);
+
+	return (
+		<div className="relative flex min-h-[480px] w-full justify-center bg-background sm:min-h-[600px]">
+			<Popover open={open} onOpenChange={setOpen} modal={false}>
+				<PopoverTrigger
+					render={
+						<Button className="absolute bottom-4 right-4 z-20 shadow-lg sm:bottom-6 sm:right-6">
+							Share feedback
+						</Button>
+					}
+				/>
+				<PopoverContent
+					aria-label={args.survey.name}
+					side="top"
+					align="end"
+					sideOffset={16}
+					className="pointer-events-auto w-[min(90vw,420px)] border border-border bg-background p-0 shadow-xl"
+				>
+					<SurveyContainer
+						{...args}
+						onDismiss={(step) => {
+							args.onDismiss(step);
+							setOpen(false);
+						}}
+						onComplete={(responses) => {
+							args.onComplete(responses);
+							setOpen(false);
+						}}
+					/>
+				</PopoverContent>
+			</Popover>
+		</div>
+	);
+}
+
 export const InPagePopover: Story = {
 	parameters: {
 		layout: "fullscreen",
 	},
-	render: (args) => {
-		const [open, setOpen] = useState(true);
-
-		return (
-			<div className="relative flex min-h-[480px] w-full justify-center bg-background sm:min-h-[600px]">
-				<Popover open={open} onOpenChange={setOpen} modal={false}>
-					<PopoverTrigger
-						render={
-							<Button className="absolute bottom-4 right-4 z-20 shadow-lg sm:bottom-6 sm:right-6">
-								Share feedback
-							</Button>
-						}
-					/>
-					<PopoverContent
-						aria-label={args.survey.name}
-						side="top"
-						align="end"
-						sideOffset={16}
-						className="pointer-events-auto w-[min(90vw,420px)] border border-border bg-background p-0 shadow-xl"
-					>
-						<SurveyContainer
-							{...args}
-							onDismiss={(step) => {
-								args.onDismiss?.(step);
-								setOpen(false);
-							}}
-							onComplete={(responses) => {
-								args.onComplete?.(responses);
-								setOpen(false);
-							}}
-						/>
-					</PopoverContent>
-				</Popover>
-			</div>
-		);
-	},
+	render: (args) => <InPagePopoverHarness {...args} />,
 };
 
 export const ResponseBasedBranching: Story = {

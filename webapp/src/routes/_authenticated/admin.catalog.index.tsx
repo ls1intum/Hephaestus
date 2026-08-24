@@ -29,8 +29,8 @@ import {
 } from "@/components/admin/curated-catalog/curated-catalog-cache";
 import {
 	CURATED_CATALOG_SEARCH_PARAMS,
+	CURATED_LEVEL_KINDS,
 	type CuratedCatalogSearch,
-	type CuratedLevelKind,
 	curatedAreaLevel,
 	curatedCatalogSearchSchema,
 	curatedPracticeLevel,
@@ -45,7 +45,7 @@ import { useDetailStack } from "@/components/core/detail-drawer/use-detail-stack
 import { PageHeader } from "@/components/core/PageHeader";
 import { PageLayout } from "@/components/core/PageLayout";
 import { Button, buttonVariants } from "@/components/ui/button";
-import { filedUnder, usePendingMutationIds } from "@/hooks/use-pending-mutation-ids";
+import { filedUnder, pathString, usePendingMutationIds } from "@/hooks/use-pending-mutation-ids";
 import { instanceAdminHead } from "@/lib/page-title";
 import { problemDetailOf, problemStatusOf } from "@/lib/problem-detail";
 import { CuratedAreaCreateLevel } from "./-CuratedAreaCreateLevel";
@@ -68,7 +68,7 @@ function AdminCuratedCatalogPage() {
 	const navigate = useNavigate({ from: Route.fullPath });
 	const { detail, ...search } = Route.useSearch();
 	const queryClient = useQueryClient();
-	const detailStack = parseDetailStack<CuratedLevelKind>(detail);
+	const detailStack = parseDetailStack(detail, CURATED_LEVEL_KINDS);
 	const stackControls = useDetailStack(detailStack);
 	const catalogQuery = useQuery({ ...adminGetCuratedCatalogOptions() });
 
@@ -224,13 +224,11 @@ function AdminCuratedCatalogPage() {
 		onError: structureError,
 		onSettled: invalidateStructure,
 	});
-	const pendingPracticeSlugs = usePendingMutationIds<{ path: { slug: string } }, string>(
-		PRACTICE_STATUS_KEY,
-		(variables) => variables.path.slug,
+	const pendingPracticeSlugs = usePendingMutationIds(PRACTICE_STATUS_KEY, (variables) =>
+		pathString(variables, "slug"),
 	);
-	const pendingAreaSlugs = usePendingMutationIds<{ path: { slug: string } }, string>(
-		AREA_STATUS_KEY,
-		(variables) => variables.path.slug,
+	const pendingAreaSlugs = usePendingMutationIds(AREA_STATUS_KEY, (variables) =>
+		pathString(variables, "slug"),
 	);
 	const structurePending =
 		reorderAreas.isPending ||
@@ -283,7 +281,7 @@ function AdminCuratedCatalogPage() {
 				<QueryErrorAlert
 					error={catalogQuery.error}
 					title="Couldn't load the practice catalog"
-					onRetry={() => catalogQuery.refetch()}
+					onRetry={() => void catalogQuery.refetch()}
 				/>
 			) : (
 				<CuratedCatalog
@@ -296,7 +294,7 @@ function AdminCuratedCatalogPage() {
 					pendingAreaSlugs={pendingAreaSlugs}
 					writePending={writePending}
 					onSearchChange={(next: CuratedCatalogSearch) =>
-						navigate({ search: (previous) => ({ ...previous, ...next }), replace: true })
+						void navigate({ search: (previous) => ({ ...previous, ...next }), replace: true })
 					}
 					onPracticeStatusChange={(practice: CuratedPracticeSummary, offered) => {
 						const parent = practice.areaSlug

@@ -39,6 +39,7 @@ const meta = {
 	tags: ["autodocs"],
 	args: {
 		id: "review-model",
+		"aria-labelledby": "review-model-label",
 		availableModels: mockModels,
 		value: null,
 		onChange: fn(),
@@ -46,7 +47,7 @@ const meta = {
 	decorators: [
 		(Story) => (
 			<div className="w-80">
-				<Label htmlFor="review-model" className="mb-2">
+				<Label id="review-model-label" htmlFor="review-model" className="mb-2">
 					Review model
 				</Label>
 				<Story />

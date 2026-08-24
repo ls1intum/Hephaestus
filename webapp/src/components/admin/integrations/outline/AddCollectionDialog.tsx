@@ -135,7 +135,7 @@ export function AddCollectionDialog({
 				<form
 					onSubmit={(e) => {
 						e.preventDefault();
-						submit();
+						void submit();
 					}}
 				>
 					{isLoading ? (
@@ -149,7 +149,7 @@ export function AddCollectionDialog({
 							error={error}
 							title="Could not reach Outline"
 							onRetry={() => {
-								refetch();
+								void refetch();
 							}}
 						/>
 					) : all.length === 0 ? (
@@ -190,6 +190,7 @@ export function AddCollectionDialog({
 						>
 							<div ref={comboboxRef} className="rounded-lg border">
 								<ComboboxSearchInput
+									// oxlint-disable-next-line jsx-a11y/no-autofocus -- Narrowing the candidate list by typing is the only way through this dialog, so it opens onto the search box.
 									autoFocus
 									placeholder="Search collections…"
 									disabled={submitting}

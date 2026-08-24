@@ -381,13 +381,15 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 	].filter((entry): entry is FormError => Boolean(entry));
 	const valid = errorSummary.length === 0;
 
-	const handleSubmit = (event: React.FormEvent) => {
+	const handleSubmit = (event: React.SubmitEvent<HTMLFormElement>) => {
 		event.preventDefault();
 		if (!valid) {
 			setRefusals((count) => count + 1);
-			const first = errorSummary[0];
-			first.reveal?.();
-			requestAnimationFrame(() => document.getElementById(first.fieldId)?.focus());
+			const [first] = errorSummary;
+			if (first) {
+				first.reveal?.();
+				requestAnimationFrame(() => document.getElementById(first.fieldId)?.focus());
+			}
 			return;
 		}
 
@@ -455,7 +457,9 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 								</Field>
 
 								<Field>
-									<FieldLabel htmlFor="practice-area">Practice group</FieldLabel>
+									<FieldLabel id="practice-area-label" htmlFor="practice-area">
+										Practice group
+									</FieldLabel>
 									<Select
 										items={areaItems}
 										value={form.areaSlug}
@@ -466,7 +470,7 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 										<SelectTrigger id="practice-area" aria-describedby="practice-area-description">
 											<SelectValue />
 										</SelectTrigger>
-										<SelectContent>
+										<SelectContent aria-labelledby="practice-area-label">
 											{areaItems.map((item) => (
 												<SelectItem key={item.value} value={item.value}>
 													{item.label}

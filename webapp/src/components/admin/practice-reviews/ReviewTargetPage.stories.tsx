@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn, screen } from "storybook/test";
 import type { ReviewArtifact } from "@/api/types.gen";
-import type { KnownArtifactKind } from "@/lib/artifact-kinds";
+import { isKnownArtifactKind } from "@/lib/artifact-kinds";
 import { expectNoPageOverflow } from "@/test/reflow";
 import { REVIEW_PREVIEW_SIZE, type ReviewSectionState } from "./ReviewOutputSections";
 import { ReviewTargetPage } from "./ReviewTargetPage";
@@ -36,14 +36,20 @@ const outputFor = <T extends { artifact?: ReviewArtifact }>(
 const empty = <T,>(): ReviewSectionState<T> => ({ status: "ready", items: [], total: 0 });
 
 /** The practice one of this work's observations names, and the one the card is read on. */
-const THIN_CONTROLLERS = workspacePractices[0];
+const THIN_CONTROLLERS = workspacePractices.find((p) => p.slug === "thin-controllers");
+if (!THIN_CONTROLLERS) throw new Error("The practice fixtures no longer cover thin-controllers");
 
-const argsFor = (artifact: ReviewArtifact) => ({
-	artifactKind: artifact.type as KnownArtifactKind,
-	artifactId: artifact.id,
-	feedback: outputFor(reviewFeedback, artifact),
-	observations: outputFor(reviewObservations, artifact),
-});
+const argsFor = (artifact: ReviewArtifact) => {
+	if (!isKnownArtifactKind(artifact.type)) {
+		throw new Error(`Fixture artifact ${artifact.id} has an unlabelled kind: ${artifact.type}`);
+	}
+	return {
+		artifactKind: artifact.type,
+		artifactId: artifact.id,
+		feedback: outputFor(reviewFeedback, artifact),
+		observations: outputFor(reviewObservations, artifact),
+	};
+};
 
 const meta = {
 	title: "Workspace admin/Practice reviews/Reviewed work",
@@ -72,7 +78,7 @@ export const PullRequest: Story = {
 		// Nothing labels the page as "Reviewed work": the breadcrumb stops before the heading, and the
 		// work names itself.
 		await expect(canvas.queryAllByText("Reviewed work")).toHaveLength(0);
-		expect(canvas.getAllByText("ls1intum/Hephaestus · PR #1423").length).toBeGreaterThan(0);
+		await expect(canvas.getAllByText("ls1intum/Hephaestus · PR #1423").length).toBeGreaterThan(0);
 		await expectNoPageOverflow();
 	},
 };
@@ -103,7 +109,9 @@ export const MergeRequest: Story = {
 			name: "Move invoice numbering behind the billing boundary",
 			level: 2,
 		});
-		expect(canvas.getAllByText("platform/billing-service · MR !88").length).toBeGreaterThan(0);
+		await expect(canvas.getAllByText("platform/billing-service · MR !88").length).toBeGreaterThan(
+			0,
+		);
 	},
 };
 
@@ -115,7 +123,7 @@ export const Conversation: Story = {
 			name: "How should we roll back the pricing migration?",
 			level: 2,
 		});
-		expect(canvas.getAllByText("#engineering").length).toBeGreaterThan(0);
+		await expect(canvas.getAllByText("#engineering").length).toBeGreaterThan(0);
 	},
 };
 

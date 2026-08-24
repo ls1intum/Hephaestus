@@ -3,7 +3,6 @@ package de.tum.cit.aet.hephaestus.integration.core.connection;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.integration.core.events.ConnectionLifecycleEvent;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.BearerToken;
-import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.CredentialBundle;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
@@ -521,15 +520,18 @@ public class ConnectionService {
     }
 
     private Connection applyTransition(
-        Connection connection,
+        Connection requested,
         TransitionRequest req,
         @Nullable Runnable beforeLocalTransition,
         boolean fenceOnActiveSyncJob,
         boolean propagateRevokeFailure
     ) {
-        if (connection.getId() != null) {
-            long connectionId = connection.getId();
-            long workspaceId = connection.getWorkspace().getId();
+        // For a persisted argument the row transitioned below is the one re-read under the lifecycle
+        // lock, never the caller's possibly-stale instance.
+        Connection connection = requested;
+        if (requested.getId() != null) {
+            long connectionId = requested.getId();
+            long workspaceId = requested.getWorkspace().getId();
             connectionRepository.acquireLifecycleLock(connectionId, workspaceId);
             connection = connectionRepository
                 .findByIdAndWorkspaceId(connectionId, workspaceId)

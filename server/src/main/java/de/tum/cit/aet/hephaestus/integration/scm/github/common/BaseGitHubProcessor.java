@@ -104,13 +104,7 @@ public abstract class BaseGitHubProcessor {
         long nativeId =
             dto.id() != null ? dto.id() : LabelIdUtils.generateDeterministicId(repository.getId(), dto.name());
         Long providerId = repository.getProvider().getId();
-        int inserted = labelRepository.insertIfAbsent(
-            nativeId,
-            providerId,
-            dto.name(),
-            dto.color(),
-            repository.getId()
-        );
+        labelRepository.insertIfAbsent(nativeId, providerId, dto.name(), dto.color(), repository.getId());
 
         // Always fetch by business key — the PK is auto-generated and unknown here.
         return labelRepository.findByRepositoryIdAndName(repository.getId(), dto.name()).orElse(null);

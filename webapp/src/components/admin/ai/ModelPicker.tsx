@@ -23,15 +23,19 @@ export interface ModelPickerProps {
 	disabled?: boolean;
 	invalid?: boolean;
 	"aria-describedby"?: string;
+	/** Points at the caller's visible label; only the caller can say what the listbox is a list of. */
+	"aria-labelledby": string;
 }
 
 function encode(scope: ModelSelection["scope"], id: number): string {
 	return `${scope}:${id}`;
 }
 
-function decode(value: string): ModelSelection {
-	const [scope, id] = value.split(":");
-	return { scope: scope as ModelSelection["scope"], id: Number(id) };
+function decode(value: string): ModelSelection | null {
+	const [scope, rawId] = value.split(":");
+	const id = Number(rawId);
+	if ((scope !== "SHARED" && scope !== "WORKSPACE") || !Number.isInteger(id)) return null;
+	return { scope, id };
 }
 
 function optionLabel(model: AvailableLlmModel): string {
@@ -66,6 +70,7 @@ export function ModelPicker({
 	disabled = false,
 	invalid = false,
 	"aria-describedby": ariaDescribedBy,
+	"aria-labelledby": ariaLabelledBy,
 }: ModelPickerProps) {
 	const shared = availableModels.filter((model) => model.scope === "SHARED");
 	const own = availableModels.filter((model) => model.scope === "WORKSPACE");
@@ -78,7 +83,8 @@ export function ModelPicker({
 			}))}
 			value={value ? encode(value.scope, value.id) : null}
 			onValueChange={(next) => {
-				if (next) onChange(decode(next));
+				const selection = next ? decode(next) : null;
+				if (selection) onChange(selection);
 			}}
 			disabled={disabled}
 		>
@@ -90,7 +96,7 @@ export function ModelPicker({
 			>
 				<SelectValue placeholder="Select a model…" />
 			</SelectTrigger>
-			<SelectContent>
+			<SelectContent aria-labelledby={ariaLabelledBy}>
 				{shared.length > 0 && (
 					<SelectGroup>
 						<SelectLabel>Shared models</SelectLabel>

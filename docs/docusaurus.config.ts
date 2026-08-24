@@ -4,6 +4,8 @@ import type * as Preset from '@docusaurus/preset-classic';
 
 // This runs in Node.js - Don't use client-side code here (browser APIs, JSX...)
 
+const envBaseUrl = process.env.DOCUSAURUS_BASE_URL;
+
 const config: Config = {
   title: 'Hephaestus Documentation',
   tagline: 'Feedback on how you work',
@@ -26,8 +28,9 @@ const config: Config = {
   },
 
   url: 'https://ls1intum.github.io',
-  // PR previews on Surge.sh need '/', production GitHub Pages needs '/Hephaestus/'
-  baseUrl: process.env.DOCUSAURUS_BASE_URL || '/Hephaestus/',
+  // PR previews on Surge.sh need '/', production GitHub Pages needs '/Hephaestus/'. Unset and empty
+  // both mean production: an empty base URL would resolve every asset against the site root.
+  baseUrl: envBaseUrl === undefined || envBaseUrl === '' ? '/Hephaestus/' : envBaseUrl,
   organizationName: 'ls1intum',
   projectName: 'Hephaestus',
 

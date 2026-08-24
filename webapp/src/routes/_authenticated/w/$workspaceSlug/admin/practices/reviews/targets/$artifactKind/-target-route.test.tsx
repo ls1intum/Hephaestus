@@ -36,7 +36,7 @@ beforeEach(() => {
 
 describe("reviewed work route", () => {
 	/**
-	 * The wire contract the page cannot state for itself now that it takes its rows as props: both
+	 * The wire contract the page cannot state for itself, because it takes its rows as props: both
 	 * endpoints are asked for *this* work, and for exactly the number of rows the section previews —
 	 * a page that asked for the default page size would silently claim a "see all" count it had
 	 * already fetched.

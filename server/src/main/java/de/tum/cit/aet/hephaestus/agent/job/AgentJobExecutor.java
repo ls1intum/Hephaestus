@@ -33,7 +33,6 @@ import de.tum.cit.aet.hephaestus.agent.usage.LlmPriceSnapshot;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageRecorder;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.runtime.RuntimeRole;
-import de.tum.cit.aet.hephaestus.evidence.ArtifactSourceManifest;
 import de.tum.cit.aet.hephaestus.evidence.AutomatedReviewReadinessReport;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -1246,7 +1245,7 @@ public class AgentJobExecutor {
                 )
             );
         } catch (RetryException e) {
-            throw new TerminalPersistenceException(e.getLastException());
+            throw new TerminalPersistenceException(e);
         }
     }
 

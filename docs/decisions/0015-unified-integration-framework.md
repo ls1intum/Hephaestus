@@ -56,7 +56,7 @@ in the shipped tree (deferred to #1203). No `OUTLINE` value ships in
 The integration domain lives under `integration/` with the following top-level
 shape:
 
-```
+```text
 integration/
 ├── core/   vendor-neutral substrate: spi, events, framework, connection,
 │           consumer, handler, oauth, webhook, feedback

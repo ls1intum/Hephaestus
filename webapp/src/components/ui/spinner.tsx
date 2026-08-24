@@ -4,10 +4,11 @@ import { cn } from "@/lib/utils";
 /**
  * An indeterminate spinner, for a control the reader just activated. A region gets a skeleton.
  *
- * Decoration by default: `role="status"` is not a presentational role, so a spinner that carries one
- * inside a button interrupts that button's accessible name computation and "Save" announces as
- * "Loading". A caller that genuinely needs the announcement opts in with the standard attributes —
- * pass `role` or `aria-label` and the spinner stops hiding itself.
+ * Decoration by default. A labelled spinner inside a button joins that button's accessible name
+ * rather than replacing it — "Save" becomes "Loading Save" — and `role="status"` is a live region
+ * besides, so it re-announces every time the button enters its pending state. A caller that genuinely
+ * wants the announcement opts in with the standard attributes: pass `role` or `aria-label` and the
+ * spinner stops hiding itself.
  */
 function Spinner({ className, ...props }: React.ComponentProps<"svg">) {
 	const announces = props.role !== undefined || props["aria-label"] !== undefined;

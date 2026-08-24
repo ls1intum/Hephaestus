@@ -6,7 +6,7 @@ import { renderWithRouter } from "@/test/router-harness";
 import { PracticeDefinitionForm, type PracticeDefinitionValue } from "./PracticeDefinitionForm";
 
 vi.mock("@/components/shared/CodeEditor", () => ({
-	CodeEditor: () => <div data-testid="code-editor" />,
+	CodeEditor: () => <div />,
 }));
 
 function renderCreateForm(onSubmit: (value: PracticeDefinitionValue) => void | Promise<void>) {
@@ -23,8 +23,8 @@ function renderCreateForm(onSubmit: (value: PracticeDefinitionValue) => void | P
 	);
 }
 
-const nameField = () => screen.getByRole("textbox", { name: /Name/ });
-const slugField = () => screen.getByRole("textbox", { name: "Identifier" });
+const nameField = () => screen.getByRole<HTMLInputElement>("textbox", { name: /Name/ });
+const slugField = () => screen.getByRole<HTMLInputElement>("textbox", { name: "Identifier" });
 
 async function openTechnicalSettings() {
 	fireEvent.click(screen.getByRole("button", { name: /Technical settings/ }));
@@ -44,15 +44,15 @@ describe("the identifier a practice is created under", () => {
 		await openTechnicalSettings();
 
 		fireEvent.change(nameField(), { target: { value: "Small changes" } });
-		expect((slugField() as HTMLInputElement).value).toBe("small-changes");
+		expect(slugField().value).toBe("small-changes");
 
 		// The identifier cannot be changed after the practice exists, so an author who takes it over
 		// has made a decision the name is not allowed to overwrite behind them.
 		fireEvent.change(slugField(), { target: { value: "reviewable-diffs" } });
 		fireEvent.change(nameField(), { target: { value: "Small, reviewable changes" } });
 
-		expect((slugField() as HTMLInputElement).value).toBe("reviewable-diffs");
-		expect((nameField() as HTMLInputElement).value).toBe("Small, reviewable changes");
+		expect(slugField().value).toBe("reviewable-diffs");
+		expect(nameField().value).toBe("Small, reviewable changes");
 	});
 
 	it("can be handed back to the name", async () => {
@@ -63,10 +63,10 @@ describe("the identifier a practice is created under", () => {
 		fireEvent.change(slugField(), { target: { value: "reviewable-diffs" } });
 		fireEvent.click(screen.getByRole("button", { name: "Reset to generated identifier" }));
 
-		expect((slugField() as HTMLInputElement).value).toBe("small-changes");
+		expect(slugField().value).toBe("small-changes");
 
 		fireEvent.change(nameField(), { target: { value: "Small, reviewable changes" } });
-		expect((slugField() as HTMLInputElement).value).toBe("small-reviewable-changes");
+		expect(slugField().value).toBe("small-reviewable-changes");
 	});
 });
 
@@ -107,9 +107,7 @@ describe("the unsaved-changes guard around a save", () => {
 		fireEvent.click(screen.getByRole("link", { name: "Cancel" }));
 
 		// The draft is still the only copy of this practice, so leaving has to be a decision again.
-		expect(
-			await screen.findByRole("alertdialog", { name: "Discard unsaved changes?" }),
-		).toBeTruthy();
+		await screen.findByRole("alertdialog", { name: "Discard unsaved changes?" });
 	});
 
 	it("is left exactly as it was by a caller that says nothing", async () => {
@@ -121,8 +119,6 @@ describe("the unsaved-changes guard around a save", () => {
 		fireEvent.click(screen.getByRole("button", { name: "Create practice" }));
 		fireEvent.click(screen.getByRole("link", { name: "Cancel" }));
 
-		expect(
-			await screen.findByRole("alertdialog", { name: "Discard unsaved changes?" }),
-		).toBeTruthy();
+		await screen.findByRole("alertdialog", { name: "Discard unsaved changes?" });
 	});
 });

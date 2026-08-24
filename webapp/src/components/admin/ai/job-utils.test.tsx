@@ -1,5 +1,5 @@
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { assert, describe, expect, it } from "vitest";
 import { holdReasonCopy, jobWait, MoneyCell } from "./job-utils";
 
 const NOW = new Date("2026-05-20T12:00:00Z").getTime();
@@ -8,21 +8,27 @@ const EARLIER = new Date("2026-05-20T11:55:00Z");
 
 describe("jobWait", () => {
 	it("reports a hold whenever the server names a reason", () => {
-		expect(jobWait({ status: "QUEUED", holdReason: "BUDGET", availableAt: SOON }, NOW)).toEqual({
+		expect(
+			jobWait({ status: "QUEUED", holdReason: "BUDGET", availableAt: SOON }, NOW),
+		).toStrictEqual({
 			kind: "hold",
 			reason: "BUDGET",
 		});
 	});
 
 	it("still reports a hold once the parked instant has lapsed", () => {
-		expect(jobWait({ status: "QUEUED", holdReason: "BUDGET", availableAt: EARLIER }, NOW)).toEqual({
+		expect(
+			jobWait({ status: "QUEUED", holdReason: "BUDGET", availableAt: EARLIER }, NOW),
+		).toStrictEqual({
 			kind: "hold",
 			reason: "BUDGET",
 		});
 	});
 
 	it("reports a backoff for a queued run whose next attempt is still ahead", () => {
-		expect(jobWait({ status: "QUEUED", availableAt: SOON }, NOW)).toEqual({ kind: "backoff" });
+		expect(jobWait({ status: "QUEUED", availableAt: SOON }, NOW)).toStrictEqual({
+			kind: "backoff",
+		});
 	});
 
 	it("reports nothing for a queued run that is already claimable", () => {
@@ -91,6 +97,8 @@ describe("MoneyCell", () => {
 		);
 
 		const [cents, bound] = screen.getAllByRole("cell");
+		assert(cents);
+		assert(bound);
 		expect(cents.textContent).toBe("$4.50");
 		expect(bound.textContent).toBe("<$0.01");
 	});

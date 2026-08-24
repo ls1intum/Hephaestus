@@ -58,17 +58,19 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 // Sample messages for testing
+const openingQuestion: ChatMessage = {
+	id: "msg-1",
+	role: "user",
+	parts: [
+		{
+			type: "text",
+			text: "Hello! Can you help me understand React components?",
+		},
+	],
+};
+
 const sampleMessages: ChatMessage[] = [
-	{
-		id: "msg-1",
-		role: "user",
-		parts: [
-			{
-				type: "text",
-				text: "Hello! Can you help me understand React components?",
-			},
-		],
-	},
+	openingQuestion,
 	{
 		id: "msg-2",
 		role: "assistant",
@@ -220,7 +222,7 @@ export const WithVotes: Story = {
  */
 export const Streaming: Story = {
 	args: {
-		messages: [sampleMessages[0]],
+		messages: [openingQuestion],
 		status: "streaming",
 	},
 	render: (args) => {
@@ -294,7 +296,7 @@ The key is to include all values from component scope that are used inside the e
 				}, 20);
 
 				return () => clearInterval(interval);
-			}, []);
+			}, [fullResponse]);
 
 			const messages: ChatMessage[] = [
 				...args.messages,

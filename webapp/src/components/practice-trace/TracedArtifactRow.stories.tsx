@@ -1,8 +1,12 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect } from "storybook/test";
 import { ItemGroup } from "@/components/ui/item";
-import { tracedArtifacts } from "./story-mock-data";
+import { tracedArtifact } from "./story-mock-data";
 import { TracedArtifactRow } from "./TracedArtifactRow";
+
+const pullRequestRow = tracedArtifact(1423);
+const issueWithNoReviews = tracedArtifact(1430);
+const unlinkableConversation = tracedArtifact(88);
 
 /**
  * One row of the review-activity list. The whole row is the link into the trace, and the two counts
@@ -20,7 +24,7 @@ const meta = {
 			</ItemGroup>
 		),
 	],
-	args: { workspaceSlug: "demo", artifact: tracedArtifacts[0] },
+	args: { workspaceSlug: "demo", artifact: pullRequestRow },
 } satisfies Meta<typeof TracedArtifactRow>;
 
 export default meta;
@@ -38,7 +42,7 @@ export const PullRequest: Story = {
 
 /** Nothing was reviewed yet, and the sentence says so rather than leaving the second count off. */
 export const NothingReviewedYet: Story = {
-	args: { artifact: tracedArtifacts[2] },
+	args: { artifact: issueWithNoReviews },
 	play: async ({ canvas }) => {
 		await expect(canvas.getByText("2 moments recorded · 0 started a review")).toBeVisible();
 	},
@@ -49,7 +53,7 @@ export const NothingReviewedYet: Story = {
  * kind is still named for a screen reader beside the icon.
  */
 export const UnlinkableArtifact: Story = {
-	args: { artifact: tracedArtifacts[3] },
+	args: { artifact: unlinkableConversation },
 	play: async ({ canvas }) => {
 		const link = canvas.getByRole("link");
 		await expect(link).toHaveAttribute("href", "/w/demo/reviews/chat.conversation_thread/88");
@@ -63,7 +67,7 @@ export const UnlinkableArtifact: Story = {
 export const LongTitle: Story = {
 	args: {
 		artifact: {
-			...tracedArtifacts[0],
+			...pullRequestRow,
 			title:
 				"Say why a practice stayed quiet on a pull request, and where a workspace admin goes to change the answer, in a title long enough to wrap on any viewport",
 		},

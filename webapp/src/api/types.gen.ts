@@ -5703,9 +5703,9 @@ export type Achievement = {
      */
     status: 'locked' | 'available' | 'unlocked' | 'hidden';
     /**
-     * Optional of when the achievement was unlocked, empty() if not unlocked
+     * When the achievement was unlocked, absent while it is still locked
      */
-    unlockedAt: Date;
+    unlockedAt?: Date;
 };
 
 export type GetJwksData = {

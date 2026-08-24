@@ -20,53 +20,61 @@ const automatedReview: CuratedPracticeSummary["automatedReview"] = {
 	evidenceSufficiency: "SUFFICIENT_WHEN_REQUIREMENTS_MET",
 };
 
-const areas: CuratedArea[] = [
-	{
-		slug: "review-ready-work",
-		position: 0,
-		definition: {
-			name: "Packaging work for review",
-			description: "Make a change cheap to review before you ask for one.",
-			icon: "Package",
-			color: "sky",
-		},
-		status: status(),
+const reviewReadyArea: CuratedArea = {
+	slug: "review-ready-work",
+	position: 0,
+	definition: {
+		name: "Packaging work for review",
+		description: "Make a change cheap to review before you ask for one.",
+		icon: "Package",
+		color: "sky",
 	},
+	status: status(),
+};
+
+const excludedArea: CuratedArea = {
+	slug: "not-offered",
+	position: 2,
+	definition: { name: "Legacy conventions" },
+	status: status({ offered: false }),
+};
+
+const smallFocusedPrs: CuratedPracticeSummary = {
+	slug: "small-focused-prs",
+	position: 0,
+	name: "Keep a change to one concern",
+	artifactKind: "scm.pull_request",
+	automatedReview,
+	areaSlug: "review-ready-work",
+	effectivelyOffered: true,
+	status: status(),
+};
+
+const explainsTheChange: CuratedPracticeSummary = {
+	slug: "explains-the-change",
+	position: 1,
+	name: "Say what changed and why",
+	artifactKind: "scm.pull_request",
+	automatedReview,
+	areaSlug: "review-ready-work",
+	effectivelyOffered: true,
+	status: status({ state: "UPDATE_WAITING", changeKind: "DETECTION" }),
+};
+
+const areas: CuratedArea[] = [
+	reviewReadyArea,
 	{
 		slug: "house-rules",
 		position: 1,
 		definition: { name: "Team conventions", icon: "Scale", color: "amber" },
 		status: status({ state: "YOURS" }),
 	},
-	{
-		slug: "not-offered",
-		position: 2,
-		definition: { name: "Legacy conventions" },
-		status: status({ offered: false }),
-	},
+	excludedArea,
 ];
 
 const practices: CuratedPracticeSummary[] = [
-	{
-		slug: "small-focused-prs",
-		position: 0,
-		name: "Keep a change to one concern",
-		artifactKind: "scm.pull_request",
-		automatedReview,
-		areaSlug: "review-ready-work",
-		effectivelyOffered: true,
-		status: status(),
-	},
-	{
-		slug: "explains-the-change",
-		position: 1,
-		name: "Say what changed and why",
-		artifactKind: "scm.pull_request",
-		automatedReview,
-		areaSlug: "review-ready-work",
-		effectivelyOffered: true,
-		status: status({ state: "UPDATE_WAITING", changeKind: "DETECTION" }),
-	},
+	smallFocusedPrs,
+	explainsTheChange,
 	{
 		slug: "reworded-upstream",
 		position: 2,
@@ -192,7 +200,7 @@ export const APracticeWhoseAreaIsGone: Story = {
 			}),
 		);
 		await userEvent.click(await screen.findByRole("menuitemradio", { name: "Unassigned" }));
-		expect(args.onPlacePractice).toHaveBeenCalledWith("orphaned-practice", null, 1);
+		await expect(args.onPlacePractice).toHaveBeenCalledWith("orphaned-practice", null, 1);
 	},
 };
 
@@ -268,16 +276,16 @@ export const ExcludingAnAreaListsItsPractices: Story = {
 
 export const PracticeInsideExcludedArea: Story = {
 	args: {
-		areas: [areas[2]],
+		areas: [excludedArea],
 		practices: [
 			{
-				...practices[0],
-				areaSlug: areas[2].slug,
+				...smallFocusedPrs,
+				areaSlug: excludedArea.slug,
 				effectivelyOffered: false,
 			},
 			{
-				...practices[1],
-				areaSlug: areas[2].slug,
+				...explainsTheChange,
+				areaSlug: excludedArea.slug,
 				effectivelyOffered: false,
 				status: status({ offered: false }),
 			},
@@ -299,11 +307,11 @@ export const PracticeInsideExcludedArea: Story = {
 
 export const ExcludingAnAreaCountsOnlyIncludedPractices: Story = {
 	args: {
-		areas: [areas[0]],
+		areas: [reviewReadyArea],
 		practices: [
-			practices[0],
+			smallFocusedPrs,
 			{
-				...practices[1],
+				...explainsTheChange,
 				effectivelyOffered: false,
 				status: status({ offered: false }),
 			},
@@ -325,11 +333,11 @@ export const ExcludingAnAreaCountsOnlyIncludedPractices: Story = {
 
 export const ExcludingAnAreaDoesNotRecountExcludedPractices: Story = {
 	args: {
-		areas: [areas[0]],
+		areas: [reviewReadyArea],
 		practices: [
 			{
-				...practices[0],
-				areaSlug: areas[0].slug,
+				...smallFocusedPrs,
+				areaSlug: reviewReadyArea.slug,
 				effectivelyOffered: false,
 				status: status({ offered: false }),
 			},

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { assert, describe, expect, it } from "vitest";
 import { extractVotesFromThreadDetail, parseThreadMessages } from "./chat-validation";
 
 // chat-validation is the Zod boundary on untrusted server-provided chat content that mentor hydration
@@ -14,14 +14,17 @@ function msg(id: string, role: string) {
 }
 
 describe("parseThreadMessages", () => {
-	it("accepts well-formed messages and preserves passthrough part fields", () => {
+	it("accepts well-formed messages and preserves part fields the schema does not name", () => {
 		const result = parseThreadMessages([
 			{ id: UUID, role: "user", parts: [{ type: "text", text: "hi", extra: 1 }] },
 			msg(UUID2, "assistant"),
 		]);
+		assert(result);
 		expect(result).toHaveLength(2);
-		expect(result?.[0].id).toBe(UUID);
-		expect(result?.[0].parts[0]).toMatchObject({ extra: 1 });
+		const [first] = result;
+		assert(first);
+		expect(first.id).toBe(UUID);
+		expect(first.parts[0]).toMatchObject({ extra: 1 });
 	});
 
 	it("rejects a non-UUID message id (the exact class that silently skipped hydration)", () => {
@@ -41,16 +44,18 @@ describe("parseThreadMessages", () => {
 describe("extractVotesFromThreadDetail", () => {
 	it("returns the validated votes for a well-formed payload", () => {
 		const votes = extractVotesFromThreadDetail({ votes: [{ messageId: UUID, isUpvoted: true }] });
-		expect(votes).toEqual([{ messageId: UUID, isUpvoted: true }]);
+		expect(votes).toStrictEqual([{ messageId: UUID, isUpvoted: true }]);
 	});
 
 	it("returns [] when votes are absent, not an array, or the container is not an object", () => {
-		expect(extractVotesFromThreadDetail({})).toEqual([]);
-		expect(extractVotesFromThreadDetail({ votes: "nope" })).toEqual([]);
-		expect(extractVotesFromThreadDetail(null)).toEqual([]);
+		expect(extractVotesFromThreadDetail({})).toStrictEqual([]);
+		expect(extractVotesFromThreadDetail({ votes: "nope" })).toStrictEqual([]);
+		expect(extractVotesFromThreadDetail(null)).toStrictEqual([]);
 	});
 
 	it("returns [] (fail closed) when any vote is malformed", () => {
-		expect(extractVotesFromThreadDetail({ votes: [{ messageId: "not-a-uuid" }] })).toEqual([]);
+		expect(extractVotesFromThreadDetail({ votes: [{ messageId: "not-a-uuid" }] })).toStrictEqual(
+			[],
+		);
 	});
 });

@@ -1,7 +1,7 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { HttpResponse, http } from "msw";
-import { describe, expect, it, vi } from "vitest";
+import { HttpResponse, http, type PathParams } from "msw";
+import { assert, describe, expect, it, vi } from "vitest";
 import { buildAutonomyFixture } from "@/components/admin/practices/practice-autonomy/story-mock-data";
 import { server } from "@/mocks/server";
 import { ROUTE_RENDER_WAIT, renderRouteAt, renderRouteAtWithRouter } from "@/test/router-harness";
@@ -55,9 +55,9 @@ describe("review route", () => {
 	});
 
 	/**
-	 * The three pages this replaced were in the sidebar, in the admin docs, and in bookmarks. Each
-	 * lands on the section that absorbed it — and the autonomy screen's overrides filter, the one deep
-	 * link into it anybody had reason to save, survives the move.
+	 * Three URLs that have been in the sidebar, in the admin docs and in people's bookmarks, so each
+	 * has to keep resolving to the section that holds its subject. The autonomy screen's overrides
+	 * filter travels too: it is the one deep link into these anybody had reason to save.
 	 */
 	it.each([
 		["/w/acme/admin/practices/autonomy", "/w/acme/admin/practices/review"],
@@ -129,10 +129,10 @@ describe("review route", () => {
 	it("clears an override by omitting the autonomy, not by sending null", async () => {
 		const bodies: Array<Record<string, unknown>> = [];
 		stubWorkspace([
-			http.patch(
+			http.patch<PathParams, Record<string, unknown>>(
 				"*/workspaces/:workspaceSlug/practices/:practiceSlug/autonomy",
 				async ({ request }) => {
-					bodies.push((await request.json()) as Record<string, unknown>);
+					bodies.push(await request.json());
 					return HttpResponse.json({
 						...fixture.practices[1],
 						autonomy: { effective: "HUMAN_APPROVAL", source: "AREA", inherited: true },
@@ -146,7 +146,7 @@ describe("review route", () => {
 		const area = await screen.findByRole("button", { name: /Hygiene/ }, ROUTE_RENDER_WAIT);
 		await userEvent.click(area);
 		const row = (await screen.findByText("Links the issue")).closest("li");
-		if (!(row instanceof HTMLElement)) throw new Error("Practice row not rendered");
+		assert(row instanceof HTMLElement, "Practice row not rendered");
 
 		// `hidden: true`: jsdom runs no layout, so Base UI leaves the opened accordion panel carrying
 		// the attribute it strips once the panel has a height. The browser-run story covers the state a
@@ -159,7 +159,9 @@ describe("review route", () => {
 		);
 
 		await waitFor(() => expect(bodies).toHaveLength(1));
-		expect(bodies[0]).toEqual({});
-		expect("autonomy" in bodies[0]).toBe(false);
+		const [body] = bodies;
+		assert(body);
+		expect(body).toStrictEqual({});
+		expect("autonomy" in body).toBe(false);
 	});
 });

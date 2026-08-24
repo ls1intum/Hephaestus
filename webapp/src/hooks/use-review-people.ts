@@ -5,6 +5,7 @@ import {
 	type PersonOption,
 	type ReviewPeople,
 } from "@/components/admin/practice-reviews/ReviewPersonFacet";
+import { firstNonBlank } from "@/lib/text";
 
 /**
  * The people a review list can be filtered by, fetched once per workspace and shared by every facet
@@ -22,7 +23,7 @@ export function useReviewPeople(workspaceSlug: string): ReviewPeople {
 		.filter((member): member is typeof member & { userId: number } => member.userId != null)
 		.map((member) => ({
 			userId: member.userId,
-			label: member.userName || member.userLogin || `#${member.userId}`,
+			label: firstNonBlank(member.userName, member.userLogin) ?? `#${member.userId}`,
 			secondary: member.userName && member.userLogin ? member.userLogin : undefined,
 		}));
 

@@ -47,19 +47,18 @@ export function clearedObservationFilters(): Partial<ObservationsSearch> {
 	};
 }
 
-/** Whether anything above is set — read by the count's wording and by the empty state's copy. */
 export function hasObservationFilter(search: ObservationsSearch): boolean {
-	return Boolean(
-		search.areaSlug?.length ||
-			search.practiceSlug?.length ||
-			search.presence?.length ||
-			search.assessment?.length ||
-			search.severity?.length ||
-			search.agentJobId ||
-			search.artifactKind ||
-			search.subjectUserId ||
-			search.from ||
-			search.to,
+	return (
+		(search.areaSlug?.length ?? 0) > 0 ||
+		(search.practiceSlug?.length ?? 0) > 0 ||
+		(search.presence?.length ?? 0) > 0 ||
+		(search.assessment?.length ?? 0) > 0 ||
+		(search.severity?.length ?? 0) > 0 ||
+		search.agentJobId !== undefined ||
+		search.artifactKind !== undefined ||
+		search.subjectUserId !== undefined ||
+		search.from !== undefined ||
+		search.to !== undefined
 	);
 }
 

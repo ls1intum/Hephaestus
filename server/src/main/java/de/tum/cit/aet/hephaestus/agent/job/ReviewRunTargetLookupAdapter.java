@@ -4,7 +4,6 @@ import de.tum.cit.aet.hephaestus.practices.spi.ReviewRunTargetLookup;
 import java.util.Collection;
 import java.util.Map;
 import java.util.UUID;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;

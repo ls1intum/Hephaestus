@@ -5,6 +5,7 @@ import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { Spinner } from "@/components/ui/spinner";
 import { useWorkspaceFeatures } from "@/hooks/use-workspace-features";
 import { useAuth } from "@/integrations/auth/AuthContext";
+import { firstNonBlank } from "@/lib/text";
 
 export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/achievements")({
 	staticData: { surface: "fullscreen" },
@@ -25,7 +26,7 @@ function AchievementsPage() {
 			achievementsEnabled === false &&
 			username
 		) {
-			navigate({
+			void navigate({
 				to: "/w/$workspaceSlug/user/$username",
 				params: { workspaceSlug, username },
 				replace: true,
@@ -61,9 +62,9 @@ function AchievementsPage() {
 	return (
 		<AchievementsView
 			workspaceSlug={workspaceSlug}
-			targetUsername={username || ""}
+			targetUsername={username}
 			isOwnProfile={true}
-			fallbackName={userProfile?.name || userProfile?.username}
+			fallbackName={firstNonBlank(userProfile?.name, userProfile?.username)}
 			fallbackAvatarUrl={getUserProfilePictureUrl()}
 		/>
 	);

@@ -1,8 +1,11 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { assert, describe, expect, it, vi } from "vitest";
 import type { LlmConnection } from "@/api/types.gen";
 import { validateLlmConnectionForm } from "@/lib/llm-form-validation";
-import { AdminLlmConnectionFormDialog } from "./AdminLlmConnectionFormDialog";
+import {
+	AdminLlmConnectionFormDialog,
+	type AdminLlmConnectionFormDialogProps,
+} from "./AdminLlmConnectionFormDialog";
 
 const connection: LlmConnection = {
 	id: 1,
@@ -17,8 +20,8 @@ const connection: LlmConnection = {
 	createdAt: new Date("2026-07-01T00:00:00Z"),
 };
 
-function renderDialog(overrides: Partial<Parameters<typeof AdminLlmConnectionFormDialog>[0]> = {}) {
-	const props = {
+function renderDialog(overrides: Partial<AdminLlmConnectionFormDialogProps> = {}) {
+	const props: AdminLlmConnectionFormDialogProps = {
 		open: true,
 		onOpenChange: vi.fn(),
 		editing: null,
@@ -48,23 +51,23 @@ describe("AdminLlmConnectionFormDialog", () => {
 	});
 
 	it("keeps routing immutable and tests the saved connection with its stored credential", () => {
-		const onUpdate = vi.fn();
-		const onProbe = vi.fn();
-		const onProbeSaved = vi.fn();
+		const onUpdate = vi.fn<AdminLlmConnectionFormDialogProps["onUpdate"]>();
+		const onProbe = vi.fn<AdminLlmConnectionFormDialogProps["onProbe"]>();
+		const onProbeSaved = vi.fn<NonNullable<AdminLlmConnectionFormDialogProps["onProbeSaved"]>>();
 		renderDialog({ editing: connection, onUpdate, onProbe, onProbeSaved });
-		expect((screen.getByLabelText("Base URL") as HTMLInputElement).disabled).toBe(true);
+		expect(screen.getByLabelText<HTMLInputElement>("Base URL").disabled).toBe(true);
 		expect(screen.queryByRole("combobox", { name: "Endpoint preset" })).toBeNull();
 		fireEvent.click(screen.getByRole("button", { name: "Test saved connection" }));
 		expect(onProbeSaved).toHaveBeenCalledWith(connection.id, expect.any(Object));
 		expect(onProbe).not.toHaveBeenCalled();
 		fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
 		const update = onUpdate.mock.calls[0]?.[1];
-		expect(update).toEqual({ displayName: "Custom endpoint" });
+		expect(update).toStrictEqual({ displayName: "Custom endpoint" });
 	});
 
 	it("tests a replacement credential instead of reporting the old saved credential", () => {
-		const onProbe = vi.fn();
-		const onProbeSaved = vi.fn();
+		const onProbe = vi.fn<AdminLlmConnectionFormDialogProps["onProbe"]>();
+		const onProbeSaved = vi.fn<NonNullable<AdminLlmConnectionFormDialogProps["onProbeSaved"]>>();
 		renderDialog({ editing: connection, onProbe, onProbeSaved });
 
 		screen.getByRole("button", { name: "Test saved connection" });
@@ -81,7 +84,7 @@ describe("AdminLlmConnectionFormDialog", () => {
 	});
 
 	it("refuses an endpoint that smuggles a credential into the URL", () => {
-		const onCreate = vi.fn();
+		const onCreate = vi.fn<AdminLlmConnectionFormDialogProps["onCreate"]>();
 		renderDialog({ onCreate });
 		fireEvent.change(screen.getByLabelText("Display name"), { target: { value: "Gateway" } });
 		fireEvent.change(screen.getByLabelText("Base URL"), {
@@ -94,17 +97,20 @@ describe("AdminLlmConnectionFormDialog", () => {
 			displayName: "Gateway",
 			baseUrl: "https://gw.example.com/v1?api-key=SECRET",
 		}).baseUrl;
-		expect(rejection).toBeTruthy();
-		screen.getByText(rejection as string);
+		assert(rejection, "A base URL carrying a secret must be rejected");
+		screen.getByText(rejection);
 		expect(onCreate).not.toHaveBeenCalled();
 	});
 
 	it("keeps a probe result while the connection is being named", () => {
-		const onProbe = vi.fn();
-		const onProbed = vi.fn();
+		const onProbe = vi.fn<AdminLlmConnectionFormDialogProps["onProbe"]>();
+		const onProbed = vi.fn<NonNullable<AdminLlmConnectionFormDialogProps["onProbed"]>>();
 		renderDialog({ onProbe, onProbed });
 		fireEvent.click(screen.getByRole("button", { name: "Test & fetch models" }));
-		act(() => onProbe.mock.calls[0]?.[1].onSuccess({ reachable: true, models: ["gpt-5"] }));
+		// The probe answers synchronously here, so `act` flushes the state it sets before the assertion.
+		act(() => {
+			onProbe.mock.calls[0]?.[1].onSuccess({ reachable: true, models: ["gpt-5"] });
+		});
 		screen.getByText("gpt-5");
 
 		fireEvent.change(screen.getByLabelText("Display name"), { target: { value: "Production" } });
@@ -114,11 +120,12 @@ describe("AdminLlmConnectionFormDialog", () => {
 	});
 
 	it("ignores an in-flight probe after its connection inputs change", () => {
-		const onProbe = vi.fn();
-		const onProbed = vi.fn();
+		const onProbe = vi.fn<AdminLlmConnectionFormDialogProps["onProbe"]>();
+		const onProbed = vi.fn<NonNullable<AdminLlmConnectionFormDialogProps["onProbed"]>>();
 		renderDialog({ onProbe, onProbed });
 		fireEvent.click(screen.getByRole("button", { name: "Test & fetch models" }));
 		const callbacks = onProbe.mock.calls[0]?.[1];
+		assert(callbacks);
 
 		fireEvent.change(screen.getByLabelText("Base URL"), {
 			target: { value: "https://different.example.test/v1" },

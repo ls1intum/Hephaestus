@@ -10,7 +10,7 @@ import {
 } from "@/mocks/fixtures/practice";
 import { withPageBehind } from "@/stories/decorators";
 import { Stateful } from "@/stories/stateful";
-import { expectSettledVisible } from "@/test/overlay";
+import { settledDrawerPanel } from "@/test/overlay";
 import { expectNoPanelOverflow, expectPanelContentInset } from "@/test/reflow";
 import { CuratedFormLevel } from "./CuratedFormLevel";
 import { CuratedPracticeForm, type CuratedPracticeFormInitialValue } from "./CuratedPracticeForm";
@@ -75,13 +75,6 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** The editor is a drawer level, so it arrives over a transition rather than being simply present. */
-async function settledEditor(): Promise<HTMLElement> {
-	const [popup] = document.querySelectorAll<HTMLElement>('[data-slot="drawer-popup"]');
-	await expectSettledVisible(popup);
-	return popup;
-}
-
 export const Create: Story = {
 	args: {
 		mode: "create",
@@ -94,7 +87,7 @@ export const Create: Story = {
 		chromatic: { viewports: [320, 1440] },
 	},
 	play: async () => {
-		await expectNoPanelOverflow(await settledEditor());
+		await expectNoPanelOverflow(await settledDrawerPanel());
 	},
 };
 
@@ -119,7 +112,7 @@ export const StaleEdit: Story = {
 		onSubmit: fn(),
 	},
 	play: async () => {
-		await settledEditor();
+		await settledDrawerPanel();
 		await expect(screen.getByText("This practice changed while you were editing")).toBeVisible();
 		await expect(screen.getByRole("button", { name: "Save changes" })).toBeDisabled();
 	},
@@ -152,7 +145,7 @@ export const HephaestusUpdateAvailable: Story = {
 		onSubmit: fn(),
 	},
 	play: async () => {
-		const popup = await settledEditor();
+		const popup = await settledDrawerPanel();
 		// The version banner is the host's, not the form's: rendered as a sibling of `DrawerBody` it
 		// lands directly on the panel, which has no padding, and touches both edges.
 		await expectPanelContentInset(popup);
@@ -177,7 +170,7 @@ export const ValidationErrors: Story = {
 	},
 	parameters: { chromatic: { disableSnapshot: true } },
 	play: async () => {
-		await settledEditor();
+		await settledDrawerPanel();
 		await userEvent.click(screen.getByRole("button", { name: "Create practice" }));
 		await expect(screen.getByText("Name must be at least 3 characters")).toBeVisible();
 		await expect(screen.queryByText("Select at least one trigger event")).not.toBeInTheDocument();
@@ -197,7 +190,7 @@ export const Submitting: Story = {
 		onSubmit: fn(),
 	},
 	play: async () => {
-		await settledEditor();
+		await settledDrawerPanel();
 		await expect(screen.getByRole("textbox", { name: /Name/ })).toBeDisabled();
 	},
 };

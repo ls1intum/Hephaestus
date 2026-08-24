@@ -96,9 +96,11 @@ export function LlmConnectionFields({
 
 	const displayNameId = useId();
 	const presetId = useId();
+	const presetLabelId = useId();
 	const responsesApiId = useId();
 	const baseUrlId = useId();
 	const authModeId = useId();
+	const authModeLabelId = useId();
 	const apiKeyId = useId();
 	const clearApiKeyId = useId();
 	const displayNameErrorId = useId();
@@ -136,16 +138,18 @@ export function LlmConnectionFields({
 			{!isEdit && (
 				<FieldGroup className="gap-3">
 					<Field>
-						<FieldLabel htmlFor={presetId}>Endpoint preset</FieldLabel>
+						<FieldLabel id={presetLabelId} htmlFor={presetId}>
+							Endpoint preset
+						</FieldLabel>
 						<Select
 							items={PROVIDER_PRESET_SELECT_ITEMS}
 							value={value.preset}
-							onValueChange={(next) => next && applyPreset(next as ProviderPreset)}
+							onValueChange={(next) => next && applyPreset(next)}
 						>
 							<SelectTrigger id={presetId} className="w-full">
 								<SelectValue />
 							</SelectTrigger>
-							<SelectContent>
+							<SelectContent aria-labelledby={presetLabelId}>
 								{PROVIDER_PRESET_ORDER.map((item) => (
 									<SelectItem key={item} value={item}>
 										{PROVIDER_PRESET_LABELS[item]}
@@ -165,7 +169,7 @@ export function LlmConnectionFields({
 						<Checkbox
 							id={responsesApiId}
 							checked={value.useResponsesApi}
-							onCheckedChange={(checked) => update({ useResponsesApi: checked === true })}
+							onCheckedChange={(checked) => update({ useResponsesApi: checked })}
 						/>
 						<FieldContent>
 							<FieldLabel htmlFor={responsesApiId} className="font-normal">
@@ -200,19 +204,21 @@ export function LlmConnectionFields({
 
 			{!isEdit && value.preset === "OTHER" && (
 				<Field>
-					<FieldLabel htmlFor={authModeId}>Authentication</FieldLabel>
+					<FieldLabel id={authModeLabelId} htmlFor={authModeId}>
+						Authentication
+					</FieldLabel>
 					<Select
 						items={[
 							{ value: "BEARER", label: "Bearer token" },
 							{ value: "API_KEY", label: "api-key header" },
 						]}
 						value={value.authMode}
-						onValueChange={(next) => next && update({ authMode: next as LlmAuthMode })}
+						onValueChange={(next) => next && update({ authMode: next })}
 					>
 						<SelectTrigger id={authModeId} className="w-full">
 							<SelectValue />
 						</SelectTrigger>
-						<SelectContent>
+						<SelectContent aria-labelledby={authModeLabelId}>
 							<SelectItem value="BEARER">Bearer token</SelectItem>
 							<SelectItem value="API_KEY">api-key header</SelectItem>
 						</SelectContent>
@@ -245,7 +251,7 @@ export function LlmConnectionFields({
 							id={clearApiKeyId}
 							checked={value.clearApiKey}
 							onCheckedChange={(checked) =>
-								update({ clearApiKey: checked === true, ...(checked === true && { apiKey: "" }) })
+								update({ clearApiKey: checked, ...(checked && { apiKey: "" }) })
 							}
 						/>
 						<FieldContent>

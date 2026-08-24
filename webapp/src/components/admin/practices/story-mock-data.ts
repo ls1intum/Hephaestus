@@ -76,26 +76,28 @@ export function chosenAutonomy(effective: PracticeAutonomy): AutonomyAssignment 
 	return { effective, override: effective, source: "PRACTICE", inherited: false };
 }
 
+export const mockPractice: Practice = {
+	id: 1,
+	slug: "pr-description-quality",
+	name: "PR Description Quality",
+	bindings: [mockPullRequestBinding],
+	criteria:
+		"## The standard\n\nEvaluate whether the pull request description provides sufficient context, motivation, and testing steps.\n\n### Required elements\n- Summary of changes\n- Motivation / why\n- Testing steps\n- Link to issue",
+	whyItMatters:
+		"A clear description lets reviewers understand intent without reverse-engineering the diff, speeding up review and reducing back-and-forth.",
+	whatGoodLooksLike:
+		"A PR opens with a one-paragraph summary, links the issue, and lists the exact steps a reviewer ran to verify it.",
+	artifactKind: "scm.pull_request",
+	automatedReviewPolicy: mockPullRequestPolicy,
+	automatedReviewValidation: mockAuthorDeclaredEvidenceValidation,
+	displayOrder: 0,
+	autonomy: inheritedAutonomy(),
+	createdAt: new Date("2025-06-01"),
+	updatedAt: new Date("2025-06-15"),
+};
+
 export const mockPractices: Practice[] = [
-	{
-		id: 1,
-		slug: "pr-description-quality",
-		name: "PR Description Quality",
-		bindings: [mockPullRequestBinding],
-		criteria:
-			"## The standard\n\nEvaluate whether the pull request description provides sufficient context, motivation, and testing steps.\n\n### Required elements\n- Summary of changes\n- Motivation / why\n- Testing steps\n- Link to issue",
-		whyItMatters:
-			"A clear description lets reviewers understand intent without reverse-engineering the diff, speeding up review and reducing back-and-forth.",
-		whatGoodLooksLike:
-			"A PR opens with a one-paragraph summary, links the issue, and lists the exact steps a reviewer ran to verify it.",
-		artifactKind: "scm.pull_request",
-		automatedReviewPolicy: mockPullRequestPolicy,
-		automatedReviewValidation: mockAuthorDeclaredEvidenceValidation,
-		displayOrder: 0,
-		autonomy: inheritedAutonomy(),
-		createdAt: new Date("2025-06-01"),
-		updatedAt: new Date("2025-06-15"),
-	},
+	mockPractice,
 	{
 		id: 2,
 		slug: "code-review-thoroughness",
@@ -180,8 +182,8 @@ export const mockPracticeWithAllTriggers: Practice = {
 	criteria:
 		"## Commit Discipline\n\nEach commit message must:\n- Start with a type prefix (feat, fix, refactor, etc.)\n- Have a descriptive subject (not just issue numbers)\n- Reference the related issue\n\n### Anti-patterns to Flag\n- `fixes #123` with no description\n- Branch-slug-format titles like `feature/ABC-123`\n- Single-word messages like `update` or `fix`",
 	precomputeScript: [
-		'import { readDiff } from "../lib/diff";',
-		'import { parseDiffFiles } from "../lib/parse";',
+		'import { readDiff } from "@/components/admin/lib/diff";',
+		'import { parseDiffFiles } from "@/components/admin/lib/parse";',
 		"",
 		"const diff = await readDiff();",
 		"const files = parseDiffFiles(diff);",

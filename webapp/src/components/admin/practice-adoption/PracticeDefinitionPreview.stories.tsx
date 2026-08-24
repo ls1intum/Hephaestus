@@ -90,7 +90,7 @@ export const CriteriaIsMarkdown: Story = {
 			].join("\n"),
 		},
 	},
-	play: async ({ canvas, userEvent }) => {
+	play: async ({ canvas }) => {
 		await userEvent.click(canvas.getByRole("button", { name: "How it decides" }));
 		const standard = await canvas.findByRole("heading", { name: "The standard", level: 4 });
 		await expect(standard).toBeVisible();
@@ -108,7 +108,7 @@ export const CriteriaIsMarkdown: Story = {
  */
 export const RationaleLeadsTheRuleFollows: Story = {
 	play: async ({ canvas }) => {
-		const rationale = canvas.getByText(realPracticeDefinition.whyItMatters as string);
+		const rationale = canvas.getByText(realPracticeDefinition.whyItMatters);
 		await expect(rationale).toBeVisible();
 		// Collapsed, so none of the rule is in the accessible tree until it is asked for.
 		await expect(
@@ -125,7 +125,7 @@ export const RationaleLeadsTheRuleFollows: Story = {
 export const RationaleOnly: Story = {
 	args: { definition: { ...realPracticeDefinition, whatGoodLooksLike: undefined } },
 	play: async ({ canvas }) => {
-		await expect(canvas.getByText(realPracticeDefinition.whyItMatters as string)).toBeVisible();
+		await expect(canvas.getByText(realPracticeDefinition.whyItMatters)).toBeVisible();
 		await expect(
 			canvas.queryByRole("heading", { name: "What good looks like" }),
 		).not.toBeInTheDocument();
@@ -136,7 +136,7 @@ export const RationaleOnly: Story = {
 /** An artifact kind the options do not describe: the evidence summary must still render. */
 export const UnknownWorkType: Story = {
 	args: { options: { ...mockPracticeDefinitionOptions, workTypes: [] } },
-	play: async ({ canvas, userEvent }) => {
+	play: async ({ canvas }) => {
 		await userEvent.click(canvas.getByRole("button", { name: "What it reads" }));
 		await expect(await canvas.findByRole("button", { name: "How it decides" })).toBeVisible();
 	},

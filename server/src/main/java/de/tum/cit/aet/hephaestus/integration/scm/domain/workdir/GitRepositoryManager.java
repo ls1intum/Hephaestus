@@ -161,7 +161,12 @@ public class GitRepositoryManager {
                             forced.getMessage(),
                             forced
                         );
-                        throw new GitOperationException("Failed to delete local git clone: " + repositoryId, forced);
+                        GitOperationException failure = new GitOperationException(
+                            "Failed to delete local git clone: " + repositoryId,
+                            forced
+                        );
+                        failure.addSuppressed(e);
+                        throw failure;
                     }
                 }
             }
@@ -1045,19 +1050,14 @@ public class GitRepositoryManager {
      * Walks the tree depth-first (files before directories).
      */
     private void deleteRecursively(Path path) throws IOException {
+        List<Path> deepestFirst;
         try (var stream = Files.walk(path)) {
-            // Sort in reverse order so files are deleted before their parent directories
-            stream
-                .sorted(Comparator.reverseOrder())
-                .forEach(p -> {
-                    try {
-                        Files.delete(p);
-                    } catch (IOException e) {
-                        throw new java.io.UncheckedIOException(e);
-                    }
-                });
-        } catch (java.io.UncheckedIOException e) {
-            throw e.getCause();
+            // Collected rather than deleted inside the stream so Files.delete can throw IOException
+            // straight out, instead of being wrapped and unwrapped through UncheckedIOException.
+            deepestFirst = stream.sorted(Comparator.reverseOrder()).toList();
+        }
+        for (Path p : deepestFirst) {
+            Files.delete(p);
         }
     }
 

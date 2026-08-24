@@ -11,6 +11,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import org.jspecify.annotations.Nullable;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -62,7 +63,15 @@ public class AccountExportService {
     );
 
     private static ResponseStatusException inFlightConflict() {
-        return new ResponseStatusException(HttpStatus.CONFLICT, "An export is already in progress for this account.");
+        return inFlightConflict(null);
+    }
+
+    private static ResponseStatusException inFlightConflict(@Nullable Throwable cause) {
+        return new ResponseStatusException(
+            HttpStatus.CONFLICT,
+            "An export is already in progress for this account.",
+            cause
+        );
     }
 
     /**
@@ -84,7 +93,7 @@ public class AccountExportService {
             export = accountExportRepository.saveAndFlush(new AccountExport(accountId));
         } catch (DataIntegrityViolationException e) {
             // Lost the race: a concurrent POST inserted the in-flight row first and won the unique index.
-            throw inFlightConflict();
+            throw inFlightConflict(e);
         }
         authEventLogger
             .event(AuthEvent.EventType.EXPORT_REQUESTED, AuthEvent.Result.SUCCESS)

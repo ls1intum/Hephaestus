@@ -13,14 +13,13 @@ does not apply to any given component. Enumerate what the component can actually
 A fifth variant story that reaches no new branch adds a Chromatic snapshot and a maintenance edge and
 nothing else. One story and no play, for a component with branches, is the actual defect.
 
-**Reflow viewport, house form:** `parameters: { viewport: { defaultViewport: "reflow" } }`, matching 71
-of the 72 stories that set one. The `globals: { viewport: { value: "reflow" } }` form works too and
-measures identically — the choice is consistency, not correctness. Pair it with
-`chromatic: { viewports: [320] }` when the snapshot is the point.
+**Reflow viewport, house form:** `parameters: { viewport: { defaultViewport: "reflow" } }`, which is
+the only form the tree uses for it — set it on the meta to cover a whole file, or on the one story
+that needs it. Pair it with `chromatic: { viewports: [320] }` when the snapshot is the point.
 
-**Not a gap:** `components/ui/**` primitives with no story. They are vendored shadcn and
-`webapp/AGENTS.md` forbids editing them; a story per primitive documents upstream's API as if it were
-ours. Do not open that as work.
+**Not a gap:** `webapp/src/components/ui/**` primitives with no story. They are a registry install
+that re-vendoring overwrites, so a story per primitive documents upstream's API as if it were ours. Do
+not open that as work.
 
 ## The Controls must drive the real component
 
@@ -31,16 +30,17 @@ ours. Do not open that as work.
 - **`autodocs` publishes the `component`'s props.** If the stories render a test harness rather than
   the component, either point `component` at the real component or drop `autodocs` — do not publish the
   harness's props as if they were the API. A file that opts out says why in its meta
-  (`SortableCatalogTree.stories.tsx`).
+  (`webapp/src/components/admin/practice-catalog/SortableCatalogTree.stories.tsx`).
 - **A controlled component closes its own loop** through `Stateful` / `StatefulPatch`
-  (`src/stories/stateful.tsx`), so the control moves the component *and* the `fn()` spy in `meta.args`
+  (`webapp/src/stories/stateful.tsx`), so the control moves the component *and* the `fn()` spy in `meta.args`
   still fires.
 
 **The swallowed spy.** A hand-rolled stateful wrapper that *overrides* a callback from `args` makes the
 `fn()` in `meta.args` unreachable: it can never be asserted and the Actions panel is permanently empty,
 while the file looks well instrumented. To find it: for each `fn()` in `meta.args`, grep the file for a
-JSX attribute of the same name that is **not** `{...args}`. Live instance:
-`admin/practice-catalog/OccasionLifecycle.stories.tsx:18-33`.
+JSX attribute of the same name that is **not** `{...args}`.
+`webapp/src/components/admin/practice-catalog/OccasionLifecycle.stories.tsx` shows the shape that stays
+instrumented: it spreads `{...args}` and patches only the props it holds state for.
 
 ## `argTypes` where a prop is explorable, and nowhere else
 
@@ -49,9 +49,9 @@ an object arg that should be `control: false` — or to make a genuinely explora
 not add them to restate what inference already produced.
 
 A component whose one prop is a domain object (`StatusDef`, a `ReactNode`) gains nothing from
-`argTypes`; there is no useful control for a `Pick<Wire, …>`. Roughly a fifth of story files use
-`argTypes` today and that is about the right share — this is not a coverage number to raise.
+`argTypes`; there is no useful control for a `Pick<Wire, …>`. A minority of story files use them, which
+is the right shape — this is not a coverage number to raise.
 
-Controls exist because the story is args-driven: *"To use Controls, you need to write your stories using
-args"*, and they are inferred from the `component` annotation. The `argTypes` are the correction layer,
-not the source.
+Controls exist because the story is args-driven — *"To use Controls, you need to write your stories
+using args"* (storybook.js.org/docs/essentials/controls) — and their types are inferred from the
+`component` annotation. `argTypes` are the correction layer, not the source.

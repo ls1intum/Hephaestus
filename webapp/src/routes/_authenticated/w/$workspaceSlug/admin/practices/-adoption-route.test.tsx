@@ -38,6 +38,42 @@ const preview: CatalogPracticePreview = {
 	},
 };
 
+/**
+ * The preview as it stands, then as it stands after someone else changed it — the shape a 412 is
+ * about. A handler is where setup is allowed to branch; a test body is not.
+ */
+function planChangedAfterTheFirstRead() {
+	let reads = 0;
+	return http.get("*/workspaces/:workspaceSlug/practice-catalog/adoption/:slug", () => {
+		reads += 1;
+		const changed = reads > 1;
+		return HttpResponse.json({
+			...preview,
+			definition: {
+				...preview.definition,
+				criteria: changed
+					? "Updated review rule that must be reviewed."
+					: preview.definition.criteria,
+			},
+			etag: changed ? '"updated-plan"' : preview.etag,
+		});
+	});
+}
+
+/** The preview once, and then nothing: the refresh a 412 asks for is itself allowed to fail. */
+function planUnreadableAfterTheFirstRead() {
+	let reads = 0;
+	return http.get("*/workspaces/:workspaceSlug/practice-catalog/adoption/:slug", () => {
+		reads += 1;
+		return reads === 1
+			? HttpResponse.json(preview)
+			: HttpResponse.json(
+					{ title: "Service Unavailable", status: 503, detail: "Try again later." },
+					{ status: 503 },
+				);
+	});
+}
+
 /** A one-level stack survives the readable URL form as well as the encoded array form. */
 const LIBRARY = "/w/acme/admin/practices?library=true";
 const REVIEWING = `${LIBRARY}&detail=catalog-practice:${preview.slug}`;
@@ -150,7 +186,7 @@ describe("catalog adoption over practice setup", () => {
 		await screen.findByRole("button", { name: "Add practice" }, ROUTE_RENDER_WAIT);
 		// The catalog is still the page; only the drawer stack changed.
 		expect(router.state.location.pathname).toBe("/w/acme/admin/practices");
-		expect(router.state.location.search.detail).toEqual([`catalog-practice:${preview.slug}`]);
+		expect(router.state.location.search.detail).toStrictEqual([`catalog-practice:${preview.slug}`]);
 	});
 
 	it("opens a workspace practice read-only over the tree instead of in the edit form", async () => {
@@ -180,7 +216,7 @@ describe("catalog adoption over practice setup", () => {
 			)}`,
 		);
 		expect(router.state.location.pathname).toBe("/w/acme/admin/practices");
-		expect(router.state.location.search.detail).toEqual(["practice:already-mine"]);
+		expect(router.state.location.search.detail).toStrictEqual(["practice:already-mine"]);
 	});
 
 	it("pins adoption to the reviewed ETag and returns to the catalog", async () => {
@@ -216,25 +252,11 @@ describe("catalog adoption over practice setup", () => {
 
 	it("requires review again after a 412", async () => {
 		const seenIfMatch = vi.fn();
-		let previewReads = 0;
 		server.use(
 			http.get("*/workspaces/:workspaceSlug/practice-catalog/adoption", () =>
 				HttpResponse.json([]),
 			),
-			http.get("*/workspaces/:workspaceSlug/practice-catalog/adoption/:slug", () => {
-				previewReads += 1;
-				return HttpResponse.json({
-					...preview,
-					definition: {
-						...preview.definition,
-						criteria:
-							previewReads > 1
-								? "Updated review rule that must be reviewed."
-								: preview.definition.criteria,
-					},
-					etag: previewReads > 1 ? '"updated-plan"' : preview.etag,
-				});
-			}),
+			planChangedAfterTheFirstRead(),
 			http.post("*/workspaces/:workspaceSlug/practice-catalog/adoption/:slug", ({ request }) => {
 				seenIfMatch(request.headers.get("If-Match"));
 				return HttpResponse.json(
@@ -258,20 +280,11 @@ describe("catalog adoption over practice setup", () => {
 	});
 
 	it("does not claim the latest preview is shown when refreshing after a 412 fails", async () => {
-		let previewReads = 0;
 		server.use(
 			http.get("*/workspaces/:workspaceSlug/practice-catalog/adoption", () =>
 				HttpResponse.json([]),
 			),
-			http.get("*/workspaces/:workspaceSlug/practice-catalog/adoption/:slug", () => {
-				previewReads += 1;
-				return previewReads === 1
-					? HttpResponse.json(preview)
-					: HttpResponse.json(
-							{ title: "Service Unavailable", status: 503, detail: "Try again later." },
-							{ status: 503 },
-						);
-			}),
+			planUnreadableAfterTheFirstRead(),
 			http.post("*/workspaces/:workspaceSlug/practice-catalog/adoption/:slug", () =>
 				HttpResponse.json(
 					{ title: "Precondition Failed", status: 412, detail: "The adoption preview changed." },
@@ -325,14 +338,16 @@ describe("catalog adoption over practice setup", () => {
 			() => expect(router.state.location.pathname).toBe("/w/acme/admin/practices"),
 			ROUTE_RENDER_WAIT,
 		);
-		expect(router.state.location.search.detail).toEqual(["practice-new:draft"]);
+		expect(router.state.location.search.detail).toStrictEqual(["practice-new:draft"]);
 
 		const edited = renderRouteAtWithRouter("/w/acme/admin/practices/already-mine");
 		await waitFor(
 			() => expect(edited.router.state.location.pathname).toBe("/w/acme/admin/practices"),
 			ROUTE_RENDER_WAIT,
 		);
-		expect(edited.router.state.location.search.detail).toEqual(["practice-edit:already-mine"]);
+		expect(edited.router.state.location.search.detail).toStrictEqual([
+			"practice-edit:already-mine",
+		]);
 	});
 
 	it("creates a practice from the editor level and lands back on the tree", async () => {
@@ -354,10 +369,9 @@ describe("catalog adoption over practice setup", () => {
 		fireEvent.click(screen.getByRole("button", { name: "Create practice" }));
 
 		await waitFor(() => expect(created).toHaveBeenCalled(), ROUTE_RENDER_WAIT);
-		expect(created.mock.calls[0][0]).toMatchObject({
-			name: "Explain the change",
-			slug: "explain-the-change",
-		});
+		expect(created).toHaveBeenCalledWith(
+			expect.objectContaining({ name: "Explain the change", slug: "explain-the-change" }),
+		);
 		// The level goes; the tree it was opened over is what the reader lands on.
 		await waitFor(
 			() => expect(router.state.location.search.detail).toBeUndefined(),
@@ -381,7 +395,7 @@ describe("catalog adoption over practice setup", () => {
 		await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
 
 		// The level is still open and still holds the draft: refusing has to be free.
-		expect(router.state.location.search.detail).toEqual(["practice-new:draft"]);
+		expect(router.state.location.search.detail).toStrictEqual(["practice-new:draft"]);
 		screen.getByDisplayValue("A draft worth keeping");
 	});
 

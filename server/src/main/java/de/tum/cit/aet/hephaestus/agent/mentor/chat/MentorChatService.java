@@ -33,7 +33,6 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.mentor.ChatThread;
 import de.tum.cit.aet.hephaestus.mentor.ChatThreadRepository;
-import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import io.micrometer.core.instrument.Timer;
 import java.time.Duration;
 import java.util.List;
@@ -187,6 +186,8 @@ public class MentorChatService implements MentorTurnRunner {
                 channel.completeWithConflict();
             }
         } catch (Throwable t) {
+            // Anything short of an Error is logged and swallowed: one turn's failure must not take the
+            // dispatch loop down with it.
             log.error(
                 "Mentor dispatchTurn escaped: workspaceId={}, threadId={}: {}",
                 key.workspaceId(),
@@ -201,7 +202,7 @@ public class MentorChatService implements MentorTurnRunner {
                 // Best-effort: the channel may already be closed.
             }
             // Re-throw Error subclasses (OOME, StackOverflowError) — JVM stability over metrics tidy-up.
-            if (t instanceof Error err) throw err;
+            if (t instanceof Error) throw (Error) t;
         }
     }
 

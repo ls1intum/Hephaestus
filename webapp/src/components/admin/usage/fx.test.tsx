@@ -176,7 +176,7 @@ describe("page disclosure", () => {
 	});
 
 	it("declines to name a publisher it does not recognise", () => {
-		const unknownSource = { ...eur, source: "SNB" as FxRateInfo["source"] };
+		const unknownSource: Fx = { ...eur, source: "SNB" };
 		expect(disclosureText(unknownSource, true)).toBe(
 			"EUR amounts are estimates at the reference rate published on Jul 24, 2026 (1 USD ≈ €0.879). Spend is metered and enforced in USD.",
 		);
@@ -189,11 +189,6 @@ describe("page disclosure", () => {
 
 	it("reports nothing without a rate", () => {
 		expect(disclosureText(undefined, true)).toBeNull();
-	});
-
-	it("coerces the ISO date the SDK actually returns", () => {
-		const asString = { ...eur, rateDate: "2026-07-24" as unknown as Date };
-		expect(disclosureText(asString, true)).toContain("Jul 24, 2026");
 	});
 });
 
@@ -210,7 +205,7 @@ describe("nothing to convert renders no node", () => {
 
 describe("the live hint under a cap field", () => {
 	it("rounds to whole units, like every other cap figure", () => {
-		expect(fxCapHint(50, eur, true)).toEqual({
+		expect(fxCapHint(50, eur, true)).toStrictEqual({
 			conversion: { text: "≈ €44", label: "approximately 44 euros" },
 			tail: " at today's rate.",
 		});

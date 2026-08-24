@@ -56,6 +56,7 @@ function buildCandidates(page: LegalPageId, profile: string): Candidate[] {
 async function tryFetch(url: string, signal?: AbortSignal): Promise<string | null> {
 	let response: Response;
 	try {
+		// oxlint-disable-next-line no-restricted-globals -- Static markdown the deployment drops into the SPA's own origin, not application-server data: no operation for it exists in `openapi.yaml`, or could.
 		response = await fetch(url, { signal, cache: "no-cache" });
 	} catch (err) {
 		// Preserve abort semantics so the caller can distinguish teardown from

@@ -15,10 +15,10 @@ const LAYOUT_SLACK_PX = 1;
  */
 async function expectRungsConnected(rungs: HTMLElement[]) {
 	await expect(rungs.length).toBeGreaterThan(1);
-	const boxes = rungs.map((rung) => rung.getBoundingClientRect());
-	for (let index = 1; index < boxes.length; index++) {
-		const previous = boxes[index - 1];
-		const current = boxes[index];
+	const [firstBox, ...laterBoxes] = rungs.map((rung) => rung.getBoundingClientRect());
+	if (!firstBox) throw new Error("The ladder rendered no rungs.");
+	let previous = firstBox;
+	for (const [offset, current] of laterBoxes.entries()) {
 		const stacked =
 			Math.abs(current.top - previous.bottom) <= LAYOUT_SLACK_PX &&
 			Math.abs(current.left - previous.left) <= LAYOUT_SLACK_PX;
@@ -27,8 +27,9 @@ async function expectRungsConnected(rungs: HTMLElement[]) {
 			Math.abs(current.top - previous.top) <= LAYOUT_SLACK_PX;
 		await expect(
 			stacked || sideBySide,
-			`Rung ${index + 1} does not share an edge with the one before it, so the ladder reads as separate fragments.`,
+			`Rung ${offset + 2} does not share an edge with the one before it, so the ladder reads as separate fragments.`,
 		).toBe(true);
+		previous = current;
 	}
 }
 

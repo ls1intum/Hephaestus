@@ -33,10 +33,10 @@ export function parseDiff(diffContent: string): Map<string, DiffFile> {
 				line.match(/^@@\s+-(\d+)(?:,(\d+))?\s+\+(\d+)(?:,(\d+))?\s+@@/) ?? [];
 			if (oldStart !== undefined && newStart !== undefined) {
 				currentHunk = {
-					oldStart: parseInt(oldStart, 10),
-					oldCount: parseInt(oldCount, 10),
-					newStart: parseInt(newStart, 10),
-					newCount: parseInt(newCount, 10),
+					oldStart: Number.parseInt(oldStart, 10),
+					oldCount: Number.parseInt(oldCount, 10),
+					newStart: Number.parseInt(newStart, 10),
+					newCount: Number.parseInt(newCount, 10),
 					lines: [],
 				};
 				hunks.push(currentHunk);

@@ -1,12 +1,9 @@
 import {
 	addDays,
 	addWeeks,
-	differenceInCalendarDays,
 	endOfMonth,
-	format,
 	formatISO,
 	getISODay,
-	isSameYear,
 	parseISO,
 	setHours,
 	setMilliseconds,
@@ -39,18 +36,11 @@ export const DEFAULT_SCHEDULE: LeaderboardSchedule = {
 	minute: 0,
 };
 
-const WEEKDAY_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-
 /**
  * Set a date to a specific ISO weekday and time.
  * Day is 1-7 where 1 = Monday (ISO standard).
  */
-export function setToScheduledTime(
-	date: Date,
-	dayOfWeek: number,
-	hour: number,
-	minute: number,
-): Date {
+function setToScheduledTime(date: Date, dayOfWeek: number, hour: number, minute: number): Date {
 	const currentISODay = getISODay(date);
 	const diff = dayOfWeek - currentISODay;
 	const adjustedDate = addDays(date, diff);
@@ -83,7 +73,7 @@ export function getLeaderboardWeekStart(
 /**
  * Calculate the start of last leaderboard week.
  */
-export function getLastLeaderboardWeekStart(
+function getLastLeaderboardWeekStart(
 	now: Date,
 	schedule: LeaderboardSchedule = DEFAULT_SCHEDULE,
 ): Date {
@@ -103,11 +93,13 @@ export function getLeaderboardWeekEnd(weekStart: Date): Date {
  * Returns { after, before } where before is undefined for open-ended ranges.
  */
 export function getDateRangeForPreset(
+	instant: Date,
 	preset: TimeframePreset,
 	schedule: LeaderboardSchedule = DEFAULT_SCHEDULE,
 	customRange?: { from: Date; to?: Date },
 ): { after: Date; before: Date | undefined } {
-	const now = new Date();
+	// Copied before truncating: the caller's instant is shared with everything else it renders.
+	const now = new Date(instant);
 	now.setSeconds(0, 0);
 
 	switch (preset) {
@@ -185,13 +177,6 @@ export function formatDateRangeForApi(range: { after: Date; before: Date | undef
 }
 
 /**
- * Get weekday name from ISO day number (1-7).
- */
-function getWeekdayName(isoDay: number): string {
-	return WEEKDAY_NAMES[isoDay - 1] ?? "Unknown";
-}
-
-/**
  * Simple label for dropdown items - clean and scannable.
  * Used inside SelectItem components.
  */
@@ -213,140 +198,10 @@ export function formatDropdownLabel(preset: TimeframePreset): string {
 }
 
 /**
- * Detailed label for the selected trigger value.
- * Shows date context to help user understand the current selection.
- * Uses natural language: "This week, since Tue Dec 3"
- */
-export function formatSelectedLabel(
-	preset: TimeframePreset,
-	schedule: LeaderboardSchedule = DEFAULT_SCHEDULE,
-): string {
-	const now = new Date();
-
-	switch (preset) {
-		case "all-activity":
-			return "All time";
-
-		case "this-week": {
-			const weekStart = getLeaderboardWeekStart(now, schedule);
-			// "This week, since Tue Dec 3"
-			return `This week, since ${format(weekStart, "EEE MMM d")}`;
-		}
-
-		case "last-week": {
-			const lastWeekStart = getLastLeaderboardWeekStart(now, schedule);
-			const lastWeekEnd = addDays(getLeaderboardWeekStart(now, schedule), -1);
-			// "Last week, Nov 25 – Dec 1" or "Nov 25 – 30" if same month
-			const sameMonth =
-				lastWeekStart.getMonth() === lastWeekEnd.getMonth() &&
-				lastWeekStart.getFullYear() === lastWeekEnd.getFullYear();
-			if (sameMonth) {
-				return `Last week, ${format(lastWeekStart, "MMM d")} – ${format(lastWeekEnd, "d")}`;
-			}
-			return `Last week, ${format(lastWeekStart, "MMM d")} – ${format(lastWeekEnd, "MMM d")}`;
-		}
-
-		case "this-month": {
-			// "This month, since Dec 1"
-			return `This month, since ${format(startOfMonth(now), "MMM d")}`;
-		}
-
-		case "last-month": {
-			// "Last month (November)"
-			return `Last month (${format(subMonths(now, 1), "MMMM")})`;
-		}
-
-		case "custom":
-			return "Custom range";
-	}
-}
-
-/**
- * Format a human-readable label for a preset.
- * Includes weekday and duration context. Used for detailed displays.
- * @deprecated Use formatSelectedLabel for the trigger, formatDropdownLabel for dropdown items
- */
-export function formatPresetLabel(
-	preset: TimeframePreset,
-	schedule: LeaderboardSchedule = DEFAULT_SCHEDULE,
-): string {
-	const now = new Date();
-	const weekdayName = getWeekdayName(schedule.day);
-
-	switch (preset) {
-		case "all-activity":
-			return "All time";
-
-		case "this-week": {
-			const weekStart = getLeaderboardWeekStart(now, schedule);
-			const daysSinceStart = differenceInCalendarDays(now, weekStart);
-			const startLabel = format(weekStart, "LLL d");
-			return `This week · ${weekdayName} ${startLabel} (${daysSinceStart} days)`;
-		}
-
-		case "last-week": {
-			const lastWeekStart = getLastLeaderboardWeekStart(now, schedule);
-			const lastWeekEnd = getLeaderboardWeekEnd(lastWeekStart);
-			const startLabel = format(lastWeekStart, "LLL d");
-			const endLabel = format(addDays(lastWeekEnd, -1), "LLL d");
-			return `Last week · ${weekdayName} ${startLabel} – ${endLabel}`;
-		}
-
-		case "this-month": {
-			const monthStart = startOfMonth(now);
-			const daysSinceStart = differenceInCalendarDays(now, monthStart);
-			const monthName = format(now, "LLLL");
-			return `This month · ${monthName} (${daysSinceStart + 1} days)`;
-		}
-
-		case "last-month": {
-			const lastMonth = subMonths(now, 1);
-			const monthName = format(lastMonth, "LLLL");
-			const daysInMonth = differenceInCalendarDays(startOfMonth(now), startOfMonth(lastMonth));
-			return `Last month · ${monthName} (${daysInMonth} days)`;
-		}
-
-		case "custom":
-			return "Custom range";
-	}
-}
-
-/**
- * Format a short label for the preset (for compact displays like selects).
- * @deprecated Use formatDropdownLabel for dropdown items, formatSelectedLabel for trigger
- */
-export function formatPresetShortLabel(
-	preset: TimeframePreset,
-	schedule: LeaderboardSchedule = DEFAULT_SCHEDULE,
-): string {
-	// Delegate to the new function for backwards compatibility
-	return formatSelectedLabel(preset, schedule);
-}
-
-/**
- * Format a custom date range for display.
- */
-export function formatCustomRangeLabel(from?: Date, to?: Date): string {
-	if (!from) return "Pick a date range";
-
-	const now = new Date();
-	const fromLabel = format(from, "LLL d");
-
-	if (!to) {
-		const daysSinceStart = differenceInCalendarDays(now, from);
-		return `Since ${fromLabel} (${daysSinceStart} days)`;
-	}
-
-	const toLabel = isSameYear(from, to) ? format(to, "LLL d") : format(to, "LLL d, y");
-
-	const daySpan = differenceInCalendarDays(to, from) + 1;
-	return `${fromLabel} – ${toLabel} (${daySpan} days)`;
-}
-
-/**
  * Try to detect which preset matches a given date range.
  */
 export function detectPresetFromDates(
+	now: Date,
 	afterStr?: string,
 	beforeStr?: string,
 	schedule: LeaderboardSchedule = DEFAULT_SCHEDULE,
@@ -358,7 +213,6 @@ export function detectPresetFromDates(
 
 	const after = parseISO(afterStr);
 	const before = beforeStr ? parseISO(beforeStr) : undefined;
-	const now = new Date();
 
 	// Check for all-activity (epoch start)
 	if (enableAllActivity && after.getTime() <= new Date(0).getTime() + 86400000) {
@@ -408,48 +262,4 @@ export function detectPresetFromDates(
 	}
 
 	return "custom";
-}
-
-/**
- * Format the selected value label for a compact display (like in a row).
- */
-export function formatTimeframeButtonLabel(
-	preset: TimeframePreset,
-	schedule: LeaderboardSchedule = DEFAULT_SCHEDULE,
-	customRange?: { from?: Date; to?: Date },
-): string {
-	if (preset === "custom") {
-		return formatCustomRangeLabel(customRange?.from, customRange?.to);
-	}
-
-	const now = new Date();
-
-	switch (preset) {
-		case "all-activity":
-			return "All activity";
-
-		case "this-week": {
-			const weekStart = getLeaderboardWeekStart(now, schedule);
-			const daysSinceStart = differenceInCalendarDays(now, weekStart);
-			const startLabel = format(weekStart, "EEE, LLL d");
-			return `Since ${startLabel} (${daysSinceStart}d)`;
-		}
-
-		case "last-week": {
-			const lastWeekStart = getLastLeaderboardWeekStart(now, schedule);
-			const lastWeekEnd = addDays(getLeaderboardWeekEnd(lastWeekStart), -1);
-			return `${format(lastWeekStart, "LLL d")} – ${format(lastWeekEnd, "LLL d")}`;
-		}
-
-		case "this-month": {
-			const monthStart = startOfMonth(now);
-			const daysSinceStart = differenceInCalendarDays(now, monthStart);
-			return `Since ${format(monthStart, "LLL 1")} (${daysSinceStart + 1}d)`;
-		}
-
-		case "last-month": {
-			const lastMonth = subMonths(now, 1);
-			return format(lastMonth, "LLLL yyyy");
-		}
-	}
 }

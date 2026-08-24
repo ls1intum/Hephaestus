@@ -28,7 +28,6 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubExceptionCl
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubGraphQlClientProvider;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubSyncProperties;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GraphQlConnectionOverflowDetector;
-import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHProjectV2;
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHProjectV2Connection;
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHProjectV2FieldConfiguration;
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHProjectV2FieldConfigurationConnection;
@@ -36,9 +35,6 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHProjectV
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHProjectV2ItemConnection;
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHProjectV2StatusUpdate;
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHProjectV2StatusUpdateConnection;
-import de.tum.cit.aet.hephaestus.integration.scm.github.project.Project;
-import de.tum.cit.aet.hephaestus.integration.scm.github.project.ProjectItem;
-import de.tum.cit.aet.hephaestus.integration.scm.github.project.ProjectRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.github.project.dto.GitHubProjectDTO;
 import de.tum.cit.aet.hephaestus.integration.scm.github.project.dto.GitHubProjectFieldDTO;
 import de.tum.cit.aet.hephaestus.integration.scm.github.project.dto.GitHubProjectFieldValueDTO;

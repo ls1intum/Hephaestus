@@ -44,6 +44,14 @@ jobs:
             webapp:
               - 'webapp/**'
               - 'docs/images/readme/**'
+              # webapp/.oxlintrc.json carries no `options` block and webapp/biome.jsonc declares
+              # `root: false`, so `typeAware`, `reportUnusedDisableDirectives` and the Biome graph
+              # root all come from these two files — they decide the webapp's verdict from outside
+              # webapp/.
+              - '.oxlintrc.json'
+              - 'biome.jsonc'
+              # check:components, check:stories and check:story-sort live here, run on the Webapp leg.
+              - 'scripts/**'
               - 'package.json'
               - 'pnpm-lock.yaml'
               - 'pnpm-workspace.yaml'
@@ -51,24 +59,32 @@ jobs:
               - '.node-version'
             application-server:
               - 'server/**'
-              # The contract validator and the immutability guard live here; a PR that edits only a
-              # guard would otherwise skip the workflow that runs it.
+              # check:env, check:contracts, check:diagrams and db-utils.sh all live here and run on
+              # the App Server or Database leg.
               - 'scripts/**'
               # test:agents and typecheck:agents cover the precompute tree and are configured here;
               # the Bun they run on is read from the agent image.
               - 'docker/agents/**'
               - 'tsconfig.agents.json'
-              # The lint/format gate for every non-webapp TypeScript tree. Its rules live in
-              # biome.jsonc, the `:agents` scripts that invoke it live in the root package.json,
-              # and the Biome binary it runs is resolved from the lockfile — a change to any of
-              # the three changes the gate's verdict, so each has to be able to trigger it.
+              # The lint/format gate for every non-webapp TypeScript tree is assembled from all five:
+              # oxlint's rules, Biome's rules, the `:agents` scripts that invoke them, the pinned
+              # binaries, and the root tsconfig — which exists only to give the Bun trees, configured
+              # by tsconfig.agents.json, the project that oxlint's type-aware rules require.
+              - '.oxlintrc.json'
               - 'biome.jsonc'
+              - 'tsconfig.json'
               - 'package.json'
               - 'pnpm-lock.yaml'
+              # Linted by the same leg (docs/.oxlintrc.json decides that verdict), markdown-linted by
+              # docs:lint, and parsed by check:diagrams. The `docs` filter below feeds no job, so this
+              # entry is the only thing that puts a docs-only PR into `any-code`.
+              - 'docs/**'
+              - '.changeset/*.cjs'
+              - 'commitlint.config.ts'
+              - '.github/scripts/**'
               # check:biome-pin compares this file's $schema against the pinned version.
-              - 'webapp/biome.json'
-              # check:env compares application.yml against the deployment that has to deliver it, so
-              # a change to either side has to be able to trigger the job that runs it.
+              - 'webapp/biome.jsonc'
+              # check:env compares application.yml against the deployment that has to deliver it.
               - 'docker/compose.app.yaml'
               - 'docker/compose.core.yaml'
             agent-images:
@@ -267,11 +283,9 @@ jobs:
       - name: Generate CI Summary
         if: always()
         run: |
-          # Header
           echo "## 🔍 CI Pipeline Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
 
-          # Overall status
           if [[ "${{ steps.evaluate.outputs.status }}" == "success" ]]; then
             echo "✅ **All checks passed!**" >> $GITHUB_STEP_SUMMARY
           elif [[ "${{ steps.evaluate.outputs.status }}" == "failure" ]]; then
@@ -281,13 +295,11 @@ jobs:
           fi
           echo "" >> $GITHUB_STEP_SUMMARY
 
-          # Workflow results table
           echo "### Workflow Results" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Workflow | Status |" >> $GITHUB_STEP_SUMMARY
           echo "|----------|--------|" >> $GITHUB_STEP_SUMMARY
 
-          # Map result to emoji
           result_to_emoji() {
             case "$1" in
               success) echo "✅ Passed" ;;
@@ -304,7 +316,6 @@ jobs:
           echo "| Docker | $(result_to_emoji '${{ needs.Docker.result }}') |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
 
-          # Path filtering info
           echo "### 📁 Components Changed" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Component | Changed |" >> $GITHUB_STEP_SUMMARY
@@ -315,12 +326,10 @@ jobs:
           echo "| CI Config | ${{ needs.detect-changes.outputs.ci-config == 'true' && '⚙️ Yes' || '➖ No' }} |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
 
-          # Tips section for failures - specific to what failed
           if [[ "${{ steps.evaluate.outputs.status }}" == "failure" ]]; then
             echo "### 💡 Troubleshooting Guide" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
 
-            # Quality failures
             if [[ "${{ needs.Quality.result }}" == "failure" ]]; then
               echo "<details><summary><b>❌ Quality Failed</b></summary>" >> $GITHUB_STEP_SUMMARY
               echo "" >> $GITHUB_STEP_SUMMARY
@@ -328,9 +337,13 @@ jobs:
               echo "|-------|-------------|" >> $GITHUB_STEP_SUMMARY
               echo "| Formatting errors | \`pnpm run format\` |" >> $GITHUB_STEP_SUMMARY
               echo "| TypeScript errors | \`pnpm run typecheck\` |" >> $GITHUB_STEP_SUMMARY
-              echo "| Biome lint errors (webapp) | \`pnpm run lint:webapp:fix\` |" >> $GITHUB_STEP_SUMMARY
-              echo "| Biome lint errors (agent runtime + scripts) | \`pnpm run check:agents:fix\` |" >> $GITHUB_STEP_SUMMARY
+              echo "| Lint errors (webapp) | \`pnpm run check:webapp:fix\` |" >> $GITHUB_STEP_SUMMARY
+              echo "| Lint errors (outside webapp) | \`pnpm run check:agents:fix\` |" >> $GITHUB_STEP_SUMMARY
               echo "| Java formatting | \`pnpm run format:java\` |" >> $GITHUB_STEP_SUMMARY
+              echo "| Java lint (PMD) | \`pnpm run lint:java:report\` |" >> $GITHUB_STEP_SUMMARY
+              echo "| Storybook sidebar order | \`pnpm run check:story-sort\` |" >> $GITHUB_STEP_SUMMARY
+              echo "| Mermaid diagram parse errors | \`pnpm run check:diagrams\` |" >> $GITHUB_STEP_SUMMARY
+              echo "| Stale \`routeTree.gen.ts\` | \`cd webapp && pnpm run build\` |" >> $GITHUB_STEP_SUMMARY
               echo "| OpenAPI out of sync | \`pnpm run generate:api\` |" >> $GITHUB_STEP_SUMMARY
               echo "| Database schema drift | \`pnpm run db:draft-changelog\` |" >> $GITHUB_STEP_SUMMARY
               echo "" >> $GITHUB_STEP_SUMMARY
@@ -338,7 +351,6 @@ jobs:
               echo "" >> $GITHUB_STEP_SUMMARY
             fi
 
-            # Test failures
             if [[ "${{ needs.Test.result }}" == "failure" ]]; then
               echo "<details><summary><b>❌ Tests Failed</b></summary>" >> $GITHUB_STEP_SUMMARY
               echo "" >> $GITHUB_STEP_SUMMARY
@@ -354,7 +366,6 @@ jobs:
               echo "" >> $GITHUB_STEP_SUMMARY
             fi
 
-            # Docker failures
             if [[ "${{ needs.Docker.result }}" == "failure" ]]; then
               echo "<details><summary><b>❌ Docker Failed</b></summary>" >> $GITHUB_STEP_SUMMARY
               echo "" >> $GITHUB_STEP_SUMMARY
@@ -369,7 +380,6 @@ jobs:
               echo "" >> $GITHUB_STEP_SUMMARY
             fi
 
-            # Security failures
             if [[ "${{ needs.Security.result }}" == "failure" ]]; then
               echo "<details><summary><b>❌ Security Failed</b></summary>" >> $GITHUB_STEP_SUMMARY
               echo "" >> $GITHUB_STEP_SUMMARY
@@ -384,7 +394,6 @@ jobs:
             echo "**Quick fix:** Run \`pnpm run format && pnpm run check\` before pushing." >> $GITHUB_STEP_SUMMARY
           fi
 
-          # Performance note for successful runs
           if [[ "${{ steps.evaluate.outputs.status }}" == "success" ]]; then
             echo "### ⚡ Performance" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY

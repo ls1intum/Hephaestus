@@ -76,7 +76,7 @@ function WorkspaceLlmConnectionFormDialogContent({
 	const [errors, setErrors] = useState<FieldErrors<LlmConnectionFormField>>({});
 	const enabledId = useId();
 
-	const handleSubmit = (event: React.FormEvent) => {
+	const handleSubmit = (event: React.SubmitEvent<HTMLFormElement>) => {
 		event.preventDefault();
 		const found = validateConnectionFields(fields, isEdit);
 		setErrors(found);

@@ -26,14 +26,15 @@ public class WorkspaceScopedWebMvcConfiguration implements WebMvcRegistrations {
 
         @Override
         protected void registerHandlerMethod(Object handler, Method method, RequestMappingInfo mapping) {
+            RequestMappingInfo effective = mapping;
             if (mapping != null && isWorkspaceScoped(method.getDeclaringClass())) {
                 RequestMappingInfo workspacePrefix = RequestMappingInfo.paths(WORKSPACE_PREFIX)
                     .options(getBuilderConfiguration())
                     .build();
 
-                mapping = normalizePaths(workspacePrefix.combine(mapping));
+                effective = normalizePaths(workspacePrefix.combine(mapping));
             }
-            super.registerHandlerMethod(handler, method, mapping);
+            super.registerHandlerMethod(handler, method, effective);
         }
 
         private boolean isWorkspaceScoped(Class<?> handlerType) {

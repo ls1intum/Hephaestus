@@ -53,8 +53,8 @@ const serverUrl = () => environment.serverUrl.replace(/\/$/, "");
 
 /** Read a cookie value by name (used for the CSRF double-submit token). */
 function readCookie(name: string): string | undefined {
-	const match = document.cookie.match(new RegExp(`(?:^|; )${name}=([^;]*)`));
-	return match ? decodeURIComponent(match[1]) : undefined;
+	const value = document.cookie.match(new RegExp(`(?:^|; )${name}=([^;]*)`))?.[1];
+	return value === undefined ? undefined : decodeURIComponent(value);
 }
 
 /** The CSRF header/cookie pair Spring Security's CookieCsrfTokenRepository expects. */
@@ -74,7 +74,7 @@ export function csrfHeaders(): Record<string, string> {
  * seam — see `main.tsx` for the wiring.
  */
 export function applyStateChangingHeaders(request: Request, writesEnabled: boolean): Request {
-	const method = (request.method ?? "GET").toUpperCase();
+	const method = request.method.toUpperCase();
 	if (method !== "GET" && method !== "HEAD" && method !== "OPTIONS") {
 		for (const [key, value] of Object.entries(csrfHeaders())) {
 			request.headers.set(key, value);
@@ -120,10 +120,11 @@ export const authClient = {
 	 * Passwordless dev/test sign-in (server endpoint gated by {@code hephaestus.auth.dev-login-enabled},
 	 * fail-closed in prod). Mints the same cookie session as the OAuth flow for a local account, then
 	 * lands on the sanitised `returnTo`. Only reachable when the discovery list advertises the `dev`
-	 * provider, so this is a no-op surface in production. Mirrors `logout`'s direct-fetch pattern (these
-	 * auth kickoff/session calls are intentionally outside the generated client).
+	 * provider, so this is a no-op surface in production. Like `logout`, it ends in a full page load
+	 * rather than a render, which is why it is a direct request instead of a generated mutation.
 	 */
 	async devLogin(username: string, admin: boolean, returnTo?: string): Promise<void> {
+		// oxlint-disable-next-line no-restricted-globals -- `/auth/dev-login` is absent from `openapi.yaml`, so no generated operation exists, and the call ends in a full page load that discards the cache anyway.
 		const response = await fetch(`${serverUrl()}/auth/dev-login`, {
 			method: "POST",
 			credentials: "include",
@@ -136,9 +137,15 @@ export const authClient = {
 		window.location.assign(safeReturnTo(returnTo));
 	},
 
-	/** Revoke the session server-side, then return home. */
+	/**
+	 * Revoke the session server-side, then return home.
+	 *
+	 * The `finally` is the contract: a failed revocation must still land the browser on `/`, because
+	 * leaving someone on an authenticated screen after they asked to sign out is the worse outcome.
+	 */
 	async logout(): Promise<void> {
 		try {
+			// oxlint-disable-next-line no-restricted-globals -- Sign-out tears the SPA down in the `finally` below, leaving no cache to update and no component to render an error; `/auth/*` is exempt from the 401 handler for the same reason.
 			await fetch(`${serverUrl()}/auth/logout`, {
 				method: "POST",
 				credentials: "include",
@@ -159,7 +166,7 @@ export const authClient = {
  */
 export function toUserProfile(user: CurrentUserView): UserProfile {
 	const name = user.displayName ?? user.username ?? "";
-	const [firstName, ...rest] = name.split(" ");
+	const [firstName = "", ...rest] = name.split(" ");
 	return {
 		id: String(user.id),
 		username: user.username ?? "",

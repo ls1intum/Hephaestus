@@ -11,6 +11,8 @@ import { useAllAchievementDefinitions } from "@/hooks/use-all-achievement-defini
 import { useWorkspaceFeatures } from "@/hooks/use-workspace-features";
 import { useAuth } from "@/integrations/auth/AuthContext";
 import { workspaceAdminHead } from "@/lib/page-title";
+import { queryOperationId } from "@/lib/query-operation-id";
+import { firstNonBlank } from "@/lib/text";
 
 export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/achievement-designer")(
 	{
@@ -33,9 +35,9 @@ function AchievementDesignerPage() {
 			toast.promise(Promise.resolve(), {
 				loading: "Reloading achievement definitions...",
 				success: () => {
-					queryClient.invalidateQueries({
+					void queryClient.invalidateQueries({
 						predicate: (query) => {
-							const id = (query.queryKey[0] as { _id?: string } | undefined)?._id;
+							const id = queryOperationId(query.queryKey);
 							return id === "getUserAchievements" || id === "getAllAchievementDefinitions";
 						},
 					});
@@ -50,19 +52,19 @@ function AchievementDesignerPage() {
 		reloadMutation.mutate({
 			path: {
 				workspaceSlug,
-				login: username || "",
+				login: username ?? "",
 			},
 		});
 	};
 
 	const profileQuery = useQuery({
 		...getUserProfileOptions({
-			path: { workspaceSlug, login: username || "" },
+			path: { workspaceSlug, login: username ?? "" },
 		}),
 		enabled: Boolean(username),
 	});
 
-	const allDefinitionsQuery = useAllAchievementDefinitions(workspaceSlug, username || "");
+	const allDefinitionsQuery = useAllAchievementDefinitions(workspaceSlug, username ?? "");
 
 	if (!featureState.isLoading && !featureState.isError && achievementsEnabled === false) {
 		return <Navigate to="/w/$workspaceSlug/admin/settings" params={{ workspaceSlug }} replace />;
@@ -87,10 +89,12 @@ function AchievementDesignerPage() {
 	}
 
 	const user = {
-		name: profileQuery.data?.userInfo?.name || userProfile?.name || userProfile?.username || "",
-		avatarUrl: profileQuery.data?.userInfo?.avatarUrl || getUserProfilePictureUrl(),
-		level: profileQuery.data?.xpRecord?.currentLevel ?? 1,
-		leaguePoints: profileQuery.data?.userInfo?.leaguePoints ?? 0,
+		name:
+			firstNonBlank(profileQuery.data?.userInfo.name, userProfile?.name, userProfile?.username) ??
+			"",
+		avatarUrl: firstNonBlank(profileQuery.data?.userInfo.avatarUrl) ?? getUserProfilePictureUrl(),
+		level: profileQuery.data?.xpRecord.currentLevel ?? 1,
+		leaguePoints: profileQuery.data?.userInfo.leaguePoints ?? 0,
 	};
 
 	return (

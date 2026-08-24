@@ -2,10 +2,14 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn, screen, userEvent, waitFor } from "storybook/test";
 import { DetailDrawerStack } from "@/components/core/detail-drawer/DetailDrawerStack";
 import { LevelCancel } from "@/components/core/detail-drawer/LevelCancel";
-import { mockPracticeDefinitionOptions } from "@/mocks/fixtures/practice";
+import {
+	mockConversationWorkType,
+	mockPracticeDefinitionOptions,
+	mockPullRequestWorkType,
+} from "@/mocks/fixtures/practice";
 import { withPageBehind } from "@/stories/decorators";
 import { Stateful } from "@/stories/stateful";
-import { expectSettledVisible } from "@/test/overlay";
+import { settledDrawerPanel } from "@/test/overlay";
 import { expectNoPanelOverflow } from "@/test/reflow";
 import { PracticeForm } from "./PracticeForm";
 import { PracticeFormLevel } from "./PracticeFormLevel";
@@ -63,29 +67,22 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** The editor is a drawer level, so it arrives over a transition rather than being simply present. */
-async function settledEditor(): Promise<HTMLElement> {
-	const [popup] = document.querySelectorAll<HTMLElement>('[data-slot="drawer-popup"]');
-	await expectSettledVisible(popup);
-	return popup;
-}
-
 export const Create: Story = {
 	parameters: {
 		viewport: { defaultViewport: "reflow" },
 		chromatic: { viewports: [320, 1440] },
 	},
 	play: async () => {
-		// The level is the full viewport at 320px, so the form has to fit it: 43 controls that scroll
-		// down, never across.
-		await expectNoPanelOverflow(await settledEditor());
+		// The level is the full viewport at 320px, so the longest form in the app has to fit it by
+		// scrolling down and never across.
+		await expectNoPanelOverflow(await settledDrawerPanel());
 	},
 };
 
 export const EscapeLeavesACleanEditor: Story = {
 	parameters: { chromatic: { disableSnapshot: true } },
 	play: async () => {
-		await settledEditor();
+		await settledDrawerPanel();
 
 		// Nothing typed, so nothing to ask about: Escape leaves, exactly as it does on a read-only
 		// panel. An editor that swallowed the gesture instead would be indistinguishable from a
@@ -104,7 +101,7 @@ export const EditWithAdvanced: Story = {
 export const Submitting: Story = {
 	args: { isPending: true, onSubmit: fn() },
 	play: async () => {
-		await settledEditor();
+		await settledDrawerPanel();
 		await expect(screen.getByRole("textbox", { name: /Name/ })).toBeDisabled();
 	},
 };
@@ -121,7 +118,7 @@ export const EditClearsOptionalGuidance: Story = {
 	},
 	parameters: { chromatic: { disableSnapshot: true } },
 	play: async () => {
-		await settledEditor();
+		await settledDrawerPanel();
 		editSubmit.mockClear();
 		await userEvent.clear(screen.getByRole("textbox", { name: "Why it matters" }));
 		await userEvent.clear(screen.getByRole("textbox", { name: "What good looks like" }));
@@ -140,7 +137,7 @@ export const EditClearsOptionalGuidance: Story = {
 export const ValidationErrors: Story = {
 	parameters: { chromatic: { viewports: [320, 1440] } },
 	play: async () => {
-		await settledEditor();
+		await settledDrawerPanel();
 		await userEvent.click(screen.getByRole("button", { name: "Create practice" }));
 		await expect(screen.getByText("Name must be at least 3 characters")).toBeVisible();
 		await expect(screen.queryByText("Select at least one trigger event")).not.toBeInTheDocument();
@@ -176,10 +173,10 @@ export const ValidationAndSubmit: Story = {
 							"scm.pull_request.ready",
 							"scm.pull_request.synchronized",
 						],
-						needs: mockPracticeDefinitionOptions.workTypes[0].recommendedNeeds,
+						needs: mockPullRequestWorkType.recommendedNeeds,
 					},
 				],
-				automatedReviewPolicy: mockPracticeDefinitionOptions.workTypes[0].recommendedPolicy,
+				automatedReviewPolicy: mockPullRequestWorkType.recommendedPolicy,
 			},
 			null,
 		);
@@ -189,7 +186,7 @@ export const ValidationAndSubmit: Story = {
 export const ConversationPractice: Story = {
 	parameters: { chromatic: { disableSnapshot: true } },
 	play: async () => {
-		await settledEditor();
+		await settledDrawerPanel();
 		createSubmit.mockClear();
 		await userEvent.type(screen.getByRole("textbox", { name: /Name/ }), "Helpful discussion");
 		await userEvent.click(screen.getByRole("radio", { name: /Conversation/ }));
@@ -209,10 +206,10 @@ export const ConversationPractice: Story = {
 				bindings: [
 					{
 						signals: ["chat.conversation_thread.settled"],
-						needs: mockPracticeDefinitionOptions.workTypes[2].recommendedNeeds,
+						needs: mockConversationWorkType.recommendedNeeds,
 					},
 				],
-				automatedReviewPolicy: mockPracticeDefinitionOptions.workTypes[2].recommendedPolicy,
+				automatedReviewPolicy: mockConversationWorkType.recommendedPolicy,
 			},
 			null,
 		);

@@ -41,7 +41,7 @@ import { PageHeader } from "@/components/core/PageHeader";
 import { PageLayout } from "@/components/core/PageLayout";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
-import { filedUnder, usePendingMutationIds } from "@/hooks/use-pending-mutation-ids";
+import { filedUnder, pathNumber, usePendingMutationIds } from "@/hooks/use-pending-mutation-ids";
 import {
 	type AdminLlmModelSaveBody,
 	AdminLlmModelSaveError,
@@ -105,7 +105,7 @@ function AdminLlmPage() {
 	const createConnection = useMutation({
 		...adminCreateLlmConnectionMutation(),
 		onSuccess: (created) => {
-			invalidateConnections();
+			void invalidateConnections();
 			setConnectionDialogOpen(false);
 			setSelectedConnectionId(created.id);
 			setProbedModels((current) =>
@@ -122,7 +122,7 @@ function AdminLlmPage() {
 	const updateConnection = useMutation({
 		...filedUnder(CONNECTION_WRITE_MUTATION_KEY, adminUpdateLlmConnectionMutation()),
 		onSuccess: () => {
-			invalidateConnections();
+			void invalidateConnections();
 			setConnectionDialogOpen(false);
 			toast.success("Connection updated");
 		},
@@ -133,7 +133,7 @@ function AdminLlmPage() {
 	const deleteConnection = useMutation({
 		...filedUnder(CONNECTION_WRITE_MUTATION_KEY, adminDeleteLlmConnectionMutation()),
 		onSuccess: (_data, variables) => {
-			invalidateConnections();
+			void invalidateConnections();
 			if (variables.path.id === selectedConnectionId) setSelectedConnectionId(null);
 			toast.success("Connection deleted");
 		},
@@ -141,9 +141,8 @@ function AdminLlmPage() {
 			toast.error("Couldn't delete the connection", { description: problemDetailOf(error) }),
 	});
 
-	const mutatingConnectionIds = usePendingMutationIds<{ path: { id: number } }>(
-		CONNECTION_WRITE_MUTATION_KEY,
-		(variables) => variables.path.id,
+	const mutatingConnectionIds = usePendingMutationIds(CONNECTION_WRITE_MUTATION_KEY, (variables) =>
+		pathNumber(variables, "id"),
 	);
 
 	const probeDraft = useMutation({ ...adminProbeLlmConnectionDraftMutation() });
@@ -158,22 +157,21 @@ function AdminLlmPage() {
 	const deleteModel = useMutation({
 		...filedUnder(MODEL_WRITE_MUTATION_KEY, adminDeleteLlmModelMutation()),
 		onSuccess: () => {
-			invalidateModels();
+			void invalidateModels();
 			toast.success("Model deleted");
 		},
 		onError: (error) =>
 			toast.error("Couldn't delete the model", { description: problemDetailOf(error) }),
 	});
 
-	const mutatingModelIds = usePendingMutationIds<{ path: { id: number } }>(
-		MODEL_WRITE_MUTATION_KEY,
-		(variables) => variables.path.id,
+	const mutatingModelIds = usePendingMutationIds(MODEL_WRITE_MUTATION_KEY, (variables) =>
+		pathNumber(variables, "id"),
 	);
 
 	const updateSettings = useMutation({
 		...adminUpdateLlmSettingsMutation(),
 		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: adminGetLlmSettingsQueryKey() });
+			void queryClient.invalidateQueries({ queryKey: adminGetLlmSettingsQueryKey() });
 			toast.success("Settings saved");
 		},
 		onError: (error) =>
@@ -203,11 +201,11 @@ function AdminLlmPage() {
 						updateSharing.mutateAsync({ path: { id }, body: sharing }),
 				},
 			});
-			invalidateModels();
+			void invalidateModels();
 			setModelDialogOpen(false);
 			toast.success(editingModel ? "Model updated" : "Model added");
 		} catch (error) {
-			invalidateModels();
+			void invalidateModels();
 			if (error instanceof AdminLlmModelSaveError && error.modelId != null) {
 				toast.error("Model saved inactive, but setup is incomplete", {
 					description: "Review the model and save again before activating it.",
@@ -246,7 +244,7 @@ function AdminLlmPage() {
 				isLoading={connectionsQuery.isLoading}
 				isError={connectionsQuery.isError}
 				error={connectionsQuery.error}
-				onRetry={() => connectionsQuery.refetch()}
+				onRetry={() => void connectionsQuery.refetch()}
 				mutatingIds={mutatingConnectionIds}
 				selectedId={selectedConnection?.id ?? null}
 				onSelect={(connection) => {
@@ -275,7 +273,7 @@ function AdminLlmPage() {
 					<QueryErrorAlert
 						error={modelsQuery.error}
 						title="Could not load models"
-						onRetry={() => modelsQuery.refetch()}
+						onRetry={() => void modelsQuery.refetch()}
 					/>
 				) : modelsQuery.isLoading ? (
 					<div
@@ -311,7 +309,7 @@ function AdminLlmPage() {
 				<QueryErrorAlert
 					error={settingsQuery.error}
 					title="Could not load AI policy"
-					onRetry={() => settingsQuery.refetch()}
+					onRetry={() => void settingsQuery.refetch()}
 				/>
 			) : (
 				<InstanceLlmSettingsCard
@@ -371,7 +369,7 @@ function AdminLlmPage() {
 						: []
 				}
 				isSubmitting={isModelSaving}
-				onSave={handleSaveModel}
+				onSave={(body) => void handleSaveModel(body)}
 			/>
 
 			<AdminLlmModelAccessDialog
@@ -383,7 +381,7 @@ function AdminLlmPage() {
 				workspaceOptions={workspaceOptions}
 				isLoadingWorkspaces={workspacesQuery.isLoading}
 				workspacesError={workspacesQuery.error}
-				onRetryWorkspaces={() => workspacesQuery.refetch()}
+				onRetryWorkspaces={() => void workspacesQuery.refetch()}
 				isSubmitting={updateSharing.isPending}
 				onSave={(body) => {
 					if (!accessModel) return;
@@ -391,7 +389,7 @@ function AdminLlmPage() {
 						{ path: { id: accessModel.id }, body },
 						{
 							onSuccess: () => {
-								invalidateModels();
+								void invalidateModels();
 								setAccessModel(null);
 								toast.success("Workspace access updated");
 							},

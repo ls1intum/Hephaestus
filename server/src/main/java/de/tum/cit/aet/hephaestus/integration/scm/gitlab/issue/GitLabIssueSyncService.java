@@ -273,7 +273,6 @@ public class GitLabIssueSyncService {
         int totalProcessed = 0;
         int minIid = Integer.MAX_VALUE;
         int maxIid = -1;
-        String nextCursor = null;
         boolean hasMore = false;
 
         try {

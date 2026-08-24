@@ -55,21 +55,37 @@ export function LegalPage({
 	resolver = resolveLegalContent,
 	profileOverride,
 }: LegalPageProps) {
+	const profile = profileOverride ?? environment.legal.profile;
+
+	return (
+		<div className="max-w-4xl mx-auto flex flex-col gap-4">
+			<h1 className="text-3xl font-bold">{title}</h1>
+			{/* Keyed by what identifies the content: a switch remounts, so the previous page's markdown
+			    is never on screen while the new one loads. */}
+			<LegalContent key={`${page}:${profile}`} page={page} profile={profile} resolver={resolver} />
+		</div>
+	);
+}
+
+interface LegalContentProps {
+	page: LegalPageId;
+	profile: string;
+	resolver: typeof resolveLegalContent;
+}
+
+function LegalContent({ page, profile, resolver }: LegalContentProps) {
 	const [resolved, setResolved] = useState<ResolvedLegalContent | null>(null);
 	const [error, setError] = useState<Error | null>(null);
 
-	const profile = profileOverride ?? environment.legal.profile;
-
 	useEffect(() => {
 		const controller = new AbortController();
-		setError(null);
-		setResolved(null);
 		resolver(page, { signal: controller.signal, profile })
-			.then((next) => {
+			.then((content) => {
 				if (controller.signal.aborted) return;
-				setResolved(next);
-				if (next.source === "disclaimer" && !warnedDisclaimer.has(page)) {
+				setResolved(content);
+				if (content.source === "disclaimer" && !warnedDisclaimer.has(page)) {
 					warnedDisclaimer.add(page);
+					// oxlint-disable-next-line no-console -- Remediation addressed to whoever deployed the instance, once per page; the reader's half of this is the disclaimer banner.
 					console.warn(
 						`[legal] Disclaimer fallback served for page=${page}. Configure LEGAL_PROFILE or mount /legal-overrides/. See docs/admin/legal-pages.`,
 					);
@@ -84,14 +100,11 @@ export function LegalPage({
 	}, [page, profile, resolver]);
 
 	return (
-		<div className="max-w-4xl mx-auto flex flex-col gap-4">
-			<h1 className="text-3xl font-bold">{title}</h1>
-
+		<>
 			{resolved?.source === "disclaimer" ? (
 				<div
 					role="alert"
 					className="rounded-md border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive"
-					data-testid="legal-disclaimer-banner"
 				>
 					{DISCLAIMER_BANNER}
 				</div>
@@ -109,8 +122,8 @@ export function LegalPage({
 			{resolved ? (
 				<article lang="en" className="prose dark:prose-invert max-w-none">
 					{/* Empty `rehypePlugins` drops Streamdown's default rehype-raw, and its bundled
-					    rehype-harden ships `allowedProtocols: ["*"]`, so SAFE_COMPONENTS is the only
-					    thing keeping `javascript:` and unknown schemes out of the DOM. */}
+				    rehype-harden ships `allowedProtocols: ["*"]`, so SAFE_COMPONENTS is the only
+				    thing keeping `javascript:` and unknown schemes out of the DOM. */}
 					<Streamdown
 						mode="static"
 						rehypePlugins={[]}
@@ -122,6 +135,6 @@ export function LegalPage({
 					</Streamdown>
 				</article>
 			) : null}
-		</div>
+		</>
 	);
 }

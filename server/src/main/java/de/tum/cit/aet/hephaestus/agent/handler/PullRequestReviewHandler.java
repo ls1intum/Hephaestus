@@ -12,7 +12,6 @@ import de.tum.cit.aet.hephaestus.agent.context.InsufficientEvidenceException;
 import de.tum.cit.aet.hephaestus.agent.context.PreparedEvidence;
 import de.tum.cit.aet.hephaestus.agent.context.WorkspaceContextBuilder;
 import de.tum.cit.aet.hephaestus.agent.handler.composition.ComposedFeedbackUnit;
-import de.tum.cit.aet.hephaestus.agent.handler.composition.FeedbackCompositionInputs;
 import de.tum.cit.aet.hephaestus.agent.handler.composition.FeedbackCompositionResultParser;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.ExistingDeliveryLookup;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException;
@@ -29,13 +28,11 @@ import de.tum.cit.aet.hephaestus.agent.task.TaskEnvelope;
 import de.tum.cit.aet.hephaestus.agent.task.TaskEnvelopeWriter;
 import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.core.fabric.ContentAddressedStore;
-import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.integration.core.signal.SignalName;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
-import de.tum.cit.aet.hephaestus.practices.model.ObservationOrigin;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
@@ -51,7 +48,6 @@ import java.util.TreeSet;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.context.ApplicationEventPublisher;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ArrayNode;
@@ -104,7 +100,6 @@ public class PullRequestReviewHandler implements JobTypeHandler {
     private final SecretDiffScanner secretDiffScanner;
     private final ReactionSuppressionFilter reactionSuppressionFilter;
     private final InContextDeliveryGate inContextDeliveryGate;
-    private final ApplicationEventPublisher eventPublisher;
     private final ObservationRepository observationRepository;
 
     PullRequestReviewHandler(
@@ -120,7 +115,6 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         SecretDiffScanner secretDiffScanner,
         ReactionSuppressionFilter reactionSuppressionFilter,
         InContextDeliveryGate inContextDeliveryGate,
-        ApplicationEventPublisher eventPublisher,
         ObservationRepository observationRepository
     ) {
         this.objectMapper = objectMapper;
@@ -135,7 +129,6 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         this.secretDiffScanner = secretDiffScanner;
         this.reactionSuppressionFilter = reactionSuppressionFilter;
         this.inContextDeliveryGate = inContextDeliveryGate;
-        this.eventPublisher = eventPublisher;
         this.observationRepository = observationRepository;
     }
 
@@ -536,8 +529,6 @@ public class PullRequestReviewHandler implements JobTypeHandler {
                 job.getId()
             );
         }
-
-        return;
     }
 
     /**

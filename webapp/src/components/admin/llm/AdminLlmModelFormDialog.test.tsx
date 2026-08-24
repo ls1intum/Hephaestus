@@ -1,11 +1,14 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { assert, describe, expect, it, vi } from "vitest";
 import type { LlmModel } from "@/api/types.gen";
 import { validateLlmModelForm } from "@/lib/llm-form-validation";
 import { expectUnavailable } from "@/test/controls";
-import { AdminLlmModelFormDialog } from "./AdminLlmModelFormDialog";
+import {
+	AdminLlmModelFormDialog,
+	type AdminLlmModelFormDialogProps,
+} from "./AdminLlmModelFormDialog";
 
-function renderDialog(onSave = vi.fn()) {
+function renderDialog(onSave = vi.fn<AdminLlmModelFormDialogProps["onSave"]>()) {
 	render(
 		<AdminLlmModelFormDialog
 			open
@@ -23,7 +26,7 @@ function renderDialog(onSave = vi.fn()) {
 describe("AdminLlmModelFormDialog", () => {
 	it("creates a model inactive and shared with no workspace by default", async () => {
 		const onSave = renderDialog();
-		const active = screen.getByRole("switch", { name: "Active" }) as HTMLButtonElement;
+		const active = screen.getByRole<HTMLButtonElement>("switch", { name: "Active" });
 		expect(active.getAttribute("aria-checked")).toBe("false");
 		await expectUnavailable(active);
 		fireEvent.click(active);
@@ -32,16 +35,14 @@ describe("AdminLlmModelFormDialog", () => {
 		fireEvent.change(screen.getByLabelText("Display name"), { target: { value: "GPT-5" } });
 		fireEvent.change(screen.getByLabelText("Upstream model id"), { target: { value: "gpt-5" } });
 		fireEvent.click(screen.getByRole("button", { name: "Add model" }));
-		expect(onSave).toHaveBeenCalledWith(
-			expect.objectContaining({
-				metadata: expect.objectContaining({ enabled: false }),
-				sharing: { visibility: "GRANTED", workspaceIds: [] },
-			}),
-		);
+		const saved = onSave.mock.calls[0]?.[0];
+		assert(saved);
+		expect(saved.metadata.enabled).toBe(false);
+		expect(saved.sharing).toStrictEqual({ visibility: "GRANTED", workspaceIds: [] });
 	});
 
 	it("keeps the upstream model identity immutable", () => {
-		const onSave = vi.fn();
+		const onSave = vi.fn<AdminLlmModelFormDialogProps["onSave"]>();
 		const editing: LlmModel = {
 			id: 1,
 			slug: "gpt-5",
@@ -66,7 +67,7 @@ describe("AdminLlmModelFormDialog", () => {
 				onSave={onSave}
 			/>,
 		);
-		expect((screen.getByLabelText("Upstream model id") as HTMLInputElement).disabled).toBe(true);
+		expect(screen.getByLabelText<HTMLInputElement>("Upstream model id").disabled).toBe(true);
 		expect(screen.queryByLabelText("Initial workspace access")).toBeNull();
 		fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
 		expect(onSave.mock.calls[0]?.[0].metadata).not.toHaveProperty("upstreamModelId");
@@ -92,8 +93,8 @@ describe("AdminLlmModelFormDialog", () => {
 			per1mInputUsd: 0,
 			per1mOutputUsd: 0,
 		}).per1mInputUsd;
-		expect(rejection).toBeTruthy();
-		screen.getByText(rejection as string);
+		assert(rejection, "A priced model without a price must be rejected");
+		screen.getByText(rejection);
 		expect(onSave).not.toHaveBeenCalled();
 	});
 
@@ -115,11 +116,11 @@ describe("AdminLlmModelFormDialog", () => {
 			maxOutputTokens: "3000000000",
 			pricingMode: "UNPRICED",
 		});
-		expect(rejected.contextWindow).toBeTruthy();
+		expect(rejected.contextWindow).toMatch(/tokens or fewer/);
 		expect(onSave).not.toHaveBeenCalled();
 
 		const alerts = screen.getAllByRole("alert");
-		expect(alerts.map((alert) => alert.textContent)).toEqual([
+		expect(alerts.map((alert) => alert.textContent)).toStrictEqual([
 			rejected.contextWindow,
 			rejected.maxOutputTokens,
 		]);
@@ -138,7 +139,7 @@ describe("AdminLlmModelFormDialog", () => {
 	});
 
 	it("turns an active model off when its price becomes unknown", () => {
-		const onSave = vi.fn();
+		const onSave = vi.fn<AdminLlmModelFormDialogProps["onSave"]>();
 		const editing: LlmModel = {
 			id: 2,
 			slug: "gpt-5-active",
@@ -178,6 +179,8 @@ describe("AdminLlmModelFormDialog", () => {
 		);
 		screen.getByText("Work on this model stops immediately, in every workspace");
 		fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
-		expect(onSave.mock.calls[0]?.[0].metadata).toEqual(expect.objectContaining({ enabled: false }));
+		expect(onSave.mock.calls[0]?.[0].metadata).toStrictEqual(
+			expect.objectContaining({ enabled: false }),
+		);
 	});
 });

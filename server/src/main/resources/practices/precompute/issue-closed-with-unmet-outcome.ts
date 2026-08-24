@@ -13,7 +13,11 @@ interface IssueMeta {
 	closed_at?: string | null;
 }
 
-export default async function (_repo: string, _diff: Map<string, unknown>, m: IssueMeta) {
+export default function issueClosedWithUnmetOutcome(
+	_repo: string,
+	_diff: Map<string, unknown>,
+	m: IssueMeta,
+) {
 	const body = (m.body ?? "").trim();
 	const state = (m.state ?? "").toUpperCase();
 	const reason = m.state_reason ?? null;

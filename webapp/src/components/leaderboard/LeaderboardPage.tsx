@@ -103,7 +103,7 @@ export function LeaderboardPage({
 					</div>
 
 					<div className="col-span-2 min-w-0 space-y-4">
-						{currentUserEntry && leaguePoints !== undefined && (
+						{currentUserEntry && (
 							<LeaderboardOverview
 								leaderboardEntry={currentUserEntry}
 								leaguePoints={leaguePoints}

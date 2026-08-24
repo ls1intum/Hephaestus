@@ -10,6 +10,7 @@ import {
 import { useClampedPage } from "@/hooks/use-clamped-page";
 import { useReviewPeople } from "@/hooks/use-review-people";
 import { workspaceAdminHead } from "@/lib/page-title";
+import { pageParam } from "@/lib/search-params";
 
 export const Route = createFileRoute(
 	"/_authenticated/w/$workspaceSlug/admin/practices/reviews/delivery/",
@@ -23,10 +24,10 @@ function FeedbackListRoute() {
 	const search = Route.useSearch();
 	const navigate = useNavigate({ from: Route.fullPath });
 	const updateSearch = (patch: Partial<FeedbackSearch>) =>
-		navigate({
+		void navigate({
 			search: (previous) => {
 				const next = { ...previous, ...patch };
-				return { ...next, page: next.page || undefined };
+				return { ...next, page: pageParam(next.page) };
 			},
 			replace: true,
 		});
@@ -53,7 +54,7 @@ function FeedbackListRoute() {
 			feedback={feedbackQueryResult.data}
 			isLoading={feedbackQueryResult.isLoading}
 			error={feedbackQueryResult.isError ? feedbackQueryResult.error : undefined}
-			onRetry={() => feedbackQueryResult.refetch()}
+			onRetry={() => void feedbackQueryResult.refetch()}
 			people={people}
 		/>
 	);

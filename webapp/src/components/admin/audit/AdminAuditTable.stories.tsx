@@ -90,8 +90,9 @@ export const DeletedAccountFallback: Story = {
 
 export const RowDetail: Story = {
 	play: async ({ canvas }) => {
-		const buttons = canvas.getAllByRole("button", { name: /View details/i });
-		await userEvent.click(buttons[0]);
+		const [firstDetails] = canvas.getAllByRole("button", { name: /View details/i });
+		if (!firstDetails) throw new Error("The table rendered no rows to open");
+		await userEvent.click(firstDetails);
 		await expectSettledVisible(await screen.findByText("User agent"));
 		screen.getByText("Workspace");
 	},
@@ -130,7 +131,9 @@ export const ColumnCountMatchesHeader: Story = {
 	args: {},
 	play: async ({ canvas }) => {
 		const headers = canvas.getAllByRole("columnheader");
-		const cells = within(canvas.getAllByRole("row")[1]).getAllByRole("cell");
+		const [, firstBodyRow] = canvas.getAllByRole("row");
+		if (!firstBodyRow) throw new Error("The table rendered no body rows");
+		const cells = within(firstBodyRow).getAllByRole("cell");
 		await expect(headers).toHaveLength(cells.length);
 	},
 };

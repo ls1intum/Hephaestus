@@ -59,8 +59,11 @@ jobs:
             echo "no_changes_detected=false" >> $GITHUB_OUTPUT
           fi
 
+      # No `always()`: a skipped `check_changes` has the empty string for its output, which passes
+      # `!= 'true'`. `generate:api` deletes `webapp/src/api` before regenerating it, so an `always()`
+      # here would commit that deletion to the contributor's branch.
       - name: Commit files
-        if: ${{ always() && contains(github.event.pull_request.labels.*.name, 'autocommit-openapi') && steps.check_changes.outputs.no_changes_detected != 'true' }}
+        if: ${{ contains(github.event.pull_request.labels.*.name, 'autocommit-openapi') && steps.check_changes.outputs.no_changes_detected != 'true' }}
         run: |
           echo "Committing and pushing changes..."
           git config --local user.name "github-actions[bot]"
@@ -68,7 +71,7 @@ jobs:
           git commit -a -m "chore: update API specs and client"
 
       - name: Push changes
-        if: ${{ always() && contains(github.event.pull_request.labels.*.name, 'autocommit-openapi') && steps.check_changes.outputs.no_changes_detected != 'true' }}
+        if: ${{ contains(github.event.pull_request.labels.*.name, 'autocommit-openapi') && steps.check_changes.outputs.no_changes_detected != 'true' }}
         uses: ad-m/github-push-action@d91a481090679876dfc4178fef17f286781251df # v0.8.0
         with:
           github_token: ${{ secrets.GH_PAT }}
@@ -84,7 +87,12 @@ jobs:
       - name: Add PR comment with results
         if: always()
         run: |
-          if [[ "${{ steps.check_changes.outputs.no_changes_detected }}" == "true" ]]; then
+          # A skipped step's output is the empty string, so generation having failed has to be its
+          # own branch: `== "true"` and `!= "true"` both read as "there were changes to commit",
+          # and the comment would report a commit that never happened.
+          if [[ -z "${{ steps.check_changes.outputs.no_changes_detected }}" ]]; then
+            COMMENT="🤖 Generating the OpenAPI specs and clients failed, so nothing was committed. See the workflow run for the error."
+          elif [[ "${{ steps.check_changes.outputs.no_changes_detected }}" == "true" ]]; then
             COMMENT="🤖 No OpenAPI changes were needed - everything is already up to date."
           else
             COMMENT="🤖 OpenAPI specs and clients have been automatically updated and committed."

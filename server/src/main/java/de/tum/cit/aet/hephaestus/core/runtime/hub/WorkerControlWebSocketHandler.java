@@ -137,7 +137,6 @@ public class WorkerControlWebSocketHandler extends TextWebSocketHandler {
         try {
             dispatch(session, frame);
             maybeForceReconnect(session);
-            return;
         } catch (RuntimeException e) {
             log.error(
                 "Hub frame dispatch threw for workerId={}, frame={}",

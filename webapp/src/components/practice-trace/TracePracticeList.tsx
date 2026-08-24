@@ -8,6 +8,7 @@ import { Item, ItemContent, ItemGroup, ItemTitle } from "@/components/ui/item";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { artifactKindLabel } from "@/lib/artifact-kinds";
 import { PRACTICE_AUTONOMY_DESCRIPTIONS } from "@/lib/practice-autonomy";
+import { hasText } from "@/lib/text";
 import { TraceOutcomeBadge } from "./TraceOutcomeBadge";
 import { deliveryLabel, occurrenceDomId, WITHHELD_REASON_LABELS } from "./trace-format";
 
@@ -106,7 +107,7 @@ function TracePracticeEntry({ entry, occurrence }: TracePracticeEntryProps) {
 								</dd>
 							</div>
 						)}
-						{(occurrence || entry.occasionedBy) && (
+						{(occurrence !== undefined || hasText(entry.occasionedBy)) && (
 							<div className="flex min-w-0 items-center gap-1">
 								<dt>Rests on</dt>
 								<dd className="min-w-0">

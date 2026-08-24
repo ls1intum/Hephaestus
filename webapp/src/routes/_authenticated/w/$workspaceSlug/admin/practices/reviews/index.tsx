@@ -11,6 +11,7 @@ import {
 } from "@/components/admin/practice-reviews/review-search";
 import { useClampedPage } from "@/hooks/use-clamped-page";
 import { workspaceAdminHead } from "@/lib/page-title";
+import { pageParam } from "@/lib/search-params";
 
 export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/practices/reviews/")({
 	validateSearch: runsSearchSchema,
@@ -23,10 +24,10 @@ function ReviewRunsRoute() {
 	const search = Route.useSearch();
 	const navigate = useNavigate({ from: Route.fullPath });
 	const updateSearch = (patch: Partial<RunsSearch>) =>
-		navigate({
+		void navigate({
 			search: (previous) => {
 				const next = { ...previous, ...patch };
-				return { ...next, page: next.page || undefined };
+				return { ...next, page: pageParam(next.page) };
 			},
 			replace: true,
 		});

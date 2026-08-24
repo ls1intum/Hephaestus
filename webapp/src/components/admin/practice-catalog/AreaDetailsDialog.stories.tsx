@@ -5,6 +5,9 @@ import { expectGenuinelyDisabled } from "@/test/controls";
 import { expectSettledVisible } from "@/test/overlay";
 import { AreaDetailsDialog } from "./AreaDetailsDialog";
 
+const [reviewReadyArea] = mockAreas;
+if (!reviewReadyArea) throw new Error("The shared area fixtures no longer hold an area to edit");
+
 const meta = {
 	title: "Workspace admin/Practices/Area details",
 	component: AreaDetailsDialog,
@@ -37,7 +40,7 @@ export const Creating: Story = {
 };
 
 export const Renaming: Story = {
-	args: { area: mockAreas[0] },
+	args: { area: reviewReadyArea },
 	play: async ({ args }) => {
 		const field = await screen.findByLabelText("Name");
 		await expectSettledVisible(field);
@@ -47,14 +50,14 @@ export const Renaming: Story = {
 		await userEvent.click(screen.getByRole("button", { name: "Save" }));
 		await expect(args.onSubmit).toHaveBeenCalledWith({
 			name: "Review-ready work",
-			icon: mockAreas[0].icon ?? null,
-			color: mockAreas[0].color ?? null,
+			icon: reviewReadyArea.icon ?? null,
+			color: reviewReadyArea.color ?? null,
 		});
 	},
 };
 
 export const UnchangedDetailsJustClose: Story = {
-	args: { area: mockAreas[0] },
+	args: { area: reviewReadyArea },
 	play: async ({ args }) => {
 		await expectSettledVisible(await screen.findByLabelText("Name"));
 		await userEvent.click(screen.getByRole("button", { name: "Save" }));
@@ -80,7 +83,7 @@ export const Pending: Story = {
 
 /** The verb differs from creating, so the label is not one string with a spinner in front of it. */
 export const SavingAnEdit: Story = {
-	args: { area: mockAreas[0], pending: true },
+	args: { area: reviewReadyArea, pending: true },
 	play: async () => {
 		await expectGenuinelyDisabled(await screen.findByRole("button", { name: "Saving…" }));
 	},

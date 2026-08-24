@@ -1,10 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { AchievementsListView } from "@/components/achievements/AchievementsListView";
-import {
-	asUI,
-	mythicAchievementsUI,
-	zeusThunderbolt,
-} from "@/components/achievements/story-mock-data";
+import { mythicAchievementsUI, zeusThunderbolt } from "@/components/achievements/story-mock-data";
 
 const meta = {
 	component: AchievementsListView,
@@ -50,6 +46,6 @@ export const EmptyListState: Story = {
 
 export const SingleRowExample: Story = {
 	args: {
-		achievements: [asUI(zeusThunderbolt)],
+		achievements: [zeusThunderbolt],
 	},
 };

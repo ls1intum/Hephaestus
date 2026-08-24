@@ -104,13 +104,12 @@ public class OAuthCallbackService {
      */
     @Transactional
     public Connection completeConnection(
-        Connection connection,
+        Connection pending,
         ConnectFinalization.Completed completed,
         @Nullable String actorRef
     ) {
-        Connection original = connection;
-        connection = resolveSlackCompletionTarget(connection, completed);
-        deleteSupersededPending(original, connection);
+        Connection connection = resolveSlackCompletionTarget(pending, completed);
+        deleteSupersededPending(pending, connection);
         applyVendorMetadata(connection, completed);
         connection.setCredentials(completed.credentials(), credentialBundleConverter);
         connection = connectionRepository.save(connection);

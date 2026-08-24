@@ -216,7 +216,7 @@ public class HmacOAuthStateService implements OAuthStateService {
         try {
             kind = IntegrationKind.valueOf(kindStr);
         } catch (IllegalArgumentException e) {
-            throw new IllegalArgumentException("OAuth state references unknown kind: " + kindStr);
+            throw new IllegalArgumentException("OAuth state references unknown kind: " + kindStr, e);
         }
         long workspaceId;
         try {

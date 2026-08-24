@@ -76,7 +76,10 @@ export function AvailablePracticeList({
 	return (
 		<div className="space-y-5">
 			{Array.from(groups, ([key, entries]) => {
-				const first = entries[0];
+				// A group exists because something was filed under it, so the first entry is what names
+				// it — an empty one would be a group nothing put anything in.
+				const [first] = entries;
+				if (!first) return null;
 				const areaSlug = first.areaSlug;
 				const available = entries.filter(({ availability }) => availability === "AVAILABLE").length;
 				const restorable = entries.filter(({ availability }) => availability === "ADOPTED").length;
@@ -153,8 +156,8 @@ function PracticeRow({ practice }: { practice: CatalogPracticeSummary }) {
 				<ItemDescription className="line-clamp-none">
 					<WorkTypeLabel artifactKind={practice.artifactKind} />
 				</ItemDescription>
-				{/* Without this the rows differ only by name: 20 of the 37 bundled practices review a
-				    pull request, so the work type separates almost none of them. */}
+				{/* Without this the rows differ only by name: the large majority of the bundled catalogue
+				    reviews a pull request, so the work type above separates almost none of them. */}
 				{practice.whyItMatters && (
 					<ItemDescription className="line-clamp-2 text-pretty">
 						{practice.whyItMatters}

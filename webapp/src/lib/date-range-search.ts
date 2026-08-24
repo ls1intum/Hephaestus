@@ -3,13 +3,19 @@ import type { DateRange } from "react-day-picker";
 
 const DAY = "yyyy-MM-dd";
 
+/**
+ * A fixed reference keeps this module a pure function of the URL: `parse` only consults it for fields
+ * the format omits, and `DAY` names every field down to the day, below which the setters take midnight.
+ */
+const DAY_PARSE_REFERENCE = new Date(0);
+
 export function toDayParam(date: Date): string {
 	return format(date, DAY);
 }
 
 export function fromDayParam(value: string | undefined): Date | undefined {
 	if (!value) return undefined;
-	const parsed = parse(value, DAY, new Date());
+	const parsed = parse(value, DAY, DAY_PARSE_REFERENCE);
 	return Number.isNaN(parsed.getTime()) ? undefined : parsed;
 }
 

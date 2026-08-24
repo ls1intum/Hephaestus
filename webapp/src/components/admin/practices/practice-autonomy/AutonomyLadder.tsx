@@ -38,8 +38,7 @@ export function AutonomyLadder({
 			value={value}
 			disabled={disabled}
 			onValueChange={(next) => {
-				const autonomy = next as PracticeAutonomy;
-				if (autonomy && autonomy !== value) onChange(autonomy);
+				if (next !== value) onChange(next);
 			}}
 			className={cn(
 				"grid min-w-0 grid-cols-1 gap-px overflow-hidden rounded-lg border bg-border",

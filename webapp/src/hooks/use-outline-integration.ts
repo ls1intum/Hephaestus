@@ -107,12 +107,12 @@ export function useOutlineIntegration(workspaceSlug: string) {
 		queryClient.invalidateQueries({ queryKey: connectionsQueryOptions.queryKey });
 
 	const invalidateOutline = () => {
-		queryClient.invalidateQueries({ queryKey: collectionsQueryOptions.queryKey });
-		queryClient.invalidateQueries({ queryKey: statusQueryOptions.queryKey });
-		queryClient.invalidateQueries({ queryKey: resourcesQueryOptions.queryKey });
-		queryClient.invalidateQueries({ queryKey: tokenStatusQueryOptions.queryKey });
+		void queryClient.invalidateQueries({ queryKey: collectionsQueryOptions.queryKey });
+		void queryClient.invalidateQueries({ queryKey: statusQueryOptions.queryKey });
+		void queryClient.invalidateQueries({ queryKey: resourcesQueryOptions.queryKey });
+		void queryClient.invalidateQueries({ queryKey: tokenStatusQueryOptions.queryKey });
 		if (connectionId != null) {
-			queryClient.invalidateQueries({
+			void queryClient.invalidateQueries({
 				queryKey: listConnectionSyncJobsQueryKey({ path: { workspaceSlug, connectionId } }),
 			});
 		}
@@ -122,7 +122,7 @@ export function useOutlineIntegration(workspaceSlug: string) {
 		...initiateMutation(),
 		onSuccess: () => {
 			toast.success("Outline connected");
-			invalidateConnections();
+			void invalidateConnections();
 			invalidateOutline();
 		},
 		onError: (e) => {
@@ -134,7 +134,7 @@ export function useOutlineIntegration(workspaceSlug: string) {
 		...updateConnectionStatusMutation(),
 		onSuccess: () => {
 			toast.success("Outline disconnected");
-			invalidateConnections();
+			void invalidateConnections();
 			invalidateOutline();
 		},
 		onError: (e) => {
@@ -258,7 +258,7 @@ export function useOutlineIntegration(workspaceSlug: string) {
 		// Outline's only manual trigger is a reconciliation, so a bare `isPending` names it exactly.
 		triggeringType: syncNow.isPending ? "RECONCILIATION" : null,
 		isCancelling: cancelJob.isPending,
-		onRetry: () => refetchStatus(),
+		onRetry: () => void refetchStatus(),
 		onSync: () => {
 			if (connectionId == null) return;
 			syncNow.mutate({
@@ -287,13 +287,13 @@ export function useOutlineIntegration(workspaceSlug: string) {
 		hasActiveJob: connectionStatus?.activeJob != null,
 		isLoading: connectionsQuery.isLoading,
 		connectionsError: connectionsQuery.error,
-		retryConnections: () => connectionsQuery.refetch(),
+		retryConnections: () => void connectionsQuery.refetch(),
 		// The raw unified status; the route gates the shared header on its presence.
 		status: connectionStatus,
 		statusError,
-		retryStatus: () => refetchStatus(),
+		retryStatus: () => void refetchStatus(),
 		tokenStatusError,
-		retryTokenStatus: () => refetchTokenStatus(),
+		retryTokenStatus: () => void refetchTokenStatus(),
 		syncStatusHeaderProps,
 		// The per-collection observability ledger — the same shared table SCM and Slack mount. Shown
 		// even when suspended, so an admin can see how far behind each collection got before sync stopped.
@@ -302,7 +302,7 @@ export function useOutlineIntegration(workspaceSlug: string) {
 			isLoading: isResourcesLoading,
 			isError: isResourcesError,
 			error: resourcesError,
-			onRetry: () => refetchResources(),
+			onRetry: () => void refetchResources(),
 			resourceNoun: "collection",
 			resourceNounPlural: "collections",
 			// The freshness cadence comes from the server so the client doesn't hard-code one; without it

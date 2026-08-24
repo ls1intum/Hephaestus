@@ -9,31 +9,24 @@ metadata:
 
 # Web Interface Guidelines
 
-Review files for compliance with Web Interface Guidelines.
-
-## How It Works
-
-1. Fetch the latest guidelines from the source URL below
-2. Read the specified files (or prompt user for files/pattern)
-3. Check against all rules in the fetched guidelines
-4. Output findings in the terse `file:line` format
-
-## Guidelines Source
-
-Fetch fresh guidelines before each review:
+The rules are not in this file — fetch them, then review the named files against what you fetched:
 
 ```
 https://raw.githubusercontent.com/vercel-labs/web-interface-guidelines/main/command.md
 ```
 
-Use WebFetch to retrieve the latest rules. The fetched content contains all the rules and output format instructions.
+That document carries the full rule set (accessibility, focus, forms, animation, typography, images,
+performance, navigation, touch, safe areas, theming, i18n, hydration, copy) **and** its own output
+format. Follow the format it states; do not impose one from here.
 
-## Usage
+If no file or pattern was given, ask which files to review rather than guessing at the tree.
 
-When a user provides a file or pattern argument:
-1. Fetch guidelines from the source URL above
-2. Read the specified files
-3. Apply all rules from the fetched guidelines
-4. Output findings using the format specified in the guidelines
+## Reading it against this repo
 
-If no files specified, ask the user which files to review.
+Two rule groups will misfire here unless you check first:
+
+- **Hydration safety** assumes SSR. The webapp is a client-rendered Vite SPA, so hydration-mismatch
+  rules have no subject.
+- **Accessibility** overlaps the Storybook a11y suite, which already runs axe at `test: "error"` on
+  every story. A finding that axe would have caught is a bug in the story coverage, not in the
+  component — check `/storybook-components` § a11y before filing it as a UI defect.

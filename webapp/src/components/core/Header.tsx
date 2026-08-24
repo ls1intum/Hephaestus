@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { getInitials } from "@/lib/avatar";
+import { firstNonBlank } from "@/lib/text";
 import { cn } from "@/lib/utils";
 import { type EnvironmentTone, resolveHeaderBadge } from "@/lib/version";
 
@@ -134,7 +135,7 @@ export default function Header({
 									render={<Button variant="ghost" size="icon" className="rounded-full" />}
 								>
 									<Avatar className="hover:brightness-90">
-										<AvatarImage src={avatarUrl || undefined} alt={`${username}'s avatar`} />
+										<AvatarImage src={firstNonBlank(avatarUrl)} alt={`${username}'s avatar`} />
 										<AvatarFallback>{getInitials(name, username)}</AvatarFallback>
 									</Avatar>
 								</DropdownMenuTrigger>

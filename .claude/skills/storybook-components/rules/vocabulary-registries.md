@@ -2,8 +2,8 @@
 
 ## 1. One canonical registry per enum, and no component defines its own copy
 
-The unit is the **enum**, not the file: `practice-vocabulary/review-status-defs.ts` correctly holds two
-registries for two different enums (`REVIEW_STATUS_DEFS`, `SUMMARY_POST_DEFS`). Each is
+The unit is the **enum**, not the file: `webapp/src/components/practice-vocabulary/review-status-defs.ts`
+correctly holds two registries for two different enums (`REVIEW_STATUS_DEFS`, `SUMMARY_POST_DEFS`). Each is
 `{ label, icon, badgeVariant, description }` per value, as a **total `Record` over the generated wire
 union**, so a value the server adds fails `typecheck:webapp` rather than rendering blank. Badges, facet
 options, select items and empty states all read that one entry.
@@ -33,9 +33,9 @@ that hides best: three copies of one vocabulary where the third is lower-cased i
 fourth enum value updates nine call sites and silently misses one.
 
 Lane-specific wording is the sanctioned exception, and it is done with an **override table plus a
-stated invariant** — `delivery-outcome-defs.ts` requires that *"Each label must begin with the label of
-the state it refines"*, and one function taking the whole record resolves it. That is an extension of
-the registry, not a copy of it.
+stated invariant** — `webapp/src/components/practice-vocabulary/delivery-outcome-defs.ts` requires that *"Each label must
+begin with the label of the state it refines"*, and one function taking the whole record resolves it.
+That is an extension of the registry, not a copy of it.
 
 ## 3. Badge the exception, not the norm (house policy)
 

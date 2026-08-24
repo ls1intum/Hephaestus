@@ -1,8 +1,9 @@
 import { AnimatePresence, motion } from "motion/react";
 import type { Survey as PostHogSurveyRaw } from "posthog-js";
-import { usePostHog } from "posthog-js/react";
 import { useEffect, useRef, useState } from "react";
-
+import { v4 as uuidv4 } from "uuid";
+import { usePostHogClient } from "@/integrations/posthog/use-posthog-client";
+import { firstNonBlank } from "@/lib/text";
 import { useSurveyNotificationStore } from "@/stores/survey-notification-store";
 import {
 	normalisePostHogSurvey,
@@ -18,7 +19,7 @@ import { SURVEY_LAYOUT_ID } from "./survey-notification-button";
  * Replicates PostHog's internal URL matching logic
  */
 function checkUrlMatch(currentUrl: string, pattern: string, matchType?: string): boolean {
-	const type = matchType || "icontains";
+	const type = firstNonBlank(matchType) ?? "icontains";
 
 	switch (type) {
 		case "icontains":
@@ -57,12 +58,9 @@ export function PostHogSurveyWidget({
 	autoOpen = true,
 	reloadOnComplete = false,
 }: PostHogSurveyWidgetProps) {
-	const posthog = usePostHog();
+	const posthog = usePostHogClient();
 
 	// Zustand store for persistent survey notifications
-	const shouldShowSurvey = useSurveyNotificationStore((s) => s.shouldShowSurvey);
-	const pendingSurvey = useSurveyNotificationStore((s) => s.pendingSurvey);
-	const clearShowSignal = useSurveyNotificationStore((s) => s.clearShowSignal);
 	const setPendingSurvey = useSurveyNotificationStore((s) => s.setPendingSurvey);
 	const clearPendingSurvey = useSurveyNotificationStore((s) => s.clearPendingSurvey);
 
@@ -75,6 +73,15 @@ export function PostHogSurveyWidget({
 	// Refs to capture latest values for cleanup effect (avoids stale closures)
 	const surveyRef = useRef<PostHogSurvey | null>(null);
 	const isVisibleRef = useRef(isVisible);
+
+	// Hiding the survey re-arms the reveal delay, so a later reopen animates in again.
+	const [wasVisible, setWasVisible] = useState(isVisible);
+	if (wasVisible !== isVisible) {
+		setWasVisible(isVisible);
+		if (!isVisible) {
+			setShowWithDelay(false);
+		}
+	}
 
 	// Sync refs with state so cleanup always has current values
 	useEffect(() => {
@@ -92,17 +99,25 @@ export function PostHogSurveyWidget({
 		};
 	}, [setPendingSurvey]);
 
-	// Handle reopening the survey from the notification button
-	// Uses the pending survey object from Zustand - synchronous, no fetch needed
+	// Read off the store rather than through a selector: the reopen request is a one-shot signal, and
+	// a selector would render this widget once with the signal still pending.
 	useEffect(() => {
-		if (shouldShowSurvey && pendingSurvey) {
+		const consumeShowSignal = () => {
+			const { shouldShowSurvey, pendingSurvey, clearShowSignal } =
+				useSurveyNotificationStore.getState();
+			if (!shouldShowSurvey || !pendingSurvey) {
+				return;
+			}
 			clearShowSignal();
 			setSurvey(pendingSurvey);
 			setIsVisible(true);
 			setShowWithDelay(true);
 			hasTrackedShown.current = false;
-		}
-	}, [shouldShowSurvey, pendingSurvey, clearShowSignal]);
+		};
+
+		consumeShowSignal();
+		return useSurveyNotificationStore.subscribe(consumeShowSignal);
+	}, []);
 
 	// Monitor URL changes and re-check survey conditions
 	useEffect(() => {
@@ -135,16 +150,16 @@ export function PostHogSurveyWidget({
 		window.addEventListener("popstate", checkUrlChange);
 
 		// Listen to pushState and replaceState (client-side navigation)
-		const originalPushState = window.history.pushState;
-		const originalReplaceState = window.history.replaceState;
+		const originalPushState = window.history.pushState.bind(window.history);
+		const originalReplaceState = window.history.replaceState.bind(window.history);
 
 		window.history.pushState = (...args) => {
-			originalPushState.apply(window.history, args);
+			originalPushState(...args);
 			checkUrlChange();
 		};
 
 		window.history.replaceState = (...args) => {
-			originalReplaceState.apply(window.history, args);
+			originalReplaceState(...args);
 			checkUrlChange();
 		};
 
@@ -158,7 +173,6 @@ export function PostHogSurveyWidget({
 	// Delay showing the survey by 5 seconds for a better UX
 	useEffect(() => {
 		if (!isVisible) {
-			setShowWithDelay(false);
 			return;
 		}
 
@@ -170,15 +184,19 @@ export function PostHogSurveyWidget({
 	}, [isVisible]);
 
 	useEffect(() => {
-		if (!posthog || !autoOpen) {
+		if (!autoOpen) {
 			return;
 		}
 
-		let isActive = true;
-		let latestRequestId = 0;
+		const cancellation = new AbortController();
+		// Two lookups can overlap inside one effect run — the 100ms kick-off and an `onSurveysLoaded`
+		// refresh — so the newest one wins even though neither has been cancelled.
+		const inFlight = { latestRequestId: 0 };
+		const isSuperseded = (signal: AbortSignal, requestId: number) =>
+			signal.aborted || requestId !== inFlight.latestRequestId;
 
-		const resolveSurvey = async (surveys: PostHogSurveyRaw[]) => {
-			if (!isActive) {
+		const resolveSurvey = async (surveys: PostHogSurveyRaw[], signal: AbortSignal) => {
+			if (signal.aborted) {
 				return;
 			}
 
@@ -188,9 +206,6 @@ export function PostHogSurveyWidget({
 				: eligible;
 
 			if (candidates.length === 0) {
-				if (!isActive) {
-					return;
-				}
 				setIsVisible(false);
 				setSurvey(null);
 				setSubmissionId(null);
@@ -198,13 +213,14 @@ export function PostHogSurveyWidget({
 				return;
 			}
 
-			const requestId = ++latestRequestId;
+			inFlight.latestRequestId += 1;
+			const requestId = inFlight.latestRequestId;
 
 			for (const candidate of candidates) {
 				try {
 					const reason = await posthog.canRenderSurveyAsync(candidate.id);
 
-					if (!isActive || requestId !== latestRequestId) {
+					if (isSuperseded(signal, requestId)) {
 						return;
 					}
 
@@ -237,15 +253,16 @@ export function PostHogSurveyWidget({
 					hasTrackedShown.current = false;
 					return;
 				} catch (error) {
+					// oxlint-disable-next-line no-console -- Addressed to whoever authored the survey; a toast would interrupt a reader over a widget they never asked for, and silence would leave a misconfigured survey with no symptom at all.
 					console.error("[PostHogSurveyWidget] Error checking survey:", error);
 
-					if (!isActive || requestId !== latestRequestId) {
+					if (isSuperseded(signal, requestId)) {
 						return;
 					}
 				}
 			}
 
-			if (!isActive || requestId !== latestRequestId) {
+			if (isSuperseded(signal, requestId)) {
 				return;
 			}
 
@@ -256,33 +273,33 @@ export function PostHogSurveyWidget({
 		};
 
 		const unsubscribe = posthog.onSurveysLoaded(() => {
-			if (!isActive) {
+			if (cancellation.signal.aborted) {
 				return;
 			}
 			posthog.getSurveys((updatedSurveys) => {
-				void resolveSurvey(updatedSurveys as PostHogSurveyRaw[]);
+				void resolveSurvey(updatedSurveys, cancellation.signal);
 			}, false);
 		});
 
 		const initTimeout = setTimeout(() => {
-			if (!isActive) {
+			if (cancellation.signal.aborted) {
 				return;
 			}
 
 			posthog.getSurveys((surveys) => {
-				void resolveSurvey(surveys as PostHogSurveyRaw[]);
+				void resolveSurvey(surveys, cancellation.signal);
 			}, false);
 		}, 100);
 
 		return () => {
-			isActive = false;
+			cancellation.abort();
 			clearTimeout(initTimeout);
-			unsubscribe?.();
+			unsubscribe();
 		};
 	}, [autoOpen, posthog, surveyId]);
 
 	useEffect(() => {
-		if (!posthog || !survey || !isVisible || !showWithDelay || hasTrackedShown.current) {
+		if (!survey || !isVisible || !showWithDelay || hasTrackedShown.current) {
 			return;
 		}
 
@@ -304,14 +321,13 @@ export function PostHogSurveyWidget({
 		if (submissionId) {
 			return submissionId;
 		}
-		const generated =
-			typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}`;
+		const generated = uuidv4();
 		setSubmissionId(generated);
 		return generated;
 	};
 
 	const handleDismiss = (step: number) => {
-		if (!survey || !posthog) {
+		if (!survey) {
 			return;
 		}
 
@@ -330,7 +346,7 @@ export function PostHogSurveyWidget({
 	};
 
 	const handleProgress = (responses: Record<string, SurveyResponse>) => {
-		if (!survey || !posthog) {
+		if (!survey) {
 			return;
 		}
 		if (survey.enable_partial_responses === false || Object.keys(responses).length === 0) {
@@ -349,7 +365,7 @@ export function PostHogSurveyWidget({
 	};
 
 	const handleComplete = (responses: Record<string, SurveyResponse>) => {
-		if (!survey || !posthog) {
+		if (!survey) {
 			return;
 		}
 		const id = ensureSubmissionId();
@@ -481,7 +497,7 @@ const transformResponseValue = (question: SurveyQuestion, response: SurveyRespon
 		}
 		default:
 			if (Array.isArray(response)) {
-				return response.map((value) => value.toString());
+				return response.map((value) => value);
 			}
 			return String(response);
 	}

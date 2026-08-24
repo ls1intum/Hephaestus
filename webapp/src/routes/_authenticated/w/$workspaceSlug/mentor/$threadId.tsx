@@ -1,9 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { toast } from "sonner";
 import { Chat } from "@/components/mentor/Chat";
 import { defaultPartRenderers } from "@/components/mentor/renderers";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useMentorChat } from "@/hooks/use-mentor-chat";
-import type { ChatMessage } from "@/lib/types";
 
 export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/mentor/$threadId")({
 	component: ThreadContainer,
@@ -12,12 +12,9 @@ export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/mentor/$t
 function ThreadContainer() {
 	const { threadId } = Route.useParams();
 
-	const mentorChat = useMentorChat({
-		threadId,
-		onError: (error: Error) => {
-			console.error("Chat error:", error);
-		},
-	});
+	// No `onError`: `Chat` renders `status === "error"` inside the transcript, where the reader
+	// already is, rather than as a toast away from the conversation that failed.
+	const mentorChat = useMentorChat({ threadId });
 
 	const handleMessageSubmit = ({ text }: { text: string }) => {
 		if (!text.trim()) return;
@@ -29,8 +26,8 @@ function ThreadContainer() {
 	};
 
 	const handleCopy = (content: string) => {
-		navigator.clipboard.writeText(content).catch((error) => {
-			console.error("Failed to copy to clipboard:", error);
+		navigator.clipboard.writeText(content).catch(() => {
+			toast.error("Couldn't copy that to the clipboard.");
 		});
 	};
 
@@ -108,7 +105,7 @@ function ThreadContainer() {
 		);
 	}
 
-	if (!mentorChat.threadDetail && !mentorChat.isThreadLoading) {
+	if (!mentorChat.threadDetail) {
 		return (
 			<div className="h-full flex items-center justify-center p-6">
 				<div className="text-center">
@@ -121,17 +118,17 @@ function ThreadContainer() {
 	return (
 		<div className="flex flex-col flex-1 min-h-0">
 			<Chat
-				messages={mentorChat.messages as unknown as ChatMessage[]}
+				messages={mentorChat.messages}
 				votes={mentorChat.votes}
 				status={mentorChat.status}
 				readonly={false}
 				attachments={[]}
 				onMessageSubmit={handleMessageSubmit}
 				onMessageEdit={handleMessageEdit}
-				onStop={mentorChat.stop}
+				onStop={() => void mentorChat.stop()}
 				onReload={() => {
 					mentorChat.clearError();
-					mentorChat.regenerate();
+					void mentorChat.regenerate();
 				}}
 				onFileUpload={() => Promise.resolve([])}
 				onAttachmentsChange={() => {}}

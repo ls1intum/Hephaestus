@@ -1,17 +1,22 @@
 import { Link } from "@tanstack/react-router";
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { assert, describe, expect, it, vi } from "vitest";
+import { bindingsProblem } from "@/components/admin/practice-catalog/bindings";
 import { buttonVariants } from "@/components/ui/button";
 import {
 	mockAuthorDeclaredEvidenceValidation,
 	mockPracticeDefinitionOptions,
 	mockPullRequestBinding,
 	mockPullRequestPolicy,
+	mockPullRequestWorkType,
 } from "@/mocks/fixtures/practice";
 import { renderWithRouter } from "@/test/router-harness";
-import { bindingsProblem } from "../practice-catalog/bindings";
-import { CuratedPracticeForm, type CuratedPracticeFormInitialValue } from "./CuratedPracticeForm";
+import {
+	CuratedPracticeForm,
+	type CuratedPracticeFormInitialValue,
+	type CuratedPracticeFormValue,
+} from "./CuratedPracticeForm";
 
 /**
  * A cancel that navigates, which is what `useUnsavedChanges` guards. In the app it is a
@@ -24,7 +29,7 @@ const cancel = (
 );
 
 vi.mock("@/components/shared/CodeEditor", () => ({
-	CodeEditor: () => <div data-testid="code-editor" />,
+	CodeEditor: () => <div />,
 }));
 
 const initialData: CuratedPracticeFormInitialValue = {
@@ -42,7 +47,14 @@ const initialData: CuratedPracticeFormInitialValue = {
 	},
 };
 
-function renderForm(overrides: Partial<CuratedPracticeFormInitialValue> = {}, onSubmit = vi.fn()) {
+function submitSpy() {
+	return vi.fn<(value: CuratedPracticeFormValue) => void>();
+}
+
+function renderForm(
+	overrides: Partial<CuratedPracticeFormInitialValue> = {},
+	onSubmit = submitSpy(),
+) {
 	return renderWithRouter(
 		<CuratedPracticeForm
 			mode="edit"
@@ -66,9 +78,7 @@ function occasion() {
  * name, so the name is matched by prefix rather than in full.
  */
 function moment(signal: string) {
-	const option = mockPracticeDefinitionOptions.workTypes[0].signals.find(
-		(candidate) => candidate.signal === signal,
-	);
+	const option = mockPullRequestWorkType.signals.find((candidate) => candidate.signal === signal);
 	if (!option) throw new Error(`No signal option for ${signal}`);
 	return new RegExp(`^${option.displayName}`);
 }
@@ -138,9 +148,7 @@ describe("CuratedPracticeForm", () => {
 		});
 		fireEvent.click(screen.getByRole("link", { name: "Cancel" }));
 
-		expect(
-			await screen.findByRole("alertdialog", { name: "Discard unsaved changes?" }),
-		).toBeTruthy();
+		await screen.findByRole("alertdialog", { name: "Discard unsaved changes?" });
 		fireEvent.click(screen.getByRole("button", { name: "Keep editing" }));
 		await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
 		screen.getByDisplayValue("A new practice");
@@ -197,18 +205,17 @@ describe("CuratedPracticeForm", () => {
 		);
 
 		screen.getByDisplayValue("Write a clear pull request description");
+		expect(screen.getByRole<HTMLButtonElement>("button", { name: "Save changes" }).disabled).toBe(
+			true,
+		);
 		expect(
-			(screen.getByRole("button", { name: "Save changes" }) as HTMLButtonElement).disabled,
-		).toBe(true);
-		expect(
-			(screen.getByRole("button", { name: "Continue with my draft" }) as HTMLButtonElement)
-				.disabled,
+			screen.getByRole<HTMLButtonElement>("button", { name: "Continue with my draft" }).disabled,
 		).toBe(false);
 	});
 
 	it("submits the one occasion the practice is reviewed on", async () => {
 		const user = userEvent.setup();
-		const onSubmit = vi.fn();
+		const onSubmit = submitSpy();
 		await renderForm({}, onSubmit);
 
 		// Nothing adds a second: a practice that would read different evidence at a different moment is
@@ -218,16 +225,19 @@ describe("CuratedPracticeForm", () => {
 		await user.click(screen.getByRole("button", { name: "Save changes" }));
 
 		const submitted = onSubmit.mock.calls[0]?.[0];
+		assert(submitted);
 		expect(submitted.bindings).toHaveLength(1);
+		const [occasionSubmitted] = submitted.bindings;
+		assert(occasionSubmitted);
 		// Sorted the way the server stores them, so an untouched practice is not dirty on the way back.
-		expect(submitted.bindings[0].signals).toEqual(
+		expect(occasionSubmitted.signals).toStrictEqual(
 			["scm.pull_request.merged", ...mockPullRequestBinding.signals].sort(),
 		);
 	});
 
 	it("sends focus to the moments when none is chosen, not to the top of the form", async () => {
 		const user = userEvent.setup();
-		const onSubmit = vi.fn();
+		const onSubmit = submitSpy();
 		await renderForm({}, onSubmit);
 
 		for (const signal of mockPullRequestBinding.signals) {
@@ -236,9 +246,10 @@ describe("CuratedPracticeForm", () => {
 		await user.click(screen.getByRole("button", { name: "Save changes" }));
 
 		expect(onSubmit).not.toHaveBeenCalled();
-		// Two alerts now: the summary at the top of the form listing every refusal, and this one at
-		// the field it is about. The inline one is what this test is for — a summary alone would put
-		// the message a screenful away from the control that fixes it.
+		// A refusal raises two alerts: the summary at the top of the form listing every one, and this
+		// one at the field it is about — hence `getAllByRole` and the `some`. The inline alert is what
+		// this test is for; a summary alone would put the message a screenful from the control that
+		// fixes it.
 		expect(
 			screen
 				.getAllByRole("alert")
@@ -252,7 +263,7 @@ describe("CuratedPracticeForm", () => {
 
 	it("lets the review claim something is absent from a source it reads whole", async () => {
 		const user = userEvent.setup();
-		const onSubmit = vi.fn();
+		const onSubmit = submitSpy();
 		await renderForm({}, onSubmit);
 
 		await user.click(
@@ -301,28 +312,27 @@ describe("CuratedPracticeForm", () => {
 
 	it("strips the occasion's evidence when the practice stops being reviewed", async () => {
 		const user = userEvent.setup();
-		const onSubmit = vi.fn();
+		const onSubmit = submitSpy();
 		await renderForm({}, onSubmit);
 
 		await user.click(screen.getByRole("radio", { name: /Guidance only/ }));
 		await user.click(screen.getByRole("button", { name: "Save changes" }));
 
-		expect(onSubmit).toHaveBeenCalledWith(
-			expect.objectContaining({
-				bindings: [expect.objectContaining({ needs: [] })],
-				automatedReviewPolicy: expect.objectContaining({
-					automatedReview: { mode: "NONE", evidenceSufficiency: "NONE" },
-					knownLimitations: [],
-				}),
-			}),
-		);
+		const submitted = onSubmit.mock.calls[0]?.[0];
+		assert(submitted);
+		expect(submitted.bindings.map((binding) => binding.needs)).toStrictEqual([[]]);
+		expect(submitted.automatedReviewPolicy.automatedReview).toStrictEqual({
+			mode: "NONE",
+			evidenceSufficiency: "NONE",
+		});
+		expect(submitted.automatedReviewPolicy.knownLimitations).toStrictEqual([]);
 		await user.click(screen.getByRole("button", { name: /Technical settings/ }));
 		expect(screen.queryByText("Static analysis")).toBeNull();
 	});
 
 	it("gives the occasion its evidence back when review resumes", async () => {
 		const user = userEvent.setup();
-		const onSubmit = vi.fn();
+		const onSubmit = submitSpy();
 		await renderForm({}, onSubmit);
 
 		await user.click(screen.getByRole("radio", { name: /Guidance only/ }));
@@ -332,18 +342,17 @@ describe("CuratedPracticeForm", () => {
 		// Saveable, not merely non-empty: a list of purely contextual sources is longer than zero and
 		// still refused, so what has to hold is the rule the form itself enforces.
 		const submitted = onSubmit.mock.calls[0]?.[0];
+		assert(submitted);
+		const [resumed] = submitted.bindings;
+		assert(resumed);
 		expect(
-			bindingsProblem(
-				submitted.bindings[0],
-				submitted.automatedReviewPolicy,
-				mockPracticeDefinitionOptions.workTypes[0],
-			),
+			bindingsProblem(resumed, submitted.automatedReviewPolicy, mockPullRequestWorkType),
 		).toBeUndefined();
 	});
 
 	it("does not schedule mentoring when a practice needs human review", async () => {
 		const user = userEvent.setup();
-		const onSubmit = vi.fn();
+		const onSubmit = submitSpy();
 		await renderForm({ precomputeScript: "export default {};" }, onSubmit);
 
 		await user.click(screen.getByRole("radio", { name: /Human review needed/ }));
@@ -356,8 +365,9 @@ describe("CuratedPracticeForm", () => {
 
 		await user.click(screen.getByRole("button", { name: "Save changes" }));
 		const submitted = onSubmit.mock.calls[0]?.[0];
-		expect(submitted?.precomputeScript).toBeUndefined();
-		expect(submitted?.automatedReviewPolicy.automatedReview).toEqual({
+		assert(submitted);
+		expect(submitted.precomputeScript).toBeUndefined();
+		expect(submitted.automatedReviewPolicy.automatedReview).toStrictEqual({
 			mode: "LANGUAGE_MODEL",
 			evidenceSufficiency: "DECLARED_EVIDENCE_INSUFFICIENT",
 		});

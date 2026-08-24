@@ -62,7 +62,7 @@ function feedbackPage(
 			selects(query.suppressionReason, row.suppressionReason) &&
 			(query.recipientUserId === undefined || row.recipient?.id === query.recipientUserId),
 	);
-	const number = query.page ?? 0;
+	const number = query.page;
 	return {
 		content: rows.slice(number * REVIEW_PAGE_SIZE, (number + 1) * REVIEW_PAGE_SIZE),
 		page: {

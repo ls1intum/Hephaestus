@@ -62,7 +62,7 @@ public final class ServerUrlValidator {
         try {
             uri = new URI(url.trim());
         } catch (URISyntaxException e) {
-            throw new IllegalArgumentException("Server URL is malformed: " + e.getMessage());
+            throw new IllegalArgumentException("Server URL is malformed: " + e.getMessage(), e);
         }
 
         // Must be HTTPS

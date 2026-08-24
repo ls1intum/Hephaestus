@@ -11,6 +11,11 @@ export function nonEmpty<T>(values: T[]): T[] | undefined {
 	return values.length > 0 ? values : undefined;
 }
 
+/** Page one is index `0`, which the parsers here already default to, so `page=0` is noise in a URL. */
+export function pageParam(page: number | undefined): number | undefined {
+	return page === 0 ? undefined : page;
+}
+
 export function narrowToEnum<T extends string>(
 	values: string[] | undefined,
 	allowed: readonly T[],

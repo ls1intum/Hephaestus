@@ -1,15 +1,16 @@
+import { isStaticToolUIPart } from "ai";
 import { AnimatePresence, motion } from "motion/react";
 import { type InputHTMLAttributes, useState } from "react";
 import { Streamdown } from "streamdown";
 import type { ChatMessageVote } from "@/api/types.gen";
 import { MarkdownCode } from "@/components/common/MarkdownCode";
-import type { ChatMessage } from "@/lib/types";
+import type { ChatMessage, ChatTools } from "@/lib/types";
 import { cn, sanitizeText } from "@/lib/utils";
 import { MentorAvatar } from "./MentorAvatar";
 import { MessageActions } from "./MessageActions";
 import { MessageEditor } from "./MessageEditor";
 import { PreviewAttachment } from "./PreviewAttachment";
-import type { PartRenderer, PartRendererMap, ToolPart } from "./renderers/types";
+import type { PartRendererMap } from "./renderers/types";
 
 export interface MessageProps {
 	message: ChatMessage;
@@ -49,14 +50,13 @@ export function PreviewMessage({
 }: MessageProps) {
 	const [mode, setMode] = useState<"view" | "edit">(initialEditMode ? "edit" : "view");
 
-	const attachmentsFromMessage = message.parts?.filter((part) => part.type === "file") ?? [];
+	const attachmentsFromMessage = message.parts.filter((part) => part.type === "file");
 
 	const isArtifact = variant === "artifact";
 
 	return (
 		<AnimatePresence>
 			<motion.div
-				data-testid={`message-${message.role}`}
 				className={cn(
 					"w-full max-w-3xl px-4 group/message",
 					{
@@ -77,13 +77,11 @@ export function PreviewMessage({
 						},
 					)}
 				>
-					{message.role === "assistant" && (
-						<MentorAvatar streaming={isLoading && message.role === "assistant"} />
-					)}
+					{message.role === "assistant" && <MentorAvatar streaming={isLoading} />}
 
 					<div className="flex flex-col gap-4 w-full">
 						{attachmentsFromMessage.length > 0 && (
-							<div data-testid="message-attachments" className="flex flex-row justify-end gap-2">
+							<div className="flex flex-row justify-end gap-2">
 								{attachmentsFromMessage.map((attachment) => (
 									<PreviewAttachment
 										key={attachment.url}
@@ -97,7 +95,7 @@ export function PreviewMessage({
 							</div>
 						)}
 
-						{message.parts?.map((part, index) => {
+						{message.parts.map((part, index) => {
 							const { type } = part;
 							const key = `message-${message.id}-part-${index}`;
 
@@ -106,7 +104,6 @@ export function PreviewMessage({
 									return (
 										<div
 											key={key}
-											data-testid="message-content"
 											className={cn("flex flex-col gap-4", {
 												"self-end w-fit min-w-0 bg-primary text-primary-foreground px-3 py-2 rounded-xl ml-5":
 													message.role === "user",
@@ -119,39 +116,32 @@ export function PreviewMessage({
 									);
 								}
 
-								if (mode === "edit") {
-									return (
-										<div key={key} className="flex flex-row gap-2 items-start">
-											<div className="size-8" />
+								return (
+									<div key={key} className="flex flex-row gap-2 items-start">
+										<div className="size-8" />
 
-											<MessageEditor
-												key={message.id}
-												initialContent={part.text}
-												onCancel={() => setMode("view")}
-												onSend={(content) => {
-													onMessageEdit?.(message.id, content);
-													setMode("view");
-												}}
-											/>
-										</div>
-									);
-								}
+										<MessageEditor
+											key={message.id}
+											initialContent={part.text}
+											onCancel={() => setMode("view")}
+											onSend={(content) => {
+												onMessageEdit?.(message.id, content);
+												setMode("view");
+											}}
+										/>
+									</div>
+								);
 							}
 
-							if (type.startsWith("tool-")) {
-								if (!partRenderers) return null;
-								const toolKey = (part as { toolCallId?: string }).toolCallId || key;
-								const isAnyToolPart = (p: unknown): p is ToolPart =>
-									Boolean(
-										p &&
-											typeof (p as { type?: unknown }).type === "string" &&
-											(p as { type: string }).type.startsWith("tool-"),
-									);
-								if (!isAnyToolPart(part)) return null;
-								const renderers = partRenderers as unknown as Record<string, PartRenderer>;
-								const Renderer = renderers[type];
+							if (isStaticToolUIPart<ChatTools>(part)) {
+								const Renderer = partRenderers?.[part.type];
 								return Renderer ? (
-									<Renderer key={toolKey} message={message} part={part} variant={variant} />
+									<Renderer
+										key={part.toolCallId || key}
+										message={message}
+										part={part}
+										variant={variant}
+									/>
 								) : null;
 							}
 
@@ -162,12 +152,10 @@ export function PreviewMessage({
 							<MessageActions
 								className="-mt-3"
 								key={`action-${message.id}`}
-								messageContentToCopy={
-									message.parts
-										?.filter((p) => p.type === "text")
-										?.map((p) => p.text)
-										?.join("\n") ?? ""
-								}
+								messageContentToCopy={message.parts
+									.filter((p) => p.type === "text")
+									.map((p) => p.text)
+									.join("\n")}
 								messageRole={message.role}
 								vote={vote}
 								isLoading={isLoading}
@@ -194,7 +182,6 @@ export const ThinkingMessage = () => {
 
 	return (
 		<motion.div
-			data-testid="message-assistant-loading"
 			className="w-full mx-auto max-w-3xl px-4 group/message min-h-96"
 			initial={{ y: 5 }}
 			animate={{ y: 0 }}

@@ -1,4 +1,10 @@
-import { ARTIFACT_KIND, type ArtifactKindId, artifactKindPluralLabel } from "@/lib/artifact-kinds";
+import type { FilterOption } from "@/components/common/FilterToggle";
+import {
+	ARTIFACT_KIND,
+	type ArtifactKindId,
+	artifactKindPluralLabel,
+	type KnownArtifactKind,
+} from "@/lib/artifact-kinds";
 
 export type WorkArtifact = ArtifactKindId;
 
@@ -29,7 +35,7 @@ export const WORK_ARTIFACT_FILTER_OPTIONS = [
  * because a Base UI `Select` must hold one, and it is the sentinel the URL already carries.
  */
 export const WORK_ARTIFACT_FILTER_ITEMS: {
-	value: "ALL" | ArtifactKindId;
+	value: ArtifactKindId;
 	label: string;
 }[] = [{ value: "ALL", label: "All work types" }, ...WORK_ARTIFACT_FILTER_OPTIONS];
 
@@ -37,12 +43,7 @@ export const WORK_ARTIFACT_FILTER_ITEMS: {
  * The same list for {@link FilterToggle}. "All" is shortened on screen to fit the row, so the full
  * name is restored for a screen reader (WCAG 2.2 SC 2.5.3).
  */
-export const WORK_TYPE_FILTER_OPTIONS: {
-	value: "ALL" | ArtifactKindId;
-	label: string;
-	shortLabel?: string;
-	srSuffix?: string;
-}[] = [
+export const WORK_TYPE_FILTER_OPTIONS: FilterOption<"ALL" | KnownArtifactKind>[] = [
 	{ value: "ALL", label: "All work types", shortLabel: "All", srSuffix: "work types" },
 	...WORK_ARTIFACT_FILTER_OPTIONS,
 ];

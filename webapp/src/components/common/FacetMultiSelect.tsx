@@ -63,10 +63,11 @@ export interface FacetMultiSelectProps<TValue extends string | number> {
 export function toFacetOptions<TValue extends string>(
 	labels: Record<TValue, string>,
 ): FacetOption<TValue>[] {
-	return Object.entries(labels).map(([value, label]) => ({
-		value: value as TValue,
-		label: String(label),
-	}));
+	const options: FacetOption<TValue>[] = [];
+	for (const value in labels) {
+		options.push({ value, label: labels[value] });
+	}
+	return options;
 }
 
 const MAX_INLINE_CHIPS = 2;
@@ -155,7 +156,7 @@ export function FacetMultiSelect<TValue extends string | number>({
 							{selectedOptions.length > 0 && (
 								<span className="text-muted-foreground">
 									:{" "}
-									{selectedOptions.length === 1
+									{selectedOptions.length === 1 && selectedOptions[0]
 										? selectedOptions[0].label
 										: `${selectedOptions.length} selected`}
 								</span>

@@ -38,7 +38,7 @@ export function CuratedAreaEditLevel({ areaSlug, nested, onDone }: CuratedAreaEd
 					<QueryErrorAlert
 						error={areaQuery.error}
 						title="Couldn't load the group"
-						onRetry={() => areaQuery.refetch()}
+						onRetry={() => void areaQuery.refetch()}
 					/>
 				</DrawerBody>
 			) : (
@@ -66,6 +66,23 @@ function LoadedCuratedAreaEditor({ areaSlug, initialArea, onDone }: LoadedCurate
 	const [formGeneration, setFormGeneration] = useState(0);
 	const detailOptions = adminGetCuratedAreaOptions({ path: { slug: areaSlug } });
 	const detailQueryKey = adminGetCuratedAreaQueryKey({ path: { slug: areaSlug } });
+
+	const continueWithDraft = async () => {
+		try {
+			await queryClient.invalidateQueries({
+				queryKey: detailQueryKey,
+				exact: true,
+				refetchType: "none",
+			});
+			const latest: CuratedArea = await queryClient.fetchQuery(detailOptions);
+			setBaseArea(latest);
+			setConflict(false);
+		} catch (error) {
+			toast.error("Couldn't load the current version", {
+				description: problemDetailOf(error),
+			});
+		}
+	};
 
 	const invalidateCatalog = () =>
 		void queryClient.invalidateQueries({ queryKey: adminGetCuratedCatalogQueryKey() });
@@ -156,22 +173,7 @@ function LoadedCuratedAreaEditor({ areaSlug, initialArea, onDone }: LoadedCurate
 			isResetPending={deleteOverride.isPending}
 			isKeepPending={keepCurrentDefinition.isPending}
 			conflict={conflict}
-			onContinueWithDraft={async () => {
-				try {
-					await queryClient.invalidateQueries({
-						queryKey: detailQueryKey,
-						exact: true,
-						refetchType: "none",
-					});
-					const latest: CuratedArea = await queryClient.fetchQuery(detailOptions);
-					setBaseArea(latest);
-					setConflict(false);
-				} catch (error) {
-					toast.error("Couldn't load the current version", {
-						description: problemDetailOf(error),
-					});
-				}
-			}}
+			onContinueWithDraft={() => void continueWithDraft()}
 			onUseHephaestusVersion={() => {
 				setConflict(false);
 				deleteOverride.mutate({

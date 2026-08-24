@@ -1,11 +1,12 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { endOfISOWeek, formatISO, startOfISOWeek } from "date-fns";
 import { fn } from "storybook/test";
+import { STORY_NOW } from "@/components/common/story-clock";
 import { withStandardPage } from "@/stories/decorators";
 import { expectNoPageOverflow } from "@/test/reflow";
 import { ProfilePage } from "./ProfilePage";
 
-const now = new Date();
+const now = new Date(STORY_NOW);
 const defaultAfter = formatISO(startOfISOWeek(now));
 const defaultBefore = formatISO(endOfISOWeek(now));
 
@@ -143,9 +144,9 @@ export const MobileReflow: Story = {
 		...Default.args,
 		username: "avery-long-provider-username-that-must-remain-readable",
 		profileData: {
-			...Default.args?.profileData,
+			...Default.args.profileData,
 			userInfo: {
-				...Default.args?.profileData?.userInfo,
+				...Default.args.profileData?.userInfo,
 				id: 99,
 				login: "avery-long-provider-username-that-must-remain-readable",
 				name: "A deliberately long contributor name that wraps cleanly",
@@ -153,14 +154,14 @@ export const MobileReflow: Story = {
 				htmlUrl: "https://github.com/avery-long-provider-username-that-must-remain-readable",
 				leaguePoints: 150,
 			},
-			xpRecord: Default.args?.profileData?.xpRecord ?? {
+			xpRecord: Default.args.profileData?.xpRecord ?? {
 				currentLevel: 5,
 				currentLevelXP: 450,
 				xpNeeded: 1000,
 				totalXP: 5450,
 			},
-			firstContribution: Default.args?.profileData?.firstContribution,
-			contributedRepositories: Default.args?.profileData?.contributedRepositories ?? [],
+			firstContribution: Default.args.profileData?.firstContribution,
+			contributedRepositories: Default.args.profileData?.contributedRepositories ?? [],
 		},
 	},
 	parameters: {

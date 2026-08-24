@@ -1,35 +1,39 @@
-import { forwardRef, type SVGProps } from "react";
+import type { ReactElement, SVGProps } from "react";
 
 // lucide-react v1 dropped brand glyphs (GitHub, GitLab, ...) for licensing reasons.
 // These thin wrappers mimic the Lucide icon API (size/className/currentColor) so
 // callsites that previously imported `GithubIcon`/`GitlabIcon` from lucide-react
 // can drop-in replace by switching the import path.
 
-export type BrandIcon = React.ForwardRefExoticComponent<
-	SVGProps<SVGSVGElement> & { size?: number | string } & React.RefAttributes<SVGSVGElement>
->;
+type BrandIconProps = SVGProps<SVGSVGElement> & { size?: number | string };
+
+/**
+ * A plain function component. Lucide's icons are `ForwardRefExoticComponent`s, so a slot that takes
+ * either has to name both types rather than reusing Lucide's.
+ */
+export type BrandIcon = {
+	(props: BrandIconProps): ReactElement;
+	displayName?: string;
+};
 
 const make = (displayName: string, viewBox: string, path: string): BrandIcon => {
-	const Icon = forwardRef<SVGSVGElement, SVGProps<SVGSVGElement> & { size?: number | string }>(
-		({ size, width, height, ...props }, ref) => {
-			const label = props["aria-label"] ?? displayName;
-			return (
-				<svg
-					ref={ref}
-					xmlns="http://www.w3.org/2000/svg"
-					viewBox={viewBox}
-					width={width ?? size ?? "1em"}
-					height={height ?? size ?? "1em"}
-					fill="currentColor"
-					role="img"
-					{...props}
-				>
-					<title>{label}</title>
-					<path d={path} />
-				</svg>
-			);
-		},
-	);
+	const Icon: BrandIcon = ({ size, width, height, ...props }: BrandIconProps) => {
+		const label = props["aria-label"] ?? displayName;
+		return (
+			<svg
+				xmlns="http://www.w3.org/2000/svg"
+				viewBox={viewBox}
+				width={width ?? size ?? "1em"}
+				height={height ?? size ?? "1em"}
+				fill="currentColor"
+				role="img"
+				{...props}
+			>
+				<title>{label}</title>
+				<path d={path} />
+			</svg>
+		);
+	};
 	Icon.displayName = displayName;
 	return Icon;
 };

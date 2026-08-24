@@ -1,3 +1,4 @@
+import { QuestionDescription } from "@/components/surveys/question-description";
 import { Button } from "@/components/ui/button";
 import {
 	Field,
@@ -8,7 +9,6 @@ import {
 } from "@/components/ui/field";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import type { SurveyQuestion, SurveyResponse } from "@/types/survey";
-import { QuestionDescription } from "../question-description";
 
 type QuestionRatingQuestion = Pick<
 	SurveyQuestion,
@@ -62,12 +62,12 @@ export function QuestionRating({
 
 	const handleNumericChange = (nextValue: readonly string[]) => {
 		// Base UI ToggleGroup uses array-based API - take the last selected value
-		const value = nextValue[nextValue.length - 1];
-		if (!value) {
+		const picked = nextValue[nextValue.length - 1];
+		if (!picked) {
 			return;
 		}
 
-		const parsed = Number(value);
+		const parsed = Number(picked);
 		if (!Number.isNaN(parsed)) {
 			onChange(parsed);
 		}

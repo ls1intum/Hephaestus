@@ -110,7 +110,6 @@ export function MessageActions({
 							<TooltipTrigger
 								render={
 									<Button
-										data-testid="message-upvote"
 										aria-label="Good response"
 										className={cn(
 											"touch:w-10 size-8 text-muted-foreground hover:text-provider-success-foreground hover:bg-provider-success-foreground/10",
@@ -134,7 +133,6 @@ export function MessageActions({
 							<TooltipTrigger
 								render={
 									<Button
-										data-testid="message-downvote"
 										aria-label="Bad response"
 										className={cn(
 											"touch:w-10 size-8 text-muted-foreground hover:text-provider-danger-foreground hover:bg-provider-danger-foreground/10",

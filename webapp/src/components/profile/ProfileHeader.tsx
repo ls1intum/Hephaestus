@@ -111,7 +111,7 @@ export function ProfileHeader({
 								{achievementsEnabled && (
 									<Link
 										to="/w/$workspaceSlug/user/$username/achievements"
-										params={{ workspaceSlug, username: user.login ?? "" }}
+										params={{ workspaceSlug, username: user.login }}
 										className={buttonVariants({
 											variant: "ghost",
 											size: "sm",

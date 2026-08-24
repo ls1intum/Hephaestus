@@ -187,7 +187,7 @@ function MomentNode({
 					id={controlId}
 					checked={chosen}
 					disabled={disabled}
-					onCheckedChange={(next) => onToggle(next === true)}
+					onCheckedChange={(next) => onToggle(next)}
 				/>
 			</span>
 			<span

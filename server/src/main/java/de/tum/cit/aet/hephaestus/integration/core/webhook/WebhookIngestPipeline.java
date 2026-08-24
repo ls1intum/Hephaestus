@@ -8,8 +8,6 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.WebhookPublishGate;
 import de.tum.cit.aet.hephaestus.integration.core.spi.WebhookSignatureVerifier;
 import de.tum.cit.aet.hephaestus.integration.core.spi.WebhookSignatureVerifier.VerificationResult;
 import de.tum.cit.aet.hephaestus.integration.core.spi.WebhookSignatureVerifier.WebhookRequest;
-import de.tum.cit.aet.hephaestus.integration.core.webhook.JetStreamPublisher;
-import de.tum.cit.aet.hephaestus.integration.core.webhook.PublishRequest;
 import jakarta.servlet.http.HttpServletRequest;
 import java.io.IOException;
 import java.time.Duration;

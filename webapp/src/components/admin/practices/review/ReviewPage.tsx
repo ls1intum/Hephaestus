@@ -37,7 +37,10 @@ export function ReviewPage({ section, onSectionChange, running, sections }: Revi
 			{running && <ReviewRunningBanner running={running} />}
 			<Tabs
 				value={section}
-				onValueChange={(next) => onSectionChange(next as ReviewSectionId)}
+				onValueChange={(next) => {
+					const opened = REVIEW_SECTIONS.find((candidate) => candidate.id === next);
+					if (opened) onSectionChange(opened.id);
+				}}
 				className="gap-6"
 			>
 				{/* `h-auto` and wrapping: the labels do not fit on one narrow line, and a tab list that

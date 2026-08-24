@@ -1,4 +1,4 @@
-import { type FormEvent, useRef, useState } from "react";
+import { type SubmitEvent, useRef, useState } from "react";
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -43,7 +43,7 @@ export function DeleteWorkspaceAlertDialog({
 		onOpenChange(next);
 	}
 
-	function confirm(event: FormEvent<HTMLFormElement>) {
+	function confirm(event: SubmitEvent<HTMLFormElement>) {
 		event.preventDefault();
 		if (confirmText !== workspaceSlug) {
 			setMismatch(true);

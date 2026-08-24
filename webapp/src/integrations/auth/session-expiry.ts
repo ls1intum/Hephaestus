@@ -84,19 +84,19 @@ let lastRefreshRecoveryAt = 0;
  * invalidations.
  */
 function recoverOrLogout(queryClient: QueryClient, currentPath: string): Promise<void> {
-	if (!recovery) {
-		recovery = doRecoverOrLogout(queryClient, currentPath).finally(() => {
-			recovery = null;
-		});
-	}
+	recovery ??= doRecoverOrLogout(queryClient, currentPath).finally(() => {
+		recovery = null;
+	});
 	return recovery;
 }
 
 async function doRecoverOrLogout(queryClient: QueryClient, currentPath: string): Promise<void> {
+	// oxlint-disable-next-line no-restricted-properties -- Module-level response interceptor: there is no component here to hold `useNow`, and the cooldown is shorter than its tick besides.
 	const recentlyRecovered = Date.now() - lastRefreshRecoveryAt < REFRESH_RECOVERY_COOLDOWN_MS;
 	if (!recentlyRecovered && (await refreshAccessToken())) {
 		// Session restored under a fresh cookie — refetch active queries so the UI recovers in place
 		// (including the failed request's data) without a navigation.
+		// oxlint-disable-next-line no-restricted-properties -- The stamp the cooldown above subtracts from; the two have to read one clock.
 		lastRefreshRecoveryAt = Date.now();
 		void queryClient.invalidateQueries();
 		return;

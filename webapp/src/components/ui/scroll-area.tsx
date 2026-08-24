@@ -52,10 +52,13 @@ function ScrollBar({
 	return (
 		<ScrollAreaPrimitive.Scrollbar
 			data-slot="scroll-area-scrollbar"
-			data-orientation={orientation}
 			orientation={orientation}
+			// Match the axis on `data-orientation`, never `data-horizontal`: Base UI writes non-boolean
+			// state as `data-<key>="<value>"`, so a `data-horizontal:` variant compiles to
+			// `[data-horizontal]` and matches nothing — and these utilities are the scrollbar's whole
+			// box, so it would render as a bare strip of padding with no width and no border.
 			className={cn(
-				"data-horizontal:h-2.5 data-horizontal:flex-col data-horizontal:border-t data-horizontal:border-t-transparent data-vertical:h-full data-vertical:w-2.5 data-vertical:border-l data-vertical:border-l-transparent flex touch-none p-px transition-colors select-none",
+				"data-[orientation=horizontal]:h-2.5 data-[orientation=horizontal]:flex-col data-[orientation=horizontal]:border-t data-[orientation=horizontal]:border-t-transparent data-[orientation=vertical]:h-full data-[orientation=vertical]:w-2.5 data-[orientation=vertical]:border-l data-[orientation=vertical]:border-l-transparent flex touch-none p-px transition-colors select-none",
 				className,
 			)}
 			{...props}

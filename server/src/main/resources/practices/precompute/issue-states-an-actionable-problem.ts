@@ -8,11 +8,11 @@ import type { Hint } from "../lib/types";
 
 /** Title-token overlap (Jaccard) — a coarse near-duplicate signal across the project inventory. */
 function titleOverlap(a: string, b: string): number {
-	// String(...) coerces defensively: a malformed inventory item whose `title` is a number/object would
-	// otherwise throw on .toLowerCase() and discard this script's entire result (runner per-script catch).
+	// Both callers pass text that lib/context.ts has already established is a string — an inventory item
+	// whose `title` is a number or an object is dropped there rather than reaching this comparison.
 	const toks = (s: string) =>
 		new Set(
-			String(s ?? "")
+			s
 				.toLowerCase()
 				.split(/[^a-z0-9]+/)
 				.filter((t) => t.length > 3),
@@ -34,7 +34,7 @@ interface IssueMeta {
 
 const has = (re: RegExp, s: string) => re.test(s);
 
-export default async function (
+export default async function issueStatesAnActionableProblem(
 	_repo: string,
 	_diff: Map<string, unknown>,
 	m: IssueMeta,
@@ -152,14 +152,12 @@ export default async function (
 	const inventory = await readProjectInventory(contextDir);
 	if (inventory?.issues?.length && title.length > 0) {
 		const matches: InventoryItem[] = inventory.issues
-			.filter((it) => titleOverlap(title, it.title ?? "") >= 0.5)
+			.filter((it) => titleOverlap(title, it.title) >= 0.5)
 			.slice(0, 3);
 		nearDuplicateCount = matches.length;
 		if (matches.length > 0) {
 			directions.push(
-				`Cross-artifact fact: ${matches.length} other issue(s) in this project share a strongly-overlapping title — ` +
-					matches.map((it) => `#${it.number} "${it.title}" (${it.state ?? "?"})`).join("; ") +
-					`. Open project_inventory.json and compare bodies before crediting this as a fresh, distinct problem.`,
+				`Cross-artifact fact: ${matches.length} other issue(s) in this project share a strongly-overlapping title — ${matches.map((it) => `#${it.number} "${it.title}" (${it.state ?? "?"})`).join("; ")}. Open project_inventory.json and compare bodies before crediting this as a fresh, distinct problem.`,
 			);
 		} else if (inventory.truncated) {
 			// Capped listing: the absence of an overlap among the LISTED subset does NOT prove uniqueness.
@@ -177,14 +175,12 @@ export default async function (
 	// closing refs are not synced, so this title-overlap is a CANDIDATE signal only; the LLM confirms.
 	if (inventory?.pullRequests?.length && title.length > 0) {
 		const prMatches = inventory.pullRequests
-			.filter((p) => p.state === "OPEN" && titleOverlap(title, p.title ?? "") >= 0.5)
+			.filter((p) => p.state === "OPEN" && titleOverlap(title, p.title) >= 0.5)
 			.slice(0, 3);
 		openPrTitleMatchCount = prMatches.length;
 		if (prMatches.length > 0) {
 			directions.push(
-				`Cross-artifact fact: ${prMatches.length} OPEN pull request(s) have a strongly-overlapping title — ` +
-					prMatches.map((p) => `#${p.number} "${p.title}"`).join("; ") +
-					`. This issue's work may already be in flight; open project_inventory.json and confirm before treating it as unaddressed (title overlap only — PR-to-issue links are not in the index).`,
+				`Cross-artifact fact: ${prMatches.length} OPEN pull request(s) have a strongly-overlapping title — ${prMatches.map((p) => `#${p.number} "${p.title}"`).join("; ")}. This issue's work may already be in flight; open project_inventory.json and confirm before treating it as unaddressed (title overlap only — PR-to-issue links are not in the index).`,
 			);
 		}
 	}

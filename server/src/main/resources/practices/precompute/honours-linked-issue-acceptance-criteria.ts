@@ -4,6 +4,7 @@
 // each criterion to done/deferred. No observation. This practice over-NAs when the linked-issue fact is absent, so
 // the point is to make BOTH the link and the issue's done-artifact visible when they exist.
 import { readContextJson } from "../lib/context";
+import { isJsonObject } from "../lib/practice-contract";
 import type { DiffFile, PullRequestMetadata } from "../lib/types";
 
 // Closing-keyword grammar shared by GitHub/GitLab: close|closes|closed|fix|fixes|fixed|resolve|resolves|resolved
@@ -39,16 +40,37 @@ interface LinkedWorkItem {
 	description?: string;
 }
 
+function optionalText(value: unknown): string | undefined {
+	return typeof value === "string" ? value : undefined;
+}
+
+function optionalRef(value: unknown): number | string | undefined {
+	return typeof value === "number" || typeof value === "string" ? value : undefined;
+}
+
+// An entry carrying none of the fields above still counts as a linked item: `linkedIssueCount` reports
+// how many items the connector linked, which is a fact about the tracker, not about how much of each
+// entry this side could read.
+function toLinkedWorkItem(entry: unknown): LinkedWorkItem {
+	if (!isJsonObject(entry)) return {};
+	return {
+		number: optionalRef(entry.number),
+		iid: optionalRef(entry.iid),
+		title: optionalText(entry.title),
+		bodyExcerpt: optionalText(entry.bodyExcerpt),
+		body: optionalText(entry.body),
+		description: optionalText(entry.description),
+	};
+}
+
 // Unwrap whatever shape linked_work_items.json carries into a flat item list (or null if not a usable object).
 function unwrapLinkedItems(data: unknown): LinkedWorkItem[] | null {
+	if (Array.isArray(data)) return data.map(toLinkedWorkItem);
+	if (!isJsonObject(data)) return null;
 	// The SCM connector wraps items under `workItems`; check it FIRST, then host-general fallbacks.
-	if (data && Array.isArray((data as { workItems?: unknown }).workItems))
-		return (data as { workItems: LinkedWorkItem[] }).workItems;
-	if (Array.isArray(data)) return data as LinkedWorkItem[];
-	if (data && Array.isArray((data as { items?: unknown }).items))
-		return (data as { items: LinkedWorkItem[] }).items;
-	if (data && typeof data === "object") return [data as LinkedWorkItem];
-	return null;
+	if (Array.isArray(data.workItems)) return data.workItems.map(toLinkedWorkItem);
+	if (Array.isArray(data.items)) return data.items.map(toLinkedWorkItem);
+	return [toLinkedWorkItem(data)];
 }
 
 // Repo-mount-derived fallback for linked_work_items.json (.../inputs/sources/scm/repo → .../inputs/context/...).
@@ -58,7 +80,7 @@ async function readLinkedItemsFromRepoPath(repoPath: string): Promise<LinkedWork
 	const idx = repoPath.lastIndexOf("/inputs/");
 	if (idx < 0) return null;
 	try {
-		const data = await Bun.file(
+		const data: unknown = await Bun.file(
 			`${repoPath.slice(0, idx)}/inputs/context/linked_work_items.json`,
 		).json();
 		return unwrapLinkedItems(data);
@@ -91,7 +113,7 @@ function acFacts(body: string): { heading: boolean; boxes: number } {
 	return { heading, boxes };
 }
 
-export default async function (
+export default async function honoursLinkedIssueAcceptanceCriteria(
 	repoPath: string,
 	_diff: Map<string, DiffFile>,
 	meta: PullRequestMetadata,
@@ -99,7 +121,7 @@ export default async function (
 ) {
 	const title = meta.title ?? "";
 	const body = meta.body ?? "";
-	const branch = meta.source_branch ?? "";
+	const branch = meta.source_branch;
 
 	// Only explicit closing keywords + issue URLs in title/body are CLOSING references. A bare number in a
 	// branch name (e.g. `fix/2024-01-rewrite` → #2024, a year) is at most a *traceability* candidate, not a

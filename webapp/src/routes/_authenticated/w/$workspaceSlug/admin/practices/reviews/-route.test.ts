@@ -113,9 +113,9 @@ describe("practice review routes", () => {
 		const navigation = screen.getByRole("navigation", { name: "Practice review sections" });
 		expect(within(navigation).queryByRole("link", { current: "page" })).toBeNull();
 
-		const deliveryLink = within(navigation).getByRole("link", {
+		const deliveryLink = within(navigation).getByRole<HTMLAnchorElement>("link", {
 			name: "Delivery",
-		}) as HTMLAnchorElement;
+		});
 		const deliveryUrl = new URL(deliveryLink.href);
 		expect(deliveryUrl.pathname).toBe("/w/acme/admin/practices/reviews/delivery");
 		expect(deliveryUrl.searchParams.get("artifactKind")).toBe("scm.pull_request");

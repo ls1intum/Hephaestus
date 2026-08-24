@@ -75,12 +75,12 @@ function AdminMembersContainer() {
 	const toggleHidden = useMutation({
 		...updateMemberVisibilityMutation(),
 		onSuccess: () => {
-			queryClient.invalidateQueries({
+			void queryClient.invalidateQueries({
 				queryKey: getUsersWithTeamsQueryKey({ path: { workspaceSlug: workspaceSlug ?? "" } }),
 			});
 		},
 		onError: (error) => {
-			toast.error(`Failed to update visibility: ${(error as Error).message}`);
+			toast.error(`Failed to update visibility: ${error.message}`);
 		},
 	});
 
@@ -92,13 +92,13 @@ function AdminMembersContainer() {
 		});
 	};
 
-	const users = (usersData?.map(adaptApiUserTeams) || [])
+	const users = (usersData?.map(adaptApiUserTeams) ?? [])
 		.map((user) => ({
 			...user,
-			teams: [...(user.teams || [])].sort((a, b) => a.name.localeCompare(b.name)),
+			teams: [...user.teams].sort((a, b) => a.name.localeCompare(b.name)),
 		}))
 		.sort((a, b) => a.user.name.localeCompare(b.user.name));
-	const teams = [...(teamsData || [])].sort((a, b) => a.name.localeCompare(b.name));
+	const teams = [...(teamsData ?? [])].sort((a, b) => a.name.localeCompare(b.name));
 	const isLoading = isWorkspaceLoading || usersLoading || teamsLoading;
 	const selectedTeam =
 		search.team && teams.some((team) => team.id.toString() === search.team) ? search.team : "all";
@@ -113,7 +113,7 @@ function AdminMembersContainer() {
 
 	useEffect(() => {
 		if (teamsData && !teamsError && search.team && selectedTeam === "all") {
-			navigate({ search: (previous) => ({ ...previous, team: undefined }), replace: true });
+			void navigate({ search: (previous) => ({ ...previous, team: undefined }), replace: true });
 		}
 	}, [navigate, search.team, selectedTeam, teamsData, teamsError]);
 
@@ -128,13 +128,13 @@ function AdminMembersContainer() {
 			isLoading={isLoading || !workspaceSlug}
 			error={workspaceError ?? usersError ?? teamsError}
 			onRetry={() => {
-				refetchUsers();
-				refetchTeams();
+				void refetchUsers();
+				void refetchTeams();
 			}}
 			onToggleHidden={handleToggleHidden}
 			view={view}
 			onViewChange={(patch) => {
-				navigate({
+				void navigate({
 					search: (previous) => {
 						const next = {
 							q: "",

@@ -2,7 +2,6 @@ package de.tum.cit.aet.hephaestus.integration.scm.domain.issuecomment;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.RepositoryItemCountProjection;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;

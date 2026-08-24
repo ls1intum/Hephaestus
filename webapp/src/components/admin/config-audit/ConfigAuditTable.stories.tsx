@@ -3,6 +3,35 @@ import { expect, fn, screen, userEvent, within } from "storybook/test";
 import type { ConfigAuditEntryView } from "@/api/types.gen";
 import { ConfigAuditTable } from "./ConfigAuditTable";
 
+const impersonatedUpdate: ConfigAuditEntryView = {
+	id: 3,
+	occurredAt: new Date("2026-07-10T09:50:00Z"),
+	actorKind: "IMPERSONATED",
+	actorAccountId: 42,
+	actor: { id: 42, displayName: "Ada Lovelace", email: "ada@example.com" },
+	actingAccountId: 7,
+	actingActor: { id: 7, displayName: "Grace Hopper", email: "grace@example.com" },
+	entityType: "AGENT_CONFIG",
+	entityId: "5",
+	action: "UPDATED",
+	changedKeys: ["modelName", "llmApiKeySet"],
+	oldValue: '{"name":"GPT reviewer","modelName":"gpt-4o","llmApiKeySet":false}',
+	newValue: '{"name":"GPT reviewer","modelName":"gpt-5","llmApiKeySet":true}',
+	workspaceId: 12,
+};
+
+const systemCreate: ConfigAuditEntryView = {
+	id: 1,
+	occurredAt: new Date("2026-07-10T09:00:00Z"),
+	actorKind: "SYSTEM",
+	entityType: "PRACTICE_REVIEW_SETTINGS",
+	entityId: "12",
+	action: "CREATED",
+	changedKeys: ["cooldownMinutes"],
+	newValue: '{"cooldownMinutes":30}',
+	workspaceId: 12,
+};
+
 const entries: ConfigAuditEntryView[] = [
 	{
 		id: 4,
@@ -18,22 +47,7 @@ const entries: ConfigAuditEntryView[] = [
 		newValue: '{"cooldownMinutes":10,"skipDrafts":true,"deliverToMerged":false}',
 		workspaceId: 12,
 	},
-	{
-		id: 3,
-		occurredAt: new Date("2026-07-10T09:50:00Z"),
-		actorKind: "IMPERSONATED",
-		actorAccountId: 42,
-		actor: { id: 42, displayName: "Ada Lovelace", email: "ada@example.com" },
-		actingAccountId: 7,
-		actingActor: { id: 7, displayName: "Grace Hopper", email: "grace@example.com" },
-		entityType: "AGENT_CONFIG",
-		entityId: "5",
-		action: "UPDATED",
-		changedKeys: ["modelName", "llmApiKeySet"],
-		oldValue: '{"name":"GPT reviewer","modelName":"gpt-4o","llmApiKeySet":false}',
-		newValue: '{"name":"GPT reviewer","modelName":"gpt-5","llmApiKeySet":true}',
-		workspaceId: 12,
-	},
+	impersonatedUpdate,
 	{
 		id: 2,
 		occurredAt: new Date("2026-07-10T09:30:00Z"),
@@ -47,17 +61,7 @@ const entries: ConfigAuditEntryView[] = [
 		newValue: '{"name":"GPT reviewer","modelName":"gpt-4o","enabled":true,"llmApiKeySet":true}',
 		workspaceId: 12,
 	},
-	{
-		id: 1,
-		occurredAt: new Date("2026-07-10T09:00:00Z"),
-		actorKind: "SYSTEM",
-		entityType: "PRACTICE_REVIEW_SETTINGS",
-		entityId: "12",
-		action: "CREATED",
-		changedKeys: ["cooldownMinutes"],
-		newValue: '{"cooldownMinutes":30}',
-		workspaceId: 12,
-	},
+	systemCreate,
 ];
 
 const meta = {
@@ -88,7 +92,7 @@ export const Default: Story = {
 };
 
 export const Impersonation: Story = {
-	args: { entries: [entries[1]] },
+	args: { entries: [impersonatedUpdate] },
 	play: async ({ canvas }) => {
 		canvas.getByText(/acting as Ada Lovelace/);
 		canvas.getByText(/not set → ••••••/);
@@ -96,9 +100,7 @@ export const Impersonation: Story = {
 };
 
 export const SystemActor: Story = {
-	args: {
-		entries: [entries[3]],
-	},
+	args: { entries: [systemCreate] },
 	play: async ({ canvas }) => {
 		canvas.getByText("System");
 	},
@@ -116,8 +118,9 @@ export const WithWorkspaceColumn: Story = {
 
 export const RowDetail: Story = {
 	play: async ({ canvas }) => {
-		const buttons = canvas.getAllByRole("button", { name: /View details/i });
-		await userEvent.click(buttons[0]);
+		const [firstDetails] = canvas.getAllByRole("button", { name: /View details/i });
+		if (!firstDetails) throw new Error("The table rendered no rows to open");
+		await userEvent.click(firstDetails);
 		const dialog = within(await screen.findByRole("dialog"));
 		dialog.getByText("cooldownMinutes");
 		dialog.getByText("30");
@@ -157,7 +160,9 @@ export const ColumnCountMatchesHeader: Story = {
 	args: { showWorkspace: true },
 	play: async ({ canvas }) => {
 		const headers = canvas.getAllByRole("columnheader");
-		const cells = within(canvas.getAllByRole("row")[1]).getAllByRole("cell");
+		const [, firstBodyRow] = canvas.getAllByRole("row");
+		if (!firstBodyRow) throw new Error("The table rendered no body rows");
+		const cells = within(firstBodyRow).getAllByRole("cell");
 		await expect(headers).toHaveLength(cells.length);
 	},
 };

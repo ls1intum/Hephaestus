@@ -1,16 +1,16 @@
 import { useQuery } from "@tanstack/react-query";
-import { usePostHog } from "posthog-js/react";
 import { useEffect, useRef } from "react";
 
 import { getUserSettingsOptions } from "@/api/@tanstack/react-query.gen";
-import { useAuth } from "../auth";
+import { useAuth } from "@/integrations/auth";
 import { isPosthogEnabled } from "./config";
+import { usePostHogClient } from "./use-posthog-client";
 
 /**
  * Handles user identification and consent-aware tracking with PostHog.
  */
 export function PostHogIdentity() {
-	const posthog = usePostHog();
+	const posthog = usePostHogClient();
 	const { isAuthenticated, isLoading, userProfile, getUserId } = useAuth();
 	const hasIdentified = useRef(false);
 
@@ -25,7 +25,6 @@ export function PostHogIdentity() {
 	});
 
 	const participatesInResearch = userSettings?.participateInResearch;
-	// React Compiler handles memoization automatically - no useMemo needed
 	const shouldDenyTracking = !isAuthenticated
 		? false
 		: isSettingsError
@@ -33,7 +32,7 @@ export function PostHogIdentity() {
 			: participatesInResearch !== true;
 
 	useEffect(() => {
-		if (!posthog || !isPosthogEnabled) {
+		if (!isPosthogEnabled) {
 			return;
 		}
 
@@ -54,8 +53,8 @@ export function PostHogIdentity() {
 		if (shouldDenyTracking) {
 			posthog.opt_out_capturing();
 			posthog.reset();
-			posthog.stopSessionRecording?.();
-			posthog.getActiveMatchingSurveys?.(() => {}, true);
+			posthog.stopSessionRecording();
+			posthog.getActiveMatchingSurveys(() => {}, true);
 			hasIdentified.current = false;
 			return;
 		}

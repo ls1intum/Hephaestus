@@ -4,13 +4,13 @@ import { AchievementNode } from "@/components/achievements/AchievementNode";
 import {
 	apolloClarity,
 	aresConflict,
-	asUI,
 	hephaestusInit,
 	hermesSprint,
 	poseidonTrident,
 	zeusThunderbolt,
 } from "@/components/achievements/story-mock-data";
 import type { UIAchievement } from "@/components/achievements/types";
+import { STORY_NOW } from "@/components/common/story-clock";
 
 /**
  * AchievementNode component for displaying achievements in the skill tree visualization.
@@ -65,12 +65,12 @@ const sharedNodeProps = {
 const rarities = ["common", "uncommon", "rare", "epic", "legendary", "mythic"] as const;
 
 const rarityMocks: Record<(typeof rarities)[number], UIAchievement> = {
-	common: asUI(hephaestusInit),
-	uncommon: asUI(hermesSprint),
-	rare: asUI(aresConflict),
-	epic: asUI(apolloClarity),
-	legendary: asUI(poseidonTrident),
-	mythic: asUI(zeusThunderbolt),
+	common: hephaestusInit,
+	uncommon: hermesSprint,
+	rare: aresConflict,
+	epic: apolloClarity,
+	legendary: poseidonTrident,
+	mythic: zeusThunderbolt,
 };
 
 /**
@@ -82,9 +82,6 @@ export const Unlocked: Story = {
 			{rarities.map((rarity) => {
 				const unlockedProgressData = (() => {
 					const raw = rarityMocks[rarity].progressData;
-					if (!raw) {
-						return { type: "BinaryAchievementProgress", unlocked: true } as const;
-					}
 
 					switch (raw.type) {
 						case "LinearAchievementProgress":
@@ -103,7 +100,7 @@ export const Unlocked: Story = {
 								achievement: {
 									...rarityMocks[rarity],
 									status: "unlocked",
-									unlockedAt: new Date(Date.now()),
+									unlockedAt: new Date(STORY_NOW),
 									progressData: unlockedProgressData,
 								},
 								showTooltips: true,
@@ -167,9 +164,6 @@ export const Locked: Story = {
 			{rarities.map((rarity) => {
 				const lockedProgressData = (() => {
 					const raw = rarityMocks[rarity].progressData;
-					if (!raw) {
-						return { type: "BinaryAchievementProgress", unlocked: false } as const;
-					}
 
 					switch (raw.type) {
 						case "LinearAchievementProgress":

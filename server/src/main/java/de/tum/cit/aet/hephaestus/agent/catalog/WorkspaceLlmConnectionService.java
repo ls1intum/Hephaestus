@@ -81,7 +81,7 @@ public class WorkspaceLlmConnectionService {
         try {
             saved = connectionRepository.save(connection);
         } catch (DataIntegrityViolationException e) {
-            throw new LlmConnectionSlugConflictException(slug);
+            throw new LlmConnectionSlugConflictException(slug, e);
         }
         configAudit.record(
             ConfigAuditEntry.created(

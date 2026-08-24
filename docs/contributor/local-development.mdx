@@ -27,22 +27,29 @@ Open the repository using the `project.code-workspace` file in VS Code and insta
 - Java Extension Pack
 - Spring Boot tools
 - Node.js + TypeScript tooling
-- Biome (lint + format)
+- oxlint (lint) and Biome (format)
 - Tailwind CSS IntelliSense
 
 The Biome extension picks up both configurations automatically: `biome.jsonc` at the repository root
 covers the Bun agent runtime, its specs, both precompute trees and `scripts/**`, and
-`webapp/biome.json` (declared `"root": false`) covers the SPA. Editing a file in either tree
-formats it to that tree's rules on save.
+`webapp/biome.jsonc` (declared `"root": false`) covers the SPA. Editing a file in either tree
+formats it to that tree's rules on save. Both configs set `"linter": { "enabled": false }` — Biome
+formats and sorts imports and lints nothing anywhere, which is why the oxlint extension is a
+recommendation too.
 
 Run the same checks from the shell with:
 
 ```bash
-pnpm run check:agents          # Lint + format + import order + typecheck, outside the webapp
+pnpm run check:agents          # Biome format, then oxlint, then both typechecks, outside the webapp
 pnpm run check:agents:fix      # Apply every safe fix
-pnpm run check:webapp          # The SPA equivalent
-pnpm run check                 # Everything, the way CI runs it
+pnpm run check:webapp          # The SPA: Biome format check, then oxlint
+pnpm run typecheck:webapp      # The SPA's typecheck — a separate leg, not part of check:webapp
+pnpm run check                 # Everything — a strict superset of CI
 ```
+
+`check` is a superset, not a copy: PMD (`lint:java`), `check:story-sort` and `check:diagrams` run in
+no workflow, so green CI is not evidence that `check` passes. The `pre-push` hook is the only thing
+that runs them before a merge, and `--no-verify` skips it.
 
 JetBrains alternatives such as IntelliJ (Java) and WebStorm (React/TypeScript) work equally well.
 

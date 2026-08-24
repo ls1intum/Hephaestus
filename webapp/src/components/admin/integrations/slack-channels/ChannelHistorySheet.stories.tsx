@@ -2,12 +2,11 @@ import type { Meta, StoryObj } from "@storybook/react";
 import { delay, HttpResponse, http } from "msw";
 import { expect, fn, screen, within } from "storybook/test";
 import type { SlackChannelConsentEvent, SlackMonitoredChannel } from "@/api/types.gen";
+import { daysBefore } from "@/components/common/story-clock";
 import { expectSettledVisible } from "@/test/overlay";
 import { ChannelHistorySheet } from "./ChannelHistorySheet";
 
 const CONSENT_EVENTS_URL = "*/slack/channels/:slackChannelId/consent-events";
-
-const iso = (days: number) => new Date(Date.now() - days * 24 * 60 * 60 * 1000);
 
 const channel: SlackMonitoredChannel = {
 	id: 1,
@@ -16,8 +15,8 @@ const channel: SlackMonitoredChannel = {
 	channelName: "team-standup",
 	consentState: "ACTIVE",
 	optedOutMemberCount: 0,
-	consentAnnouncedAt: iso(3),
-	createdAt: iso(9),
+	consentAnnouncedAt: daysBefore(3),
+	createdAt: daysBefore(9),
 };
 
 const events: SlackChannelConsentEvent[] = [
@@ -26,7 +25,7 @@ const events: SlackChannelConsentEvent[] = [
 		slackChannelId: channel.slackChannelId,
 		toState: "ACTIVE",
 		fromState: "PAUSED",
-		createdAt: iso(1),
+		createdAt: daysBefore(1),
 		reason: "Course resumed",
 	},
 	{
@@ -34,7 +33,7 @@ const events: SlackChannelConsentEvent[] = [
 		slackChannelId: channel.slackChannelId,
 		toState: "PAUSED",
 		fromState: "ACTIVE",
-		createdAt: iso(4),
+		createdAt: daysBefore(4),
 		reason: "Exam week",
 	},
 	{
@@ -42,9 +41,9 @@ const events: SlackChannelConsentEvent[] = [
 		slackChannelId: channel.slackChannelId,
 		toState: "ACTIVE",
 		fromState: "PENDING",
-		createdAt: iso(7),
+		createdAt: daysBefore(7),
 	},
-	{ id: 1, slackChannelId: channel.slackChannelId, toState: "PENDING", createdAt: iso(9) },
+	{ id: 1, slackChannelId: channel.slackChannelId, toState: "PENDING", createdAt: daysBefore(9) },
 ];
 
 const meta = {

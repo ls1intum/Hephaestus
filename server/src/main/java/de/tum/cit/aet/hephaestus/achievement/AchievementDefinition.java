@@ -1,6 +1,5 @@
 package de.tum.cit.aet.hephaestus.achievement;
 
-import com.fasterxml.jackson.annotation.JsonValue;
 import de.tum.cit.aet.hephaestus.achievement.progress.AchievementProgress;
 import de.tum.cit.aet.hephaestus.activity.ActivityEventType;
 import io.swagger.v3.oas.annotations.media.Schema;

@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { expect, fn, screen, userEvent } from "storybook/test";
 import type { OutlineCollection } from "@/api/types.gen";
+import { daysBefore, minutesBefore } from "@/components/common/story-clock";
 import { Table, TableBody } from "@/components/ui/table";
 import { expectSettledVisible } from "@/test/overlay";
 import { OutlineCollectionRow } from "./OutlineCollectionRow";
@@ -36,8 +37,6 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-const ago = (minutes: number) => new Date(Date.now() - minutes * 60 * 1000);
-
 const base: OutlineCollection = {
 	id: 1,
 	collectionId: "col-engineering",
@@ -47,8 +46,8 @@ const base: OutlineCollection = {
 	state: "ENABLED",
 	syncStatus: "COMPLETE",
 	documentCount: 87,
-	lastSyncedAt: ago(12),
-	createdAt: ago(60 * 24 * 30),
+	lastSyncedAt: minutesBefore(12),
+	createdAt: daysBefore(30),
 };
 
 /** Steady state — mirroring, up to date, Pause offered in the row menu. */
@@ -141,7 +140,7 @@ export const BudgetSkipped: Story = {
 			documentCount: 480,
 			documentsUpstream: 512,
 			exportsSkippedForBudget: 32,
-			lastSyncedAt: ago(30),
+			lastSyncedAt: minutesBefore(30),
 		},
 	},
 	play: async ({ canvas }) => {

@@ -83,18 +83,19 @@ public final class StudentTextSanitizer {
         if (text == null || text.isBlank()) {
             return text == null ? "" : text;
         }
-        text = text.replace("\\r\\n", "\n").replace("\\n", "\n").replace("\\t", "    ");
-        StringBuilder kept = new StringBuilder(text.length());
-        Matcher sep = SENTENCE_SEPARATOR.matcher(text);
+        // Literal "\r\n"/"\n"/"\t" escapes survive a round trip through the runner's JSON envelope.
+        String unescaped = text.replace("\\r\\n", "\n").replace("\\n", "\n").replace("\\t", "    ");
+        StringBuilder kept = new StringBuilder(unescaped.length());
+        Matcher sep = SENTENCE_SEPARATOR.matcher(unescaped);
         int pos = 0;
         while (sep.find()) {
-            String sentence = text.substring(pos, sep.start());
+            String sentence = unescaped.substring(pos, sep.start());
             if (!GRADING_SENTENCE.matcher(sentence).find()) {
-                kept.append(sentence).append(text, sep.start(), sep.end());
+                kept.append(sentence).append(unescaped, sep.start(), sep.end());
             }
             pos = sep.end();
         }
-        String tail = text.substring(pos);
+        String tail = unescaped.substring(pos);
         if (!GRADING_SENTENCE.matcher(tail).find()) {
             kept.append(tail);
         }

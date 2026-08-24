@@ -2,7 +2,13 @@ import { LinkIcon, type LucideIcon, Unlink } from "lucide-react";
 import { useEffect, useRef } from "react";
 import type { IdentityProviderView, IdentityView } from "@/api/types.gen";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
-import { GithubIcon, GitlabIcon, OutlineIcon, SlackIcon } from "@/components/icons/brand";
+import {
+	type BrandIcon,
+	GithubIcon,
+	GitlabIcon,
+	OutlineIcon,
+	SlackIcon,
+} from "@/components/icons/brand";
 import {
 	AlertDialog,
 	AlertDialogCancel,
@@ -35,8 +41,10 @@ import {
 import { Spinner } from "@/components/ui/spinner";
 import { asDate } from "@/lib/dates";
 import { getProviderLabel } from "@/lib/provider";
+import { firstNonBlank } from "@/lib/text";
 
-const PROVIDER_ICONS: Record<string, LucideIcon> = {
+/** Both types are named because `BrandIcon` is a plain component and `LucideIcon` is not. */
+const PROVIDER_ICONS: Record<string, LucideIcon | BrandIcon> = {
 	GITHUB: GithubIcon,
 	GITLAB: GitlabIcon,
 	SLACK: SlackIcon,
@@ -45,6 +53,8 @@ const PROVIDER_ICONS: Record<string, LucideIcon> = {
 
 /** Providers that can only be *linked* from Settings — they are never a sign-in method. */
 const LINK_ONLY_PROVIDER_TYPES = new Set(["SLACK", "OUTLINE"]);
+
+type LinkableProvider = IdentityProviderView & { registrationId: string };
 
 /**
  * Why each link-only account is worth connecting. Both are linked, never signed in with, so the copy
@@ -59,7 +69,7 @@ const LINK_ONLY_RATIONALE: Record<string, string> = {
  * Resolve a brand icon from a provider type (e.g. "GITHUB", "GITLAB"). Falls back
  * to a generic link icon for unknown providers so new IdPs render gracefully.
  */
-function getProviderIcon(providerType?: string): LucideIcon {
+function getProviderIcon(providerType?: string): LucideIcon | BrandIcon {
 	if (!providerType) return LinkIcon;
 	return PROVIDER_ICONS[providerType.toUpperCase()] ?? LinkIcon;
 }
@@ -138,9 +148,9 @@ export function LinkedAccountsSection({
 	// either (Outline is unique on (type, base_url), one row per deployment), so this is a list and
 	// never a single `find(...)` match; each unconnected one is named by its display name.
 	const linkOnlyProviders = linkableProviders.filter(
-		(provider) =>
+		(provider): provider is LinkableProvider =>
 			LINK_ONLY_PROVIDER_TYPES.has(provider.providerType?.toUpperCase() ?? "") &&
-			provider.registrationId,
+			Boolean(provider.registrationId),
 	);
 	const signInProviders = linkableProviders.filter(
 		(provider) => !LINK_ONLY_PROVIDER_TYPES.has(provider.providerType?.toUpperCase() ?? ""),
@@ -213,7 +223,8 @@ export function LinkedAccountsSection({
 								const identityId = identity.id;
 								const Icon = getProviderIcon(identity.providerType);
 								const name =
-									identity.displayName || identity.username || identity.subject || "Account";
+									firstNonBlank(identity.displayName, identity.username, identity.subject) ??
+									"Account";
 								const lastLogin = formatLastLogin(identity.lastLoginAt);
 
 								return (
@@ -259,8 +270,9 @@ export function LinkedAccountsSection({
 							{linkOnlyProviders.map((provider) => {
 								const type = provider.providerType?.toUpperCase() ?? "";
 								const Icon = getProviderIcon(type);
-								const label = provider.displayName || getProviderLabel(type, "this account");
-								const registrationId = provider.registrationId as string;
+								const label =
+									firstNonBlank(provider.displayName) ?? getProviderLabel(type, "this account");
+								const registrationId = provider.registrationId;
 								return (
 									<Item key={registrationId} variant="outline" role="listitem">
 										<ItemMedia variant="icon">
@@ -297,7 +309,8 @@ export function LinkedAccountsSection({
 							<div className="flex flex-wrap gap-2 pt-1">
 								{signInProviders.map((provider) => {
 									const Icon = getProviderIcon(provider.providerType);
-									const label = provider.displayName || provider.registrationId || "provider";
+									const label =
+										firstNonBlank(provider.displayName, provider.registrationId) ?? "provider";
 									return (
 										<Button
 											key={provider.registrationId ?? label}

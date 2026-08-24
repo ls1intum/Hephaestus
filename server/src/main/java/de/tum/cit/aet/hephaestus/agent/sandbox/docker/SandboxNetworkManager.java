@@ -1,7 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.sandbox.docker;
 
 import de.tum.cit.aet.hephaestus.agent.sandbox.SandboxProperties;
-import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxException;
 import java.util.List;
 import java.util.UUID;
 import java.util.function.Supplier;

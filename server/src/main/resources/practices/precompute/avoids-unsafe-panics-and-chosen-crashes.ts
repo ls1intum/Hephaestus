@@ -109,7 +109,7 @@ function isComment(trimmed: string): boolean {
 	);
 }
 
-export default async function (
+export default function avoidsUnsafePanicsAndChosenCrashes(
 	_repo: string,
 	diffFiles: Map<string, DiffFile>,
 	_m: PullRequestMetadata,

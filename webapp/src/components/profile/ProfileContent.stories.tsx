@@ -1,9 +1,10 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { endOfISOWeek, formatISO, startOfISOWeek, subDays } from "date-fns";
+import { endOfISOWeek, formatISO, startOfISOWeek } from "date-fns";
 import { fn } from "storybook/test";
+import { daysBefore, STORY_NOW } from "@/components/common/story-clock";
 import { ProfileContent } from "./ProfileContent";
 
-const now = new Date();
+const now = new Date(STORY_NOW);
 const defaultAfter = formatISO(startOfISOWeek(now));
 const defaultBefore = formatISO(endOfISOWeek(now));
 
@@ -35,7 +36,7 @@ const reviewActivity = [
 	{
 		id: 1,
 		state: "APPROVED" as const,
-		submittedAt: subDays(new Date(), 2),
+		submittedAt: daysBefore(2),
 		htmlUrl: "https://github.com/ls1intum/Hephaestus/pull/42",
 		pullRequest: {
 			id: 101,
@@ -54,7 +55,7 @@ const reviewActivity = [
 	{
 		id: 2,
 		state: "CHANGES_REQUESTED" as const,
-		submittedAt: subDays(new Date(), 5),
+		submittedAt: daysBefore(5),
 		htmlUrl: "https://github.com/ls1intum/Artemis/pull/123",
 		pullRequest: {
 			id: 102,
@@ -73,7 +74,7 @@ const reviewActivity = [
 	{
 		id: 3,
 		state: "COMMENTED" as const,
-		submittedAt: subDays(new Date(), 7),
+		submittedAt: daysBefore(7),
 		htmlUrl: "https://github.com/ls1intum/Athena/pull/15",
 		pullRequest: {
 			id: 103,
@@ -103,7 +104,7 @@ const authoredPullRequests = [
 		additions: 250,
 		deletions: 30,
 		htmlUrl: "https://github.com/ls1intum/Hephaestus/pull/42",
-		createdAt: subDays(new Date(), 3),
+		createdAt: daysBefore(3),
 		repository: repositories[0],
 		labels: [
 			{ id: 1, name: "enhancement", color: "0E8A16" },
@@ -121,7 +122,7 @@ const authoredPullRequests = [
 		additions: 320,
 		deletions: 280,
 		htmlUrl: "https://github.com/ls1intum/Artemis/pull/87",
-		createdAt: subDays(new Date(), 1),
+		createdAt: daysBefore(1),
 		repository: repositories[1],
 		labels: [
 			{ id: 3, name: "refactoring", color: "D93F0B" },

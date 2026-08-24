@@ -21,7 +21,7 @@ match returned **both** rows, and Spring Data's `Optional` wrapper crashed with
 
 Observed in the live run as soon as the GitHub workspace was activated:
 
-```
+```text
 Failed to sync projects: scopeId=2, orgLogin=HephaestusTest,
   error=NonUniqueResultException - Query did not return a unique result: 2 results
 Failed to sync teams: scopeId=2, orgLogin=HephaestusTest,

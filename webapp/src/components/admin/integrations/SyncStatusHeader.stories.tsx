@@ -2,12 +2,10 @@ import type { Meta, StoryObj } from "@storybook/react";
 import { ExternalLinkIcon } from "lucide-react";
 import { expect, fn, screen, userEvent } from "storybook/test";
 import type { ConnectionSyncStatus, SyncJob } from "@/api/types.gen";
+import { minutesAfter, minutesBefore } from "@/components/common/story-clock";
 import { buttonVariants } from "@/components/ui/button";
 import { expectSettledVisible } from "@/test/overlay";
 import { SyncStatusHeader } from "./SyncStatusHeader";
-
-const minutesAgo = (minutes: number) => new Date(Date.now() - minutes * 60_000);
-const minutesFromNow = (minutes: number) => new Date(Date.now() + minutes * 60_000);
 
 const SYNC_INTERVAL_SECONDS = 3_600;
 
@@ -19,15 +17,15 @@ const baseStatus: ConnectionSyncStatus = {
 	resourceCounts: { total: 12, errored: 0, pending: 0, stale: 0 },
 	backfillSupported: true,
 	syncIntervalSeconds: SYNC_INTERVAL_SECONDS,
-	lastSuccessfulSyncAt: minutesAgo(4),
-	nextScheduledSyncAt: minutesFromNow(56),
-	lastEventProcessedAt: minutesAgo(1),
+	lastSuccessfulSyncAt: minutesBefore(4),
+	nextScheduledSyncAt: minutesAfter(56),
+	lastEventProcessedAt: minutesBefore(1),
 	webhookRegistered: true,
 	rateLimit: {
 		limit: 5000,
 		remaining: 4812,
-		resetAt: minutesFromNow(40),
-		observedAt: minutesAgo(2),
+		resetAt: minutesAfter(40),
+		observedAt: minutesBefore(2),
 	},
 };
 
@@ -37,8 +35,8 @@ const runningJob: SyncJob = {
 	trigger: "MANUAL",
 	status: "RUNNING",
 	cancelRequested: false,
-	createdAt: minutesAgo(1),
-	startedAt: minutesAgo(1),
+	createdAt: minutesBefore(1),
+	startedAt: minutesBefore(1),
 	itemsProcessed: 5,
 	itemsTotal: 12,
 };
@@ -72,18 +70,18 @@ export const Healthy: Story = {
 
 export const StaleFreshness: Story = {
 	args: {
-		status: { ...baseStatus, health: "DEGRADED", lastSuccessfulSyncAt: minutesAgo(150) },
+		status: { ...baseStatus, health: "DEGRADED", lastSuccessfulSyncAt: minutesBefore(150) },
 	},
 };
 
 export const VeryStaleFreshness: Story = {
 	args: {
-		status: { ...baseStatus, health: "DEGRADED", lastSuccessfulSyncAt: minutesAgo(60 * 11) },
+		status: { ...baseStatus, health: "DEGRADED", lastSuccessfulSyncAt: minutesBefore(60 * 11) },
 	},
 };
 
 export const NextRunDue: Story = {
-	args: { status: { ...baseStatus, nextScheduledSyncAt: minutesAgo(2) } },
+	args: { status: { ...baseStatus, nextScheduledSyncAt: minutesBefore(2) } },
 	play: async ({ canvas }) => {
 		canvas.getByText(/next run due/i);
 	},
@@ -95,7 +93,7 @@ export const UnknownCadence: Story = {
 			...baseStatus,
 			syncIntervalSeconds: undefined,
 			nextScheduledSyncAt: undefined,
-			lastSuccessfulSyncAt: minutesAgo(60 * 20),
+			lastSuccessfulSyncAt: minutesBefore(60 * 20),
 			lastEventProcessedAt: undefined,
 		},
 	},
@@ -190,8 +188,8 @@ export const RateLimitNearlyExhausted: Story = {
 			rateLimit: {
 				limit: 5000,
 				remaining: 220,
-				resetAt: minutesFromNow(12),
-				observedAt: minutesAgo(1),
+				resetAt: minutesAfter(12),
+				observedAt: minutesBefore(1),
 			},
 		},
 	},
@@ -212,7 +210,7 @@ export const RateLimitThrottled: Story = {
 			kind: "SLACK",
 			health: "DEGRADED",
 			backfillSupported: false,
-			rateLimit: { observedAt: minutesAgo(1), throttledUntil: minutesFromNow(1) },
+			rateLimit: { observedAt: minutesBefore(1), throttledUntil: minutesAfter(1) },
 		},
 		onBackfill: undefined,
 	},
@@ -227,7 +225,7 @@ export const RateLimitCeilingOnly: Story = {
 	args: {
 		status: {
 			...baseStatus,
-			rateLimit: { limit: 5000, observedAt: minutesAgo(90) },
+			rateLimit: { limit: 5000, observedAt: minutesBefore(90) },
 		},
 	},
 	play: async ({ canvas }) => {
@@ -240,7 +238,7 @@ export const RateLimitNotReported: Story = {
 	args: {
 		status: {
 			...baseStatus,
-			rateLimit: { observedAt: minutesAgo(90), throttledUntil: minutesAgo(30) },
+			rateLimit: { observedAt: minutesBefore(90), throttledUntil: minutesBefore(30) },
 		},
 	},
 	play: async ({ canvas }) => {

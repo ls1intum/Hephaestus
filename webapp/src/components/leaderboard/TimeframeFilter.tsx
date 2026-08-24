@@ -10,8 +10,10 @@ import {
 	subDays,
 } from "date-fns";
 import { CalendarDays, CalendarIcon, CalendarRange, Clock } from "lucide-react";
+// oxlint-disable-next-line no-restricted-imports -- `schedule` below is a dependency of the emitting effect, so its identity decides whether that effect re-runs; see the note there.
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { DateRange } from "react-day-picker";
+import { useNow } from "@/components/common/use-now";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Label } from "@/components/ui/label";
@@ -81,22 +83,31 @@ export function TimeframeFilter({
 	openEndedPresets = false,
 	enableAllActivityOption = false,
 }: TimeframeFilterProps) {
-	// Convert the leaderboardSchedule prop to the LeaderboardSchedule type
-	const schedule: LeaderboardSchedule = leaderboardSchedule
-		? {
-				day: leaderboardSchedule.day,
-				hour: leaderboardSchedule.hour,
-				minute: leaderboardSchedule.minute,
-			}
-		: DEFAULT_SCHEDULE;
-
-	// Track whether the user has manually selected a timeframe
-	const [userInteracted, setUserInteracted] = useState(false);
-
-	// Initial preset - captured on first render only via initializer
-	const [selectedPreset, setSelectedPreset] = useState<TimeframePreset>(() =>
-		detectPresetFromDates(initialAfterDate, initialBeforeDate, schedule, enableAllActivityOption),
+	// Keyed on the three scalars, not on `leaderboardSchedule`: callers pass that inline, and a fresh
+	// identity each render would re-run the emitting effect below each render.
+	const scheduleDay = leaderboardSchedule?.day ?? DEFAULT_SCHEDULE.day;
+	const scheduleHour = leaderboardSchedule?.hour ?? DEFAULT_SCHEDULE.hour;
+	const scheduleMinute = leaderboardSchedule?.minute ?? DEFAULT_SCHEDULE.minute;
+	const schedule = useMemo<LeaderboardSchedule>(
+		() => ({ day: scheduleDay, hour: scheduleHour, minute: scheduleMinute }),
+		[scheduleDay, scheduleHour, scheduleMinute],
 	);
+
+	const [chosenPreset, setChosenPreset] = useState<TimeframePreset>();
+	// Ticks, so a week or month boundary crossed with the page open rolls the emitted range over
+	// instead of stranding it in the period that ended.
+	const nowMs = useNow();
+	const now = new Date(nowMs);
+
+	const selectedPreset =
+		chosenPreset ??
+		detectPresetFromDates(
+			now,
+			initialAfterDate,
+			initialBeforeDate,
+			schedule,
+			enableAllActivityOption,
+		);
 
 	const [customRange, setCustomRange] = useState<DateRange | undefined>(() => {
 		if (selectedPreset === "custom" && initialAfterDate) {
@@ -109,40 +120,16 @@ export function TimeframeFilter({
 
 	const lastEmittedRef = useRef<{ after: string; before?: string } | null>(null);
 
-	const items = useMemo(() => {
-		const baseItems = [
-			{ value: "this-week", label: formatDropdownLabel("this-week") },
-			{ value: "last-week", label: formatDropdownLabel("last-week") },
-			{ value: "this-month", label: formatDropdownLabel("this-month") },
-			{ value: "last-month", label: formatDropdownLabel("last-month") },
-			{ value: "custom", label: formatDropdownLabel("custom") },
-		];
-		if (enableAllActivityOption) {
-			return [{ value: "all-activity", label: formatDropdownLabel("all-activity") }, ...baseItems];
-		}
-		return baseItems;
-	}, [enableAllActivityOption]);
-
-	// Sync preset from external date changes (when user hasn't interacted yet)
-	useEffect(() => {
-		if (userInteracted) return;
-		const detected = detectPresetFromDates(
-			initialAfterDate,
-			initialBeforeDate,
-			schedule,
-			enableAllActivityOption,
-		);
-		if (detected !== selectedPreset) {
-			setSelectedPreset(detected);
-		}
-	}, [
-		initialAfterDate,
-		initialBeforeDate,
-		schedule,
-		enableAllActivityOption,
-		userInteracted,
-		selectedPreset,
-	]);
+	const baseItems: { value: TimeframePreset; label: string }[] = [
+		{ value: "this-week", label: formatDropdownLabel("this-week") },
+		{ value: "last-week", label: formatDropdownLabel("last-week") },
+		{ value: "this-month", label: formatDropdownLabel("this-month") },
+		{ value: "last-month", label: formatDropdownLabel("last-month") },
+		{ value: "custom", label: formatDropdownLabel("custom") },
+	];
+	const items = enableAllActivityOption
+		? [{ value: "all-activity", label: formatDropdownLabel("all-activity") }, ...baseItems]
+		: baseItems;
 
 	// Emit changes when preset or custom range changes
 	useEffect(() => {
@@ -150,15 +137,17 @@ export function TimeframeFilter({
 
 		let range: { after: string; before: string | undefined };
 
+		const at = new Date(nowMs);
+
 		if (selectedPreset === "custom") {
 			if (!customRange?.from) return;
-			const dateRange = getDateRangeForPreset(selectedPreset, schedule, {
+			const dateRange = getDateRangeForPreset(at, selectedPreset, schedule, {
 				from: customRange.from,
 				to: customRange.to,
 			});
 			range = formatDateRangeForApi(dateRange);
 		} else {
-			const dateRange = getDateRangeForPreset(selectedPreset, schedule);
+			const dateRange = getDateRangeForPreset(at, selectedPreset, schedule);
 			// For leaderboard, we may need bounded ranges even for "this week"
 			if (!openEndedPresets && dateRange.before === undefined) {
 				// Force bounded range for leaderboard display
@@ -185,22 +174,19 @@ export function TimeframeFilter({
 
 		if (
 			lastEmittedRef.current?.after === range.after &&
-			lastEmittedRef.current?.before === range.before
+			lastEmittedRef.current.before === range.before
 		) {
 			return;
 		}
 
 		lastEmittedRef.current = range;
 		onTimeframeChange(range.after, range.before, selectedPreset);
-	}, [selectedPreset, customRange, schedule, onTimeframeChange, openEndedPresets]);
+	}, [nowMs, selectedPreset, customRange, schedule, onTimeframeChange, openEndedPresets]);
 
-	const handlePresetChange = (value: string) => {
-		const preset = value as TimeframePreset;
-		setUserInteracted(true);
-		setSelectedPreset(preset);
+	const handlePresetChange = (preset: TimeframePreset) => {
+		setChosenPreset(preset);
 
 		if (preset === "custom" && !customRange?.from) {
-			const now = new Date();
 			// If we have an initial after date from props (from a previous preset),
 			// use it as the from date and set to as now
 			if (initialAfterDate) {
@@ -221,7 +207,7 @@ export function TimeframeFilter({
 
 	const handleCustomRangeChange = (range: DateRange | undefined) => {
 		if (range) {
-			setUserInteracted(true);
+			setChosenPreset("custom");
 			setCustomRange(range);
 		}
 	};
@@ -247,7 +233,9 @@ export function TimeframeFilter({
 
 	return (
 		<div className="space-y-1.5">
-			<Label htmlFor="timeframe">Timeframe</Label>
+			<Label id="timeframe-label" htmlFor="timeframe">
+				Timeframe
+			</Label>
 			<Select
 				value={selectedPreset}
 				onValueChange={(value) => value && handlePresetChange(value)}
@@ -256,7 +244,7 @@ export function TimeframeFilter({
 				<SelectTrigger id="timeframe" className="w-full">
 					<SelectValue placeholder="Select timeframe" />
 				</SelectTrigger>
-				<SelectContent>
+				<SelectContent aria-labelledby="timeframe-label">
 					{enableAllActivityOption && (
 						<SelectItem value="all-activity">
 							<PresetIcon preset="all-activity" />
@@ -306,6 +294,7 @@ export function TimeframeFilter({
 							/>
 							<PopoverContent className="w-auto p-0" align="start">
 								<Calendar
+									// oxlint-disable-next-line jsx-a11y/no-autofocus -- Choosing "custom" opens this popover for the sole purpose of picking a range, so the day grid takes focus with it.
 									autoFocus
 									mode="range"
 									defaultMonth={customRange?.from}

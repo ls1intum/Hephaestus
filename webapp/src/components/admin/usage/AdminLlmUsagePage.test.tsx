@@ -1,5 +1,5 @@
 import { fireEvent, screen, within } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { assert, describe, expect, it, vi } from "vitest";
 import type { FxRateInfo, WorkspaceLlmUsageReport } from "@/api/types.gen";
 import { renderWithRouter } from "@/test/router-harness";
 import { AdminLlmUsagePage } from "./AdminLlmUsagePage";
@@ -60,6 +60,18 @@ async function renderPage(
 		"/w/acme/admin/usage",
 	);
 	await screen.findByRole("heading", { name: "AI usage" });
+}
+
+/** The banner's fix link, or null where the reader is not the one who can apply it. */
+function fixLinkHref(banner: HTMLElement) {
+	return (
+		within(banner).queryByRole("link", { name: "Open AI models" })?.getAttribute("href") ?? null
+	);
+}
+
+/** The pace warning, or null where the page deliberately stays quiet. */
+function paceNote() {
+	return screen.queryByRole("status")?.textContent ?? null;
 }
 
 describe("AdminLlmUsagePage", () => {
@@ -151,14 +163,9 @@ describe("AdminLlmUsagePage", () => {
 				await renderPage({ ...baseReport, ...patch });
 
 				const banner = screen.getByText(title).closest("[role='alert']");
-				if (!(banner instanceof HTMLElement)) {
-					throw new Error(`Pause banner "${title}" not found`);
-				}
+				assert(banner instanceof HTMLElement, `Pause banner "${title}" not found`);
 				within(banner).getByText(body);
-				expect(
-					within(banner).queryByRole("link", { name: "Open AI models" })?.getAttribute("href") ??
-						null,
-				).toBe(href);
+				expect(fixLinkHref(banner)).toBe(href);
 			},
 		);
 
@@ -175,9 +182,7 @@ describe("AdminLlmUsagePage", () => {
 			);
 
 			const banner = screen.getByText("Your provider cap is reached").closest("[role='alert']");
-			if (!(banner instanceof HTMLElement)) {
-				throw new Error("Provider pause banner not found");
-			}
+			assert(banner instanceof HTMLElement, "Provider pause banner not found");
 			const adjust = within(banner).getByRole("button", { name: "Adjust cap" });
 
 			fireEvent.click(adjust);
@@ -224,7 +229,7 @@ describe("AdminLlmUsagePage", () => {
 		])("%s", async (_name, patch, now, pace) => {
 			await renderPage({ ...baseReport, unpricedEventCount: 0, ...patch }, { now });
 
-			expect(screen.queryByRole("status")?.textContent ?? null).toBe(pace);
+			expect(paceNote()).toBe(pace);
 		});
 	});
 
@@ -292,29 +297,29 @@ describe("AdminLlmUsagePage", () => {
 			},
 		];
 
-		it.each<[string, WorkspaceLlmUsageReport["byDay"], number, string | null]>([
-			["only the table footers convert", twoDaysWithATotalRow, 12.4, "≈ €10.90"],
-			["nothing on the page converted", [], 0, null],
-		])("discloses the rate when %s", async (_name, byDay, instanceTotalCostUsd, footerText) => {
-			await renderPage({
-				...baseReport,
-				instanceMonthlyBudgetUsd: 0,
-				ownProviderMonthlyBudgetUsd: undefined,
-				instanceTotalCostUsd,
-				ownProviderTotalCostUsd: 0,
-				unpricedEventCount: 0,
-				byJobType: [],
-				byDay,
-				fx: eur,
-			});
+		/** No caps anywhere, so the day table's footer is the only thing that can convert. */
+		const uncapped: WorkspaceLlmUsageReport = {
+			...baseReport,
+			instanceMonthlyBudgetUsd: 0,
+			ownProviderMonthlyBudgetUsd: undefined,
+			ownProviderTotalCostUsd: 0,
+			unpricedEventCount: 0,
+			byJobType: [],
+			fx: eur,
+		};
 
-			if (footerText == null) {
-				expect(screen.queryByText(/reference rate published on/)).toBeNull();
-				return;
-			}
+		it("discloses the rate when only the table footers convert", async () => {
+			await renderPage({ ...uncapped, byDay: twoDaysWithATotalRow, instanceTotalCostUsd: 12.4 });
+
 			const table = screen.getByRole("table", { name: "AI spend by day" });
-			expect(within(table).getByRole("row", { name: /^Total/ }).textContent).toContain(footerText);
+			expect(within(table).getByRole("row", { name: /^Total/ }).textContent).toContain("≈ €10.90");
 			screen.getByText(/reference rate published on/);
+		});
+
+		it("says nothing about the rate when nothing on the page converted", async () => {
+			await renderPage({ ...uncapped, byDay: [], instanceTotalCostUsd: 0 });
+
+			expect(screen.queryByText(/reference rate published on/)).toBeNull();
 		});
 
 		it("stays silent under a cap that is set but converted nowhere on the page", async () => {

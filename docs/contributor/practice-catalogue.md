@@ -222,7 +222,7 @@ is a declaration and nothing more — the product validates no policy independen
 policy carries the single status `AUTHOR_DECLARED` to say so. Requirements also say nothing about whether
 a developer, peer, or human mentor can review the practice outside the governed integrations.
 
-The review-rule fingerprint uses an explicit scheme prefix, bumped whenever its _inputs_ change rather
+The review-rule fingerprint uses an explicit scheme prefix, bumped whenever its *inputs* change rather
 than the rules, so a stored fingerprint is never compared against one computed from a different set of
 facts. Each scheme retains its original meaning, so two schemes never compare equal by accident. Bump the
 prefix in the same change that alters the input set.

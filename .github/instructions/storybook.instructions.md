@@ -1,199 +1,58 @@
 ---
 applyTo: "**/*.stories.ts,**/*.stories.tsx"
 ---
-# Storybook Guidelines
+# Storybook
 
-## Core Principles
+The full conventions — props shape, slots, story titles, args and Controls, play assertions, the
+accessibility posture, the silent traps, and a grading rubric — live in
+`.claude/skills/storybook-components/`. Read the file there that answers your question rather than
+reasoning from Storybook's own docs, which do not know what this repo has been burned by.
 
-We create stories that **accelerate development** and **improve team communication**. Stories should be practical tools that help developers work faster, not documentation overhead.
+This file is the short version: what a story here owes, and what no gate can tell you.
 
-## Structure & Setup
+## What a story is for
 
-- **Co-locate** story files with component files (`Component.stories.tsx`)
-- Use `satisfies Meta<typeof Component>` for type safety
-- Always include `tags: ["autodocs"]` for automatic documentation generation
-- Favor auto-generated titles (omit `title` property)
+A story proves the component renders what it is **given**. Stories accelerate development and design
+review; they are not a second test suite and not documentation overhead. Enumerate the states the
+component can actually reach — every branch of its state union, every `variant` value, the longest
+realistic string, the empty collection — rather than filling in a checklist. A variant story that
+reaches no new branch adds a Chromatic snapshot and a maintenance edge and nothing else.
 
-## Documentation Strategy
+A story renders with **no network**. Whether the screen sends the right query is a route test's
+question, not a story's.
 
-### Component-Level Documentation
-- Add a **concise JSDoc comment** above the `meta` object explaining the component's purpose and key capabilities
-- Focus on **when to use** the component, not implementation details
+## Shape
 
-```typescript
-/**
- * CodeBlock component for displaying code snippets and terminal output.
- * Supports both inline code and multi-line code blocks with syntax highlighting.
- */
-```
+- Colocate: `Component.stories.tsx` beside `Component.tsx`.
+- Set defaults with `args` at the meta level, never `argTypes.defaultValue`.
+- Keep at least one story per file driven by meta args (`export const Default: Story = {};`). A
+  `render` that ignores `args` disables the Controls panel, which is most of a story's value.
+- Add `argTypes` only to **correct** what `react-docgen` inferred wrong — a union rendered as a text
+  box, an object arg that should be `control: false`. Not to restate inference.
+- `layout: "centered"` for an isolated component, `"fullscreen"` for a page-level one.
 
-### Story-Level Documentation
-- Add **brief JSDoc comments** for each story explaining its specific use case
-- Use action-oriented descriptions that help developers choose the right variant
+## Titles
 
-```typescript
-/**
- * Multi-line code block for displaying formatted code snippets.
- */
-export const CodeBlock: Story = { /* ... */ };
-```
+Most files omit `title` and are filed by their path under `src`, which cannot go stale. Declare an
+explicit `title` when the file layout cannot express where a reader looks for the thing — a product
+surface assembled from several directories, or one an admin knows by the screen it is on. Sentence
+case. `rules/story-titles.md` in the skill has the namespaces and the sidebar-ordering gate.
 
-## Controls Configuration
+## Published prose
 
-### Selective argTypes
-- Only configure `argTypes` for props that **benefit from interactive controls**
-- Let Storybook infer most controls automatically 
-- Add `description` for complex or non-obvious props
+Nearly every file carries `tags: ["autodocs"]`, so a JSDoc block above `meta` or above a story **is**
+the component's documentation page. It earns its place only by recording something the reader cannot
+derive from the code below it — a rejected alternative, a trap, a why. Restating the story's name is
+the common failure.
 
-```typescript
-argTypes: {
-  inline: {
-    control: 'boolean',
-    description: 'Whether to display as inline code or a code block',
-  },
-  className: {
-    description: 'Additional CSS classes for styling',
-  },
-}
-```
+If the stories render a test harness rather than the component, either point `component` at the real
+component or drop `autodocs`; do not publish the harness's props as if they were the API. A file that
+opts out says why in its meta.
 
-### Default Values
-- Set meaningful defaults using `args` at the meta level
-- Avoid setting `defaultValue` in argTypes (deprecated pattern)
+## Gates
 
-```typescript
-const meta = {
-  component: CodeBlock,
-  args: {
-    inline: false,
-    className: '',
-    children: 'console.log("Hello, world!");',
-  },
-} satisfies Meta<typeof CodeBlock>;
-```
-
-## Story Patterns
-
-### Essential Stories
-Every component should have these core stories:
-1. **Default** - Standard usage with common props
-2. **Variants** - Different visual styles/states
-3. **Edge Cases** - Empty states, long content, error states
-
-### Interactive Stories
-- Use realistic content that demonstrates actual usage patterns
-- Include examples with both short and long content to test layout
-- Show different states and configurations
-
-### Content Guidelines
-- Use **realistic, relevant content** that reflects actual usage
-- Follow our platform's **friendly, supportive engineering voice**
-- Use consistent terminology across all components
-- Include practical examples developers would actually encounter
-
-## Layout & Presentation
-
-### Parameters
-- Use `layout: 'centered'` for isolated components
-- Use `layout: 'fullscreen'` for page-level components
-- Add appropriate decorators when components need context
-
-```typescript
-parameters: {
-  layout: 'centered',
-  docs: {
-    description: {
-      component: 'Additional context if the JSDoc comment is insufficient',
-    },
-  },
-},
-decorators: [
-  (Story) => (
-    <div className="max-w-4xl p-6 bg-background">
-      <Story />
-    </div>
-  ),
-],
-```
-
-## Advanced Patterns
-
-### Composition Stories
-Create stories that show components working together:
-
-```typescript
-export const InContext: Story = {
-  render: () => (
-    <div className="prose">
-      <p>Here's how to use the API:</p>
-      <CodeBlock inline={false} className="">
-        {`const response = await fetch('/api/users');
-const users = await response.json();`}
-      </CodeBlock>
-    </div>
-  ),
-};
-```
-
-### Data-Driven Stories
-For components with complex requirements, create realistic mock data and scenarios.
-
-## Quality Standards
-
-- **Simplicity over complexity** - Don't over-engineer stories
-- **Practical scenarios** - Focus on real use cases over edge cases
-- **Visual clarity** - Stories should immediately show component capabilities
-- **Performance** - Avoid heavy computations or API calls in stories
-- **Maintenance** - Keep stories simple enough that they don't become a burden
-
-## Example Story Structure
-
-```typescript
-import type { Meta, StoryObj } from '@storybook/react';
-import { CodeBlock } from './CodeBlock';
-
-/**
- * CodeBlock component for displaying code snippets and terminal output.
- * Supports both inline code and multi-line code blocks with proper formatting.
- */
-const meta = {
-  component: CodeBlock,
-  parameters: { layout: 'centered' },
-  tags: ['autodocs'],
-  argTypes: {
-    inline: {
-      control: 'boolean',
-      description: 'Whether to display as inline code or a code block',
-    },
-    className: {
-      description: 'Additional CSS classes for styling',
-    },
-  },
-  args: {
-    inline: false,
-    className: '',
-  },
-} satisfies Meta<typeof CodeBlock>;
-
-export default meta;
-type Story = StoryObj<typeof meta>;
-
-/**
- * Multi-line code block for displaying formatted code snippets.
- */
-export const Default: Story = {
-  args: {
-    children: 'console.log("Hello, world!");',
-  },
-};
-
-/**
- * Inline code for referencing variables or short snippets within text.
- */
-export const Inline: Story = {
-  args: {
-    inline: true,
-    children: 'useState',
-  },
-};
-```
+Several of the conventions above are enforced by house oxlint rules and by `check:stories`,
+`check:story-sort` and `check:components`. Each states itself at the call site when it fires and
+carries its own reasoning, so read the diagnostic rather than looking for the rule restated here.
+The one thing no gate can see is whether a `play` function asserts the **outcome** of what it did
+rather than merely reaching an assertion.

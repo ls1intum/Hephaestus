@@ -11,7 +11,7 @@ export type JobWait = { kind: "hold"; reason: string } | { kind: "backoff" };
  */
 export function jobWait(
 	job: Pick<AgentJob, "status" | "holdReason" | "availableAt">,
-	now: number = Date.now(),
+	now: number,
 ): JobWait | null {
 	if (job.status !== "QUEUED") return null;
 	if (job.holdReason) return { kind: "hold", reason: job.holdReason };

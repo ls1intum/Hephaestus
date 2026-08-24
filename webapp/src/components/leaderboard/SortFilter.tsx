@@ -31,16 +31,18 @@ export function SortFilter({
 
 	return (
 		<div className="space-y-1.5">
-			<Label htmlFor="sort">Sort by</Label>
+			<Label id="sort-label" htmlFor="sort">
+				Sort by
+			</Label>
 			<Select
 				value={selectedSort}
-				onValueChange={(value) => value && onSortChange?.(value as LeaderboardSortType)}
+				onValueChange={(value) => value && onSortChange?.(value)}
 				items={visibleOptions}
 			>
 				<SelectTrigger id="sort" className="w-full">
 					<SelectValue placeholder="Sort by" />
 				</SelectTrigger>
-				<SelectContent>
+				<SelectContent aria-labelledby="sort-label">
 					{visibleOptions.map((option) => (
 						<SelectItem key={option.value} value={option.value}>
 							{option.label}

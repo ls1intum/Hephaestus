@@ -1,5 +1,5 @@
 import { SearchIcon } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import type { GitLabGroup } from "@/api/types.gen";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -12,12 +12,10 @@ export function SelectGroupStep() {
 	const { state, dispatch } = useWizard();
 	const [search, setSearch] = useState("");
 
-	const filteredGroups = useMemo(() => {
-		const q = search.toLowerCase();
-		return state.groups.filter(
-			(g) => g.name.toLowerCase().includes(q) || g.fullPath.toLowerCase().includes(q),
-		);
-	}, [state.groups, search]);
+	const query = search.toLowerCase();
+	const filteredGroups = state.groups.filter(
+		(g) => g.name.toLowerCase().includes(query) || g.fullPath.toLowerCase().includes(query),
+	);
 
 	if (state.groups.length === 0) {
 		return (

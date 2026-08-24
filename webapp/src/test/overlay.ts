@@ -24,9 +24,9 @@ export const POSITIONED_POPUPS = [
  * animation of its own and would otherwise look settled the moment it mounts.
  */
 function enteringAnimationsOf(element: Element): Animation[] {
-	return document.getAnimations().filter((animation) => {
-		const target = (animation.effect as KeyframeEffect | null)?.target;
-		return target instanceof Element && target.contains(element);
+	return document.getAnimations().filter(({ effect }) => {
+		if (!(effect instanceof KeyframeEffect)) return false;
+		return effect.target instanceof Element && effect.target.contains(element);
 	});
 }
 
@@ -45,7 +45,7 @@ function enteringAnimationsOf(element: Element): Animation[] {
  */
 export async function expectSettledVisible(element: HTMLElement): Promise<void> {
 	await waitFor(() => {
-		expect(
+		void expect(
 			element.closest("[data-starting-style]"),
 			"Still inside the overlay's starting-style frame, where everything in it is transparent.",
 		).toBeNull();
@@ -77,4 +77,21 @@ export async function settledPopup(): Promise<HTMLElement> {
 	});
 	await expectSettledVisible(popup);
 	return popup;
+}
+
+/**
+ * The drawer level nearest the page, once it has landed. A level is portalled but not positioned, so
+ * `settledPopup` above cannot see it, and it arrives over a transition rather than being simply
+ * present — a play that measures the panel has to wait for it rather than take the first query hit.
+ */
+export async function settledDrawerPanel(): Promise<HTMLElement> {
+	const panel = await waitFor(() => {
+		const open = document.querySelector<HTMLElement>('[data-slot="drawer-popup"]');
+		if (open == null) {
+			throw new Error("No drawer level is open, so there is no panel to measure.");
+		}
+		return open;
+	});
+	await expectSettledVisible(panel);
+	return panel;
 }

@@ -1,4 +1,6 @@
 import type { ConfigAuditEntryView } from "@/api/types.gen";
+import { prettyJson } from "@/components/admin/audit-shared/pretty-json";
+import { formatTimestamp } from "@/components/admin/audit-shared/time-format";
 import { DetailRow } from "@/components/common/DetailRow";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -10,8 +12,7 @@ import {
 	SheetHeader,
 	SheetTitle,
 } from "@/components/ui/sheet";
-import { prettyJson } from "../audit-shared/pretty-json";
-import { formatTimestamp } from "../audit-shared/time-format";
+import { hasText } from "@/lib/text";
 import {
 	ACTION_BADGE,
 	actionLabel,
@@ -148,7 +149,7 @@ export function ConfigAuditDetailSheet({
 							)}
 						</div>
 
-						{(oldRaw || newRaw) && (
+						{(hasText(oldRaw) || hasText(newRaw)) && (
 							<Collapsible key={entry.id}>
 								<CollapsibleTrigger
 									render={

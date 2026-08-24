@@ -1,10 +1,8 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import type {
-	AgentSession,
-	AgentSessionEvent,
-	AgentToolResult,
-} from "@earendil-works/pi-coding-agent";
 import {
+	type AgentSession,
+	type AgentSessionEvent,
+	type AgentToolResult,
 	AuthStorage,
 	createAgentSession,
 	defineTool,
@@ -13,22 +11,31 @@ import {
 	SettingsManager,
 } from "@earendil-works/pi-coding-agent";
 import { errorText } from "./pi-error-text.ts";
-import type { NormalizedObservation } from "./pi-observation-normalize.ts";
 import {
 	citationMatchesArtifact,
 	dedupeKeyForObservation,
 	isRecord,
+	type NormalizedObservation,
 	normalizeObservation,
 	validateEvidenceSources,
 	validateInapplicabilityScope,
 	validateSearchScope,
 } from "./pi-observation-normalize.ts";
 import { loadProviderConfig, registerHephaestusProvider } from "./pi-provider.ts";
-import type { ComposedFeedbackEnvelope, ComposedFeedbackUnit } from "./pi-runner-composition.ts";
-import { ACTIONS, CHANNELS, undeliverableUnits } from "./pi-runner-composition.ts";
+import {
+	ACTIONS,
+	CHANNELS,
+	type ComposedFeedbackEnvelope,
+	type ComposedFeedbackUnit,
+	undeliverableUnits,
+} from "./pi-runner-composition.ts";
 import { deriveTimeouts } from "./pi-runner-timings.ts";
-import type { UsageReport } from "./pi-runner-usage.ts";
-import { addAssistantUsage, extractUsageFromSession, newUsageLedger } from "./pi-runner-usage.ts";
+import {
+	addAssistantUsage,
+	extractUsageFromSession,
+	newUsageLedger,
+	type UsageReport,
+} from "./pi-runner-usage.ts";
 
 // ── Reading what other processes wrote ───────────────────────────────────────
 // Everything this runner is handed — the task envelope, the manifest, the practice index, the
@@ -51,6 +58,30 @@ function parseJson(text: string): unknown {
 /** The elements of a value the writer was supposed to send as an array, and none for anything else. */
 function jsonArray(value: unknown): unknown[] {
 	return Array.isArray(value) ? value : [];
+}
+
+/**
+ * A value nobody has checked, as log text. A string reads as itself; anything else is rendered as the
+ * JSON it arrived as, because an object coerced to a string is "[object Object]" — and a line that
+ * reports a rejected envelope that way has said nothing about the envelope.
+ */
+function logValue(value: unknown): string {
+	if (typeof value === "string") return value;
+	if (value === undefined) return "undefined";
+	return JSON.stringify(value);
+}
+
+/**
+ * An array field the SDK declares required, read as the empty list when it is not there.
+ *
+ * <p>These reads run over whatever a session has left behind — before a first turn, after an abort,
+ * after a provider error — which is the state in which pi-runner-usage.ts records a message arriving
+ * without the usage block its declaration promises. Neither a session with no transcript nor a
+ * message with no parts is a reason to throw inside an event subscription, or to end a review that
+ * has already measured something.
+ */
+function listOrEmpty<T>(items: T[] | undefined): T[] {
+	return items ?? [];
 }
 
 /** One practice this run may report on, as inputs/practices/index.json describes it. */
@@ -214,7 +245,8 @@ function readPracticeIndex(): PracticeIndexEntry[] {
 		}
 		return {
 			slug: practice.slug,
-			area: typeof practice.area === "string" ? practice.area : undefined,
+			// A blank area is no area: the fan-out groups a practice without one under its own slug.
+			area: typeof practice.area === "string" && practice.area !== "" ? practice.area : undefined,
 			exhaustiveSources: jsonArray(practice.exhaustiveSources).filter(
 				(kind): kind is string => typeof kind === "string",
 			),
@@ -471,20 +503,35 @@ function isValidObservationsPayload(payload: unknown): payload is ObservationsPa
 	);
 }
 
+/**
+ * The three control characters a model does put inside a JSON string, and what JSON says they are.
+ * Every other one is dropped: none of them carries text, and none was legal where it appeared.
+ */
+const CONTROL_CHARACTER_ESCAPES = new Map([
+	["\n", "\\n"],
+	["\r", "\\r"],
+	["\t", "\\t"],
+]);
+const LAST_CONTROL_CODE_POINT = 0x1f;
+const DELETE_CODE_POINT = 0x7f;
+
+/** Parse text a model wrote, repairing the raw control characters it embedded in a string. */
 function lenientJsonParse(text: string): unknown {
 	try {
-		return JSON.parse(text);
+		return parseJson(text);
 	} catch {
 		// Unparseable as-is; the repair pass below is the point of this function.
 	}
-	// biome-ignore lint/suspicious/noControlCharactersInRegex: control characters are what this repairs — model output that embedded a raw newline or tab inside a JSON string.
-	const cleaned = text.replace(/[\u0000-\u001F\u007F]/g, (ch) => {
-		if (ch === "\n") return "\\n";
-		if (ch === "\r") return "\\r";
-		if (ch === "\t") return "\\t";
-		return "";
-	});
-	return JSON.parse(cleaned);
+	let cleaned = "";
+	for (const character of text) {
+		const codePoint = character.codePointAt(0) ?? 0;
+		if (codePoint > LAST_CONTROL_CODE_POINT && codePoint !== DELETE_CODE_POINT) {
+			cleaned += character;
+			continue;
+		}
+		cleaned += CONTROL_CHARACTER_ESCAPES.get(character) ?? "";
+	}
+	return parseJson(cleaned);
 }
 
 /**
@@ -497,7 +544,7 @@ function lenientJsonParse(text: string): unknown {
 function checkResultFile(): boolean {
 	if (!existsSync(RESULT_PATH)) return false;
 	try {
-		const data = lenientJsonParse(readFileSync(RESULT_PATH, "utf-8"));
+		const data = lenientJsonParse(readFileSync(RESULT_PATH, "utf8"));
 		if (!isValidObservationsPayload(data)) {
 			const observations = isRecord(data) ? jsonArray(data.observations) : [];
 			const validCount = observations.filter(isValidObservation).length;
@@ -612,20 +659,22 @@ const reportObservationTool = defineTool({
 			observation: observationSchema,
 		},
 	},
-	execute: async (_toolCallId, params): Promise<AgentToolResult<ReportObservationDetails>> => {
+	// Nothing here waits on anything, and Pi awaits what this returns inside its own try/catch — so a
+	// validation throw out of appendObservations still reaches the model as this call's failure.
+	execute: (_toolCallId, params): Promise<AgentToolResult<ReportObservationDetails>> => {
 		if (measurementClosed) {
-			return {
+			return Promise.resolve({
 				content: [
 					{ type: "text", text: "Measurement is closed; this turn may only compose feedback." },
 				],
 				details: { inserted: 0, measurementClosed: true },
-			};
+			});
 		}
 		// Counted off the normalised observation. It used to be read from `params.observation.assessment`,
 		// a field the tool schema does not have and `additionalProperties: false` forbids, so the model
 		// was told "Negative observations in this call: 0" however bad the finding it had just filed.
 		const { inserted, duplicates, negatives } = appendObservations([params.observation]);
-		return {
+		return Promise.resolve({
 			content: [
 				{
 					type: "text",
@@ -633,30 +682,32 @@ const reportObservationTool = defineTool({
 				},
 			],
 			details: { inserted, duplicates, totalObservations: reviewState.observations.length },
-		};
+		});
 	},
 });
 
 function accumulateUsage(prev: UsageReport | null, curr: UsageReport): void {
-	usageTotals.model = curr.model || usageTotals.model;
-	usageTotals.inputTokens += Math.max(0, curr.inputTokens - (prev?.inputTokens || 0));
-	usageTotals.outputTokens += Math.max(0, curr.outputTokens - (prev?.outputTokens || 0));
-	usageTotals.reasoningTokens += Math.max(0, curr.reasoningTokens - (prev?.reasoningTokens || 0));
-	usageTotals.cacheReadTokens += Math.max(0, curr.cacheReadTokens - (prev?.cacheReadTokens || 0));
+	usageTotals.model = curr.model ?? usageTotals.model;
+	usageTotals.inputTokens += Math.max(0, curr.inputTokens - (prev?.inputTokens ?? 0));
+	usageTotals.outputTokens += Math.max(0, curr.outputTokens - (prev?.outputTokens ?? 0));
+	usageTotals.reasoningTokens += Math.max(0, curr.reasoningTokens - (prev?.reasoningTokens ?? 0));
+	usageTotals.cacheReadTokens += Math.max(0, curr.cacheReadTokens - (prev?.cacheReadTokens ?? 0));
 	usageTotals.cacheWriteTokens += Math.max(
 		0,
-		curr.cacheWriteTokens - (prev?.cacheWriteTokens || 0),
+		curr.cacheWriteTokens - (prev?.cacheWriteTokens ?? 0),
 	);
-	usageTotals.costUsd += Math.max(0, curr.costUsd - (prev?.costUsd || 0));
-	usageTotals.totalCalls += Math.max(0, curr.totalCalls - (prev?.totalCalls || 0));
+	usageTotals.costUsd += Math.max(0, curr.costUsd - (prev?.costUsd ?? 0));
+	usageTotals.totalCalls += Math.max(0, curr.totalCalls - (prev?.totalCalls ?? 0));
 }
 
-function extractLastAssistantText(sessionState: SessionState): string | null {
-	const messages = sessionState.messages || [];
+function extractLastAssistantText(sessionState: {
+	messages?: SessionState["messages"];
+}): string | null {
+	const messages = listOrEmpty(sessionState.messages);
 	for (let i = messages.length - 1; i >= 0; i--) {
 		const msg = messages[i];
 		if (msg?.role !== "assistant") continue;
-		const text = (msg.content || [])
+		const text = listOrEmpty(msg.content)
 			.map((part) =>
 				part.type === "text" ? part.text : part.type === "thinking" ? part.thinking : "",
 			)
@@ -675,7 +726,7 @@ function tryParseJsonFromText(text: string | null): ObservationsPayload | null {
 	if (!text) return null;
 	if (text.length > MAX_RESCUE_TEXT_LENGTH) return null;
 	try {
-		const parsed = JSON.parse(text);
+		const parsed = parseJson(text);
 		if (isValidObservationsPayload(parsed)) return parsed;
 	} catch {
 		// The whole text is rarely bare JSON; the fenced and braced passes below are the real attempts.
@@ -684,7 +735,7 @@ function tryParseJsonFromText(text: string | null): ObservationsPayload | null {
 	// it names what each iteration is about and keeps the regex's lastIndex out of the loop condition.
 	for (const [, fencedBody = ""] of text.matchAll(/```(?:json)?\s*\n?([\s\S]*?)\n?\s*```/g)) {
 		try {
-			const parsed = JSON.parse(fencedBody.trim());
+			const parsed = parseJson(fencedBody.trim());
 			if (isValidObservationsPayload(parsed)) return parsed;
 		} catch {
 			// A fence that is not JSON: try the next one.
@@ -703,7 +754,7 @@ function tryParseJsonFromText(text: string | null): ObservationsPayload | null {
 		attempts++;
 		try {
 			const candidate = text.slice(braceStart, end + 1);
-			const parsed = JSON.parse(candidate);
+			const parsed = parseJson(candidate);
 			if (isValidObservationsPayload(parsed)) return parsed;
 		} catch {
 			// This brace does not close the object: widen to the next candidate.
@@ -745,7 +796,7 @@ function loadPracticeGroups(): { area: string; slugs: string[] }[] {
 	const byArea = new Map<string, string[]>();
 	for (const practice of practiceIndex) {
 		if (!practice.slug) continue;
-		const area = practice.area || practice.slug;
+		const area = practice.area ?? practice.slug;
 		const slugs = byArea.get(area) ?? [];
 		slugs.push(practice.slug);
 		byArea.set(area, slugs);
@@ -783,7 +834,7 @@ const TASK_PATH = "/workspace/task.json";
 function readTaskEnvelope(): TaskEnvelope {
 	let raw: string;
 	try {
-		raw = readFileSync(TASK_PATH, "utf-8");
+		raw = readFileSync(TASK_PATH, "utf8");
 	} catch (err) {
 		console.error(`[pi-runner] Failed to read ${TASK_PATH}: ${errorText(err)}`);
 		process.exit(ENVELOPE_MISMATCH_EXIT);
@@ -798,7 +849,7 @@ function readTaskEnvelope(): TaskEnvelope {
 	const envelope: Record<string, unknown> = isRecord(parsed) ? parsed : {};
 	if (envelope.schemaVersion !== SUPPORTED_SCHEMA_VERSION) {
 		console.error(
-			`[pi-runner] Unsupported schemaVersion: got ${envelope.schemaVersion}, expected ${SUPPORTED_SCHEMA_VERSION}. ` +
+			`[pi-runner] Unsupported schemaVersion: got ${logValue(envelope.schemaVersion)}, expected ${SUPPORTED_SCHEMA_VERSION}. ` +
 				`Server/image version drift — rebuild the agent-pi image or roll back the server.`,
 		);
 		process.exit(ENVELOPE_MISMATCH_EXIT);
@@ -806,7 +857,7 @@ function readTaskEnvelope(): TaskEnvelope {
 	const task: Record<string, unknown> = isRecord(envelope.task) ? envelope.task : {};
 	if (task.kind !== SUPPORTED_KIND) {
 		console.error(
-			`[pi-runner] Unknown task kind: got "${task.kind}", expected "${SUPPORTED_KIND}". ` +
+			`[pi-runner] Unknown task kind: got "${logValue(task.kind)}", expected "${SUPPORTED_KIND}". ` +
 				`This runner only handles practice_review tasks.`,
 		);
 		process.exit(ENVELOPE_MISMATCH_EXIT);
@@ -832,9 +883,9 @@ const taskEnvelope = readTaskEnvelope();
 const prompt = taskEnvelope.task.prompt.trim();
 console.error(
 	`[pi-runner] Task envelope loaded: kind=${taskEnvelope.task.kind}, ` +
-		`jobId=${taskEnvelope.jobId}, workspaceId=${taskEnvelope.workspaceId}, ` +
-		`repository=${taskEnvelope.task.repositoryFullName ?? "?"}, ` +
-		`prNumber=${taskEnvelope.task.pullRequestNumber ?? "?"}`,
+		`jobId=${logValue(taskEnvelope.jobId)}, workspaceId=${logValue(taskEnvelope.workspaceId)}, ` +
+		`repository=${logValue(taskEnvelope.task.repositoryFullName ?? "?")}, ` +
+		`prNumber=${logValue(taskEnvelope.task.pullRequestNumber ?? "?")}`,
 );
 
 const COMPOSITION_REQUEST_PATH = `${CWD}/inputs/feedback-composition.json`;
@@ -1007,7 +1058,7 @@ function composablePracticeSlugs(): string[] {
 	} catch (e) {
 		console.error(`[pi-runner] observation history unreadable for composition: ${errorText(e)}`);
 	}
-	return [...slugs].sort();
+	return [...slugs].toSorted();
 }
 
 // Supersession is limited to unread thread keys present in this snapshot.
@@ -1079,13 +1130,11 @@ function buildFeedbackTool(
 	// naming a thread outside it, so the vocabulary is recorded here, where it is decided.
 	composedFeedback.preparedThreadKeys = preparedThreadKeys;
 	const enabledChannels = CHANNELS.filter((channel) => request.channels[channel].enabled);
-	const placementKinds = request.inContextPlacementKinds || [];
+	const placementKinds = request.inContextPlacementKinds;
 	const usedPerChannel: Record<Channel, number> = { IN_CONTEXT: 0, IN_APP: 0, IN_CHAT: 0 };
 	const seen = new Set<string>();
-	const refuse = (text: string): AgentToolResult<ReportFeedbackDetails> => ({
-		content: [{ type: "text", text }],
-		details: { stored: 0 },
-	});
+	const refuse = (text: string): Promise<AgentToolResult<ReportFeedbackDetails>> =>
+		Promise.resolve({ content: [{ type: "text", text }], details: { stored: 0 } });
 
 	return defineTool({
 		name: "report_feedback",
@@ -1223,7 +1272,8 @@ function buildFeedbackTool(
 				},
 			},
 		},
-		execute: async (_toolCallId, params): Promise<AgentToolResult<ReportFeedbackDetails>> => {
+		// Nothing here waits on anything; Pi takes the result as a promise either way.
+		execute: (_toolCallId, params): Promise<AgentToolResult<ReportFeedbackDetails>> => {
 			if (!compositionAdmitted) {
 				return refuse(
 					"Feedback composition opens only after Java admits the completed observations.",
@@ -1242,7 +1292,7 @@ function buildFeedbackTool(
 				observations.map((observation) => [observation.id, observation]),
 			);
 			const bounds = request.channels[unit.channel];
-			if (!bounds?.enabled) {
+			if (!bounds.enabled) {
 				return refuse(`${unit.channel} is not a lane this run may write for; skipped.`);
 			}
 			const key = `${unit.channel}:${unit.practiceSlug}`;
@@ -1260,7 +1310,7 @@ function buildFeedbackTool(
 			usedPerChannel[unit.channel]++;
 			composedFeedback.units.push(unit);
 			persistComposedFeedback();
-			return {
+			return Promise.resolve({
 				content: [
 					{
 						type: "text",
@@ -1268,7 +1318,7 @@ function buildFeedbackTool(
 					},
 				],
 				details: { stored: 1, channel: unit.channel, total: composedFeedback.units.length },
-			};
+			});
 		},
 	});
 }
@@ -1304,7 +1354,7 @@ function asFeedbackUnit(value: unknown): FeedbackUnit | null {
 		: undefined;
 	const placement = isRecord(value.placement)
 		? {
-				kind: String(value.placement.kind ?? ""),
+				kind: optionalString(value.placement.kind) ?? "",
 				observationId: optionalString(value.placement.observationId),
 				citationIndex:
 					typeof value.placement.citationIndex === "number"
@@ -1356,11 +1406,11 @@ function validateUnit(
 		if (unit.body || unit.nextStep) {
 			return "IN_CHAT takes notes{situation,capability,evidenceSummary,inConversationSignal}, not body/nextStep - nothing on this lane is read out; skipped.";
 		}
-		if (!unit.notes?.situation?.trim()) return "IN_CHAT needs notes.situation; skipped.";
-		if (!unit.notes?.capability?.trim()) return "IN_CHAT needs notes.capability; skipped.";
-		if (!unit.notes?.evidenceSummary?.trim())
-			return "IN_CHAT needs notes.evidenceSummary; skipped.";
-		if (!unit.notes?.inConversationSignal?.trim())
+		const { notes } = unit;
+		if (!notes?.situation?.trim()) return "IN_CHAT needs notes.situation; skipped.";
+		if (!notes.capability?.trim()) return "IN_CHAT needs notes.capability; skipped.";
+		if (!notes.evidenceSummary?.trim()) return "IN_CHAT needs notes.evidenceSummary; skipped.";
+		if (!notes.inConversationSignal?.trim())
 			return "IN_CHAT needs notes.inConversationSignal; skipped.";
 		if (unit.placement) return "Only IN_CONTEXT units may carry a placement; skipped.";
 		return null;
@@ -1373,7 +1423,7 @@ function validateUnit(
 		const normalizedBody = normalizeQuotedText(unit.body);
 		const repeatsCurrentEvidence = unit.basedOn.some((id) =>
 			(observationsById.get(id)?.citations ?? []).some((citation) => {
-				const quote = normalizeQuotedText(String(citation.quote ?? ""));
+				const quote = normalizeQuotedText(optionalString(citation.quote) ?? "");
 				return quote.length >= 12 && normalizedBody.includes(quote);
 			}),
 		);
@@ -1435,18 +1485,17 @@ function buildCompositionTurn(
 		.join(", ");
 	const closed = CHANNELS.filter((channel) => !request.channels[channel].enabled);
 	const anchorable = observations.filter((observation) => Boolean(observation.anchorable)).length;
+	const closedNote =
+		closed.length > 0 ? ` Closed this turn, so write nothing for them: ${closed.join(", ")}.` : "";
+	const placementNote = request.channels.IN_CONTEXT.enabled
+		? ` IN_CONTEXT placements available here: ${request.inContextPlacementKinds.join(", ")}.`
+		: "";
 	return (
 		`## This turn\n` +
 		`The review just finished. Its ${observations.length} measurement(s) are in ` +
 		`\`work/composition/observations.json\`; ${anchorable} of them cite a line inside this change and can ` +
 		`therefore carry a note on the work. Read that file first, then the history.\n\n` +
-		`Lanes open this turn: ${lanes}.` +
-		(closed.length > 0
-			? ` Closed this turn, so write nothing for them: ${closed.join(", ")}.`
-			: "") +
-		(request.channels.IN_CONTEXT.enabled
-			? ` IN_CONTEXT placements available here: ${request.inContextPlacementKinds.join(", ")}.`
-			: "") +
+		`Lanes open this turn: ${lanes}.${closedNote}${placementNote}` +
 		`\nA pattern claim needs at least ${request.minDistinctArtifacts} distinct pieces of work.\n\n` +
 		`Persist each unit with report_feedback as soon as it is ready. Writing nothing on a lane is a ` +
 		`correct and common outcome; say in one line why, and stop.`
@@ -1484,6 +1533,12 @@ async function admitObservations() {
 		JSON.stringify({ observations: admittedObservations }, null, 2),
 	);
 }
+
+// What the timeouts did to this run. Each is set from a timer callback and read after the turn it
+// interrupted, so it belongs to the run rather than to any one step of it.
+let softTimeoutFired = false;
+let hardAborted = false;
+let retryAborted = false;
 
 async function main() {
 	console.error(`[pi-runner] Embedded SDK mode`);
@@ -1540,15 +1595,11 @@ async function main() {
 		modelRegistry,
 	});
 	// Fail closed: Pi otherwise silently falls back to a built-in provider.
-	if (extensionsResult?.extensions?.length) {
-		for (const ext of extensionsResult.extensions) {
-			console.error(`[pi-runner] extension loaded: ${ext.path}`);
-		}
+	for (const ext of extensionsResult.extensions) {
+		console.error(`[pi-runner] extension loaded: ${ext.path}`);
 	}
-	if (extensionsResult?.errors?.length) {
-		for (const err of extensionsResult.errors) {
-			console.error(`[pi-runner] extension error: ${err?.path}: ${err?.error}`);
-		}
+	for (const err of extensionsResult.errors) {
+		console.error(`[pi-runner] extension error: ${err.path}: ${err.error}`);
 	}
 
 	async function completeWithAdmittedComposition() {
@@ -1580,8 +1631,6 @@ async function main() {
 		persistComposedFeedback();
 	}
 
-	let softTimeoutFired = false;
-	let hardAborted = false;
 	let prevUsage = null;
 
 	const softTimer = setTimeout(() => {
@@ -1589,8 +1638,8 @@ async function main() {
 		console.error(`[pi-runner] Soft timeout fired — nudging agent to persist review state`);
 		const steerMessage =
 			`Stop analyzing and persist output now. ` +
-			`Use report_observation immediately for any observation you already have, one observation per call. ` +
-			PERSIST_DISCIPLINE;
+			`Use report_observation immediately for any observation you already have, ` +
+			`one observation per call. ${PERSIST_DISCIPLINE}`;
 		session
 			.steer(steerMessage)
 			.catch((err) => console.error(`[pi-runner] steer failed: ${errorText(err)}`));
@@ -1606,21 +1655,21 @@ async function main() {
 	const streamUsage = newUsageLedger();
 	const unsubscribe = session.subscribe((event: AgentSessionEvent) => {
 		if (event.type === "tool_execution_start") {
-			console.error(`[pi-runner] tool: ${event.toolName ?? "?"}`);
+			console.error(`[pi-runner] tool: ${event.toolName}`);
 		}
-		if (event.type === "message_end" && event.message?.role === "assistant") {
+		if (event.type === "message_end" && event.message.role === "assistant") {
 			// Compaction removes messages but does not undo their token usage.
 			addAssistantUsage(streamUsage, event.message);
 			const stopReason = event.message.stopReason;
-			const types = (event.message.content || []).map((c) => c.type);
+			const types = listOrEmpty(event.message.content).map((c) => c.type);
 			// "toolCall" is what an assistant content part is called. This counted "tool_use" and
 			// "tool_call" — neither of which the union contains — so every turn the model spent entirely
 			// on tools was logged as having made none, which is the opposite of what this line is read for.
 			const toolCalls = types.filter((t) => t === "toolCall").length;
 			const errMsg = event.message.errorMessage;
 			console.error(
-				`[pi-runner] assistant msg: stopReason=${stopReason}, toolCalls=${toolCalls}, types=[${types}]` +
-					(errMsg ? `, errorMessage=${redact(errMsg)}` : ""),
+				`[pi-runner] assistant msg: stopReason=${stopReason}, toolCalls=${toolCalls}, ` +
+					`types=[${types.join(",")}]${errMsg ? `, errorMessage=${redact(errMsg)}` : ""}`,
 			);
 		}
 		events.push({ type: event.type, timestamp: Date.now() });
@@ -1662,15 +1711,15 @@ async function main() {
 					: `Continue the SAME review. Using the diff and context you ALREADY read (do NOT re-read the diff), ${readHint} and evaluate ONLY these practices, persisting each with report_observation (one call per observation): ${batch.join(", ")}.`;
 			try {
 				await session.prompt(batchPrompt);
+				console.error(
+					`[pi-runner] turn ${bi + 1}/${batches.length} complete (slugs=${batch.length})`,
+				);
 			} catch (err) {
+				// A hard abort during this turn is what the check at the top of the next one is for.
 				console.error(
 					`[pi-runner] turn ${bi + 1}/${batches.length} prompt error: ${errorText(err)}`,
 				);
-				if (hardAborted) break;
 			}
-			console.error(
-				`[pi-runner] turn ${bi + 1}/${batches.length} complete (slugs=${batch.length})`,
-			);
 		}
 
 		if (!hardAborted && allSlugs.length > 0) {
@@ -1746,15 +1795,18 @@ async function main() {
 		process.exit(0);
 	}
 
-	const lastMsgs = (session.state.messages || []).filter((m) => m.role === "assistant").slice(-2);
+	const lastMsgs = listOrEmpty(session.state.messages)
+		.filter((m) => m.role === "assistant")
+		.slice(-2);
 	for (const m of lastMsgs) {
-		const types = (m.content || []).map((c) => c.type);
-		const textLen = (m.content || []).reduce(
+		const parts = listOrEmpty(m.content);
+		const types = parts.map((c) => c.type);
+		const textLen = parts.reduce(
 			(total, part) => total + (part.type === "text" ? part.text.length : 0),
 			0,
 		);
 		console.error(
-			`[pi-runner] assistant msg: stopReason=${m.stopReason}, contentTypes=[${types}], textLen=${textLen}`,
+			`[pi-runner] assistant msg: stopReason=${m.stopReason}, contentTypes=[${types.join(",")}], textLen=${textLen}`,
 		);
 	}
 
@@ -1777,7 +1829,6 @@ async function main() {
 	const scaffold = buildRetryScaffold(slugs);
 	console.error(`[pi-runner] Loaded ${slugs.length} practice slugs for retry scaffold`);
 
-	let retryAborted = false;
 	const retryTimer = setTimeout(() => {
 		retryAborted = true;
 		console.error(`[pi-runner] Retry hard timeout — aborting`);
@@ -1793,24 +1844,18 @@ async function main() {
 		retryPrompt =
 			`You ran out of time before finalizing the review. ` +
 			`Do NOT restart analysis from scratch. Do NOT read more files. ` +
-			`Persist every remaining justified observation with report_observation immediately, one observation per call. ` +
-			PERSIST_DISCIPLINE +
-			` ` +
-			scaffold;
+			`Persist every remaining justified observation with report_observation immediately, ` +
+			`one observation per call. ${PERSIST_DISCIPLINE} ${scaffold}`;
 	} else if (agentText) {
 		retryPrompt =
 			`You completed analysis but did not persist the final review output. ` +
-			`Do NOT read any more files. Persist the remaining observations with report_observation NOW, one observation per call. ` +
-			PERSIST_DISCIPLINE +
-			` ` +
-			scaffold;
+			`Do NOT read any more files. Persist the remaining observations with report_observation NOW, ` +
+			`one observation per call. ${PERSIST_DISCIPLINE} ${scaffold}`;
 	} else {
 		retryPrompt =
 			`You did not persist the review output. The review will fail unless you persist it NOW. ` +
-			`Use your analysis from above. Do NOT read more files. Persist observations with report_observation immediately, one observation per call. ` +
-			PERSIST_DISCIPLINE +
-			` ` +
-			scaffold;
+			`Use your analysis from above. Do NOT read more files. Persist observations with ` +
+			`report_observation immediately, one observation per call. ${PERSIST_DISCIPLINE} ${scaffold}`;
 	}
 
 	try {
@@ -1883,7 +1928,7 @@ process.on("uncaughtException", (err) => {
 });
 
 process.on("unhandledRejection", (reason) => {
-	console.error(`[pi-runner] UNHANDLED REJECTION: ${reason}`);
+	console.error(`[pi-runner] UNHANDLED REJECTION: ${errorText(reason)}`);
 	persistRunnerDebug();
 	persistUsage();
 	process.exit(2);

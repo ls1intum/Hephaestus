@@ -169,7 +169,7 @@ public class SyncJobService implements SmartLifecycle {
                     .orElse(null)
             );
             if (raced != null) {
-                throw new SyncJobConflictException(raced);
+                throw new SyncJobConflictException(raced, e);
             }
             throw e;
         }

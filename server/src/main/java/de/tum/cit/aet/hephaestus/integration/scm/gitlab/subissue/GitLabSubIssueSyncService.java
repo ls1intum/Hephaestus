@@ -104,12 +104,13 @@ public class GitLabSubIssueSyncService {
         String cursor = null;
         String previousCursor = null;
         int page = 0;
-        boolean errorAborted = false;
+        boolean partialView = false;
 
         try {
             do {
                 if (page >= GitLabSyncConstants.MAX_PAGINATION_PAGES) {
                     log.warn("Reached max pagination: project={}", safeProjectPath);
+                    partialView = true;
                     break;
                 }
 
@@ -129,7 +130,7 @@ public class GitLabSubIssueSyncService {
                 }
                 if (handleResult.action() == GitLabGraphQlResponseHandler.HandleResult.Action.ABORT) {
                     graphQlClientProvider.recordFailure(new GitLabSyncException("Invalid GraphQL response"));
-                    errorAborted = true;
+                    partialView = true;
                     break;
                 }
 
@@ -137,7 +138,13 @@ public class GitLabSubIssueSyncService {
                 List<Map<String, Object>> nodes = (List<Map<String, Object>>) (List<?>) response
                     .field("project.workItems.nodes")
                     .toEntityList(Map.class);
-                if (nodes == null || nodes.isEmpty()) break;
+                if (nodes == null) {
+                    // A response the handler passed but whose nodes field is missing is a page we did
+                    // not read, not an empty project.
+                    partialView = true;
+                    break;
+                }
+                if (nodes.isEmpty()) break;
 
                 for (Map<String, Object> node : nodes) {
                     int linked = processWorkItemNode(node, issueByIid, issuesWithParentInGitLab, repository);
@@ -151,15 +158,22 @@ public class GitLabSubIssueSyncService {
                 if (
                     responseHandler.isPaginationLoop(cursor, previousCursor, "sub-issues for " + safeProjectPath, log)
                 ) {
-                    errorAborted = true;
+                    partialView = true;
                     break;
                 }
                 previousCursor = cursor;
                 page++;
             } while (cursor != null);
 
-            // Stale parent cleanup: clear parentIssue for issues that no longer have a parent in GitLab
-            int staleCleared = clearStaleParents(issues, issuesWithParentInGitLab);
+            // Clearing parentIssue for issues GitLab no longer reports a parent for is only safe on a
+            // COMPLETE walk: issuesWithParentInGitLab is built page by page, so after a run that stopped
+            // early every issue whose parent lived on an unfetched page looks parentless and would have
+            // its real link deleted. Anything that can end the loop before the last page therefore has
+            // to set partialView.
+            int staleCleared = partialView ? 0 : clearStaleParents(issues, issuesWithParentInGitLab);
+            if (partialView) {
+                log.warn("Skipping stale-parent cleanup after an incomplete walk: project={}", safeProjectPath);
+            }
 
             if (totalLinked > 0 || staleCleared > 0) {
                 log.info(

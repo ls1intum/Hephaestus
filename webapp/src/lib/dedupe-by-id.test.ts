@@ -3,7 +3,7 @@ import { dedupeById } from "./dedupe-by-id";
 
 describe("dedupeById", () => {
 	it("drops a row an earlier page already served, keeping order", () => {
-		expect(dedupeById([{ id: 3 }, { id: 2 }, { id: 3 }, { id: 1 }])).toEqual([
+		expect(dedupeById([{ id: 3 }, { id: 2 }, { id: 3 }, { id: 1 }])).toStrictEqual([
 			{ id: 3 },
 			{ id: 2 },
 			{ id: 1 },

@@ -1,8 +1,14 @@
 package de.tum.cit.aet.hephaestus.core.settings;
 
+import org.jspecify.annotations.Nullable;
+
 final class StaleInstanceSettingsException extends RuntimeException {
 
     StaleInstanceSettingsException() {
-        super("Instance settings changed since they were loaded.");
+        this(null);
+    }
+
+    StaleInstanceSettingsException(@Nullable Throwable cause) {
+        super("Instance settings changed since they were loaded.", cause);
     }
 }

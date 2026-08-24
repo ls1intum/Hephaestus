@@ -57,7 +57,7 @@ function withinDates(url: URL, at: Date) {
 	return true;
 }
 
-function page<T>(rows: T[], url: URL) {
+function page(rows: unknown[], url: URL) {
 	const number = Number(single(url, "page") ?? 0);
 	const size = Number(single(url, "size") ?? PAGE_SIZE);
 	return HttpResponse.json({

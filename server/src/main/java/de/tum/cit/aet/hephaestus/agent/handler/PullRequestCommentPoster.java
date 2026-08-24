@@ -279,7 +279,7 @@ class PullRequestCommentPoster {
         try {
             subjectExternalId = channel.formatIssueSubjectId(repoFullName, issueNumber);
         } catch (IllegalArgumentException e) {
-            throw new JobDeliveryException(e.getMessage());
+            throw new JobDeliveryException(e.getMessage(), e);
         }
         FeedbackTarget target = new FeedbackTarget(
             new IntegrationRef(kind, workspaceId, null),
@@ -378,7 +378,7 @@ class PullRequestCommentPoster {
         try {
             subjectExternalId = channel.formatPullRequestSubjectId(repoFullName, prNumber);
         } catch (IllegalArgumentException e) {
-            throw new JobDeliveryException(e.getMessage());
+            throw new JobDeliveryException(e.getMessage(), e);
         }
 
         String resourceUrl = optionalMetadataText(metadata, "commit_sha");

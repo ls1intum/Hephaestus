@@ -3,6 +3,7 @@
 // adds PR links + "Thanks @user!"). Operators read this file; git metadata
 // lives in git.
 module.exports = {
-  getReleaseLine: async (changeset) => `- ${changeset.summary.trim().split("\n").join("\n  ")}`,
-  getDependencyReleaseLine: async () => "",
+	/** @param {{ summary: string }} changeset */
+	getReleaseLine: (changeset) => `- ${changeset.summary.trim().split("\n").join("\n  ")}`,
+	getDependencyReleaseLine: () => "",
 };
