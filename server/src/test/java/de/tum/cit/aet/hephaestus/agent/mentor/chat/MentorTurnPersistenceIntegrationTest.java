@@ -11,7 +11,6 @@ import de.tum.cit.aet.hephaestus.agent.mentor.chat.wire.UIMessageChunk;
 import de.tum.cit.aet.hephaestus.agent.usage.FundingSource;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmPriceSnapshot;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageEventRepository;
-import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageRecorder;
 import de.tum.cit.aet.hephaestus.agent.usage.PricingState;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
@@ -90,10 +89,7 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
     private LlmUsageEventRepository usageEventRepository;
 
     @Autowired
-    private LlmUsageRecorder usageRecorder;
-
-    @Autowired
-    private MentorInFlightReaper reaper;
+    private MentorInFlightAccounting accounting;
 
     @Autowired
     private MeterRegistry meterRegistry;
@@ -719,19 +715,8 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
         return assistantId;
     }
 
-    /**
-     * A window below the safe floor, so the clamp — not the requested ten minutes — decides which rows
-     * are stale. Hand-built because the injected bean's {@code @SchedulerLock} needs a {@code shedlock}
-     * table that {@code ddl-auto=create} doesn't produce; the injected bean is still passed as
-     * self-reference so each turn runs in the {@code REQUIRES_NEW} transaction the batch semantics need.
-     */
     private MentorInFlightReaper reaperWithAnUnsafeWindow() {
-        return new MentorInFlightReaper(
-            chatMessageRepository,
-            new MentorInFlightAccounting(chatMessageRepository, usageRecorder),
-            meterRegistry,
-            Duration.ofMinutes(10)
-        );
+        return new MentorInFlightReaper(chatMessageRepository, accounting, meterRegistry, Duration.ofMinutes(10));
     }
 
     private void setCreatedAt(UUID messageId, Instant createdAt) throws Exception {

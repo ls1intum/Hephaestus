@@ -119,7 +119,7 @@ public final class HephaestusConditions {
 
     /**
      * Condition that checks if a class has at most the specified number of
-     * declared business methods (excluding getters/setters/equals/hashCode/toString).
+     * declared public business methods (excluding getters/setters/equals/hashCode/toString).
      *
      * <p>Classes with many methods often have multiple responsibilities.
      *
@@ -134,6 +134,7 @@ public final class HephaestusConditions {
                     .getMethods()
                     .stream()
                     .filter(m -> m.getOwner().equals(javaClass))
+                    .filter(m -> m.getModifiers().contains(JavaModifier.PUBLIC))
                     .filter(m -> !m.getName().startsWith("$"))
                     .filter(m -> !m.getName().startsWith("lambda$"))
                     .filter(m -> !m.getName().equals("equals"))
