@@ -5536,6 +5536,52 @@ export type ChatMessageVote = {
     updatedAt?: Date;
 };
 
+export type CatalogPracticeSummary = {
+    areaName?: string;
+    areaSlug?: string;
+    artifactKind: string;
+    automatedReviewValidation: PracticeAutomatedReviewValidation;
+    availability: 'AVAILABLE' | 'ADOPTED' | 'SLUG_CONFLICT';
+    name: string;
+    slug: string;
+    whyItMatters?: string;
+};
+
+export type CatalogPracticePreview = {
+    area: CatalogAdoptionArea;
+    availability: 'AVAILABLE' | 'ADOPTED' | 'SLUG_CONFLICT';
+    definition: CuratedPracticeDefinition;
+    etag: string;
+    initialAutonomy: 'OFF' | 'HUMAN_APPROVAL' | 'AUTOMATIC';
+    slug: string;
+    sourceReviewRuleFingerprint: string;
+};
+
+export type CatalogAdoptionArea = {
+    definition?: CuratedAreaRequest;
+    disposition: 'UNASSIGNED' | 'REUSE_EXISTING_AREA' | 'CREATE_CATALOG_AREA';
+    slug?: string;
+};
+
+export type CatalogAreaPracticeAction = {
+    action: 'ADD' | 'MOVE_TO_AREA' | 'KEEP' | 'BLOCKED';
+    slug: string;
+};
+
+export type CatalogAreaAdoptionResult = {
+    added: Array<Practice>;
+    moved: Array<Practice>;
+};
+
+export type CatalogAreaAdoptionPreview = {
+    actions: Array<CatalogAreaPracticeAction>;
+    definition: CuratedAreaRequest;
+    disposition: 'UNASSIGNED' | 'REUSE_EXISTING_AREA' | 'CREATE_CATALOG_AREA';
+    etag: string;
+    practices: Array<CatalogPracticePreview>;
+    slug: string;
+};
+
 /**
  * Binary progress indicating unlocked state
  */
@@ -9236,7 +9282,9 @@ export type DeleteAreaData = {
         workspaceSlug: string;
         areaSlug: string;
     };
-    query?: never;
+    query?: {
+        deletePractices?: boolean;
+    };
     url: '/workspaces/{workspaceSlug}/practice-areas/{areaSlug}';
 };
 
@@ -9421,6 +9469,164 @@ export type ListPracticeAreaTrendResponses = {
 };
 
 export type ListPracticeAreaTrendResponse = ListPracticeAreaTrendResponses[keyof ListPracticeAreaTrendResponses];
+
+export type ListAdoptablePracticesData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practice-catalog/adoption';
+};
+
+export type ListAdoptablePracticesErrors = {
+    /**
+     * Workspace administrator access is required
+     */
+    403: ProblemDetail;
+};
+
+export type ListAdoptablePracticesError = ListAdoptablePracticesErrors[keyof ListAdoptablePracticesErrors];
+
+export type ListAdoptablePracticesResponses = {
+    /**
+     * Available practices returned
+     */
+    200: Array<CatalogPracticeSummary>;
+};
+
+export type ListAdoptablePracticesResponse = ListAdoptablePracticesResponses[keyof ListAdoptablePracticesResponses];
+
+export type PreviewAreaAdoptionData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        slug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practice-catalog/adoption/areas/{slug}';
+};
+
+export type PreviewAreaAdoptionResponses = {
+    /**
+     * OK
+     */
+    200: CatalogAreaAdoptionPreview;
+};
+
+export type PreviewAreaAdoptionResponse = PreviewAreaAdoptionResponses[keyof PreviewAreaAdoptionResponses];
+
+export type AdoptAreaData = {
+    body?: never;
+    headers?: {
+        'If-Match'?: string;
+    };
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        slug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practice-catalog/adoption/areas/{slug}';
+};
+
+export type AdoptAreaResponses = {
+    /**
+     * OK
+     */
+    200: CatalogAreaAdoptionResult;
+};
+
+export type AdoptAreaResponse = AdoptAreaResponses[keyof AdoptAreaResponses];
+
+export type PreviewPracticeAdoptionData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        slug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practice-catalog/adoption/{slug}';
+};
+
+export type PreviewPracticeAdoptionErrors = {
+    /**
+     * Workspace administrator access is required
+     */
+    403: ProblemDetail;
+    /**
+     * Practice is not offered
+     */
+    404: ProblemDetail;
+};
+
+export type PreviewPracticeAdoptionError = PreviewPracticeAdoptionErrors[keyof PreviewPracticeAdoptionErrors];
+
+export type PreviewPracticeAdoptionResponses = {
+    /**
+     * Adoption preview returned
+     */
+    200: CatalogPracticePreview;
+};
+
+export type PreviewPracticeAdoptionResponse = PreviewPracticeAdoptionResponses[keyof PreviewPracticeAdoptionResponses];
+
+export type AdoptPracticeData = {
+    body?: never;
+    headers?: {
+        'If-Match'?: string;
+    };
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        slug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practice-catalog/adoption/{slug}';
+};
+
+export type AdoptPracticeErrors = {
+    /**
+     * Workspace administrator access is required
+     */
+    403: ProblemDetail;
+    /**
+     * The practice slug already exists in the workspace
+     */
+    409: ProblemDetail;
+    /**
+     * Catalog or workspace state changed since preview
+     */
+    412: ProblemDetail;
+    /**
+     * The If-Match preview validator is required
+     */
+    428: ProblemDetail;
+};
+
+export type AdoptPracticeError = AdoptPracticeErrors[keyof AdoptPracticeErrors];
+
+export type AdoptPracticeResponses = {
+    /**
+     * Practice adopted
+     */
+    201: Practice;
+};
+
+export type AdoptPracticeResponse = AdoptPracticeResponses[keyof AdoptPracticeResponses];
 
 export type GetCuratedPracticeCatalogEntryData = {
     body?: never;
