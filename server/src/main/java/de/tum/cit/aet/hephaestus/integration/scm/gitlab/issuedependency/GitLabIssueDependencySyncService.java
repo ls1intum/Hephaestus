@@ -91,10 +91,10 @@ public class GitLabIssueDependencySyncService {
         Repository repository,
         @Nullable OffsetDateTime updatedAfter
     ) {
-        return syncDependenciesInTransaction(scopeId, repository, updatedAfter);
+        return syncDependenciesInternal(scopeId, repository, updatedAfter);
     }
 
-    private SyncResult syncDependenciesInTransaction(
+    private SyncResult syncDependenciesInternal(
         Long scopeId,
         Repository repository,
         @Nullable OffsetDateTime updatedAfter
@@ -186,7 +186,7 @@ public class GitLabIssueDependencySyncService {
      */
     @Transactional
     public SyncResult syncDependenciesForRepository(Long scopeId, Repository repository) {
-        return syncDependenciesInTransaction(scopeId, repository, null);
+        return syncDependenciesInternal(scopeId, repository, null);
     }
 
     @SuppressWarnings("unchecked")

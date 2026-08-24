@@ -32,7 +32,7 @@ public class SlackPersonErasureService {
 
     @Transactional
     public void eraseMember(long workspaceId, long memberId, @Nullable String slackUserId) {
-        erasePersonInTransaction(workspaceId, memberId, slackUserId);
+        erasePersonInternal(workspaceId, memberId, slackUserId);
     }
 
     /**
@@ -41,10 +41,10 @@ public class SlackPersonErasureService {
      */
     @Transactional
     public void erasePerson(long workspaceId, @Nullable Long memberId, @Nullable String slackUserId) {
-        erasePersonInTransaction(workspaceId, memberId, slackUserId);
+        erasePersonInternal(workspaceId, memberId, slackUserId);
     }
 
-    private void erasePersonInTransaction(long workspaceId, @Nullable Long memberId, @Nullable String slackUserId) {
+    private void erasePersonInternal(long workspaceId, @Nullable Long memberId, @Nullable String slackUserId) {
         int messagesBySlackId = 0;
         if (slackUserId != null && !slackUserId.isBlank()) {
             messagesBySlackId = messageRepository.deleteByWorkspaceIdAndAuthorSlackUserId(workspaceId, slackUserId);

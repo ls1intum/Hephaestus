@@ -656,7 +656,6 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
     @DisplayName("a turn abandoned by a crashed worker is billed for the calls the proxy recorded")
     void accountingReaper_billsACrashedTurnFromItsProxyRecordedUsage() throws Exception {
         UUID crashedTurn = persistInFlightTurn("crashed-turn");
-        // Two calls served through the proxy before the worker went away, at $10/M input.
         accumulateProxyCall(crashedTurn, 40_000, 1_000, 250, 5_000);
         accumulateProxyCall(crashedTurn, 60_000, 2_000, 250, 5_000);
         setCreatedAt(crashedTurn, Instant.now().minus(Duration.ofMinutes(80)));

@@ -76,7 +76,6 @@ public class WorkspaceService {
     private final WorkspaceMembershipService workspaceMembershipService;
     private final ConnectionService connectionService;
 
-    /** Notifies subscribers when a workspace is created. */
     private final ApplicationEventPublisher eventPublisher;
     private final TransactionTemplate transactionTemplate;
 

@@ -10,6 +10,5 @@ import java.util.Map;
  * <p>{@code userInput} is intentionally a free-form map so per-kind ConnectionStrategy
  * implementations can dictate their own field schema (e.g. GitLab needs {@code pat} +
  * {@code group_id}; GitHub needs nothing because the install URL is server-configured).
- * Provider-specific input validation is the strategy's responsibility.
  */
 public record InitiateConnectionRequestDTO(@NotNull IntegrationKind kind, Map<String, String> userInput) {}

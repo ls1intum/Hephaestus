@@ -174,20 +174,15 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
     }
 
     /**
-     * Handles an {@code action=update} issue event. Persists the issue via {@link #process} (which
-     * overwrites the label set to the new state), then emits one {@link ScmDomainEvent.IssueLabeled}
+     * Handles an {@code action=update} issue event. Persists the issue, then emits one
+     * {@link ScmDomainEvent.IssueLabeled}
      * per newly-added label — GitLab has no native "labeled" action, so this is how the IssueLabeled
      * trigger reaches parity with GitHub. The added-label delta is read from the webhook's
      * {@code changes.labels} diff, so a plain title/description edit emits nothing.
-     *
-     * <p>{@code @Transactional} so the whole update runs in one transaction: the self-invoked
-     * {@link #process} bypasses its own proxy (Spring AOP self-invocation), so without this its writes
-     * would run with no active transaction.
      */
     @Transactional
     @Nullable
     public Issue processUpdated(GitLabIssueEventDTO event, ProcessingContext context) {
-        // Capture the delta from the payload (independent of the entity's label set, which process() rewrites).
         List<GitLabWebhookLabel> addedLabels = event.addedLabels();
         Issue issue = processInternal(event, context);
         if (issue == null || addedLabels.isEmpty()) {

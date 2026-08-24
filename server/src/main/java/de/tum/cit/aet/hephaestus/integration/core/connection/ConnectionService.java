@@ -39,10 +39,6 @@ public class ConnectionService {
     private final ApplicationEventPublisher eventPublisher;
     private final SyncJobService syncJobService;
 
-    /**
-     * Runs the pre-transition revoke/erase callback in its own {@code REQUIRES_NEW} transaction so a
-     * failing erase cannot mark the lifecycle transaction rollback-only — see {@link #runRevokeIsolated}.
-     */
     private final TransactionTemplate revokeTransactionTemplate;
 
     public ConnectionService(
@@ -64,11 +60,7 @@ public class ConnectionService {
 
     @Transactional(readOnly = true)
     public Optional<Connection> findActive(long workspaceId, IntegrationKind kind) {
-        return connectionRepository.findFirstByWorkspaceIdAndKindAndStateOrderByCreatedAtDesc(
-            workspaceId,
-            kind,
-            IntegrationState.ACTIVE
-        );
+        return connectionRepository.findActive(workspaceId, kind);
     }
 
     /**
@@ -86,20 +78,8 @@ public class ConnectionService {
      */
     @Transactional(readOnly = true)
     public Optional<IntegrationKind> findActiveProviderKind(long workspaceId) {
-        boolean github = connectionRepository
-            .findFirstByWorkspaceIdAndKindAndStateOrderByCreatedAtDesc(
-                workspaceId,
-                IntegrationKind.GITHUB,
-                IntegrationState.ACTIVE
-            )
-            .isPresent();
-        boolean gitlab = connectionRepository
-            .findFirstByWorkspaceIdAndKindAndStateOrderByCreatedAtDesc(
-                workspaceId,
-                IntegrationKind.GITLAB,
-                IntegrationState.ACTIVE
-            )
-            .isPresent();
+        boolean github = connectionRepository.findActive(workspaceId, IntegrationKind.GITHUB).isPresent();
+        boolean gitlab = connectionRepository.findActive(workspaceId, IntegrationKind.GITLAB).isPresent();
         if (github && gitlab) {
             throw new IllegalStateException(
                 "Workspace " +
@@ -116,11 +96,7 @@ public class ConnectionService {
     @Transactional(readOnly = true)
     public Optional<ConnectionConfig.GitHubAppConfig> findActiveGitHubAppConfig(long workspaceId) {
         return connectionRepository
-            .findFirstByWorkspaceIdAndKindAndStateOrderByCreatedAtDesc(
-                workspaceId,
-                IntegrationKind.GITHUB,
-                IntegrationState.ACTIVE
-            )
+            .findActive(workspaceId, IntegrationKind.GITHUB)
             .map(Connection::getConfig)
             .filter(c -> c instanceof ConnectionConfig.GitHubAppConfig)
             .map(c -> (ConnectionConfig.GitHubAppConfig) c);
@@ -129,11 +105,7 @@ public class ConnectionService {
     @Transactional(readOnly = true)
     public Optional<ConnectionConfig.GitHubPatConfig> findActiveGitHubPatConfig(long workspaceId) {
         return connectionRepository
-            .findFirstByWorkspaceIdAndKindAndStateOrderByCreatedAtDesc(
-                workspaceId,
-                IntegrationKind.GITHUB,
-                IntegrationState.ACTIVE
-            )
+            .findActive(workspaceId, IntegrationKind.GITHUB)
             .map(Connection::getConfig)
             .filter(c -> c instanceof ConnectionConfig.GitHubPatConfig)
             .map(c -> (ConnectionConfig.GitHubPatConfig) c);
@@ -142,11 +114,7 @@ public class ConnectionService {
     @Transactional(readOnly = true)
     public Optional<ConnectionConfig.GitLabConfig> findActiveGitLabConfig(long workspaceId) {
         return connectionRepository
-            .findFirstByWorkspaceIdAndKindAndStateOrderByCreatedAtDesc(
-                workspaceId,
-                IntegrationKind.GITLAB,
-                IntegrationState.ACTIVE
-            )
+            .findActive(workspaceId, IntegrationKind.GITLAB)
             .map(Connection::getConfig)
             .filter(c -> c instanceof ConnectionConfig.GitLabConfig)
             .map(c -> (ConnectionConfig.GitLabConfig) c);
@@ -155,11 +123,7 @@ public class ConnectionService {
     @Transactional(readOnly = true)
     public Optional<ConnectionConfig.SlackConfig> findSlackNotificationConfig(long workspaceId) {
         return connectionRepository
-            .findFirstByWorkspaceIdAndKindAndStateOrderByCreatedAtDesc(
-                workspaceId,
-                IntegrationKind.SLACK,
-                IntegrationState.ACTIVE
-            )
+            .findActive(workspaceId, IntegrationKind.SLACK)
             .map(Connection::getConfig)
             .filter(c -> c instanceof ConnectionConfig.SlackConfig)
             .map(c -> (ConnectionConfig.SlackConfig) c);
@@ -168,11 +132,7 @@ public class ConnectionService {
     @Transactional(readOnly = true)
     public Optional<ConnectionConfig.OutlineConfig> findActiveOutlineConfig(long workspaceId) {
         return connectionRepository
-            .findFirstByWorkspaceIdAndKindAndStateOrderByCreatedAtDesc(
-                workspaceId,
-                IntegrationKind.OUTLINE,
-                IntegrationState.ACTIVE
-            )
+            .findActive(workspaceId, IntegrationKind.OUTLINE)
             .map(Connection::getConfig)
             .filter(c -> c instanceof ConnectionConfig.OutlineConfig)
             .map(c -> (ConnectionConfig.OutlineConfig) c);
@@ -236,7 +196,7 @@ public class ConnectionService {
     @Transactional(readOnly = true)
     public Optional<BearerToken> findActiveBearerToken(long workspaceId, IntegrationKind kind) {
         return connectionRepository
-            .findFirstByWorkspaceIdAndKindAndStateOrderByCreatedAtDesc(workspaceId, kind, IntegrationState.ACTIVE)
+            .findActive(workspaceId, kind)
             .flatMap(c -> c.credentials(credentialConverter))
             .flatMap(b -> b instanceof BearerToken bt ? Optional.of(bt) : Optional.empty());
     }
@@ -266,11 +226,7 @@ public class ConnectionService {
                 ref.instanceKey()
             );
         }
-        return connectionRepository.findFirstByWorkspaceIdAndKindAndStateOrderByCreatedAtDesc(
-            ref.workspaceId(),
-            ref.kind(),
-            IntegrationState.ACTIVE
-        );
+        return connectionRepository.findActive(ref.workspaceId(), ref.kind());
     }
 
     @Transactional(readOnly = true)
@@ -310,7 +266,7 @@ public class ConnectionService {
         UnaryOperator<ConnectionConfig> mutator
     ) {
         return connectionRepository
-            .findFirstByWorkspaceIdAndKindAndStateOrderByCreatedAtDesc(workspaceId, kind, IntegrationState.ACTIVE)
+            .findActive(workspaceId, kind)
             .map(c -> {
                 ConnectionConfig next = mutator.apply(c.getConfig());
                 if (next == null) {
@@ -340,7 +296,7 @@ public class ConnectionService {
     @Transactional
     public Optional<Connection> rotateBearerToken(long workspaceId, IntegrationKind kind, BearerToken bundle) {
         return connectionRepository
-            .findFirstByWorkspaceIdAndKindAndStateOrderByCreatedAtDesc(workspaceId, kind, IntegrationState.ACTIVE)
+            .findActive(workspaceId, kind)
             .map(c -> {
                 c.setCredentials(bundle, credentialConverter);
                 return connectionRepository.save(c);
@@ -656,38 +612,8 @@ public class ConnectionService {
     }
 
     /**
-     * Runs the vendor revoke / provider-data erase in its own {@code REQUIRES_NEW} transaction and
-     * absorbs its failure, so "best effort, proceed locally" is actually reachable.
-     *
-     * <p><b>Why a nested transaction and not a plain try/catch.</b> The erasers
-     * ({@code ScmWorkspaceContentEraser}, {@code SlackWorkspaceContentEraser}, the Outline
-     * {@code deleteByWorkspaceId} sweep) are {@code @Transactional} with default {@code REQUIRED}
-     * propagation, so joining the lifecycle transaction would let a {@code DataAccessException} from any
-     * of them — an FK surprise, a statement timeout on a large mirror delete — mark the shared
-     * transaction rollback-only, and the commit would then fail with {@code UnexpectedRollbackException}
-     * even though the transition and audit row were written. Running the callback on its own transaction
-     * confines that poisoning to the callback; catching OUTSIDE the template also absorbs the
-     * {@code UnexpectedRollbackException} raised at the nested commit when a callback swallowed the
-     * failure internally.
-     *
-     * <p><b>Why this cannot deadlock against our own row lock.</b> We hold {@code SELECT … FOR UPDATE}
-     * on the {@code connection} row on the outer connection, and the nested transaction runs on a
-     * second pooled connection — so it must never wait on that row. It does not: no revoke path writes
-     * the {@code connection} row (both {@code OutlineWebhookRegistrar#deregister} and
-     * {@code GitLabWebhookService#deregisterActiveWebhook} refuse to rewrite config there), and the FK
-     * children they DO write are only ever deleted — {@code outline_document},
-     * {@code outline_collection} and {@code outline_document_event} carry a {@code connection_id}, but
-     * PostgreSQL runs no parent-side referential check on a child DELETE, so no {@code FOR KEY SHARE} is
-     * taken on the locked row. Plain reads of {@code connection} from the nested transaction (e.g.
-     * {@code findActiveBearerToken}) are MVCC snapshots and never block on {@code FOR UPDATE}. Adding a
-     * write of {@code connection} — or an INSERT into any table keyed on it — to a revoke path would
-     * break this and self-deadlock.
-     *
-     * <p><b>Accepted consequence.</b> Erase and transition are not atomic. A revoke that erases
-     * successfully still commits even if the transition afterwards fails (duplicate-correlation
-     * short-circuit, illegal transition), leaving erased data behind an ACTIVE connection. Every erase
-     * path is idempotent and the next disconnect re-runs it, so this is recoverable — and it is the
-     * direction to fail in, since the reverse strands the admin with a 500 and an ACTIVE connection.
+     * Isolates vendor revocation from the local lifecycle transition. A vendor failure rolls back its
+     * database work while the local transition proceeds, so the operation is intentionally non-atomic.
      */
     private void runRevokeIsolated(Connection connection, Runnable revoke) {
         try {

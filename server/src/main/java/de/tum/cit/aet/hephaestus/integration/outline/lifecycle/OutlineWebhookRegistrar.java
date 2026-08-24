@@ -256,7 +256,7 @@ public class OutlineWebhookRegistrar {
     public void deregister(long workspaceId, long connectionId) {
         boolean hadSubscription;
         try {
-            hadSubscription = deregisterStrictWithoutTransaction(workspaceId, connectionId);
+            hadSubscription = deregisterStrictInternal(workspaceId, connectionId);
         } catch (RuntimeException e) {
             log.warn("outline.webhook: deregistration failed for connectionId={}: {}", connectionId, e.toString());
             hadSubscription = true;
@@ -268,10 +268,10 @@ public class OutlineWebhookRegistrar {
 
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public boolean deregisterStrict(long workspaceId, long connectionId) {
-        return deregisterStrictWithoutTransaction(workspaceId, connectionId);
+        return deregisterStrictInternal(workspaceId, connectionId);
     }
 
-    private boolean deregisterStrictWithoutTransaction(long workspaceId, long connectionId) {
+    private boolean deregisterStrictInternal(long workspaceId, long connectionId) {
         Optional<Connection> connection = connectionService.findInWorkspace(workspaceId, connectionId);
         if (connection.isEmpty() || !(connection.get().getConfig() instanceof ConnectionConfig.OutlineConfig config)) {
             return false;

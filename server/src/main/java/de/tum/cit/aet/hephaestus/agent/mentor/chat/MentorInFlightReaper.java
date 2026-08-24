@@ -18,19 +18,10 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 /**
- * Interrupts and accounts mentor turns abandoned by a crashed process. Nobody is left to report what
- * such a turn spent — no runner report, no in-process meter — so it is billed from the per-call totals
- * the LLM proxy wrote to its row, and only a turn with no recorded call at all is booked UNVERIFIABLE.
+ * Interrupts and accounts mentor turns abandoned by a crashed process.
  *
- * <p>This sweep writes money, so it is deliberately per-turn rather than per-batch: the accounting collaborator
- * owns one turn in its own {@code REQUIRES_NEW} transaction. A batch rollback would also undo turns
- * already billed in it and leave their {@code in_flight} rows in place, and the partial unique index
- * would then refuse every further turn on those threads.
- *
- * <p>What prevents a double charge is the ledger's {@code (MENTOR_TURN, messageId, 0)} unique
- * constraint behind {@code ON CONFLICT … DO NOTHING}, not any in-process check. The per-turn re-read
- * decides which of the two writes is the CORRECT one: without it, this sweep could bill a turn that has
- * since finished and permanently shadow the normal path's real amount.
+ * <p>Each turn is accounted independently so one failure cannot roll back previously accounted turns
+ * or leave their in-flight rows blocking the thread.
  */
 @ConditionalOnServerRole
 @Component

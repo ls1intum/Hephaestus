@@ -59,10 +59,6 @@ import org.springframework.stereotype.Service;
  * workspace lifecycle (creation/activation) with integration.scm sync services. The dependency
  * direction is always {@code workspace → integration.scm}, never the reverse.
  *
- * <p>{@link #ensureRepositoryMonitors} is intentionally
- * NOT {@code @Transactional} — each monitor save auto-commits independently so that
- * a failure on one does not roll back previously created monitors.
- *
  * @see WorkspaceActivationService
  * @see de.tum.cit.aet.hephaestus.integration.scm.gitlab.organization.GitLabGroupSyncService
  */
@@ -336,12 +332,7 @@ public class GitLabWorkspaceInitializationService {
 
     /**
      * Creates {@link RepositoryToMonitor} entries for each synced repository.
-     * Idempotent: existing monitors are not duplicated.
-     *
-     * <p>This method is {@code public} so that callers outside this class may invoke
-     * it directly for re-initialization. Each save runs in its own auto-committed
-     * transaction (no {@code @Transactional}) so that a failure on one monitor
-     * does not roll back previously created ones.
+     * Existing monitors are not duplicated.
      *
      * @return number of newly created monitors
      */
@@ -410,7 +401,6 @@ public class GitLabWorkspaceInitializationService {
             return;
         }
 
-        // Sync group memberships — look up organization via repository to avoid lazy proxy issues
         var memberSyncService = gitLabServices.getGroupMemberSyncService();
         if (memberSyncService != null) {
             organizationRepository

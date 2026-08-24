@@ -25,12 +25,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.dao.OptimisticLockingFailureException;
 
-/**
- * A single {@code @Transactional} spanning every row would let one optimistic-lock collision discard the
- * ledger writes of every turn already billed in that pass and leave all of them stuck {@code in_flight}
- * behind the partial unique index, so the boundary has to sit around one turn. {@code self} is injected,
- * which makes that per-turn boundary a seam a unit test can make throw.
- */
 class MentorInFlightReaperTest extends BaseUnitTest {
 
     private final ChatMessageRepository chatMessageRepository = mock(ChatMessageRepository.class);
@@ -46,7 +40,6 @@ class MentorInFlightReaperTest extends BaseUnitTest {
         UUID second = stale.get(1).getId();
         UUID third = stale.get(2).getId();
         when(chatMessageRepository.findStaleInFlightForAccounting(any())).thenReturn(stale);
-        // The turn finished between the select and the write; its snapshot is stale and the write loses.
         when(accounting.account(second)).thenThrow(new OptimisticLockingFailureException("row moved"));
         when(accounting.account(first)).thenReturn(true);
         when(accounting.account(third)).thenReturn(true);
@@ -86,7 +79,6 @@ class MentorInFlightReaperTest extends BaseUnitTest {
         verify(usageRecorder, never()).record(anyLong(), any());
     }
 
-    /** Asserted on the annotation because there is no observable behaviour to assert without a second JVM. */
     @Test
     @DisplayName("the sweep is single-flighted across replicas")
     void shouldBeSchedulerLocked() throws NoSuchMethodException {
@@ -104,11 +96,6 @@ class MentorInFlightReaperTest extends BaseUnitTest {
             .isNotBlank();
     }
 
-    /**
-     * The window is sized from {@link AgentBindingLimits#MAX_TIMEOUT_SECONDS}, so the two are checked
-     * against each other rather than each against a literal: reaping a live turn bills it as abandoned
-     * and closes a conversation someone is talking to.
-     */
     @Test
     @DisplayName("the window always outlasts the longest turn a binding can be configured to produce")
     void shouldNeverReapWithinTheConfigurableTimeoutCeiling() {
@@ -117,7 +104,6 @@ class MentorInFlightReaperTest extends BaseUnitTest {
         MentorInFlightReaper defaultWindow = reaperWith(
             new MentorInFlightAccounting(chatMessageRepository, usageRecorder)
         );
-        // The window property is a knob for sweeping LATER, never sooner: below the floor you get the floor.
         MentorInFlightReaper misconfigured = new MentorInFlightReaper(
             chatMessageRepository,
             new MentorInFlightAccounting(chatMessageRepository, usageRecorder),

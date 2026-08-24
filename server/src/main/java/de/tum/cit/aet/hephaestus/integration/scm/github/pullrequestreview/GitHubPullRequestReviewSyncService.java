@@ -60,9 +60,8 @@ import reactor.util.retry.Retry;
  * Uses typed GraphQL models for type-safe deserialization and delegates
  * persistence to GitHubPullRequestReviewProcessor.
  * <p>
- * GraphQL fetching is non-transactional; persistence is done per-page in
- * {@code REQUIRES_NEW} transactions via self-proxy to isolate deadlock
- * failures and avoid poisoned-transaction retries.
+ * Reviews are fetched outside a transaction and persisted one page at a time so deadlock retries
+ * start clean.
  */
 @Service
 public class GitHubPullRequestReviewSyncService {
@@ -417,11 +416,7 @@ public class GitHubPullRequestReviewSyncService {
         return totalSynced;
     }
 
-    /**
-     * Persists a page of reviews with transient failure retry. Each attempt runs in a fresh
-     * {@code REQUIRES_NEW} transaction via self-proxy, so a deadlock on one attempt
-     * does not poison subsequent retries.
-     */
+    /** Persists a page of reviews in a new transaction and retries transient failures. */
     private int persistReviewPageWithRetry(
         List<GHPullRequestReview> reviews,
         Long pullRequestId,
@@ -479,19 +474,6 @@ public class GitHubPullRequestReviewSyncService {
         return 0;
     }
 
-    /**
-     * Processes a page of review nodes in a {@code REQUIRES_NEW} transaction.
-     * <p>
-     * Called via self-proxy to ensure the transaction annotation is honoured.
-     * If a deadlock occurs, the transaction is rolled back independently without
-     * poisoning any outer transaction.
-     *
-     * @param reviews       the review nodes from the GraphQL response
-     * @param pullRequestId the database ID of the owning pull request
-     * @param scopeId       the scope ID for authentication
-     * @param repository    the repository entity for creating the processing context
-     * @return number of reviews persisted
-     */
     private int processReviewPage(
         List<GHPullRequestReview> reviews,
         Long pullRequestId,

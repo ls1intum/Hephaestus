@@ -58,11 +58,11 @@ class SpringCorrectnessArchitectureTest extends HephaestusArchitectureTest {
         ArchRule methodsRule = methods()
             .should()
             .notBeAnnotatedWith(jakarta.transaction.Transactional.class)
-            .because("transaction rules use Spring's @Transactional consistently");
+            .because("all transaction boundaries use Spring's annotation so the same architecture rules apply");
         ArchRule classesRule = noClasses()
             .should()
             .beAnnotatedWith(jakarta.transaction.Transactional.class)
-            .because("transaction rules use Spring's @Transactional consistently");
+            .because("all transaction boundaries use Spring's annotation so the same architecture rules apply");
 
         methodsRule.check(classes);
         classesRule.check(classes);

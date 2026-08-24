@@ -35,12 +35,14 @@ public class MentorInFlightAccounting {
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public boolean account(UUID messageId) {
+        // Re-read here so a turn completed after the sweep query is not billed as abandoned.
         ChatMessage message = chatMessageRepository.findById(messageId).orElse(null);
         if (message == null || message.getStatus() != ChatMessage.Status.in_flight) return false;
         JsonNode existingMetadata = message.getMetadata();
         LlmPriceSnapshot price = MentorAdmissionMetadata.readPrice(existingMetadata);
         message.setStatus(ChatMessage.Status.interrupted);
         message.setMetadata(withAbandonedError(existingMetadata));
+        // End the in-flight state before reading usage so the proxy accumulator can no longer change the totals.
         chatMessageRepository.saveAndFlush(message);
         MentorTurnLlmUsage observed = chatMessageRepository
             .findLlmUsageById(message.getId())

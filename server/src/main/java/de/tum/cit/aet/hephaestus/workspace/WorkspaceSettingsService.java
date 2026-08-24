@@ -136,13 +136,7 @@ public class WorkspaceSettingsService {
         return workspace;
     }
 
-    /**
-     * Atomically update the entire weekly digest configuration — schedule (day/time) plus
-     * notification settings (enabled/team/channel) — in a single transaction. Composes
-     * {@link #updateSchedule} and {@link #updateNotifications} so a mid-failure can never leave the
-     * schedule changed but the channel not (or vice versa); the schedule-changed event is published
-     * once.
-     */
+    /** Updates the weekly digest schedule and notification settings atomically. */
     @Transactional
     public Workspace updateLeaderboardDigest(
         Long workspaceId,
