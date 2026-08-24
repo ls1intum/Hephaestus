@@ -22,6 +22,8 @@ export interface ComposedFeedbackEnvelope {
 	observations?: unknown[];
 	preparedThreadKeys?: string[];
 	units?: ComposedFeedbackUnit[];
+	/** How the review opens, in the composer's words. Absent means it opens on its first finding. */
+	lead?: string | null;
 }
 
 /**

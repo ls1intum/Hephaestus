@@ -336,15 +336,16 @@ public class PullRequestReviewHandler implements JobTypeHandler {
             .evaluate(job, loudEnough)
             .deliverable();
         List<ComposedFeedbackUnit> units = compositionResultParser.parse(job.getOutput(), FeedbackChannel.IN_CONTEXT);
+        String lead = FeedbackCompositionResultParser.lead(job.getOutput());
         Map<String, String> why = practiceCatalogInjector.whyBySlug(job.getWorkspace(), ArtifactKinds.PULL_REQUEST);
         feedbackService.recordProposal(
             job,
-            DeliveryComposer.compose(proposals, ArtifactKinds.PULL_REQUEST, why, unifiedDiff, units),
+            DeliveryComposer.compose(proposals, ArtifactKinds.PULL_REQUEST, why, unifiedDiff, units, lead),
             proposals
         );
-        var content = DeliveryComposer.compose(deliverable, ArtifactKinds.PULL_REQUEST, why, unifiedDiff, units);
+        var content = DeliveryComposer.compose(deliverable, ArtifactKinds.PULL_REQUEST, why, unifiedDiff, units, lead);
         feedbackService.deliverFeedback(job, content, delivered ->
-            DeliveryComposer.recomposeMrNote(deliverable, ArtifactKinds.PULL_REQUEST, why, delivered, units)
+            DeliveryComposer.recomposeMrNote(deliverable, ArtifactKinds.PULL_REQUEST, why, delivered, units, lead)
         );
     }
 

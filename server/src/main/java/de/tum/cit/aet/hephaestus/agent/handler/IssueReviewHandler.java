@@ -260,12 +260,13 @@ public class IssueReviewHandler implements JobTypeHandler {
         );
         Map<String, String> why = practiceCatalogInjector.whyBySlug(job.getWorkspace(), ArtifactKinds.ISSUE);
         List<ComposedFeedbackUnit> units = compositionResultParser.parse(job.getOutput(), FeedbackChannel.IN_CONTEXT);
+        String lead = FeedbackCompositionResultParser.lead(job.getOutput());
         feedbackLedgerRecorder.recordProposal(
             job,
-            DeliveryComposer.compose(proposals, ArtifactKinds.ISSUE, why, null, units),
+            DeliveryComposer.compose(proposals, ArtifactKinds.ISSUE, why, null, units, lead),
             proposals
         );
-        postIssueNote(job, DeliveryComposer.compose(loudEnough, ArtifactKinds.ISSUE, why, null, units));
+        postIssueNote(job, DeliveryComposer.compose(loudEnough, ArtifactKinds.ISSUE, why, null, units, lead));
     }
 
     private PracticeDetectionResultParser.ValidatedObservation validated(Observation observation) {

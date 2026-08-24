@@ -932,6 +932,58 @@ interface ConversationNotes {
 	inConversationSignal?: string;
 }
 
+const LEAD_MAX_LENGTH = 400;
+
+interface ReportSummaryDetails {
+	stored: number;
+}
+
+/**
+ * The review's opening line, written by whoever composed the findings. It exists because the reader
+ * meets the message before any of its parts, and a server-side opener can only ever say the same
+ * sentence about every change.
+ */
+function buildSummaryTool() {
+	return defineTool({
+		name: "report_summary",
+		label: "Report Summary",
+		description:
+			"Write how this review opens, in your own words, about this change. One call. It carries no " +
+			"evidence and no counts: the reader can see the findings below it, and the server renders every " +
+			"quote and location. Skip it and the review opens on its first finding.",
+		parameters: {
+			type: "object",
+			additionalProperties: false,
+			required: ["lead"],
+			properties: {
+				lead: {
+					type: "string",
+					minLength: 1,
+					maxLength: LEAD_MAX_LENGTH,
+					description:
+						"One or two sentences orienting the reader in this change. Not a list, not a count, " +
+						"not a quote.",
+				},
+			},
+		},
+		execute: (_toolCallId, params): Promise<AgentToolResult<ReportSummaryDetails>> => {
+			const trimmed = optionalString((params as { lead?: unknown }).lead)?.trim() ?? "";
+			if (!trimmed) {
+				return Promise.resolve({
+					content: [{ type: "text", text: "Empty lead; nothing stored." }],
+					details: { stored: 0 },
+				});
+			}
+			composedFeedback.lead = trimmed.slice(0, LEAD_MAX_LENGTH);
+			persistComposedFeedback();
+			return Promise.resolve({
+				content: [{ type: "text", text: "Stored the opening line." }],
+				details: { stored: 1 },
+			});
+		},
+	});
+}
+
 /**
  * One unit of feedback as report_feedback receives it.
  *
@@ -979,6 +1031,7 @@ interface ComposedFeedback extends ComposedFeedbackEnvelope {
 	observations: LeanObservation[];
 	preparedThreadKeys: string[];
 	units: FeedbackUnit[];
+	lead: string | null;
 }
 
 // Echo the exact composition inputs so Java validates references against the same snapshot.
@@ -987,6 +1040,7 @@ const composedFeedback: ComposedFeedback = {
 	observations: [],
 	preparedThreadKeys: [],
 	units: [],
+	lead: null,
 };
 
 /**
@@ -1588,9 +1642,12 @@ async function main() {
 			"bash",
 			"grep",
 			"report_observation",
-			...(feedbackTool ? ["report_feedback"] : []),
+			...(feedbackTool ? ["report_feedback", "report_summary"] : []),
 		],
-		customTools: [reportObservationTool, ...(feedbackTool ? [feedbackTool] : [])],
+		customTools: [
+			reportObservationTool,
+			...(feedbackTool ? [feedbackTool, buildSummaryTool()] : []),
+		],
 		sessionManager,
 		settingsManager,
 		authStorage,

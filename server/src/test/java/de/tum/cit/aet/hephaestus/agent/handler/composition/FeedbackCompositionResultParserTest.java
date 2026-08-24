@@ -412,6 +412,33 @@ class FeedbackCompositionResultParserTest extends BaseUnitTest {
         assertThat(parser.parse(raw("{ \"units\": [ 3, null, \"x\" ] }"))).isEmpty();
     }
 
+    @Test
+    void readsTheLeadTheReviewWroteAndStripsTheWhitespaceAroundIt() {
+        JsonNode jobOutput = raw(
+            """
+            { "lead": "  You kept this to one concern; the description just never says why.  ",
+              "units": [] }
+            """
+        );
+
+        assertThat(FeedbackCompositionResultParser.lead(jobOutput)).isEqualTo(
+            "You kept this to one concern; the description just never says why."
+        );
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = { "{ \"units\": [] }", "{ \"lead\": null }", "{ \"lead\": \"\" }", "{ \"lead\": \"   \" }" })
+    void aLeadThatSaysNothingIsNoLead(String feedbackJson) {
+        assertThat(FeedbackCompositionResultParser.lead(raw(feedbackJson)))
+            .as("the note opens with what the review wrote or with nothing, never with a blank line")
+            .isNull();
+    }
+
+    @Test
+    void noJobOutputIsNoLead() {
+        assertThat(FeedbackCompositionResultParser.lead(null)).isNull();
+    }
+
     private JsonNode output(String unitJson, String preparedThreadKeysJson) {
         return outputOf(objectMapper.createArrayNode().add(objectMapper.readTree(unitJson)), preparedThreadKeysJson);
     }

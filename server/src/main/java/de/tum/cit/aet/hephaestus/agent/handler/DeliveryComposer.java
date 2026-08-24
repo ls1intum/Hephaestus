@@ -48,20 +48,6 @@ class DeliveryComposer {
     private static final Map<String, String> CO_OCCURRENCE_REDUNDANT_TO_PREFERRED = Map.ofEntries(
         Map.entry("ready-and-traceable-handoff", "ships-tests-with-the-change")
     );
-    private static final Map<String, String> SUBORDINATE_STRENGTH_PHRASES = Map.ofEntries(
-        Map.entry("engaging-with-inline-review-comments", "engaging with the review feedback"),
-        Map.entry("acting-on-review-feedback", "acting on the review feedback"),
-        Map.entry("intent-revealing-comments", "leaving intent-revealing comments"),
-        Map.entry("leaves-the-code-clean-with-intent-revealing-comments", "leaving intent-revealing comments"),
-        Map.entry("commit-subjects-explain-each-change", "writing commit subjects that explain each change"),
-        Map.entry("commits-are-atomic-and-cohesive", "keeping each commit atomic and cohesive"),
-        Map.entry("excludes-generated-and-build-artifacts", "keeping generated and build artifacts out of the diff"),
-        Map.entry("ready-and-traceable-handoff", "linking the change to its issue"),
-        Map.entry("describe-what-and-why", "explaining what changed and why"),
-        Map.entry("scope-one-reviewable-change", "keeping the change focused and reviewable"),
-        Map.entry("triages-the-issue-with-labels-and-ownership", "triaging the issue with a clear type label"),
-        Map.entry("breaks-large-work-into-trackable-subtasks", "breaking the work into trackable subtasks")
-    );
 
     private static String repoRelative(String path) {
         return path.startsWith(REPO_MOUNT_RELATIVE) ? path.substring(REPO_MOUNT_RELATIVE.length()) : path;
@@ -92,7 +78,7 @@ class DeliveryComposer {
         Map<String, String> whyBySlug
     ) {
         // Pre-delivery: no observation is known-delivered yet, so every inlinable observation keeps its full line.
-        return compose(observations, artifact, whyBySlug, Set.of(), GroundingContext.none(), List.of());
+        return compose(observations, artifact, whyBySlug, Set.of(), GroundingContext.none(), List.of(), null);
     }
 
     @Nullable
@@ -102,7 +88,7 @@ class DeliveryComposer {
         Map<String, String> whyBySlug,
         @Nullable String unifiedDiff
     ) {
-        return compose(observations, artifact, whyBySlug, unifiedDiff, List.of());
+        return compose(observations, artifact, whyBySlug, unifiedDiff, List.of(), null);
     }
 
     @Nullable
@@ -113,13 +99,26 @@ class DeliveryComposer {
         @Nullable String unifiedDiff,
         List<ComposedFeedbackUnit> composed
     ) {
+        return compose(observations, artifact, whyBySlug, unifiedDiff, composed, null);
+    }
+
+    @Nullable
+    static DeliveryContent compose(
+        List<ValidatedObservation> observations,
+        ArtifactKind artifact,
+        Map<String, String> whyBySlug,
+        @Nullable String unifiedDiff,
+        List<ComposedFeedbackUnit> composed,
+        @Nullable String lead
+    ) {
         return compose(
             observations,
             artifact,
             whyBySlug,
             Set.of(),
             GroundingContext.fromDiff(artifact, unifiedDiff),
-            composed
+            composed,
+            lead
         );
     }
 
@@ -130,7 +129,7 @@ class DeliveryComposer {
         Map<String, String> whyBySlug,
         Set<String> deliveredKeys
     ) {
-        return recomposeMrNote(observations, artifact, whyBySlug, deliveredKeys, List.of());
+        return recomposeMrNote(observations, artifact, whyBySlug, deliveredKeys, List.of(), null);
     }
 
     @Nullable
@@ -141,13 +140,26 @@ class DeliveryComposer {
         Set<String> deliveredKeys,
         List<ComposedFeedbackUnit> composed
     ) {
+        return recomposeMrNote(observations, artifact, whyBySlug, deliveredKeys, composed, null);
+    }
+
+    @Nullable
+    static String recomposeMrNote(
+        List<ValidatedObservation> observations,
+        ArtifactKind artifact,
+        Map<String, String> whyBySlug,
+        Set<String> deliveredKeys,
+        List<ComposedFeedbackUnit> composed,
+        @Nullable String lead
+    ) {
         DeliveryContent recomposed = compose(
             observations,
             artifact,
             whyBySlug,
             deliveredKeys,
             GroundingContext.none(),
-            composed
+            composed,
+            lead
         );
         return recomposed == null ? null : recomposed.mrNote();
     }
@@ -159,7 +171,8 @@ class DeliveryComposer {
         Map<String, String> whyBySlug,
         Set<String> deliveredKeys,
         GroundingContext grounding,
-        List<ComposedFeedbackUnit> composed
+        List<ComposedFeedbackUnit> composed,
+        @Nullable String lead
     ) {
         if (observations == null || observations.isEmpty()) {
             return null;
@@ -219,7 +232,7 @@ class DeliveryComposer {
                 // nothing rather than a misleading "nothing to change here" all-clear.
                 return null;
             }
-            Rendering rendering = new Rendering(whyBySlug, emittedWhy, ComposedNotes.claim(observed, composed));
+            Rendering rendering = new Rendering(whyBySlug, emittedWhy, ComposedNotes.claim(observed, composed), lead);
             return new DeliveryContent(composeNoIssuesNote(observed, rendering), List.of(), List.of());
         }
 
@@ -236,21 +249,11 @@ class DeliveryComposer {
             }
         }
 
-        List<ValidatedObservation> positives = observations.stream().filter(DeliveryComposer::isStrength).toList();
-
         // Claimed over the severity-sorted negatives, BEFORE either surface renders, so the summary and
         // the inline notes agree on which locus carries a practice's composed message.
-        Rendering rendering = new Rendering(whyBySlug, emittedWhy, ComposedNotes.claim(negatives, composed));
+        Rendering rendering = new Rendering(whyBySlug, emittedWhy, ComposedNotes.claim(negatives, composed), lead);
 
-        String mrNote = composeMrNote(
-            positives,
-            negatives,
-            nonInlinable,
-            inlinable,
-            improvementOverflow,
-            deliveredKeys,
-            rendering
-        );
+        String mrNote = composeMrNote(nonInlinable, inlinable, improvementOverflow, deliveredKeys, rendering);
 
         List<DiffNote> diffNotes = collectDiffNotes(inlinable, rendering, grounding);
 
@@ -376,6 +379,8 @@ class DeliveryComposer {
     private static final int MAX_STRENGTH_REINFORCEMENTS = 3;
     private static final int STRENGTH_BUDGET = 280;
 
+    private static final int LEAD_BUDGET = 400;
+
     private static String composeNoIssuesNote(List<ValidatedObservation> observed, Rendering rendering) {
         // Already ranked most-certain first by the caller. A strength earns a bullet when there is
         // something to say about it — the composed message where the stage wrote one, and the
@@ -470,59 +475,6 @@ class DeliveryComposer {
         return out.toString().strip();
     }
 
-    private static final Map<String, String> STRENGTH_PHRASES = Map.ofEntries(
-        Map.entry("scope-one-reviewable-change", "keeping the change focused and reviewable"),
-        Map.entry("describe-what-and-why", "explaining what changed"),
-        Map.entry("ready-and-traceable-handoff", "linking the change to its issue"),
-        Map.entry("engaging-with-inline-review-comments", "engaging with the review feedback"),
-        Map.entry("issue-states-an-actionable-problem", "stating the problem clearly"),
-        Map.entry("issue-scoped-to-single-concern", "keeping the issue scoped to one concern"),
-        Map.entry("issue-has-checkable-outcome", "defining a clear, checkable outcome"),
-        Map.entry("triages-the-issue-with-labels-and-ownership", "triaging the issue with a clear type label")
-    );
-
-    static String composeAcknowledgement(List<ValidatedObservation> positives) {
-        if (positives == null || positives.isEmpty()) {
-            return "";
-        }
-        // Curated gerund phrases only — a raw slug ("triages the issue …") breaks the "Nice work keeping X
-        // and [Ying]" grammar, so an un-phrased strength is simply not named in the opener.
-        List<String> phrases = positives
-            .stream()
-            .map(f -> STRENGTH_PHRASES.get(f.practiceSlug()))
-            .filter(p -> p != null && !p.isBlank())
-            .distinct()
-            .limit(2)
-            .toList();
-        if (phrases.isEmpty()) {
-            // A real GOOD strength exists but none has a curated phrase — acknowledge generically rather
-            // than drop the opener or dump the raw slug into the "Nice work <gerund>" frame.
-            return "Nice work here.";
-        }
-        String strengths = phrases.size() == 1 ? phrases.get(0) : phrases.get(0) + " and " + phrases.get(1);
-        return "Nice work " + strengths + ".";
-    }
-
-    static String composeSubordinatePositive(List<ValidatedObservation> positives) {
-        if (positives == null || positives.isEmpty()) {
-            return "";
-        }
-        return positives
-            .stream()
-            .filter(DeliveryComposer::isStrength)
-            .min(ObservationOrder.bestAttestedFirst())
-            .map(DeliveryComposer::subordinateStrengthLine)
-            .orElse("");
-    }
-
-    private static String subordinateStrengthLine(ValidatedObservation f) {
-        String phrase = SUBORDINATE_STRENGTH_PHRASES.get(f.practiceSlug());
-        if (phrase != null && !phrase.isBlank()) {
-            return "Worth keeping: you're " + phrase + ".";
-        }
-        return "Worth keeping: there's solid work here to build on.";
-    }
-
     private static final Pattern SENTENCE_SEPARATOR = Pattern.compile("(?<=[.!?])\\s+");
 
     static String sanitizeStudentText(@Nullable String text) {
@@ -578,8 +530,6 @@ class DeliveryComposer {
     }
 
     static String composeMrNote(
-        List<ValidatedObservation> positives,
-        List<ValidatedObservation> allNegatives,
         List<ValidatedObservation> nonInlinable,
         List<ValidatedObservation> inlinable,
         int improvementOverflow,
@@ -588,28 +538,14 @@ class DeliveryComposer {
     ) {
         var sb = new StringBuilder(4096);
 
-        // Suppressed when there is a blocking issue: front-loading praise ahead of a serious problem
-        // reads as a hollow "feedback sandwich".
-        boolean hasBlocking = allNegatives
-            .stream()
-            .anyMatch(f -> f.severity() == Severity.CRITICAL || f.severity() == Severity.MAJOR);
-        if (!hasBlocking) {
-            String acknowledgement = composeAcknowledgement(positives);
-            if (!acknowledgement.isEmpty()) {
-                sb.append(acknowledgement).append("\n\n");
-            }
+        // The runner holds the review to the same budget, but its output is the review's, not ours, so the
+        // bound is re-applied here rather than assumed. Scrubbing can empty a lead; an empty one opens nothing.
+        String lead = clampToSentenceBudget(sanitizeStudentText(rendering.lead()).strip(), LEAD_BUDGET).strip();
+        if (!lead.isBlank()) {
+            sb.append(lead).append("\n\n");
         }
 
-        composeOpening(sb, allNegatives, improvementOverflow);
-
-        // The multi-strength opener above is suppressed when blocking, but one earned acknowledgement
-        // still lands, subordinate, after the issue count rather than as a sandwich opener.
-        if (hasBlocking) {
-            String reinforcement = composeSubordinatePositive(positives);
-            if (!reinforcement.isEmpty()) {
-                sb.append(reinforcement).append("\n\n");
-            }
-        }
+        composeOpening(sb, improvementOverflow);
 
         for (int i = 0; i < nonInlinable.size(); i++) {
             composeObservation(sb, nonInlinable.get(i), rendering);
@@ -647,49 +583,17 @@ class DeliveryComposer {
         return sb.toString();
     }
 
-    private static void composeOpening(
-        StringBuilder sb,
-        List<ValidatedObservation> negatives,
-        int improvementOverflow
-    ) {
-        // Hephaestus never gates a merge, so the call-to-action is state-neutral feed-forward ("to tighten"),
-        // not "to fix before merging"; merge-state is not plumbed into the composer.
-        String blockingCta = " to tighten";
-        long blockingCount = negatives
-            .stream()
-            .filter(f -> f.severity() == Severity.CRITICAL || f.severity() == Severity.MAJOR)
-            .count();
-        // negatives is the CAPPED list; the collapsed remainder is disclosed via improvementOverflow.
-        long improvementCount = negatives.size() - blockingCount;
-        String overflowTail =
-            improvementOverflow > 0
-                ? " (+" + improvementOverflow + " more minor suggestion" + (improvementOverflow == 1 ? "" : "s") + ")"
-                : "";
-
-        if (blockingCount > 0 && improvementCount > 0) {
+    /**
+     * What the reader cannot work out from the message itself. Everything else about how a review opens
+     * belongs to whoever composed it: a server-side sentence is the same sentence on every change, and
+     * a count is already visible in the list beneath it.
+     */
+    private static void composeOpening(StringBuilder sb, int improvementOverflow) {
+        if (improvementOverflow > 0) {
             sb
-                .append(blockingCount)
-                .append(blockingCount == 1 ? " issue" : " issues")
-                .append(blockingCta)
-                .append(", plus ")
-                .append(improvementCount)
-                .append(improvementCount == 1 ? " suggestion" : " suggestions")
-                .append(" for improvement")
-                .append(overflowTail)
-                .append(":\n\n");
-        } else if (blockingCount > 0) {
-            sb
-                .append(blockingCount)
-                .append(blockingCount == 1 ? " issue" : " issues")
-                .append(blockingCta)
-                .append(":\n\n");
-        } else {
-            sb
-                .append(improvementCount)
-                .append(improvementCount == 1 ? " suggestion" : " suggestions")
-                .append(" for improvement")
-                .append(overflowTail)
-                .append(":\n\n");
+                .append(improvementOverflow)
+                .append(improvementOverflow == 1 ? " more minor suggestion is" : " more minor suggestions are")
+                .append(" not shown.\n\n");
         }
     }
 
@@ -938,7 +842,12 @@ class DeliveryComposer {
         return fences % 2 == 0 ? text : text + "\n```";
     }
 
-    record Rendering(Map<String, String> whyBySlug, Set<String> emittedWhy, ComposedNotes notes) {
+    record Rendering(
+        Map<String, String> whyBySlug,
+        Set<String> emittedWhy,
+        ComposedNotes notes,
+        @Nullable String lead
+    ) {
         @Nullable
         ComposedNote noteFor(ValidatedObservation f) {
             return notes.byObservation().get(f);

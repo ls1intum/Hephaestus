@@ -165,15 +165,17 @@ class DeliveryComposerTest extends BaseUnitTest {
     }
 
     @Test
-    void compose_forIssueArtifact_usesNonBlockingTightenCta() {
+    void compose_addsNoFramingOfItsOwnAndSoNoVerdictOnMerging() {
         DeliveryContent result = DeliveryComposer.compose(mixedObservations(), ArtifactKinds.ISSUE);
 
         assertThat(result).isNotNull();
         String mrNote = result.mrNote();
-        assertThat(mrNote).contains("2 issues to tighten");
+        // Composing the opening belongs to the review; the server adds no framing of its own, so it can
+        // add no verdict on merging either. The composer prompt carries that constraint now.
         assertThat(mrNote).doesNotContain("before merging");
         assertThat(mrNote).doesNotContain("to fix");
-        assertThat(mrNote).contains("2 suggestions for improvement");
+        assertThat(mrNote).doesNotContain("to tighten");
+        assertThat(mrNote).doesNotContain("suggestions for improvement");
     }
 
     @Test
@@ -187,11 +189,8 @@ class DeliveryComposerTest extends BaseUnitTest {
         assertThat(mrNote).isNotNull();
 
         assertThat(mrNote).doesNotContain("Nice work");
-        assertThat(mrNote).contains("Worth keeping:");
 
-        assertThat(mrNote).contains("2 issues to tighten");
         assertThat(mrNote).doesNotContain("before merging");
-        assertThat(mrNote).contains("2 suggestions for improvement");
 
         assertThat(mrNote).doesNotContain("[CRITICAL]");
         assertThat(mrNote).doesNotContain("[MAJOR]");
@@ -209,6 +208,72 @@ class DeliveryComposerTest extends BaseUnitTest {
         assertThat(mrNote).doesNotContain("ProcessInfo.processInfo.environment");
         assertThat(mrNote).doesNotContain("guard let url");
         assertThat(mrNote).doesNotContain("hardcoded directly in source code");
+    }
+
+    @Test
+    void compose_lead_isTheWholeOpeningAndNothingStandsInForItWhenAbsent() {
+        List<ValidatedObservation> observations = List.of(
+            positiveObservation("scope-one-reviewable-change"),
+            negativeObservation(
+                "describe-what-and-why",
+                "PR description lacks a rationale sentence",
+                Severity.MINOR,
+                List.of(),
+                List.of(),
+                "The body lists what changed but not why."
+            )
+        );
+        String lead = "You kept this to one concern, but the description never says why it changed.";
+
+        String withLead = DeliveryComposer.compose(
+            observations,
+            ArtifactKinds.PULL_REQUEST,
+            Map.of(),
+            null,
+            List.of(),
+            lead
+        ).mrNote();
+        String withoutLead = DeliveryComposer.compose(
+            observations,
+            ArtifactKinds.PULL_REQUEST,
+            Map.of(),
+            null,
+            List.of(),
+            null
+        ).mrNote();
+
+        assertThat(withLead).isEqualTo(lead + "\n\n" + withoutLead);
+        assertThat(withoutLead)
+            .as("with no opening of its own the server can praise nothing it did not earn, and can rule on nothing")
+            .doesNotContain("Nice work")
+            .doesNotContain("Worth keeping")
+            .doesNotContain("before merging");
+    }
+
+    @Test
+    void compose_leadThatScrubsToNothing_opensNothingRatherThanABlankLine() {
+        List<ValidatedObservation> observations = List.of(
+            negativeObservation(
+                "describe-what-and-why",
+                "PR description lacks a rationale sentence",
+                Severity.MINOR,
+                List.of(),
+                List.of(),
+                "The body lists what changed but not why."
+            )
+        );
+
+        String mrNote = DeliveryComposer.compose(
+            observations,
+            ArtifactKinds.PULL_REQUEST,
+            Map.of(),
+            null,
+            List.of(),
+            "NEGATIVE observation, MINOR severity."
+        ).mrNote();
+
+        assertThat(mrNote).doesNotStartWith("\n");
+        assertThat(mrNote).startsWith("**\uD83D\uDFE1 PR description lacks a rationale sentence**");
     }
 
     @Test
@@ -332,9 +397,10 @@ class DeliveryComposerTest extends BaseUnitTest {
         String mrNote = result.mrNote();
         assertThat(mrNote).isNotNull();
 
-        assertThat(mrNote).contains("2 issues to tighten");
         assertThat(mrNote).doesNotContain("before merging");
-        assertThat(mrNote).contains("3 suggestions for improvement (+2 more minor suggestions):");
+        assertThat(mrNote)
+            .as("a capped list must still say what it is hiding")
+            .contains("2 more minor suggestions are not shown");
 
         int criticalIdx = mrNote.indexOf("\uD83D\uDD34");
         int majorIdx = mrNote.indexOf("\uD83D\uDFE0");
@@ -463,108 +529,6 @@ class DeliveryComposerTest extends BaseUnitTest {
         assertThat(result.diffNotes()).hasSize(1);
         DiffNote note = result.diffNotes().get(0);
         assertThat(note.body()).contains("Commented-out code adds noise.");
-    }
-
-    @Test
-    void compose_withOnlyMinorNegatives_usesImprovementLanguage() {
-        List<ValidatedObservation> observations = List.of(
-            negativeObservation(
-                "code-hygiene",
-                "Dead code",
-                Severity.MINOR,
-                List.of(new LocationSpec("Views/X.swift", 10)),
-                null,
-                "Clean up dead code."
-            ),
-            negativeObservation(
-                "meaningful-naming",
-                "Poor name",
-                Severity.INFO,
-                List.of(new LocationSpec("Models/Y.swift", 5)),
-                null,
-                "Use better names."
-            )
-        );
-
-        DeliveryContent result = DeliveryComposer.compose(observations);
-
-        assertThat(result).isNotNull();
-        String mrNote = result.mrNote();
-
-        assertThat(mrNote).contains("2 suggestions for improvement");
-        assertThat(mrNote).doesNotContain("before merging");
-    }
-
-    @Test
-    void compose_suggestionsOnlyWithPositives_prependsTaskLevelAcknowledgement() {
-        List<ValidatedObservation> observations = new ArrayList<>();
-        observations.add(positiveObservation("scope-one-reviewable-change"));
-        observations.add(positiveObservation("ready-and-traceable-handoff"));
-        observations.add(
-            negativeObservation(
-                "describe-what-and-why",
-                "PR description lacks a rationale sentence",
-                Severity.MINOR,
-                List.of(),
-                List.of(),
-                "The body lists what changed but not why."
-            )
-        );
-
-        String mrNote = DeliveryComposer.compose(observations).mrNote();
-
-        assertThat(mrNote).startsWith("Nice work ");
-        assertThat(mrNote).contains("keeping the change focused and reviewable");
-        assertThat(mrNote).contains("linking the change to its issue");
-        assertThat(mrNote)
-            .as("the counted header owns the count, so the opener must not announce it too")
-            .doesNotContain("to tighten:");
-        assertThat(mrNote).contains("1 suggestion for improvement");
-    }
-
-    @Test
-    void compose_blockingIssue_suppressesOpenerButStillAcknowledgesOneStrength() {
-        List<ValidatedObservation> observations = new ArrayList<>();
-        observations.add(positiveObservation("scope-one-reviewable-change"));
-        observations.add(
-            negativeObservation(
-                "avoids-insecure-defaults-and-over-broad-permissions",
-                "Hardcoded API key",
-                Severity.CRITICAL,
-                List.of(new LocationSpec("Config/Keys.swift", 5)),
-                List.of("let key = \"abc\""),
-                "A secret is committed."
-            )
-        );
-
-        String mrNote = DeliveryComposer.compose(observations).mrNote();
-
-        assertThat(mrNote).doesNotContain("Nice work");
-        assertThat(mrNote).contains("Worth keeping: you're keeping the change focused and reviewable.");
-        assertThat(mrNote.indexOf("to tighten")).isLessThan(mrNote.indexOf("Worth keeping"));
-        assertThat(mrNote).doesNotContain("before merging");
-    }
-
-    @Test
-    void compose_uncuratedPositive_acknowledgesGenericallyNeverDropsSilently() {
-        List<ValidatedObservation> observations = new ArrayList<>();
-        observations.add(positiveObservation("some-uncurated-practice-xyz"));
-        observations.add(
-            negativeObservation(
-                "describe-what-and-why",
-                "PR description lacks a rationale sentence",
-                Severity.MINOR,
-                List.of(),
-                List.of(),
-                "The body lists what changed but not why."
-            )
-        );
-
-        String mrNote = DeliveryComposer.compose(observations).mrNote();
-
-        assertThat(mrNote).startsWith("Nice work here");
-        assertThat(mrNote).doesNotContain("some uncurated practice xyz");
-        assertThat(mrNote).doesNotContain("to tighten:");
     }
 
     @Test
@@ -830,37 +794,6 @@ class DeliveryComposerTest extends BaseUnitTest {
     }
 
     @Test
-    void compose_opener_leavesTheCountToTheHeaderBelowIt() {
-        List<ValidatedObservation> observations = List.of(
-            positiveObservation("issue-scoped-to-single-concern"),
-            negativeObservation(
-                "issue-has-checkable-outcome",
-                "Missing checkable outcome",
-                Severity.MINOR,
-                List.of(new LocationSpec("metadata.json", 2, "scm.issue.core")),
-                null,
-                "No acceptance criteria are stated."
-            ),
-            negativeObservation(
-                "issue-states-an-actionable-problem",
-                "Missing actionable problem",
-                Severity.MINOR,
-                List.of(new LocationSpec("metadata.json", 2, "scm.issue.core")),
-                null,
-                "The description does not frame a concrete problem."
-            )
-        );
-
-        DeliveryContent dc = DeliveryComposer.compose(observations, ArtifactKinds.ISSUE);
-
-        assertThat(dc).isNotNull();
-        // The header below the opener carries the count and any collapsed remainder with it. An opener that
-        // counted too would state the same number twice, and disagree with it whenever the list was capped.
-        assertThat(dc.mrNote()).contains("2 suggestions for improvement");
-        assertThat(dc.mrNote()).doesNotContain("to tighten:");
-    }
-
-    @Test
     void compose_allObservationsNotApplicable_returnsNullNoSpuriousAllClear() {
         ValidatedObservation na1 = new ValidatedObservation(
             "issue-scoped-to-single-concern",
@@ -1048,8 +981,6 @@ class DeliveryComposerTest extends BaseUnitTest {
         var dc = DeliveryComposer.compose(observations, ArtifactKinds.PULL_REQUEST);
 
         assertThat(dc).isNotNull();
-        assertThat(dc.mrNote()).contains("1 issue to tighten");
-        assertThat(dc.mrNote()).doesNotContain("2 issues");
         assertThat(dc.mrNote() + dc.diffNotes().get(0).body()).contains("Production logic ships without a test");
         assertThat(dc.mrNote()).doesNotContain("Definition of Done claims all tests pass");
         assertThat(dc.diffNotes()).hasSize(1);
@@ -1071,59 +1002,7 @@ class DeliveryComposerTest extends BaseUnitTest {
         var dc = DeliveryComposer.compose(observations, ArtifactKinds.PULL_REQUEST);
 
         assertThat(dc).isNotNull();
-        assertThat(dc.mrNote()).contains("1 issue to tighten");
         assertThat(dc.mrNote() + dc.diffNotes().get(0).body()).contains("Definition of Done claims all tests pass");
-    }
-
-    @Test
-    void compose_blockingIssue_allowsSingleSubordinateProcessPositive() {
-        var observations = List.of(
-            positiveObservation("engaging-with-inline-review-comments"),
-            negativeObservation(
-                "avoids-insecure-defaults-and-over-broad-permissions",
-                "Hardcoded secret",
-                Severity.CRITICAL,
-                List.of(new LocationSpec("Keys.swift", 1)),
-                List.of("let k=\"s\""),
-                "Secret exposed."
-            )
-        );
-        var dc = DeliveryComposer.compose(observations, ArtifactKinds.PULL_REQUEST);
-        assertThat(dc).isNotNull();
-        assertThat(dc.mrNote()).doesNotContain("Nice work");
-        assertThat(dc.mrNote()).contains("Worth keeping: you're engaging with the review feedback.");
-        assertThat(dc.mrNote().indexOf("to tighten")).isLessThan(dc.mrNote().indexOf("Worth keeping"));
-        assertThat(dc.mrNote()).doesNotContain("before merging");
-    }
-
-    @Test
-    void compose_blockingIssue_acknowledgesAnyHighConfidenceStrengthNotOnlyProcessActs() {
-        var strength = new ValidatedObservation(
-            "handles-errors-instead-of-swallowing-them",
-            "Errors are surfaced (positive)",
-            Presence.PRESENT,
-            Assessment.GOOD,
-            Severity.INFO,
-            null,
-            null
-        );
-        var observations = List.of(
-            strength,
-            negativeObservation(
-                "avoids-insecure-defaults-and-over-broad-permissions",
-                "Hardcoded secret",
-                Severity.CRITICAL,
-                List.of(new LocationSpec("Keys.swift", 1)),
-                List.of("let k=\"s\""),
-                "Secret exposed."
-            )
-        );
-        var dc = DeliveryComposer.compose(observations, ArtifactKinds.PULL_REQUEST);
-        assertThat(dc).isNotNull();
-        assertThat(dc.mrNote()).doesNotContain("Nice work");
-        assertThat(dc.mrNote()).contains("Worth keeping:");
-        assertThat(dc.mrNote()).doesNotContain("handles errors instead of swallowing them");
-        assertThat(dc.mrNote().split("Worth keeping:", -1)).hasSize(2);
     }
 
     private ValidatedObservation negativeObservation(String slug, String title, Severity severity) {
@@ -1148,8 +1027,6 @@ class DeliveryComposerTest extends BaseUnitTest {
         DeliveryContent result = DeliveryComposer.compose(observations, ArtifactKinds.PULL_REQUEST);
 
         assertThat(result).isNotNull();
-        String mrNote = result.mrNote();
-        assertThat(mrNote).contains("3 suggestions for improvement (+3 more minor suggestions):");
         assertThat(result.diffNotes()).hasSize(3);
     }
 
@@ -1169,9 +1046,12 @@ class DeliveryComposerTest extends BaseUnitTest {
 
         assertThat(result).isNotNull();
         String mrNote = result.mrNote();
-        assertThat(mrNote).contains(
-            "5 issues to tighten, plus 3 suggestions for improvement (+1 more minor suggestion):"
-        );
+        assertThat(mrNote)
+            .as("every blocker survives the cap")
+            .contains("Secret 1", "Secret 2", "Crash 1", "Crash 2", "Crash 3");
+        assertThat(mrNote)
+            .as("only the minor tail collapses, and it says so")
+            .contains("1 more minor suggestion is not shown");
         assertThat(mrNote).doesNotContain("before merging");
         assertThat(result.diffNotes()).hasSize(8);
     }
@@ -1186,7 +1066,7 @@ class DeliveryComposerTest extends BaseUnitTest {
         DeliveryContent result = DeliveryComposer.compose(observations, ArtifactKinds.PULL_REQUEST);
 
         assertThat(result).isNotNull();
-        assertThat(result.mrNote()).contains("3 suggestions for improvement:");
+        assertThat(result.mrNote()).contains("Minor nudge 1", "Minor nudge 2", "Minor nudge 3");
         assertThat(result.mrNote()).doesNotContain("more minor suggestion");
         assertThat(result.diffNotes()).hasSize(3);
     }
@@ -1203,7 +1083,9 @@ class DeliveryComposerTest extends BaseUnitTest {
 
         assertThat(result).isNotNull();
         String mrNote = result.mrNote();
-        assertThat(mrNote).contains("3 suggestions for improvement (+1 more minor suggestion):");
+        assertThat(mrNote)
+            .as("a capped list must still say what it is hiding")
+            .contains("1 more minor suggestion is not shown");
         assertThat(mrNote).contains("A nudge", "B nudge", "C nudge").doesNotContain("Z nudge");
     }
 
@@ -1220,7 +1102,9 @@ class DeliveryComposerTest extends BaseUnitTest {
 
         assertThat(result).isNotNull();
         String mrNote = result.mrNote();
-        assertThat(mrNote).contains("3 suggestions for improvement (+2 more minor suggestions):");
+        assertThat(mrNote)
+            .as("a capped list must still say what it is hiding")
+            .contains("2 more minor suggestions are not shown");
         assertThat(mrNote).contains("Minor one");
         assertThat(mrNote).contains("Minor two");
         assertThat(mrNote).contains("Minor three");

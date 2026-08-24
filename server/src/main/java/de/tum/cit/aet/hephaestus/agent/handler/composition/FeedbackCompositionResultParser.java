@@ -270,6 +270,19 @@ public class FeedbackCompositionResultParser {
         );
     }
 
+    /**
+     * How the review opens, as the composer wrote it. Absent when it wrote none, and the message then
+     * opens on its first finding rather than on a sentence the server invented.
+     */
+    @Nullable
+    public static String lead(@Nullable JsonNode jobOutput) {
+        if (jobOutput == null) {
+            return null;
+        }
+        String lead = jobOutput.path("feedback").path("lead").asString("").strip();
+        return lead.isEmpty() ? null : lead;
+    }
+
     private static Map<String, StagedObservation> readObservations(@Nullable JsonNode node) {
         Map<String, StagedObservation> observations = new LinkedHashMap<>();
         if (node == null || !node.isArray()) {
