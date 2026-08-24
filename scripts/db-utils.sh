@@ -1,72 +1,29 @@
 #!/bin/bash
 
-# Database Utilities Script
-# Provides modular database operations for development workflow
-# Usage: ./db-utils.sh [command]
-# Commands:
-#   generate-erd                         - Generate ERD documentation only
-#   draft-changelog                      - Generate changelog diff only
-
-set -eo pipefail  # Exit on any error, including pipeline failures
+set -eo pipefail
 
 SCRIPT_DIR="$(dirname "$0")"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 APP_SERVER_DIR="$PROJECT_ROOT/server"
 SCRIPTS_DIR="$PROJECT_ROOT/scripts"
-LOCAL_POSTGRES_SCRIPT="$SCRIPTS_DIR/local-postgres.sh"
 
-# Source .env for port overrides (same pattern as check-ports.sh)
 ENV_FILE="$APP_SERVER_DIR/.env"
 if [[ -f "$ENV_FILE" ]]; then
     set -a
     # shellcheck disable=SC1090
-    eval "$(grep -E '^\s*[A-Z_]+=.+' "$ENV_FILE" 2>/dev/null || true)"
+    source "$ENV_FILE"
     set +a
 fi
 
 POSTGRES_HOST="${POSTGRES_HOST:-localhost}"
 POSTGRES_PORT="${POSTGRES_PORT:-5432}"
 
-DOCKER_AVAILABLE_CACHE=""
-
-to_lower() {
-    printf '%s' "$1" | tr '[:upper:]' '[:lower:]'
-}
-
-if [[ -n "${HEPHAESTUS_DB_MODE:-}" ]]; then
-    DB_MODE="$(to_lower "${HEPHAESTUS_DB_MODE}")"
-else
-    DB_MODE="docker"
-fi
-
-if [[ "$DB_MODE" != "docker" && "$DB_MODE" != "local" ]]; then
-    echo "Unsupported database mode '$DB_MODE'. Use 'docker' or 'local'." >&2
-    exit 1
-fi
-
-docker_available() {
-    if [[ -n "$DOCKER_AVAILABLE_CACHE" ]]; then
-        [[ "$DOCKER_AVAILABLE_CACHE" == "true" ]]
-        return
-    fi
-
-    if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
-        DOCKER_AVAILABLE_CACHE="true"
-        return 0
-    fi
-
-    DOCKER_AVAILABLE_CACHE="false"
-    return 1
-}
-
-# Color codes for better output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+NC='\033[0m'
 
-# Logging functions
 log_info() {
     echo -e "${BLUE}ℹ️  $1${NC}"
 }
@@ -83,23 +40,20 @@ log_error() {
     echo -e "${RED}❌ $1${NC}"
 }
 
-if [[ "$DB_MODE" == "docker" ]] && ! docker_available; then
-    log_warning "Docker is not available; switching database utilities to local mode."
-    DB_MODE="local"
-fi
-
-ensure_local_postgres_script() {
-    if [[ ! -x "$LOCAL_POSTGRES_SCRIPT" ]]; then
-        log_error "Local PostgreSQL helper not found or not executable at '$LOCAL_POSTGRES_SCRIPT'. Run 'scripts/codex-setup.sh' to install prerequisites."
+require_docker() {
+    if ! command -v docker >/dev/null 2>&1; then
+        log_error "Docker is required for local database utilities. Install Docker, then retry."
         exit 1
     fi
-}
 
-postgres_data_dir() {
-    if [[ "$DB_MODE" == "docker" ]]; then
-        echo "$APP_SERVER_DIR/postgres-data"
-    else
-        echo "$APP_SERVER_DIR/postgres-data-local"
+    if ! docker info >/dev/null 2>&1; then
+        log_error "Docker is installed but unavailable. Start the Docker daemon, then retry."
+        exit 1
+    fi
+
+    if ! docker compose version >/dev/null 2>&1; then
+        log_error "Docker Compose is required for local database utilities. Install the Compose plugin, then retry."
+        exit 1
     fi
 }
 
@@ -108,17 +62,9 @@ wait_for_postgres_ready() {
     local count=0
 
     while [ $count -lt $retries ]; do
-        if command -v pg_isready >/dev/null 2>&1; then
-            if pg_isready -h "$POSTGRES_HOST" -p "$POSTGRES_PORT" >/dev/null 2>&1; then
-                log_success "PostgreSQL is ready!"
-                return 0
-            fi
-        elif [[ "$DB_MODE" == "docker" ]]; then
-            # Use port 5432 inside the container — POSTGRES_PORT is the host-side mapping only
-            if (cd "$APP_SERVER_DIR" && docker compose exec postgres pg_isready -h localhost -p 5432 >/dev/null 2>&1); then
-                log_success "PostgreSQL is ready!"
-                return 0
-            fi
+        if pg_isready -h "$POSTGRES_HOST" -p "$POSTGRES_PORT" >/dev/null 2>&1; then
+            log_success "PostgreSQL is ready!"
+            return 0
         fi
 
         count=$((count + 1))
@@ -130,29 +76,9 @@ wait_for_postgres_ready() {
     exit 1
 }
 
-is_postgres_running() {
-    if [[ "${CI:-false}" == "true" ]]; then
-        pg_isready -h "$POSTGRES_HOST" -p "$POSTGRES_PORT" >/dev/null 2>&1
-        return $?
-    fi
-
-    if [[ "$DB_MODE" == "local" ]]; then
-        ensure_local_postgres_script
-        "$LOCAL_POSTGRES_SCRIPT" status >/dev/null 2>&1
-        return $?
-    fi
-
-    # Use subshell to avoid pipefail affecting this check
-    # The function is meant to return false (non-zero) when postgres is not running
-    local output
-    output="$(cd "$APP_SERVER_DIR" && docker compose ps postgres 2>/dev/null)" || return 1
-    echo "$output" | grep -q "Up"
-}
-
-# Check if we're in the right directory
 check_environment() {
     if [[ ! -f "$APP_SERVER_DIR/pom.xml" ]]; then
-        log_error "Application server not found. Please run this script from the project root."
+        log_error "Application server not found at '$APP_SERVER_DIR'."
         exit 1
     fi
     
@@ -161,6 +87,15 @@ check_environment() {
         exit 1
     fi
 
+    if [[ "${CI:-false}" != "true" ]]; then
+        require_docker
+    elif ! command -v pg_isready >/dev/null 2>&1; then
+        log_error "CI database utilities require 'pg_isready'."
+        exit 1
+    fi
+}
+
+check_erd_dependencies() {
     if ! node -e "require.resolve('tsx')" >/dev/null 2>&1; then
         log_error "Missing node dependency 'tsx'. Run 'pnpm install' before generating the ERD."
         exit 1
@@ -170,68 +105,24 @@ check_environment() {
         log_error "Missing node dependency 'pg'. Run 'pnpm install' before generating the ERD."
         exit 1
     fi
+
 }
 
-# Check if PostgreSQL data directory needs cleanup
-check_postgres_data() {
-    if [[ "$DB_MODE" != "docker" ]]; then
-        return 0
-    fi
-
-    cd "$APP_SERVER_DIR"
-
-    if [[ -d "postgres-data" ]]; then
-        # Check if essential PostgreSQL files exist
-        if [[ ! -f "postgres-data/PG_VERSION" ]] || [[ ! -f "postgres-data/postgresql.conf" ]]; then
-            log_warning "PostgreSQL data directory exists but appears corrupted"
-            log_info "Cleaning up corrupted data directory..."
-            rm -rf postgres-data
-            log_success "Corrupted data directory cleaned up"
-        fi
-    fi
-}
-
-# Start PostgreSQL and wait for it to be ready
 start_postgres() {
-    # In CI environments, PostgreSQL service is already running
     if [[ "${CI:-false}" == "true" ]]; then
         log_info "CI environment detected, using existing PostgreSQL service..."
         wait_for_postgres_ready
         return 0
     fi
 
-    if [[ "$DB_MODE" == "local" ]]; then
-        log_info "Starting local PostgreSQL instance..."
-        ensure_local_postgres_script
-        "$LOCAL_POSTGRES_SCRIPT" start
-        wait_for_postgres_ready
-        return 0
-    fi
-
-    # Local development environment - use Docker
     log_info "Starting PostgreSQL container..."
     cd "$APP_SERVER_DIR"
-
-    # Check and cleanup corrupted data if needed
-    check_postgres_data
-
-    docker compose up -d postgres
-
-    log_info "Waiting for PostgreSQL to be ready..."
-    wait_for_postgres_ready
+    docker compose up -d --wait postgres
 }
 
-# Stop PostgreSQL
 stop_postgres() {
-    # In CI environments, don't try to stop the service
     if [[ "${CI:-false}" == "true" ]]; then
         log_info "CI environment detected, leaving PostgreSQL service running..."
-        return 0
-    fi
-
-    if [[ "$DB_MODE" == "local" ]]; then
-        ensure_local_postgres_script
-        "$LOCAL_POSTGRES_SCRIPT" stop
         return 0
     fi
 
@@ -240,21 +131,16 @@ stop_postgres() {
     docker compose down postgres
 }
 
-# Apply Liquibase migrations
 apply_migrations() {
     log_info "Applying Liquibase migrations..."
     cd "$APP_SERVER_DIR"
-    # Explicitly set Spring profiles to avoid specs profile (which uses H2)
-    # Use local,dev profiles for database operations
     SPRING_PROFILES_ACTIVE=local,dev ./mvnw liquibase:update -Dpostgres.port="$POSTGRES_PORT"
 }
 
-# Database credentials (configurable via environment variables)
 DB_NAME="${POSTGRES_DB:-hephaestus}"
 DB_USER="${POSTGRES_USER:-root}"
 DB_PASSWORD="${POSTGRES_PASSWORD:-root}"
 
-# Generate ERD documentation
 generate_erd() {
     log_info "Generating ERD documentation..."
     cd "$SCRIPTS_DIR"
@@ -268,42 +154,33 @@ generate_erd() {
     log_success "ERD documentation updated at 'docs/contributor/erd/schema.mmd'"
 }
 
-# Generate changelog diff with database backup/restore
 generate_changelog_diff() {
     log_info "Generating changelog diff..."
     cd "$APP_SERVER_DIR"
     
-    # Define changelog file path
     local changelog_file="src/main/resources/db/changelog_new.xml"
     
-    # Remove any existing changelog file to ensure clean state
     if [[ -f "$changelog_file" ]]; then
         rm "$changelog_file"
     fi
     
-    # In CI environments with external Docker PostgreSQL, skip backup/restore
     if [[ "${CI:-false}" == "true" ]]; then
         log_info "CI environment detected - using external PostgreSQL container"
         log_info "Ensuring PostgreSQL is ready..."
         wait_for_postgres_ready
         
-        # Apply migrations to fresh database
         apply_migrations
         
-        # Generate changelog diff
         log_info "Generating changelog diff..."
         SPRING_PROFILES_ACTIVE=local,dev ./mvnw liquibase:diff -Dpostgres.port="$POSTGRES_PORT"
     else
-        # Local development - backup and restore database state
         log_info "Backing up current database state..."
         stop_postgres
         local data_dir
-        data_dir="$(postgres_data_dir)"
-        # Use unique temp dir name with PID to avoid conflicts
+        data_dir="$APP_SERVER_DIR/postgres-data"
         local temp_dir="${data_dir}-temp-$$"
         local backup_created=false
         
-        # Cleanup function to restore database state on failure
         cleanup_changelog_diff() {
             if [[ "$backup_created" == "true" && -d "$temp_dir" ]]; then
                 log_warning "Restoring database state after failure..."
@@ -314,7 +191,6 @@ generate_changelog_diff() {
             fi
         }
         
-        # Set trap to cleanup on error
         trap cleanup_changelog_diff ERR
         
         if [[ -d "$data_dir" ]]; then
@@ -322,17 +198,12 @@ generate_changelog_diff() {
             backup_created=true
         fi
 
-        # Start fresh database and apply migrations
         start_postgres
         apply_migrations
         
-        # Generate changelog diff
         log_info "Generating changelog diff..."
-        # Explicitly set Spring profiles to avoid specs profile (which uses H2)
-        # Use local,dev profiles for database operations
         SPRING_PROFILES_ACTIVE=local,dev ./mvnw liquibase:diff -Dpostgres.port="$POSTGRES_PORT"
         
-        # Restore original database state
         log_info "Restoring original database state..."
         stop_postgres
         rm -rf "$data_dir"
@@ -340,11 +211,9 @@ generate_changelog_diff() {
             mv "$temp_dir" "$data_dir"
         fi
         
-        # Clear the trap after successful completion
         trap - ERR
     fi
     
-    # Check if changelog file was actually generated
     if [[ -f "$changelog_file" ]]; then
         log_success "Changelog diff generated at '$changelog_file'"
     else
@@ -353,33 +222,19 @@ generate_changelog_diff() {
     fi
 }
 
-# Generate ERD only (ensures database is running with up-to-date schema)
 cmd_generate_erd() {
     log_info "🚀 Starting ERD generation..."
     check_environment
+    check_erd_dependencies
     
-    # Ensure PostgreSQL is running and ready
     cd "$APP_SERVER_DIR"
-    if [[ "${CI:-false}" == "true" ]]; then
-        # In CI, PostgreSQL container is started externally
-        log_info "CI environment detected - using external PostgreSQL container"
-        wait_for_postgres_ready
-        apply_migrations
-    elif ! is_postgres_running; then
-        log_warning "PostgreSQL is not running. Starting it now..."
-        start_postgres
-        apply_migrations
-    elif [[ "$DB_MODE" == "local" ]]; then
-        apply_migrations
-    else
-        log_info "Skipping migrations in local Docker mode (assuming DB is up-to-date)"
-    fi
+    start_postgres
+    apply_migrations
 
     generate_erd
     log_success "🎉 ERD generation completed successfully!"
 }
 
-# Generate changelog diff only
 cmd_draft_changelog() {
     log_info "🚀 Starting changelog diff generation..."
     check_environment
@@ -387,7 +242,6 @@ cmd_draft_changelog() {
     log_success "🎉 Changelog diff process completed!"
 }
 
-# Show usage information
 show_usage() {
     cat << EOF
 Database Utilities Script
@@ -406,7 +260,6 @@ Examples:
 EOF
 }
 
-# Main command dispatcher
 main() {
     case "${1:-}" in
         "generate-erd")
@@ -431,5 +284,4 @@ main() {
     esac
 }
 
-# Run main function with all arguments
 main "$@"

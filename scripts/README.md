@@ -10,20 +10,22 @@ Scripts use dependencies from the root `package.json`. Run `pnpm install` at the
 
 ### Database Utilities
 
-All database-related commands are accessed via `db-utils.sh` which handles database setup, migrations, and cleanup:
+Database documentation commands use `db-utils.sh` and require Docker with the Compose plugin:
 
 ```bash
 pnpm run db:generate-erd-docs                    # Generate Mermaid ERD diagram
 pnpm run db:draft-changelog                       # Generate Liquibase changelog diff
 ```
 
-**ERD Generation Environment Variables:**
+**ERD generation environment variables:**
 
-| Variable             | Default     | Description                  |
-| -------------------- | ----------- | ---------------------------- |
-| `POSTGRES_HOST`      | `localhost` | PostgreSQL host              |
-| `POSTGRES_PORT`      | `5432`      | PostgreSQL port              |
-| `HEPHAESTUS_DB_MODE` | `docker`    | Database mode: docker/local  |
+| Variable            | Default      | Description         |
+| ------------------- | ------------ | ------------------- |
+| `POSTGRES_HOST`     | `localhost`  | PostgreSQL host     |
+| `POSTGRES_PORT`     | `5432`       | PostgreSQL port     |
+| `POSTGRES_DB`       | `hephaestus` | PostgreSQL database |
+| `POSTGRES_USER`     | `root`       | PostgreSQL user     |
+| `POSTGRES_PASSWORD` | `root`       | PostgreSQL password |
 
 ### Achievement Formatting
 

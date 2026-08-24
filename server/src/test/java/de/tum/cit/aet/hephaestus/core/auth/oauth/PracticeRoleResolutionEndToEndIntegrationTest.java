@@ -15,7 +15,6 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderTyp
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.testconfig.DatabaseTestUtils;
-import de.tum.cit.aet.hephaestus.testconfig.GitHubIntegrationPostgresShutdown;
 import de.tum.cit.aet.hephaestus.testconfig.RealAuthDatasource;
 import de.tum.cit.aet.hephaestus.testconfig.TestUserFactory;
 import java.net.URI;
@@ -45,7 +44,6 @@ import org.testcontainers.junit.jupiter.Testcontainers;
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("test")
-@Import(GitHubIntegrationPostgresShutdown.class)
 @Testcontainers
 @Tag("integration")
 class PracticeRoleResolutionEndToEndIntegrationTest {

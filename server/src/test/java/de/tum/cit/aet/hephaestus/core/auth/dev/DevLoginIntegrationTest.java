@@ -3,7 +3,6 @@ package de.tum.cit.aet.hephaestus.core.auth.dev;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.hasItem;
 
-import de.tum.cit.aet.hephaestus.testconfig.GitHubIntegrationPostgresShutdown;
 import de.tum.cit.aet.hephaestus.testconfig.RealAuthDatasource;
 import java.util.Map;
 import java.util.Objects;
@@ -33,7 +32,6 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("test")
 @AutoConfigureWebTestClient
-@Import(GitHubIntegrationPostgresShutdown.class)
 @Testcontainers
 @TestPropertySource(properties = "hephaestus.auth.dev-login-enabled=true")
 @Tag("integration")

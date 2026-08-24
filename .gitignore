@@ -190,7 +190,6 @@ sdist/
 server/.env.bak.*
 server/logs/
 server/postgres-data/
-server/postgres-data-local/
 server/postgres-data-temp-*
 server/postgres-data-temp/
 server/postgres-data*.tgz

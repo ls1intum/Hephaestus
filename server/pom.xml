@@ -1212,19 +1212,6 @@
         </plugins>
     </build>
     <profiles>
-        <profile>
-            <id>local-db-timeout</id>
-            <activation>
-                <property>
-                    <name>env.HEPHAESTUS_DB_MODE</name>
-                    <value>local</value>
-                </property>
-            </activation>
-            <properties>
-                <hephaestus.surefire.timeout>1200</hephaestus.surefire.timeout>
-            </properties>
-        </profile>
-
         <!--
             Live Tests Profile
 
