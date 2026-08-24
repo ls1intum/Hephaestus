@@ -41,6 +41,10 @@ public class PracticeReviewCoverageService {
 
     @Transactional(readOnly = true)
     public WorkspaceReviewScope scope(Workspace workspace) {
+        return readScope(workspace);
+    }
+
+    private WorkspaceReviewScope readScope(Workspace workspace) {
         long workspaceId = workspace.getId();
         List<PracticeReviewRepositoryTarget> targets = repositoryTargetRepository.findByWorkspaceId(workspaceId);
         Map<Long, RepositoryToMonitor> monitorsById = monitorRepository
@@ -78,7 +82,7 @@ public class PracticeReviewCoverageService {
 
     @Transactional(readOnly = true)
     public PracticeReviewCoverageSummaryDTO summary(Workspace workspace, int recentReviewVolume) {
-        return summary(workspace, scope(workspace), recentReviewVolume);
+        return summary(workspace, readScope(workspace), recentReviewVolume);
     }
 
     @Transactional(readOnly = true)
@@ -88,7 +92,7 @@ public class PracticeReviewCoverageService {
         int recentReviewVolume
     ) {
         validate(workspace.getId(), proposed);
-        WorkspaceReviewScope current = scope(workspace);
+        WorkspaceReviewScope current = readScope(workspace);
         return new PracticeReviewCoveragePreviewDTO(
             summary(workspace, current, recentReviewVolume),
             summary(workspace, proposed, recentReviewVolume),
@@ -186,7 +190,7 @@ public class PracticeReviewCoverageService {
         String baseBranch,
         ReviewSubject subject
     ) {
-        return admits(workspace, repositoryNameWithOwner, baseBranch, subject, true);
+        return readAssessment(workspace, repositoryNameWithOwner, baseBranch, subject, true).admitted();
     }
 
     @Transactional(readOnly = true)
@@ -197,7 +201,13 @@ public class PracticeReviewCoverageService {
         ReviewSubject subject,
         boolean branchRestrictionsApply
     ) {
-        return assess(workspace, repositoryNameWithOwner, baseBranch, subject, branchRestrictionsApply).admitted();
+        return readAssessment(
+            workspace,
+            repositoryNameWithOwner,
+            baseBranch,
+            subject,
+            branchRestrictionsApply
+        ).admitted();
     }
 
     @Transactional(readOnly = true)
@@ -208,7 +218,17 @@ public class PracticeReviewCoverageService {
         ReviewSubject subject,
         boolean branchRestrictionsApply
     ) {
-        WorkspaceReviewScope scope = scope(workspace);
+        return readAssessment(workspace, repositoryNameWithOwner, baseBranch, subject, branchRestrictionsApply);
+    }
+
+    private CoverageAssessment readAssessment(
+        Workspace workspace,
+        String repositoryNameWithOwner,
+        String baseBranch,
+        ReviewSubject subject,
+        boolean branchRestrictionsApply
+    ) {
+        WorkspaceReviewScope scope = readScope(workspace);
         SubjectStatus subjectStatus;
         if (subject == null || subject.actorId() == null) {
             subjectStatus = SubjectStatus.MISSING;

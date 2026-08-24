@@ -78,7 +78,7 @@ public class PracticeFeedbackDeliveryPolicy {
 
     @Transactional(readOnly = true)
     public Decision<Issue> evaluateIssue(AgentJob job) {
-        return evaluateIssue(job, DeliveryPolicyStage.AUTOMATIC, null);
+        return evaluateIssue(job, DeliveryPolicyStage.AUTOMATIC, null, DeliveryPolicySurface.ARTIFACT, Set.of());
     }
 
     @Transactional(readOnly = true)
@@ -191,11 +191,15 @@ public class PracticeFeedbackDeliveryPolicy {
 
     @Transactional(readOnly = true)
     public Decision<PullRequest> evaluatePullRequest(AgentJob job) {
-        return evaluatePullRequest(job, DeliveryPolicyStage.AUTOMATIC, null);
+        return evaluatePullRequest(job, DeliveryPolicyStage.AUTOMATIC, null, DeliveryPolicySurface.ARTIFACT, Set.of());
     }
 
     @Transactional(readOnly = true)
-    public Decision<PullRequest> evaluatePullRequest(AgentJob job, DeliveryPolicyStage stage, @Nullable UUID feedbackId) {
+    public Decision<PullRequest> evaluatePullRequest(
+        AgentJob job,
+        DeliveryPolicyStage stage,
+        @Nullable UUID feedbackId
+    ) {
         return evaluatePullRequest(job, stage, feedbackId, DeliveryPolicySurface.ARTIFACT, Set.of());
     }
 
