@@ -36,7 +36,7 @@ runs:
           ${{ inputs.os }}-maven-
 
     - name: Cache Playwright browsers
-      if: contains(fromJSON('["webapp-storybook", "webapp-e2e"]'), inputs.cache-type)
+      if: inputs.cache-type == 'webapp-storybook'
       uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
       with:
         path: ~/.cache/ms-playwright

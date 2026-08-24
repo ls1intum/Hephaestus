@@ -21,6 +21,7 @@ jobs:
     outputs:
       webapp: ${{ steps.filter.outputs.webapp }}
       application-server: ${{ steps.filter.outputs.application-server }}
+      e2e: ${{ steps.filter.outputs.e2e }}
       agent-images: ${{ steps.filter.outputs.agent-images }}
       docs: ${{ steps.filter.outputs.docs }}
       ci-config: ${{ steps.filter.outputs.ci-config }}
@@ -97,6 +98,26 @@ jobs:
               - '.opencode/**'
               - '.agents/**'
               - 'opencode.json'
+            e2e:
+              - 'webapp/e2e/**'
+              - 'webapp/src/**'
+              - 'webapp/public/**'
+              - 'webapp/index.html'
+              - 'webapp/package.json'
+              - 'webapp/playwright.config.ts'
+              - 'server/src/main/**'
+              - 'server/pom.xml'
+              - 'server/compose.yaml'
+              - 'docker/postgres/**'
+              - 'package.json'
+              - 'pnpm-lock.yaml'
+              - 'pnpm-workspace.yaml'
+              - '.npmrc'
+              - '.node-version'
+              - '.github/workflows/cicd.yml'
+              - '.github/workflows/ci-tests.yml'
+              - '.github/actions/setup-caches/**'
+              - '.github/actions/setup-pnpm-node/**'
             agent-images:
               - 'docker/agents/**'
             docs:
@@ -206,6 +227,7 @@ jobs:
       should_skip: ${{ needs.detect-changes.outputs.should_skip }}
       webapp_changed: ${{ (needs.detect-changes.outputs.webapp == 'true' || needs.detect-changes.outputs.ci-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
       application_server_changed: ${{ (needs.detect-changes.outputs.application-server == 'true' || needs.detect-changes.outputs.ci-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
+      e2e_changed: ${{ (needs.detect-changes.outputs.e2e == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
 
   Security:
     uses: ./.github/workflows/ci-security-scan.yml

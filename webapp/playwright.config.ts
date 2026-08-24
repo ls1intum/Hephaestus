@@ -15,7 +15,7 @@ export default defineConfig({
 	reporter: process.env.CI ? [["github"]] : [["list"]],
 	use: {
 		baseURL: BASE_URL,
-		trace: "retain-on-failure",
+		trace: "on-first-retry",
 		screenshot: "only-on-failure",
 	},
 	projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],

@@ -1,0 +1,17 @@
+hephaestus:
+  runtime:
+    worker:
+      enabled: false
+    webhook:
+      enabled: false
+  agent:
+    enabled: false
+  sync:
+    nats:
+      enabled: false
+  integration:
+    gitlab:
+      enabled: false
+  features:
+    flags:
+      gitlab: false

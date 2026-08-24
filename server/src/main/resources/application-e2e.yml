@@ -1,5 +1,4 @@
 hephaestus:
-  # Credential encryption requires a 32-byte key.
   security:
     encryption-key: ${HEPHAESTUS_SECURITY_ENCRYPTION_KEY:hephaestusLocalDevEncryptKey0123}
   auth:

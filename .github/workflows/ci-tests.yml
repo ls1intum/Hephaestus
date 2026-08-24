@@ -19,6 +19,11 @@ on:
         required: false
         type: string
         default: "true"
+      e2e_changed:
+        description: "Whether browser E2E runtime files changed"
+        required: false
+        type: string
+        default: "true"
 
 jobs:
   tests:
@@ -60,11 +65,7 @@ jobs:
               echo "run=${{ inputs.webapp_changed }}" >> $GITHUB_OUTPUT
               ;;
             "webapp-e2e")
-              if [[ "${{ inputs.webapp_changed }}" == 'true' || "${{ inputs.application_server_changed }}" == 'true' ]]; then
-                echo "run=true" >> $GITHUB_OUTPUT
-              else
-                echo "run=false" >> $GITHUB_OUTPUT
-              fi
+              echo "run=${{ inputs.e2e_changed }}" >> $GITHUB_OUTPUT
               ;;
             application-server-*)
               echo "run=${{ inputs.application_server_changed }}" >> $GITHUB_OUTPUT
@@ -151,7 +152,7 @@ jobs:
               fi
               ;;
             "webapp-e2e")
-              docker compose -f ../server/compose.yaml up -d --wait postgres nats
+              docker compose -f ../server/compose.yaml up -d --wait postgres
               cleanup() {
                 if [[ -n "${SERVER_PID:-}" ]]; then kill "${SERVER_PID}" 2>/dev/null || true; fi
                 docker compose -f ../server/compose.yaml down -v
@@ -163,7 +164,7 @@ jobs:
                 cd ../server
                 SERVER_PORT=8080 MANAGEMENT_PORT=8080 POSTGRES_PORT=5432 \
                   APPLICATION_HOST_URL=http://localhost:4200 \
-                  ./mvnw spring-boot:run -Dapp.profiles=e2e --batch-mode
+                  ./mvnw spring-boot:run -Dapp.profiles=e2e,playwright --batch-mode
               ) > ../e2e-server.log 2>&1 &
               SERVER_PID=$!
 
@@ -286,8 +287,5 @@ jobs:
                   echo "✅ Tests completed. See **Test Results** tab for details." >> $GITHUB_STEP_SUMMARY
                 fi
               fi
-              ;;
-            webapp-*)
-              echo "✅ Webapp tests completed." >> $GITHUB_STEP_SUMMARY
               ;;
           esac
