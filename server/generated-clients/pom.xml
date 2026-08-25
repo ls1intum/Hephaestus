@@ -105,7 +105,7 @@
                             <requestSuffix>Request</requestSuffix>
                             <responseSuffix>Response</responseSuffix>
                             <responseProjectionSuffix>ResponseProjection</responseProjectionSuffix>
-                            <!-- Exclude generator-internal projection state from the public model. -->
+                            <!-- The custom projection template omits generator-internal state. -->
                             <customTemplatesRoot>${project.basedir}/src/main/resources/graphql/templates
                             </customTemplatesRoot>
                             <customTemplates>
@@ -139,8 +139,7 @@
                             <generateParameterizedFieldsResolvers>false</generateParameterizedFieldsResolvers>
                             <generateModelsForRootTypes>false</generateModelsForRootTypes>
                             <generateAllMethodInProjection>true</generateAllMethodInProjection>
-                            <!-- GitLab schema has types with 300+ fields (e.g., Project).
-                                 All-args constructors for these exceed the JVM 255-parameter limit. -->
+                            <!-- Avoid the JVM's 255-parameter limit for large schema types. -->
                             <generateNoArgsConstructorOnly>true</generateNoArgsConstructorOnly>
                             <generatedLanguage>JAVA</generatedLanguage>
                             <addGeneratedAnnotation>true</addGeneratedAnnotation>
@@ -206,7 +205,7 @@
                         </goals>
                         <configuration>
                             <target>
-                                <!-- The generator emits wrappers for Query.relay although it omits the Query root model. -->
+                                <!-- GraphQL Java Codegen emits these wrappers without their required Query root model. -->
                                 <delete>
                                     <fileset dir="${project.build.directory}/generated-sources/graphql-github/de/tum/cit/aet/hephaestus/integration/scm/github/graphql/model">
                                         <include name="RelayQueryRequest.java" />
@@ -265,7 +264,6 @@
                             </configOptions>
                         </configuration>
                     </execution>
-                    <!-- Local supplement: endpoints Outline has not yet documented upstream -->
                     <execution>
                         <id>outline-supplement</id>
                         <phase>generate-sources</phase>

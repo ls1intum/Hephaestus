@@ -656,10 +656,6 @@
                         <ruleset>${maven.multiModuleProjectDirectory}/pmd-ruleset.xml</ruleset>
                     </rulesets>
                     <targetJdk>${java.version}</targetJdk>
-                    <!--
-                        Test fixtures need a separate ruleset because reflection and injection make
-                        the production dead-code rules unsuitable for some test sources.
-                    -->
                     <includeTests>false</includeTests>
                     <linkXRef>false</linkXRef>
                     <printFailingErrors>true</printFailingErrors>
@@ -828,9 +824,7 @@
                 </plugins>
             </build>
         </profile>
-        <!-- `mvn -P aot package` runs the Spring Boot AOT processor; output is inert until the
-             runtime sets `-Dspring.aot.enabled=true` (handled separately in #1282 Buildpacks).
-             https://docs.spring.io/spring-boot/maven-plugin/aot.html -->
+        <!-- AOT output is used only when the runtime enables spring.aot.enabled. -->
         <profile>
             <id>aot</id>
             <build>

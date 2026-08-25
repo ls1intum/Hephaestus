@@ -62,7 +62,8 @@ jobs:
         working-directory: server
         run: |
           mkdir -p ../ci-metrics/unit-architecture
-          ./mvnw -f application/pom.xml test -Parchitecture-tests -DskipCoverage=false \
+          ./mvnw -f application/pom.xml test -Parchitecture-tests \
+            -Dsurefire.includedGroups=unit,architecture -DskipCoverage=false \
             -Dmaven.build.cache.enabled=false -Dprofile=unit-architecture -DprofileFormat=JSON \
             -Dmaven-profiler-report-directory=../ci-metrics/unit-architecture --batch-mode
 

@@ -47,9 +47,10 @@ Only generated-client output participates in Maven Build Cache; the application 
 and saving build output. Pull requests may restore an exact generated entry, while only the default
 branch may publish one.
 
-Maven Build Cache addresses output from effective build inputs. CI persists its local cache using an
-exact source-and-toolchain key. The scheduled Server Phase Reference workflow monitors byte
-reproducibility by comparing two clean generated-client builds with caching disabled.
+Maven Build Cache computes checksums from configured inputs and the effective Maven model. CI wraps
+its local cache in an exact source-and-toolchain Actions cache key. The scheduled Server Phase
+Reference workflow monitors byte reproducibility by comparing two clean generated-client builds with
+caching disabled.
 
 ## Consequences
 
@@ -60,11 +61,21 @@ reproducibility by comparing two clean generated-client builds with caching disa
 - Commands start at `server/`; deployable-only invocations target `application` after installing its
   reactor dependency.
 - Tooling addresses module-owned paths rather than the former monolithic source and output trees.
-- ADR 0001 remains valid for organizational nesting; this reactor adds an enforceable build-lifecycle
-  boundary.
+- ADR 0001's rationale against organizational nesting remains applicable; this reactor adds an
+  enforceable build-lifecycle boundary.
 
 ## Revisit when
 
 Reconsider the mechanism if cache validation or reproducibility fails, cache transfer cost erases the
-measured gain, or Maven Build Cache support changes materially. Preserve the generated/application
-ownership boundary unless their lifecycles cease to differ.
+measured gain, or Maven Build Cache support changes materially. Re-test removal of the Relay wrapper
+cleanup when GraphQL Java Codegen is upgraded. Preserve the generated/application ownership boundary
+unless their lifecycles cease to differ.
+
+## References
+
+- [Issue #1527](https://github.com/ls1intum/Hephaestus/issues/1527) and
+  [PR #1529](https://github.com/ls1intum/Hephaestus/pull/1529) contain the measurements and hosted
+  observation record.
+- [Maven reactor builds](https://maven.apache.org/guides/mini/guide-multiple-modules.html)
+- [Maven Build Cache concepts](https://maven.apache.org/extensions/maven-build-cache-extension/concepts.html)
+- [Maven reproducible builds](https://maven.apache.org/guides/mini/guide-reproducible-builds.html)

@@ -45,12 +45,11 @@ pnpm run check:agents          # Biome format, then oxlint, then both typechecks
 pnpm run check:agents:fix      # Apply every safe fix
 pnpm run check:webapp          # The SPA: Biome format check, then oxlint
 pnpm run typecheck:webapp      # The SPA's typecheck — a separate leg, not part of check:webapp
-pnpm run check                 # Everything — a strict superset of CI
+pnpm run check                 # Complete local quality gate; every leg also runs in CI
 ```
 
-`check` is a superset, not a copy: PMD (`lint:java`), `check:story-sort` and `check:diagrams` run in
-no workflow, so green CI is not evidence that `check` passes. The `pre-push` hook is the only thing
-that runs them before a merge, and `--no-verify` skips it.
+Every `pnpm run check` leg also runs in CI. Run it locally before pushing because it fails faster and
+reports the complete local gate in one command.
 
 JetBrains alternatives such as IntelliJ (Java) and WebStorm (React/TypeScript) work equally well.
 
@@ -63,7 +62,7 @@ have their own `application-<name>.yml` under `server/application/src/main/resou
 the per-role and per-purpose overlays (`worker`, `webhook`, `e2e`, `cds-training`) documented where
 they are used.
 
-They are **not** Maven profiles — `./mvnw -Plocal` warns that the profile does not exist and changes
+They are **not** Maven profiles — `cd server && ./mvnw -Plocal` warns that the profile does not exist and changes
 nothing. Maven passes the active Spring profile through the `app.profiles` property, so the override
 is `-Dapp.profiles=…` (this is what `pnpm dev:server:e2e` does).
 

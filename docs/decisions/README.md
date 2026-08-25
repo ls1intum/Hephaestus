@@ -70,5 +70,6 @@ do, its home is the Admin Guide (`docs/admin/`) and the runbook links to it.
 | [0029](0029-measurement-intervention-seam-and-channel-levels.md) | Measurement and intervention are separate turns; a channel names where feedback lands, and its level follows | Accepted |
 | [0030](0030-agent-runtime-is-typescript-on-bun.md) | The agent runtime is TypeScript on Bun, with no Node in the sandbox | Accepted |
 | [0031](0031-agent-image-follows-the-deployments-own-tag.md) | The agent image reference follows the deployment's own image tag | Accepted |
+| [0032](0032-generated-clients-build-boundary.md) | Generated clients are a Maven build boundary | Accepted |
 
 Template: [0000-template.md](0000-template.md).

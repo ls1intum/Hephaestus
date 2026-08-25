@@ -187,6 +187,7 @@ through `core.webhook.WebhookProperties`, shared with auto-registration in `work
 ## Container image
 
 Paketo Cloud Native Buildpacks with Application CDS; `application/pom.xml` `<image>` pins builder and
-run image by digest. There is no `Dockerfile` — install the generated-client module, then build with
+run image by digest. There is no `Dockerfile`. From `server/`, run
+`./mvnw -pl generated-clients -am install -DskipTests`, then
 `./mvnw -f application/pom.xml spring-boot:build-image`. See
 `docs/admin/buildpacks-cds-decision.md`.

@@ -12,8 +12,9 @@ Hephaestus is maintained by the Applied Education Technologies (AET) team at TUM
 ```text
 Hephaestus/
 ├── webapp/                    # React + Vite front-end (public UI)
-├── server/                    # Spring Boot server (GitHub + mentor APIs, webhook receiver,
-│                              #   Pi mentor agent, sync NATS consumer — three runtime roles)
+├── server/                    # Maven reactor
+│   ├── application/           # Spring Boot application — server, worker, and webhook roles
+│   └── generated-clients/     # Generated GitHub, GitLab, and Outline transports
 ├── docs/                      # Docusaurus site (this documentation)
 └── scripts/                   # Tooling (ERD generation, migrations, utilities)
 ```

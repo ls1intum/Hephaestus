@@ -115,8 +115,9 @@ Holds wherever TypeScript is written here, the Bun agent trees and `scripts/**` 
 | `webapp/src/routeTree.gen.ts` | TanStack Router Vite plugin |
 | `server/generated-clients/target/generated-sources/**` | GraphQL and Outline codegen, owned by the generated-clients Maven module |
 
-Regeneration is destructive: it empties the target directory, so stash local edits first. Commit
-generated clients alongside the API change that caused them.
+Regeneration is destructive: it empties the target directory, so do not edit or commit Maven-generated
+sources. Commit the version-controlled OpenAPI specification and webapp client alongside the API
+change that produced them.
 
 ## Database changes (Liquibase)
 

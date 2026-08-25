@@ -14,52 +14,30 @@ Testing keeps regression risk low across services. The application server uses M
 
    ```bash
    # Unit tests only (fast)
-   ./mvnw test
+   cd server && ./mvnw test
 
    # Full suite including integration tests
-   ./mvnw verify
+   cd server && ./mvnw verify
    ```
 
-   The reactor generates and compiles the clients on the first build. Later application and test
-   edits reuse that unchanged module automatically; no skip profile or preserved generated-source
-   directory is required.
+   Generated clients have their own module, so unchanged client inputs do not require regeneration
+   or recompilation when Maven finds a matching build-cache entry. Test selection never depends on
+   existing build output.
 
 3. Extend the correct base class:
 
-   ```java
-   // Unit test
-   class UserServiceTest extends BaseUnitTest { }
-
-   // Integration test
-   class UserServiceIntegrationTest extends BaseIntegrationTest { }
-   ```
+   Unit tests extend `BaseUnitTest`; Spring-backed tests extend `BaseIntegrationTest` or a
+   feature-specific subclass.
 
 :::warning Naming matters
 Use `*Test.java` for unit tests and `*IntegrationTest.java` for integration tests. Maven's surefire and failsafe plugins use these patterns.
 :::
 
-## Why testing?
-
-Tests catch regressions before they hit production, document expected behaviour, and unlock safe refactors. Our setup keeps the feedback loop fast – unit tests finish in under a second, while the shared Testcontainers environment limits the cost of integration suites.
-
 ## Unit tests
 
 - Extend `BaseUnitTest` for isolated component tests.
 - Use Mockito (`@Mock`, `@InjectMocks`) for dependencies.
-- Expect sub-second runtime – no Spring context is loaded.
-
-```java
-class UserServiceTest extends BaseUnitTest {
-    @Mock private UserRepository repository;
-    @InjectMocks private UserService service;
-
-    @Test
-    @DisplayName("Should validate email format")
-    void shouldValidateEmailFormat() {
-        // Fast isolated test
-    }
-}
-```
+- Keep unit tests independent of Spring contexts and Testcontainers.
 
 ## Integration tests
 
@@ -137,7 +115,7 @@ The `hephaestus.tenancy.enforcement: throw` setting in `application-test.yml` fa
 
 ## Webhook fixtures and tooling
 
-Reusable webhook JSON lives in `src/test/resources/github`, named after the event it records. Load one with a `ClassPathResource`, or extract new samples with:
+Reusable webhook JSON lives in `server/application/src/test/resources/github`, named after the event it records. Load one with a `ClassPathResource`, or extract new samples with:
 
 ```bash
 pnpm run nats:extract-examples
@@ -182,7 +160,7 @@ Each annotation pins JUnit to `Execution(SAME_THREAD)` so two live tests in the 
 ### Authoring a new live test
 
 1. Pick the right meta-annotation. If the env var doesn't exist yet, add a new annotation alongside the existing four — don't reuse one with a misleading name.
-2. Put the test under `src/test/java/.../live/`. The directory marker keeps live and non-live tests in different code-review buckets.
+2. Put the test under `server/application/src/test/java/.../live/`. The directory marker keeps live and non-live tests in different code-review buckets.
 3. Read credentials from `LiveLlmCredentials.fromEnv()` (or the GitHub helpers); never inline values. Secrets stay in env vars only.
 4. Per-test wall-clock timeouts: 90s is reasonable for a single mentor turn; 5 minutes for a full practice run.
 

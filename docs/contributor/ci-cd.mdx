@@ -117,6 +117,7 @@ Coolify handles PR previews:
 | `ci-docker-build.yml`  | Called by cicd.yml    | Docker image builds per component                  |
 | `ci-security-scan.yml` | Called by cicd.yml    | Dependency scanning (Trivy), secret detection      |
 | `ci-profile.yml` | Weekly, manual | Profiles server integration tests and Spring contexts |
+| `ci-server-clean-reference.yml` | Weekly, manual | Records cold server phases and compares generated JARs |
 | `verify-changesets.yml`| PRs                   | Fails shipped-code PRs that carry no changeset     |
 | `ci-compose-validate.yml` | PRs, push to main  | Renders the reference and self-host compose stacks so an interpolation or merge break is a red check, not a stranger's bad first boot |
 | `version-pr.yml`       | Push to main          | Maintains the accumulating Version PR (changesets) |
@@ -220,6 +221,11 @@ resource usage, JUnit results, and Spring context-cache metrics. It signals only
 consecutive regressions against five earlier default-branch profiles. Branch dispatches produce
 standalone diagnostic artifacts without changing or enforcing that baseline.
 
+The weekly **Server Phase Reference** workflow records cache-disabled Maven generation, compilation,
+test-compilation, and execution profiles and compares two clean generated-client JARs. GitHub Actions
+step durations remain the source for toolchain setup and artifact-upload time; Maven Profiler covers
+only work inside Maven.
+
 `SpringTestContextArchitectureTest` separately enforces the reviewed Spring context keys. Run the
 profile options locally with:
 
@@ -235,7 +241,7 @@ mkdir -p ci-metrics
 
 Before pushing, run the same checks that CI runs:
 
-### Quick Check (Recommended)
+### Full Local Check (Recommended)
 
 ```bash
 # Format and check all services
@@ -253,7 +259,7 @@ pnpm run test:webapp           # Unit tests
 
 # Application Server (Java) — includes the integration.core.webhook receiver
 pnpm run format:java:check     # Check formatting
-cd server && ./mvnw test          # Unit tests, including required reactor dependencies
+cd server && ./mvnw test       # Unit tests, including required reactor dependencies
 
 # Agent runtime (Bun) — the Pi runner and the practice precompute scripts
 pnpm run test:agents           # Runner + precompute specs
