@@ -49,16 +49,15 @@ Each of these reports success and leaves you with the wrong result.
   local OAuth variables make environment-sensitive tests fail only on your machine. Run tests with
   `MANAGEMENT_PORT=0 SERVER_PORT=0`.
 
-### OpenAPI generation exits 0 having written nothing
+### OpenAPI generation ports
 
 `generate:api:application-server:specs` boots the app to scrape springdoc, so it needs a free HTTP port
 (`openapi.server.port`, default **38090**), a free management port, **and a free JMX port**
-(`openapi.jmx.port`, default **9001**). A busy JMX port prints `Port already in use: 9001`, writes no
-spec, and still exits 0 — you then commit a spec that is missing your new endpoint. Never stop another
-service to free a port; override:
+(`openapi.jmx.port`, default **9001**). The root generation command fails and restores the previous
+spec if Maven does not produce a new one. Never stop another service to free a port; override:
 
 ```bash
-SERVER_PORT=38111 MANAGEMENT_PORT=38113 ./mvnw verify -DskipTests=true -Dapp.profiles=specs -Dopenapi.jmx.port=9031
+pnpm run generate:api:application-server:specs -- -Dopenapi.server.port=38111 -Dopenapi.jmx.port=9031
 pnpm run generate:api:application-server:client
 ```
 

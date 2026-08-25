@@ -38,7 +38,7 @@ public class MentorChatController {
     private static final Logger log = LoggerFactory.getLogger(MentorChatController.class);
     private static final long EMITTER_TIMEOUT_MS = Duration.ofMinutes(10).toMillis();
 
-    private final MentorChatService mentorChatService;
+    private final MentorChatStarter mentorChatStarter;
     private final ObjectMapper objectMapperBean;
     private final MentorAgentProperties mentorAgentProperties;
 
@@ -79,7 +79,7 @@ public class MentorChatController {
             userMessage,
             clientUserMessageId
         );
-        mentorChatService.start(serviceRequest, emitter);
+        mentorChatStarter.start(serviceRequest, emitter);
         return emitter;
     }
 

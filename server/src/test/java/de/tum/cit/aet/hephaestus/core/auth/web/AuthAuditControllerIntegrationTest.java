@@ -7,23 +7,13 @@ import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
 import de.tum.cit.aet.hephaestus.core.auth.domain.AccountRepository;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.HephaestusJwtIssuer;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.JwtPrincipalFactory;
-import de.tum.cit.aet.hephaestus.core.auth.jwt.JwtSigningKeyService;
-import de.tum.cit.aet.hephaestus.testconfig.DatabaseTestUtils;
-import de.tum.cit.aet.hephaestus.testconfig.RealAuthDatasource;
+import de.tum.cit.aet.hephaestus.testconfig.RealAuthIntegrationTest;
 import java.time.Instant;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.webtestclient.autoconfigure.AutoConfigureWebTestClient;
-import org.springframework.context.annotation.Import;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.reactive.server.WebTestClient;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
 /**
  * {@code GET /admin/audit} — the read-only instance-admin audit viewer against the <b>real</b>
@@ -35,12 +25,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
  * the VIEWER deterministically (the audit write path swallows failures by design). Requires Docker,
  * like every {@code @Tag("integration")}.
  */
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@ActiveProfiles("test")
-@AutoConfigureWebTestClient
-@Testcontainers
-@Tag("integration")
-class AuthAuditControllerIntegrationTest {
+class AuthAuditControllerIntegrationTest extends RealAuthIntegrationTest {
 
     @Autowired
     private WebTestClient webTestClient;
@@ -56,23 +41,6 @@ class AuthAuditControllerIntegrationTest {
 
     @Autowired
     private JwtPrincipalFactory principalFactory;
-
-    @Autowired
-    private DatabaseTestUtils databaseTestUtils;
-
-    @Autowired
-    private JwtSigningKeyService signingKeyService;
-
-    @BeforeEach
-    void cleanSlate() {
-        databaseTestUtils.cleanDatabase();
-        signingKeyService.ensureActiveKey();
-    }
-
-    @DynamicPropertySource
-    static void datasource(DynamicPropertyRegistry registry) {
-        RealAuthDatasource.register(registry);
-    }
 
     @Test
     void plainUserIsForbidden() {

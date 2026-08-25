@@ -52,7 +52,7 @@ jobs:
           fi
 
           if [ "${#changesets_changed[@]}" -gt 0 ]; then
-            pnpm changeset status --output /tmp/changeset-status.json
+            pnpm changeset status --since "$BASE_SHA" --output /tmp/changeset-status.json
             node scripts/verify-changesets.ts /tmp/changeset-status.json "${changesets_changed[@]}"
           fi
 

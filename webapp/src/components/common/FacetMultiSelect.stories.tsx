@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { expect, fn, screen, userEvent } from "storybook/test";
+import { expect, fn, screen, userEvent, within } from "storybook/test";
 import { FacetMultiSelect } from "./FacetMultiSelect";
 
 const eventTypes = [
@@ -69,8 +69,9 @@ export const AccentInsensitiveSearch: Story = {
 	play: async ({ canvas }) => {
 		await userEvent.click(canvas.getByRole("combobox", { name: "Workspaces" }));
 		await userEvent.type(await screen.findByPlaceholderText("Search…"), "arztliche");
-		await expect(await screen.findByRole("option", { name: /Ärztliche/ })).toBeVisible();
-		await expect(screen.queryByRole("option", { name: /Teaching/ })).toBeNull();
+		const options = within(await screen.findByRole("listbox", { name: "Workspaces options" }));
+		await expect(await options.findByRole("option", { name: /Ärztliche/ })).toBeVisible();
+		await expect(options.queryByRole("option", { name: /Teaching/ })).toBeNull();
 	},
 };
 

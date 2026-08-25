@@ -5,19 +5,15 @@ import static org.assertj.core.api.Assertions.assertThat;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
+import de.tum.cit.aet.hephaestus.testconfig.SharedTestDoubles.FailingTransactionalOperation;
+import de.tum.cit.aet.hephaestus.testconfig.SharedTestDoubles.SucceedingTransactionalOperation;
 import de.tum.cit.aet.hephaestus.workspace.AbstractWorkspaceIntegrationTest;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import java.util.Set;
-import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.TestConfiguration;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Import;
-import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.transaction.annotation.Transactional;
 
 /**
  * The admin disconnect endpoint documents a "best effort, proceed locally" contract: if the vendor
@@ -32,11 +28,10 @@ import org.springframework.transaction.annotation.Transactional;
  * had proceeded.
  *
  * <p>These tests run against real PostgreSQL because this is a transaction-boundary defect: mocks
- * cannot express "this connection's transaction is aborted". {@link FailingEraser} reproduces it — a
+ * cannot express "this connection's transaction is aborted". The failing operation reproduces it with a
  * {@code @Transactional} REQUIRED bean that genuinely aborts its PostgreSQL transaction — rather than
  * merely throwing a Java exception.
  */
-@Import(ConnectionDisconnectRevokeIsolationIntegrationTest.RevokeStubConfig.class)
 class ConnectionDisconnectRevokeIsolationIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     @Autowired
@@ -49,17 +44,17 @@ class ConnectionDisconnectRevokeIsolationIntegrationTest extends AbstractWorkspa
     private ConnectionAuditRepository connectionAuditRepository;
 
     @Autowired
-    private FailingEraser failingEraser;
+    private FailingTransactionalOperation failingOperation;
 
     @Autowired
-    private SucceedingEraser succeedingEraser;
+    private SucceedingTransactionalOperation succeedingOperation;
 
     private Workspace workspace;
     private Connection connection;
 
     @BeforeEach
     void setUpConnection() {
-        succeedingEraser.reset();
+        succeedingOperation.reset();
         User owner = persistUser("revoke-isolation-owner-" + System.nanoTime());
         workspace = createWorkspace(
             "revoke-isolation-ws-" + System.nanoTime(),
@@ -83,7 +78,7 @@ class ConnectionDisconnectRevokeIsolationIntegrationTest extends AbstractWorkspa
     @Test
     void revokeFailingWithDataAccessException_stillCommitsTheLocalUninstalledTransition() {
         Connection result = connectionService.disconnect(connection, disconnectRequest("corr-erase-fails"), () ->
-            failingEraser.erase()
+            failingOperation.execute()
         );
 
         // No exception escaped: the endpoint returns 200, not 500.
@@ -106,11 +101,11 @@ class ConnectionDisconnectRevokeIsolationIntegrationTest extends AbstractWorkspa
     @Test
     void revokeSucceeding_runsTheRevokeAndCommitsTheUninstalledTransition() {
         Connection result = connectionService.disconnect(connection, disconnectRequest("corr-erase-ok"), () ->
-            succeedingEraser.erase()
+            succeedingOperation.execute()
         );
 
         assertThat(result.getState()).isEqualTo(IntegrationState.UNINSTALLED);
-        assertThat(succeedingEraser.calls()).as("the revoke callback still runs exactly once").isEqualTo(1);
+        assertThat(succeedingOperation.calls()).as("the revoke callback still runs exactly once").isEqualTo(1);
 
         Connection reloaded = connectionRepository.findById(connection.getId()).orElseThrow();
         assertThat(reloaded.getState()).isEqualTo(IntegrationState.UNINSTALLED);
@@ -130,20 +125,6 @@ class ConnectionDisconnectRevokeIsolationIntegrationTest extends AbstractWorkspa
         );
     }
 
-    @TestConfiguration
-    static class RevokeStubConfig {
-
-        @Bean
-        FailingEraser failingEraser(JdbcTemplate jdbcTemplate) {
-            return new FailingEraser(jdbcTemplate);
-        }
-
-        @Bean
-        SucceedingEraser succeedingEraser(JdbcTemplate jdbcTemplate) {
-            return new SucceedingEraser(jdbcTemplate);
-        }
-    }
-
     /**
      * Stands in for {@code ScmWorkspaceContentEraser} and friends: {@code @Transactional} with the
      * default {@code REQUIRED} propagation, so it joins whatever transaction the revoke callback runs
@@ -155,42 +136,4 @@ class ConnectionDisconnectRevokeIsolationIntegrationTest extends AbstractWorkspa
      * and — now that the callback runs on a second pooled connection — would self-deadlock instead of
      * failing. That constraint is documented on {@code ConnectionService#runRevokeIsolated}.
      */
-    static class FailingEraser {
-
-        private final JdbcTemplate jdbcTemplate;
-
-        FailingEraser(JdbcTemplate jdbcTemplate) {
-            this.jdbcTemplate = jdbcTemplate;
-        }
-
-        @Transactional
-        public void erase() {
-            jdbcTemplate.queryForObject("SELECT 1 / 0", Integer.class);
-        }
-    }
-
-    /** The happy-path counterpart: same propagation, a real query, no failure. */
-    static class SucceedingEraser {
-
-        private final JdbcTemplate jdbcTemplate;
-        private final AtomicInteger calls = new AtomicInteger();
-
-        SucceedingEraser(JdbcTemplate jdbcTemplate) {
-            this.jdbcTemplate = jdbcTemplate;
-        }
-
-        @Transactional
-        public void erase() {
-            jdbcTemplate.queryForObject("SELECT 1", Integer.class);
-            calls.incrementAndGet();
-        }
-
-        int calls() {
-            return calls.get();
-        }
-
-        void reset() {
-            calls.set(0);
-        }
-    }
 }

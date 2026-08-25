@@ -4,6 +4,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.InstallationRepositoryEnum
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.scm.github.installation.GitHubInstallationRepositoryEnumerationService;
 import java.util.List;
+import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
 /**
@@ -12,6 +13,7 @@ import org.springframework.stereotype.Component;
  * {@link InstallationRepositoryEnumerator} SPI consumed by the workspace module.
  */
 @Component
+@Order(0)
 public class GitHubInstallationRepositoryEnumerator implements InstallationRepositoryEnumerator {
 
     private final GitHubInstallationRepositoryEnumerationService delegate;

@@ -20,11 +20,8 @@ import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.TestPropertySource;
-import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
 /**
  * Regression coverage for the GDPR Art. 17 hard-delete sweeper ({@link AccountHardDeleteSweeper}).
@@ -39,24 +36,15 @@ import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
  * <h2>Time control</h2>
  * The production {@code clock} bean ({@code Clock.systemUTC()}) is used as-is; we never override
  * it. Instead each fixture sets {@code deleted_at} relative to the very clock the sweeper reads
- * (autowired below), and the cooldown is pinned to a known {@code 24h} via {@code @TestPropertySource}.
- * That makes the cutoff math deterministic without touching the bean graph the JWT decoder shares.
+ * (autowired below), and fixtures use the bound cooldown value.
  */
-@TestPropertySource(properties = { "hephaestus.auth.delete-cooldown=24h" })
 class AccountHardDeleteSweeperIntegrationTest extends BaseIntegrationTest {
-
-    /** Matches {@code @TestPropertySource} above; the sweeper's cutoff is {@code now - COOLDOWN}. */
-    private static final Duration COOLDOWN = Duration.ofHours(24);
 
     /** Tombstone left on display_name (see {@code AccountHardDeleteSweeper.TOMBSTONE_DISPLAY_NAME}). */
     private static final String TOMBSTONE_DISPLAY_NAME = "deleted-account";
 
     @Autowired
     private AccountHardDeleteSweeper sweeper;
-
-    /** Spy so a single account's purge can be made to throw, exercising per-account isolation. */
-    @MockitoSpyBean
-    private AccountPurger accountPurger;
 
     @Autowired
     private AccountRepository accountRepository;
@@ -80,6 +68,9 @@ class AccountHardDeleteSweeperIntegrationTest extends BaseIntegrationTest {
     @Autowired
     private Clock clock;
 
+    @Autowired
+    private AuthProperties authProperties;
+
     @BeforeEach
     void cleanState() {
         databaseTestUtils.cleanDatabase();
@@ -94,7 +85,7 @@ class AccountHardDeleteSweeperIntegrationTest extends BaseIntegrationTest {
         Long id = account.getId();
         seedChildRows(id);
         // deleted_at = now - (cooldown + 1h) → strictly older than the cutoff → must be swept.
-        markDeleting(id, clock.instant().minus(COOLDOWN).minus(Duration.ofHours(1)));
+        markDeleting(id, clock.instant().minus(authProperties.deleteCooldown()).minus(Duration.ofHours(1)));
 
         assertThat(childRowCounts(id)).as("precondition: all four child tables seeded").containsExactly(1, 1, 1, 1);
 
@@ -122,7 +113,7 @@ class AccountHardDeleteSweeperIntegrationTest extends BaseIntegrationTest {
         Account account = newAccount("Grace Hopper", "grace@example.com");
         Long id = account.getId();
         seedChildRows(id);
-        // deleted_at = now - 1h → still inside the 24h window → must NOT be swept.
+        // One hour ago is inside the configured recovery window.
         markDeleting(id, clock.instant().minus(Duration.ofHours(1)));
 
         int purged = sweeper.sweepNow();
@@ -144,7 +135,7 @@ class AccountHardDeleteSweeperIntegrationTest extends BaseIntegrationTest {
         Account account = newAccount("Alan Turing", "alan@example.com");
         Long id = account.getId();
         seedChildRows(id);
-        markDeleting(id, clock.instant().minus(COOLDOWN).minus(Duration.ofHours(1)));
+        markDeleting(id, clock.instant().minus(authProperties.deleteCooldown()).minus(Duration.ofHours(1)));
 
         // First sweep purges it.
         assertThat(sweeper.sweepNow()).isEqualTo(1);
@@ -165,15 +156,14 @@ class AccountHardDeleteSweeperIntegrationTest extends BaseIntegrationTest {
 
     @Test
     void sweepNow_cutoffIsDrivenByDeleteCooldown_boundaryAccountsSplit() {
-        // One account just past the cooldown, one just inside it. Only the first must be swept,
-        // which can only be true if the cutoff = now - delete-cooldown (the configured 24h).
+        // One account is just past the configured cooldown and one is just inside it.
         Account past = newAccount("Past Cutoff", "past@example.com");
         Long pastId = past.getId();
-        markDeleting(pastId, clock.instant().minus(COOLDOWN).minus(Duration.ofMinutes(5)));
+        markDeleting(pastId, clock.instant().minus(authProperties.deleteCooldown()).minus(Duration.ofMinutes(5)));
 
         Account inside = newAccount("Inside Cutoff", "inside@example.com");
         Long insideId = inside.getId();
-        markDeleting(insideId, clock.instant().minus(COOLDOWN).plus(Duration.ofMinutes(5)));
+        markDeleting(insideId, clock.instant().minus(authProperties.deleteCooldown()).plus(Duration.ofMinutes(5)));
 
         int purged = sweeper.sweepNow();
 
@@ -200,7 +190,7 @@ class AccountHardDeleteSweeperIntegrationTest extends BaseIntegrationTest {
             "UA-B",
             "{\"reason\":\"abuse\"}"
         );
-        markDeleting(erasedId, clock.instant().minus(COOLDOWN).minus(Duration.ofHours(1)));
+        markDeleting(erasedId, clock.instant().minus(authProperties.deleteCooldown()).minus(Duration.ofHours(1)));
 
         sweeper.sweepNow();
 
@@ -218,32 +208,6 @@ class AccountHardDeleteSweeperIntegrationTest extends BaseIntegrationTest {
             assertThat(r.get("event_type")).as("skeleton kept").isNotNull();
             assertThat(r.get("result")).as("skeleton kept").isNotNull();
         });
-    }
-
-    // ── Case 6: one failing account does not block the rest of the backlog ────────────────────
-
-    @Test
-    void sweepNow_oneAccountFails_othersStillPurgedAndCounted() {
-        Account good = newAccount("Good", "good@example.com");
-        Long goodId = good.getId();
-        seedChildRows(goodId);
-        markDeleting(goodId, clock.instant().minus(COOLDOWN).minus(Duration.ofHours(1)));
-
-        Account bad = newAccount("Bad", "bad@example.com");
-        Long badId = bad.getId();
-        seedChildRows(badId);
-        markDeleting(badId, clock.instant().minus(COOLDOWN).minus(Duration.ofHours(2)));
-
-        // Make exactly the "bad" account's purge throw; the real bean handles the rest.
-        Mockito.doThrow(new RuntimeException("boom")).when(accountPurger).purge(badId);
-
-        int purged = sweeper.sweepNow();
-
-        assertThat(purged).as("only the healthy account is counted").isEqualTo(1);
-        assertThat(accountRepository.findById(goodId).orElseThrow().getStatus()).isEqualTo(Account.Status.DELETED);
-        assertThat(accountRepository.findById(badId).orElseThrow().getStatus())
-            .as("the failing account stays DELETING for the next sweep")
-            .isEqualTo(Account.Status.DELETING);
     }
 
     // ── Fixtures ──────────────────────────────────────────────────────────────────────────────

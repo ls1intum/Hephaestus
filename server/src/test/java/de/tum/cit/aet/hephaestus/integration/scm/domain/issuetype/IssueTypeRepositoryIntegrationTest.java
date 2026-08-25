@@ -13,6 +13,7 @@ import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Integration tests for the provider-scoped {@code IssueType} name lookup used as
@@ -25,6 +26,7 @@ import org.springframework.beans.factory.annotation.Autowired;
  * primary keys are GitLab-global GraphQL IDs, resolving by provider-scoped name
  * yields the same row regardless of which organization owns it.
  */
+@Transactional
 class IssueTypeRepositoryIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
@@ -43,8 +45,6 @@ class IssueTypeRepositoryIntegrationTest extends BaseIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        databaseTestUtils.cleanDatabase();
-
         gitlabProvider = gitProviderRepository
             .findByTypeAndServerUrl(IdentityProviderType.GITLAB, "https://gitlab.example.com")
             .orElseGet(() ->

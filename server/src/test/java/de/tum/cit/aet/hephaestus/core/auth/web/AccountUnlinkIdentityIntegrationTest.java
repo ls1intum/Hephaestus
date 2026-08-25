@@ -11,7 +11,7 @@ import de.tum.cit.aet.hephaestus.core.auth.jwt.JwtPrincipalFactory;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
-import de.tum.cit.aet.hephaestus.testconfig.RealAuthDatasource;
+import de.tum.cit.aet.hephaestus.testconfig.RealAuthIntegrationTest;
 import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
@@ -19,17 +19,9 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.webtestclient.autoconfigure.AutoConfigureWebTestClient;
-import org.springframework.context.annotation.Import;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.reactive.server.WebTestClient;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
 /**
  * {@code DELETE /user/identities/{id}} — unlinking a federated identity from the current account.
@@ -41,12 +33,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
  * <p>Covers the two safety rules every account-linking UI needs: ownership (you can only unlink your
  * own identity) and last-identity lockout prevention (you cannot remove your only sign-in method).
  */
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@ActiveProfiles("test")
-@AutoConfigureWebTestClient
-@Testcontainers
-@Tag("integration")
-class AccountUnlinkIdentityIntegrationTest {
+class AccountUnlinkIdentityIntegrationTest extends RealAuthIntegrationTest {
 
     @Autowired
     private WebTestClient webTestClient;
@@ -65,11 +52,6 @@ class AccountUnlinkIdentityIntegrationTest {
 
     @Autowired
     private JwtPrincipalFactory principalFactory;
-
-    @DynamicPropertySource
-    static void datasource(DynamicPropertyRegistry registry) {
-        RealAuthDatasource.register(registry);
-    }
 
     @Test
     void unlinkSecondaryIdentityDeletesItAndKeepsTheRest() {

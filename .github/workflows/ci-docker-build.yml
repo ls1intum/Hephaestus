@@ -25,11 +25,21 @@ on:
         required: false
         type: string
         default: "true"
+      release_pin_fetcher_changed:
+        description: "Whether release-pin-fetcher image inputs changed"
+        required: false
+        type: string
+        default: "true"
+      postgres_image_changed:
+        description: "Whether the PostgreSQL image inputs changed"
+        required: false
+        type: string
+        default: "true"
 
     outputs:
       application-server-published:
         description: "Whether an application-server image exists at this commit"
-        value: ${{ jobs.application-server-build.result == 'success' }}
+        value: ${{ jobs.application-server-build.outputs.manifest-digest != '' || jobs.tag-unchanged-images.outputs.application-server-published == 'true' }}
 
 jobs:
   webapp-build:
@@ -51,6 +61,7 @@ jobs:
       tags: |
         ${{ github.ref_name }}
         ${{ github.sha }}
+        ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || '' }}
         ci-${{ github.run_number }}
         ${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.number) || '' }}
       labels: |
@@ -62,12 +73,9 @@ jobs:
 
   application-server-build:
     name: "App Server"
-    # Every code PR receives an immutable app-server tag. If server code did not change, this is
-    # intentionally a cached rebuild of main; previews can then use SOURCE_COMMIT uniformly instead
-    # of racing on a global IMAGE_TAG or failing because the commit tag does not exist.
     if: >-
       inputs.should_skip != 'true' &&
-      (inputs.application_server_changed == 'true' || github.event_name == 'pull_request')
+      (inputs.application_server_changed == 'true' || github.event_name != 'pull_request')
     uses: ./.github/workflows/reusable-docker-build.yml
     with:
       image-name: "ls1intum/hephaestus/application-server"
@@ -127,7 +135,9 @@ jobs:
 
   release-pin-fetcher-build:
     name: "Release Pin Fetcher"
-    if: inputs.should_skip != 'true'
+    if: >-
+      inputs.should_skip != 'true' &&
+      (inputs.release_pin_fetcher_changed == 'true' || github.event_name != 'pull_request')
     uses: ./.github/workflows/reusable-docker-build.yml
     with:
       image-name: "ls1intum/hephaestus/release-pin-fetcher"
@@ -139,6 +149,7 @@ jobs:
       tags: |
         ${{ github.ref_name }}
         ${{ github.sha }}
+        ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || '' }}
         ci-${{ github.run_number }}
         ${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.number) || '' }}
       labels: |
@@ -150,7 +161,9 @@ jobs:
 
   postgres-build:
     name: "Postgres (pg_partman)"
-    if: inputs.should_skip != 'true'
+    if: >-
+      inputs.should_skip != 'true' &&
+      (inputs.postgres_image_changed == 'true' || github.event_name != 'pull_request')
     uses: ./.github/workflows/reusable-docker-build.yml
     with:
       image-name: "ls1intum/hephaestus/postgres"
@@ -162,6 +175,7 @@ jobs:
       tags: |
         ${{ github.ref_name }}
         ${{ github.sha }}
+        ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || '' }}
         ci-${{ github.run_number }}
         ${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.number) || '' }}
       labels: |
@@ -170,3 +184,71 @@ jobs:
         org.opencontainers.image.vendor=AET TUM
         org.opencontainers.image.licenses=MIT
         hephaestus.component=postgres
+
+  # Preview stacks use one commit tag for every component. Point unchanged components at their
+  # verified base-commit digest instead of rebuilding identical content under a new name.
+  tag-unchanged-images:
+    name: "Tag unchanged images"
+    if: >-
+      inputs.should_skip != 'true' && github.event_name == 'pull_request' &&
+      (inputs.webapp_changed != 'true' || inputs.application_server_changed != 'true' ||
+       inputs.agent_images_changed != 'true' || inputs.release_pin_fetcher_changed != 'true' ||
+       inputs.postgres_image_changed != 'true')
+    runs-on: ubuntu-latest
+    outputs:
+      application-server-published: ${{ steps.tag.outputs.application-server-published }}
+    permissions:
+      packages: write
+      attestations: read
+      contents: read
+    steps:
+      - name: Log in to Container Registry
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Verify and tag unchanged images
+        id: tag
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          WEBAPP_CHANGED: ${{ inputs.webapp_changed }}
+          APPLICATION_SERVER_CHANGED: ${{ inputs.application_server_changed }}
+          AGENT_IMAGES_CHANGED: ${{ inputs.agent_images_changed }}
+          RELEASE_PIN_FETCHER_CHANGED: ${{ inputs.release_pin_fetcher_changed }}
+          POSTGRES_IMAGE_CHANGED: ${{ inputs.postgres_image_changed }}
+          PR_NUMBER: ${{ github.event.number }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -euo pipefail
+
+          tag_image() {
+            local image="ghcr.io/ls1intum/hephaestus/$1"
+            local source="$image:$BASE_SHA"
+            local ref_tag="${GITHUB_REF_NAME//\//-}"
+            local digest
+            digest=$(docker buildx imagetools inspect --format '{{.Manifest.Digest}}' "$source")
+            if [[ ! "$digest" =~ ^sha256:[a-f0-9]{64}$ ]]; then
+              echo "::error::Invalid digest for $source: ${digest:-<empty>}"
+              return 1
+            fi
+            local verified="$image@$digest"
+            gh attestation verify "oci://$verified" --owner "${{ github.repository_owner }}"
+            docker buildx imagetools create \
+              --tag "$image:$ref_tag" \
+              --tag "$image:${{ github.sha }}" \
+              --tag "$image:${{ github.event.pull_request.head.sha }}" \
+              --tag "$image:ci-${{ github.run_number }}" \
+              --tag "$image:pr-$PR_NUMBER" \
+              "$verified"
+          }
+
+          [ "$WEBAPP_CHANGED" = "true" ] || tag_image webapp
+          if [ "$APPLICATION_SERVER_CHANGED" != "true" ]; then
+            tag_image application-server
+            echo "application-server-published=true" >> "$GITHUB_OUTPUT"
+          fi
+          [ "$AGENT_IMAGES_CHANGED" = "true" ] || tag_image agent-pi
+          [ "$RELEASE_PIN_FETCHER_CHANGED" = "true" ] || tag_image release-pin-fetcher
+          [ "$POSTGRES_IMAGE_CHANGED" = "true" ] || tag_image postgres

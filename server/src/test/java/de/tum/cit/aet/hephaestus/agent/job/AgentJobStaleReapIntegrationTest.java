@@ -13,6 +13,7 @@ import de.tum.cit.aet.hephaestus.agent.usage.FundingSource;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmPriceSnapshot;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageEvent;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageEventRepository;
+import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageRecorder;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageSourceType;
 import de.tum.cit.aet.hephaestus.agent.usage.PricingState;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
@@ -20,6 +21,7 @@ import de.tum.cit.aet.hephaestus.testconfig.LlmCatalogTestFixtures;
 import de.tum.cit.aet.hephaestus.testconfig.TestEntities;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
+import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -28,8 +30,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
 
@@ -43,15 +44,25 @@ import tools.jackson.databind.node.ObjectNode;
 @DisplayName("Stale RUNNING reaper over PostgreSQL Integration")
 class AgentJobStaleReapIntegrationTest extends BaseIntegrationTest {
 
-    @DynamicPropertySource
-    static void agentProperties(DynamicPropertyRegistry registry) {
-        registry.add("hephaestus.agent.enabled", () -> "true");
-        // Keep the executor's background poll loop quiescent; every sweep here is driven explicitly.
-        registry.add("hephaestus.agent.poll-interval", () -> "1h");
-    }
+    private AgentJobZombieSweeper sweeper;
 
     @Autowired
-    private AgentJobZombieSweeper sweeper;
+    private WorkerRegistryRepository workerRegistryRepository;
+
+    @Autowired
+    private AgentProperties agentProperties;
+
+    @Autowired
+    private TransactionTemplate transactionTemplate;
+
+    @Autowired
+    private AgentJobLifecycleService lifecycleService;
+
+    @Autowired
+    private LlmUsageRecorder usageRecorder;
+
+    @Autowired
+    private MeterRegistry meterRegistry;
 
     @Autowired
     private AgentJobRepository jobRepository;
@@ -77,6 +88,16 @@ class AgentJobStaleReapIntegrationTest extends BaseIntegrationTest {
     @BeforeEach
     void setUp() {
         databaseTestUtils.cleanDatabase();
+        sweeper = new AgentJobZombieSweeper(
+            jobRepository,
+            workerRegistryRepository,
+            agentProperties,
+            objectMapper,
+            transactionTemplate,
+            lifecycleService,
+            usageRecorder,
+            meterRegistry
+        );
         workspace = workspaceRepository.save(TestEntities.activeWorkspace("stale-reap-ws"));
         LlmConnection connection = connectionRepository.save(LlmCatalogTestFixtures.connection("stale-reap"));
         instanceModel = modelRepository.save(

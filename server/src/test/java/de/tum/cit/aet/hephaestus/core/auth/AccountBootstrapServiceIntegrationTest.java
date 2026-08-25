@@ -2,57 +2,42 @@ package de.tum.cit.aet.hephaestus.core.auth;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.core.auth.audit.AuthEventLogger;
 import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
 import de.tum.cit.aet.hephaestus.core.auth.domain.AccountRepository;
-import de.tum.cit.aet.hephaestus.testconfig.DatabaseTestUtils;
-import de.tum.cit.aet.hephaestus.testconfig.RealAuthDatasource;
+import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpStatus;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
-import org.springframework.test.context.TestPropertySource;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.server.ResponseStatusException;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
-/**
- * End-to-end validation of the break-glass first-admin path against real Postgres: the atomic,
- * self-disabling {@code promoteToFirstAdminIfNoneExists} SQL plus the token gate. A clean DB per test
- * makes the global {@code NOT EXISTS} gate deterministic. The token is configured here so the path is
- * enabled (it is disabled — 404 — when blank, covered by the unit test).
- */
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@ActiveProfiles("test")
-@TestPropertySource(properties = "hephaestus.auth.bootstrap-token=" + AccountBootstrapServiceIntegrationTest.TOKEN)
-@Testcontainers
-@Tag("integration")
-class AccountBootstrapServiceIntegrationTest {
+/** Verifies the atomic, self-disabling first-admin promotion against PostgreSQL. */
+class AccountBootstrapServiceIntegrationTest extends BaseIntegrationTest {
 
     static final String TOKEN = "bootstrap-break-glass-token-please-rotate";
 
-    @Autowired
     private AccountBootstrapService bootstrapService;
+
+    @Autowired
+    private AuthEventLogger authEventLogger;
+
+    @Autowired
+    private TransactionTemplate transactionTemplate;
 
     @Autowired
     private AccountRepository accountRepository;
 
-    @Autowired
-    private DatabaseTestUtils databaseTestUtils;
-
     @BeforeEach
-    void cleanSlate() {
+    void setUp() {
         databaseTestUtils.cleanDatabase();
-    }
-
-    @DynamicPropertySource
-    static void datasource(DynamicPropertyRegistry registry) {
-        RealAuthDatasource.register(registry);
+        AuthProperties properties = mock(AuthProperties.class);
+        when(properties.bootstrapToken()).thenReturn(TOKEN);
+        bootstrapService = new AccountBootstrapService(accountRepository, authEventLogger, properties);
     }
 
     private Account persistUser(String name) {
@@ -69,7 +54,7 @@ class AccountBootstrapServiceIntegrationTest {
     void promotesCallerWhenNoAdminExists() {
         Account user = persistUser("Hopeful");
 
-        bootstrapService.bootstrapFirstAdmin(user.getId(), TOKEN);
+        inTransaction(() -> bootstrapService.bootstrapFirstAdmin(user.getId(), TOKEN));
 
         assertThat(accountRepository.findById(user.getId()).orElseThrow().getAppRole()).isEqualTo(
             Account.AppRole.APP_ADMIN
@@ -81,10 +66,15 @@ class AccountBootstrapServiceIntegrationTest {
         persistAdmin("Existing Admin");
         Account user = persistUser("Late Hopeful");
 
-        assertThatThrownBy(() -> bootstrapService.bootstrapFirstAdmin(user.getId(), TOKEN)).isInstanceOfSatisfying(
-            ResponseStatusException.class,
-            e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.CONFLICT)
+        assertThatThrownBy(() ->
+            inTransaction(() -> bootstrapService.bootstrapFirstAdmin(user.getId(), TOKEN))
+        ).isInstanceOfSatisfying(ResponseStatusException.class, e ->
+            assertThat(e.getStatusCode()).isEqualTo(HttpStatus.CONFLICT)
         );
         assertThat(accountRepository.findById(user.getId()).orElseThrow().getAppRole()).isEqualTo(Account.AppRole.USER);
+    }
+
+    private void inTransaction(Runnable action) {
+        transactionTemplate.executeWithoutResult(status -> action.run());
     }
 }

@@ -8,8 +8,10 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ConnectionSyncDetails;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ConnectionSyncStateProvider;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationSyncRunner;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJob;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobHandle;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobRepository;
@@ -17,8 +19,6 @@ import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobStatus;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobTrigger;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobType;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
-import de.tum.cit.aet.hephaestus.integration.scm.github.sync.status.GithubConnectionSyncStateProvider;
-import de.tum.cit.aet.hephaestus.integration.scm.github.sync.status.GithubIntegrationSyncRunner;
 import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
 import de.tum.cit.aet.hephaestus.testconfig.WithAdminUser;
 import de.tum.cit.aet.hephaestus.testconfig.WithMentorUser;
@@ -36,9 +36,9 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.reactive.server.WebTestClient;
 
 /**
@@ -46,19 +46,13 @@ import org.springframework.test.web.reactive.server.WebTestClient;
  * connection (must NOT 404), the manual-trigger idempotent-absorb ("Sync now" then a duplicate),
  * cancel, the catalog endpoint, and the class-level {@code @RequireAtLeastWorkspaceAdmin} gate.
  *
- * <p>{@link #githubSyncStateProvider} and {@link #githubSyncRunner} replace the real GitHub beans
- * with {@code @MockitoBean} doubles for {@code GITHUB} — the real beans do live DB/vendor-adjacent
- * work that this controller-level test doesn't want to exercise. {@code kind()} is stubbed in
- * {@link #setUp} to the real {@code GITHUB} value so {@link SyncStatusService}'s lazy per-lookup
- * dispatch (a linear scan over the injected {@code List<>}, see its class doc) resolves them like
- * any other kind's beans.
- *
  * <p>The test-profile {@code applicationTaskExecutor} runs {@code @Async}/executor work
  * SYNCHRONOUSLY on the calling thread (see {@code TestAsyncConfiguration}), so a POST that
  * dispatches work through it only returns once the dispatched body finishes. Scenarios that need to
  * observe a job while still RUNNING therefore fire the request on a background thread and use the
  * mock runner's cooperative-cancellation answer (or a start/release latch pair) to control timing.
  */
+@Import(SyncControllerTestConfiguration.class)
 class SyncControllerIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     @Autowired
@@ -67,11 +61,11 @@ class SyncControllerIntegrationTest extends AbstractWorkspaceIntegrationTest {
     @Autowired
     private ConnectionRepository connectionRepository;
 
-    @MockitoBean
-    private GithubConnectionSyncStateProvider githubSyncStateProvider;
+    @Autowired
+    private SyncControllerTestConfiguration.SyncControllerTestDriver syncDriver;
 
-    @MockitoBean
-    private GithubIntegrationSyncRunner githubSyncRunner;
+    private ConnectionSyncStateProvider githubSyncStateProvider;
+    private IntegrationSyncRunner githubSyncRunner;
 
     @Autowired
     private SyncJobRepository syncJobRepository;
@@ -86,6 +80,8 @@ class SyncControllerIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     @BeforeEach
     void setUp() {
+        githubSyncStateProvider = syncDriver.stateProvider();
+        githubSyncRunner = syncDriver.runner();
         Mockito.reset(githubSyncStateProvider, githubSyncRunner);
         Mockito.when(githubSyncStateProvider.kind()).thenReturn(IntegrationKind.GITHUB);
         Mockito.when(githubSyncStateProvider.describe(any(), anyLong())).thenReturn(ConnectionSyncDetails.empty());

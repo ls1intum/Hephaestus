@@ -1,10 +1,6 @@
 package de.tum.cit.aet.hephaestus.practices.review;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.catalog.WorkspaceLlmConnection;
 import de.tum.cit.aet.hephaestus.agent.catalog.WorkspaceLlmConnectionRepository;
@@ -30,7 +26,6 @@ import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
-import de.tum.cit.aet.hephaestus.practices.spi.UserRoleChecker;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.testconfig.TestUserFactory;
 import de.tum.cit.aet.hephaestus.testconfig.WorkspaceTestFixtures;
@@ -43,13 +38,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import tools.jackson.databind.ObjectMapper;
 
-/**
- * Mocks only the role-check SPI ({@link UserRoleChecker}); label/draft/assignee checks run against the
- * in-memory PR object, matching production where the PR is loaded once by the caller.
- */
 class PracticeDetectionGateIntegrationTest extends BaseIntegrationTest {
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
@@ -86,9 +76,6 @@ class PracticeDetectionGateIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     private LabelRepository labelRepository;
-
-    @MockitoBean
-    private UserRoleChecker userRoleChecker;
 
     private Workspace workspace;
     private WorkspaceLlmModel workspaceModel;
@@ -149,12 +136,6 @@ class PracticeDetectionGateIntegrationTest extends BaseIntegrationTest {
         repo.setHtmlUrl("https://github.com/org/gate-repo");
         repo.setDefaultBranch("main");
         repo = repositoryRepository.save(repo);
-
-        when(userRoleChecker.isHealthy()).thenReturn(true);
-        // Role is resolved by the stable (gitProviderId, subject) identity; subject == User.nativeId.
-        when(userRoleChecker.hasRole(anyLong(), eq(String.valueOf(assignee.getNativeId())), anyString())).thenReturn(
-            true
-        );
     }
 
     private Practice createPractice(String slug, String name, List<SignalName> signals, boolean active) {

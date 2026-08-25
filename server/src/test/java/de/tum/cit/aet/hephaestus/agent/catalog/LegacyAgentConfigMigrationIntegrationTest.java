@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import de.tum.cit.aet.hephaestus.testconfig.PostgreSQLTestContainer;
+import de.tum.cit.aet.hephaestus.testconfig.PostgreSQLTestContainer.TestDatabase;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
@@ -26,9 +28,6 @@ import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
-import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
 /**
  * The upgrade path for an instance that already has workspaces configured.
@@ -46,10 +45,13 @@ import org.testcontainers.junit.jupiter.Testcontainers;
  * it to. A rename shipped after this release is that release's own migration to prove, and pulling it in
  * here would leave a test of a past upgrade rewritten by every future one.
  */
-@Testcontainers
-@Tag("integration")
+@Tag("database")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class LegacyAgentConfigMigrationIntegrationTest {
+
+    static {
+        System.setProperty("liquibase.validateXmlChangelogFiles", "false");
+    }
 
     /**
      * The consolidated changelog this release ships; everything before it is the "old" schema, and
@@ -57,7 +59,7 @@ class LegacyAgentConfigMigrationIntegrationTest {
      */
     private static final String RELEASE_CHANGELOG = "1785015307013_changelog.xml";
 
-    private static final String MASTER = "db/master.xml";
+    private static final String MASTER = "db/legacy-agent-config-migration-test.xml";
 
     /**
      * Tagged on the last pre-release changeset, so the rollback test names a point rather than a
@@ -66,12 +68,9 @@ class LegacyAgentConfigMigrationIntegrationTest {
      */
     private static final String PRE_RELEASE_TAG = "before-1368";
 
-    @Container
-    @SuppressWarnings("resource")
-    private static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:16")
-        .withDatabaseName("hephaestus_legacy_agent_config_migration")
-        .withUsername("test")
-        .withPassword("test");
+    private static final TestDatabase DATABASE = PostgreSQLTestContainer.createDatabase(
+        "hephaestus_legacy_agent_config_migration"
+    );
 
     @BeforeAll
     static void migrateAcrossSeededLegacyData() throws Exception {
@@ -311,7 +310,7 @@ class LegacyAgentConfigMigrationIntegrationTest {
     @Test
     @Order(15)
     void theDeployLogNamesEveryWorkspaceAnOperatorHasToTouch() {
-        String deployLog = POSTGRES.getLogs();
+        String deployLog = PostgreSQLTestContainer.getLogs();
 
         assertThat(deployLog)
             .as("a placeholder endpoint, a placeholder model id and a non-OpenAI protocol all need a human")
@@ -550,7 +549,7 @@ class LegacyAgentConfigMigrationIntegrationTest {
     }
 
     private static Connection connect() throws SQLException {
-        return DriverManager.getConnection(POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword());
+        return DriverManager.getConnection(DATABASE.jdbcUrl(), DATABASE.username(), DATABASE.password());
     }
 
     private static void execute(String... statements) throws SQLException {

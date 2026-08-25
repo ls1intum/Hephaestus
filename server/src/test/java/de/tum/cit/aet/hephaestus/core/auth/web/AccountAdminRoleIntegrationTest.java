@@ -7,9 +7,7 @@ import de.tum.cit.aet.hephaestus.core.auth.domain.AccountRepository;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.HephaestusJwtIssuer;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.IssuedJwtRepository;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.JwtPrincipalFactory;
-import de.tum.cit.aet.hephaestus.core.auth.jwt.JwtSigningKeyService;
-import de.tum.cit.aet.hephaestus.testconfig.DatabaseTestUtils;
-import de.tum.cit.aet.hephaestus.testconfig.RealAuthDatasource;
+import de.tum.cit.aet.hephaestus.testconfig.RealAuthIntegrationTest;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -20,17 +18,9 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.webtestclient.autoconfigure.AutoConfigureWebTestClient;
-import org.springframework.context.annotation.Import;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.reactive.server.WebTestClient;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
 /**
  * {@code PATCH /admin/users/{id}} — the super-admin role change against the <b>real</b> security
@@ -43,12 +33,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
  * does not catch it — the {@code FOR UPDATE} over the {@code (APP_ADMIN, ACTIVE)} set is what
  * serializes them.) Requires Docker, like every {@code @Tag("integration")} test.
  */
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@ActiveProfiles("test")
-@AutoConfigureWebTestClient
-@Testcontainers
-@Tag("integration")
-class AccountAdminRoleIntegrationTest {
+class AccountAdminRoleIntegrationTest extends RealAuthIntegrationTest {
 
     @Autowired
     private WebTestClient webTestClient;
@@ -63,27 +48,7 @@ class AccountAdminRoleIntegrationTest {
     private JwtPrincipalFactory principalFactory;
 
     @Autowired
-    private DatabaseTestUtils databaseTestUtils;
-
-    @Autowired
-    private JwtSigningKeyService signingKeyService;
-
-    @Autowired
     private IssuedJwtRepository issuedJwtRepository;
-
-    // Global isolation: the last-admin guard counts ALL active admins, so each test must start from a
-    // clean slate or leftover admins from a prior test would inflate the count and mask the guard.
-    // cleanDatabase() also truncates the JWT signing key, so re-seed it before we issue test tokens.
-    @BeforeEach
-    void cleanSlate() {
-        databaseTestUtils.cleanDatabase();
-        signingKeyService.ensureActiveKey();
-    }
-
-    @DynamicPropertySource
-    static void datasource(DynamicPropertyRegistry registry) {
-        RealAuthDatasource.register(registry);
-    }
 
     @Test
     void demotingOneAdminWhileAnotherRemainsPersistsToTheDatabase() {

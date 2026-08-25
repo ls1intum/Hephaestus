@@ -8,21 +8,14 @@ import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityLink;
 import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityLinkRepository;
 import de.tum.cit.aet.hephaestus.core.auth.provider.LoginProvider;
 import de.tum.cit.aet.hephaestus.core.auth.provider.LoginProviderRepository;
-import de.tum.cit.aet.hephaestus.testconfig.RealAuthDatasource;
+import de.tum.cit.aet.hephaestus.testconfig.RealAuthIntegrationTest;
 import java.util.List;
 import java.util.Map;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.context.annotation.Import;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.core.user.DefaultOAuth2User;
 import org.springframework.security.oauth2.core.user.OAuth2User;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
 /**
  * nOAuth defence against a REAL Postgres: the mock-based {@link AccountProvisioningServiceTest} stubs
@@ -37,11 +30,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
  *
  * @see <a href="https://www.descope.com/blog/post/noauth">nOAuth: account takeover via email merging</a>
  */
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@ActiveProfiles("test")
-@Testcontainers
-@Tag("integration")
-class AccountProvisioningIntegrationTest {
+class AccountProvisioningIntegrationTest extends RealAuthIntegrationTest {
 
     @Autowired
     private AccountProvisioningService service;
@@ -54,11 +43,6 @@ class AccountProvisioningIntegrationTest {
 
     @Autowired
     private LoginProviderRepository loginProviderRepository;
-
-    @DynamicPropertySource
-    static void datasource(DynamicPropertyRegistry registry) {
-        RealAuthDatasource.register(registry);
-    }
 
     @Test
     void twoIdentitiesSharingOneEmailResolveToSeparateAccounts() {

@@ -14,27 +14,19 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRep
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
-import de.tum.cit.aet.hephaestus.testconfig.DatabaseTestUtils;
-import de.tum.cit.aet.hephaestus.testconfig.RealAuthDatasource;
+import de.tum.cit.aet.hephaestus.testconfig.RealAuthIntegrationTest;
 import de.tum.cit.aet.hephaestus.testconfig.TestUserFactory;
 import java.net.URI;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.context.annotation.Import;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.client.registration.ClientRegistration;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 import org.springframework.security.oauth2.core.user.DefaultOAuth2User;
 import org.springframework.security.oauth2.core.user.OAuth2User;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
 /**
  * Real-Postgres proof of what unit/repository tests cannot give: that login-side and SCM-side resolve
@@ -42,11 +34,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
  * {@code (User.provider.id, String.valueOf(User.nativeId))} tuple matches the {@code IdentityLink}
  * the login flow stored. Drives the real provisioning path (the inline comments mark each seam).
  */
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@ActiveProfiles("test")
-@Testcontainers
-@Tag("integration")
-class PracticeRoleResolutionEndToEndIntegrationTest {
+class PracticeRoleResolutionEndToEndIntegrationTest extends RealAuthIntegrationTest {
 
     private static final String ROLE = "run_practice_review";
     // Explicit-port base URL so origin canonicalization is genuinely exercised (a state production can
@@ -75,19 +63,6 @@ class PracticeRoleResolutionEndToEndIntegrationTest {
 
     @Autowired
     private UserRepository userRepository;
-
-    @Autowired
-    private DatabaseTestUtils databaseTestUtils;
-
-    @DynamicPropertySource
-    static void datasource(DynamicPropertyRegistry registry) {
-        RealAuthDatasource.register(registry);
-    }
-
-    @BeforeEach
-    void cleanSlate() {
-        databaseTestUtils.cleanDatabase();
-    }
 
     @Test
     void practiceRoleResolvesEndToEndThroughLoginAndSyncForTheSamePerson() {
@@ -144,7 +119,7 @@ class PracticeRoleResolutionEndToEndIntegrationTest {
     }
 
     // Cross-provider isolation (same numeric subject on a different instance must NOT inherit the flag)
-    // is owned by AccountFeatureRepositoryIntegrationTest at the query layer — not duplicated here.
+    // is owned by ProductionSchemaContractIntegrationTest at the query layer — not duplicated here.
 
     private void seedLoginProvider(String registrationId, LoginProvider.ProviderType type, String baseUrl) {
         LoginProvider provider = new LoginProvider();

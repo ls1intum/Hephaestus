@@ -12,7 +12,7 @@ import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.test.context.TestPropertySource;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Real-Postgres proof of the full-text relevance search: {@code websearch_to_tsquery('simple', ...)} +
@@ -20,7 +20,7 @@ import org.springframework.test.context.TestPropertySource;
  * carrying the query terms never surfaces; a weaker match ranks below a stronger one; other workspaces'
  * rows never leak.
  */
-@TestPropertySource(properties = "hephaestus.integration.outline.enabled=true")
+@Transactional
 class OutlineDocumentSearchIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
@@ -33,7 +33,6 @@ class OutlineDocumentSearchIntegrationTest extends BaseIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        databaseTestUtils.cleanDatabase();
         Workspace workspace = workspaceRepository.save(WorkspaceTestFixtures.activeWorkspace("outline-search"));
         workspaceId = workspace.getId();
 

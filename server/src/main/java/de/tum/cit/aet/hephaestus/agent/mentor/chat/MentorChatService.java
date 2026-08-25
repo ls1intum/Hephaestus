@@ -64,7 +64,7 @@ import tools.jackson.databind.node.JsonNodeFactory;
  */
 @Service
 @RequiredArgsConstructor
-public class MentorChatService implements MentorTurnRunner {
+public class MentorChatService implements MentorTurnRunner, MentorChatStarter {
 
     private static final Logger log = LoggerFactory.getLogger(MentorChatService.class);
     private static final JsonNodeFactory NODES = JsonNodeFactory.instance;
@@ -95,6 +95,7 @@ public class MentorChatService implements MentorTurnRunner {
      * SSE disconnect hook abort Pi even when the runner client is attached after bindLifecycle
      * (which fires synchronously) — {@code session.abort()} is documented idempotent.
      */
+    @Override
     public void start(MentorTurnRequest request, SseEmitter emitter) {
         MentorSseChannel channel = new MentorSseChannel(emitter, objectMapper, runnerTimeoutScheduler.scheduler());
         channel.bindLifecycle();

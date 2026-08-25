@@ -4,21 +4,11 @@ import static org.hamcrest.Matchers.allOf;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 
-import de.tum.cit.aet.hephaestus.core.auth.jwt.JwtSigningKeyService;
-import de.tum.cit.aet.hephaestus.testconfig.DatabaseTestUtils;
-import de.tum.cit.aet.hephaestus.testconfig.RealAuthDatasource;
+import de.tum.cit.aet.hephaestus.testconfig.RealAuthIntegrationTest;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.webtestclient.autoconfigure.AutoConfigureWebTestClient;
-import org.springframework.context.annotation.Import;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.reactive.server.WebTestClient;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
 /**
  * Pins that {@code core.security.SecurityHeaders} is actually applied on the live security chain.
@@ -27,32 +17,10 @@ import org.testcontainers.junit.jupiter.Testcontainers;
  * {@code .apply()} from a chain or a Spring-default change would have been caught only by inspection.
  * Asserted against the public {@code GET /identity-providers} so no auth/CSRF is needed.
  */
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@ActiveProfiles("test")
-@AutoConfigureWebTestClient
-@Testcontainers
-@Tag("integration")
-class SecurityHeadersIntegrationTest {
+class SecurityHeadersIntegrationTest extends RealAuthIntegrationTest {
 
     @Autowired
     private WebTestClient webTestClient;
-
-    @Autowired
-    private DatabaseTestUtils databaseTestUtils;
-
-    @Autowired
-    private JwtSigningKeyService signingKeyService;
-
-    @BeforeEach
-    void cleanSlate() {
-        databaseTestUtils.cleanDatabase();
-        signingKeyService.ensureActiveKey();
-    }
-
-    @DynamicPropertySource
-    static void datasource(DynamicPropertyRegistry registry) {
-        RealAuthDatasource.register(registry);
-    }
 
     @Test
     void publicResponseCarriesTheHardenedSecurityHeaders() {

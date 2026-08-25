@@ -6,8 +6,8 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.BearerToken;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
-import de.tum.cit.aet.hephaestus.integration.outline.client.OutlineApiClient;
 import de.tum.cit.aet.hephaestus.integration.outline.client.OutlineApiException;
+import de.tum.cit.aet.hephaestus.integration.outline.client.OutlineTokenClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -28,9 +28,9 @@ public class OutlineConnectionAdminService {
     private static final Logger log = LoggerFactory.getLogger(OutlineConnectionAdminService.class);
 
     private final ConnectionService connectionService;
-    private final OutlineApiClient apiClient;
+    private final OutlineTokenClient apiClient;
 
-    public OutlineConnectionAdminService(ConnectionService connectionService, OutlineApiClient apiClient) {
+    public OutlineConnectionAdminService(ConnectionService connectionService, OutlineTokenClient apiClient) {
         this.connectionService = connectionService;
         this.apiClient = apiClient;
     }

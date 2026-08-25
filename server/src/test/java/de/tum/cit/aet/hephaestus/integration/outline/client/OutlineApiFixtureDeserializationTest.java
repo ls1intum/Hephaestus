@@ -13,8 +13,8 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.jackson.autoconfigure.JacksonAutoConfiguration;
+import org.springframework.boot.test.autoconfigure.json.JsonTest;
 import org.springframework.boot.test.context.ConfigDataApplicationContextInitializer;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ContextConfiguration;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.json.JsonMapper;
@@ -32,8 +32,11 @@ import tools.jackson.databind.json.JsonMapper;
  * through the hand-written {@link OutlineEnvelope} wrapper, exactly as {@link OutlineApiClient} reads them.
  */
 @Tag("unit")
-@SpringBootTest(classes = JacksonAutoConfiguration.class)
-@ContextConfiguration(initializers = ConfigDataApplicationContextInitializer.class)
+@JsonTest
+@ContextConfiguration(
+    classes = JacksonAutoConfiguration.class,
+    initializers = ConfigDataApplicationContextInitializer.class
+)
 class OutlineApiFixtureDeserializationTest {
 
     @Autowired

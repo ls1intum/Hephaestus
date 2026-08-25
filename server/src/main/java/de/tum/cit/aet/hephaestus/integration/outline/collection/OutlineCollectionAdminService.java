@@ -9,7 +9,7 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.BearerToken;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
-import de.tum.cit.aet.hephaestus.integration.outline.client.OutlineApiClient;
+import de.tum.cit.aet.hephaestus.integration.outline.client.OutlineContentClient;
 import de.tum.cit.aet.hephaestus.integration.outline.client.model.OutlineCollectionModel;
 import de.tum.cit.aet.hephaestus.integration.outline.connect.OutlineConnectionResolver;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineCollection;
@@ -62,7 +62,7 @@ public class OutlineCollectionAdminService {
     private final ConnectionService connectionService;
     private final OutlineCollectionRepository collectionRepository;
     private final OutlineDocumentRepository documentRepository;
-    private final OutlineApiClient outlineApiClient;
+    private final OutlineContentClient outlineApiClient;
     private final OutlineDocumentSyncScheduler syncScheduler;
     private final AsyncTaskExecutor taskExecutor;
     private final ApplicationEventPublisher eventPublisher;
@@ -71,7 +71,7 @@ public class OutlineCollectionAdminService {
         ConnectionService connectionService,
         OutlineCollectionRepository collectionRepository,
         OutlineDocumentRepository documentRepository,
-        OutlineApiClient outlineApiClient,
+        OutlineContentClient outlineApiClient,
         OutlineDocumentSyncScheduler syncScheduler,
         @Qualifier("applicationTaskExecutor") AsyncTaskExecutor taskExecutor,
         ApplicationEventPublisher eventPublisher

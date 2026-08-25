@@ -13,8 +13,8 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.jackson.autoconfigure.JacksonAutoConfiguration;
+import org.springframework.boot.test.autoconfigure.json.JsonTest;
 import org.springframework.boot.test.context.ConfigDataApplicationContextInitializer;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ContextConfiguration;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
@@ -36,15 +36,13 @@ import tools.jackson.databind.ObjectMapper;
  * deep paths and a typed {@code Instant} coercion — still map correctly.
  */
 @Tag("unit")
-@SpringBootTest(classes = JacksonAutoConfiguration.class)
-// ConfigDataApplicationContextInitializer makes the slice read application.yml, so the
-// autoconfigured mapper binds the real spring.jackson.* stanza (fail-on-unknown-properties,
-// fail-on-null-for-primitives, etc.) rather than falling back to bare engine defaults. Without
-// it, a regression that flips fail-on-unknown-properties=true would not be caught here.
-@ContextConfiguration(initializers = ConfigDataApplicationContextInitializer.class)
+@JsonTest
+@ContextConfiguration(
+    classes = JacksonAutoConfiguration.class,
+    initializers = ConfigDataApplicationContextInitializer.class
+)
 class MultiVersionFixtureTest {
 
-    /** The exact production mapper bean — autoconfigured from {@code spring.jackson.*}. */
     @Autowired
     private ObjectMapper jackson3;
 

@@ -20,13 +20,9 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
-import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.reactive.server.WebTestClient;
 
 @Tag("integration")
-// See LlmUsageControllerIntegrationTest: the unset display currency is stated, not inherited from
-// whatever the developer's optional .env happens to hold.
-@TestPropertySource(properties = "hephaestus.llm.display-currency=")
 class LlmUsageAdminControllerIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     private static final String ADMIN_TOKEN = "mock-jwt-token-for-admin-user";
