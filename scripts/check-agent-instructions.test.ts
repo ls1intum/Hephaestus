@@ -26,6 +26,7 @@ function only(failures: readonly string[]): string {
 
 /** A symlink to `target`, as an override value. */
 const symlinkTo = (target: string): { readonly target: string } => ({ target });
+const markdownSpans = (markdown: string): readonly string[] => codeSpans(markdown, "markdown");
 
 type Override = string | { readonly target: string } | { readonly kind: "opaque" } | null;
 
@@ -181,27 +182,30 @@ await test("code is not prose: a reference inside a span, a fence or a comment i
 });
 
 await test("the markdown scanner extracts code spans, not fences or comments", () => {
-	assert.deepEqual(codeSpans("Use `scripts/check.ts` and ``a ` b``."), [
+	assert.deepEqual(markdownSpans("Use `scripts/check.ts` and ``a ` b``."), [
 		"scripts/check.ts",
 		"a ` b",
 	]);
-	assert.deepEqual(codeSpans("A `line\nwrap` is one span."), ["line wrap"]);
-	assert.deepEqual(codeSpans("A `CRLF\r\nwrap` is one span."), ["CRLF wrap"]);
-	assert.deepEqual(codeSpans("A `CR\rwrap` is one span."), ["CR wrap"]);
-	assert.deepEqual(codeSpans("` padded ` and `   `"), ["padded", "   "]);
-	assert.deepEqual(codeSpans("<!-- `hidden.md` -->\n```md\n`fenced.md`\n```\n`shown.md`"), [
+	assert.deepEqual(markdownSpans("A `line\nwrap` is one span."), ["line wrap"]);
+	assert.deepEqual(markdownSpans("A `CRLF\r\nwrap` is one span."), ["CRLF wrap"]);
+	assert.deepEqual(markdownSpans("A `CR\rwrap` is one span."), ["CR wrap"]);
+	assert.deepEqual(markdownSpans("` padded ` and `   `"), ["padded", "   "]);
+	assert.deepEqual(markdownSpans("<!-- `hidden.md` -->\n```md\n`fenced.md`\n```\n`shown.md`"), [
 		"shown.md",
 	]);
-	assert.deepEqual(codeSpans("\\`escaped.md\\`\n\n    `indented.md`"), []);
-	assert.deepEqual(codeSpans("`a <!-- literal --> span`"), ["a <!-- literal --> span"]);
-	assert.deepEqual(codeSpans("> ```md\n> `quoted.md`\n> ```\n`shown.md`"), ["shown.md"]);
-	assert.deepEqual(codeSpans("<Tabs>\n<TabItem>\nUse `inside.md`\n</TabItem>\n</Tabs>", true), [
+	assert.deepEqual(markdownSpans("\\`escaped.md\\`\n\n    `indented.md`"), []);
+	assert.deepEqual(markdownSpans("`a <!-- literal --> span`"), ["a <!-- literal --> span"]);
+	assert.deepEqual(markdownSpans("> ```md\n> `quoted.md`\n> ```\n`shown.md`"), ["shown.md"]);
+	assert.deepEqual(codeSpans("<Tabs>\n<TabItem>\nUse `inside.md`\n</TabItem>\n</Tabs>", "mdx"), [
 		"inside.md",
 	]);
-	assert.deepEqual(codeSpans("`not closed``"), []);
-	assert.deepEqual(codeSpans("```md\n`hidden.md`\n``` not a close\n`still-hidden.md`\n```"), []);
-	assert.deepEqual(codeSpans("```md\n<!--\n```\n`shown.md`"), ["shown.md"]);
-	assert.deepEqual(codeSpans("<!--\n```md\n-->\n`shown.md`"), ["shown.md"]);
+	assert.deepEqual(markdownSpans("`not closed``"), []);
+	assert.deepEqual(
+		markdownSpans("```md\n`hidden.md`\n``` not a close\n`still-hidden.md`\n```"),
+		[],
+	);
+	assert.deepEqual(markdownSpans("```md\n<!--\n```\n`shown.md`"), ["shown.md"]);
+	assert.deepEqual(markdownSpans("<!--\n```md\n-->\n`shown.md`"), ["shown.md"]);
 });
 
 await test("contributor docs reject missing repository paths and npm packages", () => {
@@ -229,16 +233,6 @@ await test("an intentional non-checkout path is allowed only in the document tha
 		),
 		[],
 	);
-	assert.deepEqual(
-		analyse(
-			snapshot({
-				"webapp/src/features/a.ts": { kind: "opaque" },
-				"webapp/src/features/b.ts": { kind: "opaque" },
-				"docs/contributor/setup.md": "Use `src/features/`.\n",
-			}),
-		),
-		[],
-	);
 	assert.match(
 		only(
 			analyse(
@@ -249,6 +243,26 @@ await test("an intentional non-checkout path is allowed only in the document tha
 			),
 		),
 		/server\/.env/,
+	);
+});
+
+await test("a unique shorthand directory resolves independently of its descendant count", () => {
+	assert.deepEqual(
+		analyse(
+			snapshot({
+				"webapp/src/features/a.ts": { kind: "opaque" },
+				"webapp/src/features/b.ts": { kind: "opaque" },
+				"docs/contributor/setup.md": "Use `src/features/`.\n",
+			}),
+		),
+		[],
+	);
+});
+
+await test("an invalid contributor MDX document is reported with its path", () => {
+	assert.throws(
+		() => analyse(snapshot({ "docs/contributor/broken.mdx": "<Component/ name>" })),
+		/docs\/contributor\/broken\.mdx:/,
 	);
 });
 

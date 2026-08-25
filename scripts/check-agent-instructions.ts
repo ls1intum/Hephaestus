@@ -14,9 +14,7 @@
  *   uncommanded — a typed-only skill with no opencode command to type.
  *   unmirrored  — a Codex copy of a skill that has drifted from the Claude Code original.
  *   duplicated  — two agent files with one body.
- *
- * Contributor docs are checked separately for inline-code paths and npm packages that resolve to
- * nothing in the checkout.
+ *   stale       — a contributor document names a repository path or npm package that does not resolve.
  *
  * `unread` runs before all of them and reports this gate's own blind spot: an agent file the
  * classifier never opened, which every check below would otherwise read as a file that says nothing.
@@ -178,12 +176,41 @@ const INTENTIONALLY_MISSING_PATHS = [
 		value: "webapp/.env",
 		reason: "a developer-local environment file that must stay untracked",
 	},
+	{
+		document: "docs/contributor/agent/workspace-abi.mdx",
+		value: "inputs/manifest.json",
+		reason: "a path inside the staged agent workspace, not the repository checkout",
+	},
+	{
+		document: "docs/contributor/agent/workspace-abi.mdx",
+		value: "out/result.json",
+		reason: "a path inside the staged agent workspace, not the repository checkout",
+	},
+	{
+		document: "docs/contributor/agent/workspace-abi.mdx",
+		value: "out/watchdog-killed.json",
+		reason: "a path inside the staged agent workspace, not the repository checkout",
+	},
+	{
+		document: "docs/contributor/artifact-source-contract.mdx",
+		value: "inputs/manifest.json",
+		reason: "a path inside the staged agent workspace, not the repository checkout",
+	},
+	{
+		document: "docs/contributor/practice-review-glossary.mdx",
+		value: "inputs/history/delta.json",
+		reason: "a path inside the staged agent workspace, not the repository checkout",
+	},
+	{
+		document: "docs/contributor/practice-review-glossary.mdx",
+		value: "out/feedback.json",
+		reason: "a path inside the staged agent workspace, not the repository checkout",
+	},
 ] satisfies readonly ClaimException[];
 
 const PACKAGE_NAME = /^(?:@[a-z0-9][a-z0-9._-]*\/[a-z0-9][a-z0-9._-]*|[a-z0-9][a-z0-9._-]*)$/;
 const PACKAGE_SHAPED = /-(?:cli|config|core|js|node|package|plugin|react|sdk|test|ts)$/;
 const FILE_SHAPED = /\.(?:java|js|jsonc?|mdx?|mjs|sh|ts|tsx|xml|ya?ml)$/;
-const RUNTIME_ROOTS = new Set(["inputs", "out"]);
 const exists = (repo: Repo, path: string): boolean =>
 	repo.present.has(path) || repo.paths.some((present) => present.startsWith(`${path}/`));
 
@@ -225,9 +252,7 @@ function looksLikePath(value: string, roots: ReadonlySet<string>): boolean {
 		roots.has(first) ||
 		(first.startsWith(".") && value.includes("/")) ||
 		(value.includes("/") && basename(value).startsWith(".")) ||
-		(FILE_SHAPED.test(value) &&
-			!RUNTIME_ROOTS.has(first) &&
-			(value.includes("/") || /\.mdx?$/.test(value)))
+		(FILE_SHAPED.test(value) && (value.includes("/") || /\.mdx?$/.test(value)))
 	);
 }
 
@@ -256,7 +281,15 @@ function staleContributorClaims(repo: Repo): readonly string[] {
 	const failures: string[] = [];
 	for (const file of repo.present.values()) {
 		if (file.kind !== "text" || !isContributorDoc(file.path)) continue;
-		for (const value of new Set(codeSpans(file.content, file.path.endsWith(".mdx")))) {
+		let spans: readonly string[];
+		try {
+			spans = codeSpans(file.content, file.path.endsWith(".mdx") ? "mdx" : "markdown");
+		} catch (error) {
+			throw new Error(`${file.path}: ${error instanceof Error ? error.message : String(error)}`, {
+				cause: error,
+			});
+		}
+		for (const value of new Set(spans)) {
 			const candidate = value.replace(/[.,:;]$/, "").replace(/#.*$/, "");
 			if (candidate.includes("…") || candidate.includes("...") || /[*<>{}$\s]/.test(candidate))
 				continue;
@@ -378,7 +411,7 @@ interface MarkdownNode {
 	readonly children?: readonly MarkdownNode[];
 }
 
-export function codeSpans(markdown: string, mdx = false): readonly string[] {
+export function codeSpans(markdown: string, syntax: "markdown" | "mdx"): readonly string[] {
 	const spans: string[] = [];
 	const visit = (node: MarkdownNode): void => {
 		if (node.type === "inlineCode" && typeof node.value === "string") {
@@ -389,7 +422,9 @@ export function codeSpans(markdown: string, mdx = false): readonly string[] {
 	visit(
 		fromMarkdown(
 			markdown,
-			mdx ? { extensions: [mdxjs()], mdastExtensions: [mdxFromMarkdown()] } : undefined,
+			syntax === "mdx"
+				? { extensions: [mdxjs()], mdastExtensions: [mdxFromMarkdown()] }
+				: undefined,
 		),
 	);
 	return spans;
@@ -766,6 +801,6 @@ if (process.argv[1] === import.meta.filename) {
 	console.log(
 		`check-agent-instructions: ${repo.guides.length} AGENTS.md reach Claude Code and opencode; ` +
 			`${skills.length} skills, ${mirrored} of them mirrored for Codex, ` +
-			`${repo.commands.length} opencode commands; contributor-doc paths and packages resolve.`,
+			`${repo.commands.length} opencode commands; contributor-doc references checked.`,
 	);
 }
