@@ -191,7 +191,7 @@ jobs:
           if grep -rEnI 'docker/agent-image-pin(\.local)?\.env' \
                 --exclude-dir=node_modules --exclude-dir=target --exclude-dir=.git \
                 . \
-              | grep -vE '^\./(MIGRATION\.md|docs/admin/agent-image-digests\.md):' ; then
+              | grep -vE '^\./(MIGRATION\.md|docs/admin/agent-image-digests\.md|scripts/check-agent-instructions\.ts):' ; then
             echo "::error::The legacy pin file was removed in v0.10.0; new references must live in MIGRATION.md only."
             exit 1
           fi

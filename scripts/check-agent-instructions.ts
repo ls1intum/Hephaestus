@@ -30,6 +30,9 @@ import { lstat, readFile, readlink } from "node:fs/promises";
 import { resolve } from "node:path";
 import { basename, dirname, join, matchesGlob, normalize } from "node:path/posix";
 import { promisify } from "node:util";
+import { fromMarkdown } from "mdast-util-from-markdown";
+import { mdxFromMarkdown } from "mdast-util-mdx";
+import { mdxjs } from "micromark-extension-mdxjs";
 import { asRecord, asStringArray, parseJson } from "./lib/json.ts";
 
 /** Resolved from this file, so the gate answers the same whatever the working directory is. */
@@ -47,8 +50,9 @@ const COMMANDS_ROOT = ".opencode/commands";
 const AGENT_ROOTS = [".claude/", ".opencode/", ".agents/"];
 
 const isContributorDoc = (path: string): boolean =>
-	(path.startsWith("docs/contributor/") || !path.includes("/")) &&
-	(path.startsWith("docs/contributor/") ? /\.mdx?$/.test(path) : path.endsWith(".md"));
+	path.startsWith("docs/contributor/")
+		? /\.mdx?$/.test(path)
+		: !path.includes("/") && path.endsWith(".md");
 
 /**
  * Codex and Claude Code share no skills directory, so a skill both must reach exists twice. That is
@@ -141,12 +145,12 @@ const INTENTIONALLY_MISSING_PATHS = [
 	},
 	{
 		document: "MIGRATION.md",
-		value: ["docker", "agent-image-pin.env"].join("/"),
+		value: "docker/agent-image-pin.env",
 		reason: "a removed path retained in migration history",
 	},
 	{
 		document: "MIGRATION.md",
-		value: ["docker", "agent-image-pin.local.env"].join("/"),
+		value: "docker/agent-image-pin.local.env",
 		reason: "a removed path retained in migration history",
 	},
 	{
@@ -233,10 +237,15 @@ function pathResolves(repo: Repo, document: string, value: string): boolean {
 	if (/^\.\.?\//.test(value) && exists(repo, normalize(join(dirname(document), cleaned))))
 		return true;
 	if (!value.startsWith(".")) {
-		const suffixes = repo.paths.filter(
-			(path) => path.endsWith(`/${cleaned}`) || path.includes(`/${cleaned}/`),
+		const suffixes = new Set(
+			repo.paths.flatMap((path) => {
+				const start = path.indexOf(`/${cleaned}`);
+				return start === -1 || (path[start + cleaned.length + 1] ?? "/") !== "/"
+					? []
+					: [path.slice(0, start + cleaned.length + 1)];
+			}),
 		);
-		if (suffixes.length === 1) return true;
+		if (suffixes.size === 1) return true;
 	}
 	return excepts(INTENTIONALLY_MISSING_PATHS, document, cleaned);
 }
@@ -247,7 +256,7 @@ function staleContributorClaims(repo: Repo): readonly string[] {
 	const failures: string[] = [];
 	for (const file of repo.present.values()) {
 		if (file.kind !== "text" || !isContributorDoc(file.path)) continue;
-		for (const value of new Set(codeSpans(file.content))) {
+		for (const value of new Set(codeSpans(file.content, file.path.endsWith(".mdx")))) {
 			const candidate = value.replace(/[.,:;]$/, "").replace(/#.*$/, "");
 			if (candidate.includes("…") || candidate.includes("...") || /[*<>{}$\s]/.test(candidate))
 				continue;
@@ -319,12 +328,6 @@ function visibleMarkdown(markdown: string): string {
 	let commented = false;
 	for (const raw of markdown.replaceAll(/\r\n?/g, "\n").split("\n")) {
 		let line = raw;
-		if (commented) {
-			const close = line.indexOf(COMMENT_END);
-			if (close === -1) continue;
-			line = line.slice(close + COMMENT_END.length);
-			commented = false;
-		}
 		const fenceMatch = /^ {0,3}(`{3,}|~{3,})(.*)$/.exec(line);
 		const marker = fenceMatch?.[1];
 		if (fence !== undefined) {
@@ -338,8 +341,19 @@ function visibleMarkdown(markdown: string): string {
 			}
 			continue;
 		}
-		if (marker !== undefined && !(marker[0] === "`" && (fenceMatch?.[2] ?? "").includes("`"))) {
-			fence = marker;
+		if (commented) {
+			const close = line.indexOf(COMMENT_END);
+			if (close === -1) continue;
+			line = line.slice(close + COMMENT_END.length);
+			commented = false;
+		}
+		const visibleFence = /^ {0,3}(`{3,}|~{3,})(.*)$/.exec(line);
+		const visibleMarker = visibleFence?.[1];
+		if (
+			visibleMarker !== undefined &&
+			!(visibleMarker[0] === "`" && (visibleFence?.[2] ?? "").includes("`"))
+		) {
+			fence = visibleMarker;
 			continue;
 		}
 		// Rescanned from the start each pass: closing one comment can bring a `<!` and a `--` together,
@@ -358,33 +372,26 @@ function visibleMarkdown(markdown: string): string {
 	return kept.join("\n");
 }
 
-export function codeSpans(markdown: string): readonly string[] {
-	const text = visibleMarkdown(markdown);
+interface MarkdownNode {
+	readonly type: string;
+	readonly value?: unknown;
+	readonly children?: readonly MarkdownNode[];
+}
+
+export function codeSpans(markdown: string, mdx = false): readonly string[] {
 	const spans: string[] = [];
-	for (let start = 0; start < text.length; ) {
-		if (text[start] !== "`") {
-			start += 1;
-			continue;
+	const visit = (node: MarkdownNode): void => {
+		if (node.type === "inlineCode" && typeof node.value === "string") {
+			spans.push(node.value.replaceAll(/\r\n?|\n/g, " "));
 		}
-		let ticks = 1;
-		while (text[start + ticks] === "`") ticks += 1;
-		let close = start + ticks;
-		while (close < text.length) {
-			close = text.indexOf("`", close);
-			if (close === -1) break;
-			let closingTicks = 1;
-			while (text[close + closingTicks] === "`") closingTicks += 1;
-			if (closingTicks === ticks) {
-				let content = text.slice(start + ticks, close).replaceAll("\n", " ");
-				if (/^ .* $/.test(content) && !/^ +$/.test(content)) content = content.slice(1, -1);
-				spans.push(content);
-				start = close + ticks;
-				break;
-			}
-			close += closingTicks;
-		}
-		if (close === -1 || close >= text.length) start += ticks;
-	}
+		for (const child of node.children ?? []) visit(child);
+	};
+	visit(
+		fromMarkdown(
+			markdown,
+			mdx ? { extensions: [mdxjs()], mdastExtensions: [mdxFromMarkdown()] } : undefined,
+		),
+	);
 	return spans;
 }
 

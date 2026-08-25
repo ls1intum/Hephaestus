@@ -180,7 +180,7 @@ await test("code is not prose: a reference inside a span, a fence or a comment i
 	assert.deepEqual(references("```sh\nx\n```\n\n@AGENTS.md\n"), ["AGENTS.md"]);
 });
 
-await test("the markdown scanner extracts CommonMark code spans, not fences or comments", () => {
+await test("the markdown scanner extracts code spans, not fences or comments", () => {
 	assert.deepEqual(codeSpans("Use `scripts/check.ts` and ``a ` b``."), [
 		"scripts/check.ts",
 		"a ` b",
@@ -192,8 +192,16 @@ await test("the markdown scanner extracts CommonMark code spans, not fences or c
 	assert.deepEqual(codeSpans("<!-- `hidden.md` -->\n```md\n`fenced.md`\n```\n`shown.md`"), [
 		"shown.md",
 	]);
+	assert.deepEqual(codeSpans("\\`escaped.md\\`\n\n    `indented.md`"), []);
+	assert.deepEqual(codeSpans("`a <!-- literal --> span`"), ["a <!-- literal --> span"]);
+	assert.deepEqual(codeSpans("> ```md\n> `quoted.md`\n> ```\n`shown.md`"), ["shown.md"]);
+	assert.deepEqual(codeSpans("<Tabs>\n<TabItem>\nUse `inside.md`\n</TabItem>\n</Tabs>", true), [
+		"inside.md",
+	]);
 	assert.deepEqual(codeSpans("`not closed``"), []);
 	assert.deepEqual(codeSpans("```md\n`hidden.md`\n``` not a close\n`still-hidden.md`\n```"), []);
+	assert.deepEqual(codeSpans("```md\n<!--\n```\n`shown.md`"), ["shown.md"]);
+	assert.deepEqual(codeSpans("<!--\n```md\n-->\n`shown.md`"), ["shown.md"]);
 });
 
 await test("contributor docs reject missing repository paths and npm packages", () => {
@@ -217,6 +225,16 @@ await test("an intentional non-checkout path is allowed only in the document tha
 			snapshot({
 				"server/existing.ts": { kind: "opaque" },
 				"docs/contributor/local-development.mdx": "Create `server/.env`.\n",
+			}),
+		),
+		[],
+	);
+	assert.deepEqual(
+		analyse(
+			snapshot({
+				"webapp/src/features/a.ts": { kind: "opaque" },
+				"webapp/src/features/b.ts": { kind: "opaque" },
+				"docs/contributor/setup.md": "Use `src/features/`.\n",
 			}),
 		),
 		[],
