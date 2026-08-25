@@ -9,6 +9,7 @@ import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.core.EntityTagPrecondition;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditPort;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
 import de.tum.cit.aet.hephaestus.practices.spi.PracticeReviewVolumeQuery;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
@@ -156,7 +157,7 @@ class PracticeReviewSettingsServiceTest extends BaseUnitTest {
     }
 
     @Test
-    void pausingAndResumingLeaveWorkAlreadyInFlightAlone() {
+    void pausingAndResumingEachInvalidateWorkAlreadyInFlight() {
         writesWorkspace();
 
         service.updatePracticeReview(
@@ -171,7 +172,52 @@ class PracticeReviewSettingsServiceTest extends BaseUnitTest {
         );
 
         assertThat(workspace.getReviewSettings().getDeliveryStatus()).isEqualTo(PracticeDeliveryStatus.ACTIVE);
-        assertThat(workspace.getReviewSettings().getRolloutRevision()).isZero();
+        assertThat(workspace.getReviewSettings().getRolloutRevision()).isEqualTo(2);
+    }
+
+    @Test
+    void removingAndReaddingCoverageCannotMakeEarlierWorkCurrentAgain() {
+        writesWorkspace();
+        WorkspaceReviewScope selectedEmpty = new WorkspaceReviewScope(
+            ReviewRepositoryMode.SELECTED,
+            ReviewPersonMode.SELECTED,
+            java.util.List.of(),
+            java.util.List.of()
+        );
+        when(coverageService.scope(workspace)).thenReturn(
+            WorkspaceReviewScope.ALL,
+            selectedEmpty,
+            selectedEmpty,
+            selectedEmpty,
+            WorkspaceReviewScope.ALL,
+            WorkspaceReviewScope.ALL
+        );
+
+        service.updatePracticeReview(
+            context,
+            new UpdatePracticeReviewSettingsRequestDTO(null, null, selectedEmpty, null, null, null),
+            tag(0)
+        );
+        service.updatePracticeReview(
+            context,
+            new UpdatePracticeReviewSettingsRequestDTO(null, null, WorkspaceReviewScope.ALL, null, null, null),
+            tag(1)
+        );
+
+        assertThat(workspace.getReviewSettings().getRolloutRevision()).isEqualTo(2);
+    }
+
+    @Test
+    void promotingDefaultAuthorityInvalidatesEarlierWork() {
+        writesWorkspace();
+
+        service.updatePracticeReview(
+            context,
+            new UpdatePracticeReviewSettingsRequestDTO(null, null, null, null, PracticeAutonomy.AUTOMATIC, null),
+            tag(0)
+        );
+
+        assertThat(workspace.getReviewSettings().getRolloutRevision()).isOne();
     }
 
     private void readsWorkspace() {

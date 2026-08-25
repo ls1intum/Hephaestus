@@ -20,13 +20,14 @@ record PracticeReviewSnapshot(
     @Nullable String defaultAutonomy
 ) implements ConfigAuditSnapshot {
     /**
-     * Excludes {@code deliveryStatus} deliberately: a revision bump discards every review in flight, and
-     * the pause already refuses delivery under its own name while it is on.
+     * The delivery status participates because a review admitted before a pause must remain stale after
+     * resume. Otherwise work that happened not to reach egress while paused could leave later.
      */
     boolean samePolicyAs(PracticeReviewSnapshot other) {
         return (
             java.util.Objects.equals(deliverToMerged, other.deliverToMerged) &&
             java.util.Objects.equals(reviewScope, other.reviewScope) &&
+            java.util.Objects.equals(deliveryStatus, other.deliveryStatus) &&
             java.util.Objects.equals(defaultAutonomy, other.defaultAutonomy)
         );
     }
