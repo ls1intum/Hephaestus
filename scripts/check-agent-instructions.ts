@@ -102,88 +102,148 @@ export interface Snapshot {
 
 interface Repo {
 	readonly present: ReadonlyMap<string, TrackedFile>;
+	readonly paths: readonly string[];
 	readonly byName: ReadonlyMap<string, readonly string[]>;
 	/** The `AGENTS.md` files that are this repo's own guidance, in the trees they describe. */
 	readonly guides: readonly string[];
 	readonly commands: readonly string[];
 }
 
-const NON_NPM_NAMES = new Map([
-	[
-		"docs/contributor/sync-lifecycle.md\0graphql-codegen-maven-plugin",
-		"a Maven plugin artifact, not an npm dependency",
-	],
-	[
-		"docs/contributor/sync-lifecycle.md\0openapi-generator-maven-plugin",
-		"a Maven plugin artifact, not an npm dependency",
-	],
-]);
+interface ClaimException {
+	readonly document: string;
+	readonly value: string;
+	readonly reason: string;
+}
 
-const INTENTIONALLY_MISSING_PATHS = new Map([
-	[
-		"docs/contributor/agent/workspace-abi.mdx\0.sessions",
-		"a per-run directory created inside the agent workspace",
-	],
-	["MIGRATION.md\0docker/.env", "a deployment-local secrets file that must stay untracked"],
-	[
-		`MIGRATION.md\0${["docker", "agent-image-pin.env"].join("/")}`,
-		"a removed path retained in migration history",
-	],
-	[
-		`MIGRATION.md\0${["docker", "agent-image-pin.local.env"].join("/")}`,
-		"a removed path retained in migration history",
-	],
-	["AGENTS.md\0server/.env", "a developer-local secrets file that must stay untracked"],
-	[
-		"docs/contributor/local-development.mdx\0server/.env",
-		"a developer-local secrets file that must stay untracked",
-	],
-	[
-		"docs/contributor/local-development.mdx\0server/postgres-data",
-		"a runtime data directory created by PostgreSQL and deliberately untracked",
-	],
-	[
-		"docs/contributor/local-development.mdx\0server/src/main/resources/application-local.yml",
-		"a developer-local override that the setup guide instructs readers to create",
-	],
-	[
-		"docs/contributor/local-development.mdx\0webapp/.env",
-		"a developer-local environment file that must stay untracked",
-	],
-]);
+const NON_NPM_NAMES = [
+	{
+		document: "docs/contributor/sync-lifecycle.md",
+		value: "graphql-codegen-maven-plugin",
+		reason: "a Maven plugin artifact, not an npm dependency",
+	},
+	{
+		document: "docs/contributor/sync-lifecycle.md",
+		value: "openapi-generator-maven-plugin",
+		reason: "a Maven plugin artifact, not an npm dependency",
+	},
+] satisfies readonly ClaimException[];
+
+const INTENTIONALLY_MISSING_PATHS = [
+	{
+		document: "docs/contributor/agent/workspace-abi.mdx",
+		value: ".sessions",
+		reason: "a per-run directory created inside the agent workspace",
+	},
+	{
+		document: "MIGRATION.md",
+		value: "docker/.env",
+		reason: "a deployment-local secrets file that must stay untracked",
+	},
+	{
+		document: "MIGRATION.md",
+		value: ["docker", "agent-image-pin.env"].join("/"),
+		reason: "a removed path retained in migration history",
+	},
+	{
+		document: "MIGRATION.md",
+		value: ["docker", "agent-image-pin.local.env"].join("/"),
+		reason: "a removed path retained in migration history",
+	},
+	{
+		document: "AGENTS.md",
+		value: "server/.env",
+		reason: "a developer-local secrets file that must stay untracked",
+	},
+	{
+		document: "docs/contributor/local-development.mdx",
+		value: "server/.env",
+		reason: "a developer-local secrets file that must stay untracked",
+	},
+	{
+		document: "docs/contributor/local-development.mdx",
+		value: "server/postgres-data",
+		reason: "a runtime data directory created by PostgreSQL and deliberately untracked",
+	},
+	{
+		document: "docs/contributor/local-development.mdx",
+		value: "server/src/main/resources/application-local.yml",
+		reason: "a developer-local override that the setup guide instructs readers to create",
+	},
+	{
+		document: "docs/contributor/local-development.mdx",
+		value: "webapp/.env",
+		reason: "a developer-local environment file that must stay untracked",
+	},
+] satisfies readonly ClaimException[];
 
 const PACKAGE_NAME = /^(?:@[a-z0-9][a-z0-9._-]*\/[a-z0-9][a-z0-9._-]*|[a-z0-9][a-z0-9._-]*)$/;
 const PACKAGE_SHAPED = /-(?:cli|config|core|js|node|package|plugin|react|sdk|test|ts)$/;
 const FILE_SHAPED = /\.(?:java|js|jsonc?|mdx?|mjs|sh|ts|tsx|xml|ya?ml)$/;
 const RUNTIME_ROOTS = new Set(["inputs", "out"]);
 const exists = (repo: Repo, path: string): boolean =>
-	repo.present.has(path) ||
-	[...repo.present.keys()].some((present) => present.startsWith(`${path}/`));
+	repo.present.has(path) || repo.paths.some((present) => present.startsWith(`${path}/`));
 
-function staleContributorClaims(repo: Repo): readonly string[] {
-	const roots = new Set([...repo.present.keys()].map((path) => path.split("/", 1)[0]));
-	const manifests = [...repo.present.values()].filter(
-		(file): file is Extract<TrackedFile, { kind: "text" }> =>
-			file.kind === "text" && basename(file.path) === "package.json",
-	);
+const excepts = (exceptions: readonly ClaimException[], document: string, value: string): boolean =>
+	exceptions.some((exception) => exception.document === document && exception.value === value);
+
+const dependencyFields = [
+	"dependencies",
+	"devDependencies",
+	"optionalDependencies",
+	"peerDependencies",
+] as const;
+
+function declaredPackages(repo: Repo): ReadonlySet<string> {
 	const packages = new Set<string>();
-	for (const manifest of manifests) {
-		const json = asRecord(parseJson(manifest.content), manifest.path);
+	for (const file of repo.present.values()) {
+		if (file.kind !== "text" || basename(file.path) !== "package.json") continue;
+		const json = asRecord(parseJson(file.content), file.path);
 		if (typeof json["name"] === "string") packages.add(json["name"]);
-		for (const field of [
-			"dependencies",
-			"devDependencies",
-			"optionalDependencies",
-			"peerDependencies",
-		]) {
+		for (const field of dependencyFields) {
 			const dependencies = json[field];
 			if (dependencies === undefined) continue;
-			for (const name of Object.keys(asRecord(dependencies, `${manifest.path} ${field}`))) {
+			for (const name of Object.keys(asRecord(dependencies, `${file.path} ${field}`))) {
 				packages.add(name);
 			}
 		}
 	}
+	return packages;
+}
 
+const looksLikePackage = (value: string, packages: ReadonlySet<string>): boolean =>
+	PACKAGE_NAME.test(value) &&
+	(value.startsWith("@") || packages.has(value) || PACKAGE_SHAPED.test(value));
+
+function looksLikePath(value: string, roots: ReadonlySet<string>): boolean {
+	if (value.startsWith("@") || value.startsWith("~/") || value.includes(":")) return false;
+	const first = value.split("/", 1)[0] ?? "";
+	return (
+		roots.has(first) ||
+		(first.startsWith(".") && value.includes("/")) ||
+		(value.includes("/") && basename(value).startsWith(".")) ||
+		(FILE_SHAPED.test(value) &&
+			!RUNTIME_ROOTS.has(first) &&
+			(value.includes("/") || /\.mdx?$/.test(value)))
+	);
+}
+
+function pathResolves(repo: Repo, document: string, value: string): boolean {
+	const cleaned = normalize(value.replace(/\/$/, ""));
+	if (exists(repo, cleaned)) return true;
+	if (/^\.\.?\//.test(value) && exists(repo, normalize(join(dirname(document), cleaned))))
+		return true;
+	if (!value.startsWith(".")) {
+		const suffixes = repo.paths.filter(
+			(path) => path.endsWith(`/${cleaned}`) || path.includes(`/${cleaned}/`),
+		);
+		if (suffixes.length === 1) return true;
+	}
+	return excepts(INTENTIONALLY_MISSING_PATHS, document, cleaned);
+}
+
+function staleContributorClaims(repo: Repo): readonly string[] {
+	const roots = new Set(repo.paths.map((path) => path.split("/", 1)[0] ?? path));
+	const packages = declaredPackages(repo);
 	const failures: string[] = [];
 	for (const file of repo.present.values()) {
 		if (file.kind !== "text" || !isContributorDoc(file.path)) continue;
@@ -191,11 +251,8 @@ function staleContributorClaims(repo: Repo): readonly string[] {
 			const candidate = value.replace(/[.,:;]$/, "").replace(/#.*$/, "");
 			if (candidate.includes("…") || candidate.includes("...") || /[*<>{}$\s]/.test(candidate))
 				continue;
-			if (
-				PACKAGE_NAME.test(candidate) &&
-				(candidate.startsWith("@") || packages.has(candidate) || PACKAGE_SHAPED.test(candidate))
-			) {
-				if (!packages.has(candidate) && !NON_NPM_NAMES.has(`${file.path}\0${candidate}`)) {
+			if (looksLikePackage(candidate, packages)) {
+				if (!packages.has(candidate) && !excepts(NON_NPM_NAMES, file.path, candidate)) {
 					failures.push(
 						`${file.path} names npm package \`${candidate}\`, but no package.json declares it.\n` +
 							"  Declare the dependency in the workspace that uses it, or remove the stale package name.",
@@ -203,35 +260,8 @@ function staleContributorClaims(repo: Repo): readonly string[] {
 				}
 				continue;
 			}
-			const firstSegment = candidate.split("/", 1)[0] ?? "";
-			const rooted =
-				roots.has(firstSegment) ||
-				(firstSegment.startsWith(".") && candidate.includes("/")) ||
-				candidate.startsWith("./") ||
-				candidate.startsWith("../");
-			const looksLikePath =
-				!candidate.startsWith("@") &&
-				!candidate.startsWith("~/") &&
-				!candidate.includes(":") &&
-				(rooted ||
-					(candidate.includes("/") && basename(candidate).startsWith(".")) ||
-					(FILE_SHAPED.test(candidate) &&
-						!RUNTIME_ROOTS.has(firstSegment) &&
-						(candidate.includes("/") || /\.mdx?$/.test(candidate))));
-			if (looksLikePath) {
-				const cleaned = normalize(candidate.replace(/\/$/, ""));
-				const relative = normalize(join(dirname(file.path), cleaned));
-				const suffixMatches = candidate.startsWith(".")
-					? []
-					: [...repo.present.keys()].filter(
-							(path) => path.endsWith(`/${cleaned}`) || path.includes(`/${cleaned}/`),
-						);
-				if (
-					!exists(repo, cleaned) &&
-					!exists(repo, relative) &&
-					suffixMatches.length !== 1 &&
-					!INTENTIONALLY_MISSING_PATHS.has(`${file.path}\0${cleaned}`)
-				) {
+			if (looksLikePath(candidate, roots)) {
+				if (!pathResolves(repo, file.path, candidate)) {
 					failures.push(
 						`${file.path} names \`${candidate}\`, which looks like a repository path but resolves to nothing in this checkout.\n` +
 							"  Fix the path or remove the stale claim.",
@@ -250,12 +280,14 @@ function survey(snapshot: Snapshot): Repo {
 		byName.set(basename(path), [...(byName.get(basename(path)) ?? []), path]);
 	}
 	const present = new Map(snapshot.files.map((file) => [file.path, file]));
+	const paths = [...present.keys()];
 	// A vendored pack under an agent root — `react-best-practices/AGENTS.md` is Vercel's — is a
 	// skill's own payload, and Claude Code reads none of those directories anyway, so a `CLAUDE.md`
 	// beside one would reach nothing.
 	const guides = (byName.get("AGENTS.md") ?? []).filter((path) => !underAgentRoot(path));
 	return {
 		present,
+		paths,
 		byName,
 		guides,
 		commands: snapshot.files

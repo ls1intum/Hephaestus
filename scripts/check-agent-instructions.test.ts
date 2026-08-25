@@ -249,8 +249,10 @@ await test("path claims cannot escape through a typo, basename, or unrelated suf
 	assert.deepEqual(
 		analyse(
 			snapshot({
+				"docs/shared.md": { kind: "opaque" },
+				"docs/contributor/local.md": { kind: "opaque" },
 				"webapp/src/config.ts": { kind: "opaque" },
-				"docs/contributor/setup.md": "Use `src/config.ts`.\n",
+				"docs/contributor/setup.md": "Use `src/config.ts`, `./local.md`, and `../shared.md`.\n",
 			}),
 		),
 		[],
