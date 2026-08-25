@@ -100,7 +100,7 @@ jobs:
 
       - name: Restore compiled server classes
         if: steps.should_run.outputs.run == 'true' && (startsWith(matrix.test-type, 'application-server-') || matrix.test-type == 'webapp-e2e')
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: ${{ inputs.server_classes_artifact_name }}
           path: server/target/classes
@@ -109,13 +109,13 @@ jobs:
         if: steps.should_run.outputs.run == 'true' && matrix.test-type == 'application-server-verification'
         run: |
           rm -rf server/target/surefire-reports/*
-          pnpm run test:server:verification -- -Dreuse.main.classes=true
+          pnpm run test:server:verification -Dreuse.main.classes=true
 
       - name: Run server integration tests
         if: steps.should_run.outputs.run == 'true' && matrix.test-type == 'application-server-integration'
         run: |
           rm -rf server/target/surefire-reports/*
-          pnpm run test:server:integration -- -Dreuse.main.classes=true
+          pnpm run test:server:integration -Dreuse.main.classes=true
 
       - name: Run tests
         id: tests
