@@ -312,6 +312,11 @@ class PullRequestCommentPoster {
         return findExistingSummaryComment(job, summaryMarkerFor(job));
     }
 
+    /** The marker an aside was posted under is the only thing that says whether it already exists. */
+    ExistingDeliveryLookup findAside(AgentJob job, String marker) {
+        return findExistingSummaryComment(job, marker);
+    }
+
     ExistingDeliveryLookup findApprovedProposal(AgentJob job, java.util.UUID feedbackId) {
         return findExistingSummaryComment(job, "<!-- hephaestus:approved-feedback:" + feedbackId + " -->");
     }

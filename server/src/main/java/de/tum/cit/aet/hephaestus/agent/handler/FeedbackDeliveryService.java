@@ -216,6 +216,14 @@ class FeedbackDeliveryService {
         if (inlineResult.suppressed()) {
             recordSuppressedRemainder(job, delivery, inlineResult.suppressedRecurrenceKeys());
         }
+        if (inlineResult.failed() > 0) {
+            // Raised last, so the ledger and both dispatches are already durable and a retry re-runs the
+            // inline reconcile alone. The reconcile is keyed by recurrence, so re-running it posts nothing
+            // twice — but nothing else retries it, and a note dropped in silence never arrives at all.
+            throw new JobDeliveryException(
+                "Inline notes were not fully delivered: failed=" + inlineResult.failed() + ", jobId=" + job.getId()
+            );
+        }
     }
 
     private void recordSuppressedRemainder(
@@ -288,11 +296,7 @@ class FeedbackDeliveryService {
             contributingPracticeSlugs
         );
         if (result.status() == PracticeFeedbackDispatchService.Result.Status.SUPPRESSED) {
-            throw new DispatchPolicySuppressedException(
-                result.suppressionReason() == null
-                    ? FeedbackSuppressionReason.INSTANCE_SILENCED
-                    : result.suppressionReason()
-            );
+            throw new DispatchPolicySuppressedException(result.suppressionReason());
         }
         if (result.status() == PracticeFeedbackDispatchService.Result.Status.UNCERTAIN && priorRef != null) {
             job.setDeliveryCommentId(priorRef);
@@ -388,6 +392,7 @@ class FeedbackDeliveryService {
         }
     }
 
+    /** Goes through the dispatcher like every other create, so a retried delivery adds no second ping. */
     private void postReReviewPing(AgentJob job, TrendDelta trend, Set<String> contributingPracticeSlugs) {
         List<String> parts = new ArrayList<>();
         if (trend.countResolved() > 0) {
@@ -399,16 +404,10 @@ class FeedbackDeliveryService {
         if (trend.countRegressed() > 0) {
             parts.add(trend.countRegressed() + " slipped back");
         }
-        String marker = "<!-- hephaestus:re-review-ping:" + job.getId() + " -->";
         String body = "🔁 **Re-reviewed** — " + String.join(", ", parts) + ". See the updated review summary above.";
         try {
-            if (
-                !deliveryPolicy
-                    .evaluatePullRequest(job, DeliveryPolicyStage.EGRESS, null, contributingPracticeSlugs)
-                    .allowed()
-            ) return;
-            String pingId = commentPoster.postAside(job, body, marker);
-            log.info("Re-review ping posted: jobId={}, pingCommentId={}", job.getId(), pingId);
+            var result = dispatchService.dispatchReReviewPing(job, body, contributingPracticeSlugs);
+            log.info("Re-review ping dispatch: jobId={}, status={}", job.getId(), result.status());
         } catch (RuntimeException e) {
             log.warn("Re-review ping failed (delivery unaffected): jobId={}, error={}", job.getId(), e.getMessage());
         }

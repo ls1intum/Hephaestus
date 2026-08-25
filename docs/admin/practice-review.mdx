@@ -148,7 +148,9 @@ Three independent controls answer different questions; confusing them is the mos
 - **Send feedback**, under **Sending feedback**, controls whether feedback may leave Hephaestus. It stops
   pull-request comments and the mentor; it does not stop measurement, does not discard configuration, and
   does not blank the developer's own feedback pages here, which are not something leaving. Pausing is the
-  one control here that leaves work already in flight alone, so it is safe to reach for.
+  one control here that leaves work already in flight alone, so it is safe to reach for. A proposal you
+  approved in the moment before the pause is held rather than lost, and goes out when you resume — the
+  usual checks run again then, so one whose pull request has since closed is refused instead of posted.
 
   The two lanes behave differently on resume, deliberately. Feedback that would have been **sent
   automatically** during the pause is dropped rather than held, so resuming never releases a backlog at

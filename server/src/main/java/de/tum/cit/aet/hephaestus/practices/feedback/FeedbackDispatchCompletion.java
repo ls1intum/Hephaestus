@@ -11,5 +11,6 @@ public record FeedbackDispatchCompletion(
     String state,
     @Nullable String externalRef,
     @Nullable String error,
+    @Nullable String suppressionReason,
     Instant nextAttemptAt
 ) {}

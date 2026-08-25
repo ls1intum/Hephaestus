@@ -345,13 +345,7 @@ public class IssueReviewHandler implements JobTypeHandler {
                 contributingPracticeSlugs
             );
             if (result.status() == PracticeFeedbackDispatchService.Result.Status.SUPPRESSED) {
-                recordSuppressed(
-                    job,
-                    delivery,
-                    result.suppressionReason() == null
-                        ? FeedbackSuppressionReason.INSTANCE_SILENCED
-                        : result.suppressionReason()
-                );
+                recordSuppressed(job, delivery, result.suppressionReason());
                 return;
             }
             if (result.status() != PracticeFeedbackDispatchService.Result.Status.SENT || result.externalRef() == null) {

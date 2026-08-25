@@ -522,6 +522,64 @@ public class FeedbackLedgerRecorder {
     }
 
     /**
+     * Records a summary the recovery sweep delivered after the run itself had ended. The normal write happens
+     * inside delivery, which a crash between the provider write and the acknowledgement skips entirely — and
+     * {@link #priorLiveSummaryRef} reads this placement, so without it the next re-review finds no prior
+     * summary and posts a second one beside the recovered comment.
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void recordRecoveredSummary(AgentJob job, String externalRef, String body) {
+        if (feedbackRepository.existsByAgentJobIdAndPosition(job.getId(), IN_CONTEXT_UNIT_ORDINAL)) {
+            return;
+        }
+        List<Observation> observations = observationRepository.findByAgentJobId(job.getId());
+        if (observations.isEmpty()) {
+            return;
+        }
+        Observation any = observations.get(0);
+        String feedbackThreadKey = feedbackThreadKeyFor(any);
+        Instant now = Instant.now();
+        Feedback feedback = feedbackRepository.save(
+            Feedback.builder()
+                .agentJobId(job.getId())
+                .workspaceId(job.getWorkspace().getId())
+                .artifactKind(any.getArtifactKind())
+                .artifactId(any.getArtifactId())
+                .recipientUserId(any.getAboutUserId())
+                .aboutUserId(any.getAboutUserId())
+                .channel(FeedbackChannel.IN_CONTEXT)
+                .position(IN_CONTEXT_UNIT_ORDINAL)
+                .deliveryState(FeedbackDeliveryState.DELIVERED)
+                .body(body)
+                .source(FeedbackSource.AGENT)
+                .threadKey(feedbackThreadKey)
+                .replacesId(
+                    feedbackPlacementRepository
+                        .findLatestDeliveredSummary(feedbackThreadKey)
+                        .map(FeedbackPlacement::getFeedbackId)
+                        .orElse(null)
+                )
+                .createdAt(now)
+                .deliveredAt(now)
+                .build()
+        );
+        feedbackPlacementRepository.save(
+            FeedbackPlacement.builder()
+                .feedback(feedback)
+                .placementType(PlacementType.SUMMARY)
+                .postedCommentRef(externalRef)
+                .createdAt(now)
+                .build()
+        );
+        log.info(
+            "Recovered summary recorded in the ledger: jobId={}, feedbackId={}, commentRef={}",
+            job.getId(),
+            feedback.getId(),
+            externalRef
+        );
+    }
+
+    /**
      * The external comment id of the CURRENT live in-context summary for this job's continuity line, if any —
      * the comment a re-review should EDIT IN PLACE rather than post anew (ADR 0021 re-review UX). Derived from
      * the job's own observations so this read key is computed identically to the write key in {@link #record},

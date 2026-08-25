@@ -9,7 +9,8 @@ says how many repositories and people it would cover, so a pilot can be checked 
 Sending feedback is now its own switch: pause it and reviews keep running, developers can still read
 their own feedback in Hephaestus, and nothing reaches a pull request or the mentor. Resuming never releases a backlog of automatic
 feedback at your developers — that work is dropped rather than held — while proposals waiting for your
-approval stay in the queue for you to decide on. Pausing leaves reviews already under way
+approval stay in the queue for you to decide on, and one already approved when you paused is held rather
+than dropped. Pausing leaves reviews already under way
 alone, so it is safe to use during an incident and undo afterwards.
 
 Every delivery decision now keeps its reasoning. On a piece of work under Review activity, a workspace

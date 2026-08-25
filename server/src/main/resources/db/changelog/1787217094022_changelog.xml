@@ -168,6 +168,7 @@
             <column name="lease_expires_at" type="TIMESTAMP WITH TIME ZONE"/>
             <column name="next_attempt_at" type="TIMESTAMP WITH TIME ZONE"><constraints nullable="false"/></column>
             <column name="attempt_count" type="INTEGER"><constraints nullable="false"/></column>
+            <column name="suppression_reason" type="VARCHAR(48)"/>
             <column name="last_error" type="VARCHAR(512)"/>
             <column name="created_at" type="TIMESTAMP WITH TIME ZONE"><constraints nullable="false"/></column>
             <column name="updated_at" type="TIMESTAMP WITH TIME ZONE"><constraints nullable="false"/></column>
@@ -177,9 +178,9 @@
         <addForeignKeyConstraint baseTableName="feedback_dispatch" baseColumnNames="workspace_id,feedback_id" referencedTableName="feedback" referencedColumnNames="workspace_id,id" constraintName="sfk_feedback_dispatch_feedback" onDelete="CASCADE"/>
         <sql splitStatements="true" endDelimiter=";"><![CDATA[
             ALTER TABLE feedback_dispatch ADD CONSTRAINT chk_feedback_dispatch_state
-                CHECK (state IN ('PENDING', 'CLAIMED', 'SENT', 'SUPPRESSED', 'UNCERTAIN', 'FAILED'));
+                CHECK (state IN ('PENDING', 'CLAIMED', 'SENT', 'HELD', 'SUPPRESSED', 'UNCERTAIN', 'FAILED'));
             ALTER TABLE feedback_dispatch ADD CONSTRAINT chk_feedback_dispatch_destination
-                CHECK (destination IN ('ARTIFACT_SUMMARY', 'APPROVED_ARTIFACT_COMMENT'));
+                CHECK (destination IN ('ARTIFACT_SUMMARY', 'APPROVED_ARTIFACT_COMMENT', 'RE_REVIEW_PING'));
             ALTER TABLE feedback DROP CONSTRAINT chk_feedback_suppression_reason;
             ALTER TABLE feedback ADD CONSTRAINT chk_feedback_suppression_reason
                 CHECK (suppression_reason IS NULL OR suppression_reason IN (

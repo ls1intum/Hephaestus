@@ -38,11 +38,14 @@ class PracticeFeedbackDispatchRecoveryTest extends BaseUnitTest {
     @Mock
     private PracticeFeedbackDispatchService service;
 
+    @Mock
+    private FeedbackLedgerRecorder ledgerRecorder;
+
     private PracticeFeedbackDispatchRecovery recovery;
 
     @BeforeEach
     void setUp() {
-        recovery = new PracticeFeedbackDispatchRecovery(dispatches, jobs, feedback, service);
+        recovery = new PracticeFeedbackDispatchRecovery(dispatches, jobs, feedback, service, ledgerRecorder);
     }
 
     @Test
@@ -112,6 +115,7 @@ class PracticeFeedbackDispatchRecoveryTest extends BaseUnitTest {
             null,
             Instant.now(),
             1,
+            null,
             null,
             Instant.now(),
             Instant.now()

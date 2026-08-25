@@ -87,10 +87,7 @@ class ApprovedFeedbackDeliveryListener {
         }
         PracticeFeedbackDispatchService.Result result = dispatchService.dispatchApproved(job, feedback);
         if (result.status() == PracticeFeedbackDispatchService.Result.Status.SUPPRESSED) {
-            FeedbackSuppressionReason reason =
-                result.suppressionReason() == null
-                    ? FeedbackSuppressionReason.INSTANCE_SILENCED
-                    : result.suppressionReason();
+            FeedbackSuppressionReason reason = result.suppressionReason();
             feedbackRepository.markApprovedSuppressed(event.workspaceId(), feedback.getId(), reason.name());
             return;
         }

@@ -13,6 +13,7 @@ import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.DeliveryContent;
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.DiffNote;
+import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliverySuppressedException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.config.ApplicationProperties;
@@ -383,7 +384,6 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             when(commentPoster.updateFormattedBody(eq(job), eq("IC_prior"), any(String.class))).thenReturn(
                 new PullRequestCommentPoster.UpdateResult(PullRequestCommentPoster.UpdateResult.Kind.EDITED, "IC_prior")
             );
-            when(commentPoster.postAside(eq(job), any(String.class), any(String.class))).thenReturn("IC_ping");
             when(
                 observationTrendService.computeForTarget(ArtifactKinds.PULL_REQUEST, PULL_REQUEST_ID, WORKSPACE_ID)
             ).thenReturn(Optional.of(resolvedTrend()));
@@ -399,10 +399,9 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             verify(commentPoster).updateFormattedBody(eq(job), eq("IC_prior"), body.capture());
             assertThat(body.getValue()).contains("Progress since your last review").contains("Resolved");
             var pingBody = ArgumentCaptor.forClass(String.class);
-            var pingMarker = ArgumentCaptor.forClass(String.class);
-            verify(commentPoster).postAside(eq(job), pingBody.capture(), pingMarker.capture());
+            verify(dispatchService).dispatchReReviewPing(eq(job), pingBody.capture(), any());
             assertThat(pingBody.getValue()).contains("Re-reviewed");
-            assertThat(pingMarker.getValue()).startsWith("<!-- hephaestus:re-review-ping:");
+            verify(commentPoster, never()).postAside(eq(job), any(String.class), any(String.class));
             verify(commentPoster, never()).postFormattedBody(eq(job), any(String.class));
         }
 
@@ -1075,7 +1074,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
 
         @Test
         @DisplayName("a FAILED inline signal contributes no delivered key — its summary line is never demoted")
-        void failedSignalDoesNotDemote() {
+        void failedSignalDoesNotDemoteAndSurfacesForRetry() {
             AgentJob job = createJob();
             stubOpenPr();
             when(commentPoster.postFormattedBody(eq(job), any(String.class))).thenReturn("IC_summary");
@@ -1090,12 +1089,14 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
                 new DiffNotePoster.DiffNoteResult(0, 1, List.of(failed))
             );
 
-            service.deliverFeedback(
-                job,
-                new DeliveryContent("Full-line summary.", List.of(), List.of()),
-                keys -> "demoted",
-                Set.of("practice")
-            );
+            assertThatThrownBy(() ->
+                service.deliverFeedback(
+                    job,
+                    new DeliveryContent("Full-line summary.", List.of(), List.of()),
+                    keys -> "demoted",
+                    Set.of("practice")
+                )
+            ).isInstanceOf(JobDeliveryException.class);
 
             verify(commentPoster, never()).updateFormattedBody(eq(job), any(String.class), any(String.class));
         }

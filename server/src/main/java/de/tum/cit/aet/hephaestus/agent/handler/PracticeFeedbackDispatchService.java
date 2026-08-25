@@ -30,6 +30,9 @@ class PracticeFeedbackDispatchService {
 
     static final Duration LEASE = Duration.ofMinutes(5);
     static final int MAX_ATTEMPTS = 8;
+
+    /** How long a parked row waits before the operator's setting is read again. */
+    private static final Duration HELD_RECHECK = Duration.ofHours(1);
     private static final Duration BASE_BACKOFF = Duration.ofSeconds(15);
     private static final Duration MAX_BACKOFF = Duration.ofMinutes(15);
 
@@ -70,6 +73,21 @@ class PracticeFeedbackDispatchService {
                 FeedbackDispatchDestination.ARTIFACT_SUMMARY,
                 body,
                 priorExternalRef,
+                contributingPracticeSlugs
+            ),
+            job
+        );
+    }
+
+    Result dispatchReReviewPing(AgentJob job, String body, Set<String> contributingPracticeSlugs) {
+        return dispatch(
+            insertIfAbsentAndLoad(
+                job,
+                null,
+                "ping:" + job.getId(),
+                FeedbackDispatchDestination.RE_REVIEW_PING,
+                body,
+                null,
                 contributingPracticeSlugs
             ),
             job
@@ -130,7 +148,10 @@ class PracticeFeedbackDispatchService {
             return Result.sent(dispatch.getDeliveredExternalRef());
         }
         if (dispatch.getState() == FeedbackDispatchState.SUPPRESSED) {
-            return Result.suppressed(null);
+            return Result.suppressed(storedReason(dispatch));
+        }
+        if (dispatch.getState() == FeedbackDispatchState.HELD && dispatch.getNextAttemptAt().isAfter(Instant.now())) {
+            return Result.held(storedReason(dispatch));
         }
         if (dispatch.getState() == FeedbackDispatchState.FAILED) {
             return Result.failed();
@@ -152,43 +173,26 @@ class PracticeFeedbackDispatchService {
 
         PracticeFeedbackDeliveryPolicy.Decision<?> decision = evaluateAtEgress(dispatch, job);
         if (!decision.allowed()) {
-            return finish(
-                    dispatch,
-                    owner,
-                    FeedbackDispatchState.SUPPRESSED,
-                    null,
-                    nameOf(decision.suppressionReason()),
-                    null
-                )
-                ? Result.suppressed(decision.suppressionReason())
-                : Result.inProgress();
+            return refuse(dispatch, owner, decision.suppressionReason());
         }
 
-        ExistingDeliveryLookup existing =
-            dispatch.getDestination() == FeedbackDispatchDestination.ARTIFACT_SUMMARY
-                ? commentPoster.findExistingSummaryComment(job)
-                : commentPoster.findApprovedProposal(job, dispatch.getFeedbackId());
+        ExistingDeliveryLookup existing = switch (dispatch.getDestination()) {
+            case ARTIFACT_SUMMARY -> commentPoster.findExistingSummaryComment(job);
+            case RE_REVIEW_PING -> commentPoster.findAside(job, pingMarker(dispatch));
+            case APPROVED_ARTIFACT_COMMENT -> commentPoster.findApprovedProposal(job, dispatch.getFeedbackId());
+        };
         if (existing.kind() == ExistingDeliveryLookup.Kind.UNKNOWN) {
             return retry(dispatch, owner, "Provider lookup was inconclusive");
         }
         if (existing.kind() == ExistingDeliveryLookup.Kind.FOUND) {
-            return finish(dispatch, owner, FeedbackDispatchState.SENT, existing.commentId(), null, null)
+            return finish(dispatch, owner, FeedbackDispatchState.SENT, existing.commentId(), null, null, null)
                 ? Result.sent(existing.commentId())
                 : Result.inProgress();
         }
 
         decision = evaluateAtEgress(dispatch, job);
         if (!decision.allowed()) {
-            return finish(
-                    dispatch,
-                    owner,
-                    FeedbackDispatchState.SUPPRESSED,
-                    null,
-                    nameOf(decision.suppressionReason()),
-                    null
-                )
-                ? Result.suppressed(decision.suppressionReason())
-                : Result.inProgress();
+            return refuse(dispatch, owner, decision.suppressionReason());
         }
 
         if (dispatch.getWriteStarted()) {
@@ -206,13 +210,11 @@ class PracticeFeedbackDispatchService {
             if (externalRef == null || externalRef.isBlank()) {
                 return retry(dispatch, owner, "Provider returned no external id");
             }
-            return finish(dispatch, owner, FeedbackDispatchState.SENT, externalRef, null, null)
+            return finish(dispatch, owner, FeedbackDispatchState.SENT, externalRef, null, null, null)
                 ? Result.sent(externalRef)
                 : Result.inProgress();
         } catch (JobDeliverySuppressedException exception) {
-            return finish(dispatch, owner, FeedbackDispatchState.SUPPRESSED, null, exception.getMessage(), null)
-                ? Result.suppressed(FeedbackSuppressionReason.INSTANCE_SILENCED)
-                : Result.inProgress();
+            return refuse(dispatch, owner, FeedbackSuppressionReason.INSTANCE_SILENCED);
         } catch (RuntimeException exception) {
             return retry(dispatch, owner, bounded(exception.getMessage()));
         }
@@ -232,6 +234,9 @@ class PracticeFeedbackDispatchService {
     }
 
     private @Nullable String post(FeedbackDispatch dispatch, AgentJob job) {
+        if (dispatch.getDestination() == FeedbackDispatchDestination.RE_REVIEW_PING) {
+            return commentPoster.postAside(job, dispatch.getBody(), pingMarker(dispatch));
+        }
         if (dispatch.getDestination() == FeedbackDispatchDestination.APPROVED_ARTIFACT_COMMENT) {
             if (job.getMetadata() != null && job.getMetadata().has("issue_number")) {
                 return commentPoster.postIssueApprovedProposal(job, dispatch.getFeedbackId(), dispatch.getBody());
@@ -262,6 +267,7 @@ class PracticeFeedbackDispatchService {
         FeedbackDispatchState state,
         @Nullable String externalRef,
         @Nullable String error,
+        @Nullable FeedbackSuppressionReason suppressionReason,
         @Nullable Instant nextAttemptAt
     ) {
         Integer affected = transactionTemplate.execute(status ->
@@ -273,6 +279,7 @@ class PracticeFeedbackDispatchService {
                     state.name(),
                     externalRef,
                     bounded(error),
+                    suppressionReason == null ? null : suppressionReason.name(),
                     nextAttemptAt == null ? Instant.now() : nextAttemptAt
                 )
             )
@@ -290,10 +297,33 @@ class PracticeFeedbackDispatchService {
         return true;
     }
 
+    /**
+     * Parks the row when an operator could lift the refusal, drops it when nobody will revisit it. Automatic
+     * feedback never parks: a pause drops it, which is what resuming without a backlog means.
+     */
+    private Result refuse(FeedbackDispatch dispatch, String owner, FeedbackSuppressionReason reason) {
+        boolean park =
+            dispatch.getDestination() == FeedbackDispatchDestination.APPROVED_ARTIFACT_COMMENT &&
+            reason.operatorRevisable();
+        if (!park) {
+            return finish(dispatch, owner, FeedbackDispatchState.SUPPRESSED, null, null, reason, null)
+                ? Result.suppressed(reason)
+                : Result.inProgress();
+        }
+        return finish(dispatch, owner, FeedbackDispatchState.HELD, null, null, reason, Instant.now().plus(HELD_RECHECK))
+            ? Result.held(reason)
+            : Result.inProgress();
+    }
+
+    private static @Nullable FeedbackSuppressionReason storedReason(FeedbackDispatch dispatch) {
+        String stored = dispatch.getSuppressionReason();
+        return stored == null ? null : FeedbackSuppressionReason.valueOf(stored);
+    }
+
     private Result retry(FeedbackDispatch dispatch, String owner, @Nullable String error) {
         int attempt = dispatch.getAttemptCount() + 1;
         if (attempt >= MAX_ATTEMPTS) {
-            return finish(dispatch, owner, FeedbackDispatchState.FAILED, null, error, null)
+            return finish(dispatch, owner, FeedbackDispatchState.FAILED, null, error, null, null)
                 ? Result.failed()
                 : Result.inProgress();
         }
@@ -303,6 +333,7 @@ class PracticeFeedbackDispatchService {
                 FeedbackDispatchState.UNCERTAIN,
                 null,
                 error,
+                null,
                 Instant.now().plus(backoff(attempt))
             )
             ? Result.uncertain()
@@ -332,8 +363,8 @@ class PracticeFeedbackDispatchService {
         return value.substring(0, 512);
     }
 
-    private static @Nullable String nameOf(@Nullable FeedbackSuppressionReason reason) {
-        return reason == null ? null : reason.name();
+    private static String pingMarker(FeedbackDispatch dispatch) {
+        return "<!-- hephaestus:re-review-ping:" + dispatch.getAgentJobId() + " -->";
     }
 
     record Result(Status status, @Nullable String externalRef, @Nullable FeedbackSuppressionReason suppressionReason) {
@@ -343,6 +374,10 @@ class PracticeFeedbackDispatchService {
 
         static Result suppressed(@Nullable FeedbackSuppressionReason reason) {
             return new Result(Status.SUPPRESSED, null, reason);
+        }
+
+        static Result held(@Nullable FeedbackSuppressionReason reason) {
+            return new Result(Status.HELD, null, reason);
         }
 
         static Result uncertain() {
@@ -359,6 +394,7 @@ class PracticeFeedbackDispatchService {
 
         enum Status {
             SENT,
+            HELD,
             SUPPRESSED,
             UNCERTAIN,
             IN_PROGRESS,

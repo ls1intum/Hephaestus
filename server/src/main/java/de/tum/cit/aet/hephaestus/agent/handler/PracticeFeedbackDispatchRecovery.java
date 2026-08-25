@@ -8,7 +8,6 @@ import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDispatch;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDispatchDestination;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDispatchRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
 import java.time.Instant;
 import lombok.RequiredArgsConstructor;
 import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
@@ -31,6 +30,10 @@ class PracticeFeedbackDispatchRecovery {
     private final AgentJobRepository agentJobRepository;
     private final FeedbackRepository feedbackRepository;
     private final PracticeFeedbackDispatchService dispatchService;
+    private final FeedbackLedgerRecorder feedbackLedgerRecorder;
+
+    /** How long an approved proposal waits for an operator to lift the brake before it is dropped. */
+    private static final java.time.Duration HELD_TTL = java.time.Duration.ofDays(30);
 
     @Scheduled(fixedDelayString = "PT30S", initialDelayString = "PT30S")
     @SchedulerLock(name = "practice-feedback-dispatch-recovery", lockAtMostFor = "PT15M", lockAtLeastFor = "PT5S")
@@ -48,6 +51,11 @@ class PracticeFeedbackDispatchRecovery {
                     exhausted.getId(),
                     exception
                 );
+            }
+        }
+        for (var stale : dispatchRepository.findHeldSince(Instant.now().minus(HELD_TTL))) {
+            if (dispatchRepository.giveUpOnHeld(stale.getId(), stale.getWorkspaceId()) == 1) {
+                projectGiveUp(stale);
             }
         }
         for (var candidate : dispatchRepository.findRecoverable(
@@ -89,23 +97,39 @@ class PracticeFeedbackDispatchRecovery {
         }
     }
 
+    private void projectGiveUp(FeedbackDispatch dispatch) {
+        log.info(
+            "Held dispatch dropped after {}: dispatchId={}, reason={}",
+            HELD_TTL,
+            dispatch.getId(),
+            dispatch.getSuppressionReason()
+        );
+        if (dispatch.getDestination() == FeedbackDispatchDestination.APPROVED_ARTIFACT_COMMENT) {
+            feedbackRepository.markApprovedSuppressed(
+                dispatch.getWorkspaceId(),
+                dispatch.getFeedbackId(),
+                dispatch.getSuppressionReason()
+            );
+        }
+    }
+
     private void reconcileDomain(FeedbackDispatch dispatch, PracticeFeedbackDispatchService.Result result) {
         if (dispatch.getDestination() == FeedbackDispatchDestination.APPROVED_ARTIFACT_COMMENT) {
             if (result.status() == PracticeFeedbackDispatchService.Result.Status.SENT) {
                 feedbackRepository.markApprovedDelivered(dispatch.getWorkspaceId(), dispatch.getFeedbackId());
             } else if (result.status() == PracticeFeedbackDispatchService.Result.Status.SUPPRESSED) {
-                var reason =
-                    result.suppressionReason() == null
-                        ? FeedbackSuppressionReason.APPROVAL_NO_LONGER_ELIGIBLE
-                        : result.suppressionReason();
                 feedbackRepository.markApprovedSuppressed(
                     dispatch.getWorkspaceId(),
                     dispatch.getFeedbackId(),
-                    reason.name()
+                    result.suppressionReason().name()
                 );
             } else if (result.status() == PracticeFeedbackDispatchService.Result.Status.FAILED) {
                 feedbackRepository.markApprovedFailed(dispatch.getWorkspaceId(), dispatch.getFeedbackId());
             }
+            return;
+        }
+        if (dispatch.getDestination() == FeedbackDispatchDestination.RE_REVIEW_PING) {
+            // Cosmetic: the summary it points at carries the review, so a lost ping is not a lost delivery.
             return;
         }
         if (result.status() == PracticeFeedbackDispatchService.Result.Status.SENT) {
@@ -115,6 +139,11 @@ class PracticeFeedbackDispatchRecovery {
                 DeliveryStatus.DELIVERED,
                 result.externalRef()
             );
+            agentJobRepository
+                .findById(dispatch.getAgentJobId())
+                .ifPresent(job ->
+                    feedbackLedgerRecorder.recordRecoveredSummary(job, result.externalRef(), dispatch.getBody())
+                );
         } else if (result.status() == PracticeFeedbackDispatchService.Result.Status.FAILED) {
             agentJobRepository.reconcileDispatchDeliveryStatus(
                 dispatch.getAgentJobId(),
