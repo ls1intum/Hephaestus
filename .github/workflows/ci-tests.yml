@@ -140,6 +140,7 @@ jobs:
                 cd ../server
                 ./mvnw install -pl generated-clients -am -DskipTests --batch-mode
                 SERVER_PORT=8080 MANAGEMENT_PORT=8080 POSTGRES_PORT=5432 \
+                  SPRING_DOCKER_COMPOSE_ENABLED=false \
                   APPLICATION_HOST_URL=http://localhost:4200 \
                   ./mvnw -pl application spring-boot:run \
                     -Dapp.profiles=e2e,playwright --batch-mode

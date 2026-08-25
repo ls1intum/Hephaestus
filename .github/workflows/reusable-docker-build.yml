@@ -28,7 +28,7 @@ on:
         type: string
         required: false
         default: ""
-        description: "Maven module path passed as -pl when use-buildpacks=true (e.g. server)"
+        description: "Directory containing the Spring Boot module when use-buildpacks=true (e.g. server/application)"
       registry:
         type: string
         default: "ghcr.io"
@@ -187,7 +187,7 @@ jobs:
         if: inputs.use-buildpacks
         run: |
           if [ -z "${{ inputs.maven-module }}" ]; then
-            echo "::error::use-buildpacks=true requires maven-module (e.g. server)"
+            echo "::error::use-buildpacks=true requires maven-module (e.g. server/application)"
             exit 1
           fi
 
@@ -202,7 +202,7 @@ jobs:
         run: |
           set -euo pipefail
           PER_ARCH_TAG="${{ inputs.registry }}/${{ inputs.image-name }}:ci-${{ github.run_id }}-${{ steps.prep.outputs.platform_pair }}"
-          ./mvnw -B -ntp spring-boot:build-image -DskipTests=true \
+          ../mvnw -B -ntp spring-boot:build-image -DskipTests=true \
             -Dspring-boot.build-image.imageName="$PER_ARCH_TAG" \
             -Dspring-boot.build-image.imagePlatform="${{ matrix.platform }}" \
             -Dspring-boot.build-image.publish=true \
