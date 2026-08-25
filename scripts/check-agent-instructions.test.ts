@@ -1,15 +1,14 @@
 import assert from "node:assert/strict";
-import { execFile } from "node:child_process";
-import { lstat, readFile, readlink } from "node:fs/promises";
 import { resolve } from "node:path";
 import { test } from "node:test";
-import { promisify } from "node:util";
 import {
 	analyse,
 	CODEX_SKILLS,
+	codeSpans,
 	parse,
 	references,
 	type Snapshot,
+	scan,
 	type TrackedFile,
 	withoutCode,
 } from "./check-agent-instructions.ts";
@@ -27,6 +26,7 @@ function only(failures: readonly string[]): string {
 
 /** A symlink to `target`, as an override value. */
 const symlinkTo = (target: string): { readonly target: string } => ({ target });
+const markdownSpans = (markdown: string): readonly string[] => codeSpans(markdown, "markdown");
 
 type Override = string | { readonly target: string } | { readonly kind: "opaque" } | null;
 
@@ -57,27 +57,8 @@ await test("the wired checkout passes", () => {
 	assert.deepEqual(analyse(snapshot()), []);
 });
 
-/**
- * The repository itself. `pnpm run check` runs the CLI over the real tree, but only ever over the
- * content of the day; this pins it.
- */
 await test("the repository this gate ships in passes it", async () => {
-	const { stdout } = await promisify(execFile)(
-		"git",
-		["ls-files", "-z", "--cached", "--others", "--exclude-standard"],
-		{ cwd: REPO_ROOT, maxBuffer: 64 * 1024 * 1024 },
-	);
-	const files: TrackedFile[] = [];
-	for (const path of [...new Set(stdout.split("\0").filter(Boolean))].toSorted()) {
-		const stats = await lstat(resolve(REPO_ROOT, path)).catch(() => undefined);
-		if (stats === undefined) continue;
-		if (stats.isSymbolicLink()) {
-			files.push({ path, kind: "symlink", target: await readlink(resolve(REPO_ROOT, path)) });
-		} else if (path.endsWith(".md") || path === "opencode.json") {
-			files.push({ path, kind: "text", content: await readFile(resolve(REPO_ROOT, path), "utf8") });
-		} else files.push({ path, kind: "opaque" });
-	}
-	assert.deepEqual(analyse({ files }, CODEX_SKILLS), []);
+	assert.deepEqual(analyse(await scan(REPO_ROOT), CODEX_SKILLS), []);
 });
 
 await test("a nested AGENTS.md with no CLAUDE.md beside it is unreachable in Claude Code", () => {
@@ -198,6 +179,158 @@ await test("code is not prose: a reference inside a span, a fence or a comment i
 	assert.ok(!withoutCode("<!<!-- -->-- @AGENTS.md").includes("<!--"));
 	// …and the fence must close, or everything after it would be swallowed.
 	assert.deepEqual(references("```sh\nx\n```\n\n@AGENTS.md\n"), ["AGENTS.md"]);
+});
+
+await test("the markdown scanner extracts code spans, not fences or comments", () => {
+	assert.deepEqual(markdownSpans("Use `scripts/check.ts` and ``a ` b``."), [
+		"scripts/check.ts",
+		"a ` b",
+	]);
+	assert.deepEqual(markdownSpans("A `line\nwrap` is one span."), ["line wrap"]);
+	assert.deepEqual(markdownSpans("A `CRLF\r\nwrap` is one span."), ["CRLF wrap"]);
+	assert.deepEqual(markdownSpans("A `CR\rwrap` is one span."), ["CR wrap"]);
+	assert.deepEqual(markdownSpans("` padded ` and `   `"), ["padded", "   "]);
+	assert.deepEqual(markdownSpans("<!-- `hidden.md` -->\n```md\n`fenced.md`\n```\n`shown.md`"), [
+		"shown.md",
+	]);
+	assert.deepEqual(markdownSpans("\\`escaped.md\\`\n\n    `indented.md`"), []);
+	assert.deepEqual(markdownSpans("`a <!-- literal --> span`"), ["a <!-- literal --> span"]);
+	assert.deepEqual(markdownSpans("> ```md\n> `quoted.md`\n> ```\n`shown.md`"), ["shown.md"]);
+	assert.deepEqual(codeSpans("<Tabs>\n<TabItem>\nUse `inside.md`\n</TabItem>\n</Tabs>", "mdx"), [
+		"inside.md",
+	]);
+	assert.deepEqual(markdownSpans("`not closed``"), []);
+	assert.deepEqual(
+		markdownSpans("```md\n`hidden.md`\n``` not a close\n`still-hidden.md`\n```"),
+		[],
+	);
+	assert.deepEqual(markdownSpans("```md\n<!--\n```\n`shown.md`"), ["shown.md"]);
+	assert.deepEqual(markdownSpans("<!--\n```md\n-->\n`shown.md`"), ["shown.md"]);
+});
+
+await test("contributor docs reject missing repository paths and npm packages", () => {
+	const failures = analyse(
+		snapshot({
+			"package.json": JSON.stringify({ dependencies: { react: "19.0.0" } }),
+			"scripts/existing.ts": { kind: "opaque" },
+			"docs/contributor/setup.md":
+				"Use `scripts/existing.ts`, `react`, `scripts/missing.ts`, `missing-plugin`, and `@missing/package`.\n",
+		}),
+	);
+	assert.equal(failures.length, 3, failures.join("\n"));
+	assert.match(failures[0] ?? "", /scripts\/missing\.ts/);
+	assert.match(failures[1] ?? "", /missing-plugin/);
+	assert.match(failures[2] ?? "", /@missing\/package/);
+});
+
+await test("an intentional non-checkout path is allowed only in the document that owns it", () => {
+	assert.deepEqual(
+		analyse(
+			snapshot({
+				"server/existing.ts": { kind: "opaque" },
+				"docs/contributor/local-development.mdx": "Create `server/.env`.\n",
+			}),
+		),
+		[],
+	);
+	assert.match(
+		only(
+			analyse(
+				snapshot({
+					"server/existing.ts": { kind: "opaque" },
+					"docs/contributor/setup.md": "Create `server/.env`.\n",
+				}),
+			),
+		),
+		/server\/.env/,
+	);
+});
+
+await test("a unique shorthand directory resolves independently of its descendant count", () => {
+	assert.deepEqual(
+		analyse(
+			snapshot({
+				"webapp/src/features/a.ts": { kind: "opaque" },
+				"webapp/src/features/b.ts": { kind: "opaque" },
+				"docs/contributor/setup.md": "Use `src/features/`.\n",
+			}),
+		),
+		[],
+	);
+});
+
+await test("an invalid contributor MDX document is reported with its path", () => {
+	assert.throws(
+		() => analyse(snapshot({ "docs/contributor/broken.mdx": "<Component/ name>" })),
+		/docs\/contributor\/broken\.mdx:/,
+	);
+});
+
+await test("path claims cannot escape through a typo, basename, or unrelated suffix match", () => {
+	for (const claim of ["scrips/missing.ts", "missing.md", "./config.md"]) {
+		const failure = only(
+			analyse(
+				snapshot({
+					"other/config.md": "# Unrelated\n",
+					"docs/contributor/setup.md": `Use \`${claim}\`.\n`,
+				}),
+			),
+		);
+		assert.ok(failure.includes(claim), claim);
+	}
+	assert.deepEqual(
+		analyse(
+			snapshot({
+				"docs/shared.md": { kind: "opaque" },
+				"docs/contributor/local.md": { kind: "opaque" },
+				"webapp/src/config.ts": { kind: "opaque" },
+				"docs/contributor/setup.md": "Use `src/config.ts`, `./local.md`, and `../shared.md`.\n",
+			}),
+		),
+		[],
+	);
+	assert.match(
+		only(
+			analyse(
+				snapshot({
+					"server/src/config.ts": { kind: "opaque" },
+					"webapp/src/config.ts": { kind: "opaque" },
+					"docs/contributor/setup.md": "Use `src/config.ts`.\n",
+				}),
+			),
+		),
+		/src\/config\.ts/,
+	);
+});
+
+await test("the contributor claim scope is root Markdown and contributor Markdown or MDX only", () => {
+	for (const path of ["README.md", "docs/contributor/setup.md", "docs/contributor/setup.mdx"]) {
+		assert.match(only(analyse(snapshot({ [path]: "Use `missing.md`.\n" }))), /missing\.md/, path);
+	}
+	for (const path of ["README.mdx", "docs/reader/setup.md"]) {
+		assert.deepEqual(analyse(snapshot({ [path]: "Use `missing.md`.\n" })), [], path);
+	}
+});
+
+await test("every package.json declaration field satisfies a contributor package claim", () => {
+	const manifest = {
+		name: "workspace-package",
+		dependencies: { dependency: "1" },
+		devDependencies: { "dev-package": "1" },
+		optionalDependencies: { "optional-package": "1" },
+		peerDependencies: { "peer-package": "1" },
+	};
+	assert.deepEqual(
+		analyse(
+			snapshot({
+				"package.json": JSON.stringify(manifest),
+				"docs/contributor/setup.md":
+					"`workspace-package` `dependency` `dev-package` `optional-package` `peer-package`\n",
+			}),
+		),
+		[],
+	);
+	assert.throws(() => analyse(snapshot({ "package.json": "{broken" })), SyntaxError);
 });
 
 await test("a code span split by the line wrap does not swallow the import after it", () => {
