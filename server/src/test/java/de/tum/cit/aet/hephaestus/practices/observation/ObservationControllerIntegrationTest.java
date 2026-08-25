@@ -32,6 +32,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -117,7 +118,7 @@ class ObservationControllerIntegrationTest extends AbstractWorkspaceIntegrationT
         User user,
         String title,
         String presence,
-        String severity,
+        @Nullable String severity,
         float confidence,
         String artifactKind,
         Long artifactId,
@@ -147,7 +148,7 @@ class ObservationControllerIntegrationTest extends AbstractWorkspaceIntegrationT
     }
 
     /** Presence-derived valence: PRESENT is a strength (GOOD), ABSENT a problem (BAD), NOT_APPLICABLE none. */
-    private static String assessmentFor(String presence) {
+    private static @Nullable String assessmentFor(String presence) {
         if ("NOT_APPLICABLE".equals(presence)) {
             return null;
         }

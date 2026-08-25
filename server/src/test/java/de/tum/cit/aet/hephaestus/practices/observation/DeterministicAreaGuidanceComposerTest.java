@@ -11,6 +11,7 @@ import de.tum.cit.aet.hephaestus.practices.observation.dto.ReflectionItemDTO;
 import de.tum.cit.aet.hephaestus.practices.observation.dto.ReflectionPracticeDTO;
 import java.util.List;
 import java.util.UUID;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -116,8 +117,8 @@ class DeterministicAreaGuidanceComposerTest {
     private static ReflectionPracticeDTO card(
         String slug,
         String name,
-        String whyItMatters,
-        String whatGoodLooksLike,
+        @Nullable String whyItMatters,
+        @Nullable String whatGoodLooksLike,
         List<ReflectionItemDTO> toWorkOn,
         List<ReflectionItemDTO> strengths
     ) {

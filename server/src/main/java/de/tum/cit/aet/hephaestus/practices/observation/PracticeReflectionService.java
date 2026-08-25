@@ -28,6 +28,7 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -158,7 +159,7 @@ public class PracticeReflectionService {
             .collect(
                 Collectors.toMap(
                     PracticeEvidence::slug,
-                    evidence -> standingShare(evidence, trends.get(evidence.slug())),
+                    evidence -> standingShare(evidence, requireTrend(trends, evidence.slug())),
                     (left, ignored) -> left,
                     LinkedHashMap::new
                 )
@@ -172,16 +173,15 @@ public class PracticeReflectionService {
             .stream()
             .filter(practice -> AutonomyResolver.effectiveAutonomyOf(practice, workspaceDefault).admitsReview())
             .toList();
-        Map<String, List<String>> eligiblePracticesByArea = eligiblePractices
-            .stream()
-            .filter(practice -> practice.getArea() != null)
-            .collect(
-                Collectors.groupingBy(
-                    practice -> practice.getArea().getSlug(),
-                    LinkedHashMap::new,
-                    Collectors.mapping(Practice::getSlug, Collectors.toList())
-                )
-            );
+        Map<String, List<String>> eligiblePracticesByArea = new LinkedHashMap<>();
+        for (Practice practice : eligiblePractices) {
+            PracticeArea area = practice.getArea();
+            if (area != null) {
+                eligiblePracticesByArea
+                    .computeIfAbsent(area.getSlug(), slug -> new ArrayList<>())
+                    .add(practice.getSlug());
+            }
+        }
         // Read once here so both area surfaces weigh the same practices the same way. Only eligible practices
         // carry a weight: one that is no longer reviewed contributes nothing to its area regardless.
         Map<String, Double> areaWeightByPractice = eligiblePractices
@@ -244,7 +244,7 @@ public class PracticeReflectionService {
                 PracticeEvidence evidence = evidenceBySlug.get(entry.getKey());
                 Double share = standingShareByPractice.get(entry.getKey());
                 return evidence != null && share != null
-                    ? toCard(evidence, trends.get(entry.getKey()), deliveredGuidance, share)
+                    ? toCard(evidence, requireTrend(trends, entry.getKey()), deliveredGuidance, share)
                     : silentCard(entry.getValue(), evidence, inapplicableByPractice.getOrDefault(entry.getKey(), 0));
             })
             .sorted(
@@ -316,6 +316,16 @@ public class PracticeReflectionService {
             trend.direction(),
             TrendSupportDTO.from(trend.support())
         );
+    }
+
+    /**
+     * The trend of a practice that produced a card.
+     *
+     * <p>Never absent: the trends were derived from exactly the evidence map these practices came from,
+     * so a missing entry is a programming error rather than a state to render around.
+     */
+    private static PracticeTrend requireTrend(Map<String, PracticeTrend> trends, String slug) {
+        return Objects.requireNonNull(trends.get(slug), () -> "no trend for practice with a card: " + slug);
     }
 
     private static List<ReflectionItemDTO> items(
@@ -399,7 +409,10 @@ public class PracticeReflectionService {
                         ObservationOutcome.of(observation).isCoherentStrengthFor(defectDetector)
                     )
                 );
-            return new PracticeEvidence(practice, problems, positives.get(true), positives.get(false).size());
+            // partitioningBy always yields both keys, even when one side stays empty.
+            List<Observation> coherent = Objects.requireNonNull(positives.get(true));
+            List<Observation> incoherent = Objects.requireNonNull(positives.get(false));
+            return new PracticeEvidence(practice, problems, coherent, incoherent.size());
         }
 
         String slug() {

@@ -14,6 +14,7 @@ import de.tum.cit.aet.hephaestus.practices.observation.dto.DeveloperPracticeSumm
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewRunTargetLookup;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -67,9 +68,9 @@ public class ObservationService {
         boolean hasArtifactKinds = query.artifactKinds() != null && !query.artifactKinds().isEmpty();
         boolean hasSeverities = query.severities() != null && !query.severities().isEmpty();
         List<ArtifactKind> artifactKinds = hasArtifactKinds
-            ? query.artifactKinds()
+            ? Objects.requireNonNull(query.artifactKinds())
             : List.of(ArtifactKinds.PULL_REQUEST);
-        List<Severity> severities = hasSeverities ? query.severities() : List.of(Severity.INFO);
+        List<Severity> severities = hasSeverities ? Objects.requireNonNull(query.severities()) : List.of(Severity.INFO);
         if (query.sort() == ObservationSort.SEVERITY) {
             return observationRepository.findByAboutUserAndWorkspaceSeverityFirst(
                 currentUser.get().getId(),

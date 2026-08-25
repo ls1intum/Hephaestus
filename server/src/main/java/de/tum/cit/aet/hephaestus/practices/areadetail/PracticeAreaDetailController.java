@@ -13,7 +13,6 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springdoc.core.annotations.ParameterObject;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.data.web.PagedModel;
 import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
@@ -91,7 +90,7 @@ public class PracticeAreaDetailController {
                     filter.practiceSlug(),
                     filter.kinds(),
                     filter.severities(),
-                    PageRequest.of(filter.page(), filter.size())
+                    filter.pageable()
                 )
             )
         );

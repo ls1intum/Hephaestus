@@ -4,7 +4,10 @@ import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
 import io.swagger.v3.oas.annotations.Parameter;
 import java.util.List;
+import java.util.Objects;
 import org.jspecify.annotations.Nullable;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.server.ResponseStatusException;
@@ -38,6 +41,17 @@ public record PracticeAreaReviewHistoryFilterParams(
     public PracticeAreaReviewHistoryFilterParams {
         page = page == null || page < 0 ? 0 : page;
         size = size == null ? 10 : Math.clamp(size, 1, 50);
+    }
+
+    /**
+     * The page to read, already normalised.
+     *
+     * <p>The compact constructor above defaults a missing or negative page to the first one and clamps the
+     * size, so neither component is null by the time anything reads it. Returning the {@link Pageable} here
+     * rather than the two numbers keeps that normalisation in one place and out of the controller.
+     */
+    public Pageable pageable() {
+        return PageRequest.of(Objects.requireNonNull(page), Objects.requireNonNull(size));
     }
 
     /** The requested artifact kinds, parsed; {@code null} means "every kind". */

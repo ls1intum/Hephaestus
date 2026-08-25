@@ -387,9 +387,9 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
     Page<Observation> findByAboutUserAndWorkspaceSeverityFirst(
         @Param("aboutUserId") Long aboutUserId,
         @Param("workspaceId") Long workspaceId,
-        @Param("practiceSlug") String practiceSlug,
-        @Param("areaSlug") String areaSlug,
-        @Param("presence") Presence presence,
+        @Param("practiceSlug") @Nullable String practiceSlug,
+        @Param("areaSlug") @Nullable String areaSlug,
+        @Param("presence") @Nullable Presence presence,
         @Param("hasArtifactKinds") boolean hasArtifactKinds,
         @Param("artifactKinds") Collection<ArtifactKind> artifactKinds,
         @Param("hasSeverities") boolean hasSeverities,
@@ -439,8 +439,8 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
     Page<ReviewHistoryRunRow> findReviewHistoryRuns(
         @Param("aboutUserId") Long aboutUserId,
         @Param("workspaceId") Long workspaceId,
-        @Param("areaSlug") String areaSlug,
-        @Param("practiceSlug") String practiceSlug,
+        @Param("areaSlug") @Nullable String areaSlug,
+        @Param("practiceSlug") @Nullable String practiceSlug,
         @Param("hasArtifactKinds") boolean hasArtifactKinds,
         @Param("artifactKinds") Collection<String> artifactKinds,
         @Param("hasSeverities") boolean hasSeverities,
@@ -468,8 +468,8 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
         @Param("jobIds") Collection<UUID> jobIds,
         @Param("aboutUserId") Long aboutUserId,
         @Param("workspaceId") Long workspaceId,
-        @Param("areaSlug") String areaSlug,
-        @Param("practiceSlug") String practiceSlug,
+        @Param("areaSlug") @Nullable String areaSlug,
+        @Param("practiceSlug") @Nullable String practiceSlug,
         @Param("hasArtifactKinds") boolean hasArtifactKinds,
         @Param("artifactKinds") Collection<ArtifactKind> artifactKinds,
         @Param("hasSeverities") boolean hasSeverities,
@@ -1162,7 +1162,7 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
     List<Observation> findRecentForSubjectAndPractice(
         @Param("workspaceId") Long workspaceId,
         @Param("aboutUserId") Long aboutUserId,
-        @Param("practiceSlug") String practiceSlug,
+        @Param("practiceSlug") @Nullable String practiceSlug,
         @Param("since") Instant since,
         Pageable pageable
     );

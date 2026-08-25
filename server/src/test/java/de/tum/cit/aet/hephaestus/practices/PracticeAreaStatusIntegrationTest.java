@@ -28,6 +28,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -183,7 +184,7 @@ class PracticeAreaStatusIntegrationTest extends AbstractWorkspaceIntegrationTest
         User user,
         String title,
         String presence,
-        String severity,
+        @Nullable String severity,
         Long artifactId
     ) {
         return insertFinding(job, targetPractice, user, title, presence, severity, artifactId, Instant.now());
@@ -195,7 +196,7 @@ class PracticeAreaStatusIntegrationTest extends AbstractWorkspaceIntegrationTest
         User user,
         String title,
         String presence,
-        String severity,
+        @Nullable String severity,
         Long artifactId,
         Instant observedAt
     ) {
@@ -218,7 +219,7 @@ class PracticeAreaStatusIntegrationTest extends AbstractWorkspaceIntegrationTest
         User user,
         String title,
         String presence,
-        String severity,
+        @Nullable String severity,
         Long artifactId,
         Instant observedAt,
         String artifactKind

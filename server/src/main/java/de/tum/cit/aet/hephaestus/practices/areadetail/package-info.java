@@ -13,4 +13,5 @@
  * application needs about an area's standing comes through {@code practices.observation}, and keeping this
  * package closed is what lets a screen's shape change without a module boundary moving.
  */
+@org.jspecify.annotations.NullMarked
 package de.tum.cit.aet.hephaestus.practices.areadetail;

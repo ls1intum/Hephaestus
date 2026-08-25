@@ -10,6 +10,7 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -105,7 +106,9 @@ final class PracticeTrendCalculator {
         double weightedMean = 0.0;
         double totalPrecision = 0.0;
         for (PracticeTrend trend : comparable) {
-            BetaPosterior.Difference difference = trend.difference();
+            // `comparable` was filtered on difference() != null above; the nullness analysis
+            // does not carry that across the stream boundary.
+            BetaPosterior.Difference difference = Objects.requireNonNull(trend.difference());
             double precision = weightFor(trend.slug(), weights) / difference.variance();
             weightedMean += precision * difference.mean();
             totalPrecision += precision;

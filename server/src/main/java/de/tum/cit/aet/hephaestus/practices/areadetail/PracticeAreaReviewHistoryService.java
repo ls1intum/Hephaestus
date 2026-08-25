@@ -19,6 +19,7 @@ import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -62,8 +63,10 @@ public class PracticeAreaReviewHistoryService {
         // `findReviewHistoryRuns` is a native query whose collection parameter is expanded into the SQL text —
         // an empty one yields `IN ()`, which Postgres rejects at parse time, before any short-circuit applies.
         // These are NOT defaults: an unfiltered request still returns issues and conversation threads.
-        List<ArtifactKind> artifactFilter = hasArtifactKinds ? artifactKinds : List.of(ArtifactKinds.PULL_REQUEST);
-        List<Severity> severityFilter = hasSeverities ? severities : List.of(Severity.INFO);
+        List<ArtifactKind> artifactFilter = hasArtifactKinds
+            ? Objects.requireNonNull(artifactKinds)
+            : List.of(ArtifactKinds.PULL_REQUEST);
+        List<Severity> severityFilter = hasSeverities ? Objects.requireNonNull(severities) : List.of(Severity.INFO);
 
         Page<ReviewHistoryRunRow> runs = observationRepository.findReviewHistoryRuns(
             currentDeveloperId.get(),

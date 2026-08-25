@@ -15,10 +15,14 @@ public final class PracticeTrend {
     private final TrendScope scope;
     private final TrendDirection direction;
     private final TrendSupport support;
-    private final OutcomeVector currentOutcomes;
-    private final OutcomeVector previousOutcomes;
+    /** Absent while the evidence is not comparable — the accessors below say the same. */
+    private final @Nullable OutcomeVector currentOutcomes;
+
+    private final @Nullable OutcomeVector previousOutcomes;
     private final List<EvidenceOpportunity> opportunities;
-    private final BetaPosterior.Difference difference;
+
+    /** Absent for INSUFFICIENT_EVIDENCE, and for an area result, which aggregates rather than diffs. */
+    private final BetaPosterior.@Nullable Difference difference;
 
     PracticeTrend(
         String slug,
@@ -28,7 +32,7 @@ public final class PracticeTrend {
         @Nullable OutcomeVector currentOutcomes,
         @Nullable OutcomeVector previousOutcomes,
         List<EvidenceOpportunity> opportunities,
-        BetaPosterior.Difference difference
+        BetaPosterior.@Nullable Difference difference
     ) {
         this.slug = slug;
         this.scope = scope;
@@ -111,7 +115,7 @@ public final class PracticeTrend {
         return opportunities;
     }
 
-    BetaPosterior.Difference difference() {
+    BetaPosterior.@Nullable Difference difference() {
         return difference;
     }
 

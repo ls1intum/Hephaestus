@@ -5,7 +5,10 @@ import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
 import io.swagger.v3.oas.annotations.Parameter;
 import java.util.List;
+import java.util.Objects;
 import org.jspecify.annotations.Nullable;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -66,6 +69,24 @@ public record ObservationFeedFilterParams(
         size = size == null ? 20 : Math.clamp(size, 1, 100);
     }
 
+    /**
+     * The page to read, already normalised and sorted.
+     *
+     * <p>The compact constructor above defaults every paging component, so none is null by the time
+     * anything reads it. The severity query carries its own ORDER BY, so it must not also receive a sort:
+     * adding one would have the database order by two different keys.
+     */
+    public Pageable pageable() {
+        PageRequest page = PageRequest.of(Objects.requireNonNull(this.page), Objects.requireNonNull(size));
+        return sort() == ObservationService.ObservationSort.SEVERITY
+            ? page
+            : PageRequest.of(
+                  page.getPageNumber(),
+                  page.getPageSize(),
+                  Sort.by(Objects.requireNonNull(direction), "observedAt")
+              );
+    }
+
     /** The domain-facing shape; {@code direction} collapses into the severity sort's only use of it. */
     public ObservationFeedQuery toQuery() {
         return new ObservationFeedQuery(
@@ -74,8 +95,8 @@ public record ObservationFeedFilterParams(
             presence,
             parseArtifactKinds(),
             severities,
-            displayableOnly,
-            sort,
+            Objects.requireNonNull(displayableOnly),
+            Objects.requireNonNull(sort),
             direction == Sort.Direction.DESC
         );
     }
