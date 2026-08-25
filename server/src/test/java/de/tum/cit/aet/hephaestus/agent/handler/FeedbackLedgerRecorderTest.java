@@ -293,6 +293,39 @@ class FeedbackLedgerRecorderTest extends BaseUnitTest {
             });
     }
 
+    /**
+     * A re-review proposes again about the same work. The queue has to offer one current decision, or an
+     * approver can send a review of a diff that has moved on.
+     */
+    @Test
+    void reReview_proposal_carriesItsThreadAndRetiresTheUndecidedOneBeforeIt() {
+        Observation observation = problem();
+        when(observationRepository.findByAgentJobId(any())).thenReturn(List.of(observation));
+        when(feedbackRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        recorder().recordProposal(
+            job(),
+            new DeliveryContent("proposed body", List.of(), List.of()),
+            List.of(
+                new PracticeDetectionResultParser.ValidatedObservation(
+                    "practice",
+                    "summary",
+                    Presence.ABSENT,
+                    Assessment.BAD,
+                    Severity.MAJOR,
+                    null,
+                    "reasoning",
+                    new ObservationKeys(observation.getOccurrenceKey(), "rk")
+                )
+            )
+        );
+
+        var saved = ArgumentCaptor.forClass(Feedback.class);
+        verify(feedbackRepository).save(saved.capture());
+        assertThat(saved.getValue().getThreadKey()).isNotBlank();
+        verify(feedbackRepository).supersedeUndecidedProposals(any(), eq(saved.getValue().getThreadKey()), any());
+    }
+
     @Test
     void reReview_priorDeliveredUnit_isSupersededAndNewRowReplacesIt() {
         // B1: the re-review SUPERSEDED branch (every other test stubs the prior lookup to Optional.empty()).

@@ -247,6 +247,25 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
     int markSuperseded(@Param("workspaceId") Long workspaceId, @Param("id") UUID id);
 
     /**
+     * Retires proposals on this thread that nobody decided, so a re-reviewed artifact offers one current
+     * decision rather than one per run. Scoped to {@code AWAITING_APPROVAL}: a decided proposal is a
+     * record of what a person chose and is never rewritten.
+     */
+    @Modifying(flushAutomatically = true)
+    @Transactional
+    @Query(
+        value = "UPDATE feedback SET delivery_state = 'SUPERSEDED' " +
+            "WHERE workspace_id = :workspaceId AND thread_key = :threadKey AND id <> :keepId " +
+            "AND delivery_state = 'AWAITING_APPROVAL'",
+        nativeQuery = true
+    )
+    int supersedeUndecidedProposals(
+        @Param("workspaceId") Long workspaceId,
+        @Param("threadKey") String threadKey,
+        @Param("keepId") UUID keepId
+    );
+
+    /**
      * Whether a unit has been received. Asked only after a supersession compare-and-set matched nothing,
      * to tell "the recipient read it first" — a thread that continues, so the replacement still points
      * back at what it follows — from "the thread already moved on", where pointing back would fork the

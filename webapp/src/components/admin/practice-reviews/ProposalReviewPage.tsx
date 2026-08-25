@@ -101,7 +101,8 @@ export function ProposalReviewPage({
 				provenance={
 					<p className="max-w-2xl text-sm text-muted-foreground">
 						Review the exact feedback, the work it addresses, and every observation behind it.
-						Approval sends only this feedback.
+						Approval sends only this feedback, and it arrives as one comment on the work — notes on
+						individual lines are posted only for feedback that sends automatically.
 					</p>
 				}
 			/>

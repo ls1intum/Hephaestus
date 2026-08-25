@@ -581,7 +581,9 @@ public class FeedbackLedgerRecorder {
 
     /**
      * The external comment id of the CURRENT live in-context summary for this job's continuity line, if any —
-     * the comment a re-review should EDIT IN PLACE rather than post anew (ADR 0021 re-review UX). Derived from
+     * the comment a re-review edits in place rather than posting anew. That is the shipped provider UX, not
+     * what ADR 0021 asks for — the ADR says delivered feedback is never rewritten and a new unit supersedes
+     * the one it replaces, which is what the ledger below already does. Derived from
      * the job's own observations so this read key is computed identically to the write key in {@link #record},
      * with no reliance on PR↔observation id coupling. Empty when this is the first delivery on the line, the prior
      * unit is already superseded/failed, or it had no recoverable SUMMARY placement (e.g. the post had failed).
@@ -670,8 +672,16 @@ public class FeedbackLedgerRecorder {
                 .deliveryState(FeedbackDeliveryState.AWAITING_APPROVAL)
                 .body(delivery.mrNote())
                 .source(FeedbackSource.AGENT)
+                .threadKey(feedbackThreadKeyFor(first))
                 .createdAt(Instant.now())
                 .build()
+        );
+        // A re-review proposes again about the same work. Without this the queue offers one decision per
+        // run, and approving an older one posts a review of a diff that has moved on.
+        feedbackRepository.supersedeUndecidedProposals(
+            job.getWorkspace().getId(),
+            feedbackThreadKeyFor(first),
+            feedback.getId()
         );
         int ordinal = 0;
         for (ValidatedObservation candidate : proposed) {
