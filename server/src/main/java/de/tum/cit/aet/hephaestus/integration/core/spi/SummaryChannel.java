@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.core.spi;
 
 import java.util.Objects;
+import org.jspecify.annotations.Nullable;
 
 /**
  * The vendor pipe that posts a review's summary — every integration declaring
@@ -57,7 +58,7 @@ public interface SummaryChannel {
         return repoFullName + "#" + issueNumber;
     }
 
-    record FeedbackTarget(IntegrationRef ref, String subjectExternalId, String resourceUrl) {}
+    record FeedbackTarget(IntegrationRef ref, String subjectExternalId, @Nullable String resourceUrl) {}
 
     record FeedbackContent(String body, String marker) {
         public String externalBody() {
@@ -70,7 +71,7 @@ public interface SummaryChannel {
     /** Vendor-side post identifier recorded on {@code FeedbackPlacement.external_ref} for edit-in-place (ADR 0021). */
     record SummaryHandle(String externalId) {}
 
-    record ExistingSummaryLookup(Kind kind, SummaryHandle handle) {
+    record ExistingSummaryLookup(Kind kind, @Nullable SummaryHandle handle) {
         public enum Kind {
             FOUND,
             ABSENT,
@@ -95,7 +96,7 @@ public interface SummaryChannel {
      * The outcome of an {@link #updateSummary} attempt. {@code TRANSIENT} is the load-bearing case: the caller
      * must NOT create-fallback on it (that double-posts), only on {@code GONE}/{@code UNSUPPORTED}.
      */
-    record UpdateOutcome(Kind kind, SummaryHandle handle, String reason) {
+    record UpdateOutcome(Kind kind, @Nullable SummaryHandle handle, @Nullable String reason) {
         public enum Kind {
             EDITED,
             GONE,

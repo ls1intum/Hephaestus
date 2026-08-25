@@ -24,6 +24,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.annotation.Order;
@@ -254,7 +255,7 @@ public class LinkedWorkItemContentSource implements EvidenceSource {
         return node;
     }
 
-    private void collectFromText(String text, Refs refs, String source) {
+    private void collectFromText(@Nullable String text, Refs refs, String source) {
         if (text == null || text.isBlank()) {
             return;
         }
@@ -286,7 +287,7 @@ public class LinkedWorkItemContentSource implements EvidenceSource {
         }
     }
 
-    private void collectFromBranch(String sourceBranch, Refs refs) {
+    private void collectFromBranch(@Nullable String sourceBranch, Refs refs) {
         if (sourceBranch == null || sourceBranch.isBlank()) {
             return;
         }
@@ -304,7 +305,7 @@ public class LinkedWorkItemContentSource implements EvidenceSource {
         }
     }
 
-    private void collectFromCommits(JsonNode metadata, long repositoryId, String sourceBranch, Refs refs) {
+    private void collectFromCommits(JsonNode metadata, long repositoryId, @Nullable String sourceBranch, Refs refs) {
         if (!gitRepositoryManager.isEnabled() || !gitRepositoryManager.isRepositoryCloned(repositoryId)) {
             return;
         }
@@ -338,7 +339,7 @@ public class LinkedWorkItemContentSource implements EvidenceSource {
         }
     }
 
-    private static Integer parseNumber(String raw) {
+    private static @Nullable Integer parseNumber(String raw) {
         try {
             long value = Long.parseLong(raw);
             if (value <= 0 || value > Integer.MAX_VALUE) {
@@ -350,7 +351,7 @@ public class LinkedWorkItemContentSource implements EvidenceSource {
         }
     }
 
-    private static String firstNonBlank(String a, String b) {
+    private static @Nullable String firstNonBlank(@Nullable String a, @Nullable String b) {
         if (a != null && !a.isBlank()) {
             return a;
         }

@@ -14,14 +14,17 @@ import de.tum.cit.aet.hephaestus.testconfig.WorkspaceTestFixtures;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.util.List;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.ObjectMapper;
 
+@Transactional
 class PracticeRepositoryIntegrationTest extends BaseIntegrationTest {
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
@@ -39,7 +42,6 @@ class PracticeRepositoryIntegrationTest extends BaseIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        databaseTestUtils.cleanDatabase();
         workspace = workspaceRepository.save(WorkspaceTestFixtures.activeWorkspace("practice-test"));
     }
 
@@ -54,7 +56,7 @@ class PracticeRepositoryIntegrationTest extends BaseIntegrationTest {
         return practice;
     }
 
-    private PracticeArea persistArea(String slug, PracticeAutonomy autonomy, int displayOrder) {
+    private PracticeArea persistArea(String slug, @Nullable PracticeAutonomy autonomy, int displayOrder) {
         PracticeArea area = new PracticeArea();
         area.setWorkspace(workspace);
         area.setSlug(slug);

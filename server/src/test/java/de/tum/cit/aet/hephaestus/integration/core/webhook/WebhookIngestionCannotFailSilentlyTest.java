@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.core.webhook;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import de.tum.cit.aet.hephaestus.core.webhook.WebhookProperties;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
@@ -93,7 +94,9 @@ class WebhookIngestionCannotFailSilentlyTest extends BaseUnitTest {
     void readinessFormsOnAContainerMissingMostOfItsContributors() {
         healthContext(WEBHOOK_ROLE_ONLY).run(context -> {
             assertThat(context).hasNotFailed();
-            assertThat(context.getBean(HealthEndpointGroups.class).get("readiness").isMember("webhook")).isTrue();
+            var readiness = context.getBean(HealthEndpointGroups.class).get("readiness");
+            assertNotNull(readiness);
+            assertThat(readiness.isMember("webhook")).isTrue();
         });
     }
 
@@ -160,8 +163,10 @@ class WebhookIngestionCannotFailSilentlyTest extends BaseUnitTest {
             "HEPHAESTUS_WEBHOOK_STREAM_MAX_BYTES",
             "HEPHAESTUS_WEBHOOK_STREAM_MAX_BYTES_GITHUB"
         );
-        long perStream = shipped.get("HEPHAESTUS_WEBHOOK_STREAM_MAX_BYTES");
-        long github = shipped.get("HEPHAESTUS_WEBHOOK_STREAM_MAX_BYTES_GITHUB");
+        Long perStream = shipped.get("HEPHAESTUS_WEBHOOK_STREAM_MAX_BYTES");
+        Long github = shipped.get("HEPHAESTUS_WEBHOOK_STREAM_MAX_BYTES_GITHUB");
+        assertNotNull(perStream);
+        assertNotNull(github);
         long total = github + perStream * (WebhookJetStreamBootstrap.STREAMS.length - 1);
 
         assertThat(total)

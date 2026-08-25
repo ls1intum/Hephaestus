@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.workspace;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import java.time.Instant;
+import org.jspecify.annotations.Nullable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -39,6 +40,7 @@ public interface WorkspaceContributionQueryRepository extends JpaRepository<Pull
             AND rtm.workspace.id = :workspaceId
         """
     )
+    @Nullable
     Instant findEarliestPullRequestCreatedAt(@Param("workspaceId") Long workspaceId, @Param("userId") Long userId);
 
     /**
@@ -59,6 +61,7 @@ public interface WorkspaceContributionQueryRepository extends JpaRepository<Pull
             AND rtm.workspace.id = :workspaceId
         """
     )
+    @Nullable
     Instant findEarliestReviewSubmittedAt(@Param("workspaceId") Long workspaceId, @Param("userId") Long userId);
 
     /**
@@ -79,5 +82,6 @@ public interface WorkspaceContributionQueryRepository extends JpaRepository<Pull
             AND rtm.workspace.id = :workspaceId
         """
     )
+    @Nullable
     Instant findEarliestCommentCreatedAt(@Param("workspaceId") Long workspaceId, @Param("userId") Long userId);
 }

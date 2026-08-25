@@ -56,7 +56,7 @@ public abstract class AbstractIntegrationMessageHandler<T> implements Integratio
      *                            handler runs DB writes; we need a real tx boundary).
      */
     protected AbstractIntegrationMessageHandler(
-        IntegrationKind kind,
+        @org.jspecify.annotations.Nullable IntegrationKind kind,
         String eventType,
         Class<T> payloadType,
         NatsMessageDeserializer deserializer,

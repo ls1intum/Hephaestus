@@ -48,6 +48,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -145,12 +146,16 @@ class AgentJobEventListenerTest extends BaseUnitTest {
      * Creates a real PullRequest with the fields the listener reads set — not all fields
      * are accessed depending on the code path (e.g., closed PR skips branch info checks).
      */
-    private PullRequest mockPullRequest(String headRefOid, String headRefName, String baseRefName) {
+    private PullRequest mockPullRequest(
+        @Nullable String headRefOid,
+        @Nullable String headRefName,
+        @Nullable String baseRefName
+    ) {
         PullRequest pr = new PullRequest();
         pr.setId(PR_ID);
-        pr.setHeadRefOid(headRefOid);
-        pr.setHeadRefName(headRefName);
-        pr.setBaseRefName(baseRefName);
+        org.springframework.test.util.ReflectionTestUtils.setField(pr, "headRefOid", headRefOid);
+        org.springframework.test.util.ReflectionTestUtils.setField(pr, "headRefName", headRefName);
+        org.springframework.test.util.ReflectionTestUtils.setField(pr, "baseRefName", baseRefName);
         pr.setState(Issue.State.OPEN);
         pr.setMerged(false);
         return pr;
@@ -656,9 +661,9 @@ class AgentJobEventListenerTest extends BaseUnitTest {
 
             PullRequest pr = mockPullRequest("abc123", "feature/test", "main");
             when(pullRequestRepository.findByIdWithAllForGate(PR_ID)).thenReturn(Optional.of(pr));
-            when(
-                practiceReviewDetectionGate.evaluate(pr, ScmSignals.PULL_REQUEST_REVIEWED, TriggerMode.AUTO)
-            ).thenReturn(new GateDecision.Skip("no matching practices"));
+            lenient()
+                .when(practiceReviewDetectionGate.evaluate(pr, ScmSignals.PULL_REQUEST_REVIEWED, TriggerMode.AUTO))
+                .thenReturn(new GateDecision.Skip("no matching practices"));
 
             listener.onReviewSubmitted(event);
 
@@ -700,9 +705,9 @@ class AgentJobEventListenerTest extends BaseUnitTest {
 
             PullRequest pr = mockPullRequest("abc123", "feature/test", "main");
             when(pullRequestRepository.findByIdWithAllForGate(PR_ID)).thenReturn(Optional.of(pr));
-            when(
-                practiceReviewDetectionGate.evaluate(pr, ScmSignals.PULL_REQUEST_REVIEWED, TriggerMode.AUTO)
-            ).thenThrow(new RuntimeException("unexpected gate error"));
+            lenient()
+                .when(practiceReviewDetectionGate.evaluate(pr, ScmSignals.PULL_REQUEST_REVIEWED, TriggerMode.AUTO))
+                .thenThrow(new RuntimeException("unexpected gate error"));
 
             // Should not throw — outer catch handles gate exceptions
             listener.onReviewSubmitted(event);

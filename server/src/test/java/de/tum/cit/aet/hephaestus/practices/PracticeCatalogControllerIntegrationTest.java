@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.as;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.containsInAnyOrder;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import de.tum.cit.aet.hephaestus.agent.conversation.ChatSignals;
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
@@ -42,7 +43,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.stream.Stream;
 import org.assertj.core.api.InstanceOfAssertFactories;
-import org.assertj.core.api.InstanceOfAssertFactories;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -108,7 +109,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
         return practiceAreaRepository.save(area);
     }
 
-    private Practice persistPractice(String slug, PracticeArea area, int displayOrder) {
+    private Practice persistPractice(String slug, @Nullable PracticeArea area, int displayOrder) {
         Practice practice = persistPractice(slug, slug, true);
         practice.setArea(area);
         practice.setDisplayOrder(displayOrder);
@@ -499,7 +500,9 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
         void shouldCreatePracticeInactiveWithoutAutomatedReview() {
             ensureAdminMembership(workspace);
             CreatePracticeRequestDTO baseline = validCreateRequest("human-assessment-only");
-            var request = withEvidence(baseline, withoutAutomatedReview(baseline.automatedReviewPolicy()));
+            PracticeAutomatedReviewPolicy policy = baseline.automatedReviewPolicy();
+            assertNotNull(policy);
+            var request = withEvidence(baseline, withoutAutomatedReview(policy));
 
             PracticeDTO result = webTestClient
                 .post()
@@ -541,13 +544,12 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 .jsonPath("$.areaSlug")
                 .isEqualTo("review-quality");
 
-            assertThat(
-                practiceRepository
-                    .findByWorkspaceIdAndSlug(workspace.getId(), "scoped-practice")
-                    .orElseThrow()
-                    .getArea()
-                    .getSlug()
-            ).isEqualTo("review-quality");
+            PracticeArea area = practiceRepository
+                .findByWorkspaceIdAndSlug(workspace.getId(), "scoped-practice")
+                .orElseThrow()
+                .getArea();
+            assertNotNull(area);
+            assertThat(area.getSlug()).isEqualTo("review-quality");
         }
 
         @Test
@@ -677,6 +679,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
             assertThat(problem).isNotNull();
             assertThat(problem.getTitle()).isEqualTo("Validation failed");
+            assertNotNull(problem.getProperties());
             assertThat(problem.getProperties().get("errors"))
                 .asInstanceOf(InstanceOfAssertFactories.map(String.class, Object.class))
                 .containsKey("slug");
@@ -803,6 +806,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
             assertThat(problem).isNotNull();
             assertThat(problem.getTitle()).isEqualTo("Validation failed");
+            assertNotNull(problem.getProperties());
             assertThat(problem.getProperties().get("errors"))
                 .asInstanceOf(InstanceOfAssertFactories.map(String.class, Object.class))
                 .containsKeys("slug", "name", "criteria");
@@ -852,6 +856,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 .getResponseBody();
 
             assertThat(problem).isNotNull();
+            assertNotNull(problem.getProperties());
             assertThat(problem.getProperties().get("errors"))
                 .asInstanceOf(InstanceOfAssertFactories.map(String.class, Object.class))
                 .hasEntrySatisfying("bindings", messages ->
@@ -1101,7 +1106,9 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
             assertThat(persisted).isPresent();
             assertThat(persisted.get().getName()).isEqualTo("New Name");
             assertThat(persisted.get().getCriteria()).isEqualTo("New prompt");
-            assertThat(persisted.get().getArea().getSlug()).isEqualTo("target-area");
+            PracticeArea area = persisted.get().getArea();
+            assertNotNull(area);
+            assertThat(area.getSlug()).isEqualTo("target-area");
             PracticeRevision revision = practiceRevisionRepository
                 .findFirstByPracticeIdOrderByRevisionNumberDesc(persisted.get().getId())
                 .orElseThrow();
@@ -1264,6 +1271,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
             assertThat(problem).isNotNull();
             assertThat(problem.getTitle()).isEqualTo("Validation failed");
+            assertNotNull(problem.getProperties());
             assertThat(problem.getProperties().get("errors"))
                 .asInstanceOf(InstanceOfAssertFactories.map(String.class, Object.class))
                 .containsKey("name");
@@ -1292,6 +1300,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
             assertThat(problem).isNotNull();
             assertThat(problem.getTitle()).isEqualTo("Validation failed");
+            assertNotNull(problem.getProperties());
             assertThat(problem.getProperties().get("errors"))
                 .asInstanceOf(InstanceOfAssertFactories.map(String.class, Object.class))
                 .containsKey("name");
@@ -1320,6 +1329,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
             assertThat(problem).isNotNull();
             assertThat(problem.getTitle()).isEqualTo("Validation failed");
+            assertNotNull(problem.getProperties());
             assertThat(problem.getProperties().get("errors"))
                 .asInstanceOf(InstanceOfAssertFactories.map(String.class, Object.class))
                 .containsKey("criteria");
@@ -1574,8 +1584,8 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 .exchange();
         }
 
-        private List<String> slugsIn(List<PracticeDTO> practices, String areaSlug) {
-            assertThat(practices).isNotNull();
+        private List<String> slugsIn(@Nullable List<PracticeDTO> practices, String areaSlug) {
+            assertNotNull(practices);
             return practices
                 .stream()
                 .filter(practice -> areaSlug.equals(practice.areaSlug()))

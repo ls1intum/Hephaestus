@@ -24,8 +24,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.ObjectMapper;
 
@@ -37,16 +35,6 @@ import tools.jackson.databind.ObjectMapper;
  */
 @DisplayName("Poll candidate fairness")
 class AgentJobPollFairnessIntegrationTest extends BaseIntegrationTest {
-
-    @DynamicPropertySource
-    static void agentProperties(DynamicPropertyRegistry registry) {
-        registry.add("hephaestus.agent.enabled", () -> "true");
-        // Quiescent: this test drives claims explicitly rather than racing the background poll loop.
-        registry.add("hephaestus.agent.poll-interval", () -> "1h");
-        registry.add("hephaestus.runtime.worker.enabled", () -> "true");
-        registry.add("hephaestus.sandbox.docker-host", () -> "unix:///nonexistent/hephaestus-test-fairness.sock");
-        registry.add("hephaestus.agent.image.pull-policy", () -> "NEVER");
-    }
 
     @Autowired
     private AgentJobRepository jobRepository;

@@ -11,4 +11,5 @@
  * Modulith documentation calls out.
  */
 @org.springframework.modulith.NamedInterface("events")
+@org.jspecify.annotations.NullMarked
 package de.tum.cit.aet.hephaestus.workspace.events;

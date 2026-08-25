@@ -10,6 +10,7 @@ import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import java.util.List;
+import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -59,7 +60,12 @@ public class CatalogAdoptionService {
             );
         }
         if (plan.areaDisposition() == CatalogAreaDisposition.CREATE_CATALOG_AREA) {
-            areaService.adoptAreaFromCatalog(context, plan.areaSlug(), plan.areaDefinition(), plan.areaDisplayOrder());
+            areaService.adoptAreaFromCatalog(
+                context,
+                Objects.requireNonNull(plan.areaSlug()),
+                Objects.requireNonNull(plan.areaDefinition()),
+                plan.areaDisplayOrder()
+            );
         }
         return practiceService.adoptPracticeFromCatalog(context, slug, plan.definition(), plan.initialAutonomy());
     }

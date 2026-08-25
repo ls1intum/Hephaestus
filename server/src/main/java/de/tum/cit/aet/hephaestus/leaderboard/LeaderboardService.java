@@ -31,6 +31,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -126,7 +127,7 @@ public class LeaderboardService {
         Instant before,
         Optional<Team> team,
         LeaderboardSortType sort,
-        Map<Long, List<Team>> teamHierarchy
+        @Nullable Map<Long, List<Team>> teamHierarchy
     ) {
         if (workspace == null || workspace.getId() == null) {
             log.warn("Skipped leaderboard creation: reason=missingWorkspaceId");

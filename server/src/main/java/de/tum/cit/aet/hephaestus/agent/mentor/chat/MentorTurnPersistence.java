@@ -102,7 +102,6 @@ public class MentorTurnPersistence {
     }
 
     private static String truncateTitle(String prompt) {
-        if (prompt == null) return null;
         String s = prompt.strip().replaceAll("\\s+", " ");
         if (s.length() <= 80) return s;
         // Cut on a code-point boundary so a 77th-char surrogate pair (e.g. an emoji) is not split into a lone

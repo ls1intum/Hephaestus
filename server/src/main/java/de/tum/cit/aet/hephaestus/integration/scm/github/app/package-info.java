@@ -8,4 +8,5 @@
  * {@code app/} stays internal.
  */
 @org.springframework.modulith.NamedInterface("app")
+@org.jspecify.annotations.NullMarked
 package de.tum.cit.aet.hephaestus.integration.scm.github.app;

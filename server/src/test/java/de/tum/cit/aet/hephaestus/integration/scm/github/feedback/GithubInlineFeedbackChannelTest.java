@@ -27,6 +27,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
@@ -545,7 +546,7 @@ class GithubInlineFeedbackChannelTest extends BaseUnitTest {
         return spec;
     }
 
-    private static void stubField(ClientGraphQlResponse response, String path, Object value) {
+    private static void stubField(ClientGraphQlResponse response, String path, @Nullable Object value) {
         ClientResponseField field = mock(ClientResponseField.class);
         lenient().when(response.field(path)).thenReturn(field);
         lenient().when(field.getValue()).thenReturn(value);
@@ -613,6 +614,6 @@ class GithubInlineFeedbackChannelTest extends BaseUnitTest {
     /** Mutable holder for capturing the {@code threads} mutation variable. */
     private static final class ThreadsCaptor {
 
-        private Object value;
+        private @Nullable Object value;
     }
 }

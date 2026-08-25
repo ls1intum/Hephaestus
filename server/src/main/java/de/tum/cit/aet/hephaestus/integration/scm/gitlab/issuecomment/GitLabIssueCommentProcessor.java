@@ -30,6 +30,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.gitlab.issuecomment.dto.GitLabN
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.user.GitLabUserService;
 import java.time.Instant;
 import java.util.HashSet;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import org.jspecify.annotations.Nullable;
@@ -92,7 +93,7 @@ public class GitLabIssueCommentProcessor extends BaseGitLabProcessor {
         }
 
         Issue parent = issueRepository
-            .findByRepositoryIdAndNumber(context.repository().getId(), embeddedIssue.iid())
+            .findByRepositoryIdAndNumber(Objects.requireNonNull(context.repository()).getId(), embeddedIssue.iid())
             .orElse(null);
 
         if (parent == null) {
@@ -107,7 +108,7 @@ public class GitLabIssueCommentProcessor extends BaseGitLabProcessor {
             }
         }
 
-        User author = findOrCreateUser(event.user(), context.providerId());
+        User author = findOrCreateUser(event.user(), Objects.requireNonNull(context.providerId()));
         return processCommentInternal(attrs, parent, author, context);
     }
 
@@ -123,7 +124,7 @@ public class GitLabIssueCommentProcessor extends BaseGitLabProcessor {
 
         // PullRequest extends Issue, so findByRepositoryIdAndNumber works
         PullRequest parent = pullRequestRepository
-            .findByRepositoryIdAndNumber(context.repository().getId(), embeddedMr.iid())
+            .findByRepositoryIdAndNumber(Objects.requireNonNull(context.repository()).getId(), embeddedMr.iid())
             .orElse(null);
 
         if (parent == null) {
@@ -138,21 +139,21 @@ public class GitLabIssueCommentProcessor extends BaseGitLabProcessor {
             }
         }
 
-        User author = findOrCreateUser(event.user(), context.providerId());
+        User author = findOrCreateUser(event.user(), Objects.requireNonNull(context.providerId()));
         return processCommentInternal(attrs, parent, author, context);
     }
 
     public record SyncNoteData(
         long id,
-        String body,
-        String url,
+        @Nullable String body,
+        @Nullable String url,
         @Nullable String authorGlobalId,
         @Nullable String authorUsername,
         @Nullable String authorName,
         @Nullable String authorAvatarUrl,
         @Nullable String authorWebUrl,
-        String createdAt,
-        String updatedAt
+        @Nullable String createdAt,
+        @Nullable String updatedAt
     ) {}
 
     @Transactional
@@ -229,7 +230,7 @@ public class GitLabIssueCommentProcessor extends BaseGitLabProcessor {
         if (isNew) {
             EventContext eventCtx = EventContext.forSync(
                 scopeId,
-                RepositoryRef.from(parent.getRepository()),
+                Objects.requireNonNull(RepositoryRef.from(parent.getRepository())),
                 IdentityProviderType.GITLAB
             );
             eventPublisher.publishEvent(
@@ -239,7 +240,7 @@ public class GitLabIssueCommentProcessor extends BaseGitLabProcessor {
         } else if (!changedFields.isEmpty()) {
             EventContext eventCtx = EventContext.forSync(
                 scopeId,
-                RepositoryRef.from(parent.getRepository()),
+                Objects.requireNonNull(RepositoryRef.from(parent.getRepository())),
                 IdentityProviderType.GITLAB
             );
             eventPublisher.publishEvent(
@@ -265,7 +266,7 @@ public class GitLabIssueCommentProcessor extends BaseGitLabProcessor {
         Long issueId = parent.getId();
         Optional<IssueComment> existingOpt = commentRepository.findByNativeIdAndProviderId(
             attrs.id(),
-            context.providerId()
+            Objects.requireNonNull(context.providerId())
         );
         boolean isNew = existingOpt.isEmpty();
         IssueComment comment = existingOpt.orElseGet(IssueComment::new);
@@ -273,7 +274,7 @@ public class GitLabIssueCommentProcessor extends BaseGitLabProcessor {
 
         if (isNew) {
             comment.setNativeId(attrs.id());
-            comment.setProvider(context.provider());
+            comment.setProvider(Objects.requireNonNull(context.provider()));
         }
 
         String sanitizedBody = sanitize(attrs.note());
@@ -336,20 +337,22 @@ public class GitLabIssueCommentProcessor extends BaseGitLabProcessor {
             return createMinimalIssue(dto, context);
         } catch (DataIntegrityViolationException e) {
             log.debug("Concurrent issue creation, looking up: iid={}", dto.iid());
-            return issueRepository.findByRepositoryIdAndNumber(context.repository().getId(), dto.iid()).orElse(null);
+            return issueRepository
+                .findByRepositoryIdAndNumber(Objects.requireNonNull(context.repository()).getId(), dto.iid())
+                .orElse(null);
         }
     }
 
     @Nullable
     private Issue createMinimalIssue(EmbeddedIssue dto, ProcessingContext context) {
-        Repository repository = context.repository();
+        Repository repository = Objects.requireNonNull(context.repository());
         if (repository == null || dto.id() == null) return null;
 
         Issue issue = new Issue();
         issue.setNativeId(dto.id());
-        issue.setProvider(context.provider());
+        issue.setProvider(Objects.requireNonNull(context.provider()));
         issue.setNumber(dto.iid());
-        issue.setTitle(sanitize(dto.title()));
+        issue.setTitle(Objects.requireNonNullElse(sanitize(dto.title()), ""));
         issue.setBody(sanitize(dto.description()));
         issue.setState(convertIssueState(dto.state()));
         issue.setHtmlUrl(dto.url());
@@ -375,21 +378,21 @@ public class GitLabIssueCommentProcessor extends BaseGitLabProcessor {
         } catch (DataIntegrityViolationException e) {
             log.debug("Concurrent MR creation, looking up: iid={}", dto.iid());
             return pullRequestRepository
-                .findByRepositoryIdAndNumber(context.repository().getId(), dto.iid())
+                .findByRepositoryIdAndNumber(Objects.requireNonNull(context.repository()).getId(), dto.iid())
                 .orElse(null);
         }
     }
 
     @Nullable
     private PullRequest createMinimalPullRequest(EmbeddedMergeRequest dto, ProcessingContext context) {
-        Repository repository = context.repository();
+        Repository repository = Objects.requireNonNull(context.repository());
         if (repository == null || dto.id() == null) return null;
 
         PullRequest pr = new PullRequest();
         pr.setNativeId(dto.id());
-        pr.setProvider(context.provider());
+        pr.setProvider(Objects.requireNonNull(context.provider()));
         pr.setNumber(dto.iid());
-        pr.setTitle(sanitize(dto.title()));
+        pr.setTitle(Objects.requireNonNullElse(sanitize(dto.title()), ""));
         pr.setBody(sanitize(dto.description()));
         Issue.State mappedState = convertMrState(dto.state());
         pr.setState(mappedState);

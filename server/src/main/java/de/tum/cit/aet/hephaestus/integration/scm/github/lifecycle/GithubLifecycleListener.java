@@ -27,7 +27,9 @@ import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembershipService;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceSlugService;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.Optional;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
@@ -225,10 +227,10 @@ public class GithubLifecycleListener implements IntegrationLifecycleListener {
      * @return the created or updated workspace, or null if workspace creation was skipped
      */
     @Transactional
-    public Workspace createOrUpdateFromInstallation(
+    public @Nullable Workspace createOrUpdateFromInstallation(
         long installationId,
         String accountLogin,
-        RepositorySelection repositorySelection
+        @Nullable RepositorySelection repositorySelection
     ) {
         return createOrUpdateFromInstallationInternal(
             installationId,
@@ -252,13 +254,13 @@ public class GithubLifecycleListener implements IntegrationLifecycleListener {
      * @return the created or updated workspace, or null if workspace creation was skipped
      */
     @Transactional
-    public Workspace createOrUpdateFromInstallation(
+    public @Nullable Workspace createOrUpdateFromInstallation(
         long installationId,
-        Long accountId,
-        String accountLogin,
+        @Nullable Long accountId,
+        @Nullable String accountLogin,
         AccountKind accountKind,
-        String avatarUrl,
-        RepositorySelection repositorySelection
+        @Nullable String avatarUrl,
+        @Nullable RepositorySelection repositorySelection
     ) {
         return createOrUpdateFromInstallationInternal(
             installationId,
@@ -270,13 +272,13 @@ public class GithubLifecycleListener implements IntegrationLifecycleListener {
         );
     }
 
-    private Workspace createOrUpdateFromInstallationInternal(
+    private @Nullable Workspace createOrUpdateFromInstallationInternal(
         long installationId,
-        Long accountId,
-        String accountLogin,
+        @Nullable Long accountId,
+        @Nullable String accountLogin,
         AccountKind accountKind,
-        String avatarUrl,
-        RepositorySelection repositorySelection
+        @Nullable String avatarUrl,
+        @Nullable RepositorySelection repositorySelection
     ) {
         // Check suspension before any reactivation logic: replayed NATS "created" events
         // must not reactivate a suspended workspace and re-trigger failed repository syncs.
@@ -292,8 +294,9 @@ public class GithubLifecycleListener implements IntegrationLifecycleListener {
         }
 
         if (workspace == null && !isBlank(accountLogin)) {
+            String resolvedAccountLogin = Objects.requireNonNull(accountLogin);
             Workspace existingByLogin = workspaceRepository
-                .findByAccountLoginIgnoreCaseForUpdate(accountLogin)
+                .findByAccountLoginIgnoreCaseForUpdate(resolvedAccountLogin)
                 .orElse(null);
             if (existingByLogin != null && existingByLogin.getStatus() == Workspace.WorkspaceStatus.PURGED) {
                 log.info(
@@ -371,7 +374,7 @@ public class GithubLifecycleListener implements IntegrationLifecycleListener {
             Long ownerUserId = syncGitHubUserForOwnership(
                 installationId,
                 accountId,
-                accountLogin,
+                Objects.requireNonNull(accountLogin),
                 accountKind,
                 avatarUrl
             );
@@ -388,7 +391,7 @@ public class GithubLifecycleListener implements IntegrationLifecycleListener {
 
             AccountType wsAccountType = accountKind == AccountKind.ORGANIZATION ? AccountType.ORG : AccountType.USER;
 
-            String desiredSlug = workspaceSlugService.normalize(accountLogin);
+            String desiredSlug = Objects.requireNonNull(workspaceSlugService.normalize(accountLogin));
             String availableSlug = workspaceSlugService.allocate(
                 desiredSlug,
                 "install-" + installationId + "-" + accountLogin
@@ -408,7 +411,7 @@ public class GithubLifecycleListener implements IntegrationLifecycleListener {
         }
 
         if (!isBlank(accountLogin)) {
-            workspace.setAccountLogin(accountLogin);
+            workspace.setAccountLogin(Objects.requireNonNull(accountLogin));
         }
 
         if (repositorySelection != null) {
@@ -427,11 +430,17 @@ public class GithubLifecycleListener implements IntegrationLifecycleListener {
 
         // Organization must exist before repositories are created so they get organization_id set.
         if (accountKind == AccountKind.ORGANIZATION && accountId != null) {
-            Long providerId = gitProviderRepository
-                .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
-                .orElseThrow(() -> new IllegalStateException("IdentityProvider for GitHub not found"))
-                .getId();
-            Organization org = organizationService.upsertIdentity(accountId, accountLogin, providerId);
+            Long providerId = Objects.requireNonNull(
+                gitProviderRepository
+                    .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
+                    .orElseThrow(() -> new IllegalStateException("IdentityProvider for GitHub not found"))
+                    .getId()
+            );
+            Organization org = organizationService.upsertIdentity(
+                accountId,
+                Objects.requireNonNull(accountLogin),
+                providerId
+            );
             workspace.setOrganization(org);
             log.debug(
                 "Linked organization to workspace: orgId={}, orgLogin={}, workspaceId={}",
@@ -636,11 +645,11 @@ public class GithubLifecycleListener implements IntegrationLifecycleListener {
      * @param newLogin       the new account login
      */
     @Transactional
-    public void handleAccountRename(long installationId, String previousLogin, String newLogin) {
+    public void handleAccountRename(long installationId, @Nullable String previousLogin, String newLogin) {
         handleAccountRenameInternal(installationId, previousLogin, newLogin);
     }
 
-    private void handleAccountRenameInternal(long installationId, String previousLogin, String newLogin) {
+    private void handleAccountRenameInternal(long installationId, @Nullable String previousLogin, String newLogin) {
         if (isBlank(newLogin)) {
             log.warn("Skipped account rename: reason=missingTargetLogin, installationId={}", installationId);
             return;
@@ -656,9 +665,11 @@ public class GithubLifecycleListener implements IntegrationLifecycleListener {
                         workspace.setAccountLogin(newLogin);
                         workspaceRepository.save(workspace);
                     }
-                    retargetRepositoryMonitors(workspace, oldLogin, newLogin);
-                    renameTrackedRepositories(oldLogin, newLogin);
-                    rotateOrganizationConsumer(workspace, oldLogin, newLogin);
+                    if (oldLogin != null) {
+                        retargetRepositoryMonitors(workspace, oldLogin, newLogin);
+                        renameTrackedRepositories(oldLogin, newLogin);
+                        rotateOrganizationConsumer(workspace, oldLogin, newLogin);
+                    }
                 },
                 () -> log.warn("Skipped account rename: reason=unknownInstallation, installationId={}", installationId)
             );
@@ -770,12 +781,12 @@ public class GithubLifecycleListener implements IntegrationLifecycleListener {
      * @param avatarUrl      the account's avatar URL
      * @return the user ID, or null if user could not be created
      */
-    private Long syncGitHubUserForOwnership(
+    private @Nullable Long syncGitHubUserForOwnership(
         long installationId,
-        Long accountId,
+        @Nullable Long accountId,
         String accountLogin,
         AccountKind accountKind,
-        String avatarUrl
+        @Nullable String avatarUrl
     ) {
         var existingUser = userRepository.findByLogin(accountLogin);
         if (existingUser.isPresent()) {
@@ -797,7 +808,7 @@ public class GithubLifecycleListener implements IntegrationLifecycleListener {
             IdentityProvider provider = gitProviderRepository
                 .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
                 .orElseThrow(() -> new IllegalStateException("IdentityProvider for GitHub not found"));
-            Long providerId = provider.getId();
+            Long providerId = Objects.requireNonNull(provider.getId());
 
             userRepository.acquireLoginLock(accountLogin, providerId);
             userRepository.freeLoginConflicts(accountLogin, accountId, providerId);
@@ -835,15 +846,15 @@ public class GithubLifecycleListener implements IntegrationLifecycleListener {
         return null;
     }
 
-    private boolean shouldUseNats(Workspace workspace) {
+    private boolean shouldUseNats(@Nullable Workspace workspace) {
         return natsProperties.enabled() && workspace != null;
     }
 
-    private boolean isBlank(String value) {
+    private boolean isBlank(@Nullable String value) {
         return value == null || value.isBlank();
     }
 
-    private static Long parseInstallationId(IntegrationRef ref) {
+    private static @Nullable Long parseInstallationId(@Nullable IntegrationRef ref) {
         if (ref == null || ref.instanceKey() == null) {
             return null;
         }
@@ -854,7 +865,7 @@ public class GithubLifecycleListener implements IntegrationLifecycleListener {
         }
     }
 
-    private static Long parseAccountIdNullable(String externalId) {
+    private static @Nullable Long parseAccountIdNullable(@Nullable String externalId) {
         if (externalId == null || externalId.isBlank()) {
             return null;
         }

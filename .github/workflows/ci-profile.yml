@@ -1,0 +1,83 @@
+name: CI profile
+
+on:
+  schedule:
+    - cron: "17 3 * * 1"
+  workflow_dispatch:
+
+concurrency:
+  group: ci-profile-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  server-integration:
+    name: "Server integration profile"
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          persist-credentials: false
+
+      - uses: ./.github/actions/setup-pnpm-node
+
+      - uses: ./.github/actions/setup-caches
+        with:
+          cache-type: application-server-integration
+          os: ${{ runner.os }}
+
+      - name: Restore performance history
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ci-profile-history
+          key: ci-profile-history-${{ github.run_id }}
+          restore-keys: ci-profile-history-
+
+      - name: Run integration suite with JFR
+        run: |
+          mkdir -p ci-metrics
+          /usr/bin/time -v -o ci-metrics/server-integration-resource.txt \
+            pnpm run test:server:integration \
+            -DargLine=-XX:StartFlightRecording=filename=target/integration-profile.jfr,settings=profile,dumponexit=true \
+            -Dlogging.level.org.springframework.test.context.cache=DEBUG \
+            2>&1 | tee ci-metrics/server-integration.log
+
+      - name: Summarize integration results
+        if: always()
+        continue-on-error: true
+        run: >-
+          pnpm run summarize:test-results "Server Integration Profile"
+          server/target/surefire-reports ci-metrics/server-integration-profile.json
+          ci-metrics/server-integration.log ci-metrics/server-integration-resource.txt
+
+      - name: Enforce performance budgets
+        if: success()
+        run: |
+          node scripts/check-ci-performance.ts ci-metrics/server-integration-profile.json ci-profile-history
+          mkdir -p ci-profile-history
+          cp ci-metrics/server-integration-profile.json "ci-profile-history/${{ github.run_id }}.json"
+
+      - name: Extract database cleanup timings
+        if: always()
+        continue-on-error: true
+        run: >-
+          jfr print --events hephaestus.test.DatabaseCleanup
+          server/target/integration-profile.jfr
+          > ci-metrics/database-cleanup.jfr.txt
+
+      - name: Upload profile
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: server-integration-profile-${{ github.run_id }}
+          path: |
+            server/target/integration-profile.jfr
+            server/target/surefire-reports
+            ci-metrics/server-integration-profile.json
+            ci-metrics/server-integration.log
+            ci-metrics/server-integration-resource.txt
+            ci-metrics/database-cleanup.jfr.txt
+          if-no-files-found: warn
+          retention-days: 14

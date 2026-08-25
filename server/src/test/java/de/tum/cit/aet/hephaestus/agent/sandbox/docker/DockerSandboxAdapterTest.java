@@ -117,7 +117,10 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
         return createSpec(allowInternet, null);
     }
 
-    private SandboxSpec createSpec(boolean allowInternet, Map<String, String> volumeMounts) {
+    private SandboxSpec createSpec(
+        boolean allowInternet,
+        @org.jspecify.annotations.Nullable Map<String, String> volumeMounts
+    ) {
         return new SandboxSpec(
             JOB_ID,
             "alpine:latest",

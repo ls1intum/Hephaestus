@@ -8,6 +8,7 @@ import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.EnumSet;
 import java.util.Set;
 import java.util.UUID;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
@@ -19,7 +20,7 @@ import org.junit.jupiter.params.provider.EnumSource;
  */
 class ObservationCoherenceTest extends BaseUnitTest {
 
-    private static Observation.ObservationBuilder observation(Presence presence, Assessment assessment) {
+    private static Observation.ObservationBuilder observation(Presence presence, @Nullable Assessment assessment) {
         return Observation.builder()
             .occurrenceKey("occurrence")
             .agentJobId(UUID.randomUUID())

@@ -247,7 +247,7 @@ public class WorkspaceConnectionBackfillChange implements CustomTaskChange {
         IntegrationKind kind,
         String instanceKey,
         ConnectionConfig config,
-        @Nullable byte[] credentialBlob
+        byte@Nullable [] credentialBlob
     ) throws Exception {
         String configJson = MAPPER.writeValueAsString(config);
         String sql =
@@ -286,8 +286,7 @@ public class WorkspaceConnectionBackfillChange implements CustomTaskChange {
      * under {@link CredentialBundleConverter}'s v2 per-row AAD format. Returns {@code null}
      * when the input is null or blank.
      */
-    @Nullable
-    private static byte[] rewrapPat(
+    private static byte@Nullable [] rewrapPat(
         @Nullable String encryptedValue,
         long workspaceId,
         IntegrationKind kind,
@@ -363,8 +362,7 @@ public class WorkspaceConnectionBackfillChange implements CustomTaskChange {
      */
     private static final class EncryptionKeyHolder {
 
-        @Nullable
-        private byte[] cachedKey;
+        private byte@Nullable [] cachedKey;
 
         private boolean resolved;
 
@@ -383,8 +381,7 @@ public class WorkspaceConnectionBackfillChange implements CustomTaskChange {
             return cachedKey;
         }
 
-        @Nullable
-        private static byte[] resolveKey() {
+        private static byte@Nullable [] resolveKey() {
             String key = System.getProperty("hephaestus.security.encryption-key");
             if (key == null || key.isBlank()) {
                 key = System.getenv("HEPHAESTUS_SECURITY_ENCRYPTION_KEY");

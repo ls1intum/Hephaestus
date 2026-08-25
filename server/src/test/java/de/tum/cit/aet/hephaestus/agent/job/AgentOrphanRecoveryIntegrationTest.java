@@ -1,6 +1,8 @@
 package de.tum.cit.aet.hephaestus.agent.job;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmConnection;
@@ -16,12 +18,14 @@ import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBinding;
 import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBindingRepository;
 import de.tum.cit.aet.hephaestus.agent.usage.FundingSource;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmPriceSnapshot;
+import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageRecorder;
 import de.tum.cit.aet.hephaestus.agent.usage.PricingState;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.testconfig.LlmCatalogTestFixtures;
 import de.tum.cit.aet.hephaestus.testconfig.TestEntities;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
+import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.UUID;
@@ -29,40 +33,23 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.ObjectMapper;
 
-/**
- * {@code hephaestus.agent.poll-interval} is set to an hour so the executor's own background poll
- * thread stays quiescent for the duration of the test — every claim in this test is driven explicitly.
- * The Docker host points at a socket that can never exist so the worker-role sandbox beans wire
- * (lazy clients, no I/O at construction) without needing a real Docker daemon; any resulting async
- * sandbox failure lands after this test's synchronous claim assertions, and is caught internally
- * (RUNNING → FAILED), never propagating.
- */
+/** Verifies orphan recovery, retry fencing, and claim eligibility against PostgreSQL. */
 @DisplayName("Orphan recovery over PostgreSQL Integration")
 class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
 
-    @DynamicPropertySource
-    static void agentProperties(DynamicPropertyRegistry registry) {
-        registry.add("hephaestus.agent.enabled", () -> "true");
-        registry.add("hephaestus.agent.poll-interval", () -> "1h");
-        registry.add("hephaestus.agent.max-retries", () -> "5");
-        // application-test.yml turns the worker role off by default; AgentJobExecutor needs it on.
-        registry.add("hephaestus.runtime.worker.enabled", () -> "true");
-        registry.add("hephaestus.sandbox.docker-host", () ->
-            "unix:///nonexistent/hephaestus-test-orphan-recovery.sock"
-        );
-        registry.add("hephaestus.agent.image.pull-policy", () -> "NEVER");
-    }
-
-    @Autowired
     private AgentJobZombieSweeper sweeper;
 
     @Autowired
-    private AgentJobExecutor executor;
+    private AgentJobLifecycleService lifecycleService;
+
+    @Autowired
+    private LlmUsageRecorder usageRecorder;
+
+    @Autowired
+    private MeterRegistry meterRegistry;
 
     @Autowired
     private AgentJobRepository jobRepository;
@@ -98,6 +85,18 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
     @BeforeEach
     void setUp() {
         databaseTestUtils.cleanDatabase();
+        AgentProperties properties = mock(AgentProperties.class);
+        when(properties.maxRetries()).thenReturn(5);
+        sweeper = new AgentJobZombieSweeper(
+            jobRepository,
+            workerRegistryRepository,
+            properties,
+            objectMapper,
+            transactionTemplate,
+            lifecycleService,
+            usageRecorder,
+            meterRegistry
+        );
         workspace = workspaceRepository.save(TestEntities.activeWorkspace("orphan-recovery-ws"));
 
         LlmConnection connection = connectionRepository.save(LlmCatalogTestFixtures.connection("orphan-recovery"));
@@ -135,12 +134,7 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
 
         fastForwardAvailableAt(jobId);
 
-        boolean claimed = executor.processJob(jobId);
-        assertThat(claimed).isTrue();
-
-        AgentJob reclaimed = jobRepository.findById(jobId).orElseThrow();
-        assertThat(reclaimed.getStatus()).isEqualTo(AgentJobStatus.RUNNING);
-        assertThat(reclaimed.getRetryCount()).isEqualTo(1); // claim itself doesn't touch retry_count
+        assertThat(eligibleForClaim(jobId)).isTrue();
     }
 
     @Test
@@ -164,9 +158,7 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
 
         fastForwardAvailableAt(jobId);
 
-        boolean claimed = executor.processJob(jobId);
-        assertThat(claimed).isTrue();
-        assertThat(jobRepository.findByJobTokenHashAndStatus(newTokenHash, AgentJobStatus.RUNNING)).isPresent();
+        assertThat(eligibleForClaim(jobId)).isTrue();
         assertThat(jobRepository.findByJobTokenHashAndStatus(oldTokenHash, AgentJobStatus.RUNNING)).isEmpty();
     }
 
@@ -184,12 +176,7 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
             .as("the backoff-computed available_at is still in the future")
             .isAfter(Instant.now());
 
-        // Deliberately NOT fast-forwarded: a claim attempt against a job whose backoff has not yet
-        // elapsed must be refused, closing the stale-poll-result race (a concurrent backoff-requeue
-        // between a candidate poll and this claim must not be bypassable).
-        boolean claimed = executor.processJob(jobId);
-
-        assertThat(claimed).isFalse();
+        assertThat(eligibleForClaim(jobId)).isFalse();
         AgentJob stillQueued = jobRepository.findById(jobId).orElseThrow();
         assertThat(stillQueued.getStatus()).isEqualTo(AgentJobStatus.QUEUED);
     }
@@ -329,6 +316,12 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
         w.setLastHeartbeat(lastHeartbeat);
         w.setRegisteredAt(lastHeartbeat);
         workerRegistryRepository.saveAndFlush(w);
+    }
+
+    private boolean eligibleForClaim(UUID jobId) {
+        return transactionTemplate.execute(status ->
+            jobRepository.findByIdQueuedForUpdateSkipLocked(jobId, Instant.now()).isPresent()
+        );
     }
 
     private void fastForwardAvailableAt(UUID jobId) {

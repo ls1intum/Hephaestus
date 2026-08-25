@@ -10,6 +10,7 @@ import java.time.Duration;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
@@ -46,7 +47,7 @@ public class WorkerLivenessReporter {
     private final Counter heartbeatFailures;
 
     private volatile int consecutiveFailures;
-    private ScheduledExecutorService scheduler;
+    private @Nullable ScheduledExecutorService scheduler;
 
     public WorkerLivenessReporter(
         WorkerRegistryRepository repository,

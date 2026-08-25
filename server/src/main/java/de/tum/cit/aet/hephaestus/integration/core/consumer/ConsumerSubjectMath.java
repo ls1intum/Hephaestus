@@ -117,7 +117,7 @@ public final class ConsumerSubjectMath {
      * @return the subject e.g. {@code github.?.?.>}
      * @throws UnsupportedOperationException if {@code kind} has no installation semantics
      */
-    public static String installationAwareSubjectFilter(IntegrationKind kind) {
+    public static String installationAwareSubjectFilter(@org.jspecify.annotations.Nullable IntegrationKind kind) {
         if (kind == null) {
             throw new IllegalArgumentException("kind must not be null");
         }
@@ -215,7 +215,10 @@ public final class ConsumerSubjectMath {
     /**
      * Builds the durable consumer name for a scope. Format: {@code <base>-scope-<scopeId>}.
      */
-    public static String scopeConsumerName(String baseConsumerName, long scopeId) {
+    public static String scopeConsumerName(@org.jspecify.annotations.Nullable String baseConsumerName, long scopeId) {
+        if (baseConsumerName == null) {
+            throw new IllegalArgumentException("baseConsumerName must not be null");
+        }
         return durablePrefix(baseConsumerName) + "scope-" + scopeId;
     }
 

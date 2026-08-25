@@ -6,6 +6,7 @@ import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import org.jspecify.annotations.Nullable;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtException;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -68,7 +69,7 @@ public class StaleAuthCookieFilter extends OncePerRequestFilter {
         chain.doFilter(request, response);
     }
 
-    private String readAuthCookie(HttpServletRequest request) {
+    private @Nullable String readAuthCookie(HttpServletRequest request) {
         Cookie[] cookies = request.getCookies();
         if (cookies == null) {
             return null;

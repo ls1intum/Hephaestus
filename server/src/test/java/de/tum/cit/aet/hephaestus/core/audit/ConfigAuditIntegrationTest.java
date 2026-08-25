@@ -159,7 +159,7 @@ class ConfigAuditIntegrationTest extends AbstractWorkspaceIntegrationTest {
         List<ConfigAuditEvent> rows = configAuditEventRepository
             .findAll()
             .stream()
-            .filter(row -> row.getWorkspaceId().equals(workspace.getId()))
+            .filter(row -> java.util.Objects.equals(row.getWorkspaceId(), workspace.getId()))
             .filter(row -> row.getEntityType() == ConfigAuditEntityType.PRACTICE_DEFINITION)
             .filter(row -> row.getEntityId().equals(String.valueOf(practice.id())))
             .sorted(java.util.Comparator.comparing(ConfigAuditEvent::getId))
@@ -509,7 +509,7 @@ class ConfigAuditIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     private void patchPracticeReview(Workspace workspace, Map<String, Object> body) {
         String slug = workspace.getWorkspaceSlug();
-        String etag = webTestClient
+        String version = webTestClient
             .get()
             .uri("/workspaces/{slug}/practices/review-settings", slug)
             .headers(TestAuthUtils.withCurrentUser())
@@ -519,6 +519,7 @@ class ConfigAuditIntegrationTest extends AbstractWorkspaceIntegrationTest {
             .returnResult(String.class)
             .getResponseHeaders()
             .getETag();
+        String etag = java.util.Objects.requireNonNull(version, "the settings endpoint always answers with an ETag");
 
         webTestClient
             .patch()

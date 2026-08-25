@@ -4,10 +4,10 @@ import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditActorRefDTO;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntryViewDTO;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditFilter;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditQuery;
-import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
 import de.tum.cit.aet.hephaestus.core.auth.domain.AccountRepository;
 import java.util.HashSet;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -62,8 +62,13 @@ class ConfigAuditService implements ConfigAuditQuery {
                   .stream()
                   .collect(
                       Collectors.toMap(
-                          Account::getId,
-                          a -> new ConfigAuditActorRefDTO(a.getId(), a.getDisplayName(), a.getPrimaryEmail()),
+                          a -> Objects.requireNonNull(a.getId()),
+                          a ->
+                              new ConfigAuditActorRefDTO(
+                                  Objects.requireNonNull(a.getId()),
+                                  a.getDisplayName(),
+                                  a.getPrimaryEmail()
+                              ),
                           (a, b) -> a
                       )
                   );

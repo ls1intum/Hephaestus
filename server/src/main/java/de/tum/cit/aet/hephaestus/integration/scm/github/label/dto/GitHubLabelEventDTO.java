@@ -6,6 +6,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubEventAction
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubWebhookEvent;
 import de.tum.cit.aet.hephaestus.integration.scm.github.repository.dto.GitHubRepositoryRefDTO;
 import de.tum.cit.aet.hephaestus.integration.scm.github.user.dto.GitHubUserDTO;
+import org.jspecify.annotations.Nullable;
 
 /**
  * DTO for GitHub label webhook events.
@@ -13,9 +14,9 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.user.dto.GitHubUserDTO;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record GitHubLabelEventDTO(
     @JsonProperty("action") String action,
-    @JsonProperty("label") GitHubLabelDTO label,
-    @JsonProperty("repository") GitHubRepositoryRefDTO repository,
-    @JsonProperty("sender") GitHubUserDTO sender
+    @JsonProperty("label") @Nullable GitHubLabelDTO label,
+    @JsonProperty("repository") @Nullable GitHubRepositoryRefDTO repository,
+    @JsonProperty("sender") @Nullable GitHubUserDTO sender
 ) implements GitHubWebhookEvent {
     @Override
     public GitHubEventAction.Label actionType() {
@@ -23,7 +24,7 @@ public record GitHubLabelEventDTO(
     }
 
     @Override
-    public GitHubRepositoryRefDTO repository() {
+    public @Nullable GitHubRepositoryRefDTO repository() {
         return repository;
     }
 }

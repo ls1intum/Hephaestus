@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.workspace.context;
 
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
@@ -29,7 +30,7 @@ public final class WorkspaceContextHolder {
      *
      * @param context WorkspaceContext to set
      */
-    public static void setContext(WorkspaceContext context) {
+    public static void setContext(@Nullable WorkspaceContext context) {
         WorkspaceContext existing = contextHolder.get();
         if (existing != null && !existing.equals(context)) {
             log.warn(

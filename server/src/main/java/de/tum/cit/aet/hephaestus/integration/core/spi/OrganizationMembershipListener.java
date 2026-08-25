@@ -1,5 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.core.spi;
 
+import org.jspecify.annotations.Nullable;
+
 /**
  * Listener for organization membership change events.
  * <p>
@@ -56,6 +58,6 @@ public interface OrganizationMembershipListener {
         String organizationLogin,
         Long userId,
         String userLogin,
-        String role
+        @Nullable String role
     ) {}
 }

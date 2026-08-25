@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.scm.github.project;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
@@ -31,6 +32,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -137,7 +139,7 @@ class GitHubProjectItemProcessorTest extends BaseUnitTest {
         );
     }
 
-    private GitHubProjectItemDTO createIssueDTO(Long issueId) {
+    private GitHubProjectItemDTO createIssueDTO(@Nullable Long issueId) {
         return new GitHubProjectItemDTO(
             null,
             ITEM_DB_ID,
@@ -365,7 +367,7 @@ class GitHubProjectItemProcessorTest extends BaseUnitTest {
 
             ProjectItem result = processor.process(dto, project, context);
 
-            assertThat(result).isNotNull();
+            assertNotNull(result);
             assertThat(result.getId()).isEqualTo(ITEM_DB_ID);
             assertThat(result.getContentType()).isEqualTo(ProjectItem.ContentType.DRAFT_ISSUE);
 
@@ -407,7 +409,7 @@ class GitHubProjectItemProcessorTest extends BaseUnitTest {
 
             ProjectItem result = processor.process(dto, project, context);
 
-            assertThat(result).isNotNull();
+            assertNotNull(result);
 
             // Verify upsert was called with ISSUE content type and resolved issueId
             verify(projectItemRepository).upsertCore(
@@ -437,7 +439,7 @@ class GitHubProjectItemProcessorTest extends BaseUnitTest {
 
             ProjectItem result = processor.process(dto, project, context);
 
-            assertThat(result).isNotNull();
+            assertNotNull(result);
             verify(projectItemRepository).upsertCore(
                 eq(ITEM_DB_ID),
                 eq(PROVIDER_ID),
@@ -465,7 +467,7 @@ class GitHubProjectItemProcessorTest extends BaseUnitTest {
 
             ProjectItem result = processor.process(dto, project, context);
 
-            assertThat(result).isNotNull();
+            assertNotNull(result);
             // issueId should be null because issue doesn't exist locally
             // contentDatabaseId should still be set for orphan relinking
             verify(projectItemRepository).upsertCore(
@@ -494,7 +496,7 @@ class GitHubProjectItemProcessorTest extends BaseUnitTest {
 
             ProjectItem result = processor.process(dto, project, context);
 
-            assertThat(result).isNotNull();
+            assertNotNull(result);
             verify(projectItemRepository).upsertCore(
                 eq(ITEM_DB_ID),
                 eq(PROVIDER_ID),
@@ -543,7 +545,7 @@ class GitHubProjectItemProcessorTest extends BaseUnitTest {
 
             ProjectItem result = processor.process(dto, project, context);
 
-            assertThat(result).isNotNull();
+            assertNotNull(result);
             verify(projectItemRepository).upsertCore(
                 eq(ITEM_DB_ID),
                 eq(PROVIDER_ID),
@@ -753,7 +755,7 @@ class GitHubProjectItemProcessorTest extends BaseUnitTest {
 
             ProjectItem result = processor.process(dto, project, context);
 
-            assertThat(result).isNotNull();
+            assertNotNull(result);
             verify(projectItemRepository).upsertCore(
                 eq(fallbackId), // getDatabaseId() falls back to id
                 eq(PROVIDER_ID),
@@ -1009,7 +1011,7 @@ class GitHubProjectItemProcessorTest extends BaseUnitTest {
 
             ProjectItem result = processor.processArchived(dto, project, context);
 
-            assertThat(result).isNotNull();
+            assertNotNull(result);
 
             // Verify that archived=true was forced via withArchived(true)
             verify(projectItemRepository).upsertCore(
@@ -1064,7 +1066,7 @@ class GitHubProjectItemProcessorTest extends BaseUnitTest {
 
             ProjectItem result = processor.processArchived(dto, project, context, actorId);
 
-            assertThat(result).isNotNull();
+            assertNotNull(result);
             ArgumentCaptor<Object> eventCaptor = ArgumentCaptor.forClass(Object.class);
             verify(eventPublisher, Mockito.times(2)).publishEvent(eventCaptor.capture());
 
@@ -1108,7 +1110,7 @@ class GitHubProjectItemProcessorTest extends BaseUnitTest {
 
             ProjectItem result = processor.processRestored(dto, project, context);
 
-            assertThat(result).isNotNull();
+            assertNotNull(result);
 
             // Verify that archived=false was forced via withArchived(false)
             verify(projectItemRepository).upsertCore(
@@ -1161,7 +1163,7 @@ class GitHubProjectItemProcessorTest extends BaseUnitTest {
 
             ProjectItem result = processor.processRestored(dto, project, context, actorId);
 
-            assertThat(result).isNotNull();
+            assertNotNull(result);
             ArgumentCaptor<Object> eventCaptor = ArgumentCaptor.forClass(Object.class);
             verify(eventPublisher, Mockito.times(2)).publishEvent(eventCaptor.capture());
 
@@ -1180,7 +1182,7 @@ class GitHubProjectItemProcessorTest extends BaseUnitTest {
 
             ProjectItem result = processor.processRestored(dto, project, context);
 
-            assertThat(result).isNotNull();
+            assertNotNull(result);
             // Verify archived=false is passed
             verify(projectItemRepository).upsertCore(
                 any(),

@@ -13,6 +13,7 @@ import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.net.UnknownHostException;
 import java.util.List;
+import org.jspecify.annotations.Nullable;
 
 /**
  * A Netty {@link AddressResolverGroup} that rejects DNS answers resolving to a non-public address,
@@ -57,11 +58,11 @@ public final class SsrfGuardedResolverGroup extends AddressResolverGroup<InetSoc
      * Reject the resolution if the resolved address is non-public. Package-private + returning the
      * {@link UnknownHostException} (rather than throwing) so it is unit-testable with a stub delegate.
      */
-    static UnknownHostException blockedReason(InetSocketAddress resolved) {
+    static @Nullable UnknownHostException blockedReason(InetSocketAddress resolved) {
         return blockedReason(resolved, false);
     }
 
-    static UnknownHostException blockedReason(InetSocketAddress resolved, boolean allowLoopback) {
+    static @Nullable UnknownHostException blockedReason(InetSocketAddress resolved, boolean allowLoopback) {
         InetAddress addr = (resolved == null) ? null : resolved.getAddress();
         if (addr == null) {
             return new UnknownHostException("address did not resolve");

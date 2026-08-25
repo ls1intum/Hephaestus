@@ -20,6 +20,7 @@ import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import jakarta.persistence.Version;
 import java.time.Instant;
+import java.util.Objects;
 import java.util.Optional;
 import org.hibernate.annotations.ColumnDefault;
 import org.hibernate.annotations.CreationTimestamp;
@@ -49,7 +50,7 @@ public class Connection {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    private @Nullable Long id;
 
     @ManyToOne(optional = false)
     @JoinColumn(name = "workspace_id", nullable = false)
@@ -81,8 +82,7 @@ public class Connection {
     private ConnectionConfig config;
 
     @Column(name = "credentials_encrypted")
-    @Nullable
-    private byte[] credentialsEncrypted;
+    private byte@Nullable [] credentialsEncrypted;
 
     @Column(name = "credentials_alg", length = 64)
     @Nullable
@@ -90,11 +90,11 @@ public class Connection {
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
-    private Instant createdAt;
+    private @Nullable Instant createdAt;
 
     @UpdateTimestamp
     @Column(name = "updated_at", nullable = false)
-    private Instant updatedAt;
+    private @Nullable Instant updatedAt;
 
     @Version
     @Column(nullable = false)
@@ -142,7 +142,7 @@ public class Connection {
     }
 
     public Long getId() {
-        return id;
+        return Objects.requireNonNull(id, "Connection has not been persisted");
     }
 
     public Workspace getWorkspace() {
@@ -176,8 +176,7 @@ public class Connection {
         return config;
     }
 
-    @Nullable
-    public byte[] getCredentialsEncrypted() {
+    public byte@Nullable [] getCredentialsEncrypted() {
         return credentialsEncrypted;
     }
 
@@ -187,11 +186,11 @@ public class Connection {
     }
 
     public Instant getCreatedAt() {
-        return createdAt;
+        return Objects.requireNonNull(createdAt, "Connection has not been persisted");
     }
 
     public Instant getUpdatedAt() {
-        return updatedAt;
+        return Objects.requireNonNull(updatedAt, "Connection has not been persisted");
     }
 
     public Long getVersion() {
@@ -214,7 +213,7 @@ public class Connection {
         this.config = config;
     }
 
-    public void setCredentialsEncrypted(@Nullable byte[] credentialsEncrypted) {
+    public void setCredentialsEncrypted(byte@Nullable [] credentialsEncrypted) {
         this.credentialsEncrypted = credentialsEncrypted;
     }
 

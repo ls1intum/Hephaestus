@@ -120,7 +120,7 @@ class PracticeFeedbackDispatchServiceTest extends BaseUnitTest {
             argThat(
                 completion ->
                     completion.state().equals("SENT") &&
-                    completion.externalRef().equals("provider-42") &&
+                    "provider-42".equals(completion.externalRef()) &&
                     completion.error() == null
             )
         );

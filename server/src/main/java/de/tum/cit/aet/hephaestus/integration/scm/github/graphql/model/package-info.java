@@ -9,4 +9,5 @@
  * build under {@code target/generated-sources/}.
  */
 @org.springframework.modulith.NamedInterface("graphql-model")
+@org.jspecify.annotations.NullMarked
 package de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model;

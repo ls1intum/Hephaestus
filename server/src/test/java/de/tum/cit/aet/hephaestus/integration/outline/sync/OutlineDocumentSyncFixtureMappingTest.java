@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.outline.sync;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -170,6 +171,7 @@ class OutlineDocumentSyncFixtureMappingTest extends BaseUnitTest {
             "/outline-api/collections.list.json",
             new TypeReference<>() {}
         );
+        assertNotNull(collectionsList.data());
         OutlineCollectionModel engineeringDocs = collectionsList
             .data()
             .stream()

@@ -198,7 +198,8 @@ public class GitLabWorkspaceInitializationService {
             return;
         }
 
-        if (isBlank(workspace.getAccountLogin())) {
+        String accountLogin = workspace.getAccountLogin();
+        if (accountLogin == null || accountLogin.isBlank()) {
             log.warn("Skipped GitLab initialization: reason=missingAccountLogin, workspaceId={}", workspace.getId());
             return;
         }
@@ -397,19 +398,20 @@ public class GitLabWorkspaceInitializationService {
             );
             return;
         }
-        if (isBlank(workspace.getAccountLogin())) {
+        String accountLogin = workspace.getAccountLogin();
+        if (accountLogin == null || accountLogin.isBlank()) {
             return;
         }
 
         var memberSyncService = gitLabServices.getGroupMemberSyncService();
         if (memberSyncService != null) {
             organizationRepository
-                .findByLoginIgnoreCaseAndProvider_Type(workspace.getAccountLogin(), IdentityProviderType.GITLAB)
+                .findByLoginIgnoreCaseAndProvider_Type(accountLogin, IdentityProviderType.GITLAB)
                 .ifPresent(org -> {
                     try {
                         int membersSynced = memberSyncService.syncGroupMemberships(
                             workspace.getId(),
-                            workspace.getAccountLogin(),
+                            accountLogin,
                             org
                         );
                         log.info(
@@ -427,10 +429,7 @@ public class GitLabWorkspaceInitializationService {
         var issueTypeSyncService = gitLabServices.getIssueTypeSyncService();
         if (issueTypeSyncService != null) {
             try {
-                int issueTypes = issueTypeSyncService.syncIssueTypesForGroup(
-                    workspace.getId(),
-                    workspace.getAccountLogin()
-                );
+                int issueTypes = issueTypeSyncService.syncIssueTypesForGroup(workspace.getId(), accountLogin);
                 log.info("GitLab issue type sync: workspaceId={}, types={}", workspace.getId(), issueTypes);
             } catch (Exception e) {
                 log.warn("Failed issue type sync: workspaceId={}", workspace.getId(), e);
@@ -452,20 +451,20 @@ public class GitLabWorkspaceInitializationService {
                 try {
                     SyncResult groupMilestoneResult = milestoneSyncService.syncMilestonesForGroup(
                         workspace.getId(),
-                        workspace.getAccountLogin(),
+                        accountLogin,
                         repos
                     );
                     log.info(
                         "GitLab group milestone sync: workspaceId={}, group={}, written={}",
                         workspace.getId(),
-                        LoggingUtils.sanitizeForLog(workspace.getAccountLogin()),
+                        LoggingUtils.sanitizeForLog(accountLogin),
                         groupMilestoneResult.count()
                     );
                 } catch (Exception e) {
                     log.warn(
                         "Failed GitLab group milestone sync: workspaceId={}, group={}",
                         workspace.getId(),
-                        LoggingUtils.sanitizeForLog(workspace.getAccountLogin()),
+                        LoggingUtils.sanitizeForLog(accountLogin),
                         e
                     );
                 }
@@ -502,7 +501,7 @@ public class GitLabWorkspaceInitializationService {
         var teamSyncService = gitLabServices.getTeamSyncService();
         if (teamSyncService != null) {
             try {
-                int teamsCount = teamSyncService.syncTeamsForGroup(workspace.getId(), workspace.getAccountLogin());
+                int teamsCount = teamSyncService.syncTeamsForGroup(workspace.getId(), accountLogin);
                 // Stamp the teams watermark so the cron scheduler's cooldown logic reflects that
                 // initial sync just ran; otherwise cron would re-sync teams redundantly right after
                 // workspace activation.
@@ -801,9 +800,5 @@ public class GitLabWorkspaceInitializationService {
         if (natsProperties.enabled()) {
             natsConsumerService.ifAvailable(svc -> svc.startConsumingScope(workspace.getId()));
         }
-    }
-
-    private boolean isBlank(String value) {
-        return value == null || value.isBlank();
     }
 }

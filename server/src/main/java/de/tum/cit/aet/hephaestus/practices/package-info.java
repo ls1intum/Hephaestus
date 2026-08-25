@@ -21,4 +21,5 @@
  * gamifies developer actions rather than analyzing code quality).
  */
 @org.springframework.modulith.ApplicationModule(displayName = "Practices (Code Health)")
+@org.jspecify.annotations.NullMarked
 package de.tum.cit.aet.hephaestus.practices;

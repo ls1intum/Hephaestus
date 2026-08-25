@@ -38,7 +38,7 @@ public class ConnectionActivity {
         updatable = false,
         foreignKey = @ForeignKey(name = "fk_connection_activity_connection")
     )
-    private Connection connection;
+    private @Nullable Connection connection;
 
     @Column(name = "workspace_id", nullable = false)
     private Long workspaceId;
@@ -50,7 +50,7 @@ public class ConnectionActivity {
         updatable = false,
         foreignKey = @ForeignKey(name = "fk_connection_activity_workspace")
     )
-    private Workspace workspace;
+    private @Nullable Workspace workspace;
 
     @Column(name = "last_event_at")
     @Nullable

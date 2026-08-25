@@ -184,7 +184,7 @@ public class SlackChannelHistorySyncService {
      * Sync one channel's window. Returns the number of messages routed through ingest on clean completion, or
      * {@code null} when the channel was skipped (no announcement stamp, consent flipped mid-sync, budget out).
      */
-    private Long syncChannel(
+    private @Nullable Long syncChannel(
         long workspaceId,
         SlackMonitoredChannel channel,
         String retentionFloor,

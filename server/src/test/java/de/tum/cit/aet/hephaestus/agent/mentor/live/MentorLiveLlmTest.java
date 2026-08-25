@@ -31,6 +31,7 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
@@ -84,8 +85,8 @@ class MentorLiveLlmTest {
     ).toAbsolutePath();
 
     private final List<Path> workspaceDirs = new ArrayList<>();
-    private Path workspaceDir;
-    private StdioAttachedSandbox sandbox;
+    private @Nullable Path workspaceDir;
+    private @Nullable StdioAttachedSandbox sandbox;
 
     @BeforeAll
     static void installPiSdk() throws Exception {
@@ -146,6 +147,12 @@ class MentorLiveLlmTest {
         }
         workspaceDirs.clear();
         workspaceDir = null;
+    }
+
+    private StdioAttachedSandbox activeSandbox() {
+        StdioAttachedSandbox current = sandbox;
+        org.junit.jupiter.api.Assertions.assertNotNull(current);
+        return current;
     }
 
     @Test
@@ -358,7 +365,7 @@ class MentorLiveLlmTest {
 
         respawnWithSession(creds, threadId, bytesA);
         String followUp = runTurnAndCollect(
-            new RunnerDriver(sandbox),
+            new RunnerDriver(activeSandbox()),
             threadId,
             "What framework am I using? Reply with only the framework name."
         );
@@ -456,7 +463,7 @@ class MentorLiveLlmTest {
         assertThat(bytesA).isNotNull();
 
         Path sessionFile = respawnWithSession(creds, threadId, bytesA);
-        runTurnAndCollect(new RunnerDriver(sandbox), threadId, "Reply with exactly: beta.");
+        runTurnAndCollect(new RunnerDriver(activeSandbox()), threadId, "Reply with exactly: beta.");
 
         byte[] bytesAfterB = Files.readAllBytes(sessionFile);
         assertThat(bytesAfterB.length).isGreaterThanOrEqualTo(bytesA.length);
@@ -490,7 +497,9 @@ class MentorLiveLlmTest {
         runTurnAndCollect(driver, threadId, prompt);
         sandbox.close(Duration.ofSeconds(5));
         sandbox = null;
-        return captured.get();
+        byte[] session = captured.get();
+        assertThat(session).isNotNull();
+        return session;
     }
 
     /**
@@ -539,7 +548,7 @@ class MentorLiveLlmTest {
         List<UIMessageChunk> chunks = new ArrayList<>();
         var done = new CompletableFuture<Void>();
         // Use a per-turn subscription so collected chunks are scoped to this turn only.
-        var unsubscribe = sandbox.subscribe(frame -> {
+        var unsubscribe = activeSandbox().subscribe(frame -> {
             if (!isThreadEvent(frame, threadId)) return;
             JsonNode event = frame.path("params").path("event");
             chunks.addAll(translator.translate(event, state));

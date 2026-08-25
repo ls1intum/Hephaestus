@@ -22,7 +22,7 @@ public record PullRequestReviewSubmissionRequest(
     String headRefOid,
     String baseRefName,
     @Nullable SignalName triggerSignal,
-    ObservationOrigin observationOrigin
+    @Nullable ObservationOrigin observationOrigin
 ) implements JobSubmissionRequest {
     public PullRequestReviewSubmissionRequest {
         Objects.requireNonNull(pullRequest, "pullRequest must not be null");

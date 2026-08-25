@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.integration.core.connection.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -41,6 +42,7 @@ import java.util.NoSuchElementException;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 import org.assertj.core.api.Assertions;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -52,6 +54,7 @@ import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
+import org.springframework.test.util.ReflectionTestUtils;
 import tools.jackson.databind.ObjectMapper;
 
 /**
@@ -158,6 +161,7 @@ class ConnectionControllerTest extends BaseUnitTest {
         ResponseEntity<ConnectionDetailDTO> response = controller.read(ctx(workspaceId), 5L);
 
         assertThat(response.getStatusCode().value()).isEqualTo(200);
+        assertNotNull(response.getBody());
         Map<String, Object> config = response.getBody().config();
         assertThat(config).doesNotContainKey("webhookSecret");
         assertThat(config).containsEntry("webhookSubscriptionId", "sub-1");
@@ -174,6 +178,7 @@ class ConnectionControllerTest extends BaseUnitTest {
 
         assertThat(response.getStatusCode().value()).isEqualTo(200);
         InitiateConnectionResponseDTO redirect = response.getBody();
+        assertNotNull(redirect);
         assertThat(redirect.type()).isEqualTo(InitiateConnectionResponseDTO.Type.REDIRECT);
         assertThat(redirect.vendorUrl()).isEqualTo(vendor);
         assertThat(redirect.connectionId()).isNull();
@@ -206,6 +211,7 @@ class ConnectionControllerTest extends BaseUnitTest {
 
         assertThat(response.getStatusCode().value()).isEqualTo(200);
         InitiateConnectionResponseDTO linked = response.getBody();
+        assertNotNull(linked);
         assertThat(linked.type()).isEqualTo(InitiateConnectionResponseDTO.Type.LINKED);
         assertThat(linked.connectionId()).isEqualTo(99L);
         assertThat(linked.vendorUrl()).isNull();
@@ -251,6 +257,7 @@ class ConnectionControllerTest extends BaseUnitTest {
         );
 
         assertThat(response.getStatusCode().value()).isEqualTo(200);
+        assertNotNull(response.getBody());
         assertThat(response.getBody().state()).isEqualTo(IntegrationState.SUSPENDED);
         assertThat(response.getBody().stateReason()).isEqualTo("scheduled maintenance");
 
@@ -282,6 +289,7 @@ class ConnectionControllerTest extends BaseUnitTest {
         );
 
         assertThat(response.getStatusCode().value()).isEqualTo(200);
+        assertNotNull(response.getBody());
         assertThat(response.getBody().state()).isEqualTo(IntegrationState.ACTIVE);
 
         ArgumentCaptor<TransitionRequest> req = ArgumentCaptor.forClass(TransitionRequest.class);
@@ -313,6 +321,7 @@ class ConnectionControllerTest extends BaseUnitTest {
         );
 
         assertThat(response.getStatusCode().value()).isEqualTo(200);
+        assertNotNull(response.getBody());
         assertThat(response.getBody().state()).isEqualTo(IntegrationState.UNINSTALLED);
         assertThat(githubStrategy.revokeCalls).isEqualTo(1);
 
@@ -360,6 +369,7 @@ class ConnectionControllerTest extends BaseUnitTest {
         );
 
         assertThat(response.getStatusCode().value()).isEqualTo(200);
+        assertNotNull(response.getBody());
         assertThat(response.getBody().state()).isEqualTo(IntegrationState.UNINSTALLED);
         assertThat(githubStrategy.revokeCalls).isEqualTo(1);
         // The failure must reach the service — the only layer that can absorb it without poisoning
@@ -423,16 +433,20 @@ class ConnectionControllerTest extends BaseUnitTest {
             "corr-2",
             "vacation"
         );
+        ReflectionTestUtils.setField(a1, "occurredAt", Instant.parse("2026-01-01T00:00:00Z"));
+        ReflectionTestUtils.setField(a2, "occurredAt", Instant.parse("2026-01-02T00:00:00Z"));
         when(admin.auditForConnection(eq(7L), anyInt())).thenReturn(List.of(a2, a1));
 
         ResponseEntity<List<ConnectionAuditEntryDTO>> response = controller.audit(ctx(workspaceId), 7L);
 
         assertThat(response.getStatusCode().value()).isEqualTo(200);
-        assertThat(response.getBody()).hasSize(2);
-        assertThat(response.getBody().get(0).eventType()).isEqualTo("SUSPEND");
-        assertThat(response.getBody().get(0).fromState()).isEqualTo(IntegrationState.ACTIVE);
-        assertThat(response.getBody().get(0).toState()).isEqualTo(IntegrationState.SUSPENDED);
-        assertThat(response.getBody().get(1).eventType()).isEqualTo("INITIATE");
+        List<ConnectionAuditEntryDTO> body = response.getBody();
+        assertNotNull(body);
+        assertThat(body).hasSize(2);
+        assertThat(body.get(0).eventType()).isEqualTo("SUSPEND");
+        assertThat(body.get(0).fromState()).isEqualTo(IntegrationState.ACTIVE);
+        assertThat(body.get(0).toState()).isEqualTo(IntegrationState.SUSPENDED);
+        assertThat(body.get(1).eventType()).isEqualTo("INITIATE");
         verify(admin).auditForConnection(7L, 200);
     }
 
@@ -526,7 +540,10 @@ class ConnectionControllerTest extends BaseUnitTest {
     static final class FakeStrategy implements ConnectionStrategy {
 
         private final IntegrationKind kind;
-        ConnectInitiation nextInitiation;
+        ConnectInitiation nextInitiation = new ConnectInitiation.AcceptInline(
+            new BearerToken("test-token", null),
+            null
+        );
         int revokeCalls = 0;
         boolean revokeThrows = false;
 
@@ -548,7 +565,7 @@ class ConnectionControllerTest extends BaseUnitTest {
         }
 
         @Override
-        public ConnectFinalization finalizeConnect(IntegrationRef ref, Map<String, String> callbackParams) {
+        public ConnectFinalization finalizeConnect(@Nullable IntegrationRef ref, Map<String, String> callbackParams) {
             return new ConnectFinalization.Completed(
                 "unused-instance-key",
                 new InstallationCredential(0L, "unused"),
@@ -557,7 +574,7 @@ class ConnectionControllerTest extends BaseUnitTest {
         }
 
         @Override
-        public void revoke(IntegrationRef ref) {
+        public void revoke(@Nullable IntegrationRef ref) {
             revokeCalls++;
             if (revokeThrows) {
                 throw new RuntimeException("vendor unreachable");

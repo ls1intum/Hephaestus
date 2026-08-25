@@ -13,18 +13,11 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRep
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabProperties;
-import de.tum.cit.aet.hephaestus.testconfig.PostgreSQLTestContainer;
-import org.junit.jupiter.api.Tag;
+import de.tum.cit.aet.hephaestus.testconfig.RealAuthIntegrationTest;
+import java.util.Objects;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.webtestclient.autoconfigure.AutoConfigureWebTestClient;
-import org.springframework.context.annotation.Import;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.reactive.server.WebTestClient;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
 /**
  * Verifies that {@code GET /user/settings} provisions the SCM {@code User} for a GitLab login-only
@@ -37,12 +30,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
  * whose only identity claim is {@code sub = Account.id}. Resolution is therefore
  * {@code sub → Account → active GitLab IdentityLink → User} end-to-end.
  */
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@ActiveProfiles("test")
-@AutoConfigureWebTestClient
-@Testcontainers
-@Tag("integration")
-class AccountControllerIntegrationTest {
+class AccountControllerIntegrationTest extends RealAuthIntegrationTest {
 
     private static final long GITLAB_NATIVE_ID = 18024L;
     private static final String GITLAB_LOGIN = "gitlabuser";
@@ -70,16 +58,6 @@ class AccountControllerIntegrationTest {
 
     @Autowired
     private JwtPrincipalFactory principalFactory;
-
-    @DynamicPropertySource
-    static void datasource(DynamicPropertyRegistry registry) {
-        var postgres = PostgreSQLTestContainer.getInstance();
-        registry.add("spring.datasource.url", postgres::getJdbcUrl);
-        registry.add("spring.datasource.username", postgres::getUsername);
-        registry.add("spring.datasource.password", postgres::getPassword);
-        registry.add("spring.datasource.hikari.maximum-pool-size", () -> "10");
-        registry.add("spring.datasource.hikari.minimum-idle", () -> "1");
-    }
 
     /**
      * A GitLab login-only user with no pre-existing SCM {@code User} row must get one provisioned
@@ -129,17 +107,22 @@ class AccountControllerIntegrationTest {
                 )
             );
 
+        Long providerId = Objects.requireNonNull(provider.getId(), "Persisted identity provider must have an ID");
         Account account = accountRepository.save(new Account("GitLab User"));
 
         IdentityLink link = new IdentityLink();
         link.setAccount(account);
-        link.setProviderId(provider.getId());
+        link.setProviderId(providerId);
         link.setSubject(String.valueOf(GITLAB_NATIVE_ID));
         link.setUsernameAtSignup(GITLAB_LOGIN);
         link.setDisplayName("GitLab User");
         link = identityLinkRepository.save(link);
 
         HephaestusJwtIssuer.Token token = jwtIssuer.issue(principalFactory.forAccount(account), null, null);
-        return new SeededIdentity(token.value(), link.getId(), provider.getId());
+        return new SeededIdentity(
+            token.value(),
+            Objects.requireNonNull(link.getId(), "Persisted identity link must have an ID"),
+            providerId
+        );
     }
 }

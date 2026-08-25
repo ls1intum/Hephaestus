@@ -24,7 +24,14 @@ public record LiveLlmCredentials(String baseUrl, String apiKey, String model) {
         String baseUrl = environment.get("HEPHAESTUS_LIVE_LLM_BASE_URL");
         String apiKey = environment.get("HEPHAESTUS_LIVE_LLM_API_KEY");
         String model = environment.get("HEPHAESTUS_LIVE_LLM_MODEL");
-        if (isBlank(baseUrl) || isBlank(apiKey) || isBlank(model)) {
+        if (
+            baseUrl == null ||
+            baseUrl.isBlank() ||
+            apiKey == null ||
+            apiKey.isBlank() ||
+            model == null ||
+            model.isBlank()
+        ) {
             throw new IllegalStateException(
                 "Live LLM tests require HEPHAESTUS_LIVE_LLM_BASE_URL, " +
                     "HEPHAESTUS_LIVE_LLM_API_KEY, and HEPHAESTUS_LIVE_LLM_MODEL"
@@ -36,9 +43,5 @@ public record LiveLlmCredentials(String baseUrl, String apiKey, String model) {
     /** Env vars the Pi SDK reads natively for {@code openai-completions} provider routing. */
     public Map<String, String> asProcessEnv() {
         return Map.of("OPENAI_API_KEY", apiKey, "OPENAI_BASE_URL", baseUrl);
-    }
-
-    private static boolean isBlank(String value) {
-        return value == null || value.isBlank();
     }
 }

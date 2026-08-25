@@ -58,13 +58,13 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.event.ApplicationEvents;
 import org.springframework.test.context.event.RecordApplicationEvents;
 import tools.jackson.databind.JsonNode;
@@ -124,13 +124,13 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
     @Autowired
     private InstanceSettingsService instanceSettingsService;
 
-    @MockitoBean
+    @Autowired
     private PullRequestCommentPoster commentPoster;
 
-    @MockitoBean
+    @Autowired
     private DiffNotePoster diffNotePoster;
 
-    @MockitoBean
+    @Autowired
     private AccountPreferencesQuery accountPreferencesQuery;
 
     private JobTypeHandler handler;
@@ -138,8 +138,14 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
     private AgentJob agentJob;
     private Long prId;
 
+    @AfterEach
+    void resetHandlerDoubles() {
+        org.mockito.Mockito.reset(commentPoster, diffNotePoster, accountPreferencesQuery);
+    }
+
     @BeforeEach
     void setUp() {
+        org.mockito.Mockito.reset(commentPoster, diffNotePoster, accountPreferencesQuery);
         databaseTestUtils.cleanDatabase();
         releaseSilentMode();
         when(commentPoster.findExistingSummaryComment(any())).thenReturn(ExistingDeliveryLookup.absent());
@@ -176,9 +182,10 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
         repositoryToMonitorRepository.save(WorkspaceTestFixtures.repositoryMonitor(workspace, repo.getNameWithOwner()));
 
         Instant now = Instant.now();
+        Long providerId = java.util.Objects.requireNonNull(provider.getId());
         pullRequestRepository.upsertCore(
             8001L,
-            provider.getId(),
+            providerId,
             50,
             "Pipeline Test PR",
             "Test body",
@@ -265,7 +272,9 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
         JsonNode observations = OBJECT_MAPPER.readTree(withEvidence(rawOutput)).path("observations");
         ((PullRequestReviewHandler) handler).admitObservations(job, observations);
         String digest = "test-admission-digest";
-        ObjectNode metadata = (ObjectNode) job.getMetadata().deepCopy();
+        JsonNode jobMetadata = job.getMetadata();
+        org.junit.jupiter.api.Assertions.assertNotNull(jobMetadata);
+        ObjectNode metadata = (ObjectNode) jobMetadata.deepCopy();
         metadata.put(ObservationAdmissionService.DIGEST_METADATA_KEY, digest);
         job.setMetadata(metadata);
         ObjectNode output = OBJECT_MAPPER.createObjectNode();
@@ -295,7 +304,9 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
         next.setJobType(AgentJobType.PULL_REQUEST_REVIEW);
         next.setStatus(AgentJobStatus.COMPLETED);
         next.setConfigSnapshot(agentJob.getConfigSnapshot());
-        next.setMetadata(agentJob.getMetadata().deepCopy());
+        JsonNode metadata = agentJob.getMetadata();
+        org.junit.jupiter.api.Assertions.assertNotNull(metadata);
+        next.setMetadata(metadata.deepCopy());
         next.setEvidenceSnapshot(agentJob.getEvidenceSnapshot().deepCopy());
         next = agentJobRepository.save(next);
         return admitAndSetOutput(next, rawOutput);
@@ -552,9 +563,12 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
         @Test
         void closedPrSkipsDelivery() {
             var pr = pullRequestRepository.findById(prId).orElseThrow();
+            var provider = java.util.Objects.requireNonNull(pr.getProvider());
+            var author = java.util.Objects.requireNonNull(pr.getAuthor());
+            var createdAt = java.util.Objects.requireNonNull(pr.getCreatedAt());
             pullRequestRepository.upsertCore(
                 8001L,
-                pr.getProvider().getId(),
+                java.util.Objects.requireNonNull(provider.getId()),
                 50,
                 "Pipeline Test PR",
                 "Test body",
@@ -564,11 +578,11 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
                 false,
                 null,
                 0,
-                pr.getCreatedAt(),
+                createdAt,
                 Instant.now(),
-                pr.getCreatedAt(),
-                pr.getAuthor().getId(),
-                pr.getRepository().getId(),
+                createdAt,
+                author.getId(),
+                pr.requireRepository().getId(),
                 null,
                 null,
                 false,

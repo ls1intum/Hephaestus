@@ -46,6 +46,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -290,7 +291,7 @@ public class GitHubHistoricalBackfillService {
      * @param pendingRepositories   number of repositories that need backfill but were skipped
      * @param skipReason            why pending repositories were skipped (null if none pending)
      */
-    public record BackfillCycleResult(int repositoriesProcessed, int pendingRepositories, String skipReason) {
+    public record BackfillCycleResult(int repositoriesProcessed, int pendingRepositories, @Nullable String skipReason) {
         /** Creates a result indicating no backfill work is needed. */
         public static BackfillCycleResult nothingToDo() {
             return new BackfillCycleResult(0, 0, null);
@@ -414,7 +415,7 @@ public class GitHubHistoricalBackfillService {
      * @return true if any work was performed
      */
     boolean backfillRepository(SyncTarget target, int batchSize, BackfillPageObserver observer) {
-        String safeRepoName = sanitizeForLog(target.repositoryNameWithOwner());
+        String safeRepoName = Objects.requireNonNull(sanitizeForLog(target.repositoryNameWithOwner()));
         Long syncTargetId = target.id();
         Long scopeId = target.scopeId();
 
@@ -617,7 +618,7 @@ public class GitHubHistoricalBackfillService {
         Long repositoryId,
         String repoNameForLog,
         Long syncTargetId,
-        String startCursor,
+        @Nullable String startCursor,
         int maxPages,
         BackfillPageObserver observer
     ) {
@@ -826,7 +827,7 @@ public class GitHubHistoricalBackfillService {
         Long repositoryId,
         String repoNameForLog,
         Long syncTargetId,
-        String startCursor,
+        @Nullable String startCursor,
         int maxPages,
         BackfillPageObserver observer
     ) {
@@ -1098,7 +1099,7 @@ public class GitHubHistoricalBackfillService {
         Long scopeId,
         Long repositoryId,
         Long syncTargetId,
-        String nextCursor
+        @Nullable String nextCursor
     ) {
         IssuePageResult result = transactionTemplate.execute(status -> {
             // Fetch repository INSIDE the transaction with organization eagerly loaded.
@@ -1180,7 +1181,7 @@ public class GitHubHistoricalBackfillService {
         Long scopeId,
         Long repositoryId,
         Long syncTargetId,
-        String nextCursor
+        @Nullable String nextCursor
     ) {
         PullRequestPageResult result = transactionTemplate.execute(status -> {
             // Fetch repository INSIDE the transaction with organization eagerly loaded.
@@ -1239,7 +1240,7 @@ public class GitHubHistoricalBackfillService {
                             prsNeedingReviewPagination.add(
                                 new PullRequestWithReviewCursor(
                                     processed,
-                                    embeddedReviews.endCursor(),
+                                    Objects.requireNonNull(embeddedReviews.endCursor()),
                                     embeddedReviews.reviews().size()
                                 )
                             );
@@ -1422,9 +1423,9 @@ public class GitHubHistoricalBackfillService {
         String repositoryName,
         boolean isInitialized,
         boolean isComplete,
-        Instant lastRunAt,
-        String issueCursor,
-        String prCursor,
+        @Nullable Instant lastRunAt,
+        @Nullable String issueCursor,
+        @Nullable String prCursor,
         int itemsRemaining,
         int itemsTotal
     ) {
@@ -1556,7 +1557,7 @@ public class GitHubHistoricalBackfillService {
      * @param e the exception that occurred
      */
     private void handleBackfillFailure(SyncTarget target, Exception e) {
-        String safeRepoName = sanitizeForLog(target.repositoryNameWithOwner());
+        String safeRepoName = Objects.requireNonNull(sanitizeForLog(target.repositoryNameWithOwner()));
 
         // BackfillTransientException is explicitly marked as transient - always cooldown
         if (e instanceof BackfillTransientException) {
@@ -1719,7 +1720,7 @@ public class GitHubHistoricalBackfillService {
      */
     static class BackfillTransientException extends RuntimeException {
 
-        BackfillTransientException(String message, Throwable cause) {
+        BackfillTransientException(String message, @Nullable Throwable cause) {
             super(message, cause);
         }
     }

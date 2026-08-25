@@ -6,6 +6,7 @@ import static de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabSync
 import static de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabSyncConstants.HEADER_RATE_LIMIT_RESET;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatNoException;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
@@ -277,9 +278,9 @@ class GitLabRateLimitTrackerTest extends BaseUnitTest {
             tracker.getRecommendedDelay(scopeId);
             assertThatNoException().isThrownBy(() -> tracker.waitIfNeeded(scopeId));
 
-            assertThat(
-                meterRegistry.find("gitlab.graphql.ratelimit.points.remaining").tag("scope_id", "1").gauge().value()
-            ).isEqualTo(2.0);
+            var gauge0 = meterRegistry.find("gitlab.graphql.ratelimit.points.remaining").tag("scope_id", "1").gauge();
+            assertNotNull(gauge0);
+            assertThat(gauge0.value()).isEqualTo(2.0);
         }
 
         @Test
@@ -287,15 +288,15 @@ class GitLabRateLimitTrackerTest extends BaseUnitTest {
             Long scopeId = 1L;
             tracker.updateFromHeaders(scopeId, createHeaders(80, 100, Instant.now().plusSeconds(60), 5));
 
-            assertThat(
-                meterRegistry.find("gitlab.graphql.ratelimit.points.remaining").tag("scope_id", "1").gauge().value()
-            ).isEqualTo(80.0);
-            assertThat(
-                meterRegistry.find("gitlab.graphql.ratelimit.points.limit").tag("scope_id", "1").gauge().value()
-            ).isEqualTo(100.0);
-            assertThat(
-                meterRegistry.find("gitlab.graphql.ratelimit.points.used").tag("scope_id", "1").gauge().value()
-            ).isEqualTo(20.0);
+            var gauge1 = meterRegistry.find("gitlab.graphql.ratelimit.points.remaining").tag("scope_id", "1").gauge();
+            assertNotNull(gauge1);
+            assertThat(gauge1.value()).isEqualTo(80.0);
+            var gauge2 = meterRegistry.find("gitlab.graphql.ratelimit.points.limit").tag("scope_id", "1").gauge();
+            assertNotNull(gauge2);
+            assertThat(gauge2.value()).isEqualTo(100.0);
+            var gauge3 = meterRegistry.find("gitlab.graphql.ratelimit.points.used").tag("scope_id", "1").gauge();
+            assertNotNull(gauge3);
+            assertThat(gauge3.value()).isEqualTo(20.0);
         }
     }
 

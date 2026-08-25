@@ -12,6 +12,7 @@ import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Objects;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
@@ -41,18 +42,20 @@ class LlmModelAdminControllerIntegrationTest extends AbstractWorkspaceIntegratio
     private LlmModelDTO createModel(Long connectionId, String slug) {
         // Models start inactive until an explicit price declaration is supplied.
         var request = new CreateLlmModelRequestDTO(slug, "Test Model", "gpt-5", null, null, null, false);
-        return webTestClient
-            .post()
-            .uri("/admin/llm/connections/{connectionId}/models", connectionId)
-            .headers(h -> h.setBearerAuth(ADMIN_TOKEN))
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(request)
-            .exchange()
-            .expectStatus()
-            .isCreated()
-            .expectBody(LlmModelDTO.class)
-            .returnResult()
-            .getResponseBody();
+        return Objects.requireNonNull(
+            webTestClient
+                .post()
+                .uri("/admin/llm/connections/{connectionId}/models", connectionId)
+                .headers(h -> h.setBearerAuth(ADMIN_TOKEN))
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(request)
+                .exchange()
+                .expectStatus()
+                .isCreated()
+                .expectBody(LlmModelDTO.class)
+                .returnResult()
+                .getResponseBody()
+        );
     }
 
     @Test
@@ -177,7 +180,7 @@ class LlmModelAdminControllerIntegrationTest extends AbstractWorkspaceIntegratio
             .returnResult()
             .getResponseBody();
         assertThat(fetched).isNotNull();
-        assertThat(fetched.currentPrice().per1mInputUsd()).isEqualByComparingTo("3.00");
+        assertThat(Objects.requireNonNull(fetched.currentPrice()).per1mInputUsd()).isEqualByComparingTo("3.00");
     }
 
     @Test

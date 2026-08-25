@@ -85,7 +85,7 @@ public class AuthIntentCookie {
             return new Intent(workspaceSlug, returnTo, Mode.LOGIN, null, System.currentTimeMillis());
         }
 
-        public static Intent link(Long currentAccountId, @Nullable String returnTo) {
+        public static Intent link(@Nullable Long currentAccountId, @Nullable String returnTo) {
             return new Intent(null, returnTo, Mode.LINK, currentAccountId, System.currentTimeMillis());
         }
     }

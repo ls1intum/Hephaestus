@@ -21,11 +21,11 @@ import org.jspecify.annotations.Nullable;
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record GitLabGroupResponse(
-    String id,
-    String fullPath,
-    String name,
+    @Nullable String id,
+    @Nullable String fullPath,
+    @Nullable String name,
     @Nullable String avatarUrl,
-    String webUrl,
+    @Nullable String webUrl,
     @Nullable String description,
     @Nullable String visibility,
     @Nullable GitLabGroupResponse parent

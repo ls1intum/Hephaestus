@@ -41,6 +41,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -784,7 +785,10 @@ class GitLabGroupMemberSyncServiceTest extends BaseUnitTest {
     }
 
     @SuppressWarnings("unchecked")
-    private ClientGraphQlResponse mockMembersPage(List<GitLabGroupMemberResponse> members, GitLabPageInfo pageInfo) {
+    private ClientGraphQlResponse mockMembersPage(
+        List<GitLabGroupMemberResponse> members,
+        @Nullable GitLabPageInfo pageInfo
+    ) {
         ClientGraphQlResponse resp = mock(ClientGraphQlResponse.class);
         lenient().when(resp.isValid()).thenReturn(true);
 

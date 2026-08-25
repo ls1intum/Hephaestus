@@ -6,6 +6,7 @@ import de.tum.cit.aet.hephaestus.account.UserPreferences;
 import de.tum.cit.aet.hephaestus.core.auth.spi.AccountPreferencesQuery.PreferencesView;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.Optional;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -37,7 +38,7 @@ class AccountPreferencesQueryTest extends BaseUnitTest {
         );
     }
 
-    private static AccountPreferencesQuery preferences(Boolean stored) {
+    private static AccountPreferencesQuery preferences(@Nullable Boolean stored) {
         return new AccountPreferencesQuery() {
             @Override
             public Optional<PreferencesView> preferencesForLogin(String login) {

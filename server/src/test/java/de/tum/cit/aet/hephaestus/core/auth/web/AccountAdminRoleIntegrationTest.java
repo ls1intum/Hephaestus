@@ -1,15 +1,14 @@
 package de.tum.cit.aet.hephaestus.core.auth.web;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
 import de.tum.cit.aet.hephaestus.core.auth.domain.AccountRepository;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.HephaestusJwtIssuer;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.IssuedJwtRepository;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.JwtPrincipalFactory;
-import de.tum.cit.aet.hephaestus.core.auth.jwt.JwtSigningKeyService;
-import de.tum.cit.aet.hephaestus.testconfig.DatabaseTestUtils;
-import de.tum.cit.aet.hephaestus.testconfig.RealAuthDatasource;
+import de.tum.cit.aet.hephaestus.testconfig.RealAuthIntegrationTest;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -19,18 +18,11 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.webtestclient.autoconfigure.AutoConfigureWebTestClient;
-import org.springframework.context.annotation.Import;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.reactive.server.WebTestClient;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
 /**
  * {@code PATCH /admin/users/{id}} — the super-admin role change against the <b>real</b> security
@@ -43,12 +35,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
  * does not catch it — the {@code FOR UPDATE} over the {@code (APP_ADMIN, ACTIVE)} set is what
  * serializes them.) Requires Docker, like every {@code @Tag("integration")} test.
  */
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@ActiveProfiles("test")
-@AutoConfigureWebTestClient
-@Testcontainers
-@Tag("integration")
-class AccountAdminRoleIntegrationTest {
+class AccountAdminRoleIntegrationTest extends RealAuthIntegrationTest {
 
     @Autowired
     private WebTestClient webTestClient;
@@ -63,27 +50,7 @@ class AccountAdminRoleIntegrationTest {
     private JwtPrincipalFactory principalFactory;
 
     @Autowired
-    private DatabaseTestUtils databaseTestUtils;
-
-    @Autowired
-    private JwtSigningKeyService signingKeyService;
-
-    @Autowired
     private IssuedJwtRepository issuedJwtRepository;
-
-    // Global isolation: the last-admin guard counts ALL active admins, so each test must start from a
-    // clean slate or leftover admins from a prior test would inflate the count and mask the guard.
-    // cleanDatabase() also truncates the JWT signing key, so re-seed it before we issue test tokens.
-    @BeforeEach
-    void cleanSlate() {
-        databaseTestUtils.cleanDatabase();
-        signingKeyService.ensureActiveKey();
-    }
-
-    @DynamicPropertySource
-    static void datasource(DynamicPropertyRegistry registry) {
-        RealAuthDatasource.register(registry);
-    }
 
     @Test
     void demotingOneAdminWhileAnotherRemainsPersistsToTheDatabase() {
@@ -92,14 +59,14 @@ class AccountAdminRoleIntegrationTest {
 
         webTestClient
             .patch()
-            .uri("/admin/users/{id}", victim.getId())
+            .uri("/admin/users/{id}", persistedId(victim.getId()))
             .headers(h -> h.setBearerAuth(tokenFor(keeper)))
             .bodyValue(Map.of("appRole", "USER"))
             .exchange()
             .expectStatus()
             .isOk();
 
-        assertThat(accountRepository.findById(victim.getId()))
+        assertThat(accountRepository.findById(persistedId(victim.getId())))
             .get()
             .extracting(Account::getAppRole)
             .isEqualTo(Account.AppRole.USER);
@@ -113,7 +80,7 @@ class AccountAdminRoleIntegrationTest {
 
         webTestClient
             .patch()
-            .uri("/admin/users/{id}", self.getId())
+            .uri("/admin/users/{id}", persistedId(self.getId()))
             .headers(h -> h.setBearerAuth(tokenFor(self)))
             .bodyValue(Map.of("appRole", "USER"))
             .exchange()
@@ -123,7 +90,7 @@ class AccountAdminRoleIntegrationTest {
             .jsonPath("$.detail")
             .isEqualTo("You can't revoke your own admin access. Have another admin do it.");
 
-        assertThat(accountRepository.findById(self.getId()))
+        assertThat(accountRepository.findById(persistedId(self.getId())))
             .get()
             .extracting(Account::getAppRole)
             .isEqualTo(Account.AppRole.APP_ADMIN);
@@ -142,8 +109,8 @@ class AccountAdminRoleIntegrationTest {
         try {
             CountDownLatch ready = new CountDownLatch(2);
             CountDownLatch go = new CountDownLatch(1);
-            Future<Integer> first = pool.submit(demote(tokenFor(adminA), adminB.getId(), ready, go));
-            Future<Integer> second = pool.submit(demote(tokenFor(adminB), adminA.getId(), ready, go));
+            Future<Integer> first = pool.submit(demote(tokenFor(adminA), persistedId(adminB.getId()), ready, go));
+            Future<Integer> second = pool.submit(demote(tokenFor(adminB), persistedId(adminA.getId()), ready, go));
             ready.await(10, TimeUnit.SECONDS);
             go.countDown();
 
@@ -162,12 +129,12 @@ class AccountAdminRoleIntegrationTest {
         Account admin = persistAdmin("Admin");
         Account user = persistUser("Plain User");
         tokenFor(user); // mints + records an active issued_jwt for the user
-        assertThat(issuedJwtRepository.findActiveByAccountId(user.getId(), Instant.now())).hasSize(1);
+        assertThat(issuedJwtRepository.findActiveByAccountId(persistedId(user.getId()), Instant.now())).hasSize(1);
 
         // Admin force sign-out revokes the user's active session(s).
         webTestClient
             .delete()
-            .uri("/admin/users/{id}/sessions", user.getId())
+            .uri("/admin/users/{id}/sessions", persistedId(user.getId()))
             .headers(h -> h.setBearerAuth(tokenFor(admin)))
             .exchange()
             .expectStatus()
@@ -178,7 +145,7 @@ class AccountAdminRoleIntegrationTest {
 
         // The account now has no active sessions — RevocationAwareJwtDecoder rejects the token on its
         // next request (enforced per-request via the issued_jwt revocation row).
-        assertThat(issuedJwtRepository.findActiveByAccountId(user.getId(), Instant.now())).isEmpty();
+        assertThat(issuedJwtRepository.findActiveByAccountId(persistedId(user.getId()), Instant.now())).isEmpty();
     }
 
     @Test
@@ -187,7 +154,7 @@ class AccountAdminRoleIntegrationTest {
 
         webTestClient
             .delete()
-            .uri("/admin/users/{id}/sessions", user.getId())
+            .uri("/admin/users/{id}/sessions", persistedId(user.getId()))
             .headers(h -> h.setBearerAuth(tokenFor(user)))
             .exchange()
             .expectStatus()
@@ -236,5 +203,10 @@ class AccountAdminRoleIntegrationTest {
 
     private String tokenFor(Account account) {
         return jwtIssuer.issue(principalFactory.forAccount(account), null, null).value();
+    }
+
+    private static long persistedId(@Nullable Long id) {
+        assertNotNull(id);
+        return id;
     }
 }

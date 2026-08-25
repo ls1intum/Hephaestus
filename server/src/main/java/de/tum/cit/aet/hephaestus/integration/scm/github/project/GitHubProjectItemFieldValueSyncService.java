@@ -27,6 +27,7 @@ import java.util.Collection;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jspecify.annotations.Nullable;
 import org.springframework.graphql.client.ClientGraphQlResponse;
 import org.springframework.graphql.client.HttpGraphQlClient;
 import org.springframework.stereotype.Service;
@@ -53,10 +54,10 @@ public class GitHubProjectItemFieldValueSyncService {
 
     @Transactional
     public List<String> processFieldValues(
-        Long itemId,
-        List<GitHubProjectFieldValueDTO> fieldValues,
+        @Nullable Long itemId,
+        @Nullable List<GitHubProjectFieldValueDTO> fieldValues,
         boolean truncated,
-        String endCursor
+        @Nullable String endCursor
     ) {
         if (itemId == null) {
             return List.of();
@@ -108,9 +109,9 @@ public class GitHubProjectItemFieldValueSyncService {
 
     public int syncRemainingFieldValues(
         Long scopeId,
-        String itemNodeId,
-        Long itemId,
-        String startCursor,
+        @Nullable String itemNodeId,
+        @Nullable Long itemId,
+        @Nullable String startCursor,
         List<String> initialFieldIds
     ) {
         if (itemNodeId == null || itemNodeId.isBlank() || itemId == null) {
@@ -237,7 +238,11 @@ public class GitHubProjectItemFieldValueSyncService {
                     }
 
                     for (GitHubProjectFieldValueDTO fieldValue : fieldValueDTOs) {
-                        if (!projectFieldRepository.existsById(fieldValue.fieldId())) {
+                        String fieldId = fieldValue.fieldId();
+                        if (fieldId == null) {
+                            continue;
+                        }
+                        if (!projectFieldRepository.existsById(fieldId)) {
                             log.debug(
                                 "Skipped field value: reason=fieldNotFound, fieldId={}, itemId={}",
                                 fieldValue.fieldId(),
@@ -246,11 +251,11 @@ public class GitHubProjectItemFieldValueSyncService {
                             continue;
                         }
 
-                        processedFieldIds.add(fieldValue.fieldId());
+                        processedFieldIds.add(fieldId);
 
                         projectFieldValueRepository.upsertCore(
                             itemId,
-                            fieldValue.fieldId(),
+                            fieldId,
                             fieldValue.textValue(),
                             fieldValue.numberValue(),
                             fieldValue.dateValue(),
@@ -376,7 +381,7 @@ public class GitHubProjectItemFieldValueSyncService {
         }
     }
 
-    private ClassificationResult classifyGraphQlErrors(ClientGraphQlResponse response) {
+    private @Nullable ClassificationResult classifyGraphQlErrors(@Nullable ClientGraphQlResponse response) {
         ClassificationResult classification = exceptionClassifier.classifyGraphQlResponse(response);
         if (classification != null) {
             return classification;

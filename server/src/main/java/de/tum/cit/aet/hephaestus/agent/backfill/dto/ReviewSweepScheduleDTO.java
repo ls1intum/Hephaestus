@@ -7,6 +7,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
 import java.util.UUID;
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 /**
  * A standing instruction to review recent work on a cadence, as an admin sees it.
@@ -26,6 +27,7 @@ public record ReviewSweepScheduleDTO(
     @NonNull Boolean enabled,
     @NonNull Instant nextRunAt,
     @Schema(description = "When a campaign was last opened from this schedule; absent until the first one")
+    @Nullable
     Instant lastRunAt,
     @NonNull Long createdByAccountId,
     @NonNull Instant createdAt

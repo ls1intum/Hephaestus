@@ -19,6 +19,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
@@ -90,7 +91,7 @@ class GraphQlPaginationHelperTest {
 
         @Test
         void shouldProcessSinglePageAndComplete() {
-            GHPageInfo pageInfo = new GHPageInfo("cursor1", false, false, null);
+            GHPageInfo pageInfo = pageInfo("cursor1", false);
             TestConnection connection = new TestConnection(List.of("item1", "item2"), pageInfo);
 
             ClientGraphQlResponse response = mockValidResponse(connection);
@@ -114,9 +115,9 @@ class GraphQlPaginationHelperTest {
 
         @Test
         void shouldPaginateThroughMultiplePages() {
-            GHPageInfo pageInfo1 = new GHPageInfo("cursor1", true, false, null);
-            GHPageInfo pageInfo2 = new GHPageInfo("cursor2", true, false, null);
-            GHPageInfo pageInfo3 = new GHPageInfo("cursor3", false, false, null);
+            GHPageInfo pageInfo1 = pageInfo("cursor1", true);
+            GHPageInfo pageInfo2 = pageInfo("cursor2", true);
+            GHPageInfo pageInfo3 = pageInfo("cursor3", false);
 
             TestConnection connection1 = new TestConnection(List.of("item1"), pageInfo1);
             TestConnection connection2 = new TestConnection(List.of("item2"), pageInfo2);
@@ -144,7 +145,7 @@ class GraphQlPaginationHelperTest {
 
         @Test
         void shouldStopWhenRateLimitIsCritical() {
-            GHPageInfo pageInfo = new GHPageInfo("cursor1", true, false, null);
+            GHPageInfo pageInfo = pageInfo("cursor1", true);
             TestConnection connection = new TestConnection(List.of("item1"), pageInfo);
             ClientGraphQlResponse response = mockValidResponse(connection);
             mockClientExecution(response);
@@ -189,7 +190,7 @@ class GraphQlPaginationHelperTest {
 
         @Test
         void shouldStopWhenProcessorReturnsFalse() {
-            GHPageInfo pageInfo = new GHPageInfo("cursor1", true, false, null);
+            GHPageInfo pageInfo = pageInfo("cursor1", true);
             TestConnection connection = new TestConnection(List.of("item1"), pageInfo);
             ClientGraphQlResponse response = mockValidResponse(connection);
             mockClientExecution(response);
@@ -206,7 +207,7 @@ class GraphQlPaginationHelperTest {
         @Test
         void shouldRespectMaxPagesLimit() {
             // Given - always return hasNextPage=true
-            GHPageInfo pageInfo = new GHPageInfo("cursor", true, false, null);
+            GHPageInfo pageInfo = pageInfo("cursor", true);
             TestConnection connection = new TestConnection(List.of("item"), pageInfo);
             ClientGraphQlResponse response = mockValidResponse(connection);
 
@@ -245,7 +246,7 @@ class GraphQlPaginationHelperTest {
         @Test
         void shouldUseInitialCursorWhenProvided() {
             String initialCursor = "resumeCursor123";
-            GHPageInfo pageInfo = new GHPageInfo("cursor1", false, false, null);
+            GHPageInfo pageInfo = pageInfo("cursor1", false);
             TestConnection connection = new TestConnection(List.of("item1"), pageInfo);
             ClientGraphQlResponse response = mockValidResponse(connection);
             mockClientExecution(response);
@@ -273,8 +274,8 @@ class GraphQlPaginationHelperTest {
 
         @Test
         void shouldTrackRateLimitForEachPage() {
-            GHPageInfo pageInfo1 = new GHPageInfo("cursor1", true, false, null);
-            GHPageInfo pageInfo2 = new GHPageInfo("cursor2", false, false, null);
+            GHPageInfo pageInfo1 = pageInfo("cursor1", true);
+            GHPageInfo pageInfo2 = pageInfo("cursor2", false);
 
             TestConnection connection1 = new TestConnection(List.of("item1"), pageInfo1);
             TestConnection connection2 = new TestConnection(List.of("item2"), pageInfo2);
@@ -302,7 +303,7 @@ class GraphQlPaginationHelperTest {
 
         @Test
         void shouldUseDefaultMaxPagesWhenNotSpecified() {
-            GHPageInfo pageInfo = new GHPageInfo(null, false, false, null);
+            GHPageInfo pageInfo = pageInfo(null, false);
             TestConnection connection = new TestConnection(List.of("item"), pageInfo);
             ClientGraphQlResponse response = mockValidResponse(connection);
             mockClientExecution(response);
@@ -364,7 +365,7 @@ class GraphQlPaginationHelperTest {
         @Test
         void shouldTrackRateLimitEvenWhenProcessorStops() {
             // Given - processor returns false (stop) on first page
-            GHPageInfo pageInfo = new GHPageInfo("cursor1", true, false, null);
+            GHPageInfo pageInfo = pageInfo("cursor1", true);
             TestConnection connection = new TestConnection(List.of("item1"), pageInfo);
             ClientGraphQlResponse response = mockValidResponse(connection);
             mockClientExecution(response);
@@ -431,5 +432,12 @@ class GraphQlPaginationHelperTest {
             rest[i - 1] = Mono.just(responses[i]);
         }
         when(requestSpec.execute()).thenReturn(first, rest);
+    }
+
+    private static GHPageInfo pageInfo(@Nullable String endCursor, boolean hasNextPage) {
+        GHPageInfo pageInfo = new GHPageInfo();
+        pageInfo.setHasNextPage(hasNextPage);
+        if (endCursor != null) pageInfo.setEndCursor(endCursor);
+        return pageInfo;
     }
 }

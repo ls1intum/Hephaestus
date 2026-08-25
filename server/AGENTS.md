@@ -49,16 +49,15 @@ Each of these reports success and leaves you with the wrong result.
   local OAuth variables make environment-sensitive tests fail only on your machine. Run tests with
   `MANAGEMENT_PORT=0 SERVER_PORT=0`.
 
-### OpenAPI generation exits 0 having written nothing
+### OpenAPI generation ports
 
 `generate:api:application-server:specs` boots the app to scrape springdoc, so it needs a free HTTP port
 (`openapi.server.port`, default **38090**), a free management port, **and a free JMX port**
-(`openapi.jmx.port`, default **9001**). A busy JMX port prints `Port already in use: 9001`, writes no
-spec, and still exits 0 — you then commit a spec that is missing your new endpoint. Never stop another
-service to free a port; override:
+(`openapi.jmx.port`, default **9001**). The root generation command fails and restores the previous
+spec if Maven does not produce a new one. Never stop another service to free a port; override:
 
 ```bash
-SERVER_PORT=38111 MANAGEMENT_PORT=38113 ./mvnw verify -DskipTests=true -Dapp.profiles=specs -Dopenapi.jmx.port=9031
+pnpm run generate:api:application-server:specs -- -Dopenapi.server.port=38111 -Dopenapi.jmx.port=9031
 pnpm run generate:api:application-server:client
 ```
 
@@ -73,6 +72,17 @@ authorization logic.
 **Never** — commit credentials · `System.out.println` (log through SLF4J with `{}` placeholders, and
 never log a token) · `@Transactional` on a controller (service layer only) · expose an entity from a
 controller.
+
+## Null-safety
+
+NullAway checks all handwritten production and test code in JSpecify mode; generated sources are
+excluded. Every new package needs a `package-info.java` containing
+`@org.jspecify.annotations.NullMarked`, and the build rejects missing null-marking scopes and
+`NullAway` suppressions. Use `@Nullable` only for genuine absence and place it on the precise type:
+`List<@Nullable String>` permits null elements; `String @Nullable []` permits a null array reference.
+Fix violations at the contract or implementation boundary. In tests, refine a nullable result once
+before using it rather than adding duplicate assertions. Run `./mvnw test -P'!quick'` after changing a
+nullness contract.
 
 ## Test tiers
 
@@ -141,9 +151,9 @@ or on "the only" result, and never write cleanup that another test depends on ha
   `OpenAPIConfiguration.ALLOWED_DOMAIN_OBJECTS`. The webapp client then simply has no type for it, with
   no error anywhere. Domain types the API deliberately exposes (`ProblemDetail`, `PracticeBinding`, …)
   are there for this reason.
-- DTOs are records, and `@NonNull` (`org.jspecify.annotations`) on a component is what puts it in the
-  generated schema's `required` list. A component the API may omit is left off that list — annotate it
-  `@Nullable` or leave it bare; neither changes the spec.
+- DTOs are records. All bare components are non-null under `@NullMarked`; add JSpecify `@NonNull` when
+  that component must also appear in the generated schema's `required` list. A component the API may
+  omit is `@Nullable`, never bare.
 - **Never wrap a DTO component in `Optional<>`.** springdoc unwraps it to the value type but still marks
   it required, so the generated TypeScript declares it non-optional and its response transformer
   converts it unconditionally — a value the server never sends is typed as one it always sends. Use

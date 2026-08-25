@@ -114,7 +114,7 @@ public class GitLabLabelProcessor {
      * @param context processing context with scope information
      */
     @Transactional
-    public void delete(Long labelId, ProcessingContext context) {
+    public void delete(@Nullable Long labelId, ProcessingContext context) {
         if (labelId == null) {
             return;
         }

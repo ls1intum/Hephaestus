@@ -43,6 +43,9 @@ public record PullRequestWithReviewThreads(
         String context = "PR #" + ghPullRequest.getNumber();
 
         GitHubPullRequestDTO dto = GitHubPullRequestDTO.fromPullRequest(ghPullRequest);
+        if (dto == null) {
+            return null;
+        }
         EmbeddedCommentsDTO comments = EmbeddedCommentsDTO.fromConnection(ghPullRequest.getComments(), context);
         EmbeddedReviewsDTO reviews = EmbeddedReviewsDTO.fromConnection(ghPullRequest.getReviews(), context);
         EmbeddedReviewThreadsDTO threads = EmbeddedReviewThreadsDTO.fromConnection(

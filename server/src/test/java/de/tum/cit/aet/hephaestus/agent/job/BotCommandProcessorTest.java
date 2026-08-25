@@ -187,7 +187,7 @@ class BotCommandProcessorTest extends BaseUnitTest {
         @Test
         void missingBranchInfo_skipsProcessing() {
             PullRequest pr = createOpenPr();
-            pr.setHeadRefOid(null);
+            org.springframework.test.util.ReflectionTestUtils.setField(pr, "headRefOid", null);
             mockPrLookup(pr);
 
             processor.onBotCommandReceived(event("/hephaestus review"));

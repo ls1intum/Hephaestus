@@ -225,7 +225,7 @@ class IssueAgentJobEventListenerTest extends BaseUnitTest {
             var event = new ScmDomainEvent.IssueCreated(issueData, webhookContext(1L));
 
             Issue issue = createIssue(Issue.State.OPEN);
-            issue.setRepository(null);
+            org.springframework.test.util.ReflectionTestUtils.setField(issue, "repository", null);
             when(issueRepository.findByIdWithRepositoryAndAssignees(ISSUE_ID)).thenReturn(Optional.of(issue));
 
             listener.onIssueCreated(event);
@@ -534,7 +534,7 @@ class IssueAgentJobEventListenerTest extends BaseUnitTest {
             var event = new ScmDomainEvent.IssueLabeled(issueData, createLabelData(), webhookContext(1L));
 
             Issue issue = createIssue(Issue.State.OPEN);
-            issue.setRepository(null);
+            org.springframework.test.util.ReflectionTestUtils.setField(issue, "repository", null);
             when(issueRepository.findByIdWithRepositoryAndAssignees(ISSUE_ID)).thenReturn(Optional.of(issue));
 
             listener.onIssueLabeled(event);

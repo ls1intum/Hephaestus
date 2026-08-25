@@ -6,6 +6,7 @@ import java.util.Locale;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.jspecify.annotations.Nullable;
 
 final class SecretDiffScanner {
 
@@ -96,7 +97,7 @@ final class SecretDiffScanner {
      * @param unifiedDiff the output of {@code git diff base head} (may be null/blank)
      * @return one {@link SecretHit} per credential found on a {@code '+'} line
      */
-    List<SecretHit> scan(String unifiedDiff) {
+    List<SecretHit> scan(@Nullable String unifiedDiff) {
         List<SecretHit> hits = new ArrayList<>();
         if (unifiedDiff == null || unifiedDiff.isBlank()) {
             return hits;
@@ -257,7 +258,7 @@ final class SecretDiffScanner {
         return LOW_SIGNAL_PATH.matcher(path).find();
     }
 
-    private static String parseNewPath(String header) {
+    private static @Nullable String parseNewPath(String header) {
         // "+++ b/path/to/file"  or  "+++ path/to/file"
         String p = header.substring(4).trim();
         int tab = p.indexOf('\t');

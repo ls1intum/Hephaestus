@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.agent.sandbox.spi;
 import java.net.URI;
 import java.util.Set;
 import java.util.regex.Pattern;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Network access policy for a sandboxed container.
@@ -23,7 +24,7 @@ import java.util.regex.Pattern;
  * present. We perform a light prefix/scheme check on template URLs and defer full URI
  * validation to the adapter (which sees the resolved value).
  */
-public record NetworkPolicy(boolean internetAccess, String llmProxyUrl, String llmProxyToken) {
+public record NetworkPolicy(boolean internetAccess, @Nullable String llmProxyUrl, @Nullable String llmProxyToken) {
     private static final Set<String> ALLOWED_SCHEMES = Set.of("http", "https");
 
     /** Matches the documented template placeholder produced before adapter resolution. */

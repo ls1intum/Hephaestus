@@ -20,6 +20,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
+import org.jspecify.annotations.Nullable;
 
 @Entity
 @Table(name = "repository_collaborator")
@@ -70,7 +71,7 @@ public class RepositoryCollaborator {
         ADMIN,
         UNKNOWN;
 
-        public static Permission fromGitHubValue(String value) {
+        public static Permission fromGitHubValue(@Nullable String value) {
             if (value == null || value.isBlank()) {
                 return UNKNOWN;
             }

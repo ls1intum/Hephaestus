@@ -11,6 +11,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabEventType;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabWebhookContextResolver;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.milestone.dto.GitLabMilestoneDTO;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.milestone.dto.GitLabMilestoneEventDTO;
+import java.util.Objects;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -72,7 +73,7 @@ public class GitLabMilestoneMessageHandler extends AbstractIntegrationMessageHan
             log.warn("Received milestone event with missing project path");
             return;
         }
-        String safeProjectPath = sanitizeForLog(projectPath);
+        String safeProjectPath = Objects.requireNonNullElse(sanitizeForLog(projectPath), "<unknown>");
         GitLabEventAction action = event.actionType();
 
         log.info(
@@ -93,6 +94,6 @@ public class GitLabMilestoneMessageHandler extends AbstractIntegrationMessageHan
             return;
         }
 
-        milestoneProcessor.process(dto, context.repository(), context);
+        milestoneProcessor.process(dto, Objects.requireNonNull(context.repository()), context);
     }
 }

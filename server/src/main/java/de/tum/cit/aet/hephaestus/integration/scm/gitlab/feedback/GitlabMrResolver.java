@@ -4,6 +4,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackDeliveryException;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabGraphQlClientProvider;
 import java.time.Duration;
 import java.util.List;
+import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.graphql.client.ClientGraphQlResponse;
@@ -43,9 +44,9 @@ class GitlabMrResolver {
             throw new FeedbackDeliveryException("Null response resolving MR info: " + projectPath + "!" + mrIid);
         }
 
-        String globalId = response.field("project.mergeRequest.id").getValue();
+        String globalId = Objects.requireNonNull(response).field("project.mergeRequest.id").getValue();
         if (globalId == null) {
-            List<?> errors = response.getErrors();
+            List<?> errors = Objects.requireNonNull(response).getErrors();
             throw new FeedbackDeliveryException(
                 "MR not found via GraphQL: " +
                     projectPath +
@@ -56,9 +57,9 @@ class GitlabMrResolver {
         }
 
         // diffRefs may be null if the MR has no diffs yet
-        String baseSha = response.field("project.mergeRequest.diffRefs.baseSha").getValue();
-        String headSha = response.field("project.mergeRequest.diffRefs.headSha").getValue();
-        String startSha = response.field("project.mergeRequest.diffRefs.startSha").getValue();
+        String baseSha = Objects.requireNonNull(response).field("project.mergeRequest.diffRefs.baseSha").getValue();
+        String headSha = Objects.requireNonNull(response).field("project.mergeRequest.diffRefs.headSha").getValue();
+        String startSha = Objects.requireNonNull(response).field("project.mergeRequest.diffRefs.startSha").getValue();
 
         return new MrInfo(globalId, baseSha, headSha, startSha);
     }
@@ -67,7 +68,7 @@ class GitlabMrResolver {
      * Splits {@code "project/full/path!42"} (GitLab MR external-id convention) into
      * the path + iid components needed by GraphQL.
      */
-    static MrCoordinates parseSubjectExternalId(String subjectExternalId) {
+    static MrCoordinates parseSubjectExternalId(@Nullable String subjectExternalId) {
         if (subjectExternalId == null || subjectExternalId.isBlank()) {
             throw new FeedbackDeliveryException("subjectExternalId is required for GitLab MR feedback");
         }
@@ -107,9 +108,9 @@ class GitlabMrResolver {
         if (response == null) {
             throw new FeedbackDeliveryException("Null response resolving issue gid: " + projectPath + "#" + issueIid);
         }
-        String gid = response.field("project.issue.id").getValue();
+        String gid = Objects.requireNonNull(response).field("project.issue.id").getValue();
         if (gid == null) {
-            List<?> errors = response.getErrors();
+            List<?> errors = Objects.requireNonNull(response).getErrors();
             throw new FeedbackDeliveryException(
                 "Issue not found via GraphQL: " +
                     projectPath +

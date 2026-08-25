@@ -7,4 +7,5 @@
  * stereotype is not mixed with broadcast event records in a single API surface.
  */
 @org.springframework.modulith.NamedInterface("spi")
+@org.jspecify.annotations.NullMarked
 package de.tum.cit.aet.hephaestus.workspace.spi;

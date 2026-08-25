@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Translates {@link SecurityProfile}, {@link ResourceLimits}, and {@link NetworkPolicy} into a
@@ -57,13 +58,13 @@ public class ContainerSecurityPolicy {
     );
 
     private final SandboxProperties properties;
-    private final String seccompProfileJson;
+    private final @Nullable String seccompProfileJson;
 
     /**
      * @param properties sandbox configuration
      * @param seccompProfileJson pre-loaded seccomp JSON string (null if no profile)
      */
-    public ContainerSecurityPolicy(SandboxProperties properties, String seccompProfileJson) {
+    public ContainerSecurityPolicy(SandboxProperties properties, @Nullable String seccompProfileJson) {
         this.properties = properties;
         this.seccompProfileJson = seccompProfileJson;
     }
@@ -79,7 +80,7 @@ public class ContainerSecurityPolicy {
     public DockerOperations.HostConfigSpec buildHostConfig(
         SecurityProfile security,
         ResourceLimits resources,
-        NetworkPolicy networkPolicy
+        @Nullable NetworkPolicy networkPolicy
     ) {
         // Enforcement floors: these security invariants are always applied regardless
         // of the caller-supplied SecurityProfile. A compromised or misconfigured caller

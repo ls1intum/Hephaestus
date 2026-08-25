@@ -10,6 +10,7 @@ import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
+import org.jspecify.annotations.Nullable;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
@@ -237,17 +238,37 @@ public interface FeedbackObservationRepository extends JpaRepository<FeedbackObs
         Integer getOrdinal();
         String getPracticeSlug();
         String getPracticeName();
+
+        @Nullable
         String getAreaSlug();
+
+        @Nullable
         String getAreaName();
+
+        @Nullable
         String getAreaIcon();
+
+        @Nullable
         String getAreaColor();
+
         String getSummary();
         Presence getPresence();
+
+        @Nullable
         Assessment getAssessment();
+
+        @Nullable
         Severity getSeverity();
+
+        @Nullable
         Long getPracticeRevisionId();
+
+        @Nullable
         String getPracticeRevisionFingerprint();
+
+        @Nullable
         String getCurrentPracticeRevisionFingerprint();
+
         Instant getObservedAt();
     }
 
@@ -257,8 +278,13 @@ public interface FeedbackObservationRepository extends JpaRepository<FeedbackObs
         UUID getAgentJobId();
         FeedbackChannel getChannel();
         FeedbackDeliveryState getDeliveryState();
+
+        @Nullable
         FeedbackSuppressionReason getSuppressionReason();
+
         Instant getCreatedAt();
+
+        @Nullable
         Instant getDeliveredAt();
     }
 
@@ -269,14 +295,20 @@ public interface FeedbackObservationRepository extends JpaRepository<FeedbackObs
         String getPracticeSlug();
         String getPracticeName();
         String getSummary();
+
+        @Nullable
         String getEvidenceRationale();
+
         /**
          * The composer's notes to the mentor, or null when nothing was composed for this unit. See
          * {@link ConversationBriefBody}.
          */
         String getBody();
         Severity getSeverity();
+
+        @Nullable
         ArtifactKind getArtifactKind();
+
         Long getArtifactId();
         Instant getPreparedAt();
     }

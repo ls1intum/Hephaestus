@@ -271,7 +271,7 @@ public class GitlabInlineFeedbackChannel implements InlineFeedbackChannel {
                 return Outcome.failed();
             }
 
-            List<String> errors = response.field("createDiffNote.errors").getValue();
+            List<String> errors = Objects.requireNonNull(response).field("createDiffNote.errors").getValue();
             if (errors != null && !errors.isEmpty()) {
                 if (isLineCodeError(errors)) {
                     log.info(
@@ -327,7 +327,7 @@ public class GitlabInlineFeedbackChannel implements InlineFeedbackChannel {
                 return Outcome.failed();
             }
 
-            List<String> errors = response.field("updateNote.errors").getValue();
+            List<String> errors = Objects.requireNonNull(response).field("updateNote.errors").getValue();
             if (errors != null && !errors.isEmpty()) {
                 log.warn(
                     "GitLab updateNote failed: workspaceId={}, noteId={}, errors={}",
@@ -402,11 +402,13 @@ public class GitlabInlineFeedbackChannel implements InlineFeedbackChannel {
             if (response == null) {
                 break;
             }
-            List<Map<String, Object>> nodes = response.field("project.mergeRequest.discussions.nodes").getValue();
+            List<Map<String, Object>> nodes = Objects.requireNonNull(response)
+                .field("project.mergeRequest.discussions.nodes")
+                .getValue();
             if (nodes != null) {
                 all.addAll(nodes);
             }
-            GitLabPageInfo pageInfo = response
+            GitLabPageInfo pageInfo = Objects.requireNonNull(response)
                 .field("project.mergeRequest.discussions.pageInfo")
                 .toEntity(GitLabPageInfo.class);
             page++;
@@ -473,12 +475,12 @@ public class GitlabInlineFeedbackChannel implements InlineFeedbackChannel {
 
     @Nullable
     private static String noteIdOf(ClientGraphQlResponse response) {
-        return response.field("createDiffNote.note.id").getValue();
+        return Objects.requireNonNull(response).field("createDiffNote.note.id").getValue();
     }
 
     @Nullable
     private static String discussionIdOf(ClientGraphQlResponse response) {
-        return response.field("createDiffNote.note.discussion.id").getValue();
+        return Objects.requireNonNull(response).field("createDiffNote.note.discussion.id").getValue();
     }
 
     @Nullable
@@ -670,7 +672,7 @@ public class GitlabInlineFeedbackChannel implements InlineFeedbackChannel {
                 return null;
             }
 
-            List<String> errors = response.field("createNote.errors").getValue();
+            List<String> errors = Objects.requireNonNull(response).field("createNote.errors").getValue();
             if (errors != null && !errors.isEmpty()) {
                 log.warn(
                     "Fallback MR comment failed: workspaceId={}, errors={}",
@@ -679,7 +681,7 @@ public class GitlabInlineFeedbackChannel implements InlineFeedbackChannel {
                 );
                 return null;
             }
-            return response.field("createNote.note.id").getValue();
+            return Objects.requireNonNull(response).field("createNote.note.id").getValue();
         } catch (OutboundEgressSuppressedException e) {
             throw e;
         } catch (Exception e) {

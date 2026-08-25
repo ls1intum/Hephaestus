@@ -9,6 +9,7 @@ import de.tum.cit.aet.hephaestus.mentor.ChatMessageRepository;
 import java.util.List;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.core.JacksonException;
@@ -73,7 +74,7 @@ public class CurrentThreadHistoryContentSource implements ContentSource {
         }
     }
 
-    private static String visibleText(JsonNode parts) {
+    private static String visibleText(@Nullable JsonNode parts) {
         if (parts == null || !parts.isArray()) {
             return "";
         }

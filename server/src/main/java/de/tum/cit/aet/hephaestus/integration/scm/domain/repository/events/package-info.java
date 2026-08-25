@@ -9,4 +9,5 @@
  * can subscribe without piercing internal repository-service implementation packages.
  */
 @org.springframework.modulith.NamedInterface("events")
+@org.jspecify.annotations.NullMarked
 package de.tum.cit.aet.hephaestus.integration.scm.domain.repository.events;

@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.testconfig;
 
 import java.util.List;
 import java.util.function.Consumer;
+import org.jspecify.annotations.Nullable;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -25,8 +26,7 @@ public class TestAuthUtils {
     public static String getCurrentUserToken() {
         var authentication = SecurityContextHolder.getContext().getAuthentication();
 
-        if (authentication instanceof JwtAuthenticationToken) {
-            Jwt jwt = (Jwt) authentication.getPrincipal();
+        if (authentication instanceof JwtAuthenticationToken && authentication.getPrincipal() instanceof Jwt jwt) {
             return jwt.getTokenValue();
         }
 
@@ -40,11 +40,10 @@ public class TestAuthUtils {
      *
      * @return JWT token string, or null if no authentication is present
      */
-    public static String getCurrentUserTokenOrNull() {
+    public static @Nullable String getCurrentUserTokenOrNull() {
         var authentication = SecurityContextHolder.getContext().getAuthentication();
 
-        if (authentication instanceof JwtAuthenticationToken) {
-            Jwt jwt = (Jwt) authentication.getPrincipal();
+        if (authentication instanceof JwtAuthenticationToken && authentication.getPrincipal() instanceof Jwt jwt) {
             return jwt.getTokenValue();
         }
 

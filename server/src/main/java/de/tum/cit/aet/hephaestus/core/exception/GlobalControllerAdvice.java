@@ -40,45 +40,45 @@ public class GlobalControllerAdvice {
 
     @ExceptionHandler(EntityNotFoundException.class)
     ProblemDetail handleNotFound(EntityNotFoundException exception) {
-        log.debug("Handled entity not found exception: message={}", exception.getMessage());
-        return problem(HttpStatus.NOT_FOUND, "Resource not found", exception.getMessage());
+        log.debug("Handled entity not found exception: message={}", messageOf(exception));
+        return problem(HttpStatus.NOT_FOUND, "Resource not found", messageOf(exception));
     }
 
     @ExceptionHandler(NoResourceFoundException.class)
     ProblemDetail handleNoResourceFound(NoResourceFoundException exception) {
-        log.debug("Handled no resource found exception: message={}", exception.getMessage());
-        return problem(HttpStatus.NOT_FOUND, "Resource not found", exception.getMessage());
+        log.debug("Handled no resource found exception: message={}", messageOf(exception));
+        return problem(HttpStatus.NOT_FOUND, "Resource not found", messageOf(exception));
     }
 
     @ExceptionHandler(AccessForbiddenException.class)
     ProblemDetail handleForbidden(AccessForbiddenException exception) {
-        log.warn("Handled access forbidden exception: message={}", exception.getMessage());
-        return problem(HttpStatus.FORBIDDEN, "Access denied", exception.getMessage());
+        log.warn("Handled access forbidden exception: message={}", messageOf(exception));
+        return problem(HttpStatus.FORBIDDEN, "Access denied", messageOf(exception));
     }
 
     @ExceptionHandler(AuthorizationDeniedException.class)
     ProblemDetail handleAuthorizationDenied(AuthorizationDeniedException exception) {
-        log.debug("Authorization denied: message={}", exception.getMessage());
+        log.debug("Authorization denied: message={}", messageOf(exception));
         return problem(HttpStatus.FORBIDDEN, "Access denied", "Insufficient permissions for this operation.");
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
     ProblemDetail handleBadRequest(IllegalArgumentException exception) {
-        log.debug("Handled bad request exception: message={}", exception.getMessage());
-        return problem(HttpStatus.BAD_REQUEST, "Invalid request", exception.getMessage());
+        log.debug("Handled bad request exception: message={}", messageOf(exception));
+        return problem(HttpStatus.BAD_REQUEST, "Invalid request", messageOf(exception));
     }
 
     @ExceptionHandler(IllegalStateException.class)
     ProblemDetail handleIllegalState(IllegalStateException exception) {
-        log.warn("Handled illegal state exception: message={}", exception.getMessage());
-        return problem(HttpStatus.CONFLICT, "Invalid state", exception.getMessage());
+        log.warn("Handled illegal state exception: message={}", messageOf(exception));
+        return problem(HttpStatus.CONFLICT, "Invalid state", messageOf(exception));
     }
 
     @ExceptionHandler(ConfigAuditUnavailableException.class)
     ProblemDetail handleConfigAuditUnavailable(ConfigAuditUnavailableException exception) {
         // 500, not 4xx: the caller did nothing wrong, and a 4xx would keep this out of the error budget
         // that makes a fail-closed audit trail's failure visible. The specific cause stays server-side.
-        log.error("Config audit unavailable, change refused: message={}", exception.getMessage());
+        log.error("Config audit unavailable, change refused: message={}", messageOf(exception));
         return problem(
             HttpStatus.INTERNAL_SERVER_ERROR,
             "Change not recorded",
@@ -144,7 +144,7 @@ public class GlobalControllerAdvice {
     ProblemDetail handleWebClientRequestException(WebClientRequestException exception) {
         // All WebClient request failures (connection refused, DNS, timeout, etc.) are unexpected
         // and warrant WARN level - environment-specific log filtering should be configured externally
-        log.warn("External service request failed: uri={}, reason={}", exception.getUri(), exception.getMessage());
+        log.warn("External service request failed: uri={}, reason={}", exception.getUri(), messageOf(exception));
 
         return problem(
             HttpStatus.SERVICE_UNAVAILABLE,
@@ -178,6 +178,10 @@ public class GlobalControllerAdvice {
     }
 
     // HELPER METHODS
+
+    private static String messageOf(Exception exception) {
+        return exception.getMessage() != null ? exception.getMessage() : exception.getClass().getSimpleName();
+    }
 
     private static ProblemDetail problem(HttpStatus status, String title, String detail) {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(status, detail);

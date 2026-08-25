@@ -31,6 +31,7 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
 import java.util.List;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -119,7 +120,7 @@ class GitHubDeletionSweepServiceTest extends BaseUnitTest {
 
     /** A valid response whose issues connection carries the given numbers. */
     private static ClientGraphQlResponse issuePage(List<Integer> numbers, boolean hasNextPage, int totalCount) {
-        return issuePage(numbers, new GHPageInfo(hasNextPage ? "cursor" : null, hasNextPage, false, null), totalCount);
+        return issuePage(numbers, pageInfo(hasNextPage), totalCount);
     }
 
     /** A valid issues response with an explicitly-built {@code pageInfo}, for malformed-paging cases. */
@@ -152,7 +153,7 @@ class GitHubDeletionSweepServiceTest extends BaseUnitTest {
                 })
                 .toList()
         );
-        connection.setPageInfo(new GHPageInfo(hasNextPage ? "cursor" : null, hasNextPage, false, null));
+        connection.setPageInfo(pageInfo(hasNextPage));
         connection.setTotalCount(totalCount);
         return validResponse("repository.pullRequests", connection);
     }
@@ -439,7 +440,7 @@ class GitHubDeletionSweepServiceTest extends BaseUnitTest {
         void shouldDeleteNothingWhenUpstreamClaimsMorePagesButHandsBackNoCursor() {
             // hasNextPage=true with a null endCursor: there is more and we have no way to ask for it.
             // The page itself is perfectly valid, so only the cursor check catches this.
-            scriptedResponses.add(Mono.just(issuePage(List.of(1), new GHPageInfo(null, true, false, null), 50)));
+            scriptedResponses.add(Mono.just(issuePage(List.of(1), pageInfo(null, true), 50)));
             scriptedResponses.add(Mono.just(pullRequestPage(List.of(), false, 0)));
             stubLocalNumbers(List.of(1, 2, 3), List.of());
 
@@ -687,5 +688,19 @@ class GitHubDeletionSweepServiceTest extends BaseUnitTest {
             assertThat(outcome.total()).isZero();
             assertThat(outcome.skipped()).isFalse();
         }
+    }
+
+    private static GHPageInfo pageInfo(@Nullable String endCursor, boolean hasNextPage) {
+        GHPageInfo pageInfo = new GHPageInfo();
+        pageInfo.setHasNextPage(hasNextPage);
+        if (endCursor != null) pageInfo.setEndCursor(endCursor);
+        return pageInfo;
+    }
+
+    private static GHPageInfo pageInfo(boolean hasNextPage) {
+        GHPageInfo pageInfo = new GHPageInfo();
+        pageInfo.setHasNextPage(hasNextPage);
+        if (hasNextPage) pageInfo.setEndCursor("cursor");
+        return pageInfo;
     }
 }

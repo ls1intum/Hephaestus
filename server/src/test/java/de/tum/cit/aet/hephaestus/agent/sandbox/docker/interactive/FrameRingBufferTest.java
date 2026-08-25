@@ -7,7 +7,6 @@ import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.util.List;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.JsonNode;
@@ -15,14 +14,7 @@ import tools.jackson.databind.node.IntNode;
 
 class FrameRingBufferTest extends BaseUnitTest {
 
-    private Counter dropped;
-    private FrameRingBuffer buffer;
-
-    @BeforeEach
-    void setUp() {
-        SimpleMeterRegistry registry = new SimpleMeterRegistry();
-        dropped = registry.counter("test.dropped");
-    }
+    private final Counter dropped = new SimpleMeterRegistry().counter("test.dropped");
 
     @Nested
     class Capacity {
@@ -35,7 +27,7 @@ class FrameRingBufferTest extends BaseUnitTest {
 
         @Test
         void underCapacityNoDropping() {
-            buffer = new FrameRingBuffer(4, dropped);
+            FrameRingBuffer buffer = new FrameRingBuffer(4, dropped);
             buffer.offer(IntNode.valueOf(1));
             buffer.offer(IntNode.valueOf(2));
             buffer.offer(IntNode.valueOf(3));
@@ -45,7 +37,7 @@ class FrameRingBufferTest extends BaseUnitTest {
 
         @Test
         void dropOldestOnOverflow() {
-            buffer = new FrameRingBuffer(3, dropped);
+            FrameRingBuffer buffer = new FrameRingBuffer(3, dropped);
             for (int i = 1; i <= 5; i++) {
                 buffer.offer(IntNode.valueOf(i));
             }
@@ -61,7 +53,7 @@ class FrameRingBufferTest extends BaseUnitTest {
 
         @Test
         void snapshotAll() {
-            buffer = new FrameRingBuffer(4, dropped);
+            FrameRingBuffer buffer = new FrameRingBuffer(4, dropped);
             buffer.offer(IntNode.valueOf(10));
             buffer.offer(IntNode.valueOf(20));
             buffer.offer(IntNode.valueOf(30));
@@ -70,7 +62,7 @@ class FrameRingBufferTest extends BaseUnitTest {
 
         @Test
         void snapshotSinceCursor() {
-            buffer = new FrameRingBuffer(4, dropped);
+            FrameRingBuffer buffer = new FrameRingBuffer(4, dropped);
             long s0 = buffer.offer(IntNode.valueOf(100));
             long s1 = buffer.offer(IntNode.valueOf(200));
             long s2 = buffer.offer(IntNode.valueOf(300));
@@ -81,7 +73,7 @@ class FrameRingBufferTest extends BaseUnitTest {
 
         @Test
         void sequenceMonotonic() {
-            buffer = new FrameRingBuffer(2, dropped);
+            FrameRingBuffer buffer = new FrameRingBuffer(2, dropped);
             long s0 = buffer.offer(IntNode.valueOf(1));
             long s1 = buffer.offer(IntNode.valueOf(2));
             long s2 = buffer.offer(IntNode.valueOf(3));

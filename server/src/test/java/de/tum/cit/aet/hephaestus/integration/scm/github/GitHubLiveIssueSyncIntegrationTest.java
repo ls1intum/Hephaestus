@@ -71,7 +71,7 @@ class GitHubLiveIssueSyncIntegrationTest extends AbstractGitHubLiveSyncIntegrati
         assertThat(storedIssue.getBody()).isEqualTo(issueBody);
         assertThat(storedIssue.getNumber()).isEqualTo(createdIssue.number());
         assertThat(storedIssue.getState()).isEqualTo(Issue.State.OPEN);
-        assertThat(storedIssue.getRepository().getId()).isEqualTo(localRepo.getId());
+        assertThat(storedIssue.requireRepository().getId()).isEqualTo(localRepo.getId());
     }
 
     @Test

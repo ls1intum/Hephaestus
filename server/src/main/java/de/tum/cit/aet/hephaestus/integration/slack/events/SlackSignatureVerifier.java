@@ -6,6 +6,7 @@ import java.security.MessageDigest;
 import java.util.HexFormat;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
+import org.jspecify.annotations.Nullable;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
@@ -36,7 +37,12 @@ public class SlackSignatureVerifier {
         return configured;
     }
 
-    public Verification check(String timestamp, String signature, byte[] rawBody, long nowEpochSeconds) {
+    public Verification check(
+        @Nullable String timestamp,
+        @Nullable String signature,
+        byte@Nullable [] rawBody,
+        long nowEpochSeconds
+    ) {
         if (!configured || timestamp == null || signature == null || rawBody == null) {
             return Verification.missingSignature();
         }
@@ -66,7 +72,12 @@ public class SlackSignatureVerifier {
         }
     }
 
-    public boolean verify(String timestamp, String signature, byte[] rawBody, long nowEpochSeconds) {
+    public boolean verify(
+        @Nullable String timestamp,
+        @Nullable String signature,
+        byte@Nullable [] rawBody,
+        long nowEpochSeconds
+    ) {
         return check(timestamp, signature, rawBody, nowEpochSeconds).status() == Verification.Status.VALID;
     }
 

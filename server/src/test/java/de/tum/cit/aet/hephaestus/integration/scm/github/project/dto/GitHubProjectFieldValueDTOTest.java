@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.scm.github.project.dto;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHLabel;
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHLabelConnection;
@@ -68,7 +69,7 @@ class GitHubProjectFieldValueDTOTest extends BaseUnitTest {
 
             GitHubProjectFieldValueDTO result = GitHubProjectFieldValueDTO.fromFieldValue(value);
 
-            assertThat(result).isNotNull();
+            assertNotNull(result);
             assertThat(result.fieldId()).isEqualTo(FIELD_ID);
             assertThat(result.fieldType()).isEqualTo("TEXT");
             assertThat(result.textValue()).isEqualTo("Hello World");
@@ -97,7 +98,7 @@ class GitHubProjectFieldValueDTOTest extends BaseUnitTest {
 
             GitHubProjectFieldValueDTO result = GitHubProjectFieldValueDTO.fromFieldValue(value);
 
-            assertThat(result).isNotNull();
+            assertNotNull(result);
             assertThat(result.fieldType()).isEqualTo("NUMBER");
             assertThat(result.numberValue()).isEqualTo(42.5);
             assertThat(result.fieldId()).isEqualTo(FIELD_ID);
@@ -123,7 +124,7 @@ class GitHubProjectFieldValueDTOTest extends BaseUnitTest {
 
             GitHubProjectFieldValueDTO result = GitHubProjectFieldValueDTO.fromFieldValue(value);
 
-            assertThat(result).isNotNull();
+            assertNotNull(result);
             assertThat(result.fieldType()).isEqualTo("DATE");
             assertThat(result.dateValue()).isEqualTo(LocalDate.of(2025, 6, 15));
             assertThat(result.fieldId()).isEqualTo(FIELD_ID);
@@ -137,7 +138,7 @@ class GitHubProjectFieldValueDTOTest extends BaseUnitTest {
 
             GitHubProjectFieldValueDTO result = GitHubProjectFieldValueDTO.fromFieldValue(value);
 
-            assertThat(result).isNotNull();
+            assertNotNull(result);
             assertThat(result.fieldType()).isEqualTo("DATE");
             assertThat(result.dateValue()).isNull();
         }
@@ -156,7 +157,7 @@ class GitHubProjectFieldValueDTOTest extends BaseUnitTest {
 
             GitHubProjectFieldValueDTO result = GitHubProjectFieldValueDTO.fromFieldValue(value);
 
-            assertThat(result).isNotNull();
+            assertNotNull(result);
             assertThat(result.fieldType()).isEqualTo("SINGLE_SELECT");
             assertThat(result.singleSelectOptionId()).isEqualTo("option-abc");
             assertThat(result.fieldId()).isEqualTo(FIELD_ID);
@@ -176,7 +177,7 @@ class GitHubProjectFieldValueDTOTest extends BaseUnitTest {
 
             GitHubProjectFieldValueDTO result = GitHubProjectFieldValueDTO.fromFieldValue(value);
 
-            assertThat(result).isNotNull();
+            assertNotNull(result);
             assertThat(result.fieldType()).isEqualTo("ITERATION");
             assertThat(result.iterationId()).isEqualTo("iter-xyz");
             assertThat(result.fieldId()).isEqualTo(FIELD_ID);
@@ -202,7 +203,7 @@ class GitHubProjectFieldValueDTOTest extends BaseUnitTest {
 
             GitHubProjectFieldValueDTO result = GitHubProjectFieldValueDTO.fromFieldValue(value);
 
-            assertThat(result).isNotNull();
+            assertNotNull(result);
             assertThat(result.fieldType()).isEqualTo("LABELS");
             assertThat(result.textValue()).contains("bug", "enhancement");
         }
@@ -218,7 +219,7 @@ class GitHubProjectFieldValueDTOTest extends BaseUnitTest {
 
             GitHubProjectFieldValueDTO result = GitHubProjectFieldValueDTO.fromFieldValue(value);
 
-            assertThat(result).isNotNull();
+            assertNotNull(result);
             assertThat(result.fieldType()).isEqualTo("LABELS");
             assertThat(result.textValue()).isEqualTo("[]");
         }
@@ -231,7 +232,7 @@ class GitHubProjectFieldValueDTOTest extends BaseUnitTest {
 
             GitHubProjectFieldValueDTO result = GitHubProjectFieldValueDTO.fromFieldValue(value);
 
-            assertThat(result).isNotNull();
+            assertNotNull(result);
             assertThat(result.fieldType()).isEqualTo("LABELS");
             assertThat(result.textValue()).isEqualTo("[]");
         }
@@ -256,7 +257,7 @@ class GitHubProjectFieldValueDTOTest extends BaseUnitTest {
 
             GitHubProjectFieldValueDTO result = GitHubProjectFieldValueDTO.fromFieldValue(value);
 
-            assertThat(result).isNotNull();
+            assertNotNull(result);
             assertThat(result.fieldType()).isEqualTo("ASSIGNEES");
             assertThat(result.textValue()).contains("alice", "bob");
         }
@@ -268,7 +269,7 @@ class GitHubProjectFieldValueDTOTest extends BaseUnitTest {
 
             GitHubProjectFieldValueDTO result = GitHubProjectFieldValueDTO.fromFieldValue(value);
 
-            assertThat(result).isNotNull();
+            assertNotNull(result);
             assertThat(result.fieldType()).isEqualTo("ASSIGNEES");
             assertThat(result.textValue()).isEqualTo("[]");
         }
@@ -291,7 +292,7 @@ class GitHubProjectFieldValueDTOTest extends BaseUnitTest {
 
             GitHubProjectFieldValueDTO result = GitHubProjectFieldValueDTO.fromFieldValue(value);
 
-            assertThat(result).isNotNull();
+            assertNotNull(result);
             assertThat(result.fieldType()).isEqualTo("REVIEWERS");
             assertThat(result.textValue()).contains("reviewer1");
         }
@@ -310,7 +311,7 @@ class GitHubProjectFieldValueDTOTest extends BaseUnitTest {
 
             GitHubProjectFieldValueDTO result = GitHubProjectFieldValueDTO.fromFieldValue(value);
 
-            assertThat(result).isNotNull();
+            assertNotNull(result);
             assertThat(result.fieldType()).isEqualTo("REVIEWERS");
             assertThat(result.textValue()).contains("backend-team");
         }
@@ -331,7 +332,7 @@ class GitHubProjectFieldValueDTOTest extends BaseUnitTest {
 
             GitHubProjectFieldValueDTO result = GitHubProjectFieldValueDTO.fromFieldValue(value);
 
-            assertThat(result).isNotNull();
+            assertNotNull(result);
             assertThat(result.fieldType()).isEqualTo("REVIEWERS");
             assertThat(result.textValue()).contains("alice", "core-team");
         }
@@ -343,7 +344,7 @@ class GitHubProjectFieldValueDTOTest extends BaseUnitTest {
 
             GitHubProjectFieldValueDTO result = GitHubProjectFieldValueDTO.fromFieldValue(value);
 
-            assertThat(result).isNotNull();
+            assertNotNull(result);
             assertThat(result.fieldType()).isEqualTo("REVIEWERS");
             assertThat(result.textValue()).isEqualTo("[]");
         }
@@ -363,7 +364,7 @@ class GitHubProjectFieldValueDTOTest extends BaseUnitTest {
 
             GitHubProjectFieldValueDTO result = GitHubProjectFieldValueDTO.fromFieldValue(value);
 
-            assertThat(result).isNotNull();
+            assertNotNull(result);
             assertThat(result.fieldType()).isEqualTo("MILESTONE");
             assertThat(result.textValue()).isEqualTo("v1.0");
         }
@@ -375,7 +376,7 @@ class GitHubProjectFieldValueDTOTest extends BaseUnitTest {
 
             GitHubProjectFieldValueDTO result = GitHubProjectFieldValueDTO.fromFieldValue(value);
 
-            assertThat(result).isNotNull();
+            assertNotNull(result);
             assertThat(result.fieldType()).isEqualTo("MILESTONE");
             assertThat(result.textValue()).isNull();
         }
@@ -395,7 +396,7 @@ class GitHubProjectFieldValueDTOTest extends BaseUnitTest {
 
             GitHubProjectFieldValueDTO result = GitHubProjectFieldValueDTO.fromFieldValue(value);
 
-            assertThat(result).isNotNull();
+            assertNotNull(result);
             assertThat(result.fieldType()).isEqualTo("REPOSITORY");
             assertThat(result.textValue()).isEqualTo("org/repo");
         }
@@ -407,7 +408,7 @@ class GitHubProjectFieldValueDTOTest extends BaseUnitTest {
 
             GitHubProjectFieldValueDTO result = GitHubProjectFieldValueDTO.fromFieldValue(value);
 
-            assertThat(result).isNotNull();
+            assertNotNull(result);
             assertThat(result.fieldType()).isEqualTo("REPOSITORY");
             assertThat(result.textValue()).isNull();
         }
@@ -432,7 +433,7 @@ class GitHubProjectFieldValueDTOTest extends BaseUnitTest {
 
             GitHubProjectFieldValueDTO result = GitHubProjectFieldValueDTO.fromFieldValue(value);
 
-            assertThat(result).isNotNull();
+            assertNotNull(result);
             assertThat(result.fieldType()).isEqualTo("PULL_REQUESTS");
             assertThat(result.textValue()).contains("42", "99");
         }
@@ -444,7 +445,7 @@ class GitHubProjectFieldValueDTOTest extends BaseUnitTest {
 
             GitHubProjectFieldValueDTO result = GitHubProjectFieldValueDTO.fromFieldValue(value);
 
-            assertThat(result).isNotNull();
+            assertNotNull(result);
             assertThat(result.fieldType()).isEqualTo("PULL_REQUESTS");
             assertThat(result.textValue()).isEqualTo("[]");
         }
@@ -463,7 +464,7 @@ class GitHubProjectFieldValueDTOTest extends BaseUnitTest {
 
             GitHubProjectFieldValueDTO result = GitHubProjectFieldValueDTO.fromFieldValue(value);
 
-            assertThat(result).isNotNull();
+            assertNotNull(result);
             assertThat(result.fieldId()).isEqualTo("field-abc");
         }
 
@@ -477,7 +478,7 @@ class GitHubProjectFieldValueDTOTest extends BaseUnitTest {
 
             GitHubProjectFieldValueDTO result = GitHubProjectFieldValueDTO.fromFieldValue(value);
 
-            assertThat(result).isNotNull();
+            assertNotNull(result);
             assertThat(result.fieldId()).isEqualTo("ss-field-123");
         }
 
@@ -491,7 +492,7 @@ class GitHubProjectFieldValueDTOTest extends BaseUnitTest {
 
             GitHubProjectFieldValueDTO result = GitHubProjectFieldValueDTO.fromFieldValue(value);
 
-            assertThat(result).isNotNull();
+            assertNotNull(result);
             assertThat(result.fieldId()).isEqualTo("iter-field-456");
         }
     }

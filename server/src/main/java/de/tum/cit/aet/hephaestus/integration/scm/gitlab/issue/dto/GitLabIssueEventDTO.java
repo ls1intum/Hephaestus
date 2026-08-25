@@ -30,9 +30,9 @@ import org.jspecify.annotations.Nullable;
 public record GitLabIssueEventDTO(
     @JsonProperty("object_kind") String objectKind,
     @JsonProperty("event_type") String eventType,
-    GitLabWebhookUser user,
-    GitLabWebhookProject project,
-    @JsonProperty("object_attributes") ObjectAttributes objectAttributes,
+    @Nullable GitLabWebhookUser user,
+    @Nullable GitLabWebhookProject project,
+    @JsonProperty("object_attributes") @Nullable ObjectAttributes objectAttributes,
     @Nullable List<GitLabWebhookLabel> labels,
     @Nullable List<GitLabWebhookUser> assignees,
     @JsonProperty("changes") @Nullable Changes changes
@@ -80,20 +80,20 @@ public record GitLabIssueEventDTO(
      */
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record ObjectAttributes(
-        Long id,
-        Integer iid,
-        String title,
-        String description,
-        String state,
-        String action,
+        @Nullable Long id,
+        @Nullable Integer iid,
+        @Nullable String title,
+        @Nullable String description,
+        @Nullable String state,
+        @Nullable String action,
         boolean confidential,
-        @JsonProperty("author_id") Long authorId,
+        @JsonProperty("author_id") @Nullable Long authorId,
         @JsonProperty("assignee_id") @Nullable Long assigneeId,
         @JsonProperty("milestone_id") @Nullable Long milestoneId,
-        @JsonProperty("created_at") String createdAt,
-        @JsonProperty("updated_at") String updatedAt,
+        @JsonProperty("created_at") @Nullable String createdAt,
+        @JsonProperty("updated_at") @Nullable String updatedAt,
         @JsonProperty("closed_at") @Nullable String closedAt,
-        String url
+        @Nullable String url
     ) {}
 
     public boolean isConfidential() {

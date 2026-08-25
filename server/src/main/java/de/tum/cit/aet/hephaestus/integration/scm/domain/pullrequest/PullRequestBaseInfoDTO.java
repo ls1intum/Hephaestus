@@ -17,8 +17,8 @@ public record PullRequestBaseInfoDTO(
     @NonNull @Schema(description = "Current state of the pull request (OPEN, CLOSED, MERGED)") State state,
     @NonNull @Schema(description = "Whether the pull request is in draft mode") Boolean isDraft,
     @NonNull @Schema(description = "Whether the pull request has been merged") Boolean isMerged,
-    @Schema(description = "Repository the pull request belongs to") RepositoryInfoDTO repository,
-    @NonNull @Schema(description = "URL to the pull request on the git provider") String htmlUrl
+    @Nullable @Schema(description = "Repository the pull request belongs to") RepositoryInfoDTO repository,
+    @Nullable @Schema(description = "URL to the pull request on the git provider") String htmlUrl
 ) {
     @Nullable
     public static PullRequestBaseInfoDTO fromPullRequest(@Nullable PullRequest pullRequest) {

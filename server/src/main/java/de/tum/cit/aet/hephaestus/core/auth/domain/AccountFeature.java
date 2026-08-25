@@ -13,6 +13,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Per-account feature opt-ins. These are the app's authorization flags (where
@@ -35,7 +36,7 @@ public class AccountFeature {
 
     @CreationTimestamp
     @Column(name = "enabled_at", nullable = false, updatable = false)
-    private Instant enabledAt;
+    private @Nullable Instant enabledAt;
 
     public AccountFeature(Long accountId, String flag) {
         this.id = new Id(accountId, flag);

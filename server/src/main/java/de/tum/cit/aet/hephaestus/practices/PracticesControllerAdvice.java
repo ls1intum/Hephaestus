@@ -10,6 +10,7 @@ import de.tum.cit.aet.hephaestus.practices.review.InvalidReviewCoverageException
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewPreconditionRequiredException;
 import de.tum.cit.aet.hephaestus.practices.review.StalePracticeReviewSettingsException;
 import java.util.Optional;
+import org.jspecify.annotations.Nullable;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpStatus;
@@ -79,7 +80,7 @@ public class PracticesControllerAdvice {
         return problem(HttpStatus.BAD_REQUEST, "Invalid practice review coverage", exception.getMessage());
     }
 
-    private ProblemDetail problem(HttpStatus status, String title, String detail) {
+    private ProblemDetail problem(HttpStatus status, String title, @Nullable String detail) {
         ProblemDetail problem = ProblemDetail.forStatus(status);
         problem.setTitle(title);
         problem.setDetail(

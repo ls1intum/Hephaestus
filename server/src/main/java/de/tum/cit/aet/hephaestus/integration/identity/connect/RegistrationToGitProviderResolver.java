@@ -6,6 +6,8 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRep
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.util.Objects;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -45,15 +47,17 @@ public class RegistrationToGitProviderResolver implements GitProviderRegistry {
     public long resolveProviderId(String providerTypeName, String baseUrl) {
         IdentityProviderType type = IdentityProviderType.valueOf(providerTypeName);
         String origin = originOf(baseUrl);
-        return gitProviderRepository
-            .findByTypeAndServerUrl(type, origin)
-            .orElseGet(() -> gitProviderRepository.save(new IdentityProvider(type, origin)))
-            .getId();
+        return Objects.requireNonNull(
+            gitProviderRepository
+                .findByTypeAndServerUrl(type, origin)
+                .orElseGet(() -> gitProviderRepository.save(new IdentityProvider(type, origin)))
+                .getId()
+        );
     }
 
     @Override
     @Transactional(readOnly = true)
-    public String providerTypeName(Long gitProviderId) {
+    public String providerTypeName(@Nullable Long gitProviderId) {
         if (gitProviderId == null) {
             return UNKNOWN;
         }
@@ -65,7 +69,7 @@ public class RegistrationToGitProviderResolver implements GitProviderRegistry {
 
     @Override
     @Transactional(readOnly = true)
-    public String providerServerUrl(Long gitProviderId) {
+    public @Nullable String providerServerUrl(@Nullable Long gitProviderId) {
         if (gitProviderId == null) {
             return null;
         }

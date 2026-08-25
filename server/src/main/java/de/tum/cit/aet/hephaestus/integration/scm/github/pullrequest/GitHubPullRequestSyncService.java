@@ -53,6 +53,7 @@ import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Stream;
 import org.jspecify.annotations.Nullable;
@@ -269,16 +270,17 @@ public class GitHubPullRequestSyncService {
         @Nullable List<String> states
     ) {
         // Fetch repository outside of transaction to avoid holding locks during API calls
-        Repository repository = transactionTemplate.execute(status ->
-            repositoryRepository.findById(repositoryId).orElse(null)
+        Optional<Repository> repositoryResult = Objects.requireNonNull(
+            transactionTemplate.execute(status -> repositoryRepository.findById(repositoryId))
         );
+        Repository repository = repositoryResult.orElse(null);
         if (repository == null) {
             log.debug("Skipped pull request sync: reason=repositoryNotFound, repoId={}", repositoryId);
             return SyncResult.completed(0);
         }
 
         String nameWithOwner = repository.getNameWithOwner();
-        String safeNameWithOwner = sanitizeForLog(nameWithOwner);
+        String safeNameWithOwner = Objects.requireNonNullElse(sanitizeForLog(nameWithOwner), "<unknown>");
         Optional<RepositoryOwnerAndName> parsedName = GitHubRepositoryNameParser.parse(nameWithOwner);
         if (parsedName.isEmpty()) {
             log.warn("Skipped pull request sync: reason=invalidRepoNameFormat, repoName={}", safeNameWithOwner);
@@ -355,7 +357,7 @@ public class GitHubPullRequestSyncService {
         final boolean incrementalSync = isIncrementalSync;
         SyncResult.Status abortReason = null; // null means completed successfully
 
-        if (resuming) {
+        if (initialCursor != null) {
             log.info(
                 "Resuming pull request sync from checkpoint: repoName={}, cursor={}",
                 safeNameWithOwner,
@@ -730,9 +732,7 @@ public class GitHubPullRequestSyncService {
                 prsNeedingReviewPagination.size()
             );
             for (PullRequestWithReviewCursor prWithCursor : prsNeedingReviewPagination) {
-                // Re-fetch PR from database with repository eagerly loaded to avoid
-                // LazyInitializationException when syncRemainingReviews accesses pr.getRepository()
-                // in a new transaction. If the transaction that created this PR was rolled back, skip it.
+                // Pagination runs in a new transaction, so reload the repository eagerly.
                 PullRequest pr = pullRequestRepository
                     .findByIdWithRepository(prWithCursor.pullRequestId())
                     .orElse(null);
@@ -790,8 +790,7 @@ public class GitHubPullRequestSyncService {
                 prsNeedingCommentPagination.size()
             );
             for (PullRequestWithCommentCursor prWithCursor : prsNeedingCommentPagination) {
-                // Re-fetch PR with repository eagerly loaded to avoid LazyInitializationException
-                // when syncRemainingComments accesses pr.getRepository() in a new transaction.
+                // Pagination runs in a new transaction, so reload the repository eagerly.
                 PullRequest pr = pullRequestRepository
                     .findByIdWithRepository(prWithCursor.pullRequestId())
                     .orElse(null);
@@ -834,7 +833,7 @@ public class GitHubPullRequestSyncService {
                     scopeId,
                     prWithCursor.nodeId(),
                     true, // This is a pull request
-                    pr.getRepository(),
+                    pr.requireRepository(),
                     prWithCursor.projectItemCursor(),
                     pr.getId()
                 );
@@ -921,7 +920,10 @@ public class GitHubPullRequestSyncService {
 
             if (embeddedComments.needsPagination()) {
                 prsNeedingCommentPagination.add(
-                    new PullRequestWithCommentCursor(entity.getId(), embeddedComments.endCursor())
+                    new PullRequestWithCommentCursor(
+                        entity.getId(),
+                        Objects.requireNonNull(embeddedComments.endCursor())
+                    )
                 );
             }
 
@@ -937,7 +939,7 @@ public class GitHubPullRequestSyncService {
                 prsNeedingReviewPagination.add(
                     new PullRequestWithReviewCursor(
                         entity.getId(),
-                        embeddedReviews.endCursor(),
+                        Objects.requireNonNull(embeddedReviews.endCursor()),
                         embeddedReviews.reviews().size()
                     )
                 );
@@ -950,7 +952,7 @@ public class GitHubPullRequestSyncService {
 
             if (embeddedThreads.needsPagination()) {
                 prsNeedingThreadPagination.add(
-                    new PullRequestWithThreadCursor(entity.getId(), embeddedThreads.endCursor())
+                    new PullRequestWithThreadCursor(entity.getId(), Objects.requireNonNull(embeddedThreads.endCursor()))
                 );
             }
 
@@ -966,7 +968,7 @@ public class GitHubPullRequestSyncService {
                     new PullRequestWithProjectItemCursor(
                         entity.getId(),
                         prWithReviews.pullRequest().nodeId(),
-                        embeddedProjectItems.endCursor()
+                        Objects.requireNonNull(embeddedProjectItems.endCursor())
                     )
                 );
             }
@@ -1069,7 +1071,9 @@ public class GitHubPullRequestSyncService {
      * to avoid Spring proxy issues with self-invocation.
      */
     private void persistCursorCheckpoint(Long syncTargetId, String cursor) {
-        TransactionTemplate requiresNewTemplate = new TransactionTemplate(transactionTemplate.getTransactionManager());
+        TransactionTemplate requiresNewTemplate = new TransactionTemplate(
+            Objects.requireNonNull(transactionTemplate.getTransactionManager())
+        );
         requiresNewTemplate.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
         requiresNewTemplate.executeWithoutResult(status -> {
             backfillStateProvider.updateSyncCursor(syncTargetId, SyncCursorKind.PULL_REQUEST, cursor);
@@ -1085,7 +1089,9 @@ public class GitHubPullRequestSyncService {
      * to avoid Spring proxy issues with self-invocation.
      */
     private void clearCursorCheckpoint(Long syncTargetId) {
-        TransactionTemplate requiresNewTemplate = new TransactionTemplate(transactionTemplate.getTransactionManager());
+        TransactionTemplate requiresNewTemplate = new TransactionTemplate(
+            Objects.requireNonNull(transactionTemplate.getTransactionManager())
+        );
         requiresNewTemplate.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
         requiresNewTemplate.executeWithoutResult(status -> {
             backfillStateProvider.updateSyncCursor(syncTargetId, SyncCursorKind.PULL_REQUEST, null);

@@ -33,6 +33,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.ObjectMapper;
 
 /**
@@ -42,6 +43,7 @@ import tools.jackson.databind.ObjectMapper;
  * Optional means "never said", and anything else here would take the lane down through the listener's
  * catch-all.
  */
+@Transactional
 class InAppCooldownQueryIntegrationTest extends BaseIntegrationTest {
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
@@ -77,7 +79,6 @@ class InAppCooldownQueryIntegrationTest extends BaseIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        databaseTestUtils.cleanDatabase();
         workspace = workspaceRepository.save(WorkspaceTestFixtures.activeWorkspace("in-app-cooldown"));
         otherWorkspace = workspaceRepository.save(WorkspaceTestFixtures.activeWorkspace("in-app-cooldown-other"));
         IdentityProvider provider = identityProviderRepository
@@ -85,7 +86,7 @@ class InAppCooldownQueryIntegrationTest extends BaseIntegrationTest {
             .orElseGet(() ->
                 identityProviderRepository.save(new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com"))
             );
-        recipient = userRepository.save(TestUserFactory.createUser(100L, "cooldown-recipient", provider));
+        recipient = userRepository.save(TestUserFactory.createUser(9_149_600L, "cooldown-recipient", provider));
     }
 
     @Test

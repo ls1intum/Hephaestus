@@ -4,4 +4,5 @@
  * a package-level declaration covers {@code UIMessageChunk} and all its nested permitted records.
  */
 @org.springframework.modulith.NamedInterface("mentor-chat")
+@org.jspecify.annotations.NullMarked
 package de.tum.cit.aet.hephaestus.agent.mentor.chat.wire;

@@ -42,7 +42,7 @@ public class InsufficientWorkspacePermissionsException extends RuntimeException 
         return workspaceSlug;
     }
 
-    public WorkspaceRole getRequiredRole() {
+    public @Nullable WorkspaceRole getRequiredRole() {
         return requiredRole;
     }
 }

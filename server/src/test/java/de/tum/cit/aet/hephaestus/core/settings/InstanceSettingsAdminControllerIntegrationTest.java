@@ -14,6 +14,7 @@ import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
@@ -206,7 +207,7 @@ class InstanceSettingsAdminControllerIntegrationTest extends AbstractWorkspaceIn
         return dto;
     }
 
-    private InstanceSettingsDTO patchSilentMode(Map<String, Object> body, String currentEtag) {
+    private InstanceSettingsDTO patchSilentMode(Map<String, Object> body, @Nullable String currentEtag) {
         WebTestClient.RequestBodySpec request = webTestClient
             .patch()
             .uri("/admin/settings/silent-mode")
@@ -223,7 +224,7 @@ class InstanceSettingsAdminControllerIntegrationTest extends AbstractWorkspaceIn
             .expectBody(InstanceSettingsDTO.class)
             .returnResult()
             .getResponseBody();
-        assertThat(dto).isNotNull();
+        org.junit.jupiter.api.Assertions.assertNotNull(dto);
         return dto;
     }
 
@@ -239,7 +240,7 @@ class InstanceSettingsAdminControllerIntegrationTest extends AbstractWorkspaceIn
         }
     }
 
-    private Exception initializeAfter(CountDownLatch ready, CountDownLatch start) {
+    private @Nullable Exception initializeAfter(CountDownLatch ready, CountDownLatch start) {
         try {
             ready.countDown();
             await(start);
@@ -250,7 +251,12 @@ class InstanceSettingsAdminControllerIntegrationTest extends AbstractWorkspaceIn
         }
     }
 
-    private Exception updateAfter(CountDownLatch ready, CountDownLatch start, boolean engaged, Long version) {
+    private @Nullable Exception updateAfter(
+        CountDownLatch ready,
+        CountDownLatch start,
+        boolean engaged,
+        @Nullable Long version
+    ) {
         try {
             ready.countDown();
             await(start);

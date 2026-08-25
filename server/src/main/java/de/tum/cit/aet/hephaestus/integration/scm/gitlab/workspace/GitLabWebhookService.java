@@ -187,7 +187,11 @@ public class GitLabWebhookService {
         }
 
         Long scopeId = workspace.getId();
-        String baseUrl = webhookProperties.externalUrl().replaceAll("/+$", "");
+        String accountLogin = workspace.getAccountLogin();
+        if (accountLogin == null || accountLogin.isBlank()) {
+            return WebhookSetupResult.skipped("GitLab group path is missing");
+        }
+        String baseUrl = Objects.requireNonNull(webhookProperties.externalUrl()).replaceAll("/+$", "");
         String webhookUrl = baseUrl + "/webhooks/gitlab";
 
         GitLabConfig config = configOpt.get();
@@ -217,7 +221,7 @@ public class GitLabWebhookService {
             if (currentGroupId != null) {
                 groupId = currentGroupId;
             } else {
-                var groupInfo = client.lookupGroup(scopeId, workspace.getAccountLogin());
+                var groupInfo = client.lookupGroup(scopeId, accountLogin);
                 groupId = groupInfo.id();
                 long resolvedGroupId = groupId;
                 updateGitLabConfig(scopeId, cfg -> cfg.withGitlabGroupId(resolvedGroupId));
@@ -245,7 +249,7 @@ public class GitLabWebhookService {
             // Step 4: Register new webhook
             WebhookConfig webhookConfig = new WebhookConfig(
                 webhookUrl,
-                webhookProperties.secret(),
+                Objects.requireNonNull(webhookProperties.secret()),
                 true, // merge_requests_events
                 true, // issues_events
                 true, // confidential_issues_events

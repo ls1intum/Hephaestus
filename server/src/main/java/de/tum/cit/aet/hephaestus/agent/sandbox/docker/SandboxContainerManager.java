@@ -22,7 +22,7 @@ import org.slf4j.LoggerFactory;
 public class SandboxContainerManager {
 
     private static final Logger log = LoggerFactory.getLogger(SandboxContainerManager.class);
-    private static final int POST_STOP_WAIT_SECONDS = 30;
+    private static final Duration POST_STOP_WAIT_TIMEOUT = Duration.ofSeconds(30);
     private static final int SIGKILL_EXIT_CODE = 137;
 
     private final DockerContainerOperations containerOps;
@@ -37,6 +37,7 @@ public class SandboxContainerManager {
      * via {@code destroyMethod="shutdown"} on the bean definition.
      */
     private final ExecutorService dockerWaitExecutor;
+    private final Duration postStopWaitTimeout;
 
     public SandboxContainerManager(
         DockerContainerOperations containerOps,
@@ -44,10 +45,21 @@ public class SandboxContainerManager {
         SandboxProperties properties,
         ExecutorService dockerWaitExecutor
     ) {
+        this(containerOps, imageGuard, properties, dockerWaitExecutor, POST_STOP_WAIT_TIMEOUT);
+    }
+
+    SandboxContainerManager(
+        DockerContainerOperations containerOps,
+        SandboxImageGuard imageGuard,
+        SandboxProperties properties,
+        ExecutorService dockerWaitExecutor,
+        Duration postStopWaitTimeout
+    ) {
         this.containerOps = containerOps;
         this.imageGuard = imageGuard;
         this.properties = properties;
         this.dockerWaitExecutor = dockerWaitExecutor;
+        this.postStopWaitTimeout = postStopWaitTimeout;
     }
 
     /**
@@ -96,7 +108,10 @@ public class SandboxContainerManager {
             }
             // Wait for the stop to take effect
             try {
-                DockerOperations.WaitResult result = waitFuture.get(POST_STOP_WAIT_SECONDS, TimeUnit.SECONDS);
+                DockerOperations.WaitResult result = waitFuture.get(
+                    postStopWaitTimeout.toMillis(),
+                    TimeUnit.MILLISECONDS
+                );
                 return new WaitOutcome(result.exitCode(), true);
             } catch (InterruptedException ex) {
                 waitFuture.cancel(true);

@@ -7,7 +7,7 @@
 	"scripts": {
 		"changeset:version": "changeset version && node scripts/sync-release-version.ts",
 		"generate:api:application-server:clean": "node -e \"import('node:fs/promises').then(fs => fs.rm('webapp/src/api', {recursive: true, force: true}))\"",
-		"generate:api:application-server:specs": "cd server && ./mvnw verify -DskipTests=true -Dapp.profiles=specs",
+		"generate:api:application-server:specs": "node --import tsx scripts/generate-openapi-spec.ts",
 		"generate:api:application-server:client": "pnpm run generate:api:application-server:clean && pnpm --filter webapp run openapi-ts",
 		"generate:api:application-server": "pnpm run generate:api:application-server:specs && pnpm run generate:api:application-server:client",
 		"generate:api": "pnpm run generate:api:application-server",
@@ -24,6 +24,11 @@
 		"check:webapp:fix": "pnpm --filter webapp run check:fix",
 		"typecheck:webapp": "pnpm --filter webapp run typecheck",
 		"test:webapp": "pnpm --filter webapp run test",
+		"test:server:unit": "cd server && ./mvnw test -P'!quick' -Dsurefire.includedGroups=unit -Dmaven.test.skip=false -DskipCoverage=false --batch-mode",
+		"test:server:architecture": "cd server && ./mvnw test -P'!quick,architecture-tests' -Dmaven.test.skip=false --batch-mode",
+		"test:server:verification": "cd server && ./mvnw test -P'!quick,architecture-tests' -Dsurefire.includedGroups=unit,architecture -Dmaven.test.skip=false -DskipCoverage=false --batch-mode",
+		"test:server:integration": "cd server && ./mvnw test -P'!quick' -Dsurefire.includedGroups=integration -Dparallel=none -Dmaven.test.skip=false --batch-mode",
+		"summarize:test-results": "node scripts/summarize-test-results.ts",
 		"build:webapp": "pnpm --filter webapp run build",
 		"nats:extract-examples": "node --import tsx scripts/nats-extract-examples.ts",
 		"typecheck:scripts": "tsc -p scripts/tsconfig.json --noEmit",
@@ -48,7 +53,7 @@
 		"format": "pnpm run format:server && pnpm run format:client && pnpm run format:agents",
 		"format:check": "pnpm run format:server:check && pnpm run format:client:check && pnpm run format:agents:check",
 		"lint": "run-s lint:server lint:client lint:agents",
-		"check": "run-s check:biome-pin check:server check:client check:agents test:agents check:stories check:story-sort check:components check:diagrams check:env check:contracts check:instructions check:changesets docs:lint",
+		"check": "run-s check:biome-pin check:java-nullness check:server check:client check:agents test:agents check:stories check:story-sort check:components check:diagrams check:env check:contracts check:instructions check:changesets docs:lint",
 		"typecheck": "pnpm run typecheck:webapp && pnpm run typecheck:scripts && pnpm run typecheck:agents",
 		"db:draft-changelog": "scripts/db-utils.sh draft-changelog",
 		"db:generate-erd-docs": "scripts/db-utils.sh generate-erd",
@@ -75,6 +80,7 @@
 		"check:diagrams": "node scripts/check-mermaid-diagrams.ts",
 		"check:env": "node scripts/check-env-defaults.ts && node scripts/check-env-roles.ts && node --test scripts/check-env-roles.test.ts",
 		"check:biome-pin": "node scripts/check-biome-pin.ts",
+		"check:java-nullness": "node scripts/check-java-nullness.ts && node --test scripts/check-java-nullness.test.ts",
 		"check:instructions": "node scripts/check-agent-instructions.ts && node --test scripts/check-agent-instructions.test.ts",
 		"check:changesets": "node --test scripts/verify-changesets.test.ts scripts/sync-release-version.test.ts"
 	},
@@ -93,6 +99,7 @@
 		"ajv": "8.20.0",
 		"ajv-formats": "3.0.1",
 		"commander": "14.0.3",
+		"fast-xml-parser": "^5.11.0",
 		"graphql": "16.14.0",
 		"husky": "9.1.7",
 		"jsdom": "29.1.1",
@@ -112,6 +119,6 @@
 		"node": ">=24.0"
 	},
 	"pnpm": {
-		"//": "overrides + peerDependencyRules live in pnpm-workspace.yaml \u2014 pnpm 11's documented location."
+		"//": "overrides + peerDependencyRules live in pnpm-workspace.yaml — pnpm 11's documented location."
 	}
 }

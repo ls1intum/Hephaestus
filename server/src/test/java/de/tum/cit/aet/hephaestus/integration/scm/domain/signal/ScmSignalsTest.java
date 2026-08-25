@@ -8,6 +8,7 @@ import de.tum.cit.aet.hephaestus.integration.core.signal.SignalKey;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.List;
 import java.util.Optional;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -19,7 +20,12 @@ class ScmSignalsTest extends BaseUnitTest {
     private static final long WORKSPACE_ID = 7L;
     private static final long ARTIFACT_ID = 42L;
 
-    private Optional<SignalKey> pullRequest(String triggerEvent, String headRefOid, String title, String body) {
+    private Optional<SignalKey> pullRequest(
+        String triggerEvent,
+        @Nullable String headRefOid,
+        String title,
+        String body
+    ) {
         return ScmSignals.pullRequestKey(
             WORKSPACE_ID,
             ARTIFACT_ID,
@@ -30,7 +36,7 @@ class ScmSignalsTest extends BaseUnitTest {
         );
     }
 
-    private Optional<SignalKey> issue(String triggerEvent, String title, String body, String labelName) {
+    private Optional<SignalKey> issue(String triggerEvent, String title, String body, @Nullable String labelName) {
         return ScmSignals.issueKey(
             WORKSPACE_ID,
             ARTIFACT_ID,

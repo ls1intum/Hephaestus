@@ -77,7 +77,7 @@ class PracticeFeedbackDispatchRecovery {
                 }
                 if (dispatch.getDestination() == FeedbackDispatchDestination.APPROVED_ARTIFACT_COMMENT) {
                     var feedback = feedbackRepository
-                        .findByIdAndWorkspaceId(dispatch.getFeedbackId(), dispatch.getWorkspaceId())
+                        .findByIdAndWorkspaceId(dispatch.approvedFeedbackId(), dispatch.getWorkspaceId())
                         .orElse(null);
                     if (
                         feedback == null || feedback.getBody() == null || !feedback.getBody().equals(dispatch.getBody())
@@ -107,8 +107,11 @@ class PracticeFeedbackDispatchRecovery {
         if (dispatch.getDestination() == FeedbackDispatchDestination.APPROVED_ARTIFACT_COMMENT) {
             feedbackRepository.markApprovedSuppressed(
                 dispatch.getWorkspaceId(),
-                dispatch.getFeedbackId(),
-                dispatch.getSuppressionReason()
+                dispatch.approvedFeedbackId(),
+                java.util.Objects.requireNonNull(
+                    dispatch.getSuppressionReason(),
+                    "a held dispatch always carries the refusal that parked it"
+                )
             );
         }
     }
@@ -116,15 +119,15 @@ class PracticeFeedbackDispatchRecovery {
     private void reconcileDomain(FeedbackDispatch dispatch, PracticeFeedbackDispatchService.Result result) {
         if (dispatch.getDestination() == FeedbackDispatchDestination.APPROVED_ARTIFACT_COMMENT) {
             if (result.status() == PracticeFeedbackDispatchService.Result.Status.SENT) {
-                feedbackRepository.markApprovedDelivered(dispatch.getWorkspaceId(), dispatch.getFeedbackId());
+                feedbackRepository.markApprovedDelivered(dispatch.getWorkspaceId(), dispatch.approvedFeedbackId());
             } else if (result.status() == PracticeFeedbackDispatchService.Result.Status.SUPPRESSED) {
                 feedbackRepository.markApprovedSuppressed(
                     dispatch.getWorkspaceId(),
-                    dispatch.getFeedbackId(),
-                    result.suppressionReason().name()
+                    dispatch.approvedFeedbackId(),
+                    result.refusal().name()
                 );
             } else if (result.status() == PracticeFeedbackDispatchService.Result.Status.FAILED) {
-                feedbackRepository.markApprovedFailed(dispatch.getWorkspaceId(), dispatch.getFeedbackId());
+                feedbackRepository.markApprovedFailed(dispatch.getWorkspaceId(), dispatch.approvedFeedbackId());
             }
             return;
         }
@@ -137,12 +140,12 @@ class PracticeFeedbackDispatchRecovery {
                 dispatch.getAgentJobId(),
                 dispatch.getWorkspaceId(),
                 DeliveryStatus.DELIVERED,
-                result.externalRef()
+                result.sentRef()
             );
             agentJobRepository
                 .findById(dispatch.getAgentJobId())
                 .ifPresent(job ->
-                    feedbackLedgerRecorder.recordRecoveredSummary(job, result.externalRef(), dispatch.getBody())
+                    feedbackLedgerRecorder.recordRecoveredSummary(job, result.sentRef(), dispatch.getBody())
                 );
         } else if (result.status() == PracticeFeedbackDispatchService.Result.Status.FAILED) {
             agentJobRepository.reconcileDispatchDeliveryStatus(
@@ -164,11 +167,8 @@ class PracticeFeedbackDispatchRecovery {
             return;
         }
         dispatchService.fail(dispatch, error);
-        if (
-            dispatch.getDestination() == FeedbackDispatchDestination.APPROVED_ARTIFACT_COMMENT &&
-            dispatch.getFeedbackId() != null
-        ) {
-            feedbackRepository.markApprovedFailed(dispatch.getWorkspaceId(), dispatch.getFeedbackId());
+        if (dispatch.getDestination() == FeedbackDispatchDestination.APPROVED_ARTIFACT_COMMENT) {
+            feedbackRepository.markApprovedFailed(dispatch.getWorkspaceId(), dispatch.approvedFeedbackId());
         } else {
             agentJobRepository.reconcileDispatchDeliveryStatus(
                 dispatch.getAgentJobId(),

@@ -11,4 +11,5 @@
  * {@code app/} etc — only this surface is legal cross-module.
  */
 @org.springframework.modulith.NamedInterface("lifecycle")
+@org.jspecify.annotations.NullMarked
 package de.tum.cit.aet.hephaestus.integration.scm.github.lifecycle;

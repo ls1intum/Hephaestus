@@ -34,6 +34,7 @@ import de.tum.cit.aet.hephaestus.workspace.settings.PracticeDeliveryStatus;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
@@ -270,7 +271,7 @@ class InContextDeliveryGateTest extends BaseUnitTest {
         return practice;
     }
 
-    private ValidatedObservation observation(String slug, String occurrenceKey) {
+    private ValidatedObservation observation(String slug, @Nullable String occurrenceKey) {
         return new ValidatedObservation(
             slug,
             "title",
@@ -283,7 +284,7 @@ class InContextDeliveryGateTest extends BaseUnitTest {
         );
     }
 
-    private Observation observation(String occurrenceKey) {
+    private Observation observation(@Nullable String occurrenceKey) {
         Observation observation = org.mockito.Mockito.mock(Observation.class);
         org.mockito.Mockito.lenient().when(observation.getOccurrenceKey()).thenReturn(occurrenceKey);
         return observation;

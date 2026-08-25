@@ -8,6 +8,7 @@ import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageSourceType;
 import de.tum.cit.aet.hephaestus.agent.usage.PricingState;
 import de.tum.cit.aet.hephaestus.agent.usage.UsageProvenance;
 import java.time.Instant;
+import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -73,8 +74,8 @@ record TerminalUsage(
             return new TerminalUsage(0L, 0L, 0L, 0L, 0L, calls, false, UsageProvenance.NONE);
         }
 
-        Buckets runner = fromRunner ? Buckets.of(runnerUsage) : Buckets.NONE;
-        Buckets proxy = fromProxy ? Buckets.of(proxyCounts) : Buckets.NONE;
+        Buckets runner = fromRunner ? Buckets.of(Objects.requireNonNull(runnerUsage)) : Buckets.NONE;
+        Buckets proxy = fromProxy ? Buckets.of(Objects.requireNonNull(proxyCounts)) : Buckets.NONE;
         return new TerminalUsage(
             Math.max(runner.input, proxy.input),
             Math.max(runner.output, proxy.output),

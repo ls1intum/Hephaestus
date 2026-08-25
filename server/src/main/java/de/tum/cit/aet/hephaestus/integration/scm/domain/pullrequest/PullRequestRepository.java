@@ -6,6 +6,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Stream;
+import org.jspecify.annotations.Nullable;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
@@ -227,34 +228,34 @@ public interface PullRequestRepository extends JpaRepository<PullRequest, Long> 
         @Param("providerId") Long providerId,
         @Param("number") int number,
         @Param("title") String title,
-        @Param("body") String body,
+        @Param("body") @Nullable String body,
         @Param("state") String state,
-        @Param("stateReason") String stateReason,
-        @Param("htmlUrl") String htmlUrl,
-        @Param("isLocked") Boolean isLocked,
-        @Param("closedAt") Instant closedAt,
-        @Param("commentsCount") Integer commentsCount,
+        @Param("stateReason") @Nullable String stateReason,
+        @Param("htmlUrl") @Nullable String htmlUrl,
+        @Param("isLocked") @Nullable Boolean isLocked,
+        @Param("closedAt") @Nullable Instant closedAt,
+        @Param("commentsCount") @Nullable Integer commentsCount,
         @Param("lastSyncAt") Instant lastSyncAt,
-        @Param("createdAt") Instant createdAt,
-        @Param("updatedAt") Instant updatedAt,
-        @Param("authorId") Long authorId,
+        @Param("createdAt") @Nullable Instant createdAt,
+        @Param("updatedAt") @Nullable Instant updatedAt,
+        @Param("authorId") @Nullable Long authorId,
         @Param("repositoryId") Long repositoryId,
-        @Param("milestoneId") Long milestoneId,
-        @Param("mergedAt") Instant mergedAt,
+        @Param("milestoneId") @Nullable Long milestoneId,
+        @Param("mergedAt") @Nullable Instant mergedAt,
         @Param("isDraft") boolean isDraft,
         @Param("isMerged") boolean isMerged,
-        @Param("commits") Integer commits,
-        @Param("additions") Integer additions,
-        @Param("deletions") Integer deletions,
-        @Param("changedFiles") Integer changedFiles,
-        @Param("reviewDecision") String reviewDecision,
-        @Param("mergeStateStatus") String mergeStateStatus,
-        @Param("mergeable") Boolean mergeable,
-        @Param("headRefName") String headRefName,
-        @Param("baseRefName") String baseRefName,
-        @Param("headRefOid") String headRefOid,
-        @Param("baseRefOid") String baseRefOid,
-        @Param("mergedById") Long mergedById,
-        @Param("mergeCommitSha") String mergeCommitSha
+        @Param("commits") @Nullable Integer commits,
+        @Param("additions") @Nullable Integer additions,
+        @Param("deletions") @Nullable Integer deletions,
+        @Param("changedFiles") @Nullable Integer changedFiles,
+        @Param("reviewDecision") @Nullable String reviewDecision,
+        @Param("mergeStateStatus") @Nullable String mergeStateStatus,
+        @Param("mergeable") @Nullable Boolean mergeable,
+        @Param("headRefName") @Nullable String headRefName,
+        @Param("baseRefName") @Nullable String baseRefName,
+        @Param("headRefOid") @Nullable String headRefOid,
+        @Param("baseRefOid") @Nullable String baseRefOid,
+        @Param("mergedById") @Nullable Long mergedById,
+        @Param("mergeCommitSha") @Nullable String mergeCommitSha
     );
 }

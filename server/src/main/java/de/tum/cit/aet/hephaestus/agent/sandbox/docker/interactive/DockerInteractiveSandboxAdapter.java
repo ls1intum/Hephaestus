@@ -26,6 +26,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
@@ -429,10 +430,10 @@ public class DockerInteractiveSandboxAdapter implements InteractiveSandboxServic
     }
 
     private void tearDownPartial(
-        DockerAttachedSandboxAdapter sandbox,
-        PiProcessHandle process,
-        String networkId,
-        String containerId
+        @Nullable DockerAttachedSandboxAdapter sandbox,
+        @Nullable PiProcessHandle process,
+        @Nullable String networkId,
+        @Nullable String containerId
     ) {
         // Pump/writer threads may already be running; terminate() drives the full close path.
         if (sandbox != null) {

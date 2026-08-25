@@ -6,6 +6,7 @@ import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 @Schema(description = "Summary information about a workspace for list views")
 public record WorkspaceListItemDTO(
@@ -19,6 +20,7 @@ public record WorkspaceListItemDTO(
     String status,
     @NonNull @Schema(description = "Git provider account login associated with this workspace") String accountLogin,
     @Schema(description = "High-level git provider type (GITHUB or GITLAB), or null if no SCM connection bound")
+    @Nullable
     IdentityProviderType providerType,
     @NonNull @Schema(description = "Timestamp when the workspace was created") Instant createdAt,
     @NonNull @Schema(description = "Whether the practice review feature is enabled") Boolean practicesEnabled,
@@ -37,7 +39,7 @@ public record WorkspaceListItemDTO(
             workspace.getId(),
             workspace.getWorkspaceSlug(),
             workspace.getDisplayName(),
-            workspace.getStatus() != null ? workspace.getStatus().name() : null,
+            workspace.getStatus().name(),
             workspace.getAccountLogin(),
             providerType,
             workspace.getCreatedAt(),

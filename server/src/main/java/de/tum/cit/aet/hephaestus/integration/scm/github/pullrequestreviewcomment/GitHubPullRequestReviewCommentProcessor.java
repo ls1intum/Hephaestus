@@ -19,6 +19,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.pullrequest.dto.GitHubPu
 import de.tum.cit.aet.hephaestus.integration.scm.github.pullrequestreviewcomment.dto.GitHubPullRequestReviewCommentEventDTO;
 import de.tum.cit.aet.hephaestus.integration.scm.github.user.GitHubUserProcessor;
 import java.time.Instant;
+import java.util.Objects;
 import java.util.Set;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
@@ -84,7 +85,7 @@ public class GitHubPullRequestReviewCommentProcessor {
      * @return the persisted PullRequestReviewComment entity, or null if processing failed
      */
     @Transactional
-    public PullRequestReviewComment processCreated(
+    public @Nullable PullRequestReviewComment processCreated(
         GitHubPullRequestReviewCommentEventDTO.GitHubReviewCommentDTO dto,
         long repositoryId,
         int prNumber,
@@ -95,7 +96,7 @@ public class GitHubPullRequestReviewCommentProcessor {
             return null;
         }
 
-        if (commentRepository.existsByNativeIdAndProviderId(dto.id(), context.providerId())) {
+        if (commentRepository.existsByNativeIdAndProviderId(dto.id(), Objects.requireNonNull(context.providerId()))) {
             log.debug("Skipped comment creation: reason=alreadyExists, commentId={}", dto.id());
             return null;
         }
@@ -137,7 +138,7 @@ public class GitHubPullRequestReviewCommentProcessor {
      * @return the persisted PullRequestReviewComment entity, or null if processing failed
      */
     @Transactional
-    public PullRequestReviewComment processCreatedWithParentCreation(
+    public @Nullable PullRequestReviewComment processCreatedWithParentCreation(
         GitHubPullRequestReviewCommentEventDTO.GitHubReviewCommentDTO dto,
         GitHubPullRequestDTO prDto,
         ProcessingContext context
@@ -147,7 +148,7 @@ public class GitHubPullRequestReviewCommentProcessor {
             return null;
         }
 
-        if (commentRepository.existsByNativeIdAndProviderId(dto.id(), context.providerId())) {
+        if (commentRepository.existsByNativeIdAndProviderId(dto.id(), Objects.requireNonNull(context.providerId()))) {
             log.debug("Skipped comment creation: reason=alreadyExists, commentId={}", dto.id());
             return null;
         }
@@ -155,7 +156,7 @@ public class GitHubPullRequestReviewCommentProcessor {
         // Try to find existing parent entity using repository ID and PR number (not database ID)
         // This avoids inconsistencies between GraphQL and webhook database IDs
         PullRequest pr = prRepository
-            .findByRepositoryIdAndNumber(context.repository().getId(), prDto.number())
+            .findByRepositoryIdAndNumber(Objects.requireNonNull(context.repository()).getId(), prDto.number())
             .orElse(null);
 
         // If parent doesn't exist, create a minimal entity from webhook data
@@ -198,13 +199,13 @@ public class GitHubPullRequestReviewCommentProcessor {
     }
 
     @Transactional
-    public PullRequestReviewComment processEdited(
+    public @Nullable PullRequestReviewComment processEdited(
         GitHubPullRequestReviewCommentEventDTO.GitHubReviewCommentDTO dto,
         Long prId,
         @NonNull ProcessingContext context
     ) {
         return commentRepository
-            .findByNativeIdAndProviderId(dto.id(), context.providerId())
+            .findByNativeIdAndProviderId(dto.id(), Objects.requireNonNull(context.providerId()))
             .map(comment -> {
                 comment.setBody(dto.body());
                 comment.setUpdatedAt(dto.updatedAt());
@@ -229,7 +230,7 @@ public class GitHubPullRequestReviewCommentProcessor {
     @Transactional
     public void processDeleted(Long commentId, Long prId, @NonNull ProcessingContext context) {
         commentRepository
-            .findByNativeIdAndProviderId(commentId, context.providerId())
+            .findByNativeIdAndProviderId(commentId, Objects.requireNonNull(context.providerId()))
             .ifPresent(comment -> {
                 // CRITICAL: For bidirectional @OneToMany with orphanRemoval=true,
                 // we MUST remove the comment from the thread's collection BEFORE deleting.
@@ -263,7 +264,7 @@ public class GitHubPullRequestReviewCommentProcessor {
     ) {
         PullRequestReviewComment comment = new PullRequestReviewComment();
         comment.setNativeId(dto.id());
-        comment.setProvider(pr.getRepository().getProvider());
+        comment.setProvider(pr.requireRepository().getProvider());
         comment.setBody(dto.body());
         comment.setDiffHunk(dto.diffHunk());
         comment.setPath(dto.path());
@@ -307,13 +308,19 @@ public class GitHubPullRequestReviewCommentProcessor {
         // Link to review if present (reviewId is the provider's native ID, not the JPA PK)
         if (dto.reviewId() != null) {
             reviewRepository
-                .findByNativeIdAndProviderId(dto.reviewId(), pr.getRepository().getProvider().getId())
+                .findByNativeIdAndProviderId(
+                    dto.reviewId(),
+                    Objects.requireNonNull(pr.requireRepository().getProvider().getId())
+                )
                 .ifPresent(comment::setReview);
         }
 
         // Link author if present - ensure user exists (create if needed)
         if (dto.author() != null) {
-            User author = userProcessor.ensureExists(dto.author(), pr.getRepository().getProvider().getId());
+            User author = userProcessor.ensureExists(
+                dto.author(),
+                Objects.requireNonNull(pr.requireRepository().getProvider().getId())
+            );
             if (author != null) {
                 comment.setAuthor(author);
             }
@@ -322,7 +329,10 @@ public class GitHubPullRequestReviewCommentProcessor {
         // Link to parent comment if this is a reply
         if (dto.inReplyToId() != null) {
             commentRepository
-                .findByNativeIdAndProviderId(dto.inReplyToId(), pr.getRepository().getProvider().getId())
+                .findByNativeIdAndProviderId(
+                    dto.inReplyToId(),
+                    Objects.requireNonNull(pr.requireRepository().getProvider().getId())
+                )
                 .ifPresent(comment::setInReplyTo);
         }
 
@@ -347,7 +357,7 @@ public class GitHubPullRequestReviewCommentProcessor {
         // If this is a reply, use the parent comment's thread
         if (dto.inReplyToId() != null) {
             // First try to get the thread from the existing parent comment
-            Long providerId = pr.getRepository().getProvider().getId();
+            Long providerId = Objects.requireNonNull(pr.requireRepository().getProvider().getId());
             var parentThread = commentRepository
                 .findByNativeIdAndProviderId(dto.inReplyToId(), providerId)
                 .map(PullRequestReviewComment::getThread)
@@ -382,18 +392,18 @@ public class GitHubPullRequestReviewCommentProcessor {
         GitHubPullRequestReviewCommentEventDTO.GitHubReviewCommentDTO dto,
         PullRequest pr
     ) {
-        Long providerId = pr.getRepository().getProvider().getId();
+        Long providerId = Objects.requireNonNull(pr.requireRepository().getProvider().getId());
         return threadRepository
             .findByNativeIdAndProviderId(parentCommentId, providerId)
             .orElseGet(() -> {
                 PullRequestReviewThread thread = new PullRequestReviewThread();
                 thread.setNativeId(parentCommentId); // Use parent's ID, not this comment's ID
-                thread.setProvider(pr.getRepository().getProvider());
+                thread.setProvider(pr.requireRepository().getProvider());
                 thread.setPullRequest(pr);
                 thread.setPath(dto.path()); // Use reply's path as best guess
                 thread.setLine(dto.line());
                 thread.setStartLine(dto.startLine());
-                thread.setSide(mapSide(dto.side()));
+                thread.setSide(mapSide(Objects.requireNonNullElse(dto.side(), "RIGHT")));
                 thread.setState(PullRequestReviewThread.State.UNRESOLVED);
                 thread.setCreatedAt(dto.createdAt());
                 thread.setUpdatedAt(dto.updatedAt());
@@ -409,18 +419,18 @@ public class GitHubPullRequestReviewCommentProcessor {
         GitHubPullRequestReviewCommentEventDTO.GitHubReviewCommentDTO dto,
         PullRequest pr
     ) {
-        Long providerId = pr.getRepository().getProvider().getId();
+        Long providerId = Objects.requireNonNull(pr.requireRepository().getProvider().getId());
         return threadRepository
             .findByNativeIdAndProviderId(dto.id(), providerId)
             .orElseGet(() -> {
                 PullRequestReviewThread thread = new PullRequestReviewThread();
                 thread.setNativeId(dto.id());
-                thread.setProvider(pr.getRepository().getProvider());
+                thread.setProvider(pr.requireRepository().getProvider());
                 thread.setPullRequest(pr);
                 thread.setPath(dto.path());
                 thread.setLine(dto.line());
                 thread.setStartLine(dto.startLine());
-                thread.setSide(mapSide(dto.side()));
+                thread.setSide(mapSide(Objects.requireNonNullElse(dto.side(), "RIGHT")));
                 thread.setState(PullRequestReviewThread.State.UNRESOLVED);
                 thread.setCreatedAt(dto.createdAt());
                 thread.setUpdatedAt(dto.updatedAt());
@@ -504,11 +514,11 @@ public class GitHubPullRequestReviewCommentProcessor {
 
         PullRequest pr = new PullRequest();
         pr.setNativeId(prId);
-        pr.setProvider(context.provider());
+        pr.setProvider(Objects.requireNonNull(context.provider()));
         pr.setNumber(dto.number());
-        pr.setTitle(sanitize(dto.title()));
+        pr.setTitle(Objects.requireNonNullElse(sanitize(dto.title()), ""));
         pr.setBody(sanitize(dto.body()));
-        pr.setState(convertState(dto.state()));
+        pr.setState(convertState(Objects.requireNonNullElse(dto.state(), "OPEN")));
         pr.setHtmlUrl(dto.htmlUrl());
         pr.setCreatedAt(dto.createdAt());
         pr.setUpdatedAt(dto.updatedAt());
@@ -537,7 +547,10 @@ public class GitHubPullRequestReviewCommentProcessor {
 
         // Link author
         if (dto.author() != null) {
-            User author = userProcessor.ensureExists(dto.author(), repository.getProvider().getId());
+            User author = userProcessor.ensureExists(
+                dto.author(),
+                Objects.requireNonNull(repository.getProvider().getId())
+            );
             pr.setAuthor(author);
         }
 

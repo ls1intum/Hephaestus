@@ -60,7 +60,7 @@ public class PracticeDetectionResultParser {
         this.lenientMapper = objectMapper.rebuild().enable(JsonReadFeature.ALLOW_UNESCAPED_CONTROL_CHARS).build();
     }
 
-    public ParseResult parse(JsonNode jobOutput) {
+    public ParseResult parse(@Nullable JsonNode jobOutput) {
         if (jobOutput == null || jobOutput.isNull() || jobOutput.isMissingNode()) {
             return ParseResult.empty("jobOutput is null or missing");
         }
@@ -110,7 +110,7 @@ public class PracticeDetectionResultParser {
             try {
                 valid.add(validateEntry(entry, i));
             } catch (EntryValidationException e) {
-                discarded.add(new DiscardedEntry(i, e.getMessage()));
+                discarded.add(new DiscardedEntry(i, String.valueOf(e.getMessage())));
             }
         }
 
@@ -184,7 +184,7 @@ public class PracticeDetectionResultParser {
     }
 
     /** Assessment exists only for outcomes that carry valence. */
-    private static Assessment parseAssessment(JsonNode entry, Presence presence) {
+    private static @Nullable Assessment parseAssessment(JsonNode entry, Presence presence) {
         if (!presence.carriesValence()) {
             return null;
         }
@@ -320,8 +320,8 @@ public class PracticeDetectionResultParser {
         Presence presence,
         @Nullable Assessment assessment,
         @Nullable Severity severity,
-        JsonNode evidence,
-        String evidenceRationale,
+        @Nullable JsonNode evidence,
+        @Nullable String evidenceRationale,
         @Nullable ObservationKeys keys
     ) {
         /** The parser's output shape: an observation not yet stamped with its persisted identities. */
@@ -331,8 +331,8 @@ public class PracticeDetectionResultParser {
             Presence presence,
             @Nullable Assessment assessment,
             @Nullable Severity severity,
-            JsonNode evidence,
-            String evidenceRationale
+            @Nullable JsonNode evidence,
+            @Nullable String evidenceRationale
         ) {
             this(practiceSlug, summary, presence, assessment, severity, evidence, evidenceRationale, null);
         }

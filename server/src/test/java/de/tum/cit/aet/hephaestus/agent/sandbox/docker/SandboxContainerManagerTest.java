@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -16,6 +17,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import org.junit.jupiter.api.AfterEach;
@@ -52,7 +54,7 @@ class SandboxContainerManagerTest extends BaseUnitTest {
             null
         );
         executor = Executors.newSingleThreadExecutor();
-        manager = new SandboxContainerManager(containerOps, image -> {}, properties, executor);
+        manager = new SandboxContainerManager(containerOps, image -> {}, properties, executor, Duration.ofMillis(20));
     }
 
     @AfterEach
@@ -80,7 +82,7 @@ class SandboxContainerManagerTest extends BaseUnitTest {
                 null,
                 null,
                 Map.of(),
-                null,
+                mock(DockerOperations.HostConfigSpec.class),
                 List.of()
             );
             when(containerOps.createContainer(spec)).thenReturn(CONTAINER_ID);
@@ -124,7 +126,7 @@ class SandboxContainerManagerTest extends BaseUnitTest {
         void shouldTimeoutAndStop() {
             // Simulate a container that never exits
             when(containerOps.waitContainer(CONTAINER_ID)).thenAnswer(inv -> {
-                Thread.sleep(5000);
+                new CountDownLatch(1).await();
                 return new DockerOperations.WaitResult(137);
             });
 
@@ -177,7 +179,7 @@ class SandboxContainerManagerTest extends BaseUnitTest {
         void shouldHandlePostTimeoutWaitFailure() {
             // waitContainer blocks forever, triggering timeout, then post-stop wait also fails
             when(containerOps.waitContainer(CONTAINER_ID)).thenAnswer(inv -> {
-                Thread.sleep(60_000);
+                new CountDownLatch(1).await();
                 return new DockerOperations.WaitResult(0);
             });
 
@@ -194,7 +196,7 @@ class SandboxContainerManagerTest extends BaseUnitTest {
         @Test
         void shouldTolerateStopFailureDuringTimeout() {
             when(containerOps.waitContainer(CONTAINER_ID)).thenAnswer(inv -> {
-                Thread.sleep(60_000);
+                new CountDownLatch(1).await();
                 return new DockerOperations.WaitResult(0);
             });
             doThrow(new SandboxException("stop failed")).when(containerOps).stopContainer(eq(CONTAINER_ID), anyInt());

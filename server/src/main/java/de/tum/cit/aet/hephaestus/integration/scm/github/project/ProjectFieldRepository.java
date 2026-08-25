@@ -4,6 +4,7 @@ import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import org.jspecify.annotations.Nullable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -75,7 +76,7 @@ public interface ProjectFieldRepository extends JpaRepository<ProjectField, Stri
         @Param("projectId") Long projectId,
         @Param("name") String name,
         @Param("dataType") String dataType,
-        @Param("options") String options,
+        @Param("options") @Nullable String options,
         @Param("createdAt") Instant createdAt,
         @Param("updatedAt") Instant updatedAt
     );

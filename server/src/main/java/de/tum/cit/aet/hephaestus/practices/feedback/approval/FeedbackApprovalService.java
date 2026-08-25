@@ -9,6 +9,7 @@ import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
 import de.tum.cit.aet.hephaestus.practices.feedback.approval.dto.DecideFeedbackProposalRequestDTO;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -119,7 +120,7 @@ public class FeedbackApprovalService {
         }
     }
 
-    private static String normalizedNote(String note) {
+    private static @Nullable String normalizedNote(@Nullable String note) {
         return note == null || note.isBlank() ? null : note.trim();
     }
 }

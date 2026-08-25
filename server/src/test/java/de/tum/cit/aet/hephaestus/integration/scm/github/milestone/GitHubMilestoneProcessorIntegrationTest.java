@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.scm.github.milestone;
 
 import static org.assertj.core.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
@@ -172,7 +173,7 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
             Milestone result = processor.process(dto, testRepository, createCreatorDto(), createContext());
 
             // Then - verify milestone created
-            assertThat(result).isNotNull();
+            assertNotNull(result);
             assertThat(result.getNativeId()).isEqualTo(milestoneId);
             assertThat(result.getNumber()).isEqualTo(3);
             assertThat(result.getTitle()).isEqualTo("New Milestone");
@@ -182,9 +183,7 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
             assertThat(result.getRepository().getNativeId()).isEqualTo(FIXTURE_REPO_ID);
 
             // Verify persisted
-            assertThat(
-                milestoneRepository.findByNativeIdAndProviderId(milestoneId, githubProvider.getId())
-            ).isPresent();
+            assertThat(milestoneRepository.findByNativeIdAndProviderId(milestoneId, providerId())).isPresent();
 
             // Verify MilestoneCreated event published
             assertThat(eventListener.ofType(ScmDomainEvent.MilestoneCreated.class))
@@ -193,6 +192,7 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
                 .satisfies(event -> {
                     assertThat(event.milestone().id()).isEqualTo(result.getId());
                     assertThat(event.context().scopeId()).isEqualTo(testWorkspace.getId());
+                    assertNotNull(event.context().repository());
                     assertThat(event.context().repository().id()).isEqualTo(testRepository.getId());
                 });
             assertThat(eventListener.ofType(ScmDomainEvent.MilestoneUpdated.class)).isEmpty();
@@ -231,6 +231,7 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
             );
 
             Milestone result = processor.process(dto, testRepository, createCreatorDto(), createContext());
+            assertNotNull(result);
 
             // Then - verify milestone updated
             assertThat(result.getTitle()).isEqualTo("Updated Title");
@@ -277,7 +278,7 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
             Milestone result = processor.process(dto, testRepository, null, createContext());
 
             // Then - milestone should be created with a generated negative ID
-            assertThat(result).isNotNull();
+            assertNotNull(result);
             assertThat(result.getNativeId()).isNotNull();
             assertThat(result.getNativeId()).isNegative(); // Generated IDs are negative to avoid collision
             assertThat(result.getNumber()).isEqualTo(1);
@@ -318,7 +319,7 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
             Milestone result = processor.process(dto, testRepository, null, createContext());
 
             // Then - should update existing milestone, not create new one
-            assertThat(result).isNotNull();
+            assertNotNull(result);
             assertThat(result.getNativeId()).isEqualTo(existingId); // keeps original nativeId
             assertThat(result.getTitle()).isEqualTo("Updated Title");
             assertThat(result.getDescription()).isEqualTo("new description");
@@ -344,13 +345,11 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
             );
 
             Milestone result = processor.process(dto, testRepository, null, createContext());
+            assertNotNull(result);
 
             assertThat(result.getDescription()).isNull();
             assertThat(
-                milestoneRepository
-                    .findByNativeIdAndProviderId(milestoneId, githubProvider.getId())
-                    .get()
-                    .getDescription()
+                milestoneRepository.findByNativeIdAndProviderId(milestoneId, providerId()).get().getDescription()
             ).isNull();
         }
 
@@ -373,10 +372,11 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
             );
 
             Milestone result = processor.process(dto, testRepository, null, createContext());
+            assertNotNull(result);
 
             assertThat(result.getDueOn()).isNull();
             assertThat(
-                milestoneRepository.findByNativeIdAndProviderId(milestoneId, githubProvider.getId()).get().getDueOn()
+                milestoneRepository.findByNativeIdAndProviderId(milestoneId, providerId()).get().getDueOn()
             ).isNull();
         }
 
@@ -429,6 +429,7 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
             );
 
             Milestone result = processor.process(dto, testRepository, createCreatorDto(), createContext());
+            assertNotNull(result);
 
             assertThat(result.getCreator()).isNotNull();
             assertThat(result.getCreator().getNativeId()).isEqualTo(FIXTURE_CREATOR_ID);
@@ -464,12 +465,13 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
             );
 
             // Verify user doesn't exist
-            assertThat(userRepository.findByNativeIdAndProviderId(newUserId, githubProvider.getId())).isEmpty();
+            assertThat(userRepository.findByNativeIdAndProviderId(newUserId, providerId())).isEmpty();
 
             Milestone result = processor.process(dto, testRepository, newCreator, createContext());
+            assertNotNull(result);
 
             assertThat(result.getCreator()).isNotNull();
-            assertThat(userRepository.findByNativeIdAndProviderId(newUserId, githubProvider.getId())).isPresent();
+            assertThat(userRepository.findByNativeIdAndProviderId(newUserId, providerId())).isPresent();
         }
 
         @Test
@@ -493,7 +495,7 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
             Milestone result = processor.process(dto, testRepository, null, createContext());
 
             // Then - milestone saved but creator is null
-            assertThat(result).isNotNull();
+            assertNotNull(result);
             assertThat(result.getCreator()).isNull();
         }
 
@@ -516,6 +518,7 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
             );
 
             Milestone result = processor.process(dto, testRepository, null, createContext());
+            assertNotNull(result);
 
             assertThat(result.getState()).isEqualTo(Milestone.State.CLOSED);
         }
@@ -539,6 +542,7 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
             );
 
             Milestone result = processor.process(dto, testRepository, null, createContext());
+            assertNotNull(result);
 
             assertThat(result.getState()).isEqualTo(Milestone.State.OPEN);
         }
@@ -563,14 +567,12 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
             milestone.setRepository(testRepository);
             Milestone savedMilestone = milestoneRepository.save(milestone);
 
-            assertThat(
-                milestoneRepository.findByNativeIdAndProviderId(milestoneId, githubProvider.getId())
-            ).isPresent();
+            assertThat(milestoneRepository.findByNativeIdAndProviderId(milestoneId, providerId())).isPresent();
 
             processor.delete(milestoneId, createContext());
 
             // Then - milestone deleted
-            assertThat(milestoneRepository.findByNativeIdAndProviderId(milestoneId, githubProvider.getId())).isEmpty();
+            assertThat(milestoneRepository.findByNativeIdAndProviderId(milestoneId, providerId())).isEmpty();
 
             // Verify event published
             assertThat(eventListener.ofType(ScmDomainEvent.MilestoneDeleted.class))
@@ -580,6 +582,7 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
                     assertThat(event.milestoneId()).isEqualTo(savedMilestone.getId());
                     assertThat(event.title()).isEqualTo("To Delete Milestone");
                     assertThat(event.context().scopeId()).isEqualTo(testWorkspace.getId());
+                    assertNotNull(event.context().repository());
                     assertThat(event.context().repository().id()).isEqualTo(testRepository.getId());
                 });
         }
@@ -588,9 +591,7 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
         void shouldHandleDeletionOfNonExistentMilestone() {
             // Given - milestone doesn't exist
             Long nonExistentId = 999999999L;
-            assertThat(
-                milestoneRepository.findByNativeIdAndProviderId(nonExistentId, githubProvider.getId())
-            ).isEmpty();
+            assertThat(milestoneRepository.findByNativeIdAndProviderId(nonExistentId, providerId())).isEmpty();
 
             // When/Then - should not throw
             assertThatCode(() -> processor.delete(nonExistentId, createContext())).doesNotThrowAnyException();
@@ -607,5 +608,11 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
             // No event published
             assertThat(eventListener.ofType(ScmDomainEvent.MilestoneDeleted.class)).isEmpty();
         }
+    }
+
+    private Long providerId() {
+        Long id = githubProvider.getId();
+        assertNotNull(id);
+        return id;
     }
 }

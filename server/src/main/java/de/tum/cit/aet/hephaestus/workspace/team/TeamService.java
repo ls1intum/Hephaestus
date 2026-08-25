@@ -16,6 +16,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -169,7 +170,10 @@ public class TeamService {
             .orElseThrow(() -> new EntityNotFoundException("TeamRepositoryPermission", teamId + "/" + repositoryId));
     }
 
-    private boolean belongsToWorkspace(Team team, Workspace workspace) {
+    private boolean belongsToWorkspace(@Nullable Team team, Workspace workspace) {
+        if (team == null) {
+            return false;
+        }
         return workspaceTeamScopeResolver
             .resolve(workspace)
             .map(scope -> scope.contains(team))

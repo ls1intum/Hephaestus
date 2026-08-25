@@ -21,6 +21,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.function.Supplier;
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.cache.Cache;
@@ -226,7 +227,7 @@ public class WorkspaceContentSource implements ContentSource {
     }
 
     /** Extracts the first text part from a UIMessage parts JSON array. */
-    private static String extractText(JsonNode parts) {
+    private static @Nullable String extractText(@Nullable JsonNode parts) {
         if (parts == null || !parts.isArray()) {
             return null;
         }

@@ -680,7 +680,11 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
         void skipsWhenLivePullRequestDoesNotMatchDeliveryTarget() {
             AgentJob job = createJob();
             var pr = createOpenPr();
-            ((ObjectNode) job.getMetadata()).put("repository_id", 999L);
+            ObjectNode metadata = org.junit.jupiter.api.Assertions.assertInstanceOf(
+                ObjectNode.class,
+                job.getMetadata()
+            );
+            metadata.put("repository_id", 999L);
             when(pullRequestRepository.findByIdWithAuthorAndRepository(PULL_REQUEST_ID)).thenReturn(Optional.of(pr));
 
             var delivery = new DeliveryContent("Fix stuff.", List.of(), List.of());

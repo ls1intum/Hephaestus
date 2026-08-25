@@ -10,6 +10,7 @@ import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -20,6 +21,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
@@ -53,7 +55,7 @@ public final class DockerAttachedSandboxAdapter implements AttachedSandbox, Stdi
     private final Duration defaultGrace;
 
     private final AtomicReference<AttachedSandboxState> state = new AtomicReference<>(AttachedSandboxState.ATTACHED);
-    private final AtomicReference<EvictionReason> terminalReason = new AtomicReference<>();
+    private final AtomicReference<@Nullable EvictionReason> terminalReason = new AtomicReference<>();
     private final CompletableFuture<Void> closed = new CompletableFuture<>();
     private final CompletableFuture<Void> firstFrame = new CompletableFuture<>();
 
@@ -144,7 +146,7 @@ public final class DockerAttachedSandboxAdapter implements AttachedSandbox, Stdi
     }
 
     public AttachedSandboxState state() {
-        return state.get();
+        return Objects.requireNonNull(state.get());
     }
 
     @Override
@@ -290,6 +292,7 @@ public final class DockerAttachedSandboxAdapter implements AttachedSandbox, Stdi
         return runtimeKey.equals(requested);
     }
 
+    @Nullable
     EvictionReason terminalReason() {
         return terminalReason.get();
     }

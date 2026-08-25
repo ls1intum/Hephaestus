@@ -22,11 +22,13 @@ public record CreatePracticeRequestDTO(
             " must not start or end with a hyphen, and must not contain consecutive hyphens"
     )
     @Schema(description = "URL-safe identifier unique within the workspace", example = "pr-description-quality")
+    @Nullable
     String slug,
 
     @NotBlank(message = "Name is required")
     @Size(min = 3, max = 128, message = "Name must be between 3 and 128 characters")
     @Schema(description = "Human-readable name", example = "PR Description Quality")
+    @Nullable
     String name,
 
     @NotNull(message = "An occasion is required")
@@ -41,11 +43,13 @@ public record CreatePracticeRequestDTO(
         description = "The one occasion this practice is reviewed on, with the evidence that review reads. " +
             "The kind of work reviewed is read off the signals."
     )
+    @Nullable
     List<PracticeBinding> bindings,
 
     @NotBlank(message = "Criteria is required")
     @Size(max = 50000, message = "Criteria must be at most 50000 characters")
     @Schema(description = "Practice review criteria")
+    @Nullable
     String criteria,
 
     @Size(
@@ -53,6 +57,7 @@ public record CreatePracticeRequestDTO(
         message = "Precompute script must be at most 100000 characters"
     )
     @Schema(description = "TypeScript/Bun static analysis run before automated review")
+    @Nullable
     String precomputeScript,
 
     @Valid

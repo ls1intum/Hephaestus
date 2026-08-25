@@ -29,6 +29,7 @@ import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.OnDelete;
 import org.hibernate.annotations.OnDeleteAction;
 import org.hibernate.type.SqlTypes;
+import org.jspecify.annotations.Nullable;
 
 /**
  * An immutable, append-only snapshot of a {@link Practice}: SCD-2 over the whole definition, not only
@@ -61,7 +62,7 @@ public class PracticeRevision {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @EqualsAndHashCode.Include
-    private Long id;
+    private @Nullable Long id;
 
     /** The practice this revision belongs to. CASCADE: deleting a practice removes its revision history. */
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
@@ -97,7 +98,7 @@ public class PracticeRevision {
 
     @Column(name = "precompute_script", columnDefinition = "TEXT")
     @ToString.Exclude
-    private String precomputeScript;
+    private @Nullable String precomputeScript;
 
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "automated_review_policy", columnDefinition = "jsonb")
@@ -106,32 +107,32 @@ public class PracticeRevision {
 
     @Column(name = "why_it_matters", columnDefinition = "TEXT")
     @ToString.Exclude
-    private String whyItMatters;
+    private @Nullable String whyItMatters;
 
     @Column(name = "what_good_looks_like", columnDefinition = "TEXT")
     @ToString.Exclude
-    private String whatGoodLooksLike;
+    private @Nullable String whatGoodLooksLike;
 
     @Column(name = "area_slug", length = 64)
-    private String areaSlug;
+    private @Nullable String areaSlug;
 
     @Column(name = "area_name", length = 128)
-    private String areaName;
+    private @Nullable String areaName;
 
     @Column(name = "area_description", columnDefinition = "TEXT")
-    private String areaDescription;
+    private @Nullable String areaDescription;
 
     @Column(name = "area_icon", length = 64)
-    private String areaIcon;
+    private @Nullable String areaIcon;
 
     @Column(name = "area_color", length = 32)
-    private String areaColor;
+    private @Nullable String areaColor;
 
     @Column(name = "review_rule_fingerprint", length = 96)
     private String reviewRuleFingerprint;
 
     @Column(name = "created_at", nullable = false, updatable = false)
-    private Instant createdAt;
+    private @Nullable Instant createdAt;
 
     public PracticeRevision(Practice practice, int revisionNumber) {
         this.practice = Objects.requireNonNull(practice, "practice");

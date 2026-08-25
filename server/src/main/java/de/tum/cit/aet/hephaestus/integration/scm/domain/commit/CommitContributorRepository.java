@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.integration.scm.domain.commit;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import java.util.List;
+import org.jspecify.annotations.Nullable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -50,9 +51,9 @@ public interface CommitContributorRepository extends JpaRepository<CommitContrib
     )
     void upsertContributor(
         @Param("commitId") Long commitId,
-        @Param("userId") Long userId,
+        @Param("userId") @Nullable Long userId,
         @Param("role") String role,
-        @Param("name") String name,
+        @Param("name") @Nullable String name,
         @Param("email") String email,
         @Param("ordinal") int ordinal
     );
@@ -94,5 +95,5 @@ public interface CommitContributorRepository extends JpaRepository<CommitContrib
         """,
         nativeQuery = true
     )
-    int backfillUserIdByEmail(@Param("email") String email, @Param("userId") Long userId);
+    int backfillUserIdByEmail(@Param("email") String email, @Param("userId") @Nullable Long userId);
 }

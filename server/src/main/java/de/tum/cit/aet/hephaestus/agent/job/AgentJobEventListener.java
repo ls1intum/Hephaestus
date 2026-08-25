@@ -295,10 +295,15 @@ public class AgentJobEventListener {
         GateDecision.Detect detect,
         SignalKey signalKey
     ) {
+        String headRefOid = pr.getHeadRefOid();
+        if (headRefOid == null) {
+            log.warn("Cannot submit agent job: missing head commit, prId={}", pr.getId());
+            return;
+        }
         PullRequestReviewSubmissionRequest request = new PullRequestReviewSubmissionRequest(
             prData,
             pr.getHeadRefName(),
-            pr.getHeadRefOid(),
+            headRefOid,
             pr.getBaseRefName(),
             signalKey.signalName()
         );

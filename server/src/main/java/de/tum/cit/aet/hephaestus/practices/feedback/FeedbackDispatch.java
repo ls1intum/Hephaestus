@@ -17,6 +17,7 @@ import lombok.NoArgsConstructor;
 import org.hibernate.annotations.ColumnDefault;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
+import org.jspecify.annotations.Nullable;
 import tools.jackson.databind.JsonNode;
 
 @Entity
@@ -50,7 +51,12 @@ public class FeedbackDispatch {
     private UUID agentJobId;
 
     @Column(name = "feedback_id", columnDefinition = "UUID")
-    private UUID feedbackId;
+    private @Nullable UUID feedbackId;
+
+    /** The feedback this carries. Only an approved-comment dispatch has one; a summary or ping has none. */
+    public UUID approvedFeedbackId() {
+        return java.util.Objects.requireNonNull(feedbackId, "an approved dispatch always names its feedback");
+    }
 
     @NotNull
     @Enumerated(EnumType.STRING)
@@ -67,7 +73,7 @@ public class FeedbackDispatch {
     private String body;
 
     @Column(name = "target_external_ref", length = 255)
-    private String targetExternalRef;
+    private @Nullable String targetExternalRef;
 
     @NotNull
     @JdbcTypeCode(SqlTypes.JSON)
@@ -80,13 +86,13 @@ public class FeedbackDispatch {
     private Boolean writeStarted;
 
     @Column(name = "delivered_external_ref", length = 255)
-    private String deliveredExternalRef;
+    private @Nullable String deliveredExternalRef;
 
     @Column(name = "lease_owner", length = 64)
-    private String leaseOwner;
+    private @Nullable String leaseOwner;
 
     @Column(name = "lease_expires_at")
-    private Instant leaseExpiresAt;
+    private @Nullable Instant leaseExpiresAt;
 
     @NotNull
     @Column(name = "next_attempt_at", nullable = false)
@@ -98,10 +104,10 @@ public class FeedbackDispatch {
 
     /** Why a policy check refused this row. Never a transport error — {@link #lastError} owns those. */
     @Column(name = "suppression_reason", length = 48)
-    private String suppressionReason;
+    private @Nullable String suppressionReason;
 
     @Column(name = "last_error", length = 512)
-    private String lastError;
+    private @Nullable String lastError;
 
     @NotNull
     @Column(name = "created_at", nullable = false)

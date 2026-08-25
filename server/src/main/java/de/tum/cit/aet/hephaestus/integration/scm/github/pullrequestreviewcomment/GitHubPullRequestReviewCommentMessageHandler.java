@@ -10,6 +10,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubEventAction
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubEventType;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.ProcessingContextFactory;
 import de.tum.cit.aet.hephaestus.integration.scm.github.pullrequestreviewcomment.dto.GitHubPullRequestReviewCommentEventDTO;
+import java.util.Objects;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -80,6 +81,10 @@ public class GitHubPullRequestReviewCommentMessageHandler
         }
 
         Long prId = prDto.getDatabaseId();
+        if (prId == null && event.actionType() != GitHubEventAction.PullRequestReviewComment.CREATED) {
+            log.warn("Skipped review comment mutation: reason=missingPullRequestId");
+            return;
+        }
 
         // Delegate to processor based on action
         // Use processCreatedWithParentCreation to handle the case where the PR webhook
@@ -88,7 +93,7 @@ public class GitHubPullRequestReviewCommentMessageHandler
         switch (event.actionType()) {
             case GitHubEventAction.PullRequestReviewComment.DELETED -> commentProcessor.processDeleted(
                 commentDto.id(),
-                prId,
+                Objects.requireNonNull(prId),
                 context
             );
             case GitHubEventAction.PullRequestReviewComment.CREATED -> commentProcessor.processCreatedWithParentCreation(
@@ -98,7 +103,7 @@ public class GitHubPullRequestReviewCommentMessageHandler
             );
             case GitHubEventAction.PullRequestReviewComment.EDITED -> commentProcessor.processEdited(
                 commentDto,
-                prId,
+                Objects.requireNonNull(prId),
                 context
             );
             default -> log.debug(

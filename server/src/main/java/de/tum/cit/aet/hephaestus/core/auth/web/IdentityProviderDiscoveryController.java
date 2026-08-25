@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.core.auth.web;
 
 import de.tum.cit.aet.hephaestus.core.auth.dev.DevLoginService;
 import de.tum.cit.aet.hephaestus.core.auth.provider.LoginProvider;
+import de.tum.cit.aet.hephaestus.core.auth.provider.LoginProvider.ProviderType;
 import de.tum.cit.aet.hephaestus.core.auth.provider.LoginProviderService;
 import de.tum.cit.aet.hephaestus.core.auth.spi.IdentityProviderCatalog;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
@@ -12,6 +13,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import org.jspecify.annotations.Nullable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.oauth2.client.registration.ClientRegistration;
@@ -103,7 +105,7 @@ public class IdentityProviderDiscoveryController {
      */
     static String providerTypeOf(
         ClientRegistration reg,
-        Function<String, LoginProvider.ProviderType> typeByRegistrationId
+        Function<String, @Nullable ProviderType> typeByRegistrationId
     ) {
         LoginProvider.ProviderType rowType = typeByRegistrationId.apply(reg.getRegistrationId());
         if (rowType != null) {
@@ -127,7 +129,7 @@ public class IdentityProviderDiscoveryController {
     }
 
     /** Host of the authorization endpoint, or {@code null} if absent/malformed. */
-    static String hostOf(ClientRegistration reg) {
+    static @Nullable String hostOf(ClientRegistration reg) {
         String authorizationUri = reg.getProviderDetails().getAuthorizationUri();
         if (authorizationUri == null) {
             return null;

@@ -52,6 +52,7 @@ import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.Set;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
@@ -243,10 +244,10 @@ class GithubDataSyncServiceTest extends BaseUnitTest {
      * @param issueCursor       value for the backfill-owned issue cursor column
      * @param pullRequestCursor value for the backfill-owned PR cursor column
      */
-    private static SyncTarget syncTarget(String issueCursor, String pullRequestCursor) {
+    private static SyncTarget syncTarget(@Nullable String issueCursor, @Nullable String pullRequestCursor) {
         // All timestamps recent => within cooldown and initial sync "completed".
         Instant recent = Instant.now();
-        return SyncTargetTestBuilder.syncTarget()
+        var builder = SyncTargetTestBuilder.syncTarget()
             .id(SYNC_TARGET_ID)
             .scopeId(SCOPE_ID)
             .installationId(100L)
@@ -258,18 +259,18 @@ class GithubDataSyncServiceTest extends BaseUnitTest {
             .lastPullRequestsSyncedAt(recent)
             .lastDiscussionsSyncedAt(recent)
             .lastCollaboratorsSyncedAt(recent)
-            .lastFullSyncAt(recent)
-            .issueSyncCursor(issueCursor)
-            .pullRequestSyncCursor(pullRequestCursor)
-            .build();
+            .lastFullSyncAt(recent);
+        if (issueCursor != null) builder.issueSyncCursor(issueCursor);
+        if (pullRequestCursor != null) builder.pullRequestSyncCursor(pullRequestCursor);
+        return builder.build();
     }
 
     private static final long NATIVE_ID = 555L;
 
     /** Same warm target as {@link #syncTarget}, with a stable provider {@code nativeId} attached. */
-    private static SyncTarget syncTargetWithNativeId(Long nativeId) {
+    private static SyncTarget syncTargetWithNativeId(@Nullable Long nativeId) {
         Instant recent = Instant.now();
-        return SyncTargetTestBuilder.syncTarget()
+        var builder = SyncTargetTestBuilder.syncTarget()
             .id(SYNC_TARGET_ID)
             .scopeId(SCOPE_ID)
             .installationId(100L)
@@ -281,9 +282,9 @@ class GithubDataSyncServiceTest extends BaseUnitTest {
             .lastPullRequestsSyncedAt(recent)
             .lastDiscussionsSyncedAt(recent)
             .lastCollaboratorsSyncedAt(recent)
-            .lastFullSyncAt(recent)
-            .nativeId(nativeId)
-            .build();
+            .lastFullSyncAt(recent);
+        if (nativeId != null) builder.nativeId(nativeId);
+        return builder.build();
     }
 
     @Test

@@ -7,6 +7,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ScmCommentReactionSink;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabGraphQlClientProvider;
 import java.time.Duration;
+import java.util.Objects;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.stereotype.Component;
@@ -56,14 +57,14 @@ public class GitLabCommentReactionSink implements ScmCommentReactionSink {
                 .execute()
                 .block(GRAPHQL_TIMEOUT);
 
-            if (response != null && response.isValid()) {
+            if (response != null && Objects.requireNonNull(response).isValid()) {
                 log.debug("Added {} reaction: noteId={}, scopeId={}", reactionName, commentNativeId, scopeId);
             } else {
                 log.debug(
                     "{} reaction GraphQL response invalid: noteId={}, errors={}",
                     reactionName,
                     commentNativeId,
-                    response != null ? response.getErrors() : "null"
+                    response != null ? Objects.requireNonNull(response).getErrors() : "null"
                 );
             }
         } catch (OutboundEgressSuppressedException e) {

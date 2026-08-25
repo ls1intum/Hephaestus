@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.integration.scm.domain.workdir;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.mock;
 
 import de.tum.cit.aet.hephaestus.integration.core.fabric.FabricLayout;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
@@ -32,8 +33,8 @@ class GitRepositoryManagerTest extends BaseUnitTest {
     private Path storagePath;
     private Path sourceRepoPath;
 
-    private GitRepositoryManager manager;
-    private GitRepositoryLockManager lockManager;
+    private GitRepositoryManager manager = mock(GitRepositoryManager.class);
+    private GitRepositoryLockManager lockManager = mock(GitRepositoryLockManager.class);
 
     @BeforeEach
     void setUp() throws Exception {

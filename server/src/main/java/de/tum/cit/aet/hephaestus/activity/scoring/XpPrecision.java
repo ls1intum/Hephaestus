@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.activity.scoring;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import org.jspecify.annotations.Nullable;
 
 /**
  * XP precision utilities for consistent rounding across the system.
@@ -110,7 +111,7 @@ public final class XpPrecision {
      * @param xp the XP value to round (may be null)
      * @return XP rounded to nearest integer, or 0 if null
      */
-    public static int roundToInt(Double xp) {
+    public static int roundToInt(@Nullable Double xp) {
         return xp != null ? roundToInt(xp.doubleValue()) : 0;
     }
 }

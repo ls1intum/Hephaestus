@@ -1,5 +1,7 @@
 package de.tum.cit.aet.hephaestus.workspace;
 
+import org.jspecify.annotations.Nullable;
+
 /**
  * Indicates how repositories are selected for a GitHub App installation.
  */
@@ -21,7 +23,7 @@ public enum RepositorySelection {
      * @return the corresponding enum value, or null if value is null/empty
      * @throws IllegalArgumentException if the value doesn't match any enum constant
      */
-    public static RepositorySelection fromString(String value) {
+    public static @Nullable RepositorySelection fromString(@Nullable String value) {
         if (value == null || value.isBlank()) {
             return null;
         }

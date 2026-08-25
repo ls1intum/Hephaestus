@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.integration.core.oauth.state;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.mock;
 
 import de.tum.cit.aet.hephaestus.integration.core.oauth.state.OAuthStateService.StateBinding;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
@@ -9,6 +10,7 @@ import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.time.Duration;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -186,26 +188,23 @@ class HmacOAuthStateServiceTest extends BaseUnitTest {
         assertThat(store.consumedCount()).isEqualTo(0);
     }
 
-    /**
-     * Minimal in-memory store used only by these tests. Mirrors the production
-     * "atomic conditional UPDATE" semantics: the first {@link #tryConsume} for a known
-     * nonce returns true once; every subsequent call returns false.
-     */
     private static final class InMemoryNonceStore extends OAuthStateNonceStore {
 
         private final Map<String, Boolean> consumed = new ConcurrentHashMap<>();
 
         InMemoryNonceStore() {
-            super(null);
+            super(mock(OAuthStateNonceRepository.class));
         }
 
         @Override
-        public void issue(String nonce, long workspaceId, IntegrationKind kind, java.time.Instant issuedAt) {
+        public void issue(@Nullable String nonce, long workspaceId, IntegrationKind kind, java.time.Instant issuedAt) {
+            if (nonce == null) return;
             consumed.putIfAbsent(nonce, false);
         }
 
         @Override
-        public boolean tryConsume(String nonce) {
+        public boolean tryConsume(@Nullable String nonce) {
+            if (nonce == null) return false;
             Boolean prior = consumed.get(nonce);
             if (prior == null || prior) return false;
             return consumed.replace(nonce, false, true);

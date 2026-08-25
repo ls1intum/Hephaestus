@@ -7,6 +7,7 @@ import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Duration;
 import java.time.Instant;
 import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -46,7 +47,7 @@ public class OAuthStateNonceCleanupJob {
     /** Canonical constructor (also the unit-test seam): retention passed directly. */
     public OAuthStateNonceCleanupJob(
         OAuthStateNonceRepository repository,
-        Duration retention,
+        @Nullable Duration retention,
         MeterRegistry meterRegistry
     ) {
         this.repository = repository;

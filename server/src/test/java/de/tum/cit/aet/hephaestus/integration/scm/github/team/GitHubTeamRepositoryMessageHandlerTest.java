@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.scm.github.team;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -29,7 +30,7 @@ class GitHubTeamRepositoryMessageHandlerTest extends BaseUnitTest {
     void registersUnderRepositoryTeamKey() {
         GitHubTeamRepositoryMessageHandler handler = new GitHubTeamRepositoryMessageHandler(
             delegate,
-            null,
+            mock(),
             new TransactionTemplate()
         );
 
@@ -40,7 +41,7 @@ class GitHubTeamRepositoryMessageHandlerTest extends BaseUnitTest {
     void delegatesToSharedTeamDispatch() throws Exception {
         GitHubTeamRepositoryMessageHandler handler = new GitHubTeamRepositoryMessageHandler(
             delegate,
-            null,
+            mock(),
             new TransactionTemplate()
         );
         GitHubTeamEventDTO event = JSON.readValue(

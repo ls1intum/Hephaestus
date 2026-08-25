@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.testconfig;
 
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.GenericContainer;
@@ -12,15 +13,17 @@ public final class NatsTestContainer {
     private static final DockerImageName IMAGE = DockerImageName.parse("nats:2.10-alpine");
     private static final int CLIENT_PORT = 4222;
 
-    private static GenericContainer<?> container;
+    private static @Nullable GenericContainer<?> container;
 
     private NatsTestContainer() {}
 
     public static synchronized GenericContainer<?> getInstance() {
-        if (container == null) {
-            container = createContainer();
+        GenericContainer<?> current = container;
+        if (current == null) {
+            current = createContainer();
+            container = current;
         }
-        return container;
+        return current;
     }
 
     public static String getServerUrl() {

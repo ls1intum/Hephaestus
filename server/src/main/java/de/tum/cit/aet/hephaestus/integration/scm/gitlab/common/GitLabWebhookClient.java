@@ -6,6 +6,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.graphql.GitLabGro
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
@@ -87,8 +88,15 @@ public class GitLabWebhookClient {
             throw new IllegalStateException("GitLab group not found: path=" + groupPath + ", scopeId=" + scopeId);
         }
 
-        long numericId = GitLabSyncConstants.extractNumericId(group.id());
-        return new GroupInfo(numericId, group.name(), group.fullPath());
+        String id = group.id();
+        String name = group.name();
+        String fullPath = group.fullPath();
+        if (id == null || name == null || fullPath == null) {
+            throw new IllegalStateException("GitLab group response is missing required fields: path=" + groupPath);
+        }
+
+        long numericId = GitLabSyncConstants.extractNumericId(id);
+        return new GroupInfo(numericId, name, fullPath);
     }
 
     /**
@@ -118,16 +126,17 @@ public class GitLabWebhookClient {
             );
         }
 
-        Number idValue = (Number) response.get("id");
+        Map<String, Object> responseBody = Objects.requireNonNull(response);
+        Number idValue = (Number) responseBody.get("id");
         if (idValue == null) {
             throw new IllegalStateException(
                 "GitLab webhook response missing 'id' field: scopeId=" + scopeId + ", groupId=" + groupId
             );
         }
         long webhookId = idValue.longValue();
-        String url = (String) response.get("url");
+        String url = (String) responseBody.get("url");
         log.info("Registered GitLab group webhook: scopeId={}, groupId={}, webhookId={}", scopeId, groupId, webhookId);
-        return new WebhookInfo(webhookId, url, (String) response.get("alert_status"));
+        return new WebhookInfo(webhookId, Objects.requireNonNull(url), (String) responseBody.get("alert_status"));
     }
 
     /**
@@ -200,13 +209,20 @@ public class GitLabWebhookClient {
                 .bodyToMono(new ParameterizedTypeReference<Map<String, Object>>() {})
                 .block(REQUEST_TIMEOUT);
 
-            if (response == null || response.get("id") == null) {
+            if (response == null) {
                 return Optional.empty();
             }
 
-            long id = ((Number) response.get("id")).longValue();
-            String url = (String) response.get("url");
-            return Optional.of(new WebhookInfo(id, url, (String) response.get("alert_status")));
+            Map<String, Object> responseBody = Objects.requireNonNull(response);
+            Number idValue = (Number) responseBody.get("id");
+            if (idValue == null) {
+                return Optional.empty();
+            }
+            long id = idValue.longValue();
+            String url = (String) responseBody.get("url");
+            return Optional.of(
+                new WebhookInfo(id, Objects.requireNonNull(url), (String) responseBody.get("alert_status"))
+            );
         } catch (WebClientResponseException e) {
             if (e.getStatusCode().value() == 404) {
                 return Optional.empty();
@@ -237,13 +253,13 @@ public class GitLabWebhookClient {
             return List.of();
         }
 
-        return response
+        return Objects.requireNonNull(response)
             .stream()
             .filter(hook -> hook.get("id") != null)
             .map(hook ->
                 new WebhookInfo(
                     ((Number) hook.get("id")).longValue(),
-                    (String) hook.get("url"),
+                    Objects.requireNonNull((String) hook.get("url")),
                     (String) hook.get("alert_status")
                 )
             )

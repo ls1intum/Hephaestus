@@ -13,6 +13,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabWebhookClie
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabWebhookClient.WebhookInfo;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.graphql.GitLabGroupResponse;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -27,6 +28,7 @@ import org.mockito.Mockito;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.graphql.client.GraphQlClient;
 import org.springframework.graphql.client.HttpGraphQlClient;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClient.RequestBodySpec;
@@ -208,7 +210,13 @@ class GitLabWebhookClientTest extends BaseUnitTest {
             when(uriSpec.uri(anyString(), eq(GROUP_ID), eq(999L))).thenReturn(headersSpec);
             when(headersSpec.header(anyString(), anyString())).thenReturn(headersSpec);
             when(headersSpec.retrieve()).thenThrow(
-                WebClientResponseException.create(404, "Not Found", null, null, null)
+                WebClientResponseException.create(
+                    404,
+                    "Not Found",
+                    HttpHeaders.EMPTY,
+                    new byte[0],
+                    StandardCharsets.UTF_8
+                )
             );
 
             Optional<WebhookInfo> result = webhookClient.getGroupWebhook(SCOPE_ID, GROUP_ID, 999L);
@@ -300,7 +308,13 @@ class GitLabWebhookClientTest extends BaseUnitTest {
             when(uriSpec.uri(anyString(), eq(GROUP_ID), eq(999L))).thenReturn(headersSpec);
             when(headersSpec.header(anyString(), anyString())).thenReturn(headersSpec);
             when(headersSpec.retrieve()).thenThrow(
-                WebClientResponseException.create(404, "Not Found", null, null, null)
+                WebClientResponseException.create(
+                    404,
+                    "Not Found",
+                    HttpHeaders.EMPTY,
+                    new byte[0],
+                    StandardCharsets.UTF_8
+                )
             );
 
             // Should complete without exception (404 is treated as already deleted)
@@ -318,7 +332,13 @@ class GitLabWebhookClientTest extends BaseUnitTest {
             when(uriSpec.uri(anyString(), eq(GROUP_ID), eq(99L))).thenReturn(headersSpec);
             when(headersSpec.header(anyString(), anyString())).thenReturn(headersSpec);
             when(headersSpec.retrieve()).thenThrow(
-                WebClientResponseException.create(500, "Internal Server Error", null, null, null)
+                WebClientResponseException.create(
+                    500,
+                    "Internal Server Error",
+                    HttpHeaders.EMPTY,
+                    new byte[0],
+                    StandardCharsets.UTF_8
+                )
             );
 
             assertThatThrownBy(() -> webhookClient.deregisterGroupWebhook(SCOPE_ID, GROUP_ID, 99L)).isInstanceOf(

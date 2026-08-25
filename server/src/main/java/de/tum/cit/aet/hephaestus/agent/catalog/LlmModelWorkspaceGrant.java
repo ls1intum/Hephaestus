@@ -26,7 +26,7 @@ public class LlmModelWorkspaceGrant {
     private Id id;
 
     @Column(name = "granted_at", nullable = false)
-    private Instant grantedAt;
+    private @Nullable Instant grantedAt;
 
     @Nullable
     @Column(name = "granted_by", length = 255)

@@ -25,6 +25,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
@@ -77,7 +78,7 @@ class WorkspaceInventoryContentSourceTest extends BaseUnitTest {
         return u;
     }
 
-    private Issue issue(int number, String title, Issue.State state, String author) {
+    private Issue issue(int number, String title, Issue.State state, @Nullable String author) {
         Issue i = new Issue();
         i.setNumber(number);
         i.setTitle(title);

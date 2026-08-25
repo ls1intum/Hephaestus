@@ -41,6 +41,7 @@ import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -200,14 +201,14 @@ class GitHubPullRequestSyncServiceTest extends BaseUnitTest {
         List<GHIssueComment> comments,
         int totalCount,
         boolean hasNextPage,
-        String endCursor
+        @Nullable String endCursor
     ) {
         GHIssueCommentConnection connection = new GHIssueCommentConnection();
         connection.setNodes(comments);
         connection.setTotalCount(totalCount);
         GHPageInfo pageInfo = new GHPageInfo();
         pageInfo.setHasNextPage(hasNextPage);
-        pageInfo.setEndCursor(endCursor);
+        if (endCursor != null) pageInfo.setEndCursor(endCursor);
         connection.setPageInfo(pageInfo);
         return connection;
     }
@@ -229,7 +230,7 @@ class GitHubPullRequestSyncServiceTest extends BaseUnitTest {
         connection.setTotalCount(1);
         GHPageInfo pageInfo = new GHPageInfo();
         pageInfo.setHasNextPage(false);
-        pageInfo.setEndCursor(null);
+
         connection.setPageInfo(pageInfo);
 
         when(graphQlClient.documentName("GetRepositoryPullRequests")).thenReturn(requestSpec);

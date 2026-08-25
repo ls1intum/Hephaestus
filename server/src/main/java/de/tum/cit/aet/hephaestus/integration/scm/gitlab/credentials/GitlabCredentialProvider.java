@@ -44,7 +44,7 @@ public class GitlabCredentialProvider implements ApiCredentialProvider {
         }
         Connection conn = connection.get();
         if (conn.getCredentialsEncrypted() == null) {
-            log.warn("GitLab Connection {} has no credentials_encrypted blob; cannot resolve PAT", conn.getId());
+            log.warn("GitLab Connection {} has no credentials_encrypted blob; cannot resolve PAT", ref.instanceKey());
             return Optional.empty();
         }
         return conn.credentials(credentialConverter);

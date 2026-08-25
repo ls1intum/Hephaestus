@@ -18,6 +18,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 @Entity
 @Table(
@@ -36,7 +37,7 @@ public class Label extends BaseGitServiceEntity {
     @NonNull
     private String name;
 
-    private String description;
+    private @Nullable String description;
 
     // 6-character hex code, without the leading #, identifying the color
     @NonNull

@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.scm.github.team;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
@@ -20,6 +21,7 @@ import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -56,7 +58,7 @@ class GitHubMembershipMessageHandlerIntegrationTest extends BaseIntegrationTest 
 
     private IdentityProvider gitProvider;
     private Organization testOrganization;
-    private Team testTeam;
+    private Team testTeam = new Team();
 
     @BeforeEach
     void setUp() {
@@ -114,7 +116,7 @@ class GitHubMembershipMessageHandlerIntegrationTest extends BaseIntegrationTest 
     @Test
     void shouldHandleMemberAddedEvent() throws Exception {
         GitHubMembershipEventDTO event = loadPayload("membership.added");
-        createTestTeam(event.team().id(), event.team().name());
+        createTestTeam(required(event.team().id()), event.team().name());
 
         handler.handleEvent(event);
 
@@ -125,15 +127,15 @@ class GitHubMembershipMessageHandlerIntegrationTest extends BaseIntegrationTest 
     @Test
     void shouldHandleMemberRemovedEvent() throws Exception {
         GitHubMembershipEventDTO event = loadPayload("membership.removed");
-        createTestTeam(event.team().id(), event.team().name());
+        createTestTeam(required(event.team().id()), event.team().name());
 
         // Add a user to remove
         if (event.member() != null) {
             User member = new User();
-            member.setNativeId(event.member().id());
+            member.setNativeId(required(event.member().id()));
             member.setProvider(gitProvider);
             member.setLogin(event.member().login());
-            member.setAvatarUrl(event.member().avatarUrl());
+            member.setAvatarUrl(required(event.member().avatarUrl()));
             member.setCreatedAt(Instant.now());
             member.setUpdatedAt(Instant.now());
             userRepository.save(member);
@@ -149,5 +151,10 @@ class GitHubMembershipMessageHandlerIntegrationTest extends BaseIntegrationTest 
         ClassPathResource resource = new ClassPathResource("github/" + filename + ".json");
         String json = resource.getContentAsString(StandardCharsets.UTF_8);
         return objectMapper.readValue(json, GitHubMembershipEventDTO.class);
+    }
+
+    private static <T> T required(@Nullable T value) {
+        assertNotNull(value);
+        return value;
     }
 }

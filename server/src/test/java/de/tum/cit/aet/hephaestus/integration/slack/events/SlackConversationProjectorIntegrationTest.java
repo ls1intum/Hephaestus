@@ -8,6 +8,7 @@ import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMessageRepository
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -57,14 +58,14 @@ class SlackConversationProjectorIntegrationTest extends BaseIntegrationTest {
     private void seedThread(
         long workspaceId,
         String channelId,
-        String threadTs,
+        @Nullable String threadTs,
         String lastTs,
         String participantArrayLiteral
     ) {
         support.seedThread(workspaceId, channelId, threadTs, lastTs, 1, participantArrayLiteral);
     }
 
-    private void seedMessage(long workspaceId, String channelId, String ts, String threadTs, String text) {
+    private void seedMessage(long workspaceId, String channelId, String ts, @Nullable String threadTs, String text) {
         support.seedMessage(workspaceId, channelId, ts, threadTs, text);
     }
 
@@ -166,7 +167,7 @@ class SlackConversationProjectorIntegrationTest extends BaseIntegrationTest {
         ).isZero();
 
         // The row stays a contentless tombstone: text NULL, deleted_at set.
-        Map<String, Object> row = jdbc.queryForMap(
+        Map<String, @Nullable Object> row = jdbc.queryForMap(
             "SELECT text, deleted_at FROM slack_message WHERE workspace_id = ? AND slack_channel_id = ? AND slack_ts = ?",
             ws,
             "C1",

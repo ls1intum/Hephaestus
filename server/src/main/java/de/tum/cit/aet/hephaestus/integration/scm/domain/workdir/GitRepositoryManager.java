@@ -1040,7 +1040,7 @@ public class GitRepositoryManager {
      * {@code gitlab-ci-token:<token>@} or {@code oauth2:<token>@}, so a token-specific redaction would leak
      * those forms in clear text.
      */
-    private String sanitizeUrl(String url) {
+    private @Nullable String sanitizeUrl(@Nullable String url) {
         if (url == null) return null;
         return url.replaceAll("//[^/@]+@", "//***@");
     }

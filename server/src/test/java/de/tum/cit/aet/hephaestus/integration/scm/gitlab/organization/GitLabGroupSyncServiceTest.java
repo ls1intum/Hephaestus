@@ -31,6 +31,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Tag;
@@ -676,7 +677,7 @@ class GitLabGroupSyncServiceTest extends BaseUnitTest {
         @SuppressWarnings("unchecked")
         private ClientGraphQlResponse mockProjectsPageWithGroup(
             List<GitLabProjectResponse> projects,
-            GitLabPageInfo pageInfo
+            @Nullable GitLabPageInfo pageInfo
         ) {
             ClientGraphQlResponse resp = mockProjectsPage(projects, pageInfo);
 
@@ -689,7 +690,10 @@ class GitLabGroupSyncServiceTest extends BaseUnitTest {
         }
 
         @SuppressWarnings("unchecked")
-        private ClientGraphQlResponse mockProjectsPage(List<GitLabProjectResponse> projects, GitLabPageInfo pageInfo) {
+        private ClientGraphQlResponse mockProjectsPage(
+            List<GitLabProjectResponse> projects,
+            @Nullable GitLabPageInfo pageInfo
+        ) {
             ClientGraphQlResponse resp = mock(ClientGraphQlResponse.class);
             when(resp.isValid()).thenReturn(true);
 
@@ -732,7 +736,7 @@ class GitLabGroupSyncServiceTest extends BaseUnitTest {
     }
 
     @SuppressWarnings("unchecked")
-    private void mockGraphQlGroupResponse(GitLabGroupResponse groupResponse) {
+    private void mockGraphQlGroupResponse(@Nullable GitLabGroupResponse groupResponse) {
         HttpGraphQlClient client = mockClient();
         ClientGraphQlResponse response = mock(ClientGraphQlResponse.class);
         lenient().when(response.isValid()).thenReturn(true);

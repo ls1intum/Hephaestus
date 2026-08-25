@@ -7,6 +7,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubWebhookEven
 import de.tum.cit.aet.hephaestus.integration.scm.github.repository.dto.GitHubRepositoryRefDTO;
 import de.tum.cit.aet.hephaestus.integration.scm.github.user.dto.GitHubUserDTO;
 import java.time.Instant;
+import org.jspecify.annotations.Nullable;
 
 /**
  * DTO for GitHub organization webhook events.
@@ -24,7 +25,7 @@ public record GitHubOrganizationEventDTO(
     }
 
     @Override
-    public GitHubRepositoryRefDTO repository() {
+    public @Nullable GitHubRepositoryRefDTO repository() {
         return null; // Organization events don't have a repository
     }
 
@@ -33,14 +34,14 @@ public record GitHubOrganizationEventDTO(
      */
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record GitHubOrganizationDTO(
-        @JsonProperty("id") Long id,
+        @JsonProperty("id") @Nullable Long id,
         @JsonProperty("node_id") String nodeId,
         @JsonProperty("login") String login,
         @JsonProperty("description") String description,
-        @JsonProperty("avatar_url") String avatarUrl,
-        @JsonProperty("html_url") String htmlUrl,
-        @JsonProperty("created_at") Instant createdAt,
-        @JsonProperty("updated_at") Instant updatedAt
+        @JsonProperty("avatar_url") @Nullable String avatarUrl,
+        @JsonProperty("html_url") @Nullable String htmlUrl,
+        @JsonProperty("created_at") @Nullable Instant createdAt,
+        @JsonProperty("updated_at") @Nullable Instant updatedAt
     ) {}
 
     /**

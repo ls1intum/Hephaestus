@@ -6,6 +6,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubEventAction
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubWebhookEvent;
 import de.tum.cit.aet.hephaestus.integration.scm.github.user.dto.GitHubUserDTO;
 import java.util.Map;
+import org.jspecify.annotations.Nullable;
 
 /**
  * DTO for GitHub member webhook events (collaborator changes).
@@ -34,7 +35,7 @@ public record GitHubMemberEventDTO(
      *
      * @return the permission string (e.g., "write", "admin"), or null if not present
      */
-    public String getPermission() {
+    public @Nullable String getPermission() {
         if (changes == null) {
             return null;
         }

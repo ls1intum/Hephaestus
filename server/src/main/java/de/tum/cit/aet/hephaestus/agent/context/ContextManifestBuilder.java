@@ -562,7 +562,7 @@ public class ContextManifestBuilder {
             : SourceCompleteness.UNKNOWN;
     }
 
-    private Optional<Boolean> truncationMarker(byte[] bytes) {
+    private Optional<Boolean> truncationMarker(byte@Nullable [] bytes) {
         if (bytes == null || bytes.length == 0 || bytes[0] != '{') {
             return Optional.empty();
         }

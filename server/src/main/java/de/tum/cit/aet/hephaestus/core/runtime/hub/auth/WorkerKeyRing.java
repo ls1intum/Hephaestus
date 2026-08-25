@@ -5,6 +5,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -75,7 +76,7 @@ public final class WorkerKeyRing {
         return new WorkerKeyRing(map, active);
     }
 
-    private static WorkerSigningKey selectActive(Map<String, WorkerSigningKey> map, String activeKid) {
+    private static WorkerSigningKey selectActive(Map<String, WorkerSigningKey> map, @Nullable String activeKid) {
         if (activeKid != null && !activeKid.isBlank()) {
             WorkerSigningKey chosen = map.get(activeKid);
             if (chosen == null) {

@@ -74,8 +74,8 @@ public class SlackParticipantConsent {
     @NoArgsConstructor
     public static class Id implements Serializable {
 
-        private Long workspaceId;
-        private String slackUserId;
+        private @Nullable Long workspaceId;
+        private @Nullable String slackUserId;
 
         public Id(Long workspaceId, String slackUserId) {
             this.workspaceId = workspaceId;

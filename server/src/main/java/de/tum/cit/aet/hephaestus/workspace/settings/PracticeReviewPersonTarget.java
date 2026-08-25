@@ -11,6 +11,7 @@ import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.jspecify.annotations.Nullable;
 
 /** One workspace member whose work is reviewed. Deleting their membership deletes this with it. */
 @Entity
@@ -39,7 +40,10 @@ public class PracticeReviewPersonTarget {
     @EqualsAndHashCode
     public static class Key implements Serializable {
 
+        @Nullable
         private Long workspaceId;
+
+        @Nullable
         private Long userId;
     }
 }

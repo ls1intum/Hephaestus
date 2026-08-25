@@ -6,6 +6,7 @@ import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -29,7 +30,7 @@ class SecurityUtilsTest extends BaseUnitTest {
         SecurityContextHolder.clearContext();
     }
 
-    private static void authenticateWithJwt(String subject, Map<String, Object> extraClaims) {
+    private static void authenticateWithJwt(@Nullable String subject, Map<String, Object> extraClaims) {
         Jwt.Builder builder = Jwt.withTokenValue("t")
             .header("alg", "ES256")
             .issuedAt(Instant.now())

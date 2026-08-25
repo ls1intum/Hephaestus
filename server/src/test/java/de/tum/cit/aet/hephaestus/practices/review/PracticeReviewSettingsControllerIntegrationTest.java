@@ -114,7 +114,7 @@ class PracticeReviewSettingsControllerIntegrationTest extends AbstractWorkspaceI
     }
 
     private String currentEtag(String slug) {
-        return webTestClient
+        String version = webTestClient
             .get()
             .uri("/workspaces/{slug}/practices/review-settings", slug)
             .headers(TestAuthUtils.withCurrentUser())
@@ -124,6 +124,7 @@ class PracticeReviewSettingsControllerIntegrationTest extends AbstractWorkspaceI
             .returnResult(PracticeReviewSettingsDTO.class)
             .getResponseHeaders()
             .getETag();
+        return java.util.Objects.requireNonNull(version, "the settings endpoint always answers with an ETag");
     }
 
     private WebTestClient.ResponseSpec patch(String slug, @Nullable String ifMatch, Map<String, Object> body) {

@@ -13,7 +13,6 @@ import de.tum.cit.aet.hephaestus.workspace.Workspace.WorkspaceStatus;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembership;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembership.WorkspaceRole;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembershipRepository;
-import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembershipService;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceSlugHistoryRepository;
 import jakarta.servlet.Filter;
@@ -33,7 +32,6 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Profile;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpHeaders;
@@ -65,36 +63,27 @@ public class WorkspaceContextFilter implements Filter {
     private final WorkspaceRepository workspaceRepository;
     private final WorkspaceMembershipRepository workspaceMembershipRepository;
     private final CurrentAccountUsers currentAccountUsers;
-    private final WorkspaceMembershipService workspaceMembershipService;
+    private final WorkspaceMembershipAutoSeeder membershipAutoSeeder;
     private final WorkspaceSlugHistoryRepository workspaceSlugHistoryRepository;
     private final ConnectionService connectionService;
     private final ObjectMapper objectMapper;
-
-    /**
-     * Gates the empty-membership ADMIN auto-seed. Defaults to {@code false} so production NEVER grants
-     * ADMIN to the first authenticated visitor of an admin-only-seeded / org-sync-churned workspace
-     * (a privilege-escalation path). Enabled only in dev/e2e profiles via {@code application-*.yml}.
-     */
-    private final boolean autoSeedMembership;
 
     public WorkspaceContextFilter(
         WorkspaceRepository workspaceRepository,
         WorkspaceMembershipRepository workspaceMembershipRepository,
         CurrentAccountUsers currentAccountUsers,
-        WorkspaceMembershipService workspaceMembershipService,
+        WorkspaceMembershipAutoSeeder membershipAutoSeeder,
         WorkspaceSlugHistoryRepository workspaceSlugHistoryRepository,
         ConnectionService connectionService,
-        ObjectMapper objectMapper,
-        @Value("${hephaestus.workspace.auto-seed-membership:false}") boolean autoSeedMembership
+        ObjectMapper objectMapper
     ) {
         this.workspaceRepository = workspaceRepository;
         this.workspaceMembershipRepository = workspaceMembershipRepository;
         this.currentAccountUsers = currentAccountUsers;
-        this.workspaceMembershipService = workspaceMembershipService;
+        this.membershipAutoSeeder = membershipAutoSeeder;
         this.workspaceSlugHistoryRepository = workspaceSlugHistoryRepository;
         this.connectionService = connectionService;
         this.objectMapper = objectMapper;
-        this.autoSeedMembership = autoSeedMembership;
     }
 
     @Override
@@ -308,33 +297,23 @@ public class WorkspaceContextFilter implements Filter {
                 return new MembershipResolution(roles, memberUserIds);
             }
 
-            // Auto-heal only when workspace has zero memberships (fresh dev DB): seed the first identity.
-            // Gated behind a non-prod flag — seeding ADMIN to an arbitrary first visitor in production is a
-            // privilege-escalation on org-sync-churned / admin-only-seeded empty-membership state. Disabled by
-            // default (prod); enabled only in dev/e2e via hephaestus.workspace.auto-seed-membership=true.
-            if (autoSeedMembership && workspaceMembershipRepository.countByWorkspace_Id(workspace.getId()) == 0) {
-                User primary = users.iterator().next();
-                try {
-                    var created = workspaceMembershipService.createMembership(
-                        workspace,
-                        primary.getId(),
-                        WorkspaceRole.ADMIN
-                    );
+            try {
+                Optional<WorkspaceMembership> seeded = membershipAutoSeeder.seedFirstUserWhenEmpty(workspace, users);
+                if (seeded.isPresent()) {
+                    WorkspaceMembership created = seeded.get();
                     log.info(
-                        "Auto-added user to workspace: userLogin={}, workspaceSlug={}, role={}",
-                        LoggingUtils.sanitizeForLog(primary.getLogin()),
+                        "Auto-added user to workspace: workspaceSlug={}, role={}",
                         LoggingUtils.sanitizeForLog(workspace.getWorkspaceSlug()),
                         created.getRole()
                     );
-                    return new MembershipResolution(Set.of(created.getRole()), Set.of(primary.getId()));
-                } catch (IllegalArgumentException ex) {
-                    log.debug(
-                        "Skipped membership auto-add: userLogin={}, workspaceSlug={}",
-                        LoggingUtils.sanitizeForLog(primary.getLogin()),
-                        LoggingUtils.sanitizeForLog(workspace.getWorkspaceSlug()),
-                        ex
-                    );
+                    return new MembershipResolution(Set.of(created.getRole()), Set.of(created.getId().getUserId()));
                 }
+            } catch (IllegalArgumentException ex) {
+                log.debug(
+                    "Skipped membership auto-add: workspaceSlug={}",
+                    LoggingUtils.sanitizeForLog(workspace.getWorkspaceSlug()),
+                    ex
+                );
             }
 
             log.debug("Returning empty roles: reason=noMembership, workspaceId={}", workspace.getId());

@@ -5,6 +5,7 @@ import org.hibernate.HibernateException;
 import org.hibernate.type.descriptor.WrapperOptions;
 import org.hibernate.type.descriptor.java.JavaType;
 import org.hibernate.type.format.FormatMapper;
+import org.jspecify.annotations.Nullable;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
 
@@ -18,7 +19,11 @@ public final class Jackson3FormatMapper implements FormatMapper {
     }
 
     @Override
-    public <T> T fromString(CharSequence charSequence, JavaType<T> javaType, WrapperOptions wrapperOptions) {
+    public <T> @Nullable T fromString(
+        @Nullable CharSequence charSequence,
+        JavaType<T> javaType,
+        WrapperOptions wrapperOptions
+    ) {
         if (charSequence == null) {
             return null;
         }
@@ -34,7 +39,7 @@ public final class Jackson3FormatMapper implements FormatMapper {
     }
 
     @Override
-    public <T> String toString(T value, JavaType<T> javaType, WrapperOptions wrapperOptions) {
+    public <T> @Nullable String toString(@Nullable T value, JavaType<T> javaType, WrapperOptions wrapperOptions) {
         if (value == null) {
             return null;
         }

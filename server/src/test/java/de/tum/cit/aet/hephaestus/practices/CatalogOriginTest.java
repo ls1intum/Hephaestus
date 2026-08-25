@@ -1,17 +1,20 @@
 package de.tum.cit.aet.hephaestus.practices;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
 import de.tum.cit.aet.hephaestus.practices.curated.CatalogEntry;
 import de.tum.cit.aet.hephaestus.practices.curated.EffectiveCatalog;
 import de.tum.cit.aet.hephaestus.practices.dto.CatalogLink;
+import de.tum.cit.aet.hephaestus.practices.dto.CatalogOriginDTO;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeRevision;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.List;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 
 class CatalogOriginTest extends BaseUnitTest {
@@ -27,31 +30,31 @@ class CatalogOriginTest extends BaseUnitTest {
     void anUntouchedCopyOfWhatTheCatalogOffersIsInSync() {
         Practice copy = practice("Seed criteria", fingerprintOf("Seed criteria"));
 
-        assertThat(CatalogOrigin.of(copy, catalog("Seed criteria")).link()).isEqualTo(CatalogLink.IN_SYNC);
+        assertThat(origin(copy, catalog("Seed criteria")).link()).isEqualTo(CatalogLink.IN_SYNC);
     }
 
     @Test
     void aCopyTheWorkspaceChangedReadsAsEditedHere() {
         Practice copy = practice("Our own criteria", fingerprintOf("Seed criteria"));
 
-        assertThat(CatalogOrigin.of(copy, catalog("Seed criteria")).link()).isEqualTo(CatalogLink.LOCALLY_EDITED);
+        assertThat(origin(copy, catalog("Seed criteria")).link()).isEqualTo(CatalogLink.LOCALLY_EDITED);
     }
 
     @Test
     void anUntouchedCopyWhoseCatalogEntryMovedOnReadsAsUpdateAvailable() {
         Practice copy = practice("Seed criteria", fingerprintOf("Seed criteria"));
 
-        assertThat(CatalogOrigin.of(copy, catalog("Instance criteria")).link()).isEqualTo(CatalogLink.UPDATE_AVAILABLE);
+        assertThat(origin(copy, catalog("Instance criteria")).link()).isEqualTo(CatalogLink.UPDATE_AVAILABLE);
     }
 
     @Test
     void aCopyEditedAwayAndBackIsInSyncAgain() {
         Practice copy = practice("Our own criteria", fingerprintOf("Seed criteria"));
-        assertThat(CatalogOrigin.of(copy, catalog("Seed criteria")).link()).isEqualTo(CatalogLink.LOCALLY_EDITED);
+        assertThat(origin(copy, catalog("Seed criteria")).link()).isEqualTo(CatalogLink.LOCALLY_EDITED);
 
         copy = practice("Seed criteria", fingerprintOf("Seed criteria"));
 
-        assertThat(CatalogOrigin.of(copy, catalog("Seed criteria")).link()).isEqualTo(CatalogLink.IN_SYNC);
+        assertThat(origin(copy, catalog("Seed criteria")).link()).isEqualTo(CatalogLink.IN_SYNC);
     }
 
     @Test
@@ -74,6 +77,7 @@ class CatalogOriginTest extends BaseUnitTest {
         );
 
         var origin = CatalogOrigin.of(copy, retired);
+        assertNotNull(origin);
         assertThat(origin.link()).isEqualTo(CatalogLink.IN_SYNC);
         assertThat(origin.sourceOffered()).isFalse();
     }
@@ -97,7 +101,7 @@ class CatalogOriginTest extends BaseUnitTest {
             List.of(CatalogEntry.shippedOnly(SLUG, practice, 0))
         );
 
-        assertThat(CatalogOrigin.of(copy, catalog).sourceOffered()).isFalse();
+        assertThat(origin(copy, catalog).sourceOffered()).isFalse();
     }
 
     private static PracticeDefinition definition(String criteria) {
@@ -121,7 +125,7 @@ class CatalogOriginTest extends BaseUnitTest {
         return new EffectiveCatalog(List.of(), List.of(CatalogEntry.shippedOnly(SLUG, definition(criteria), 0)));
     }
 
-    private static Practice practice(String criteria, String copiedFromFingerprint) {
+    private static Practice practice(String criteria, @Nullable String copiedFromFingerprint) {
         Practice practice = new Practice();
         practice.setId(1L);
         practice.setSlug(SLUG);
@@ -137,5 +141,11 @@ class CatalogOriginTest extends BaseUnitTest {
         }
         practice.setCurrentRevision(new PracticeRevision(practice, 1));
         return practice;
+    }
+
+    private static CatalogOriginDTO origin(Practice practice, EffectiveCatalog catalog) {
+        CatalogOriginDTO origin = CatalogOrigin.of(practice, catalog);
+        assertNotNull(origin);
+        return origin;
     }
 }

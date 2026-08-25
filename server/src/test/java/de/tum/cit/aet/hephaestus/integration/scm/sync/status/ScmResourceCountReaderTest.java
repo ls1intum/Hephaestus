@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.integration.scm.sync.status;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.tuple;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -20,6 +21,7 @@ import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -164,7 +166,7 @@ class ScmResourceCountReaderTest extends BaseUnitTest {
             // that silently drops empty repos would make them vanish from the read model entirely.
             assertThat(counts).containsOnlyKeys(REPO_A, REPO_B);
             assertThat(counts.get(REPO_B)).isEqualTo(ScmResourceCounts.empty());
-            assertThat(counts.get(REPO_B).headlineItemCount()).isZero();
+            assertThat(required(counts.get(REPO_B)).headlineItemCount()).isZero();
         }
     }
 
@@ -215,5 +217,10 @@ class ScmResourceCountReaderTest extends BaseUnitTest {
                 .hasSize(6)
                 .allSatisfy(count -> assertThat(count.lastSyncedAt()).isNull());
         }
+    }
+
+    private static <T> T required(@Nullable T value) {
+        assertNotNull(value);
+        return value;
     }
 }

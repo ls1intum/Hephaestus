@@ -12,4 +12,5 @@
  * is what keeps redaction at the source (see {@code ConfigAuditSnapshotArchTest}).
  */
 @org.springframework.modulith.NamedInterface("config-audit-spi")
+@org.jspecify.annotations.NullMarked
 package de.tum.cit.aet.hephaestus.core.audit.spi;

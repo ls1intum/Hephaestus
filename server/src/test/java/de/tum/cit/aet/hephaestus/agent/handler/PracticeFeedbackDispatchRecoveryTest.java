@@ -19,6 +19,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
@@ -56,7 +57,7 @@ class PracticeFeedbackDispatchRecoveryTest extends BaseUnitTest {
         recovery.recover();
 
         verify(service).fail(dispatch, "Dispatch retry limit exhausted");
-        verify(feedback).markApprovedFailed(dispatch.getWorkspaceId(), dispatch.getFeedbackId());
+        verify(feedback).markApprovedFailed(dispatch.getWorkspaceId(), dispatch.approvedFeedbackId());
     }
 
     @Test
@@ -96,7 +97,7 @@ class PracticeFeedbackDispatchRecoveryTest extends BaseUnitTest {
         );
     }
 
-    private static FeedbackDispatch dispatch(FeedbackDispatchDestination destination, UUID feedbackId) {
+    private static FeedbackDispatch dispatch(FeedbackDispatchDestination destination, @Nullable UUID feedbackId) {
         UUID id = UUID.randomUUID();
         return new FeedbackDispatch(
             id,

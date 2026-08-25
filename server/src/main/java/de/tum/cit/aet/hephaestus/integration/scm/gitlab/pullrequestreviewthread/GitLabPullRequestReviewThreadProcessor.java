@@ -12,6 +12,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewthread.
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewthread.PullRequestReviewThreadRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import java.time.Instant;
+import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -142,7 +143,7 @@ public class GitLabPullRequestReviewThreadProcessor {
         IdentityProvider provider,
         Long scopeId
     ) {
-        Long providerId = provider.getId();
+        Long providerId = Objects.requireNonNull(provider.getId());
 
         return threadRepository
             .findByNodeIdAndProviderId(data.discussionGlobalId(), providerId)
@@ -168,7 +169,7 @@ public class GitLabPullRequestReviewThreadProcessor {
         PullRequest pr,
         IdentityProvider provider
     ) {
-        Long providerId = provider.getId();
+        Long providerId = Objects.requireNonNull(provider.getId());
 
         return threadRepository
             .findByNativeIdAndProviderId(data.noteNativeId(), providerId)
@@ -309,6 +310,9 @@ public class GitLabPullRequestReviewThreadProcessor {
     private void publishThreadStateEvent(PullRequestReviewThread thread, PullRequest pr, Long scopeId) {
         ScmEventPayload.ReviewThreadData.from(thread).ifPresent(threadData -> {
             RepositoryRef repoRef = pr.getRepository() != null ? RepositoryRef.from(pr.getRepository()) : null;
+            if (repoRef == null) {
+                return;
+            }
             EventContext ctx = EventContext.forSync(scopeId, repoRef, IdentityProviderType.GITLAB);
 
             if (thread.getState() == PullRequestReviewThread.State.RESOLVED) {

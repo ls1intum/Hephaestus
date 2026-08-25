@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.integration.outline.connect;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Live state of the API token behind the workspace's Outline connection, probed against Outline
@@ -23,8 +24,11 @@ public record OutlineTokenStatusDTO(
         description = "The token's name in Outline. Absent when the token cannot list its own key " +
             "(a scoped key, or one owned by a user who cannot see it) — sync is unaffected."
     )
+    @Nullable
     String name,
-    @Schema(description = "Last four characters of the token, as Outline reports them") String last4,
-    @Schema(description = "When the token lapses. Absent for a key created without an expiry.") Instant expiresAt,
-    @Schema(description = "When Outline last saw the token used") Instant lastActiveAt
+    @Schema(description = "Last four characters of the token, as Outline reports them") @Nullable String last4,
+    @Schema(description = "When the token lapses. Absent for a key created without an expiry.")
+    @Nullable
+    Instant expiresAt,
+    @Schema(description = "When Outline last saw the token used") @Nullable Instant lastActiveAt
 ) {}

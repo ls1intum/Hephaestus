@@ -33,28 +33,28 @@ import org.jspecify.annotations.Nullable;
 @JsonIgnoreProperties(ignoreUnknown = true)
 @Slf4j
 public record GitHubProjectItemDTO(
-    @JsonProperty("id") Long id,
-    @JsonProperty("database_id") Long databaseId,
-    @JsonProperty("node_id") String nodeId,
-    @JsonProperty("project_node_id") String projectNodeId,
-    @JsonProperty("content_type") String contentType,
-    @JsonProperty("issue_id") Long issueId,
-    @JsonProperty("issue_number") Integer issueNumber,
-    @JsonProperty("draft_title") String draftTitle,
-    @JsonProperty("draft_body") String draftBody,
+    @JsonProperty("id") @Nullable Long id,
+    @JsonProperty("database_id") @Nullable Long databaseId,
+    @JsonProperty("node_id") @Nullable String nodeId,
+    @JsonProperty("project_node_id") @Nullable String projectNodeId,
+    @JsonProperty("content_type") @Nullable String contentType,
+    @JsonProperty("issue_id") @Nullable Long issueId,
+    @JsonProperty("issue_number") @Nullable Integer issueNumber,
+    @JsonProperty("draft_title") @Nullable String draftTitle,
+    @JsonProperty("draft_body") @Nullable String draftBody,
     @JsonProperty("archived") boolean archived,
-    @JsonProperty("creator") GitHubUserDTO creator,
+    @JsonProperty("creator") @Nullable GitHubUserDTO creator,
     @JsonProperty("field_values") List<GitHubProjectFieldValueDTO> fieldValues,
     @JsonProperty("field_values_truncated") boolean fieldValuesTruncated,
     @JsonProperty("field_values_total_count") int fieldValuesTotalCount,
     @JsonProperty("field_values_end_cursor") @Nullable String fieldValuesEndCursor,
-    @JsonProperty("created_at") Instant createdAt,
-    @JsonProperty("updated_at") Instant updatedAt
+    @JsonProperty("created_at") @Nullable Instant createdAt,
+    @JsonProperty("updated_at") @Nullable Instant updatedAt
 ) {
     /**
      * Get the database ID, preferring databaseId over id for GraphQL responses.
      */
-    public Long getDatabaseId() {
+    public @Nullable Long getDatabaseId() {
         return databaseId != null ? databaseId : id;
     }
 

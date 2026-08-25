@@ -100,12 +100,16 @@ final class StdioAttachedSandbox implements AttachedSandbox {
 
     @Override
     public Instant lastActivityAt() {
-        return lastActivity.get();
+        Instant activity = lastActivity.get();
+        if (activity == null) {
+            throw new IllegalStateException("last activity is unavailable");
+        }
+        return activity;
     }
 
     @Override
     public Duration idleFor() {
-        return Duration.between(lastActivity.get(), Instant.now());
+        return Duration.between(lastActivityAt(), Instant.now());
     }
 
     @Override

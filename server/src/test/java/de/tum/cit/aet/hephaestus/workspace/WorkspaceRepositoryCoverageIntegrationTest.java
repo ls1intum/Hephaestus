@@ -1,24 +1,23 @@
 package de.tum.cit.aet.hephaestus.workspace;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.spi.InstallationRepositoryEnumerator;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ProvisioningListener;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.github.app.GitHubAppTokenService;
-import de.tum.cit.aet.hephaestus.integration.scm.github.installation.GitHubInstallationRepositoryEnumerationService;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
+import de.tum.cit.aet.hephaestus.testconfig.StubInstallationRepositoryEnumerator;
 import de.tum.cit.aet.hephaestus.testconfig.WorkspaceTestFixtures;
 import java.util.List;
 import java.util.Locale;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 class WorkspaceRepositoryCoverageIntegrationTest extends BaseIntegrationTest {
 
@@ -36,8 +35,8 @@ class WorkspaceRepositoryCoverageIntegrationTest extends BaseIntegrationTest {
     @Autowired
     private RepositoryRepository repositoryRepository;
 
-    @MockitoBean
-    private GitHubInstallationRepositoryEnumerationService repositoryEnumerator;
+    @Autowired
+    private StubInstallationRepositoryEnumerator repositoryEnumerator;
 
     @Autowired
     private GitHubAppTokenService gitHubAppTokenService;
@@ -51,6 +50,7 @@ class WorkspaceRepositoryCoverageIntegrationTest extends BaseIntegrationTest {
     @BeforeEach
     void setup() {
         databaseTestUtils.cleanDatabase();
+        repositoryEnumerator.reset();
         // Ensure GitHub IdentityProvider exists - required by WorkspaceRepositoryMonitorService.ensureRepositoryFromSnapshot
         gitProviderRepository
             .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
@@ -67,7 +67,7 @@ class WorkspaceRepositoryCoverageIntegrationTest extends BaseIntegrationTest {
         Workspace workspace = persistWorkspace(RepositorySelection.ALL);
         repositoryToMonitorRepository.save(buildMonitor(workspace, "HephaestusTest/Orphaned"));
 
-        when(repositoryEnumerator.enumerate(INSTALLATION_ID)).thenReturn(
+        repositoryEnumerator.returns(
             List.of(
                 snapshot(1L, "HephaestusTest/demo-repository", "demo-repository", true),
                 snapshot(2L, "HephaestusTest/payload-fixture-repo-renamed", "payload-fixture-repo-renamed", false)
@@ -91,9 +91,7 @@ class WorkspaceRepositoryCoverageIntegrationTest extends BaseIntegrationTest {
     void shouldRespectSelectedInstallations() {
         Workspace workspace = persistWorkspace(RepositorySelection.SELECTED);
 
-        when(repositoryEnumerator.enumerate(INSTALLATION_ID)).thenReturn(
-            List.of(snapshot(3L, "HephaestusTest/HelloWorld", "HelloWorld", true))
-        );
+        repositoryEnumerator.returns(List.of(snapshot(3L, "HephaestusTest/HelloWorld", "HelloWorld", true)));
 
         // Use deferSync=true to prevent async syncs from running during test
         workspaceRepositoryMonitorService.ensureAllInstallationRepositoriesCovered(INSTALLATION_ID, null, true);
@@ -156,17 +154,12 @@ class WorkspaceRepositoryCoverageIntegrationTest extends BaseIntegrationTest {
         return WorkspaceTestFixtures.repositoryMonitor(workspace, nameWithOwner);
     }
 
-    private GitHubInstallationRepositoryEnumerationService.InstallationRepositorySnapshot snapshot(
+    private InstallationRepositoryEnumerator.InstallationRepository snapshot(
         long id,
         String nameWithOwner,
         String name,
         boolean isPrivate
     ) {
-        return new GitHubInstallationRepositoryEnumerationService.InstallationRepositorySnapshot(
-            id,
-            nameWithOwner,
-            name,
-            isPrivate
-        );
+        return new InstallationRepositoryEnumerator.InstallationRepository(id, nameWithOwner, name, isPrivate);
     }
 }

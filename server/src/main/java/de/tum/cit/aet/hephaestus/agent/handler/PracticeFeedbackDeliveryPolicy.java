@@ -124,7 +124,7 @@ public class PracticeFeedbackDeliveryPolicy {
                 "scm.issue"
             );
             record(job, workspaceId, feedbackId, surface, stage, resolution);
-            return Decision.suppressed(resolution.result().suppressionReason());
+            return Decision.suppressed(resolution.result().refusal());
         }
         if (workspace == null) {
             Resolution resolution = resolve(
@@ -144,28 +144,36 @@ public class PracticeFeedbackDeliveryPolicy {
                 "scm.issue"
             );
             record(job, workspaceId, feedbackId, surface, stage, resolution);
-            return Decision.suppressed(resolution.result().suppressionReason());
+            return Decision.suppressed(resolution.result().refusal());
         }
         JsonNode metadata = job.getMetadata();
         Issue issue = integralId(metadata, "issue_id")
             .flatMap(issueRepository::findByIdWithAuthorAndRepository)
             .orElse(null);
-        boolean target =
+        // One refined reference rather than a boolean: everything downstream needs the artifact itself,
+        // and a repository can be absent even when the issue is not.
+        Issue target =
             workspace != null &&
             isEligibleTarget(issue, metadata, "issue_number", workspaceId) &&
-            issue.getAuthor() != null;
-        boolean closedWhenQueued = metadata != null && "closed".equalsIgnoreCase(metadata.path("state").asString(""));
-        FeedbackSuppressionReason artifactRefusal = !target
-            ? FeedbackSuppressionReason.ARTIFACT_GONE
-            : closedWhenQueued || issue.getState() == Issue.State.CLOSED
-                ? FeedbackSuppressionReason.ARTIFACT_CLOSED
+            issue != null &&
+            issue.getAuthor() != null
+                ? issue
                 : null;
+        boolean closedWhenQueued = metadata != null && "closed".equalsIgnoreCase(metadata.path("state").asString(""));
+        FeedbackSuppressionReason artifactRefusal =
+            target == null
+                ? FeedbackSuppressionReason.ARTIFACT_GONE
+                : closedWhenQueued || target.getState() == Issue.State.CLOSED
+                    ? FeedbackSuppressionReason.ARTIFACT_CLOSED
+                    : null;
+        String repositoryName =
+            issue == null || issue.getRepository() == null ? null : issue.getRepository().getNameWithOwner();
         CoverageAssessment coverage =
             workspace == null
                 ? null
                 : coverageService.assess(
                       workspace,
-                      issue == null || issue.getRepository() == null ? null : issue.getRepository().getNameWithOwner(),
+                      repositoryName,
                       null,
                       issue == null ? null : issue.reviewSubject(),
                       false
@@ -176,20 +184,20 @@ public class PracticeFeedbackDeliveryPolicy {
             instanceMayDeliver,
             workspace,
             coverage,
-            target ? FactAnswer.of(recipientAllowsDelivery(issue)) : FactAnswer.NOT_APPLICABLE,
+            target == null ? FactAnswer.NOT_APPLICABLE : FactAnswer.of(recipientAllowsDelivery(target)),
             FactAnswer.of(artifactRefusal == null),
             artifactRefusal,
             stage,
             feedbackId,
             contributingPracticeSlugs,
-            issue == null ? null : issue.getRepository().getNameWithOwner(),
+            repositoryName,
             null,
             "scm.issue"
         );
         record(job, workspaceId, feedbackId, surface, stage, resolution);
-        return resolution.result().allowed()
-            ? Decision.allowed(issue)
-            : Decision.suppressed(resolution.result().suppressionReason());
+        return resolution.result().allowed() && target != null
+            ? Decision.allowed(target)
+            : Decision.suppressed(resolution.result().refusal());
     }
 
     @Transactional(readOnly = true)
@@ -244,7 +252,7 @@ public class PracticeFeedbackDeliveryPolicy {
                 "scm.pull_request"
             );
             record(job, workspaceId, feedbackId, surface, stage, resolution);
-            return Decision.suppressed(resolution.result().suppressionReason());
+            return Decision.suppressed(resolution.result().refusal());
         }
         if (workspace == null) {
             Resolution resolution = resolve(
@@ -264,33 +272,39 @@ public class PracticeFeedbackDeliveryPolicy {
                 "scm.pull_request"
             );
             record(job, workspaceId, feedbackId, surface, stage, resolution);
-            return Decision.suppressed(resolution.result().suppressionReason());
+            return Decision.suppressed(resolution.result().refusal());
         }
         JsonNode metadata = job.getMetadata();
         PullRequest pullRequest = integralId(metadata, "pull_request_id")
             .flatMap(pullRequestRepository::findByIdWithAuthorAndRepository)
             .orElse(null);
-        boolean target =
+        PullRequest target =
             workspace != null &&
             isEligibleTarget(pullRequest, metadata, "pr_number", workspaceId) &&
-            pullRequest.getAuthor() != null;
+            pullRequest != null &&
+            pullRequest.getAuthor() != null
+                ? pullRequest
+                : null;
         PracticeReviewSettings settings = workspace == null ? null : workspace.getReviewSettings();
-        FeedbackSuppressionReason artifactRefusal = !target
-            ? FeedbackSuppressionReason.ARTIFACT_GONE
-            : pullRequest.getState() == Issue.State.CLOSED
-                ? FeedbackSuppressionReason.ARTIFACT_CLOSED
-                : pullRequest.getState() == Issue.State.MERGED &&
-                  !settings.resolveDeliverToMerged(reviewProperties.deliverToMerged())
-                    ? FeedbackSuppressionReason.ARTIFACT_MERGED
-                    : null;
+        FeedbackSuppressionReason artifactRefusal =
+            target == null || settings == null
+                ? FeedbackSuppressionReason.ARTIFACT_GONE
+                : target.getState() == Issue.State.CLOSED
+                    ? FeedbackSuppressionReason.ARTIFACT_CLOSED
+                    : target.getState() == Issue.State.MERGED &&
+                      !settings.resolveDeliverToMerged(reviewProperties.deliverToMerged())
+                        ? FeedbackSuppressionReason.ARTIFACT_MERGED
+                        : null;
+        String repositoryName =
+            pullRequest == null || pullRequest.getRepository() == null
+                ? null
+                : pullRequest.getRepository().getNameWithOwner();
         CoverageAssessment coverage =
             workspace == null
                 ? null
                 : coverageService.assess(
                       workspace,
-                      pullRequest == null || pullRequest.getRepository() == null
-                          ? null
-                          : pullRequest.getRepository().getNameWithOwner(),
+                      repositoryName,
                       pullRequest == null ? null : pullRequest.getBaseRefName(),
                       pullRequest == null ? null : pullRequest.reviewSubject(),
                       true
@@ -301,20 +315,20 @@ public class PracticeFeedbackDeliveryPolicy {
             instanceMayDeliver,
             workspace,
             coverage,
-            target ? FactAnswer.of(recipientAllowsDelivery(pullRequest)) : FactAnswer.NOT_APPLICABLE,
+            target == null ? FactAnswer.NOT_APPLICABLE : FactAnswer.of(recipientAllowsDelivery(target)),
             FactAnswer.of(artifactRefusal == null),
             artifactRefusal,
             stage,
             feedbackId,
             contributingPracticeSlugs,
-            pullRequest == null ? null : pullRequest.getRepository().getNameWithOwner(),
+            repositoryName,
             pullRequest == null ? null : pullRequest.getBaseRefName(),
             "scm.pull_request"
         );
         record(job, workspaceId, feedbackId, surface, stage, resolution);
-        return resolution.result().allowed()
-            ? Decision.allowed(pullRequest)
-            : Decision.suppressed(resolution.result().suppressionReason());
+        return resolution.result().allowed() && target != null
+            ? Decision.allowed(target)
+            : Decision.suppressed(resolution.result().refusal());
     }
 
     @Transactional(readOnly = true)
@@ -351,7 +365,7 @@ public class PracticeFeedbackDeliveryPolicy {
         return resolution.result().allowed();
     }
 
-    static boolean matchesArtifact(Issue artifact, JsonNode metadata, String numberKey) {
+    static boolean matchesArtifact(Issue artifact, @Nullable JsonNode metadata, String numberKey) {
         return (
             artifact.getDeletedAt() == null &&
             artifact.getRepository() != null &&
@@ -374,6 +388,7 @@ public class PracticeFeedbackDeliveryPolicy {
     ) {
         return (
             artifact != null &&
+            artifact.getRepository() != null &&
             matchesArtifact(artifact, metadata, numberKey) &&
             repositoryToMonitorRepository.existsByWorkspaceIdAndNameWithOwner(
                 workspaceId,
@@ -383,7 +398,9 @@ public class PracticeFeedbackDeliveryPolicy {
     }
 
     private boolean recipientAllowsDelivery(Issue artifact) {
-        return accountPreferencesQuery.practiceFeedbackDeliveryEnabled(artifact.getAuthor().getId());
+        return accountPreferencesQuery.practiceFeedbackDeliveryEnabled(
+            java.util.Objects.requireNonNull(artifact.getAuthor(), "a target artifact always has an author").getId()
+        );
     }
 
     private @Nullable Workspace activePracticeWorkspace(long workspaceId) {
@@ -419,7 +436,11 @@ public class PracticeFeedbackDeliveryPolicy {
                 workspace != null,
                 workspace == null
                     ? FactAnswer.NOT_APPLICABLE
-                    : FactAnswer.of(admittedRevision != null && admittedRevision.longValue() == evaluatedRevision),
+                    : FactAnswer.of(
+                          admittedRevision != null &&
+                              evaluatedRevision != null &&
+                              admittedRevision.longValue() == evaluatedRevision.longValue()
+                      ),
                 workspace == null || !egressBrakesApply(surface)
                     ? FactAnswer.NOT_APPLICABLE
                     : FactAnswer.of(workspace.getReviewSettings().getDeliveryStatus() == PracticeDeliveryStatus.ACTIVE),
@@ -567,6 +588,16 @@ public class PracticeFeedbackDeliveryPolicy {
     record Decision<T extends Issue>(@Nullable T artifact, @Nullable FeedbackSuppressionReason suppressionReason) {
         static <T extends Issue> Decision<T> allowed(T artifact) {
             return new Decision<>(artifact, null);
+        }
+
+        /** The work this is about. An allowed decision always carries it. */
+        T target() {
+            return java.util.Objects.requireNonNull(artifact, "an allowed decision always carries its artifact");
+        }
+
+        /** The check that stopped this. A suppressed decision always names one. */
+        FeedbackSuppressionReason refusal() {
+            return java.util.Objects.requireNonNull(suppressionReason, "a suppressed decision always names its reason");
         }
 
         static <T extends Issue> Decision<T> suppressed(FeedbackSuppressionReason reason) {

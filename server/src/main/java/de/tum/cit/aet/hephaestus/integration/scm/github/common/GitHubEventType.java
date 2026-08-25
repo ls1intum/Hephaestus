@@ -1,5 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.scm.github.common;
 
+import org.jspecify.annotations.Nullable;
+
 /**
  * Enum representing GitHub webhook event types.
  * Each value corresponds to the X-GitHub-Event header value.
@@ -77,7 +79,7 @@ public enum GitHubEventType {
      * @param eventType the event type string
      * @return the matching enum value, or null if not found
      */
-    public static GitHubEventType fromString(String eventType) {
+    public static @Nullable GitHubEventType fromString(@Nullable String eventType) {
         if (eventType == null || eventType.isBlank()) {
             return null;
         }

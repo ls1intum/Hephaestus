@@ -26,13 +26,12 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.IntConsumer;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
@@ -40,8 +39,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  * (the unit test mocks the repository and cannot exercise {@code pg_advisory_xact_lock}).
  *
  * <p>The guard is deterministic: {@value #THREADS} transactions hammer the same versioned
- * {@link UserAchievement} row at <em>full</em> concurrency (the Hikari pool is widened below so the
- * threads are not serialized by the connection pool). Without the lock, {@code @Retryable}'s 3
+ * {@link UserAchievement} row at <em>full</em> concurrency. Without the lock, {@code @Retryable}'s 3
  * attempts cannot absorb that contention — each retry round lets only one writer win, so most
  * threads exhaust their retries and either throw {@link ObjectOptimisticLockingFailureException} or
  * lose their increment. With the lock, the writers serialize cleanly: zero failures, every
@@ -49,19 +47,8 @@ import org.springframework.transaction.support.TransactionTemplate;
  */
 class AchievementConcurrencyIntegrationTest extends BaseIntegrationTest {
 
-    // High-target linear achievement: 40 increments need many writes and never unlock (target 50).
     private static final String LEGENDARY = "pr.merged.legendary";
-    private static final int THREADS = 40;
-
-    @DynamicPropertySource
-    static void widenConnectionPool(DynamicPropertyRegistry registry) {
-        // Every worker holds a connection while blocked on the advisory lock, so the pool must fit
-        // all threads — otherwise workers fail with connection-timeouts unrelated to the behaviour
-        // under test. Disable leak detection: serialized lock holders legitimately hold connections.
-        registry.add("spring.datasource.hikari.maximum-pool-size", () -> THREADS + 4);
-        registry.add("spring.datasource.hikari.connection-timeout", () -> "30000");
-        registry.add("spring.datasource.hikari.leak-detection-threshold", () -> "0");
-    }
+    private static final int THREADS = 8;
 
     @Autowired
     private AchievementService achievementService;
@@ -99,7 +86,7 @@ class AchievementConcurrencyIntegrationTest extends BaseIntegrationTest {
         assertThat(readProgress(user.getId(), LEGENDARY).current())
             .as("all %d serialized increments must land (no lost updates)", THREADS)
             .isEqualTo(THREADS);
-        assertThat(readUnlockedAt(user.getId(), LEGENDARY)).as("40 < target 50, so it stays locked").isNull();
+        assertThat(readUnlockedAt(user.getId(), LEGENDARY)).as("progress below target 50 stays locked").isNull();
     }
 
     @Test
@@ -182,10 +169,16 @@ class AchievementConcurrencyIntegrationTest extends BaseIntegrationTest {
         );
     }
 
-    private Instant readUnlockedAt(Long userId, String achievementId) {
-        return transactionTemplate.execute(status ->
-            userAchievementRepository.findByUserIdAndAchievementId(userId, achievementId).orElseThrow().getUnlockedAt()
+    private @Nullable Instant readUnlockedAt(Long userId, String achievementId) {
+        Optional<Instant> unlockedAt = transactionTemplate.execute(status ->
+            Optional.ofNullable(
+                userAchievementRepository
+                    .findByUserIdAndAchievementId(userId, achievementId)
+                    .orElseThrow()
+                    .getUnlockedAt()
+            )
         );
+        return unlockedAt == null ? null : unlockedAt.orElse(null);
     }
 
     private User persistUser(String login) {

@@ -17,6 +17,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubEventType;
 import de.tum.cit.aet.hephaestus.integration.scm.github.organization.dto.GitHubOrganizationEventDTO;
 import de.tum.cit.aet.hephaestus.integration.scm.github.user.GitHubUserProcessor;
 import java.util.List;
+import java.util.Objects;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -78,18 +79,21 @@ public class GitHubOrganizationMessageHandler extends AbstractIntegrationMessage
         );
 
         // Resolve GitHub provider ID for user upsert
-        Long providerId = gitProviderRepository
-            .findByTypeAndServerUrl(IdentityProviderType.GITHUB, GITHUB_SERVER_URL)
-            .orElseThrow(() -> new IllegalStateException("IdentityProvider not found for GitHub"))
-            .getId();
+        Long providerId = Objects.requireNonNull(
+            gitProviderRepository
+                .findByTypeAndServerUrl(IdentityProviderType.GITHUB, GITHUB_SERVER_URL)
+                .orElseThrow(() -> new IllegalStateException("IdentityProvider not found for GitHub"))
+                .getId()
+        );
+        Long organizationId = Objects.requireNonNull(orgDto.id());
 
         switch (event.actionType()) {
             case GitHubEventAction.Organization.MEMBER_ADDED -> {
                 if (event.membership() != null && event.membership().user() != null) {
                     var userDto = event.membership().user();
-                    User user = userProcessor.ensureExists(userDto, providerId);
+                    User user = Objects.requireNonNull(userProcessor.ensureExists(userDto, providerId));
                     OrganizationMemberRole role = parseRole(event.membership().role());
-                    membershipRepository.upsertMembership(orgDto.id(), user.getId(), role);
+                    membershipRepository.upsertMembership(organizationId, Objects.requireNonNull(user.getId()), role);
                     log.info(
                         "Added member to organization: orgId={}, orgLogin={}, userLogin={}, role={}",
                         orgDto.id(),
@@ -101,9 +105,9 @@ public class GitHubOrganizationMessageHandler extends AbstractIntegrationMessage
                     // Notify listeners about membership change
                     membershipListener.onMemberAdded(
                         new MembershipChangedEvent(
-                            orgDto.id(),
+                            organizationId,
                             orgDto.login(),
-                            userDto.id(),
+                            Objects.requireNonNull(userDto.id()),
                             userDto.login(),
                             event.membership().role()
                         )
@@ -113,7 +117,10 @@ public class GitHubOrganizationMessageHandler extends AbstractIntegrationMessage
             case GitHubEventAction.Organization.MEMBER_REMOVED -> {
                 if (event.membership() != null && event.membership().user() != null) {
                     var userDto = event.membership().user();
-                    membershipRepository.deleteByOrganizationIdAndUserIdIn(orgDto.id(), List.of(userDto.id()));
+                    membershipRepository.deleteByOrganizationIdAndUserIdIn(
+                        organizationId,
+                        List.of(Objects.requireNonNull(userDto.id()))
+                    );
                     log.info(
                         "Removed member from organization: orgId={}, orgLogin={}, userLogin={}",
                         orgDto.id(),
@@ -123,16 +130,22 @@ public class GitHubOrganizationMessageHandler extends AbstractIntegrationMessage
 
                     // Notify listeners about membership change
                     membershipListener.onMemberRemoved(
-                        new MembershipChangedEvent(orgDto.id(), orgDto.login(), userDto.id(), userDto.login(), null)
+                        new MembershipChangedEvent(
+                            organizationId,
+                            orgDto.login(),
+                            Objects.requireNonNull(userDto.id()),
+                            userDto.login(),
+                            null
+                        )
                     );
                 }
             }
             case GitHubEventAction.Organization.RENAMED -> organizationProcessor.rename(
-                orgDto.id(),
+                organizationId,
                 orgDto.login(),
                 providerId
             );
-            case GitHubEventAction.Organization.DELETED -> organizationProcessor.delete(orgDto.id(), providerId);
+            case GitHubEventAction.Organization.DELETED -> organizationProcessor.delete(organizationId, providerId);
             default -> organizationProcessor.process(orgDto, providerId);
         }
     }

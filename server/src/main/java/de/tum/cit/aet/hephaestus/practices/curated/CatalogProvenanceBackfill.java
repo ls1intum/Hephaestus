@@ -15,6 +15,7 @@ import de.tum.cit.aet.hephaestus.practices.model.PracticeArea;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeRevision;
 import java.time.Clock;
 import java.util.List;
+import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -69,8 +70,9 @@ public class CatalogProvenanceBackfill {
             try {
                 transactionOperations.executeWithoutResult(ignored -> {
                     Practice managed = practiceRepository.findById(practiceId).orElseThrow();
+                    String sourceSlug = Objects.requireNonNull(managed.getSourceCuratedSlug());
                     catalog
-                        .practice(managed.getSourceCuratedSlug())
+                        .practice(sourceSlug)
                         .ifPresent(entry -> {
                             PracticeDefinition effective = entry.effective();
                             PracticeDefinition aligned = new PracticeDefinition(
@@ -133,7 +135,10 @@ public class CatalogProvenanceBackfill {
 
     private void fingerprintMigratedRevisions(Long workspaceId) {
         for (PracticeRevision revision : revisionRepository.findDefinitionRevisionsMissingFingerprint(workspaceId)) {
-            revisionRepository.setReviewRuleFingerprint(revision.getId(), revision.computeReviewRuleFingerprint());
+            revisionRepository.setReviewRuleFingerprint(
+                Objects.requireNonNull(revision.getId()),
+                revision.computeReviewRuleFingerprint()
+            );
         }
     }
 

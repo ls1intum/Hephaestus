@@ -10,6 +10,7 @@ import de.tum.cit.aet.hephaestus.agent.config.AgentPurpose;
 import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBinding;
 import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBindingRepository;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
+import de.tum.cit.aet.hephaestus.agent.usage.LlmBudgetService;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
@@ -45,9 +46,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.config.AutowireCapableBeanFactory;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
 
 /**
  * The gate on the whole feature: two consecutive sweeps over an artifact nobody touched submit exactly
@@ -65,24 +65,28 @@ class ReviewSweepSpendGuardIntegrationTest extends BaseIntegrationTest {
 
     private static final long ACCOUNT_ID = 4242L;
 
-    @DynamicPropertySource
-    static void agentProperties(DynamicPropertyRegistry registry) {
-        // The driver and the submitter are gated on the agent capability, which is off by default under
-        // test. The worker role stays off: nothing here executes a job, it only has to be created.
-        registry.add("hephaestus.agent.enabled", () -> "true");
-    }
-
     @Autowired
     private ReviewSweepCampaignOpener opener;
 
     @Autowired
     private ReviewSweepScheduleRepository scheduleRepository;
 
-    @Autowired
     private ReviewBackfillDriver driver;
 
     @Autowired
+    private AutowireCapableBeanFactory beanFactory;
+
+    @Autowired
     private ReviewBackfillRunRepository runRepository;
+
+    @Autowired
+    private ReviewBackfillScopeRepository scopeRepository;
+
+    @Autowired
+    private LlmBudgetService llmBudgetService;
+
+    @Autowired
+    private ReviewBackfillProperties backfillProperties;
 
     @Autowired
     private AgentJobRepository agentJobRepository;
@@ -129,6 +133,15 @@ class ReviewSweepSpendGuardIntegrationTest extends BaseIntegrationTest {
     @BeforeEach
     void setUp() {
         databaseTestUtils.cleanDatabase();
+        ReviewBackfillSubmitter submitter = beanFactory.createBean(ReviewBackfillSubmitter.class);
+        driver = new ReviewBackfillDriver(
+            runRepository,
+            scopeRepository,
+            submitter,
+            agentBindingRepository,
+            llmBudgetService,
+            backfillProperties
+        );
 
         workspace = WorkspaceTestFixtures.activeWorkspace("sweep-guard");
         workspace.setAccountLogin("sweeporg");
@@ -281,9 +294,10 @@ class ReviewSweepSpendGuardIntegrationTest extends BaseIntegrationTest {
 
     private long persistPullRequest(IdentityProvider provider, Repository repository, User author) {
         Instant now = Instant.now();
+        Long providerId = java.util.Objects.requireNonNull(provider.getId());
         pullRequestRepository.upsertCore(
             5201L,
-            provider.getId(),
+            providerId,
             12,
             "A change the webhook never announced",
             "Body",

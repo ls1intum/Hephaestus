@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.core.spi;
 
 import java.util.List;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Handles provisioning in response to GitHub App installation events.
@@ -14,7 +15,7 @@ public interface ProvisioningListener {
 
     void onRepositoriesRemoved(Long installationId, List<String> repositoryNames);
 
-    void onAccountRenamed(Long installationId, String oldLogin, String newLogin);
+    void onAccountRenamed(Long installationId, @Nullable String oldLogin, String newLogin);
 
     void onInstallationSuspended(Long installationId);
 
@@ -30,10 +31,10 @@ public interface ProvisioningListener {
 
     record InstallationData(
         Long installationId,
-        Long accountId,
-        String accountLogin,
+        @Nullable Long accountId,
+        @Nullable String accountLogin,
         AccountType accountType,
-        String avatarUrl,
+        @Nullable String avatarUrl,
         List<RepositorySnapshot> repositories
     ) {}
 

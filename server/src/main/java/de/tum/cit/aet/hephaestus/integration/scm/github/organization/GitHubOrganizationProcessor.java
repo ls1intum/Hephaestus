@@ -7,6 +7,8 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.Organizatio
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.OrganizationRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.github.organization.dto.GitHubOrganizationEventDTO;
 import de.tum.cit.aet.hephaestus.integration.scm.github.project.ProjectIntegrityService;
+import java.util.Objects;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -53,17 +55,18 @@ public class GitHubOrganizationProcessor {
      * @return the persisted Organization entity, or null if dto is invalid
      */
     @Transactional
-    public Organization process(GitHubOrganizationEventDTO.GitHubOrganizationDTO dto, Long providerId) {
+    public @Nullable Organization process(GitHubOrganizationEventDTO.GitHubOrganizationDTO dto, Long providerId) {
         if (dto == null || dto.id() == null || providerId == null) {
             log.warn("Skipped organization processing: reason=nullOrMissingId");
             return null;
         }
+        Long organizationId = Objects.requireNonNull(dto.id());
 
         Organization organization = organizationRepository
-            .findByNativeIdAndProviderId(dto.id(), providerId)
+            .findByNativeIdAndProviderId(organizationId, providerId)
             .orElseGet(() -> {
                 Organization org = new Organization();
-                org.setNativeId(dto.id());
+                org.setNativeId(organizationId);
                 org.setProvider(gitProviderRepository.getReferenceById(providerId));
                 return org;
             });
@@ -110,7 +113,7 @@ public class GitHubOrganizationProcessor {
      * @return the updated Organization entity, or null if not found
      */
     @Transactional
-    public Organization rename(Long nativeId, String newLogin, Long providerId) {
+    public @Nullable Organization rename(Long nativeId, String newLogin, Long providerId) {
         if (nativeId == null || newLogin == null || providerId == null) {
             log.warn("Skipped organization rename: reason=nullParameter");
             return null;

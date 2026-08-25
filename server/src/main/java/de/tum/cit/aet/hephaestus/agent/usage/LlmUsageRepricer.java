@@ -9,6 +9,7 @@ import de.tum.cit.aet.hephaestus.agent.catalog.WorkspaceLlmModel;
 import de.tum.cit.aet.hephaestus.agent.catalog.WorkspaceLlmModelRepository;
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
@@ -154,7 +155,8 @@ public class LlmUsageRepricer {
     }
 
     private Optional<LlmModelPrice> uniqueInstancePrice(UnpricedLedgerRow row) {
-        List<LlmModel> candidates = modelRepository.findByUpstreamModelId(row.model());
+        String model = Objects.requireNonNull(row.model());
+        List<LlmModel> candidates = modelRepository.findByUpstreamModelId(model);
         if (candidates.size() != 1) {
             reportAmbiguity(row, candidates.size());
             return Optional.empty();
@@ -163,9 +165,10 @@ public class LlmUsageRepricer {
     }
 
     private Optional<WorkspaceLlmModel> uniqueWorkspaceModel(UnpricedLedgerRow row) {
+        String model = Objects.requireNonNull(row.model());
         List<WorkspaceLlmModel> candidates = workspaceModelRepository.findByWorkspaceIdAndUpstreamModelId(
             row.workspaceId(),
-            row.model()
+            model
         );
         if (candidates.size() != 1) {
             reportAmbiguity(row, candidates.size());

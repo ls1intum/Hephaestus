@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.core.auth.oauth;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.time.Instant;
@@ -87,6 +88,7 @@ class OutlineAuthInfoUserServiceTest extends BaseUnitTest {
         OAuth2User user = service.loadUser(userRequest());
 
         ClientRequest request = captured.get();
+        assertNotNull(request);
         assertThat(request.method()).isEqualTo(HttpMethod.POST);
         assertThat(request.url().toString()).isEqualTo("https://wiki.example.com/api/auth.info");
         assertThat(request.headers().getFirst(HttpHeaders.AUTHORIZATION)).isEqualTo("Bearer outline-access-token");

@@ -19,6 +19,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 @Entity
 @Table(
@@ -65,7 +66,7 @@ public class Team extends BaseGitServiceEntity {
     @Column(length = 512)
     private String htmlUrl;
 
-    private Long parentId;
+    private @Nullable Long parentId;
 
     /**
      * Timestamp of the last successful sync for this team from the Git provider.

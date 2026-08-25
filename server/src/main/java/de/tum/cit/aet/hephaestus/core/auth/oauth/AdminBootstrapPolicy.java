@@ -7,6 +7,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -73,7 +74,7 @@ public class AdminBootstrapPolicy {
      * @return {@code true} iff this login matches the allowlist by stable subject OR by git login.
      *     Empty allowlist or a null registration returns {@code false} (fail-closed).
      */
-    public boolean shouldPromote(String registrationId, String subject, String login) {
+    public boolean shouldPromote(@Nullable String registrationId, @Nullable String subject, @Nullable String login) {
         if (!isConfigured() || registrationId == null) {
             return false;
         }

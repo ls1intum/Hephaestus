@@ -10,6 +10,7 @@ import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepositoryMonitorService;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceScopeFilter;
 import java.util.List;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -49,7 +50,8 @@ public class GitHubWorkspaceProvisioningAdapter implements ProvisioningListener 
             return;
         }
 
-        if (!workspaceScopeFilter.isOrganizationAllowed(installation.accountLogin())) {
+        String accountLogin = installation.accountLogin();
+        if (accountLogin == null || !workspaceScopeFilter.isOrganizationAllowed(accountLogin)) {
             log.debug(
                 "Skipped workspace provisioning: reason=organizationFiltered, accountLogin={}, installationId={}",
                 installation.accountLogin(),
@@ -111,7 +113,7 @@ public class GitHubWorkspaceProvisioningAdapter implements ProvisioningListener 
     }
 
     @Override
-    public void onInstallationDeleted(Long installationId) {
+    public void onInstallationDeleted(@Nullable Long installationId) {
         if (installationId == null) {
             log.warn("Skipped installation deletion: reason=nullInstallationId");
             return;
@@ -186,7 +188,7 @@ public class GitHubWorkspaceProvisioningAdapter implements ProvisioningListener 
     }
 
     @Override
-    public void onAccountRenamed(Long installationId, String oldLogin, String newLogin) {
+    public void onAccountRenamed(Long installationId, @Nullable String oldLogin, String newLogin) {
         if (installationId == null || newLogin == null || newLogin.isBlank()) {
             log.warn(
                 "Skipped account rename: reason=invalidData, installationId={}, oldLogin={}, newLogin={}",

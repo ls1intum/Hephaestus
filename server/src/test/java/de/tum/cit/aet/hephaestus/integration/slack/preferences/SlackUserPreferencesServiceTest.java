@@ -28,6 +28,7 @@ import de.tum.cit.aet.hephaestus.workspace.spi.WorkspaceSummaryQuery;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
@@ -195,7 +196,7 @@ class SlackUserPreferencesServiceTest extends BaseUnitTest {
     private static AccountIdentityQuery.IdentityLinkView link(
         long providerId,
         String subject,
-        String teamId,
+        @Nullable String teamId,
         String username
     ) {
         return new AccountIdentityQuery.IdentityLinkView(

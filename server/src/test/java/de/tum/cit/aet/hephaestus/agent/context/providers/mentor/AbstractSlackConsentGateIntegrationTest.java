@@ -50,8 +50,8 @@ abstract class AbstractSlackConsentGateIntegrationTest extends BaseIntegrationTe
     @Autowired
     SlackMonitoredChannelRepository slackMonitoredChannelRepository;
 
-    Workspace workspace;
-    User recipient;
+    Workspace workspace = new Workspace();
+    User recipient = new User();
 
     /** Saves the workspace + a GitHub-identity recipient user; call from each subclass's {@code @BeforeEach}. */
     void setUpWorkspaceAndRecipient(String workspaceSlug) {

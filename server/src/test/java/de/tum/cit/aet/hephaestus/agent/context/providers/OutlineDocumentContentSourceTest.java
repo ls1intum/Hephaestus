@@ -33,6 +33,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -123,8 +124,8 @@ class OutlineDocumentContentSourceTest extends BaseUnitTest {
         String slug,
         String title,
         String body,
-        String authorName,
-        Long authorMemberId
+        @Nullable String authorName,
+        @Nullable Long authorMemberId
     ) {
         return authoredDoc(collection, slug, title, body, authorName, authorMemberId, List.of());
     }
@@ -134,8 +135,8 @@ class OutlineDocumentContentSourceTest extends BaseUnitTest {
         String slug,
         String title,
         String body,
-        String authorName,
-        Long authorMemberId,
+        @Nullable String authorName,
+        @Nullable Long authorMemberId,
         List<ProjectedDocument.Collaborator> collaborators
     ) {
         return new ProjectedDocument(

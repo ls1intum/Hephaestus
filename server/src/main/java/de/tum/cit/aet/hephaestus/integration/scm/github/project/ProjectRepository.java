@@ -4,6 +4,7 @@ import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import org.jspecify.annotations.Nullable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -113,17 +114,17 @@ public interface ProjectRepository extends JpaRepository<Project, Long> {
         @Param("ownerId") Long ownerId,
         @Param("number") int number,
         @Param("title") String title,
-        @Param("shortDescription") String shortDescription,
-        @Param("readme") String readme,
+        @Param("shortDescription") @Nullable String shortDescription,
+        @Param("readme") @Nullable String readme,
         @Param("template") boolean template,
-        @Param("url") String url,
+        @Param("url") @Nullable String url,
         @Param("closed") boolean closed,
-        @Param("closedAt") Instant closedAt,
+        @Param("closedAt") @Nullable Instant closedAt,
         @Param("isPublic") boolean isPublic,
-        @Param("creatorId") Long creatorId,
+        @Param("creatorId") @Nullable Long creatorId,
         @Param("lastSyncAt") Instant lastSyncAt,
-        @Param("createdAt") Instant createdAt,
-        @Param("updatedAt") Instant updatedAt
+        @Param("createdAt") @Nullable Instant createdAt,
+        @Param("updatedAt") @Nullable Instant updatedAt
     );
 
     /**

@@ -5,6 +5,7 @@ import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
 import org.aspectj.lang.reflect.MethodSignature;
+import org.jspecify.annotations.Nullable;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.AnnotationUtils;
 import org.springframework.core.annotation.Order;
@@ -96,7 +97,7 @@ public class WorkspaceAgnosticAspect {
      * {@link WorkspaceAgnostic}. We cannot rely on the JDK proxy class itself because
      * proxy classes do not inherit interface annotations; we must inspect each interface.
      */
-    private static WorkspaceAgnostic findAnnotationOnInterfaces(Class<?> clazz) {
+    private static @Nullable WorkspaceAgnostic findAnnotationOnInterfaces(Class<?> clazz) {
         for (Class<?> iface : clazz.getInterfaces()) {
             if (!Repository.class.isAssignableFrom(iface)) continue;
             WorkspaceAgnostic ann = AnnotationUtils.findAnnotation(iface, WorkspaceAgnostic.class);

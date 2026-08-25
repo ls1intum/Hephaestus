@@ -105,7 +105,7 @@ public record PracticeDefinition(
         }
     }
 
-    private static String blankToNull(@Nullable String value) {
+    private static @Nullable String blankToNull(@Nullable String value) {
         return value == null || value.isBlank() ? null : value;
     }
 }

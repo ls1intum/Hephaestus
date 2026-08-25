@@ -50,7 +50,9 @@ class LoginProviderAdminControllerCallbackTest extends BaseUnitTest {
         request.setServerPort(443);
         RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(request));
 
-        return controller.list().getBody().getFirst().redirectUri();
+        var body = controller.list().getBody();
+        org.junit.jupiter.api.Assertions.assertNotNull(body);
+        return body.getFirst().redirectUri();
     }
 
     private static LoginProvider provider() {

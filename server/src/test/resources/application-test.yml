@@ -73,8 +73,6 @@ hephaestus:
         encryption-key: test-encryption-key-32-bytes-aes
     workspace:
         init-default: false # Disable PAT workspace bootstrap
-        # Tests exercise creation mechanics as a regular user; the ADMIN_ONLY gate is covered
-        # explicitly by WorkspaceCreationPolicyIntegrationTest via a property override.
         creation-policy: SELF_SERVICE
         # A5: keep the empty-membership ADMIN auto-seed OFF by default in tests (mirrors prod), so the
         # disabled-case test is deterministic. The enabled path is covered by a @TestPropertySource override.

@@ -11,6 +11,8 @@ import de.tum.cit.aet.hephaestus.core.auth.spi.GitProviderRegistry;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import java.time.Clock;
 import java.util.Map;
+import java.util.Objects;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -79,7 +81,7 @@ public class AccountProvisioningService {
         String registrationId,
         String subject,
         OAuth2User principal,
-        AuthIntentCookie.Intent intent
+        AuthIntentCookie.@Nullable Intent intent
     ) {
         LoginProvider provider = requireLoginProvider(registrationId);
         long providerId = gitProviderRegistry.resolveProviderId(provider.getType().name(), provider.getBaseUrl());
@@ -110,7 +112,7 @@ public class AccountProvisioningService {
                 mode == AuthIntentCookie.Intent.Mode.LINK &&
                 intent != null &&
                 intent.linkingAccountId() != null &&
-                !link.getAccount().getId().equals(intent.linkingAccountId())
+                !Objects.requireNonNull(link.getAccount().getId()).equals(intent.linkingAccountId())
             ) {
                 throw new AccountLinkConflictException(registrationId, subject, link.getAccount().getId());
             }
@@ -231,7 +233,12 @@ public class AccountProvisioningService {
      * (so {@code admin} lands on the first token, not the second). Never demotes — demotion stays a
      * deliberate {@code /admin/users} action.
      */
-    private Account promoteIfBootstrapAdmin(Account account, String registrationId, String subject, String login) {
+    private Account promoteIfBootstrapAdmin(
+        Account account,
+        String registrationId,
+        String subject,
+        @Nullable String login
+    ) {
         if (
             account.getAppRole() != Account.AppRole.APP_ADMIN &&
             adminBootstrapPolicy.shouldPromote(registrationId, subject, login)
@@ -248,7 +255,7 @@ public class AccountProvisioningService {
     }
 
     /** Git login the user authenticated with — the value matched by {@code provider:@username} entries. */
-    private static String loginOf(OAuth2User principal) {
+    private static @Nullable String loginOf(OAuth2User principal) {
         return stringAttr(principal, "login", "preferred_username", "username");
     }
 
@@ -256,7 +263,7 @@ public class AccountProvisioningService {
         Account account,
         long providerId,
         String subject,
-        String teamId,
+        @Nullable String teamId,
         OAuth2User principal
     ) {
         IdentityLink link = new IdentityLink();
@@ -277,7 +284,7 @@ public class AccountProvisioningService {
         return (name != null && !name.isBlank()) ? name : "user-" + subject;
     }
 
-    private static String email(OAuth2User principal) {
+    private static @Nullable String email(OAuth2User principal) {
         return stringAttr(principal, "email");
     }
 
@@ -288,7 +295,7 @@ public class AccountProvisioningService {
      * ({@code OutlineAuthInfoUserService} flattens {@code data.team.id} onto it). Kept general: any future
      * multi-tenant IdP that emits a {@code team_id}/{@code tenant_id} claim keys correctly without a special case.
      */
-    private static String teamIdOf(OAuth2User principal) {
+    private static @Nullable String teamIdOf(OAuth2User principal) {
         String flat = stringAttr(principal, "https://slack.com/team_id", "team_id", "tenant_id", "tid");
         if (flat != null) {
             return flat;
@@ -303,7 +310,7 @@ public class AccountProvisioningService {
         return null;
     }
 
-    private static String stringAttr(OAuth2User principal, String... keys) {
+    private static @Nullable String stringAttr(OAuth2User principal, String... keys) {
         Map<String, Object> attrs = principal.getAttributes();
         for (String k : keys) {
             if (attrs.get(k) instanceof String s && !s.isBlank()) {

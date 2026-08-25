@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.agent.context;
 import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
 import de.tum.cit.aet.hephaestus.evidence.ArtifactSourceManifest;
 import de.tum.cit.aet.hephaestus.evidence.PracticeSubjectCheck;
+import de.tum.cit.aet.hephaestus.evidence.SourceArtifact;
 import de.tum.cit.aet.hephaestus.evidence.SourceCapture;
 import de.tum.cit.aet.hephaestus.evidence.SourceCaptureState;
 import de.tum.cit.aet.hephaestus.evidence.SourceCompleteness;
@@ -119,13 +120,13 @@ public class PracticeSubjectEvaluator {
             return SubjectFinding.UNDECIDABLE;
         }
         String fileName = fileNameOf(collection);
-        byte[] bytes = capture
+        SourceArtifact artifact = capture
             .artifacts()
             .stream()
-            .filter(artifact -> artifact.path().endsWith(fileName))
+            .filter(candidate -> candidate.path().endsWith(fileName))
             .findFirst()
-            .map(artifact -> staged.get(artifact.path()))
             .orElse(null);
+        byte@Nullable [] bytes = artifact == null ? null : staged.get(artifact.path());
         if (bytes == null || bytes.length == 0) {
             return SubjectFinding.UNDECIDABLE;
         }

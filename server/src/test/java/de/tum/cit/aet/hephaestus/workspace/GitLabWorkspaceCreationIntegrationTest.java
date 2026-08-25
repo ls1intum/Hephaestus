@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.workspace;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
 import de.tum.cit.aet.hephaestus.core.auth.domain.AccountRepository;
@@ -20,17 +21,16 @@ import java.util.List;
 import java.util.Objects;
 import java.util.function.Consumer;
 import org.assertj.core.api.InstanceOfAssertFactories;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
-import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.reactive.server.WebTestClient;
 
 @DisplayName("GitLab workspace creation integration")
-@TestPropertySource(properties = "hephaestus.features.flags.gitlab-workspace-creation=true")
 class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     @Autowired
@@ -63,11 +63,11 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
         IdentityProvider gitlab = ensureGitLabProvider();
         IdentityLink link = new IdentityLink();
         link.setAccount(account);
-        link.setProviderId(gitlab.getId());
-        link.setSubject(String.valueOf(70_000 + account.getId())); // numeric GitLab native id
+        link.setProviderId(persistedId(gitlab.getId()));
+        link.setSubject(String.valueOf(70_000 + persistedId(account.getId())));
         link.setUsernameAtSignup(login);
         identityLinkRepository.save(link);
-        String token = "mock-jwt-sub-" + account.getId();
+        String token = "mock-jwt-sub-" + persistedId(account.getId());
         return headers -> headers.setBearerAuth(token);
     }
 
@@ -82,20 +82,23 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
     private GitLabCaller gitLabCallerWithMirror(String login) {
         Account account = accountRepository.save(new Account(login));
         IdentityProvider gitlab = ensureGitLabProvider();
-        long nativeId = 70_000 + account.getId();
+        long nativeId = 70_000 + persistedId(account.getId());
         // The SCM mirror's login MUST equal the token's preferred_username, because the current user is
         // resolved by login (SecurityUtils.getCurrentUserLogin → UserRepository.findByLogin). The
         // mock-jwt-sub-<id> token sets preferred_username = "account-<id>".
-        String scmLogin = "account-" + account.getId();
+        String scmLogin = "account-" + persistedId(account.getId());
         User scmUser = TestUserFactory.ensureUser(userRepository, scmLogin, nativeId, gitlab);
         IdentityLink link = new IdentityLink();
         link.setAccount(account);
-        link.setProviderId(gitlab.getId());
+        link.setProviderId(persistedId(gitlab.getId()));
         link.setSubject(String.valueOf(nativeId));
         link.setUsernameAtSignup(scmLogin);
-        link.setExternalActorId(scmUser.getId());
+        link.setExternalActorId(persistedId(scmUser.getId()));
         identityLinkRepository.save(link);
-        return new GitLabCaller(headers -> headers.setBearerAuth("mock-jwt-sub-" + account.getId()), scmUser);
+        return new GitLabCaller(
+            headers -> headers.setBearerAuth("mock-jwt-sub-" + persistedId(account.getId())),
+            scmUser
+        );
     }
 
     @Test
@@ -108,7 +111,7 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
             "My GitLab Workspace",
             "my-group/my-project",
             AccountType.ORG,
-            owner.getId(),
+            persistedId(owner.getId()),
             IntegrationKind.GITLAB,
             "glpat-test-token-12345",
             "https://gitlab.example.com"
@@ -155,7 +158,7 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
             "Default GitLab",
             "my-group",
             AccountType.ORG,
-            owner.getId(),
+            persistedId(owner.getId()),
             IntegrationKind.GITLAB,
             "glpat-test-token-67890",
             null
@@ -189,7 +192,7 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
             "No Token",
             "my-group",
             AccountType.ORG,
-            owner.getId(),
+            persistedId(owner.getId()),
             IntegrationKind.GITLAB,
             null, // missing token
             null
@@ -210,6 +213,7 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
 
         assertThat(problem).isNotNull();
         assertThat(problem.getTitle()).isEqualTo("Validation failed");
+        assertNotNull(problem.getProperties());
         assertThat(problem.getProperties().get("errors"))
             .asInstanceOf(InstanceOfAssertFactories.map(String.class, Object.class))
             .containsKey("tokenProvided");
@@ -227,7 +231,7 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
             "HTTP GitLab",
             "my-group",
             AccountType.ORG,
-            owner.getId(),
+            persistedId(owner.getId()),
             IntegrationKind.GITLAB,
             "glpat-test-token",
             "http://insecure.example.com" // not HTTPS
@@ -248,6 +252,7 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
 
         assertThat(problem).isNotNull();
         assertThat(problem.getTitle()).isEqualTo("Validation failed");
+        assertNotNull(problem.getProperties());
         assertThat(problem.getProperties().get("errors"))
             .asInstanceOf(InstanceOfAssertFactories.map(String.class, Object.class))
             .containsKey("serverUrlSafe");
@@ -265,7 +270,7 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
             "Owner Test",
             "owner-group",
             AccountType.ORG,
-            owner.getId(),
+            persistedId(owner.getId()),
             IntegrationKind.GITLAB,
             "glpat-owner-token",
             null
@@ -287,7 +292,7 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
         WorkspaceDTO workspace = Objects.requireNonNull(created);
 
         var membership = workspaceMembershipRepository
-            .findByWorkspace_IdAndUser_Id(workspace.id(), owner.getId())
+            .findByWorkspace_IdAndUser_Id(workspace.id(), persistedId(owner.getId()))
             .orElseThrow(() -> new AssertionError("Owner membership not created"));
         assertThat(membership.getRole()).isEqualTo(WorkspaceMembership.WorkspaceRole.OWNER);
     }
@@ -303,7 +308,7 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
             "Secret Test",
             "secret-group",
             AccountType.ORG,
-            owner.getId(),
+            persistedId(owner.getId()),
             IntegrationKind.GITLAB,
             secretToken,
             null
@@ -382,7 +387,7 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
                 "Lifecycle Test",
                 "lifecycle-group",
                 AccountType.ORG,
-                owner.getId(),
+                persistedId(owner.getId()),
                 IntegrationKind.GITLAB,
                 "glpat-lifecycle-token",
                 null
@@ -395,17 +400,22 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
 
         // Suspend
         workspaceLifecycleService.suspendWorkspace(workspace.getWorkspaceSlug());
-        Workspace suspended = workspaceRepository.findById(workspace.getId()).orElseThrow();
+        Workspace suspended = workspaceRepository.findById(persistedId(workspace.getId())).orElseThrow();
         assertThat(suspended.getStatus()).isEqualTo(Workspace.WorkspaceStatus.SUSPENDED);
 
         // Resume
         workspaceLifecycleService.resumeWorkspace(workspace.getWorkspaceSlug());
-        Workspace resumed = workspaceRepository.findById(workspace.getId()).orElseThrow();
+        Workspace resumed = workspaceRepository.findById(persistedId(workspace.getId())).orElseThrow();
         assertThat(resumed.getStatus()).isEqualTo(Workspace.WorkspaceStatus.ACTIVE);
 
         // Purge
         workspaceLifecycleService.purgeWorkspace(workspace.getWorkspaceSlug());
-        Workspace purged = workspaceRepository.findById(workspace.getId()).orElseThrow();
+        Workspace purged = workspaceRepository.findById(persistedId(workspace.getId())).orElseThrow();
         assertThat(purged.getStatus()).isEqualTo(Workspace.WorkspaceStatus.PURGED);
+    }
+
+    private static long persistedId(@Nullable Long id) {
+        assertNotNull(id);
+        return id;
     }
 }

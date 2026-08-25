@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.workspace.context;
 
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.springframework.core.MethodParameter;
 import org.springframework.web.bind.support.WebDataBinderFactory;
 import org.springframework.web.context.request.NativeWebRequest;
@@ -43,9 +44,9 @@ public class WorkspaceContextArgumentResolver implements HandlerMethodArgumentRe
     @Override
     public Object resolveArgument(
         @NonNull MethodParameter parameter,
-        ModelAndViewContainer mavContainer,
+        @Nullable ModelAndViewContainer mavContainer,
         @NonNull NativeWebRequest webRequest,
-        WebDataBinderFactory binderFactory
+        @Nullable WebDataBinderFactory binderFactory
     ) {
         WorkspaceContext context = WorkspaceContextHolder.getContext();
         if (context == null) {

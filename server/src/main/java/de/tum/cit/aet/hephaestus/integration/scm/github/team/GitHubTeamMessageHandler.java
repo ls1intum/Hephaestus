@@ -19,6 +19,8 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.team.permission.TeamRepo
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubEventAction;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubEventType;
 import de.tum.cit.aet.hephaestus.integration.scm.github.team.dto.GitHubTeamEventDTO;
+import java.util.Objects;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -91,12 +93,16 @@ public class GitHubTeamMessageHandler extends AbstractIntegrationMessageHandler<
     void routeTeamEvent(GitHubTeamEventDTO event) {
         var teamDto = event.team();
 
-        if (teamDto == null) {
+        if (teamDto == null || teamDto.id() == null) {
             log.warn("Received team event with missing data: action={}", event.action());
             return;
         }
 
         String orgLogin = event.organization() != null ? event.organization().login() : null;
+        if (orgLogin == null) {
+            log.warn("Received team event with missing organization: action={}", event.action());
+            return;
+        }
 
         log.debug(
             "Received team event: action={}, teamName={}, orgLogin={}",
@@ -105,7 +111,7 @@ public class GitHubTeamMessageHandler extends AbstractIntegrationMessageHandler<
             orgLogin != null ? sanitizeForLog(orgLogin) : "unknown"
         );
 
-        Long scopeId = orgLogin != null ? scopeIdResolver.findScopeIdByOrgLogin(orgLogin).orElse(null) : null;
+        Long scopeId = scopeIdResolver.findScopeIdByOrgLogin(orgLogin).orElse(null);
         if (scopeId == null) {
             log.debug("Skipped team event: reason=noAssociatedScope, orgLogin={}", sanitizeForLog(orgLogin));
             return;
@@ -137,9 +143,9 @@ public class GitHubTeamMessageHandler extends AbstractIntegrationMessageHandler<
             return;
         }
 
-        Long providerId = provider.getId();
+        Long providerId = Objects.requireNonNull(provider.getId());
 
-        var teamOpt = teamRepository.findByNativeIdAndProviderId(teamDto.id(), providerId);
+        var teamOpt = teamRepository.findByNativeIdAndProviderId(Objects.requireNonNull(teamDto.id()), providerId);
         if (teamOpt.isEmpty()) {
             log.debug(
                 "Skipped added_to_repository: reason=teamNotFound, teamNativeId={}, teamName={}",
@@ -201,9 +207,9 @@ public class GitHubTeamMessageHandler extends AbstractIntegrationMessageHandler<
             return;
         }
 
-        Long providerId = provider.getId();
+        Long providerId = Objects.requireNonNull(provider.getId());
 
-        var teamOpt = teamRepository.findByNativeIdAndProviderId(teamDto.id(), providerId);
+        var teamOpt = teamRepository.findByNativeIdAndProviderId(Objects.requireNonNull(teamDto.id()), providerId);
         if (teamOpt.isEmpty()) {
             log.debug(
                 "Skipped removed_from_repository: reason=teamNotFound, teamNativeId={}, teamName={}",
@@ -251,7 +257,7 @@ public class GitHubTeamMessageHandler extends AbstractIntegrationMessageHandler<
      * push}, {@code maintain}, {@code admin}), not the GraphQL enum ({@code READ}, {@code TRIAGE},
      * {@code WRITE}, {@code MAINTAIN}, {@code ADMIN}) used elsewhere.
      */
-    private static TeamRepositoryPermission.PermissionLevel mapWebhookPermission(String permission) {
+    private static TeamRepositoryPermission.PermissionLevel mapWebhookPermission(@Nullable String permission) {
         if (permission == null) {
             return TeamRepositoryPermission.PermissionLevel.READ;
         }

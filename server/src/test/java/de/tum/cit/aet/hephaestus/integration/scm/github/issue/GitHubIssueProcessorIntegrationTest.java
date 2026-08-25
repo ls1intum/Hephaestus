@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.scm.github.issue;
 
 import static org.assertj.core.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
@@ -232,7 +233,7 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
             Issue result = processor.process(dto, createContext());
 
             // Then - should use databaseId
-            assertThat(result).isNotNull();
+            assertNotNull(result);
             assertThat(result.getNativeId()).isEqualTo(databaseId);
             assertThat(issueRepository.findByRepositoryIdAndNumber(testRepository.getId(), 1)).isPresent();
         }
@@ -271,7 +272,7 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
             Issue result = processor.process(dto, createContext());
 
             // Then - should use id as fallback
-            assertThat(result).isNotNull();
+            assertNotNull(result);
             assertThat(result.getNativeId()).isEqualTo(webhookId);
             assertThat(issueRepository.findByRepositoryIdAndNumber(testRepository.getId(), 20)).isPresent();
         }
@@ -326,12 +327,12 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
             Issue result = processor.process(dto, createContext());
 
             // Then - verify issue created
-            assertThat(result).isNotNull();
+            assertNotNull(result);
             assertThat(result.getNativeId()).isEqualTo(issueId);
             assertThat(result.getNumber()).isEqualTo(20);
             assertThat(result.getTitle()).isEqualTo("Test Issue #20");
             assertThat(result.getState()).isEqualTo(Issue.State.OPEN);
-            assertThat(result.getRepository().getNativeId()).isEqualTo(FIXTURE_REPO_ID);
+            assertThat(result.requireRepository().getNativeId()).isEqualTo(FIXTURE_REPO_ID);
 
             // Verify persisted
             assertThat(issueRepository.findByRepositoryIdAndNumber(testRepository.getId(), 20)).isPresent();
@@ -349,19 +350,18 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
         @Test
         void shouldCreateAuthorIfNotExists() {
             // Given - no user exists
-            assertThat(userRepository.findByNativeIdAndProviderId(FIXTURE_AUTHOR_ID, githubProvider.getId())).isEmpty();
+            assertThat(userRepository.findByNativeIdAndProviderId(FIXTURE_AUTHOR_ID, providerId())).isEmpty();
 
             Long issueId = 111222333L;
             GitHubIssueDTO dto = createBasicIssueDto(issueId, 1);
 
             Issue result = processor.process(dto, createContext());
+            assertNotNull(result);
 
             assertThat(result.getAuthor()).isNotNull();
             assertThat(result.getAuthor().getNativeId()).isEqualTo(FIXTURE_AUTHOR_ID);
             assertThat(result.getAuthor().getLogin()).isEqualTo(FIXTURE_AUTHOR_LOGIN);
-            assertThat(
-                userRepository.findByNativeIdAndProviderId(FIXTURE_AUTHOR_ID, githubProvider.getId())
-            ).isPresent();
+            assertThat(userRepository.findByNativeIdAndProviderId(FIXTURE_AUTHOR_ID, providerId())).isPresent();
         }
 
         @Test
@@ -380,8 +380,10 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
             GitHubIssueDTO dto = createBasicIssueDto(issueId, 2);
 
             Issue result = processor.process(dto, createContext());
+            assertNotNull(result);
 
             // Then - should reuse existing user, not create new
+            assertNotNull(result.getAuthor());
             assertThat(result.getAuthor().getNativeId()).isEqualTo(FIXTURE_AUTHOR_ID);
             assertThat(userRepository.count()).isEqualTo(userCountBefore);
         }
@@ -414,6 +416,7 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
             );
 
             Issue result = processor.process(dto, createContext());
+            assertNotNull(result);
 
             assertThat(result.getBody()).isNull();
         }
@@ -447,7 +450,7 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
 
             Issue result = processor.process(dto, createContext());
 
-            assertThat(result).isNotNull();
+            assertNotNull(result);
             assertThat(result.getAuthor()).isNull();
         }
 
@@ -481,10 +484,11 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
             );
 
             Issue result = processor.process(dto, createContext());
+            assertNotNull(result);
 
             assertThat(result.getLabels()).hasSize(1);
             assertThat(result.getLabels().iterator().next().getName()).isEqualTo("bug");
-            assertThat(labelRepository.findByNativeIdAndProviderId(labelId, githubProvider.getId())).isPresent();
+            assertThat(labelRepository.findByNativeIdAndProviderId(labelId, providerId())).isPresent();
         }
 
         @Test
@@ -525,10 +529,11 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
             );
 
             Issue result = processor.process(dto, createContext());
+            assertNotNull(result);
 
             assertThat(result.getAssignees()).hasSize(1);
             assertThat(result.getAssignees().iterator().next().getLogin()).isEqualTo("assignee1");
-            assertThat(userRepository.findByNativeIdAndProviderId(assigneeId, githubProvider.getId())).isPresent();
+            assertThat(userRepository.findByNativeIdAndProviderId(assigneeId, providerId())).isPresent();
         }
 
         @Test
@@ -574,12 +579,11 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
             );
 
             Issue result = processor.process(dto, createContext());
+            assertNotNull(result);
 
             assertThat(result.getMilestone()).isNotNull();
             assertThat(result.getMilestone().getTitle()).isEqualTo("Webhook Fixtures");
-            assertThat(
-                milestoneRepository.findByNativeIdAndProviderId(milestoneId, githubProvider.getId())
-            ).isPresent();
+            assertThat(milestoneRepository.findByNativeIdAndProviderId(milestoneId, providerId())).isPresent();
         }
     }
 
@@ -630,6 +634,7 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
             );
 
             Issue result = processor.process(dto, createContext());
+            assertNotNull(result);
 
             // Then - verify issue updated
             assertThat(result.getTitle()).isEqualTo("New Title");
@@ -775,6 +780,7 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
             );
 
             Issue result = processor.process(dto, createContext());
+            assertNotNull(result);
 
             assertThat(result.getMilestone()).isNotNull();
             assertThat(eventListener.ofType(ScmDomainEvent.IssueUpdated.class))
@@ -836,6 +842,7 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
             );
 
             Issue result = processor.process(dto, createContext());
+            assertNotNull(result);
 
             assertThat(result.getMilestone()).isNull();
             assertThat(eventListener.ofType(ScmDomainEvent.IssueUpdated.class))
@@ -877,6 +884,7 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
             );
 
             Issue result = processor.processClosed(dto, createContext());
+            assertNotNull(result);
 
             assertThat(result.getState()).isEqualTo(Issue.State.CLOSED);
             assertThat(result.getStateReason()).isEqualTo(Issue.StateReason.COMPLETED);
@@ -932,6 +940,7 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
             );
 
             Issue result = processor.processReopened(dto, createContext());
+            assertNotNull(result);
 
             assertThat(result.getState()).isEqualTo(Issue.State.OPEN);
 
@@ -969,6 +978,7 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
             );
 
             Issue result = processor.processClosed(dto, createContext());
+            assertNotNull(result);
 
             assertThat(result.getStateReason()).isEqualTo(Issue.StateReason.NOT_PLANNED);
         }
@@ -1074,6 +1084,7 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
             );
 
             Issue result = processor.processTyped(issueDto, typeDto, FIXTURE_ORG_LOGIN, createContext());
+            assertNotNull(result);
 
             assertThat(result.getIssueType()).isNotNull();
             assertThat(result.getIssueType().getName()).isEqualTo("Task");
@@ -1117,6 +1128,7 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
             GitHubIssueDTO issueDto = createBasicIssueDto(issueId, 20);
 
             Issue result = processor.processUntyped(issueDto, createContext());
+            assertNotNull(result);
 
             assertThat(result.getIssueType()).isNull();
 
@@ -1124,6 +1136,7 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
                 .hasSize(1)
                 .first()
                 .satisfies(event -> {
+                    assertNotNull(event.previousType());
                     assertThat(event.previousType().name()).isEqualTo("Bug");
                     assertThat(event.issue().id()).isEqualTo(result.getId());
                 });
@@ -1302,6 +1315,7 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
             );
 
             Issue result = processor.process(dto, createContext());
+            assertNotNull(result);
 
             assertThat(result.getState()).isEqualTo(Issue.State.OPEN);
         }
@@ -1334,6 +1348,7 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
             );
 
             Issue result = processor.process(dto, createContext());
+            assertNotNull(result);
 
             assertThat(result.getState()).isEqualTo(Issue.State.OPEN);
         }
@@ -1366,6 +1381,7 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
             );
 
             Issue result = processor.process(dto, createContext());
+            assertNotNull(result);
 
             assertThat(result.getStateReason()).isEqualTo(Issue.StateReason.UNKNOWN);
         }
@@ -1398,6 +1414,7 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
             );
 
             Issue result = processor.process(dto, createContext());
+            assertNotNull(result);
 
             assertThat(result.getAssignees()).isEmpty();
         }
@@ -1430,8 +1447,15 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
             );
 
             Issue result = processor.process(dto, createContext());
+            assertNotNull(result);
 
             assertThat(result.getLabels()).isEmpty();
         }
+    }
+
+    private Long providerId() {
+        Long id = githubProvider.getId();
+        assertNotNull(id);
+        return id;
     }
 }

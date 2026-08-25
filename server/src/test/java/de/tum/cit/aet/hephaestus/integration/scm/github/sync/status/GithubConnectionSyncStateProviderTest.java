@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.integration.scm.github.sync.status;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.tuple;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.Mockito.when;
 
@@ -194,7 +195,7 @@ class GithubConnectionSyncStateProviderTest extends BaseUnitTest {
             // The configured cron fires daily at 03:00: assert the actual next occurrence, not merely
             // "in the future" (which any future instant, e.g. now+1s, would satisfy).
             Instant next = details.nextScheduledSyncAt();
-            assertThat(next).isNotNull();
+            assertNotNull(next);
             ZonedDateTime fire = next.atZone(ZoneId.systemDefault());
             assertThat(fire.getHour()).isEqualTo(3);
             assertThat(fire.getMinute()).isZero();
@@ -248,6 +249,7 @@ class GithubConnectionSyncStateProviderTest extends BaseUnitTest {
 
             ConnectionSyncDetails details = provider(schedulerProperties(true)).describe(ref, CONNECTION_ID);
 
+            assertNotNull(details.backfill());
             assertThat(details.backfill().state()).isEqualTo("NOT_STARTED");
             assertThat(details.backfill().percent()).isNull();
         }
@@ -265,6 +267,7 @@ class GithubConnectionSyncStateProviderTest extends BaseUnitTest {
 
             ConnectionSyncDetails details = provider(schedulerProperties(true)).describe(ref, CONNECTION_ID);
 
+            assertNotNull(details.backfill());
             assertThat(details.backfill().state()).isEqualTo("COMPLETE");
             assertThat(details.backfill().percent()).isEqualTo(100);
         }
@@ -282,6 +285,7 @@ class GithubConnectionSyncStateProviderTest extends BaseUnitTest {
 
             ConnectionSyncDetails details = provider(schedulerProperties(true)).describe(ref, CONNECTION_ID);
 
+            assertNotNull(details.backfill());
             assertThat(details.backfill().state()).isEqualTo("IN_PROGRESS");
             assertThat(details.backfill().percent()).isEqualTo(75);
         }

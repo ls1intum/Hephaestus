@@ -96,7 +96,7 @@ class AchievementRecalculationServiceTest extends BaseUnitTest {
                 var callback = invocation.getArgument(0);
                 @SuppressWarnings("unchecked")
                 var typedCallback = (TransactionCallback<Object>) callback;
-                return typedCallback.doInTransaction(null);
+                return typedCallback.doInTransaction(mock(org.springframework.transaction.TransactionStatus.class));
             });
 
             // Return a single slice with 2 events (no next page)
@@ -127,7 +127,7 @@ class AchievementRecalculationServiceTest extends BaseUnitTest {
                 var callback = invocation.getArgument(0);
                 @SuppressWarnings("unchecked")
                 var typedCallback = (TransactionCallback<Object>) callback;
-                return typedCallback.doInTransaction(null);
+                return typedCallback.doInTransaction(mock(org.springframework.transaction.TransactionStatus.class));
             });
 
             when(

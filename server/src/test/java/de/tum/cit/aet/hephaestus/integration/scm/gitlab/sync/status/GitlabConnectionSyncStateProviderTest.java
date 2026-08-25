@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.integration.scm.gitlab.sync.status;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.tuple;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
@@ -32,6 +33,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Tag;
@@ -74,10 +76,10 @@ class GitlabConnectionSyncStateProviderTest extends BaseUnitTest {
             7,
             "0 0 3 * * *",
             15,
-            null,
-            null,
-            null,
-            null
+            new SyncSchedulerProperties.BackfillProperties(false, 50, 100, 60),
+            new SyncSchedulerProperties.FilterProperties(Set.of(), Set.of(), Set.of()),
+            new SyncSchedulerProperties.DiscussionsProperties(false),
+            new SyncSchedulerProperties.ProjectsProperties(false)
         );
         provider = new GitlabConnectionSyncStateProvider(
             connectionService,
@@ -173,7 +175,16 @@ class GitlabConnectionSyncStateProviderTest extends BaseUnitTest {
             GitlabConnectionSyncStateProvider brokenCron = new GitlabConnectionSyncStateProvider(
                 connectionService,
                 rateLimitTrackerProvider,
-                new SyncSchedulerProperties(true, 7, "not a cron", 15, null, null, null, null),
+                new SyncSchedulerProperties(
+                    true,
+                    7,
+                    "not a cron",
+                    15,
+                    new SyncSchedulerProperties.BackfillProperties(false, 50, 100, 60),
+                    new SyncSchedulerProperties.FilterProperties(Set.of(), Set.of(), Set.of()),
+                    new SyncSchedulerProperties.DiscussionsProperties(false),
+                    new SyncSchedulerProperties.ProjectsProperties(false)
+                ),
                 repositoryToMonitorRepository,
                 repositoryRepository,
                 countReader
@@ -222,6 +233,7 @@ class GitlabConnectionSyncStateProviderTest extends BaseUnitTest {
 
             ConnectionSyncDetails details = backfillEnabledProvider().describe(ref, CONNECTION_ID);
 
+            assertNotNull(details.backfill());
             assertThat(details.backfill().state()).isEqualTo("NOT_STARTED");
             assertThat(details.backfill().percent()).isNull();
         }
@@ -238,6 +250,7 @@ class GitlabConnectionSyncStateProviderTest extends BaseUnitTest {
 
             ConnectionSyncDetails details = backfillEnabledProvider().describe(ref, CONNECTION_ID);
 
+            assertNotNull(details.backfill());
             assertThat(details.backfill().state()).isEqualTo("COMPLETE");
             assertThat(details.backfill().percent()).isEqualTo(100);
         }
@@ -255,6 +268,7 @@ class GitlabConnectionSyncStateProviderTest extends BaseUnitTest {
 
             ConnectionSyncDetails details = backfillEnabledProvider().describe(ref, CONNECTION_ID);
 
+            assertNotNull(details.backfill());
             assertThat(details.backfill().state()).isEqualTo("IN_PROGRESS");
             assertThat(details.backfill().percent()).isEqualTo(75);
         }
@@ -286,7 +300,7 @@ class GitlabConnectionSyncStateProviderTest extends BaseUnitTest {
             return m;
         }
 
-        private ConnectionConfig.GitLabConfig gitLabConfig(Long webhookId) {
+        private ConnectionConfig.GitLabConfig gitLabConfig(@Nullable Long webhookId) {
             return new ConnectionConfig.GitLabConfig(
                 "https://gitlab.com",
                 1L,

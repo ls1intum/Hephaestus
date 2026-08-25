@@ -9,6 +9,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.env.YamlPropertySourceLoader;
 import org.springframework.core.env.PropertySource;
@@ -126,7 +127,7 @@ class NoPerRequestAccessLogTest extends BaseUnitTest {
             .count();
     }
 
-    private static String propertyIn(Path yaml, String key) throws IOException {
+    private static @Nullable String propertyIn(Path yaml, String key) throws IOException {
         return new YamlPropertySourceLoader()
             .load(yaml.toString(), new FileSystemResource(yaml))
             .stream()

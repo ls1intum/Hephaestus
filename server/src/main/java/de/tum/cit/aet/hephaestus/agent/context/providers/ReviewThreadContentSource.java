@@ -18,6 +18,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.annotation.Order;
@@ -265,7 +266,7 @@ public class ReviewThreadContentSource implements EvidenceSource {
         return node;
     }
 
-    private static String mergeState(PullRequest pullRequest) {
+    private static String mergeState(@Nullable PullRequest pullRequest) {
         if (pullRequest == null) {
             return "UNKNOWN";
         }
@@ -279,7 +280,7 @@ public class ReviewThreadContentSource implements EvidenceSource {
         return "UNKNOWN";
     }
 
-    private static String login(User user) {
+    private static @Nullable String login(@Nullable User user) {
         if (user == null) {
             return null;
         }

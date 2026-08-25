@@ -9,4 +9,5 @@
  * state and its reason, and never its text ({@code ReviewFeedbackQueryService}, {@code FeedbackRepository}).
  * That direction is reversible; the other one is not.
  */
+@org.jspecify.annotations.NullMarked
 package de.tum.cit.aet.hephaestus.agent.handler.inapp;

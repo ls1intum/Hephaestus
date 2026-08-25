@@ -21,6 +21,7 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -143,18 +144,20 @@ public class PracticeReviewCoverageService {
             boolean afterRepository = proposed.repositoryMode() == ReviewRepositoryMode.ALL_MONITORED || after != null;
             if (afterRepository && !beforeRepository) return true;
             if (!afterRepository || !beforeRepository) continue;
-            boolean beforeAllBranches =
-                current.repositoryMode() == ReviewRepositoryMode.ALL_MONITORED || before.baseBranches().isEmpty();
-            boolean afterAllBranches =
-                proposed.repositoryMode() == ReviewRepositoryMode.ALL_MONITORED || after.baseBranches().isEmpty();
-            if (!beforeAllBranches && afterAllBranches) return true;
+            // An empty list is how "every branch" is spelled, which is also what an all-monitored mode means.
+            List<String> beforeBranches =
+                current.repositoryMode() == ReviewRepositoryMode.ALL_MONITORED || before == null
+                    ? List.of()
+                    : before.baseBranches();
+            List<String> afterBranches =
+                proposed.repositoryMode() == ReviewRepositoryMode.ALL_MONITORED || after == null
+                    ? List.of()
+                    : after.baseBranches();
+            if (!beforeBranches.isEmpty() && afterBranches.isEmpty()) return true;
             if (
-                !beforeAllBranches &&
-                !afterAllBranches &&
-                after
-                    .baseBranches()
-                    .stream()
-                    .anyMatch(branch -> !before.baseBranches().contains(branch))
+                !beforeBranches.isEmpty() &&
+                !afterBranches.isEmpty() &&
+                afterBranches.stream().anyMatch(branch -> !beforeBranches.contains(branch))
             ) return true;
         }
         for (WorkspaceMembership membership : eligibleMemberships(workspaceId)) {
@@ -164,7 +167,7 @@ public class PracticeReviewCoverageService {
         return false;
     }
 
-    private static ReviewRepositoryTarget selected(WorkspaceReviewScope scope, String nameWithOwner) {
+    private static @Nullable ReviewRepositoryTarget selected(WorkspaceReviewScope scope, String nameWithOwner) {
         return scope
             .repositories()
             .stream()
@@ -176,9 +179,9 @@ public class PracticeReviewCoverageService {
     @Transactional(readOnly = true)
     public boolean admits(
         Workspace workspace,
-        String repositoryNameWithOwner,
-        String baseBranch,
-        ReviewSubject subject
+        @Nullable String repositoryNameWithOwner,
+        @Nullable String baseBranch,
+        @Nullable ReviewSubject subject
     ) {
         return readAssessment(workspace, repositoryNameWithOwner, baseBranch, subject, true).admitted();
     }
@@ -186,9 +189,9 @@ public class PracticeReviewCoverageService {
     @Transactional(readOnly = true)
     public boolean admits(
         Workspace workspace,
-        String repositoryNameWithOwner,
-        String baseBranch,
-        ReviewSubject subject,
+        @Nullable String repositoryNameWithOwner,
+        @Nullable String baseBranch,
+        @Nullable ReviewSubject subject,
         boolean branchRestrictionsApply
     ) {
         return readAssessment(
@@ -203,9 +206,9 @@ public class PracticeReviewCoverageService {
     @Transactional(readOnly = true)
     public CoverageAssessment assess(
         Workspace workspace,
-        String repositoryNameWithOwner,
-        String baseBranch,
-        ReviewSubject subject,
+        @Nullable String repositoryNameWithOwner,
+        @Nullable String baseBranch,
+        @Nullable ReviewSubject subject,
         boolean branchRestrictionsApply
     ) {
         return readAssessment(workspace, repositoryNameWithOwner, baseBranch, subject, branchRestrictionsApply);
@@ -213,9 +216,9 @@ public class PracticeReviewCoverageService {
 
     private CoverageAssessment readAssessment(
         Workspace workspace,
-        String repositoryNameWithOwner,
-        String baseBranch,
-        ReviewSubject subject,
+        @Nullable String repositoryNameWithOwner,
+        @Nullable String baseBranch,
+        @Nullable ReviewSubject subject,
         boolean branchRestrictionsApply
     ) {
         WorkspaceReviewScope scope = readScope(workspace);
@@ -242,10 +245,13 @@ public class PracticeReviewCoverageService {
             repositoryMatched &&
             (!branchRestrictionsApply ||
                 scope.repositoryMode() == ReviewRepositoryMode.ALL_MONITORED ||
+                selectedRepository == null ||
                 selectedRepository.baseBranches().isEmpty() ||
                 (baseBranch != null && selectedRepository.baseBranches().contains(baseBranch)));
         boolean personMatched =
-            subjectStatus == SubjectStatus.RESOLVED_LINKED_HUMAN && scope.admitsPerson(subject.actorId());
+            subjectStatus == SubjectStatus.RESOLVED_LINKED_HUMAN &&
+            subject != null &&
+            scope.admitsPerson(subject.actorId());
         return new CoverageAssessment(
             scope.repositoryMode(),
             scope.personMode(),
@@ -314,12 +320,12 @@ public class PracticeReviewCoverageService {
                         throw new InvalidReviewCoverageException("A base branch must not exceed 255 characters");
                     }
                 }
+                RepositoryToMonitor monitor = java.util.Objects.requireNonNull(
+                    monitorsByName.get(selection.nameWithOwner()),
+                    "validate() refuses a selection this workspace does not monitor"
+                );
                 repositoryTargetRepository.save(
-                    new PracticeReviewRepositoryTarget(
-                        workspaceId,
-                        monitorsByName.get(selection.nameWithOwner()).getId(),
-                        selection.baseBranches()
-                    )
+                    new PracticeReviewRepositoryTarget(workspaceId, monitor.getId(), selection.baseBranches())
                 );
             }
         }

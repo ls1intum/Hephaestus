@@ -31,7 +31,7 @@ class SyncEventHubTest extends BaseUnitTest {
 
     private final List<RecordingEmitter> createdEmitters = Collections.synchronizedList(new ArrayList<>());
     private final SimpleMeterRegistry meters = new SimpleMeterRegistry();
-    private SyncEventHub hub;
+    private @org.jspecify.annotations.Nullable SyncEventHub hub;
 
     private SyncEventHub newHub(Duration coalesceWindow) {
         return new SyncEventHub(MAPPER, meters, coalesceWindow, () -> {
@@ -167,15 +167,16 @@ class SyncEventHubTest extends BaseUnitTest {
 
     @Test
     void subscribe_beyondPerWorkspaceCap_rejectsNewSubscriber() {
-        hub = newHub(Duration.ofMillis(10));
+        SyncEventHub currentHub = newHub(Duration.ofMillis(10));
+        hub = currentHub;
         for (int i = 0; i < 20; i++) {
-            hub.subscribe(WORKSPACE_ID);
+            currentHub.subscribe(WORKSPACE_ID);
         }
 
-        assertThatThrownBy(() -> hub.subscribe(WORKSPACE_ID)).isInstanceOf(
+        assertThatThrownBy(() -> currentHub.subscribe(WORKSPACE_ID)).isInstanceOf(
             org.springframework.web.server.ResponseStatusException.class
         );
-        assertThat(hub.subscriberCount(WORKSPACE_ID)).isEqualTo(20);
+        assertThat(currentHub.subscriberCount(WORKSPACE_ID)).isEqualTo(20);
         assertThat(counter("integration.sync.sse.subscriptions", "outcome", "accepted")).isEqualTo(20.0);
         assertThat(counter("integration.sync.sse.subscriptions", "outcome", "rejected")).isEqualTo(1.0);
         assertThat(meters.get("integration.sync.sse.subscribers").gauge().value()).isEqualTo(20.0);
@@ -183,7 +184,8 @@ class SyncEventHubTest extends BaseUnitTest {
 
     @Test
     void concurrentSubscriptions_neverExceedPerWorkspaceCap() throws Exception {
-        hub = newHub(Duration.ofMillis(10));
+        SyncEventHub currentHub = newHub(Duration.ofMillis(10));
+        hub = currentHub;
         AtomicInteger rejected = new AtomicInteger();
         List<Future<?>> futures = new ArrayList<>();
         try (var executor = Executors.newFixedThreadPool(16)) {
@@ -191,7 +193,7 @@ class SyncEventHubTest extends BaseUnitTest {
                 futures.add(
                     executor.submit(() -> {
                         try {
-                            hub.subscribe(WORKSPACE_ID);
+                            currentHub.subscribe(WORKSPACE_ID);
                         } catch (org.springframework.web.server.ResponseStatusException expected) {
                             rejected.incrementAndGet();
                         }

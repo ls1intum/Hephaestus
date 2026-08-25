@@ -32,6 +32,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.user.GitHubUserProcessor
 import de.tum.cit.aet.hephaestus.integration.scm.github.user.dto.GitHubUserDTO;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import org.slf4j.Logger;
@@ -97,7 +98,7 @@ public class GitHubCollaboratorSyncService {
             return 0;
         }
 
-        String safeNameWithOwner = sanitizeForLog(repository.getNameWithOwner());
+        String safeNameWithOwner = Objects.requireNonNull(sanitizeForLog(repository.getNameWithOwner()));
         Optional<RepositoryOwnerAndName> parsedName = GitHubRepositoryNameParser.parse(repository.getNameWithOwner());
         if (parsedName.isEmpty()) {
             log.warn("Skipped collaborator sync: reason=invalidRepoNameFormat, repoName={}", safeNameWithOwner);
@@ -229,7 +230,13 @@ public class GitHubCollaboratorSyncService {
 
                     // Convert GraphQL User to DTO and upsert
                     GitHubUserDTO userDTO = GitHubUserDTO.fromUser(graphQlUser);
-                    User user = userProcessor.findOrCreate(userDTO, repository.getProvider().getId());
+                    if (userDTO == null) {
+                        continue;
+                    }
+                    User user = userProcessor.findOrCreate(
+                        userDTO,
+                        Objects.requireNonNull(repository.getProvider().getId())
+                    );
                     if (user == null) {
                         continue;
                     }

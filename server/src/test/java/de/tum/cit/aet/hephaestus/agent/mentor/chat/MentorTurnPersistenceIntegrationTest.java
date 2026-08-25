@@ -40,12 +40,12 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import javax.sql.DataSource;
 import org.assertj.core.api.Assertions;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.OptimisticLockingFailureException;
-import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.JsonNode;
@@ -57,12 +57,6 @@ import tools.jackson.databind.node.ObjectNode;
  * Postgres container: DB unique partial index, JSONB metadata round-trip, status transitions,
  * reaper sweep.
  */
-// This class performs raw schema DDL against the SHARED singleton Testcontainer in @BeforeEach:
-// it DROPs and re-ADDs chk_chat_message_status and creates a partial unique index on chat_message.
-// Those mutations survive on the shared schema and would pollute any sibling class that touches
-// chat_message (same bug class fixed in WorkspaceConnectionBackfillChangeIntegrationTest). Recycle
-// the context after this class so ddl-auto rebuilds a clean schema for everyone after us.
-@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
 
     private static final JsonNodeFactory NODES = JsonNodeFactory.instance;
@@ -106,10 +100,6 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
     @BeforeEach
     void setUp() throws Exception {
         databaseTestUtils.cleanDatabase();
-        // ddl-auto=create skips Liquibase, so partial indexes + CHECK constraints (which JPA
-        // can't infer from @Entity) never land. Re-create the production shape here so the
-        // persistence tests below exercise the real DB-level invariants
-        // (statusColumnCheckConstraintFires + the concurrent-race tests rely on this).
         try (var conn = dataSource.getConnection(); var stmt = conn.createStatement()) {
             stmt.execute(
                 "CREATE UNIQUE INDEX IF NOT EXISTS ux_chat_message_in_flight_v2 " +
@@ -146,6 +136,14 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
         user.setUpdatedAt(Instant.now());
         user.setProvider(gitProvider);
         user = userRepository.save(user);
+    }
+
+    @AfterEach
+    void restoreGeneratedSchema() throws Exception {
+        try (var connection = dataSource.getConnection(); var statement = connection.createStatement()) {
+            statement.execute("DROP INDEX IF EXISTS ux_chat_message_in_flight_v2");
+            statement.execute("ALTER TABLE chat_message DROP CONSTRAINT IF EXISTS chk_chat_message_status");
+        }
     }
 
     @Test

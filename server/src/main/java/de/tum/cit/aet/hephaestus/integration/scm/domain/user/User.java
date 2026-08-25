@@ -124,7 +124,7 @@ public class User extends BaseGitServiceEntity {
         BOT;
 
         @JsonCreator
-        public static Type fromString(String value) {
+        public static @Nullable Type fromString(@Nullable String value) {
             if (value == null) {
                 return null;
             }

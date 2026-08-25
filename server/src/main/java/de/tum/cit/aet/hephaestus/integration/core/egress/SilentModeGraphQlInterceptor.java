@@ -6,6 +6,7 @@ import graphql.language.OperationDefinition;
 import graphql.parser.Parser;
 import java.util.List;
 import java.util.Objects;
+import org.jspecify.annotations.Nullable;
 import org.springframework.graphql.client.ClientGraphQlRequest;
 import org.springframework.graphql.client.ClientGraphQlResponse;
 import org.springframework.graphql.client.GraphQlClientInterceptor;
@@ -47,7 +48,7 @@ public class SilentModeGraphQlInterceptor implements GraphQlClientInterceptor {
             });
     }
 
-    private boolean isMutation(String document, String operationName) {
+    private boolean isMutation(String document, @Nullable String operationName) {
         List<OperationDefinition> operations = operationsByDocument.get(document, source ->
             Parser.parse(source).getDefinitionsOfType(OperationDefinition.class)
         );

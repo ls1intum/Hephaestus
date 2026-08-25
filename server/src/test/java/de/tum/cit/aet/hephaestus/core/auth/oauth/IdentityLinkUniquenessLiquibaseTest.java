@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import de.tum.cit.aet.hephaestus.testconfig.PostgreSQLTestContainer;
+import de.tum.cit.aet.hephaestus.testconfig.PostgreSQLTestContainer.TestDatabase;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
@@ -14,11 +16,10 @@ import liquibase.database.Database;
 import liquibase.database.DatabaseFactory;
 import liquibase.database.jvm.JdbcConnection;
 import liquibase.resource.ClassLoaderResourceAccessor;
-import org.junit.jupiter.api.AfterAll;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
-import org.testcontainers.containers.PostgreSQLContainer;
 
 /**
  * Proves the {@code uq_identity_link_provider_subject_team} guarantee that the JIT first-login race
@@ -35,20 +36,17 @@ import org.testcontainers.containers.PostgreSQLContainer;
  * raw-JDBC test runs the real {@code db/master.xml} on a stock {@code postgres:16} and asserts the
  * index semantics directly.
  */
-@Tag("integration")
+@Tag("database")
 class IdentityLinkUniquenessLiquibaseTest {
 
     private static final String UNIQUE_INDEX = "uq_identity_link_provider_subject_team";
 
-    @SuppressWarnings("resource") // closed in @AfterAll
-    private static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:16")
-        .withDatabaseName("identity_link_uniqueness_test")
-        .withUsername("test")
-        .withPassword("test");
+    private static final TestDatabase DATABASE = PostgreSQLTestContainer.createMigratedDatabase(
+        "identity_link_uniqueness_test"
+    );
 
     @BeforeAll
     static void startAndMigrate() throws Exception {
-        POSTGRES.start();
         // The classic Liquibase parser validates against the bundled XSD; some long-standing
         // attributes trip strict offline validation in this bare harness though SpringLiquibase
         // accepts them at real boot. We are proving index behaviour, not XSD conformance.
@@ -61,11 +59,6 @@ class IdentityLinkUniquenessLiquibaseTest {
                 liquibase.update(new Contexts());
             }
         }
-    }
-
-    @AfterAll
-    static void stop() {
-        POSTGRES.stop();
     }
 
     @Test
@@ -151,8 +144,13 @@ class IdentityLinkUniquenessLiquibaseTest {
         }
     }
 
-    private static void insertIdentityLink(Connection c, long accountId, long providerId, String subject, String teamId)
-        throws Exception {
+    private static void insertIdentityLink(
+        Connection c,
+        long accountId,
+        long providerId,
+        String subject,
+        @Nullable String teamId
+    ) throws Exception {
         try (
             PreparedStatement ps = c.prepareStatement(
                 "INSERT INTO identity_link (account_id, provider_id, subject, team_id) VALUES (?, ?, ?, ?)"
@@ -171,6 +169,6 @@ class IdentityLinkUniquenessLiquibaseTest {
     }
 
     private static Connection newConnection() throws Exception {
-        return DriverManager.getConnection(POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword());
+        return DriverManager.getConnection(DATABASE.jdbcUrl(), DATABASE.username(), DATABASE.password());
     }
 }

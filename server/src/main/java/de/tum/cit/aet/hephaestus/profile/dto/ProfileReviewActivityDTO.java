@@ -7,6 +7,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserInfoDTO;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 /** Review activity with XP score sourced from the activity_event ledger (CQRS read model). */
 @JsonInclude(JsonInclude.Include.NON_NULL)
@@ -17,9 +18,9 @@ public record ProfileReviewActivityDTO(
     @Schema(description = "State of the review (APPROVED, CHANGES_REQUESTED, COMMENTED, etc.)")
     PullRequestReview.@NonNull State state,
     @NonNull @Schema(description = "Number of inline code comments in the review", example = "3") Integer codeComments,
-    @Schema(description = "Author of the review") UserInfoDTO author,
-    @Schema(description = "Pull request that was reviewed") PullRequestBaseInfoDTO pullRequest,
+    @Schema(description = "Author of the review") @Nullable UserInfoDTO author,
+    @Schema(description = "Pull request that was reviewed") @Nullable PullRequestBaseInfoDTO pullRequest,
     @NonNull @Schema(description = "URL to the review on the git provider") String htmlUrl,
     @NonNull @Schema(description = "XP score earned for this review", example = "25") Integer score,
-    @NonNull @Schema(description = "Timestamp when the review was submitted") Instant submittedAt
+    @NonNull @Schema(description = "Timestamp when the review was submitted") @Nullable Instant submittedAt
 ) {}

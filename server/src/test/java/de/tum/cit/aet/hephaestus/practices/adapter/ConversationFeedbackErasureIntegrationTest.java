@@ -318,7 +318,7 @@ class ConversationFeedbackErasureIntegrationTest extends BaseIntegrationTest {
 
     // --- fixtures ---
 
-    private UUID lastFeedbackId;
+    private UUID lastFeedbackId = UUID.randomUUID();
 
     /** Save an observation, a feedback unit anchored to the same (artifactKind, artifactId), and the join between them. */
     private UUID seedBoundObservationAndFeedback(

@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.integration.scm.gitlab.milestone;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
@@ -516,7 +517,9 @@ class GitLabMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
             );
 
             // Both rows must carry the shared iid …
+            assertNotNull(first);
             assertThat(first.getNumber()).isEqualTo(8);
+            assertNotNull(second);
             assertThat(second.getNumber()).isEqualTo(8);
             // … but different deterministic negative nativeIds so (provider_id, native_id) stays unique.
             assertThat(first.getNativeId()).isNegative();
@@ -585,6 +588,7 @@ class GitLabMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
             Milestone milestone = milestoneProcessor.process(dto, testRepository, testContext());
             eventListener.clear();
 
+            assertNotNull(milestone);
             milestoneProcessor.delete(milestone.getId(), testContext());
 
             assertThat(milestoneRepository.findById(milestone.getId())).isEmpty();

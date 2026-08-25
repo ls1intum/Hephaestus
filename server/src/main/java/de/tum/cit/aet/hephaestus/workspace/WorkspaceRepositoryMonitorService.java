@@ -31,6 +31,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
@@ -361,7 +362,7 @@ public class WorkspaceRepositoryMonitorService {
     @Transactional
     public void ensureAllInstallationRepositoriesCovered(
         long installationId,
-        Collection<String> protectedRepositories,
+        @Nullable Collection<String> protectedRepositories,
         boolean deferSync
     ) {
         // Check suspension BEFORE adding repos so NATS replay of old "created" events
@@ -667,7 +668,7 @@ public class WorkspaceRepositoryMonitorService {
 
         repositoryRepository.upsertFromSnapshot(
             nativeId,
-            provider.getId(),
+            Objects.requireNonNull(provider.getId()),
             nameWithOwner,
             name,
             isPrivate,

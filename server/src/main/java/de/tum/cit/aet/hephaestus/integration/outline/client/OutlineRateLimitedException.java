@@ -16,7 +16,7 @@ public class OutlineRateLimitedException extends OutlineApiException {
 
     private final @Nullable Duration retryAfter;
 
-    public OutlineRateLimitedException(@Nullable Duration retryAfter, Throwable cause) {
+    public OutlineRateLimitedException(@Nullable Duration retryAfter, @Nullable Throwable cause) {
         super("Outline rate-limited the request (HTTP 429)", cause, /* retryable */ true);
         this.retryAfter = retryAfter;
     }

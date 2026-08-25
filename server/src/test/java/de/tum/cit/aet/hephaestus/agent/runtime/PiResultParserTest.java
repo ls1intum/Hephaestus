@@ -15,6 +15,12 @@ import tools.jackson.databind.ObjectMapper;
 
 class PiResultParserTest extends BaseUnitTest {
 
+    private static Object rawOutput(AgentResult result) {
+        Object output = result.output().get("rawOutput");
+        assertThat(output).isNotNull();
+        return output;
+    }
+
     private PiResultParser parser;
     private SimpleMeterRegistry meterRegistry;
 
@@ -59,7 +65,7 @@ class PiResultParserTest extends BaseUnitTest {
                 Duration.ofSeconds(10)
             )
         );
-        String raw = result.output().get("rawOutput").toString();
+        String raw = rawOutput(result).toString();
         assertThat(raw).contains("\"x\"").contains("\"ABSENT\"");
     }
 
@@ -71,7 +77,7 @@ class PiResultParserTest extends BaseUnitTest {
         var result = parser.parse(
             new SandboxResult(0, Map.of("result.json", mixed.getBytes()), "done", false, Duration.ofSeconds(10))
         );
-        assertThat(result.output().get("rawOutput").toString()).contains("observations").contains("ABSENT");
+        assertThat(rawOutput(result).toString()).contains("observations").contains("ABSENT");
     }
 
     @Test
@@ -142,7 +148,7 @@ class PiResultParserTest extends BaseUnitTest {
             new SandboxResult(0, Map.of("result.json", json.getBytes()), "done", false, Duration.ofSeconds(10))
         );
         assertThat(result.success()).isTrue();
-        assertThat(result.output().get("rawOutput").toString()).contains("line1\\nline2");
+        assertThat(rawOutput(result).toString()).contains("line1\\nline2");
     }
 
     @Test

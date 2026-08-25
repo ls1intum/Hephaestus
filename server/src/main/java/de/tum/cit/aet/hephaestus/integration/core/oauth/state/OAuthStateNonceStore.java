@@ -4,6 +4,7 @@ import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import java.time.Instant;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -40,7 +41,7 @@ public class OAuthStateNonceStore {
      * the row even if the issuing transaction is separate.
      */
     @Transactional
-    public void issue(String nonce, long workspaceId, IntegrationKind kind, Instant issuedAt) {
+    public void issue(@Nullable String nonce, long workspaceId, IntegrationKind kind, Instant issuedAt) {
         if (nonce == null || nonce.isEmpty()) {
             throw new IllegalArgumentException("nonce must be non-empty");
         }
@@ -67,7 +68,7 @@ public class OAuthStateNonceStore {
      * still fails closed. Callers should treat false as "reject and audit".
      */
     @Transactional
-    public boolean tryConsume(String nonce) {
+    public boolean tryConsume(@Nullable String nonce) {
         if (nonce == null || nonce.isEmpty()) {
             return false;
         }

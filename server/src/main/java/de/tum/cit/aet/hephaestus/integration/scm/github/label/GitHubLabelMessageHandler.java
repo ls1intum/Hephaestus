@@ -11,6 +11,8 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubEventType;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.ProcessingContextFactory;
 import de.tum.cit.aet.hephaestus.integration.scm.github.label.dto.GitHubLabelDTO;
 import de.tum.cit.aet.hephaestus.integration.scm.github.label.dto.GitHubLabelEventDTO;
+import java.util.Objects;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -46,6 +48,7 @@ public class GitHubLabelMessageHandler extends AbstractIntegrationMessageHandler
 
     @Override
     protected void handleEvent(GitHubLabelEventDTO event) {
+        @Nullable
         GitHubLabelDTO labelDto = event.label();
 
         if (labelDto == null) {
@@ -66,9 +69,9 @@ public class GitHubLabelMessageHandler extends AbstractIntegrationMessageHandler
         }
 
         if (event.actionType() == GitHubEventAction.Label.DELETED) {
-            labelProcessor.deleteByNativeId(labelDto.id(), context);
+            labelProcessor.deleteByNativeId(Objects.requireNonNull(labelDto.id()), context);
         } else {
-            labelProcessor.process(labelDto, context.repository(), context);
+            labelProcessor.process(labelDto, Objects.requireNonNull(context.repository()), context);
         }
     }
 }

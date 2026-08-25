@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.integration.scm.gitlab.feedback;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
@@ -28,6 +29,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.gitlab.feedback.GitlabMrResolve
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.List;
 import java.util.Map;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -287,6 +289,7 @@ class GitlabSummaryChannelTest extends BaseUnitTest {
         );
 
         assertThat(outcome.kind()).isEqualTo(SummaryChannel.UpdateOutcome.Kind.EDITED);
+        assertNotNull(outcome.handle());
         assertThat(outcome.handle().externalId()).isEqualTo("gid://gitlab/Note/789");
         verify(spec).variable(eq("id"), eq("gid://gitlab/Note/789"));
         verify(spec).variable(eq("body"), eq("updated body\n\nmarker"));
@@ -406,7 +409,7 @@ class GitlabSummaryChannelTest extends BaseUnitTest {
         String notesPath,
         List<Map<String, Object>> notes,
         boolean hasPreviousPage,
-        String startCursor,
+        @Nullable String startCursor,
         List<ResponseError> errors
     ) {
         ClientGraphQlResponse response = mock(ClientGraphQlResponse.class);
@@ -425,7 +428,7 @@ class GitlabSummaryChannelTest extends BaseUnitTest {
     private ClientGraphQlResponse mockMrNotesPage(
         List<Map<String, Object>> notes,
         boolean hasPreviousPage,
-        String startCursor
+        @Nullable String startCursor
     ) {
         return mockNotesPage(MR_NOTES_PATH, notes, hasPreviousPage, startCursor, List.of());
     }
@@ -452,6 +455,7 @@ class GitlabSummaryChannelTest extends BaseUnitTest {
 
         assertThat(result.kind()).isEqualTo(ExistingSummaryLookup.Kind.FOUND);
         // The handle is the note's own global id — exactly what updateSummary passes to UpdateNote as `id`.
+        assertNotNull(result.handle());
         assertThat(result.handle().externalId()).isEqualTo("gid://gitlab/Note/2");
     }
 
@@ -535,6 +539,7 @@ class GitlabSummaryChannelTest extends BaseUnitTest {
         ExistingSummaryLookup result = channel.findExistingSummary(gitlabTarget(), MARKER);
 
         assertThat(result.kind()).isEqualTo(ExistingSummaryLookup.Kind.FOUND);
+        assertNotNull(result.handle());
         assertThat(result.handle().externalId()).isEqualTo("gid://gitlab/Note/2");
         verify(spec).variable(eq("before"), eq("cursor-1"));
     }
@@ -584,6 +589,7 @@ class GitlabSummaryChannelTest extends BaseUnitTest {
         ExistingSummaryLookup result = channel.findExistingSummary(gitlabIssueTarget(), MARKER);
 
         assertThat(result.kind()).isEqualTo(ExistingSummaryLookup.Kind.FOUND);
+        assertNotNull(result.handle());
         assertThat(result.handle().externalId()).isEqualTo("gid://gitlab/Note/7");
         verify(client).documentName("GetIssueNotesNewest");
         verify(spec).variable(eq("fullPath"), eq("group/project"));

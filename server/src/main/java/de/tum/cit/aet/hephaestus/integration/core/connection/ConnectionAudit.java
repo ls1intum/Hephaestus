@@ -12,6 +12,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import java.time.Instant;
+import java.util.Objects;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
@@ -42,7 +43,7 @@ public class ConnectionAudit {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    private @Nullable Long id;
 
     @ManyToOne(optional = false)
     @JoinColumn(name = "connection_id", nullable = false)
@@ -79,7 +80,7 @@ public class ConnectionAudit {
 
     @CreationTimestamp
     @Column(name = "occurred_at", nullable = false, updatable = false)
-    private Instant occurredAt;
+    private @Nullable Instant occurredAt;
 
     protected ConnectionAudit() {}
 
@@ -103,7 +104,7 @@ public class ConnectionAudit {
         this.detail = detail;
     }
 
-    public Long getId() {
+    public @Nullable Long getId() {
         return id;
     }
 
@@ -145,6 +146,6 @@ public class ConnectionAudit {
     }
 
     public Instant getOccurredAt() {
-        return occurredAt;
+        return Objects.requireNonNull(occurredAt, "Connection audit has not been persisted");
     }
 }

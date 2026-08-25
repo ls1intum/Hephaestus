@@ -20,6 +20,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
@@ -61,12 +62,13 @@ public class InteractiveSandboxRegistry {
         meterRegistry.gauge("mentor.watchdog.targets", Tags.empty(), watchdog, StdinWriteWatchdog::activeTargets);
     }
 
+    @Nullable
     DockerAttachedSandboxAdapter find(String userId, String workspaceId) {
         return sessions.get(new SessionKey(userId, workspaceId));
     }
 
     /** Like {@link #find}, but {@code null} unless state is {@link AttachedSandboxState#ATTACHED}. */
-    public DockerAttachedSandboxAdapter findLive(String userId, String workspaceId) {
+    public @Nullable DockerAttachedSandboxAdapter findLive(String userId, String workspaceId) {
         DockerAttachedSandboxAdapter sandbox = sessions.get(new SessionKey(userId, workspaceId));
         return sandbox != null && sandbox.state() == AttachedSandboxState.ATTACHED ? sandbox : null;
     }
@@ -97,6 +99,9 @@ public class InteractiveSandboxRegistry {
             return userResult.get();
         }
         AtomicInteger userCount = sessionsPerUser.get(id.userId());
+        if (userCount == null) {
+            throw new IllegalStateException("User session reservation was not created");
+        }
 
         if (sessions.size() >= properties.maxSessionsTotal()) {
             decrementUser(id.userId(), userCount);

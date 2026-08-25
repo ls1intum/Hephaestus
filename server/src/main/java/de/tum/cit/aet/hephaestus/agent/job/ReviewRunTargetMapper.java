@@ -5,6 +5,7 @@ import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository.ReviewRunTargetRow
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewRunTargetLookup.Target;
+import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 import tools.jackson.databind.JsonNode;
 
@@ -31,7 +32,7 @@ final class ReviewRunTargetMapper {
                 longValue(metadata, "pull_request_id"),
                 integrationKind,
                 integerValue(metadata, "pr_number"),
-                textValue(metadata, "title", "Pull request"),
+                requiredTextValue(metadata, "title", "Pull request"),
                 textValue(metadata, "repository_full_name", null),
                 null,
                 textValue(metadata, "pr_url", null)
@@ -41,7 +42,7 @@ final class ReviewRunTargetMapper {
                 longValue(metadata, "issue_id"),
                 integrationKind,
                 integerValue(metadata, "issue_number"),
-                textValue(metadata, "title", "Issue"),
+                requiredTextValue(metadata, "title", "Issue"),
                 textValue(metadata, "repository_full_name", null),
                 null,
                 textValue(metadata, "issue_url", null)
@@ -65,7 +66,7 @@ final class ReviewRunTargetMapper {
                 longValue(metadata, "docs_document_id"),
                 integrationKind,
                 null,
-                textValue(metadata, "title", "Document"),
+                requiredTextValue(metadata, "title", "Document"),
                 null,
                 textValue(metadata, "docs_collection_name", null),
                 null
@@ -87,5 +88,9 @@ final class ReviewRunTargetMapper {
         if (metadata == null || !metadata.path(field).isString()) return fallback;
         String value = metadata.path(field).asString();
         return value.isBlank() ? fallback : value;
+    }
+
+    private static String requiredTextValue(@Nullable JsonNode metadata, String field, String fallback) {
+        return Objects.requireNonNull(textValue(metadata, field, fallback));
     }
 }

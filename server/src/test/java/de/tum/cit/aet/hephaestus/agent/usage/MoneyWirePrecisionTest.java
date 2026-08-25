@@ -110,7 +110,9 @@ class MoneyWirePrecisionTest extends BaseUnitTest {
         );
         LlmPriceSnapshot.Cost cost = price.calculateCost(inputTokens, 0, 0, 0);
         assertThat(cost.clamp()).as("this input must reach a clamp, or the test is asserting nothing").isNotNull();
-        return cost.usd();
+        BigDecimal usd = cost.usd();
+        org.junit.jupiter.api.Assertions.assertNotNull(usd);
+        return usd;
     }
 
     /** The largest value {@code NUMERIC(precision, scale)} holds, e.g. {@code 99999999.99}. */

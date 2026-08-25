@@ -7,6 +7,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -72,7 +73,7 @@ public class PiResultParser {
         return new AgentResult(success, output, usage);
     }
 
-    AgentResult.LlmUsage parseUsage(byte[] usageFile) {
+    AgentResult.@Nullable LlmUsage parseUsage(byte@Nullable [] usageFile) {
         if (usageFile == null || usageFile.length == 0) {
             return null;
         }
@@ -113,7 +114,7 @@ public class PiResultParser {
         }
     }
 
-    void addRunnerDebug(Map<String, Object> output, byte[] runnerDebugFile) {
+    void addRunnerDebug(Map<String, Object> output, byte@Nullable [] runnerDebugFile) {
         if (runnerDebugFile == null || runnerDebugFile.length == 0) {
             return;
         }
@@ -129,7 +130,7 @@ public class PiResultParser {
      * read off the job. Best-effort like its siblings: a malformed payload costs the surfaces one cycle's
      * messages and costs the review nothing.
      */
-    void addComposedFeedback(Map<String, Object> output, byte[] feedbackFile) {
+    void addComposedFeedback(Map<String, Object> output, byte@Nullable [] feedbackFile) {
         if (feedbackFile == null || feedbackFile.length == 0) {
             return;
         }
@@ -140,7 +141,7 @@ public class PiResultParser {
         }
     }
 
-    void addWatchdogState(Map<String, Object> output, byte[] watchdogFile) {
+    void addWatchdogState(Map<String, Object> output, byte@Nullable [] watchdogFile) {
         if (watchdogFile == null || watchdogFile.length == 0) {
             return;
         }
@@ -151,7 +152,7 @@ public class PiResultParser {
         }
     }
 
-    byte[] buildResultFromReviewState(byte[] reviewStateFile) {
+    byte@Nullable [] buildResultFromReviewState(byte@Nullable [] reviewStateFile) {
         if (reviewStateFile == null || reviewStateFile.length == 0) {
             return null;
         }
@@ -203,6 +204,7 @@ public class PiResultParser {
     }
 
     /** Find the first '{'…'}' object containing an observations array (max {@value MAX_BRACE_ATTEMPTS} attempts). */
+    @Nullable
     String extractJsonFromText(String text) {
         int searchFrom = 0;
         char[] chars = text.toCharArray();
@@ -237,7 +239,7 @@ public class PiResultParser {
         }
     }
 
-    private static JsonNode observationsNode(JsonNode root) {
+    private static @Nullable JsonNode observationsNode(JsonNode root) {
         JsonNode observations = root.get("observations");
         return observations != null && observations.isArray() ? observations : null;
     }

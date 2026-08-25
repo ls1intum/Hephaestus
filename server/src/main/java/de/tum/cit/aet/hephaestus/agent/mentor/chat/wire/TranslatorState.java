@@ -29,8 +29,7 @@ public final class TranslatorState {
     /** Assistant message id — passed back on the {@link UIMessageChunk.Start} chunk for reconciliation. */
     private final UUID assistantMessageId;
 
-    @Nullable
-    private String activeTextId;
+    private @Nullable String activeTextId;
 
     /** Buffer of text so far for the open text block — used to materialise the final {@code text} part. */
     private final StringBuilder textBuffer = new StringBuilder();
@@ -72,8 +71,7 @@ public final class TranslatorState {
     private String observedStopReason;
 
     /** Verbatim Pi SDK session JSONL captured from {@code session_persisted}; see {@link ChatThread#getSessionJsonl}. */
-    @Nullable
-    private byte[] observedSessionJsonl;
+    private byte@Nullable [] observedSessionJsonl;
 
     /**
      * Which connection funds this turn's LLM calls, frozen at turn start. Unsynchronized unlike the
@@ -100,7 +98,7 @@ public final class TranslatorState {
         this.connectionId = connectionId;
     }
 
-    public void bindAdmission(String model, LlmPriceSnapshot price) {
+    public void bindAdmission(String model, @Nullable LlmPriceSnapshot price) {
         this.admittedModel = model;
         this.admittedPrice = price;
     }
@@ -162,8 +160,7 @@ public final class TranslatorState {
         return stepDepth;
     }
 
-    @Nullable
-    public synchronized String activeTextId() {
+    public synchronized @Nullable String activeTextId() {
         return activeTextId;
     }
 
@@ -314,15 +311,14 @@ public final class TranslatorState {
         return observedStopReason;
     }
 
-    public synchronized void observeSessionJsonl(@Nullable byte[] bytes) {
+    public synchronized void observeSessionJsonl(byte@Nullable [] bytes) {
         if (bytes == null || bytes.length == 0) {
             return;
         }
         this.observedSessionJsonl = bytes.clone();
     }
 
-    @Nullable
-    public synchronized byte[] observedSessionJsonl() {
+    public synchronized byte@Nullable [] observedSessionJsonl() {
         return observedSessionJsonl;
     }
 }

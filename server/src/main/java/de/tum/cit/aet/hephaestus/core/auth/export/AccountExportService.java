@@ -10,6 +10,7 @@ import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import org.jspecify.annotations.Nullable;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -103,7 +104,7 @@ public class AccountExportService {
         // Hand off after the PENDING row commits so the worker's own transaction can read it.
         // The worker is @Async on a separate bean → real proxy hop (no inline self-invocation).
         Long exportId = export.getId();
-        afterCommit(() -> generationWorker.generate(exportId, accountId));
+        afterCommit(() -> generationWorker.generate(Objects.requireNonNull(exportId), accountId));
         return export;
     }
 
@@ -124,8 +125,8 @@ public class AccountExportService {
             .findByIdAndAccountId(exportId, accountId)
             .filter(e -> e.getStatus() == AccountExport.Status.READY)
             .filter(e -> e.getExpiresAt() == null || e.getExpiresAt().isAfter(Instant.now(clock)))
-            .map(AccountExport::getPayload)
-            .filter(payload -> payload != null && payload.length > 0);
+            .flatMap(export -> Optional.<byte[]>ofNullable(export.getPayload()))
+            .filter(payload -> payload.length > 0);
     }
 
     /**
@@ -146,9 +147,9 @@ public class AccountExportService {
 
     private ExportStatusDTO toStatus(AccountExport e) {
         return new ExportStatusDTO(
-            e.getId(),
+            Objects.requireNonNull(e.getId()),
             e.getStatus().name(),
-            e.getRequestedAt(),
+            Objects.requireNonNull(e.getRequestedAt()),
             e.getCompletedAt(),
             e.getExpiresAt()
         );

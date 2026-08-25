@@ -7,4 +7,5 @@
  * filter chain (the oauth2Login chain in {@code core.auth.config} wires it intra-module).
  */
 @org.springframework.modulith.NamedInterface("auth-ratelimit")
+@org.jspecify.annotations.NullMarked
 package de.tum.cit.aet.hephaestus.core.auth.ratelimit;

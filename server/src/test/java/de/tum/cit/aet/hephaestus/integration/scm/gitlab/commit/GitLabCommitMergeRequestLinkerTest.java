@@ -15,6 +15,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncResult;
@@ -36,6 +37,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -104,6 +106,10 @@ class GitLabCommitMergeRequestLinkerTest extends BaseUnitTest {
         repository = new Repository();
         repository.setId(REPO_ID);
         repository.setNameWithOwner(PROJECT_PATH);
+        IdentityProvider provider = new IdentityProvider();
+        provider.setId(2L);
+        provider.setType(IdentityProviderType.GITLAB);
+        repository.setProvider(provider);
     }
 
     @Test
@@ -313,7 +319,7 @@ class GitLabCommitMergeRequestLinkerTest extends BaseUnitTest {
 
         User user = new User();
         user.setId(901L);
-        when(userRepository.findByLogin(eq("00000000014C41E0"))).thenReturn(Optional.of(user));
+        when(userRepository.findByLoginAndProviderId(eq("00000000014C41E0"), eq(2L))).thenReturn(Optional.of(user));
         when(commitContributorRepository.backfillUserIdByEmail(anyString(), eq(901L))).thenReturn(1);
 
         SyncResult result = linker.linkCommits(SCOPE_ID, repository, UPDATED_AFTER);
@@ -400,7 +406,7 @@ class GitLabCommitMergeRequestLinkerTest extends BaseUnitTest {
 
         User user = new User();
         user.setId(901L);
-        when(userRepository.findByLogin(eq("devlogin"))).thenReturn(Optional.of(user));
+        when(userRepository.findByLoginAndProviderId(eq("devlogin"), eq(2L))).thenReturn(Optional.of(user));
         when(commitContributorRepository.backfillUserIdByEmail(anyString(), eq(901L))).thenReturn(1);
         when(commitRepository.bulkUpdateAuthorIdByEmail(eq("dev@example.com"), eq(REPO_ID), eq(901L))).thenReturn(1);
 
@@ -434,7 +440,7 @@ class GitLabCommitMergeRequestLinkerTest extends BaseUnitTest {
 
         User user = new User();
         user.setId(901L);
-        when(userRepository.findByLogin(eq("devlogin"))).thenReturn(Optional.of(user));
+        when(userRepository.findByLoginAndProviderId(eq("devlogin"), eq(2L))).thenReturn(Optional.of(user));
         // Contributor row is backfilled but no commit_author row is actually updated
         // (e.g. git_commit.author_id was already populated). Event must NOT be published.
         when(commitContributorRepository.backfillUserIdByEmail(anyString(), eq(901L))).thenReturn(1);
@@ -484,7 +490,7 @@ class GitLabCommitMergeRequestLinkerTest extends BaseUnitTest {
     }
 
     @SuppressWarnings("unchecked")
-    private ClientGraphQlResponse mockMrsPage(List<Map<String, Object>> nodes, GitLabPageInfo pageInfo) {
+    private ClientGraphQlResponse mockMrsPage(List<Map<String, Object>> nodes, @Nullable GitLabPageInfo pageInfo) {
         assertVendorCouldReturn(GITLAB, "LinkCommitsToMergeRequests", "project.mergeRequests.nodes", nodes);
         ClientGraphQlResponse resp = mock(ClientGraphQlResponse.class);
         lenient().when(resp.isValid()).thenReturn(true);
@@ -579,7 +585,7 @@ class GitLabCommitMergeRequestLinkerTest extends BaseUnitTest {
         int iid,
         List<String> shas,
         boolean nestedHasNextPage,
-        String nestedEndCursor
+        @Nullable String nestedEndCursor
     ) {
         Map<String, Object> pageInfoMap = new LinkedHashMap<>();
         pageInfoMap.put("hasNextPage", nestedHasNextPage);
@@ -620,7 +626,7 @@ class GitLabCommitMergeRequestLinkerTest extends BaseUnitTest {
         return node;
     }
 
-    private static Map<String, Object> commitNode(String sha, String authorEmail, String authorUsername) {
+    private static Map<String, Object> commitNode(String sha, String authorEmail, @Nullable String authorUsername) {
         Map<String, Object> node = new LinkedHashMap<>();
         node.put("sha", sha);
         node.put("authorEmail", authorEmail);

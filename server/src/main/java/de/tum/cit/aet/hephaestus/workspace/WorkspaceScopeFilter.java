@@ -6,6 +6,7 @@ import java.util.Collections;
 import java.util.Locale;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -87,11 +88,11 @@ public class WorkspaceScopeFilter {
         return workspaceId != null;
     }
 
-    public boolean isRepositoryAllowed(RepositoryToMonitor repository) {
+    public boolean isRepositoryAllowed(@Nullable RepositoryToMonitor repository) {
         return isRepositoryAllowed(repository != null ? repository.getNameWithOwner() : null);
     }
 
-    public boolean isRepositoryAllowed(String nameWithOwner) {
+    public boolean isRepositoryAllowed(@Nullable String nameWithOwner) {
         if (nameWithOwner == null) {
             return false;
         }
@@ -134,7 +135,7 @@ public class WorkspaceScopeFilter {
             .collect(Collectors.toSet());
     }
 
-    private String normalize(String value) {
+    private @Nullable String normalize(@Nullable String value) {
         return value == null ? null : value.trim().toLowerCase(Locale.ENGLISH);
     }
 }

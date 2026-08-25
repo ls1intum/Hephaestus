@@ -163,7 +163,7 @@ public class GitHubGraphQlClientProvider {
     }
 
     /** @return the reset instant, or null if unknown */
-    public java.time.Instant getRateLimitResetAt(Long scopeId) {
+    public java.time.@Nullable Instant getRateLimitResetAt(Long scopeId) {
         return rateLimitTracker.getResetAt(scopeId);
     }
 

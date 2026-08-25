@@ -1175,12 +1175,12 @@ public class CommitMetadataEnrichmentService {
         return Boolean.TRUE.equals(hasNext);
     }
 
-    private static String normalizeString(Object value) {
+    private static @Nullable String normalizeString(@Nullable Object value) {
         return CommitUtils.normalizeString(value);
     }
 
     @Nullable
-    private static Integer extractInteger(Object value) {
+    private static Integer extractInteger(@Nullable Object value) {
         if (value instanceof Number num) {
             return num.intValue();
         }
@@ -1188,7 +1188,7 @@ public class CommitMetadataEnrichmentService {
     }
 
     @Nullable
-    private static Boolean extractBoolean(Object value) {
+    private static Boolean extractBoolean(@Nullable Object value) {
         if (value instanceof Boolean b) {
             return b;
         }
@@ -1196,7 +1196,7 @@ public class CommitMetadataEnrichmentService {
     }
 
     @Nullable
-    private static Instant parseInstant(Object value) {
+    private static Instant parseInstant(@Nullable Object value) {
         if (!(value instanceof String s) || s.isEmpty()) {
             return null;
         }

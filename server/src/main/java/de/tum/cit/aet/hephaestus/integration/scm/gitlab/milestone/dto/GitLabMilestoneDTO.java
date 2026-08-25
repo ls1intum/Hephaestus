@@ -29,7 +29,7 @@ public record GitLabMilestoneDTO(
     int iid,
     String title,
     @Nullable String description,
-    String state,
+    @Nullable String state,
     @Nullable String dueDate,
     @Nullable String webPath,
     @Nullable String projectWebUrl,

@@ -21,6 +21,7 @@ import de.tum.cit.aet.hephaestus.workspace.settings.ReviewRepositoryMode;
 import de.tum.cit.aet.hephaestus.workspace.settings.WorkspaceReviewScope;
 import java.util.Optional;
 import java.util.Set;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
@@ -184,7 +185,10 @@ class PracticeReviewSettingsServiceTest extends BaseUnitTest {
             .thenAnswer(invocation -> invocation.getArgument(0));
     }
 
-    private static UpdatePracticeReviewSettingsRequestDTO patch(Boolean deliverToMerged, Integer cooldownMinutes) {
+    private static UpdatePracticeReviewSettingsRequestDTO patch(
+        @Nullable Boolean deliverToMerged,
+        @Nullable Integer cooldownMinutes
+    ) {
         return new UpdatePracticeReviewSettingsRequestDTO(deliverToMerged, cooldownMinutes, null, null, null, null);
     }
 

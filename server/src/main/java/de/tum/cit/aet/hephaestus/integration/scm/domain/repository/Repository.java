@@ -28,6 +28,7 @@ import lombok.Setter;
 import lombok.ToString;
 import org.hibernate.annotations.BatchSize;
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Represents a Git repository from a provider (e.g., GitHub).
@@ -84,7 +85,7 @@ public class Repository extends BaseGitServiceEntity {
     private String htmlUrl;
 
     @Column(columnDefinition = "TEXT")
-    private String description;
+    private @Nullable String description;
 
     @NonNull
     private Instant pushedAt;
@@ -98,8 +99,7 @@ public class Repository extends BaseGitServiceEntity {
     @Enumerated(EnumType.STRING)
     private Visibility visibility;
 
-    @NonNull
-    private String defaultBranch;
+    private @Nullable String defaultBranch;
 
     private boolean hasDiscussionsEnabled;
 
@@ -115,7 +115,7 @@ public class Repository extends BaseGitServiceEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "organization_id", foreignKey = @ForeignKey(name = "fk_repository_organization"))
     @ToString.Exclude
-    private Organization organization;
+    private @Nullable Organization organization;
 
     @OneToMany(mappedBy = "repository", cascade = CascadeType.REMOVE, orphanRemoval = true)
     @ToString.Exclude

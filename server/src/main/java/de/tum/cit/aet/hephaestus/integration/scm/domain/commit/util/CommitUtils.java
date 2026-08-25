@@ -16,7 +16,7 @@ public class CommitUtils {
      * @return the trimmed string, or {@code null} if the input is not a {@link String} or is blank
      */
     @Nullable
-    public String normalizeString(Object value) {
+    public String normalizeString(@Nullable Object value) {
         if (!(value instanceof String s)) {
             return null;
         }

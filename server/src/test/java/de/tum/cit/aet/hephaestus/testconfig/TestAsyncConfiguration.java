@@ -5,6 +5,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Future;
+import org.jspecify.annotations.Nullable;
 import org.springframework.aop.interceptor.AsyncUncaughtExceptionHandler;
 import org.springframework.aop.interceptor.SimpleAsyncUncaughtExceptionHandler;
 import org.springframework.boot.autoconfigure.task.TaskExecutionAutoConfiguration;
@@ -134,7 +135,7 @@ public class TestAsyncConfiguration implements AsyncConfigurer {
         }
 
         @Override
-        public <T> Future<T> submit(Callable<T> task) {
+        public <T extends @Nullable Object> Future<T> submit(Callable<T> task) {
             try {
                 T result = task.call();
                 return CompletableFuture.completedFuture(result);
@@ -153,9 +154,7 @@ public class TestAsyncConfiguration implements AsyncConfigurer {
     private static class NoOpAsyncTaskExecutor implements AsyncTaskExecutor {
 
         @Override
-        public void execute(Runnable task) {
-            // Skip execution
-        }
+        public void execute(Runnable task) {}
 
         @Override
         public Future<?> submit(Runnable task) {
@@ -163,8 +162,10 @@ public class TestAsyncConfiguration implements AsyncConfigurer {
         }
 
         @Override
-        public <T> Future<T> submit(Callable<T> task) {
-            return CompletableFuture.completedFuture(null);
+        public <T extends @Nullable Object> Future<T> submit(Callable<T> task) {
+            CompletableFuture<T> future = new CompletableFuture<>();
+            future.cancel(false);
+            return future;
         }
     }
 }

@@ -3,72 +3,48 @@ package de.tum.cit.aet.hephaestus.core.auth.audit;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 
-import de.tum.cit.aet.hephaestus.testconfig.DatabaseTestUtils;
-import de.tum.cit.aet.hephaestus.testconfig.RealAuthDatasource;
-import java.time.Instant;
-import org.junit.jupiter.api.BeforeEach;
+import de.tum.cit.aet.hephaestus.testconfig.PostgreSQLTestContainer;
+import de.tum.cit.aet.hephaestus.testconfig.PostgreSQLTestContainer.TestDatabase;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.ResultSet;
+import java.sql.Statement;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.context.annotation.Import;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
-/**
- * Migration guard (changeset {@code 1782980500800-15}): the {@code ck_auth_event_event_type} CHECK
- * constraint must admit {@code RESEARCH_CONSENT_REVOKED} against real Postgres. If the constraint
- * widening did not run, inserting the row raises a check violation and this test fails — proving the enum value
- * and its schema delta landed together (the {@code ddl-auto: validate} + boot gate covers the rest).
- */
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@ActiveProfiles("test")
-@Testcontainers
-@Tag("integration")
+@Tag("database")
 class ResearchConsentAuditMigrationIntegrationTest {
 
-    @Autowired
-    private AuthEventRepository authEventRepository;
-
-    @Autowired
-    private DatabaseTestUtils databaseTestUtils;
-
-    @BeforeEach
-    void cleanSlate() {
-        databaseTestUtils.cleanDatabase();
-    }
-
-    @DynamicPropertySource
-    static void datasource(DynamicPropertyRegistry registry) {
-        RealAuthDatasource.register(registry);
-    }
+    private static final TestDatabase DATABASE = PostgreSQLTestContainer.createMigratedDatabase(
+        "hephaestus_research_consent_audit"
+    );
 
     @Test
-    void researchConsentRevoked_isAdmittedByTheWidenedCheckConstraint() {
-        Instant occurredAt = Instant.now();
-        AuthEventData data = new AuthEventData(
-            AuthEvent.EventType.RESEARCH_CONSENT_REVOKED,
-            AuthEvent.Result.SUCCESS,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            "{\"source\":\"SLACK_APP_HOME\",\"login\":\"octocat\"}"
-        );
+    void researchConsentRevokedIsAdmittedByTheWidenedCheckConstraint() throws Exception {
+        assertThatCode(() -> {
+            try (Connection connection = connect(); Statement statement = connection.createStatement()) {
+                statement.executeUpdate(
+                    "CREATE TABLE auth_event_research_test PARTITION OF auth_event " +
+                        "FOR VALUES FROM ('2000-01-01') TO ('2000-02-01')"
+                );
+                statement.executeUpdate(
+                    "INSERT INTO auth_event (occurred_at, event_type, result, details) " +
+                        "VALUES ('2000-01-15', 'RESEARCH_CONSENT_REVOKED', 'SUCCESS', " +
+                        "'{\"source\":\"SLACK_APP_HOME\",\"login\":\"octocat\"}'::jsonb)"
+                );
+            }
+        }).doesNotThrowAnyException();
 
-        assertThatCode(() ->
-            authEventRepository.save(AuthEvent.create(data, 987654321L, occurredAt, "127.0.0.1", "test-agent"))
-        ).doesNotThrowAnyException();
+        try (Connection connection = connect(); Statement statement = connection.createStatement()) {
+            ResultSet rows = statement.executeQuery(
+                "SELECT count(*) FROM auth_event WHERE event_type = 'RESEARCH_CONSENT_REVOKED'"
+            );
+            assertThat(rows.next()).isTrue();
+            assertThat(rows.getInt(1)).isEqualTo(1);
+        }
+    }
 
-        assertThat(
-            authEventRepository
-                .findAll()
-                .stream()
-                .anyMatch(e -> e.getEventType() == AuthEvent.EventType.RESEARCH_CONSENT_REVOKED)
-        ).isTrue();
+    private static Connection connect() throws Exception {
+        return DriverManager.getConnection(DATABASE.jdbcUrl(), DATABASE.username(), DATABASE.password());
     }
 }

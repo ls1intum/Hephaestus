@@ -35,6 +35,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.issue.GitHubIssueProcess
 import de.tum.cit.aet.hephaestus.integration.scm.github.issue.dto.GitHubIssueDTO;
 import java.time.Instant;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
@@ -312,7 +313,7 @@ public class GitHubSubIssueSyncService {
                         MAX_RETRY_ATTEMPTS,
                         "sub-issue sync",
                         "repoName",
-                        sanitizeForLog(repoNameWithOwner),
+                        Objects.requireNonNullElse(sanitizeForLog(repoNameWithOwner), "null"),
                         log
                     )
                 );
@@ -396,7 +397,7 @@ public class GitHubSubIssueSyncService {
                             .doBeforeRetry(signal ->
                                 log.warn(
                                     "Retrying after transport error: context=subIssueSync, repoName={}, page={}, attempt={}, error={}",
-                                    sanitizeForLog(repository.getNameWithOwner()),
+                                    Objects.requireNonNullElse(sanitizeForLog(repository.getNameWithOwner()), "null"),
                                     currentPage,
                                     signal.totalRetries() + 1,
                                     signal.failure().getMessage()
@@ -416,7 +417,7 @@ public class GitHubSubIssueSyncService {
                                     MAX_RETRY_ATTEMPTS,
                                     "sub-issue repository sync",
                                     "repoName",
-                                    sanitizeForLog(repository.getNameWithOwner()),
+                                    Objects.requireNonNullElse(sanitizeForLog(repository.getNameWithOwner()), "null"),
                                     log
                                 )
                             )
@@ -444,7 +445,7 @@ public class GitHubSubIssueSyncService {
                             scopeId,
                             "sub-issue repository sync",
                             "repoName",
-                            sanitizeForLog(repository.getNameWithOwner()),
+                            Objects.requireNonNullElse(sanitizeForLog(repository.getNameWithOwner()), "null"),
                             log
                         )
                     ) {
@@ -497,7 +498,7 @@ public class GitHubSubIssueSyncService {
                             MAX_RETRY_ATTEMPTS,
                             "sub-issue repository sync",
                             "repoName",
-                            sanitizeForLog(repository.getNameWithOwner()),
+                            Objects.requireNonNullElse(sanitizeForLog(repository.getNameWithOwner()), "null"),
                             log
                         )
                     )
@@ -582,7 +583,7 @@ public class GitHubSubIssueSyncService {
         }
 
         // Check if relationship already exists
-        if (parent.equals(subIssue.getParentIssue())) {
+        if (Objects.equals(parent, subIssue.getParentIssue())) {
             return 0;
         }
 

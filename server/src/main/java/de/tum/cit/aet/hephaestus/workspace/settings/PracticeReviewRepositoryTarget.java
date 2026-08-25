@@ -14,6 +14,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
+import org.jspecify.annotations.Nullable;
 
 /** One monitored repository a workspace reviews, and the base branches of it that are in scope. */
 @Entity
@@ -48,7 +49,10 @@ public class PracticeReviewRepositoryTarget {
     @EqualsAndHashCode
     public static class Key implements Serializable {
 
+        @Nullable
         private Long workspaceId;
+
+        @Nullable
         private Long repositoryMonitorId;
     }
 }

@@ -95,9 +95,9 @@ class FeedbackDeliveryService {
             contributingPracticeSlugs
         );
         if (!decision.allowed()) {
-            if (decision.suppressionReason() != null) {
-                log.info("Delivery suppressed: reason={}, jobId={}", decision.suppressionReason(), job.getId());
-                recordGateSuppressed(job, delivery, decision.suppressionReason());
+            if (decision.refusal() != null) {
+                log.info("Delivery suppressed: reason={}, jobId={}", decision.refusal(), job.getId());
+                recordGateSuppressed(job, delivery, decision.refusal());
             } else {
                 log.info("Delivery disabled for workspace: jobId={}", job.getId());
             }
@@ -105,7 +105,7 @@ class FeedbackDeliveryService {
         }
 
         try {
-            doDeliverEligible(job, delivery, summaryComposer, decision.artifact(), contributingPracticeSlugs);
+            doDeliverEligible(job, delivery, summaryComposer, decision.target(), contributingPracticeSlugs);
         } catch (DispatchPolicySuppressedException e) {
             log.info("Delivery suppressed by current dispatch policy: reason={}, jobId={}", e.reason, job.getId());
             recordGateSuppressed(job, delivery, e.reason);
@@ -296,7 +296,7 @@ class FeedbackDeliveryService {
             contributingPracticeSlugs
         );
         if (result.status() == PracticeFeedbackDispatchService.Result.Status.SUPPRESSED) {
-            throw new DispatchPolicySuppressedException(result.suppressionReason());
+            throw new DispatchPolicySuppressedException(result.refusal());
         }
         if (result.status() == PracticeFeedbackDispatchService.Result.Status.UNCERTAIN && priorRef != null) {
             job.setDeliveryCommentId(priorRef);
@@ -426,7 +426,7 @@ class FeedbackDeliveryService {
             contributingPracticeSlugs
         );
         if (!decision.allowed()) {
-            throw new DispatchPolicySuppressedException(decision.suppressionReason());
+            throw new DispatchPolicySuppressedException(decision.refusal());
         }
         DiffNotePoster.DiffNoteResult diffResult = diffNotePoster.reconcileInlineNotes(job, delivery.diffNotes());
         log.info(

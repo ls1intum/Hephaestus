@@ -29,6 +29,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -367,7 +368,12 @@ class PracticeReviewSummaryControllerIntegrationTest extends AbstractWorkspaceIn
         return jobRepository.save(result);
     }
 
-    private void insertObservation(String title, String presence, String assessment, String severity) {
+    private void insertObservation(
+        String title,
+        String presence,
+        @Nullable String assessment,
+        @Nullable String severity
+    ) {
         UUID id = UUID.randomUUID();
         observationRepository.insertIfAbsent(
             id,
@@ -393,8 +399,8 @@ class PracticeReviewSummaryControllerIntegrationTest extends AbstractWorkspaceIn
     private void persistFeedback(
         int position,
         FeedbackDeliveryState state,
-        FeedbackSuppressionReason reason,
-        String body
+        @Nullable FeedbackSuppressionReason reason,
+        @Nullable String body
     ) {
         feedbackRepository.save(
             Feedback.builder()

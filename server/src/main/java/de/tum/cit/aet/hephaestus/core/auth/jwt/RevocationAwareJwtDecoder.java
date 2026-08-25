@@ -10,6 +10,7 @@ import de.tum.cit.aet.hephaestus.core.auth.AuthProperties;
 import de.tum.cit.aet.hephaestus.core.auth.metrics.AuthMetrics;
 import java.time.Clock;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -69,7 +70,7 @@ public class RevocationAwareJwtDecoder implements JwtDecoder {
     ) {
         this.delegate = localSignatureDecoder(keyService, properties);
         this.repository = repository;
-        this.cache = cacheManager.getCache(CACHE_NAME);
+        this.cache = Objects.requireNonNull(cacheManager.getCache(CACHE_NAME));
         this.clock = clock;
         this.metrics = metrics;
     }

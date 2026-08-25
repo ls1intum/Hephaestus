@@ -20,6 +20,7 @@ import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -93,7 +94,7 @@ class PracticeFeedbackDispatchRepositoryIntegrationTest extends AbstractWorkspac
         User otherOwner = persistUser("other-dispatch-owner");
         Workspace other = createWorkspace("other-dispatch", "Other", "other-org", AccountType.ORG, otherOwner);
 
-        assertThat(insertDispatch(other.getId(), jobId, "cross-tenant")).isNull();
+        assertThat(tryInsertDispatch(other.getId(), jobId, "cross-tenant")).isNull();
     }
 
     @Test
@@ -129,6 +130,14 @@ class PracticeFeedbackDispatchRepositoryIntegrationTest extends AbstractWorkspac
     }
 
     private UUID insertDispatch(long workspaceId, UUID owningJobId, String key) {
+        return java.util.Objects.requireNonNull(
+            tryInsertDispatch(workspaceId, owningJobId, key),
+            "the insert this test builds on must land"
+        );
+    }
+
+    /** Null is the tenancy refusal, not a failure to reach the database. */
+    private @Nullable UUID tryInsertDispatch(long workspaceId, UUID owningJobId, String key) {
         UUID id = UUID.randomUUID();
         Integer inserted = transactions.execute(status ->
             dispatchRepository.insertIfAbsent(

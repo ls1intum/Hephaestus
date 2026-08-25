@@ -76,18 +76,18 @@ class DeliveryComposer {
     }
 
     @Nullable
-    static DeliveryContent compose(List<ValidatedObservation> observations) {
+    static DeliveryContent compose(@Nullable List<ValidatedObservation> observations) {
         return compose(observations, ArtifactKinds.PULL_REQUEST);
     }
 
     @Nullable
-    static DeliveryContent compose(List<ValidatedObservation> observations, ArtifactKind artifact) {
+    static DeliveryContent compose(@Nullable List<ValidatedObservation> observations, ArtifactKind artifact) {
         return compose(observations, artifact, Map.of());
     }
 
     @Nullable
     static DeliveryContent compose(
-        List<ValidatedObservation> observations,
+        @Nullable List<ValidatedObservation> observations,
         ArtifactKind artifact,
         Map<String, String> whyBySlug
     ) {
@@ -97,7 +97,7 @@ class DeliveryComposer {
 
     @Nullable
     static DeliveryContent compose(
-        List<ValidatedObservation> observations,
+        @Nullable List<ValidatedObservation> observations,
         ArtifactKind artifact,
         Map<String, String> whyBySlug,
         @Nullable String unifiedDiff
@@ -107,7 +107,7 @@ class DeliveryComposer {
 
     @Nullable
     static DeliveryContent compose(
-        List<ValidatedObservation> observations,
+        @Nullable List<ValidatedObservation> observations,
         ArtifactKind artifact,
         Map<String, String> whyBySlug,
         @Nullable String unifiedDiff,
@@ -125,7 +125,7 @@ class DeliveryComposer {
 
     @Nullable
     static String recomposeMrNote(
-        List<ValidatedObservation> observations,
+        @Nullable List<ValidatedObservation> observations,
         ArtifactKind artifact,
         Map<String, String> whyBySlug,
         Set<String> deliveredKeys
@@ -135,7 +135,7 @@ class DeliveryComposer {
 
     @Nullable
     static String recomposeMrNote(
-        List<ValidatedObservation> observations,
+        @Nullable List<ValidatedObservation> observations,
         ArtifactKind artifact,
         Map<String, String> whyBySlug,
         Set<String> deliveredKeys,
@@ -154,7 +154,7 @@ class DeliveryComposer {
 
     @Nullable
     private static DeliveryContent compose(
-        List<ValidatedObservation> observations,
+        @Nullable List<ValidatedObservation> observations,
         ArtifactKind artifact,
         Map<String, String> whyBySlug,
         Set<String> deliveredKeys,
@@ -174,7 +174,7 @@ class DeliveryComposer {
         List<ValidatedObservation> negatives = observations
             .stream()
             .filter(DeliveryComposer::isProblem)
-            .sorted(Comparator.comparingInt(f -> f.severity().ordinal()))
+            .sorted(Comparator.comparingInt(f -> severity(f).ordinal()))
             .toList();
 
         if (ArtifactKinds.ISSUE.equals(artifact)) {
@@ -695,7 +695,7 @@ class DeliveryComposer {
     ) {
         ComposedNote note = rendering.noteFor(f);
         String title = note == null || note.title() == null ? f.summary() : note.title();
-        sb.append("**").append(severityEmoji(f.severity())).append(" ").append(title).append("**");
+        sb.append("**").append(severityEmoji(severity(f))).append(" ").append(title).append("**");
         if (withLocation) {
             String location = extractPrimaryLocation(f);
             if (location != null) {
@@ -822,6 +822,10 @@ class DeliveryComposer {
         };
     }
 
+    private static Severity severity(ValidatedObservation observation) {
+        return Objects.requireNonNull(observation.severity(), "A problem observation must have a severity");
+    }
+
     @Nullable
     private static String extractPrimaryLocation(ValidatedObservation f) {
         JsonNode evidence = f.evidence();
@@ -905,7 +909,7 @@ class DeliveryComposer {
         return value != null && value.isNumber() && value.asInt() >= minimum ? value.asInt() : null;
     }
 
-    private static String composeDiffNoteBody(ValidatedObservation f, Rendering rendering) {
+    private static @Nullable String composeDiffNoteBody(ValidatedObservation f, Rendering rendering) {
         var words = new StringBuilder();
         appendBody(words, f, rendering);
         if (words.toString().isBlank()) {
@@ -1036,7 +1040,10 @@ class DeliveryComposer {
                 // New-side only: skip hunk headers, file markers, and deletions.
                 if (line.startsWith("@@") || line.startsWith("+++") || line.startsWith("---")) continue;
                 if (line.startsWith("+") || line.startsWith(" ")) {
-                    acc.get(currentFile).append(normalizeForMatch(line.substring(1))).append('\n');
+                    acc
+                        .computeIfAbsent(currentFile, ignored -> new StringBuilder())
+                        .append(normalizeForMatch(line.substring(1)))
+                        .append('\n');
                 }
             }
             Map<String, String> out = new HashMap<>(acc.size());

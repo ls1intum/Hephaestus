@@ -9,28 +9,36 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 @Schema(description = "Full feedback detail including the stored composed body")
 public record ReviewFeedbackDetailDTO(
     @NonNull UUID id,
     @NonNull UUID agentJobId,
-    @Schema(description = "Work item the feedback targets; null when it is unanchored") ReviewArtifactDTO artifact,
+    @Schema(description = "Work item the feedback targets; null when it is unanchored")
+    @Nullable
+    ReviewArtifactDTO artifact,
     @Schema(description = "Who the feedback is addressed to; null when the identity is no longer resolvable")
+    @Nullable
     ReviewSubjectDTO recipient,
-    @Schema(description = "Whose work the feedback addresses; may equal the recipient") ReviewSubjectDTO subject,
+    @Schema(description = "Whose work the feedback addresses; may equal the recipient")
+    @Nullable
+    ReviewSubjectDTO subject,
     @NonNull FeedbackChannel channel,
     @NonNull FeedbackDeliveryState deliveryState,
     @Schema(description = "Why the feedback was withheld; null unless the state is SUPPRESSED")
+    @Nullable
     FeedbackSuppressionReason suppressionReason,
-    @Schema(description = "The feedback this one replaced; null on a first delivery") UUID replacesId,
-    @Schema(description = "Cross-run continuity key tying successive deliveries together") String threadKey,
+    @Schema(description = "The feedback this one replaced; null on a first delivery") @Nullable UUID replacesId,
+    @Schema(description = "Cross-run continuity key tying successive deliveries together") @Nullable String threadKey,
     @NonNull Instant createdAt,
-    @Schema(description = "When the feedback was placed; null if it was not delivered") Instant deliveredAt,
+    @Schema(description = "When the feedback was placed; null if it was not delivered") @Nullable Instant deliveredAt,
     @Schema(
         description = "Stored composed body; null when none was produced, and always null on the IN_APP " +
             "and IN_CHAT channels — neither the developer's practice pages nor the mentor's " +
             "queued move is readable by an operator"
     )
+    @Nullable
     String body,
     @NonNull @Schema(description = "Source observations in render order") List<ReviewBoundObservationDTO> observations,
     @NonNull @Schema(description = "Recorded placements; empty when none") List<ReviewPlacementDTO> placements
@@ -42,9 +50,9 @@ public record ReviewFeedbackDetailDTO(
      */
     public static ReviewFeedbackDetailDTO from(
         Feedback feedback,
-        ReviewArtifactDTO artifact,
-        ReviewSubjectDTO recipient,
-        ReviewSubjectDTO subject,
+        @Nullable ReviewArtifactDTO artifact,
+        @Nullable ReviewSubjectDTO recipient,
+        @Nullable ReviewSubjectDTO subject,
         List<ReviewBoundObservationDTO> observations,
         List<ReviewPlacementDTO> placements,
         boolean bodyVisible

@@ -23,6 +23,7 @@ import java.time.temporal.ChronoField;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import org.jspecify.annotations.Nullable;
@@ -130,9 +131,15 @@ public abstract class BaseGitLabProcessor {
             dto.id() != null
                 ? GitLabSyncConstants.toEntityId(dto.id())
                 : generateDeterministicLabelId(repository.getId(), dto.title());
-        Long providerId = repository.getProvider().getId();
+        Long providerId = Objects.requireNonNull(repository.getProvider().getId());
 
-        labelRepository.insertIfAbsent(nativeId, providerId, dto.title(), dto.color(), repository.getId());
+        labelRepository.insertIfAbsent(
+            nativeId,
+            Objects.requireNonNull(providerId),
+            dto.title(),
+            dto.color(),
+            repository.getId()
+        );
         return labelRepository.findByRepositoryIdAndName(repository.getId(), dto.title()).orElse(null);
     }
 
@@ -158,9 +165,9 @@ public abstract class BaseGitLabProcessor {
         }
 
         long nativeId = generateDeterministicLabelId(repository.getId(), title);
-        Long providerId = repository.getProvider().getId();
+        Long providerId = Objects.requireNonNull(repository.getProvider().getId());
 
-        labelRepository.insertIfAbsent(nativeId, providerId, title, color, repository.getId());
+        labelRepository.insertIfAbsent(nativeId, Objects.requireNonNull(providerId), title, color, repository.getId());
         return labelRepository.findByRepositoryIdAndName(repository.getId(), title).orElse(null);
     }
 
@@ -261,7 +268,7 @@ public abstract class BaseGitLabProcessor {
      */
     @Nullable
     protected ProcessingContext resolveContext(@Nullable String pathWithNamespace, @Nullable String action) {
-        if (pathWithNamespace == null || pathWithNamespace.isBlank()) {
+        if (pathWithNamespace == null || pathWithNamespace.isBlank() || action == null) {
             return null;
         }
 
@@ -282,7 +289,7 @@ public abstract class BaseGitLabProcessor {
         return ProcessingContext.forWebhook(scopeId, repository, action);
     }
 
-    private Long resolveScopeId(Repository repository) {
+    private @Nullable Long resolveScopeId(Repository repository) {
         if (repository.getOrganization() != null) {
             String orgLogin = repository.getOrganization().getLogin();
             Long scopeId = scopeIdResolver.findScopeIdByOrgLogin(orgLogin).orElse(null);

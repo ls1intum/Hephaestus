@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -9,12 +10,13 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.pullrequest.dto.GitHubPu
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.pullrequest.dto.GitLabMergeRequestEventDTO;
 import io.nats.client.Message;
 import java.io.InputStream;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.jackson.autoconfigure.JacksonAutoConfiguration;
+import org.springframework.boot.test.autoconfigure.json.JsonTest;
 import org.springframework.boot.test.context.ConfigDataApplicationContextInitializer;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ContextConfiguration;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
@@ -36,19 +38,17 @@ import tools.jackson.databind.ObjectMapper;
  * deep paths and a typed {@code Instant} coercion — still map correctly.
  */
 @Tag("unit")
-@SpringBootTest(classes = JacksonAutoConfiguration.class)
-// ConfigDataApplicationContextInitializer makes the slice read application.yml, so the
-// autoconfigured mapper binds the real spring.jackson.* stanza (fail-on-unknown-properties,
-// fail-on-null-for-primitives, etc.) rather than falling back to bare engine defaults. Without
-// it, a regression that flips fail-on-unknown-properties=true would not be caught here.
-@ContextConfiguration(initializers = ConfigDataApplicationContextInitializer.class)
+@JsonTest
+@ContextConfiguration(
+    classes = JacksonAutoConfiguration.class,
+    initializers = ConfigDataApplicationContextInitializer.class
+)
 class MultiVersionFixtureTest {
 
-    /** The exact production mapper bean — autoconfigured from {@code spring.jackson.*}. */
     @Autowired
     private ObjectMapper jackson3;
 
-    private NatsMessageDeserializer deserializer;
+    private @Nullable NatsMessageDeserializer deserializer;
 
     private NatsMessageDeserializer deserializer() {
         if (deserializer == null) {
@@ -126,15 +126,15 @@ class MultiVersionFixtureTest {
         assertThat(dto.action()).isEqualTo("opened");
         assertThat(dto.number()).isEqualTo(42);
         assertThat(dto.pullRequest()).isNotNull();
-        assertThat(dto.pullRequest().title()).isEqualTo("Add feature X");
+        assertThat(required(dto.pullRequest()).title()).isEqualTo("Add feature X");
         // Deep path: pull_request.base.ref / head.ref — proves nested @JsonProperty wiring.
         assertThat(dto.pullRequest().base()).isNotNull();
-        assertThat(dto.pullRequest().base().ref()).isEqualTo("main");
-        assertThat(dto.pullRequest().head().ref()).isEqualTo("feature-x");
+        assertThat(required(required(dto.pullRequest()).base()).ref()).isEqualTo("main");
+        assertThat(required(required(dto.pullRequest()).head()).ref()).isEqualTo("feature-x");
         // Typed coercion: created_at string -> Instant. A removed JavaTime handling or a bad
         // @JsonProperty would surface here, not in a literal echo of a String.
-        assertThat(dto.pullRequest().createdAt()).isEqualTo("2026-05-25T10:00:00Z");
-        assertThat(dto.repository().fullName()).isEqualTo("HephaestusTest/repo");
+        assertThat(required(dto.pullRequest()).createdAt()).isEqualTo("2026-05-25T10:00:00Z");
+        assertThat(required(dto.repository()).fullName()).isEqualTo("HephaestusTest/repo");
     }
 
     private static void assertKnownGitlabFields(GitLabMergeRequestEventDTO dto) {
@@ -166,5 +166,10 @@ class MultiVersionFixtureTest {
             assertThat(in).as("fixture %s must be on the classpath", classpath).isNotNull();
             return in.readAllBytes();
         }
+    }
+
+    private static <T> T required(@Nullable T value) {
+        assertNotNull(value);
+        return value;
     }
 }

@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
@@ -17,9 +18,9 @@ import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobType;
 import de.tum.cit.aet.hephaestus.integration.core.sync.api.ConnectionSyncStatusDTO;
 import de.tum.cit.aet.hephaestus.integration.core.sync.api.SyncResourceStateDTO;
 import de.tum.cit.aet.hephaestus.integration.core.sync.api.TriggerSyncJobRequestDTO;
-import de.tum.cit.aet.hephaestus.integration.outline.client.OutlineApiClient;
 import de.tum.cit.aet.hephaestus.integration.outline.client.OutlineApiException;
 import de.tum.cit.aet.hephaestus.integration.outline.client.OutlineClientModels;
+import de.tum.cit.aet.hephaestus.integration.outline.client.OutlineContentClient;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineCollection;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineCollection.MirrorState;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineCollection.SyncStatus;
@@ -36,13 +37,13 @@ import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembership.WorkspaceRole;
 import java.util.List;
 import java.util.Set;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.TestPropertySource;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.reactive.server.WebTestClient;
 
 /**
@@ -73,14 +74,20 @@ class OutlineCollectionAdminControllerIntegrationTest extends AbstractWorkspaceI
     @Autowired
     private CredentialBundleConverter credentialConverter;
 
-    @MockitoBean
-    private OutlineApiClient outlineApiClient;
+    @Autowired
+    private OutlineContentClient outlineApiClient;
 
     private Workspace workspace;
     private long connectionId;
 
+    @AfterEach
+    void resetOutlineClient() {
+        reset(outlineApiClient);
+    }
+
     @BeforeEach
     void setUp() {
+        reset(outlineApiClient);
         User owner = persistUser("outline-admin-owner-" + System.nanoTime());
         workspace = createWorkspace(
             "outline-admin-" + System.nanoTime(),

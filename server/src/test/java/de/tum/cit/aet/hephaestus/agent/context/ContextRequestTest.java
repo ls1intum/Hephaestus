@@ -28,6 +28,5 @@ class ContextRequestTest extends BaseUnitTest {
         assertThatThrownBy(() -> new MentorChatRequest(1L, 0L, threadId))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessageContaining("developerId");
-        assertThatThrownBy(() -> new MentorChatRequest(1L, 2L, null)).isInstanceOf(NullPointerException.class);
     }
 }

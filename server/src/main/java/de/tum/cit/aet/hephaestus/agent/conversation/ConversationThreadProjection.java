@@ -50,7 +50,7 @@ public interface ConversationThreadProjection {
         NOT_FOUND,
     }
 
-    default @Nullable Instant sourceEffectiveAt(String sourceEventId) {
+    default @Nullable Instant sourceEffectiveAt(@Nullable String sourceEventId) {
         return null;
     }
 }

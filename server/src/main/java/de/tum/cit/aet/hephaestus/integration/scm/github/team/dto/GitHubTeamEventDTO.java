@@ -7,6 +7,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubWebhookEven
 import de.tum.cit.aet.hephaestus.integration.scm.github.repository.dto.GitHubRepositoryRefDTO;
 import de.tum.cit.aet.hephaestus.integration.scm.github.user.dto.GitHubUserDTO;
 import java.time.Instant;
+import org.jspecify.annotations.Nullable;
 
 /**
  * DTO for GitHub team webhook events.
@@ -34,16 +35,16 @@ public record GitHubTeamEventDTO(
      */
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record GitHubTeamDTO(
-        @JsonProperty("id") Long id,
+        @JsonProperty("id") @Nullable Long id,
         @JsonProperty("node_id") String nodeId,
         @JsonProperty("name") String name,
         @JsonProperty("slug") String slug,
         @JsonProperty("description") String description,
-        @JsonProperty("privacy") String privacy,
-        @JsonProperty("permission") String permission,
-        @JsonProperty("html_url") String htmlUrl,
-        @JsonProperty("created_at") Instant createdAt,
-        @JsonProperty("updated_at") Instant updatedAt
+        @JsonProperty("privacy") @Nullable String privacy,
+        @JsonProperty("permission") @Nullable String permission,
+        @JsonProperty("html_url") @Nullable String htmlUrl,
+        @JsonProperty("created_at") @Nullable Instant createdAt,
+        @JsonProperty("updated_at") @Nullable Instant updatedAt
     ) {}
 
     /**

@@ -3,24 +3,16 @@ package de.tum.cit.aet.hephaestus.core.auth.dev;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.hasItem;
 
-import de.tum.cit.aet.hephaestus.testconfig.RealAuthDatasource;
+import de.tum.cit.aet.hephaestus.testconfig.RealAuthIntegrationTest;
 import java.util.Map;
 import java.util.Objects;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.webtestclient.autoconfigure.AutoConfigureWebTestClient;
-import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.reactive.server.WebTestClient;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
 /**
  * End-to-end contract of the passwordless dev sign-in with the flag ENABLED. Deliberately uses the
@@ -29,13 +21,8 @@ import org.testcontainers.junit.jupiter.Testcontainers;
  * accepted by the live decoder — exactly what {@code TestAuthUtils}/MockMvc cannot prove. The disabled
  * (default) contract is covered by {@link DevLoginDisabledIntegrationTest}.
  */
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@ActiveProfiles("test")
-@AutoConfigureWebTestClient
-@Testcontainers
 @TestPropertySource(properties = "hephaestus.auth.dev-login-enabled=true")
-@Tag("integration")
-class DevLoginIntegrationTest {
+class DevLoginIntegrationTest extends RealAuthIntegrationTest {
 
     @Autowired
     private WebTestClient webTestClient;
@@ -43,15 +30,10 @@ class DevLoginIntegrationTest {
     @Value("${hephaestus.auth.cookie-name:__Host-HEPHAESTUS_AT}")
     private String cookieName;
 
-    @DynamicPropertySource
-    static void datasource(DynamicPropertyRegistry registry) {
-        RealAuthDatasource.register(registry);
-    }
-
     @Test
     void devLoginMintsAcceptedCookie_andGetUserReturnsTheDevAccount() {
         // No XSRF token is sent: success here also proves the CSRF carve-out for the pre-auth POST.
-        String cookie = webTestClient
+        var responseCookie = webTestClient
             .post()
             .uri("/auth/dev-login")
             .contentType(MediaType.APPLICATION_JSON)
@@ -63,8 +45,9 @@ class DevLoginIntegrationTest {
             .exists(cookieName)
             .returnResult(Void.class)
             .getResponseCookies()
-            .getFirst(cookieName)
-            .getValue();
+            .getFirst(cookieName);
+        org.junit.jupiter.api.Assertions.assertNotNull(responseCookie);
+        String cookie = responseCookie.getValue();
 
         webTestClient
             .get()
@@ -119,19 +102,19 @@ class DevLoginIntegrationTest {
     }
 
     private String devLogin(String json) {
-        return Objects.requireNonNull(
-            webTestClient
-                .post()
-                .uri("/auth/dev-login")
-                .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(json)
-                .exchange()
-                .expectStatus()
-                .isNoContent()
-                .returnResult(Void.class)
-                .getResponseCookies()
-                .getFirst(cookieName)
-        ).getValue();
+        var cookie = webTestClient
+            .post()
+            .uri("/auth/dev-login")
+            .contentType(MediaType.APPLICATION_JSON)
+            .bodyValue(json)
+            .exchange()
+            .expectStatus()
+            .isNoContent()
+            .returnResult(Void.class)
+            .getResponseCookies()
+            .getFirst(cookieName);
+        org.junit.jupiter.api.Assertions.assertNotNull(cookie);
+        return cookie.getValue();
     }
 
     private long accountIdFrom(String cookie) {
@@ -145,6 +128,10 @@ class DevLoginIntegrationTest {
             .expectBody(Map.class)
             .returnResult()
             .getResponseBody();
-        return ((Number) Objects.requireNonNull(body).get("id")).longValue();
+        org.junit.jupiter.api.Assertions.assertNotNull(body);
+        Object id = body.get("id");
+        org.junit.jupiter.api.Assertions.assertNotNull(id);
+        assertThat(id).isInstanceOf(Number.class);
+        return ((Number) id).longValue();
     }
 }

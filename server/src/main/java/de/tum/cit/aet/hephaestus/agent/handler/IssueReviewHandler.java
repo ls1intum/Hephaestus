@@ -39,6 +39,7 @@ import java.util.EnumSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
@@ -115,7 +116,10 @@ public class IssueReviewHandler implements JobTypeHandler {
             );
         }
         ObjectNode metadata = objectMapper.createObjectNode();
-        metadata.put(PracticeDetectionDeliveryService.ORIGIN_METADATA_KEY, r.observationOrigin().name());
+        metadata.put(
+            PracticeDetectionDeliveryService.ORIGIN_METADATA_KEY,
+            Objects.requireNonNull(r.observationOrigin()).name()
+        );
         metadata.put("artifact_kind", ArtifactKinds.ISSUE.value());
         metadata.put("repository_id", r.repositoryId());
         metadata.put("repository_full_name", r.repositoryFullName());
@@ -345,7 +349,7 @@ public class IssueReviewHandler implements JobTypeHandler {
                 contributingPracticeSlugs
             );
             if (result.status() == PracticeFeedbackDispatchService.Result.Status.SUPPRESSED) {
-                recordSuppressed(job, delivery, result.suppressionReason());
+                recordSuppressed(job, delivery, result.refusal());
                 return;
             }
             if (result.status() != PracticeFeedbackDispatchService.Result.Status.SENT || result.externalRef() == null) {

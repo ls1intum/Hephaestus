@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.slack.retention;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
@@ -173,7 +174,7 @@ class SlackRetentionErasureIntegrationTest extends BaseIntegrationTest {
         assertThat(slackThreadRepository.pruneParticipant(workspace.getId(), 999L)).isZero();
     }
 
-    private UUID lastFeedbackId;
+    private UUID lastFeedbackId = UUID.randomUUID();
 
     private static String tsOf(Instant instant) {
         return String.format("%010d.000000", instant.getEpochSecond());
@@ -210,13 +211,15 @@ class SlackRetentionErasureIntegrationTest extends BaseIntegrationTest {
             "1700000000.000000",
             arr.toString()
         );
-        return jdbcTemplate.queryForObject(
+        Long id = jdbcTemplate.queryForObject(
             "SELECT id FROM slack_thread WHERE workspace_id = ? AND slack_channel_id = ? AND slack_thread_ts = ?",
             Long.class,
             workspaceId,
             channelId,
             threadTs
         );
+        assertNotNull(id);
+        return id;
     }
 
     private List<Long> participantIds(long threadId) {

@@ -16,6 +16,7 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -89,12 +90,12 @@ public class ExportBundleAssembler {
         }
 
         ExportBundle.Profile profile = new ExportBundle.Profile(
-            account.getId(),
+            Objects.requireNonNull(account.getId()),
             account.getDisplayName(),
             account.getPrimaryEmail(),
             // appRole deliberately not disclosed here — see ExportBundle.Profile (Art. 20(1) scope).
             account.getStatus().name(),
-            account.getCreatedAt()
+            Objects.requireNonNull(account.getCreatedAt())
         );
 
         List<ExportBundle.Identity> identityViews = identities.stream().map(this::toIdentity).toList();

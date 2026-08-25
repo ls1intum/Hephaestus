@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.core.auth.oauth;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
 import de.tum.cit.aet.hephaestus.core.auth.domain.AccountRepository;
@@ -9,21 +10,15 @@ import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityLink;
 import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityLinkRepository;
 import de.tum.cit.aet.hephaestus.core.auth.provider.LoginProvider;
 import de.tum.cit.aet.hephaestus.core.auth.provider.LoginProviderRepository;
-import de.tum.cit.aet.hephaestus.testconfig.RealAuthDatasource;
+import de.tum.cit.aet.hephaestus.testconfig.RealAuthIntegrationTest;
 import java.util.List;
 import java.util.Map;
-import org.junit.jupiter.api.Tag;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.context.annotation.Import;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.core.user.DefaultOAuth2User;
 import org.springframework.security.oauth2.core.user.OAuth2User;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
 /**
  * Authenticated Slack identity link, against a REAL Postgres. Drives {@link AccountProvisioningService}
@@ -35,11 +30,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
  * {@code IdentityLink(SLACK, U1, T1) MANUAL_LINK} to the SAME account, creating no new account; (2) an
  * unauthenticated link start (no bound account) fails closed and creates no orphan account.
  */
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@ActiveProfiles("test")
-@Testcontainers
-@Tag("integration")
-class SlackIdentityLinkIntegrationTest {
+class SlackIdentityLinkIntegrationTest extends RealAuthIntegrationTest {
 
     @Autowired
     private AccountProvisioningService service;
@@ -52,11 +43,6 @@ class SlackIdentityLinkIntegrationTest {
 
     @Autowired
     private LoginProviderRepository loginProviderRepository;
-
-    @DynamicPropertySource
-    static void datasource(DynamicPropertyRegistry registry) {
-        RealAuthDatasource.register(registry);
-    }
 
     @Test
     void linkingSlackAttachesExactlyOneSlackIdentityToTheSameAccount() {
@@ -79,16 +65,16 @@ class SlackIdentityLinkIntegrationTest {
             "slack-link",
             "U1",
             slackPrincipal("U1", "T1", "dev@example.com"),
-            AuthIntentCookie.Intent.link(github.getId(), "/settings")
+            AuthIntentCookie.Intent.link(persistedId(github.getId()), "/settings")
         );
 
         assertThat(linked.identityLinked()).isTrue();
-        assertThat(linked.account().getId()).isEqualTo(github.getId());
+        assertThat(linked.account().getId()).isEqualTo(persistedId(github.getId()));
         // The link attached to the existing account — it did NOT JIT a new one.
         assertThat(accountRepository.count()).isEqualTo(accountsAfterLogin);
 
         // Exactly one SLACK identity link (subject U1, team T1, MANUAL_LINK) now hangs off the SAME account.
-        List<IdentityLink> links = identityLinkRepository.findActiveByAccountId(github.getId());
+        List<IdentityLink> links = identityLinkRepository.findActiveByAccountId(persistedId(github.getId()));
         assertThat(links).extracting(IdentityLink::getSubject).containsExactlyInAnyOrder("gh-1", "U1");
         IdentityLink slack = links
             .stream()
@@ -156,5 +142,10 @@ class SlackIdentityLinkIntegrationTest {
             ),
             "sub"
         );
+    }
+
+    private static long persistedId(@Nullable Long id) {
+        assertNotNull(id);
+        return id;
     }
 }

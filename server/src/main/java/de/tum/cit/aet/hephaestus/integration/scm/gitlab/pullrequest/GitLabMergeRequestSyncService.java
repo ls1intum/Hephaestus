@@ -17,6 +17,7 @@ import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -69,7 +70,7 @@ public class GitLabMergeRequestSyncService {
 
     public SyncResult syncMergeRequests(Long scopeId, Repository repository, @Nullable OffsetDateTime updatedAfter) {
         String projectPath = repository.getNameWithOwner();
-        String safeProjectPath = sanitizeForLog(projectPath);
+        String safeProjectPath = Objects.requireNonNullElse(sanitizeForLog(projectPath), "<unknown>");
 
         log.info(
             "Starting merge request sync: scopeId={}, projectPath={}, updatedAfter={}",
@@ -136,7 +137,9 @@ public class GitLabMergeRequestSyncService {
 
                 if (page == 0) {
                     try {
-                        Object countField = response.field("project.mergeRequests.count").getValue();
+                        Object countField = Objects.requireNonNull(response)
+                            .field("project.mergeRequests.count")
+                            .getValue();
                         if (countField instanceof Number number) {
                             reportedTotalCount = number.intValue();
                             log.info(
@@ -151,7 +154,7 @@ public class GitLabMergeRequestSyncService {
                 }
 
                 @SuppressWarnings({ "unchecked", "rawtypes" })
-                List<Map<String, Object>> nodes = (List) response
+                List<Map<String, Object>> nodes = (List) Objects.requireNonNull(response)
                     .field("project.mergeRequests.nodes")
                     .toEntityList(Map.class);
 
@@ -175,7 +178,7 @@ public class GitLabMergeRequestSyncService {
                     }
                 }
 
-                GitLabPageInfo pageInfo = response
+                GitLabPageInfo pageInfo = Objects.requireNonNull(response)
                     .field("project.mergeRequests.pageInfo")
                     .toEntity(GitLabPageInfo.class);
 
@@ -250,16 +253,16 @@ public class GitLabMergeRequestSyncService {
     // Intermediate extraction records
 
     private record ScalarFields(
-        String globalId,
-        String iid,
-        String title,
+        @Nullable String globalId,
+        @Nullable String iid,
+        @Nullable String title,
         @Nullable String description,
-        String state,
+        @Nullable String state,
         boolean draft,
         @Nullable Boolean mergeable,
         @Nullable String detailedMergeStatus,
         boolean approved,
-        String webUrl,
+        @Nullable String webUrl,
         @Nullable String createdAt,
         @Nullable String updatedAt,
         @Nullable String closedAt,
@@ -267,8 +270,8 @@ public class GitLabMergeRequestSyncService {
         int commitCount,
         int userNotesCount,
         boolean discussionLocked,
-        String sourceBranch,
-        String targetBranch,
+        @Nullable String sourceBranch,
+        @Nullable String targetBranch,
         @Nullable String diffHeadSha,
         @Nullable String baseSha,
         @Nullable String mergeCommitSha
@@ -308,7 +311,7 @@ public class GitLabMergeRequestSyncService {
         int maxItems
     ) {
         String projectPath = repository.getNameWithOwner();
-        String safeProjectPath = sanitizeForLog(projectPath);
+        String safeProjectPath = Objects.requireNonNullElse(sanitizeForLog(projectPath), "<unknown>");
 
         int totalProcessed = 0;
         int minIid = Integer.MAX_VALUE;
@@ -350,7 +353,7 @@ public class GitLabMergeRequestSyncService {
                 graphQlClientProvider.recordSuccess();
 
                 @SuppressWarnings({ "unchecked", "rawtypes" })
-                List<Map<String, Object>> nodes = (List) response
+                List<Map<String, Object>> nodes = (List) Objects.requireNonNull(response)
                     .field("project.mergeRequests.nodes")
                     .toEntityList(Map.class);
 
@@ -379,7 +382,7 @@ public class GitLabMergeRequestSyncService {
 
                 remaining -= nodes.size();
 
-                GitLabPageInfo pageInfo = response
+                GitLabPageInfo pageInfo = Objects.requireNonNull(response)
                     .field("project.mergeRequests.pageInfo")
                     .toEntity(GitLabPageInfo.class);
 
@@ -672,7 +675,7 @@ public class GitLabMergeRequestSyncService {
         Map<String, Object> node,
         Long scopeId,
         String projectPath,
-        String iid,
+        @Nullable String iid,
         String context
     ) {
         Map<String, Object> labelsMap = (Map<String, Object>) node.get("labels");
@@ -719,7 +722,7 @@ public class GitLabMergeRequestSyncService {
         Map<String, Object> node,
         Long scopeId,
         String projectPath,
-        String iid,
+        @Nullable String iid,
         String context
     ) {
         Map<String, Object> assigneesMap = (Map<String, Object>) node.get("assignees");
@@ -760,7 +763,7 @@ public class GitLabMergeRequestSyncService {
         Map<String, Object> node,
         Long scopeId,
         String projectPath,
-        String iid,
+        @Nullable String iid,
         String context
     ) {
         Map<String, Object> reviewersMap = (Map<String, Object>) node.get("reviewers");
@@ -800,7 +803,7 @@ public class GitLabMergeRequestSyncService {
         Map<String, Object> node,
         Long scopeId,
         String projectPath,
-        String iid,
+        @Nullable String iid,
         String context
     ) {
         Map<String, Object> approvedByMap = (Map<String, Object>) node.get("approvedBy");
@@ -911,7 +914,7 @@ public class GitLabMergeRequestSyncService {
     private List<GitLabMergeRequestProcessor.SyncLabelData> fetchRemainingLabels(
         Long scopeId,
         String projectPath,
-        String iid,
+        @Nullable String iid,
         @Nullable String afterCursor,
         String context
     ) {
@@ -950,7 +953,9 @@ public class GitLabMergeRequestSyncService {
                 graphQlClientProvider.recordSuccess();
 
                 @SuppressWarnings("rawtypes")
-                List mrNodesRaw = response.field("project.mergeRequests.nodes").toEntityList(Map.class);
+                List mrNodesRaw = Objects.requireNonNull(response)
+                    .field("project.mergeRequests.nodes")
+                    .toEntityList(Map.class);
                 List<Map<String, Object>> mrNodes = (List<Map<String, Object>>) mrNodesRaw;
 
                 if (mrNodes == null || mrNodes.isEmpty()) break;
@@ -1011,7 +1016,7 @@ public class GitLabMergeRequestSyncService {
     private List<GitLabMergeRequestProcessor.SyncUserData> fetchRemainingAssignees(
         Long scopeId,
         String projectPath,
-        String iid,
+        @Nullable String iid,
         @Nullable String afterCursor,
         String context
     ) {
@@ -1050,7 +1055,9 @@ public class GitLabMergeRequestSyncService {
                 graphQlClientProvider.recordSuccess();
 
                 @SuppressWarnings("rawtypes")
-                List mrNodesRaw = response.field("project.mergeRequests.nodes").toEntityList(Map.class);
+                List mrNodesRaw = Objects.requireNonNull(response)
+                    .field("project.mergeRequests.nodes")
+                    .toEntityList(Map.class);
                 List<Map<String, Object>> mrNodes = (List<Map<String, Object>>) mrNodesRaw;
 
                 if (mrNodes == null || mrNodes.isEmpty()) break;
@@ -1109,7 +1116,7 @@ public class GitLabMergeRequestSyncService {
     private List<GitLabMergeRequestProcessor.SyncUserData> fetchRemainingReviewers(
         Long scopeId,
         String projectPath,
-        String iid,
+        @Nullable String iid,
         @Nullable String afterCursor,
         String context
     ) {
@@ -1148,7 +1155,9 @@ public class GitLabMergeRequestSyncService {
                 graphQlClientProvider.recordSuccess();
 
                 @SuppressWarnings("rawtypes")
-                List mrNodesRaw = response.field("project.mergeRequests.nodes").toEntityList(Map.class);
+                List mrNodesRaw = Objects.requireNonNull(response)
+                    .field("project.mergeRequests.nodes")
+                    .toEntityList(Map.class);
                 List<Map<String, Object>> mrNodes = (List<Map<String, Object>>) mrNodesRaw;
 
                 if (mrNodes == null || mrNodes.isEmpty()) break;
@@ -1207,7 +1216,7 @@ public class GitLabMergeRequestSyncService {
     private List<GitLabMergeRequestProcessor.SyncUserData> fetchRemainingApprovers(
         Long scopeId,
         String projectPath,
-        String iid,
+        @Nullable String iid,
         @Nullable String afterCursor,
         String context
     ) {
@@ -1246,7 +1255,9 @@ public class GitLabMergeRequestSyncService {
                 graphQlClientProvider.recordSuccess();
 
                 @SuppressWarnings("rawtypes")
-                List mrNodesRaw = response.field("project.mergeRequests.nodes").toEntityList(Map.class);
+                List mrNodesRaw = Objects.requireNonNull(response)
+                    .field("project.mergeRequests.nodes")
+                    .toEntityList(Map.class);
                 List<Map<String, Object>> mrNodes = (List<Map<String, Object>>) mrNodesRaw;
 
                 if (mrNodes == null || mrNodes.isEmpty()) break;

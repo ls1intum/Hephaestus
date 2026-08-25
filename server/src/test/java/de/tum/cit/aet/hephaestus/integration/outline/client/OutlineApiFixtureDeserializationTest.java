@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.outline.client;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import de.tum.cit.aet.hephaestus.integration.outline.client.model.OutlineCollectionModel;
 import de.tum.cit.aet.hephaestus.integration.outline.client.model.OutlineDocumentModel;
@@ -13,8 +14,8 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.jackson.autoconfigure.JacksonAutoConfiguration;
+import org.springframework.boot.test.autoconfigure.json.JsonTest;
 import org.springframework.boot.test.context.ConfigDataApplicationContextInitializer;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ContextConfiguration;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.json.JsonMapper;
@@ -32,8 +33,11 @@ import tools.jackson.databind.json.JsonMapper;
  * through the hand-written {@link OutlineEnvelope} wrapper, exactly as {@link OutlineApiClient} reads them.
  */
 @Tag("unit")
-@SpringBootTest(classes = JacksonAutoConfiguration.class)
-@ContextConfiguration(initializers = ConfigDataApplicationContextInitializer.class)
+@JsonTest
+@ContextConfiguration(
+    classes = JacksonAutoConfiguration.class,
+    initializers = ConfigDataApplicationContextInitializer.class
+)
 class OutlineApiFixtureDeserializationTest {
 
     @Autowired
@@ -74,6 +78,7 @@ class OutlineApiFixtureDeserializationTest {
 
         assertThat(response.data()).isNotNull();
         OutlineDocumentModel data = response.data();
+        assertNotNull(data);
         assertThat(data.getId()).isEqualTo("7d11d73d-1b36-43e3-9f31-b43e98c69b5b");
         assertThat(data.getTitle()).isEqualTo("Fixture Capture Doc Renamed");
         assertThat(data.getUrl()).isEqualTo("/doc/fixture-capture-doc-renamed-JpRHHJuY8M");
@@ -93,6 +98,7 @@ class OutlineApiFixtureDeserializationTest {
         );
 
         OutlineDocumentModel data = response.data();
+        assertNotNull(data);
         assertThat(data.getId()).isEqualTo("cec98e59-623c-4392-a343-6e96b0995e51");
         assertThat(data.getParentDocumentId()).isEqualTo("7d11d73d-1b36-43e3-9f31-b43e98c69b5b");
         assertThat(data.getCollectionId()).isEqualTo("fbe68839-b131-44e2-bb93-0bc533d39193");

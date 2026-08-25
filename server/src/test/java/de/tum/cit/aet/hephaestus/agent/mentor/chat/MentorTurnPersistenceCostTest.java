@@ -77,8 +77,10 @@ class MentorTurnPersistenceCostTest extends BaseUnitTest {
             state(1000, 200, 0, 0, 0, PricingState.PRICED)
         );
 
-        assertThat(out.messageMetadata().model()).isEqualTo("authoritative-model");
-        assertThat(out.messageMetadata().costUsd()).isEqualTo(0.0123);
+        var metadata = out.messageMetadata();
+        org.junit.jupiter.api.Assertions.assertNotNull(metadata);
+        assertThat(metadata.model()).isEqualTo("authoritative-model");
+        assertThat(metadata.costUsd()).isEqualTo(0.0123);
     }
 
     @Test
@@ -91,7 +93,9 @@ class MentorTurnPersistenceCostTest extends BaseUnitTest {
             state(0, 200, 500, 100, 150, PricingState.PRICED)
         );
 
-        assertThat(out.messageMetadata().costUsd())
+        var metadata = out.messageMetadata();
+        org.junit.jupiter.api.Assertions.assertNotNull(metadata);
+        assertThat(metadata.costUsd())
             .as("output $0.0023 + cacheRead $0.0100 + cacheWrite $0.0030, reasoning charged once")
             .isEqualTo(0.0153);
     }

@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.practices.curated.adoption;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.practices.PracticeAreaRepository;
@@ -18,6 +19,7 @@ import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -461,29 +463,33 @@ class CatalogAdoptionControllerIntegrationTest extends AbstractWorkspaceIntegrat
     }
 
     private String previewEtag() {
-        return webTestClient
-            .get()
-            .uri(BASE + "/" + PRACTICE, workspace.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .returnResult(CatalogPracticePreviewDTO.class)
-            .getResponseHeaders()
-            .getETag();
+        return required(
+            webTestClient
+                .get()
+                .uri(BASE + "/" + PRACTICE, workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .returnResult(CatalogPracticePreviewDTO.class)
+                .getResponseHeaders()
+                .getETag()
+        );
     }
 
     private CatalogAreaAdoptionPreviewDTO previewArea() {
-        return webTestClient
-            .get()
-            .uri(BASE + "/areas/" + AREA, workspace.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody(CatalogAreaAdoptionPreviewDTO.class)
-            .returnResult()
-            .getResponseBody();
+        return required(
+            webTestClient
+                .get()
+                .uri(BASE + "/areas/" + AREA, workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody(CatalogAreaAdoptionPreviewDTO.class)
+                .returnResult()
+                .getResponseBody()
+        );
     }
 
     private WebTestClient.ResponseSpec adoptArea(String etag) {
@@ -524,5 +530,10 @@ class CatalogAdoptionControllerIntegrationTest extends AbstractWorkspaceIntegrat
             .exchange()
             .returnResult(Void.class)
             .getStatus();
+    }
+
+    private static <T> T required(@Nullable T value) {
+        assertNotNull(value);
+        return value;
     }
 }

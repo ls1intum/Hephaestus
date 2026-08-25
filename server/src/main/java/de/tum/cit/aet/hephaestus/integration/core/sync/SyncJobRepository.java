@@ -4,6 +4,7 @@ import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import org.jspecify.annotations.Nullable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -112,9 +113,9 @@ public interface SyncJobRepository extends JpaRepository<SyncJob, Long> {
     int completeActiveJob(
         @Param("id") long id,
         @Param("status") SyncJobStatus status,
-        @Param("errorSummary") String errorSummary,
-        @Param("itemsProcessed") Integer itemsProcessed,
-        @Param("itemsTotal") Integer itemsTotal,
+        @Param("errorSummary") @Nullable String errorSummary,
+        @Param("itemsProcessed") @Nullable Integer itemsProcessed,
+        @Param("itemsTotal") @Nullable Integer itemsTotal,
         @Param("progress") java.util.Map<String, Object> progress,
         @Param("activeStatuses") Collection<SyncJobStatus> activeStatuses
     );

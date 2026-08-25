@@ -43,9 +43,9 @@ import org.jspecify.annotations.Nullable;
  * @param source         Whether data came from sync or webhook
  */
 public record ProcessingContext(
-    Long scopeId,
-    Repository repository,
-    IdentityProvider provider,
+    @Nullable Long scopeId,
+    @Nullable Repository repository,
+    @Nullable IdentityProvider provider,
     Instant startedAt,
     String correlationId,
     @Nullable String webhookAction,
@@ -54,14 +54,14 @@ public record ProcessingContext(
     /**
      * Returns the provider's database ID for use in upsert queries.
      */
-    public Long providerId() {
+    public @Nullable Long providerId() {
         return provider != null ? provider.getId() : null;
     }
 
     /**
      * Creates a context for scheduled sync operations.
      */
-    public static ProcessingContext forSync(Long scopeId, Repository repository) {
+    public static ProcessingContext forSync(@Nullable Long scopeId, @Nullable Repository repository) {
         return new ProcessingContext(
             scopeId,
             repository,
@@ -77,7 +77,7 @@ public record ProcessingContext(
      * Creates a context for sync operations that are not repository-scoped
      * (e.g., organization-level project sync, team sync).
      */
-    public static ProcessingContext forSync(Long scopeId, IdentityProvider provider) {
+    public static ProcessingContext forSync(@Nullable Long scopeId, IdentityProvider provider) {
         return new ProcessingContext(
             scopeId,
             null,
@@ -92,7 +92,7 @@ public record ProcessingContext(
     /**
      * Creates a context for webhook event processing.
      */
-    public static ProcessingContext forWebhook(Long scopeId, Repository repository, String action) {
+    public static ProcessingContext forWebhook(@Nullable Long scopeId, Repository repository, String action) {
         return new ProcessingContext(
             scopeId,
             repository,
@@ -108,7 +108,7 @@ public record ProcessingContext(
      * Creates a context for webhook events that are not repository-scoped
      * (e.g., organization-level project events).
      */
-    public static ProcessingContext forWebhook(Long scopeId, IdentityProvider provider, String action) {
+    public static ProcessingContext forWebhook(@Nullable Long scopeId, IdentityProvider provider, String action) {
         return new ProcessingContext(
             scopeId,
             null,

@@ -5,6 +5,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.project.ProjectItem;
 import de.tum.cit.aet.hephaestus.integration.scm.github.project.ProjectStatusUpdate;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.Objects;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
@@ -113,7 +114,7 @@ public final class GitHubProjectEventPayload {
             return new ProjectItemData(
                 item.getId(),
                 item.getNodeId() != null ? item.getNodeId() : "",
-                item.getProject().getId(),
+                Objects.requireNonNull(item.getProject()).getId(),
                 item.getContentType(),
                 item.getIssue() != null ? item.getIssue().getId() : null,
                 item.isArchived(),
@@ -143,7 +144,7 @@ public final class GitHubProjectEventPayload {
             return new ProjectStatusUpdateData(
                 update.getId(),
                 update.getNodeId() != null ? update.getNodeId() : "",
-                update.getProject().getId(),
+                Objects.requireNonNull(update.getProject()).getId(),
                 update.getBody(),
                 update.getStartDate(),
                 update.getTargetDate(),

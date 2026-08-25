@@ -1,5 +1,7 @@
 package de.tum.cit.aet.hephaestus.activity;
 
+import org.jspecify.annotations.Nullable;
+
 /**
  * Projection for XP aggregation queries on activity events.
  *
@@ -12,8 +14,10 @@ public interface ActivityXpProjection {
     Long getActorId();
 
     /** Total XP earned in the timeframe */
+    @Nullable
     Double getTotalExperiencePoints();
 
     /** Number of activity events */
+    @Nullable
     Long getEventCount();
 }

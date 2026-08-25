@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -251,19 +252,25 @@ class FeedbackObservationRepositoryIntegrationTest extends BaseIntegrationTest {
         feedbackObservationRepository.insertIfAbsent(feedback.getId(), observation.getId(), "PRIMARY", 0);
     }
 
-    private Feedback saveFeedback(int position, FeedbackDeliveryState state, String body) {
+    private Feedback saveFeedback(int position, FeedbackDeliveryState state, @Nullable String body) {
         return saveFeedback(null, position, state, body, Instant.now());
     }
 
-    private Feedback saveFeedback(UUID id, int position, FeedbackDeliveryState state, String body, Instant createdAt) {
+    private Feedback saveFeedback(
+        @Nullable UUID id,
+        int position,
+        FeedbackDeliveryState state,
+        @Nullable String body,
+        Instant createdAt
+    ) {
         return saveFeedback(id, position, state, body, createdAt, FeedbackChannel.IN_CONTEXT);
     }
 
     private Feedback saveFeedback(
-        UUID id,
+        @Nullable UUID id,
         int position,
         FeedbackDeliveryState state,
-        String body,
+        @Nullable String body,
         Instant createdAt,
         FeedbackChannel channel
     ) {

@@ -20,6 +20,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
@@ -63,7 +64,7 @@ class GeneralReviewCommentContentSourceTest extends BaseUnitTest {
         return new ContextRequest.PracticeReviewRequest(job);
     }
 
-    private IssueComment comment(String login, String body, Instant createdAt) {
+    private IssueComment comment(@Nullable String login, String body, @Nullable Instant createdAt) {
         IssueComment c = new IssueComment();
         c.setBody(body);
         if (login != null) {

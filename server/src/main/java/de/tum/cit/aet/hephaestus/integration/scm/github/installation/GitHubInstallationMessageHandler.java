@@ -19,6 +19,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubEventType;
 import de.tum.cit.aet.hephaestus.integration.scm.github.installation.dto.GitHubInstallationEventDTO;
 import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -116,7 +117,14 @@ public class GitHubInstallationMessageHandler extends AbstractIntegrationMessage
                 ? event
                       .repositories()
                       .stream()
-                      .map(ref -> new RepositorySnapshot(ref.id(), ref.fullName(), ref.name(), ref.isPrivate()))
+                      .map(ref ->
+                          new RepositorySnapshot(
+                              Objects.requireNonNull(ref.id()),
+                              ref.fullName(),
+                              ref.name(),
+                              ref.isPrivate()
+                          )
+                      )
                       .toList()
                 : Collections.emptyList();
 
@@ -173,7 +181,11 @@ public class GitHubInstallationMessageHandler extends AbstractIntegrationMessage
                 .findByTypeAndServerUrl(IdentityProviderType.GITHUB, GITHUB_SERVER_URL)
                 .orElseThrow(() -> new IllegalStateException("IdentityProvider not found for GitHub"))
                 .getId();
-            organizationService.upsertIdentity(account.id(), accountLogin, providerId);
+            organizationService.upsertIdentity(
+                Objects.requireNonNull(account.id()),
+                Objects.requireNonNull(accountLogin),
+                Objects.requireNonNull(providerId)
+            );
         }
 
         // Handle activation for CREATED events

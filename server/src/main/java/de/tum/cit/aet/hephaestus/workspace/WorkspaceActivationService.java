@@ -16,6 +16,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
@@ -256,7 +257,7 @@ public class WorkspaceActivationService {
         if (isBlank(workspace.getAccountLogin())) {
             String derived = deriveAccountLogin(workspace);
             if (!isBlank(derived)) {
-                workspace.setAccountLogin(derived);
+                workspace.setAccountLogin(Objects.requireNonNull(derived));
                 return workspaceRepository.save(workspace);
             }
         }
@@ -265,6 +266,7 @@ public class WorkspaceActivationService {
     }
 
     /** Derives an account login for legacy workspaces from their first monitored repo's owner. */
+    @Nullable
     String deriveAccountLogin(Workspace workspace) {
         String repoOwner = workspace
             .getRepositoriesToMonitor()
@@ -275,15 +277,15 @@ public class WorkspaceActivationService {
             .findFirst()
             .orElse(null);
 
-        if (!isBlank(repoOwner)) {
-            return repoOwner;
+        if (repoOwner != null && !repoOwner.isBlank()) {
+            return Objects.requireNonNull(repoOwner);
         }
 
         return null;
     }
 
-    private String extractOwner(String nameWithOwner) {
-        if (isBlank(nameWithOwner)) {
+    private @Nullable String extractOwner(@Nullable String nameWithOwner) {
+        if (nameWithOwner == null || nameWithOwner.isBlank()) {
             return null;
         }
         int idx = nameWithOwner.indexOf('/');
@@ -297,7 +299,7 @@ public class WorkspaceActivationService {
         return natsProperties.enabled() && workspace != null;
     }
 
-    private boolean isBlank(String value) {
+    private boolean isBlank(@Nullable String value) {
         return value == null || value.isBlank();
     }
 }

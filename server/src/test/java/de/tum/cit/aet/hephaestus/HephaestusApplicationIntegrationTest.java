@@ -1,35 +1,10 @@
 package de.tum.cit.aet.hephaestus;
 
-import de.tum.cit.aet.hephaestus.testconfig.PostgreSQLTestContainer;
-import org.junit.jupiter.api.Tag;
+import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import org.junit.jupiter.api.Test;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
-import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
-/**
- * Smoke test that verifies the Spring Boot application context can start successfully.
- * Tests basic configuration, bean wiring, and database connectivity.
- */
-@SpringBootTest
-@ActiveProfiles("test")
-@Testcontainers
-@Tag("integration")
-class HephaestusApplicationIntegrationTest {
-
-    @DynamicPropertySource
-    static void configureProperties(DynamicPropertyRegistry registry) {
-        PostgreSQLContainer<?> postgres = PostgreSQLTestContainer.getInstance();
-        registry.add("spring.datasource.url", postgres::getJdbcUrl);
-        registry.add("spring.datasource.username", postgres::getUsername);
-        registry.add("spring.datasource.password", postgres::getPassword);
-    }
+class HephaestusApplicationIntegrationTest extends BaseIntegrationTest {
 
     @Test
-    void contextLoads() {
-        // Verifies Spring context can start and all beans are properly configured
-    }
+    void shouldLoadApplicationContextWhenUsingBaseIntegrationTest() {}
 }

@@ -30,7 +30,7 @@ public record WorkspaceLlmModelDTO(
     @NonNull @Schema(description = "Currency code") String currency,
     @Nullable @Schema(description = "Price note") String priceNote,
     @NonNull @Schema(description = "Creation timestamp") Instant createdAt,
-    @Schema(description = "Last update timestamp") Instant updatedAt
+    @Nullable @Schema(description = "Last update timestamp") Instant updatedAt
 ) {
     public static WorkspaceLlmModelDTO from(WorkspaceLlmModel model) {
         return new WorkspaceLlmModelDTO(

@@ -121,7 +121,7 @@ class PracticeFeedbackDeliveryPolicyTest extends BaseUnitTest {
             DeliveryPolicyEvaluationCommand.class
         );
         org.mockito.Mockito.verify(evaluationRecorder).record(recorded.capture());
-        return recorded.getValue().result().suppressionReason();
+        return recorded.getValue().result().refusal();
     }
 
     private AgentJob conversationJob() {

@@ -34,6 +34,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 @Entity
 @Table(
@@ -69,7 +70,7 @@ public class Issue extends BaseGitServiceEntity {
 
     @Enumerated(EnumType.STRING)
     @Column(length = 32)
-    private Issue.StateReason stateReason;
+    private Issue.@Nullable StateReason stateReason;
 
     @NonNull
     @Column(length = 1024)
@@ -77,14 +78,13 @@ public class Issue extends BaseGitServiceEntity {
 
     @Column(columnDefinition = "TEXT")
     @ToString.Exclude
-    private String body;
+    private @Nullable String body;
 
-    @NonNull
-    private String htmlUrl;
+    private @Nullable String htmlUrl;
 
     private boolean isLocked;
 
-    private Instant closedAt;
+    private @Nullable Instant closedAt;
 
     private int commentsCount;
 
@@ -143,7 +143,7 @@ public class Issue extends BaseGitServiceEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "author_id")
     @ToString.Exclude
-    private User author;
+    private @Nullable User author;
 
     @ManyToMany
     @JoinTable(
@@ -166,15 +166,26 @@ public class Issue extends BaseGitServiceEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "milestone_id")
     @ToString.Exclude
-    private Milestone milestone;
+    private @Nullable Milestone milestone;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "repository_id")
-    private Repository repository;
+    private @Nullable Repository repository;
 
     @OneToMany(mappedBy = "issue", cascade = CascadeType.REMOVE, orphanRemoval = true)
     @ToString.Exclude
     private Set<IssueComment> comments = new HashSet<>();
+
+    public @Nullable Repository getRepository() {
+        return repository;
+    }
+
+    public Repository requireRepository() {
+        if (repository == null) {
+            throw new IllegalStateException("Issue has no repository");
+        }
+        return repository;
+    }
 
     /**
      * The parent issue if this is a sub-issue. Null if this is a top-level issue.
@@ -183,7 +194,7 @@ public class Issue extends BaseGitServiceEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "parent_issue_id")
     @ToString.Exclude
-    private Issue parentIssue;
+    private @Nullable Issue parentIssue;
 
     /**
      * Sub-issues of this issue. Empty if this issue has no children.
@@ -221,7 +232,7 @@ public class Issue extends BaseGitServiceEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "issue_type_id")
     @ToString.Exclude
-    private IssueType issueType;
+    private @Nullable IssueType issueType;
 
     /**
      * Issues that block this issue from being worked on or completed.

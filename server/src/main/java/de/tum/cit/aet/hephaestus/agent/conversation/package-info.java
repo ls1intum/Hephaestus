@@ -19,4 +19,5 @@
  * break in the agent. Exposed to {@code integration.slack} via the {@code conversation-source} named interface.
  */
 @org.springframework.modulith.NamedInterface("conversation-source")
+@org.jspecify.annotations.NullMarked
 package de.tum.cit.aet.hephaestus.agent.conversation;

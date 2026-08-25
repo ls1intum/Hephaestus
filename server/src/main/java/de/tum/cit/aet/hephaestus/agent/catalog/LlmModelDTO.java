@@ -30,7 +30,7 @@ public record LlmModelDTO(
     @NonNull @Schema(description = "Active toggle") Boolean enabled,
     @Nullable @Schema(description = "Current price; null if none has ever been set") LlmModelPriceDTO currentPrice,
     @NonNull @Schema(description = "Creation timestamp") Instant createdAt,
-    @Schema(description = "Last update timestamp") Instant updatedAt
+    @Nullable @Schema(description = "Last update timestamp") Instant updatedAt
 ) {
     public static LlmModelDTO from(
         LlmModel model,

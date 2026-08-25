@@ -7,6 +7,7 @@ import java.time.Duration;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
@@ -26,7 +27,7 @@ public class WorkerCapacityReporter {
     private final ScheduledExecutorService scheduler;
     private final Counter sent;
     private final Counter failed;
-    private volatile ScheduledFuture<?> task;
+    private volatile @Nullable ScheduledFuture<?> task;
 
     public WorkerCapacityReporter(
         WorkerCapacityState state,

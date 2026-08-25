@@ -81,7 +81,7 @@ public class WorkspaceLlmConnection {
     @Convert(converter = EncryptedStringConverter.class)
     @Column(name = "api_key", columnDefinition = "TEXT")
     @ToString.Exclude
-    private String apiKey;
+    private @Nullable String apiKey;
 
     @ColumnDefault("false")
     @Column(name = "enabled", nullable = false)

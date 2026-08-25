@@ -4,4 +4,5 @@
  * configure default GitLab connections, rotate tokens, and create/delete webhooks.
  */
 @org.springframework.modulith.NamedInterface("common")
+@org.jspecify.annotations.NullMarked
 package de.tum.cit.aet.hephaestus.integration.scm.gitlab.common;

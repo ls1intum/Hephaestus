@@ -8,6 +8,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.jspecify.annotations.Nullable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -604,20 +605,29 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
     interface OperatorFeedbackRow {
         UUID getId();
         UUID getAgentJobId();
+
         /** The raw column: a native-query projection is mapped from JDBC types, with no converter run. */
+        @Nullable
         String getArtifactKind();
+
         Long getArtifactId();
         Long getRecipientUserId();
         Long getAboutUserId();
         FeedbackChannel getChannel();
         FeedbackDeliveryState getDeliveryState();
+
+        @Nullable
         FeedbackSuppressionReason getSuppressionReason();
 
+        @Nullable
         UUID getReplacesId();
 
         Instant getCreatedAt();
+
+        @Nullable
         Instant getDeliveredAt();
 
+        @Nullable
         String getBodyPreview();
 
         Boolean getBodyTruncated();
@@ -650,7 +660,10 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
     interface ArtifactFeedbackRow {
         Long getPracticeId();
         FeedbackDeliveryState getDeliveryState();
+
+        @Nullable
         FeedbackSuppressionReason getSuppressionReason();
+
         long getUnits();
     }
 

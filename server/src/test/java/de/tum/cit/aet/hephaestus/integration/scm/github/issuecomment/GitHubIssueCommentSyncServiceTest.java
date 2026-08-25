@@ -126,7 +126,7 @@ class GitHubIssueCommentSyncServiceTest extends BaseUnitTest {
         connection.setTotalCount(comments.size());
         GHPageInfo pageInfo = new GHPageInfo();
         pageInfo.setHasNextPage(false);
-        pageInfo.setEndCursor(null);
+
         connection.setPageInfo(pageInfo);
 
         when(graphQlClient.documentName(documentName)).thenReturn(requestSpec);

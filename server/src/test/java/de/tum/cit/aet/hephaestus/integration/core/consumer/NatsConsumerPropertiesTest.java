@@ -22,14 +22,14 @@ class NatsConsumerPropertiesTest extends BaseUnitTest {
     class ConstructorDefaults {
 
         @Test
-        void nullPoisonBlockUsesDefaults() {
-            NatsConsumerProperties props = new NatsConsumerProperties(
-                Duration.ofMinutes(5),
-                500,
-                Duration.ofSeconds(2),
-                Duration.ofDays(30),
-                null
-            );
+        void nullPoisonBlockUsesDefaults() throws ReflectiveOperationException {
+            NatsConsumerProperties props = NatsConsumerProperties.class.getDeclaredConstructor(
+                Duration.class,
+                int.class,
+                Duration.class,
+                Duration.class,
+                NatsConsumerProperties.PoisonProperties.class
+            ).newInstance(Duration.ofMinutes(5), 500, Duration.ofSeconds(2), Duration.ofDays(30), null);
 
             assertThat(props.poison()).isNotNull();
             assertThat(props.poison().maxRedeliver()).isEqualTo(10);

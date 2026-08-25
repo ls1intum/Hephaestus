@@ -69,7 +69,7 @@ public class GitLabWebhookContextResolver {
         return ProcessingContext.forWebhook(scopeId, repository, action);
     }
 
-    private Long resolveScopeId(Repository repository) {
+    private @Nullable Long resolveScopeId(Repository repository) {
         if (repository.getOrganization() != null) {
             String orgLogin = repository.getOrganization().getLogin();
             Long scopeId = scopeIdResolver.findScopeIdByOrgLogin(orgLogin).orElse(null);

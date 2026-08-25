@@ -112,6 +112,10 @@ public class GitHubIssueDependenciesMessageHandler
         // Process dependency relationship
         Long blockedIssueId = blockedIssueDto.getDatabaseId();
         Long blockingIssueId = blockingIssueDto.getDatabaseId();
+        if (blockedIssueId == null || blockingIssueId == null) {
+            log.warn("Skipped issue dependency event: reason=missingDatabaseId");
+            return;
+        }
 
         switch (event.actionType()) {
             case GitHubEventAction.IssueDependency.ADDED -> issueDependencySyncService.processIssueDependencyEvent(

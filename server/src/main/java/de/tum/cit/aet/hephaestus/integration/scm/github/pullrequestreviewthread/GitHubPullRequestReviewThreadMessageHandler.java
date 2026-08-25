@@ -13,6 +13,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.common.ProcessingContext
 import de.tum.cit.aet.hephaestus.integration.scm.github.pullrequest.GitHubPullRequestProcessor;
 import de.tum.cit.aet.hephaestus.integration.scm.github.pullrequestreviewthread.dto.GitHubPullRequestReviewThreadEventDTO;
 import de.tum.cit.aet.hephaestus.integration.scm.github.user.GitHubUserProcessor;
+import java.util.Objects;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -97,7 +98,10 @@ public class GitHubPullRequestReviewThreadMessageHandler
                     return;
                 }
                 // Ensure the sender (who resolved the thread) exists
-                User resolvedBy = userProcessor.ensureExists(event.sender(), context.providerId());
+                User resolvedBy = userProcessor.ensureExists(
+                    event.sender(),
+                    Objects.requireNonNull(context.providerId())
+                );
                 threadProcessor.resolve(threadId, resolvedBy, context);
             }
             case GitHubEventAction.PullRequestReviewThread.UNRESOLVED -> {

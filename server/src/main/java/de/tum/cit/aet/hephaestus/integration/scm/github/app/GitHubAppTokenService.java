@@ -28,6 +28,7 @@ import java.util.Base64;
 import java.util.Date;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import org.jspecify.annotations.Nullable;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.client.reactive.ReactorClientHttpConnector;
@@ -245,7 +246,7 @@ public class GitHubAppTokenService {
 
     // Key loading helpers
 
-    private static PrivateKey loadKey(Resource privateKeyRes, String privateKeyPem) {
+    private static PrivateKey loadKey(@Nullable Resource privateKeyRes, @Nullable String privateKeyPem) {
         try {
             if (privateKeyPem != null && !privateKeyPem.isBlank()) {
                 return parsePemPrivateKey(privateKeyPem);
@@ -359,7 +360,11 @@ public class GitHubAppTokenService {
         }
     }
 
-    private static boolean isKeyMaterialPresent(long appId, Resource privateKeyRes, String privateKeyPem) {
+    private static boolean isKeyMaterialPresent(
+        long appId,
+        @Nullable Resource privateKeyRes,
+        @Nullable String privateKeyPem
+    ) {
         if (appId <= 0) {
             return false;
         }

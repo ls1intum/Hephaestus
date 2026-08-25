@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.core.auth.oauth;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
 import de.tum.cit.aet.hephaestus.core.auth.domain.AccountFeature;
@@ -14,27 +15,20 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRep
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
-import de.tum.cit.aet.hephaestus.testconfig.DatabaseTestUtils;
-import de.tum.cit.aet.hephaestus.testconfig.RealAuthDatasource;
+import de.tum.cit.aet.hephaestus.testconfig.RealAuthIntegrationTest;
 import de.tum.cit.aet.hephaestus.testconfig.TestUserFactory;
 import java.net.URI;
 import java.util.List;
 import java.util.Map;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.context.annotation.Import;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.client.registration.ClientRegistration;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 import org.springframework.security.oauth2.core.user.DefaultOAuth2User;
 import org.springframework.security.oauth2.core.user.OAuth2User;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
 /**
  * Real-Postgres proof of what unit/repository tests cannot give: that login-side and SCM-side resolve
@@ -42,11 +36,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
  * {@code (User.provider.id, String.valueOf(User.nativeId))} tuple matches the {@code IdentityLink}
  * the login flow stored. Drives the real provisioning path (the inline comments mark each seam).
  */
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@ActiveProfiles("test")
-@Testcontainers
-@Tag("integration")
-class PracticeRoleResolutionEndToEndIntegrationTest {
+class PracticeRoleResolutionEndToEndIntegrationTest extends RealAuthIntegrationTest {
 
     private static final String ROLE = "run_practice_review";
     // Explicit-port base URL so origin canonicalization is genuinely exercised (a state production can
@@ -76,19 +66,6 @@ class PracticeRoleResolutionEndToEndIntegrationTest {
     @Autowired
     private UserRepository userRepository;
 
-    @Autowired
-    private DatabaseTestUtils databaseTestUtils;
-
-    @DynamicPropertySource
-    static void datasource(DynamicPropertyRegistry registry) {
-        RealAuthDatasource.register(registry);
-    }
-
-    @BeforeEach
-    void cleanSlate() {
-        databaseTestUtils.cleanDatabase();
-    }
-
     @Test
     void practiceRoleResolvesEndToEndThroughLoginAndSyncForTheSamePerson() {
         seedLoginProvider(REGISTRATION_ID, LoginProvider.ProviderType.GITLAB, LOGIN_BASE_URL);
@@ -111,7 +88,7 @@ class PracticeRoleResolutionEndToEndIntegrationTest {
             .resolveOrProvision(REGISTRATION_ID, subject, principal, AuthIntentCookie.Intent.login(null, null))
             .account();
 
-        IdentityLink link = identityLinkRepository.findActiveByAccountId(account.getId()).get(0);
+        IdentityLink link = identityLinkRepository.findActiveByAccountId(persistedId(account.getId())).get(0);
         // (a) the stored subject IS the numeric id — exactly what the gate stringifies from User.nativeId.
         assertThat(link.getSubject()).isEqualTo(String.valueOf(NATIVE_ID));
         long loginResolvedProviderId = link.getProviderId();
@@ -127,16 +104,16 @@ class PracticeRoleResolutionEndToEndIntegrationTest {
                         " — login/SCM canonicalization diverged"
                 )
             );
-        assertThat(scmProvider.getId()).isEqualTo(loginResolvedProviderId);
+        assertThat(persistedId(scmProvider.getId())).isEqualTo(loginResolvedProviderId);
 
         // Synced SCM User for the same person under that same provider row.
         User user = userRepository.save(TestUserFactory.createUser(NATIVE_ID, "octocat", scmProvider));
-        accountFeatureRepository.save(new AccountFeature(account.getId(), ROLE));
+        accountFeatureRepository.save(new AccountFeature(persistedId(account.getId()), ROLE));
 
         // THE PROOF: the (provider.id, valueOf(nativeId)) tuple the gate passes resolves the granted flag.
         assertThat(
             accountFeatureRepository.existsActiveFeatureForProviderSubject(
-                user.getProvider().getId(),
+                persistedId(user.getProvider().getId()),
                 String.valueOf(user.getNativeId()),
                 ROLE
             )
@@ -144,7 +121,7 @@ class PracticeRoleResolutionEndToEndIntegrationTest {
     }
 
     // Cross-provider isolation (same numeric subject on a different instance must NOT inherit the flag)
-    // is owned by AccountFeatureRepositoryIntegrationTest at the query layer — not duplicated here.
+    // is owned by ProductionSchemaContractIntegrationTest at the query layer — not duplicated here.
 
     private void seedLoginProvider(String registrationId, LoginProvider.ProviderType type, String baseUrl) {
         LoginProvider provider = new LoginProvider();
@@ -163,5 +140,10 @@ class PracticeRoleResolutionEndToEndIntegrationTest {
         URI uri = URI.create(baseUrl);
         String origin = uri.getScheme() + "://" + uri.getHost();
         return uri.getPort() == -1 ? origin : origin + ":" + uri.getPort();
+    }
+
+    private static long persistedId(@Nullable Long id) {
+        assertNotNull(id);
+        return id;
     }
 }

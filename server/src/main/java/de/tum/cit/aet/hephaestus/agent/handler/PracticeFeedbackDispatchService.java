@@ -101,7 +101,7 @@ class PracticeFeedbackDispatchService {
                 feedback.getId(),
                 "approved:" + feedback.getId(),
                 FeedbackDispatchDestination.APPROVED_ARTIFACT_COMMENT,
-                feedback.getBody(),
+                java.util.Objects.requireNonNull(feedback.getBody(), "an approved proposal always has a body"),
                 null,
                 Set.of()
             ),
@@ -173,13 +173,13 @@ class PracticeFeedbackDispatchService {
 
         PracticeFeedbackDeliveryPolicy.Decision<?> decision = evaluateAtEgress(dispatch, job);
         if (!decision.allowed()) {
-            return refuse(dispatch, owner, decision.suppressionReason());
+            return refuse(dispatch, owner, decision.refusal());
         }
 
         ExistingDeliveryLookup existing = switch (dispatch.getDestination()) {
             case ARTIFACT_SUMMARY -> commentPoster.findExistingSummaryComment(job);
             case RE_REVIEW_PING -> commentPoster.findAside(job, pingMarker(dispatch));
-            case APPROVED_ARTIFACT_COMMENT -> commentPoster.findApprovedProposal(job, dispatch.getFeedbackId());
+            case APPROVED_ARTIFACT_COMMENT -> commentPoster.findApprovedProposal(job, dispatch.approvedFeedbackId());
         };
         if (existing.kind() == ExistingDeliveryLookup.Kind.UNKNOWN) {
             return retry(dispatch, owner, "Provider lookup was inconclusive");
@@ -192,7 +192,7 @@ class PracticeFeedbackDispatchService {
 
         decision = evaluateAtEgress(dispatch, job);
         if (!decision.allowed()) {
-            return refuse(dispatch, owner, decision.suppressionReason());
+            return refuse(dispatch, owner, decision.refusal());
         }
 
         if (dispatch.getWriteStarted()) {
@@ -239,9 +239,9 @@ class PracticeFeedbackDispatchService {
         }
         if (dispatch.getDestination() == FeedbackDispatchDestination.APPROVED_ARTIFACT_COMMENT) {
             if (job.getMetadata() != null && job.getMetadata().has("issue_number")) {
-                return commentPoster.postIssueApprovedProposal(job, dispatch.getFeedbackId(), dispatch.getBody());
+                return commentPoster.postIssueApprovedProposal(job, dispatch.approvedFeedbackId(), dispatch.getBody());
             }
-            return commentPoster.postApprovedProposal(job, dispatch.getFeedbackId(), dispatch.getBody());
+            return commentPoster.postApprovedProposal(job, dispatch.approvedFeedbackId(), dispatch.getBody());
         }
         boolean issue = job.getMetadata() != null && job.getMetadata().has("issue_number");
         String target = dispatch.getTargetExternalRef();
@@ -368,6 +368,16 @@ class PracticeFeedbackDispatchService {
     }
 
     record Result(Status status, @Nullable String externalRef, @Nullable FeedbackSuppressionReason suppressionReason) {
+        /** The check that stopped this. A refusal always names one. */
+        FeedbackSuppressionReason refusal() {
+            return java.util.Objects.requireNonNull(suppressionReason, "a refused dispatch always names its reason");
+        }
+
+        /** The provider id this landed on. A sent dispatch always has one. */
+        String sentRef() {
+            return java.util.Objects.requireNonNull(externalRef, "a sent dispatch always has a provider id");
+        }
+
         static Result sent(@Nullable String ref) {
             return new Result(Status.SENT, ref, null);
         }

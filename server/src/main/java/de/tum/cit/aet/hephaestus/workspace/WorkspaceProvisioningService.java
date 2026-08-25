@@ -21,8 +21,10 @@ import java.time.Duration;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
@@ -110,23 +112,26 @@ public class WorkspaceProvisioningService {
 
         WorkspaceProperties.DefaultProperties config = workspaceProperties.defaultProperties();
 
+        String configuredLogin = config.login();
         String accountLogin = null;
-        if (!isBlank(config.login())) {
-            accountLogin = config.login().trim();
+        if (!isBlank(configuredLogin)) {
+            accountLogin = Objects.requireNonNull(configuredLogin).trim();
         }
         if (isBlank(accountLogin)) {
             throw new IllegalStateException(
                 "Failed to derive account login for default workspace bootstrap. Set hephaestus.workspace.default.login."
             );
         }
+        accountLogin = Objects.requireNonNull(accountLogin);
 
         if (isBlank(config.token())) {
             throw new IllegalStateException(
                 "Missing PAT for default workspace bootstrap. Configure hephaestus.workspace.default.token or set GITHUB_PAT."
             );
         }
+        String token = Objects.requireNonNull(config.token());
 
-        Long ownerUserId = syncGitHubUserForPAT(config.token(), accountLogin);
+        Long ownerUserId = syncGitHubUserForPAT(token, accountLogin);
 
         String rawSlug = accountLogin;
         String displayName = accountLogin;
@@ -149,7 +154,7 @@ public class WorkspaceProvisioningService {
             IntegrationKind.GITHUB,
             "pat",
             new ConnectionConfig.GitHubPatConfig(accountLogin, /* serverUrl */ null, Set.of()),
-            config.token(),
+            token,
             "bootstrap-pat-workspace-" + savedWorkspace.getId()
         );
 
@@ -195,12 +200,14 @@ public class WorkspaceProvisioningService {
                 "Failed to derive group path for GitLab workspace bootstrap. Set hephaestus.workspace.gitlab-default.login."
             );
         }
+        groupPath = Objects.requireNonNull(groupPath);
 
         if (isBlank(config.token())) {
             throw new IllegalStateException(
                 "Missing PAT for GitLab workspace bootstrap. Set hephaestus.workspace.gitlab-default.token or GITLAB_PAT."
             );
         }
+        String token = Objects.requireNonNull(config.token());
 
         // A workspace already exists for this account-login. Two cases:
         //   (a) it has an ACTIVE GitLab Connection → already bootstrapped, no-op.
@@ -231,7 +238,7 @@ public class WorkspaceProvisioningService {
         }
 
         String serverUrl = resolveGitLabServerUrl(config.serverUrl());
-        Long ownerUserId = syncGitLabUserForPAT(config.token(), serverUrl, groupPath);
+        Long ownerUserId = syncGitLabUserForPAT(token, serverUrl, groupPath);
 
         String slug = groupPath.replace("/", "-");
         String displayName = groupPath.contains("/") ? groupPath.substring(groupPath.lastIndexOf('/') + 1) : groupPath;
@@ -262,7 +269,7 @@ public class WorkspaceProvisioningService {
                 ConnectionConfig.GitLabConfig.SigningMode.PLAINTEXT,
                 Set.of()
             ),
-            config.token(),
+            token,
             "bootstrap-gitlab-pat-workspace-" + savedWorkspace.getId()
         );
 
@@ -314,9 +321,9 @@ public class WorkspaceProvisioningService {
      * ({@code hephaestus.integration.gitlab.default-server-url}). Throws when availability is
      * unset (feature flag off) — GitLab bootstrap cannot proceed without a URL.
      */
-    private String resolveGitLabServerUrl(String configServerUrl) {
+    private String resolveGitLabServerUrl(@Nullable String configServerUrl) {
         if (!isBlank(configServerUrl)) {
-            String url = configServerUrl.trim();
+            String url = Objects.requireNonNull(configServerUrl).trim();
             url = url.endsWith("/") ? url.substring(0, url.length() - 1) : url;
             // SSRF string-layer check on the user-supplied URL (scheme/host/literal-private-IP), matching
             // GitLabPreflightService. The ssrfGuarded connector additionally blocks DNS-rebind at connect.
@@ -353,7 +360,10 @@ public class WorkspaceProvisioningService {
             .orElse(null);
 
         if (provider != null) {
-            Optional<User> existing = userRepository.findByLoginAndProviderId(groupPath, provider.getId());
+            Optional<User> existing = userRepository.findByLoginAndProviderId(
+                groupPath,
+                Objects.requireNonNull(provider.getId())
+            );
             if (existing.isPresent()) {
                 return existing.get().getId();
             }
@@ -448,7 +458,7 @@ public class WorkspaceProvisioningService {
                 log.info("Creating IdentityProvider for self-hosted GitLab: serverUrl={}", serverUrl);
                 return gitProviderRepository.save(new IdentityProvider(IdentityProviderType.GITLAB, serverUrl));
             });
-        Long providerId = provider.getId();
+        Long providerId = Objects.requireNonNull(provider.getId());
 
         userRepository.acquireLoginLock(login, providerId);
         userRepository.freeLoginConflicts(login, nativeId, providerId);
@@ -481,7 +491,7 @@ public class WorkspaceProvisioningService {
         String defaultSlug = workspaceProperties.defaultProperties().login();
         Workspace target = null;
         if (!isBlank(defaultSlug)) {
-            target = workspaceRepository.findByWorkspaceSlug(defaultSlug.trim()).orElse(null);
+            target = workspaceRepository.findByWorkspaceSlug(Objects.requireNonNull(defaultSlug).trim()).orElse(null);
         }
         if (target == null) {
             target = workspaceRepository.findAll().stream().findFirst().orElse(null);
@@ -518,7 +528,7 @@ public class WorkspaceProvisioningService {
             });
     }
 
-    private boolean isBlank(String value) {
+    private boolean isBlank(@Nullable String value) {
         return value == null || value.isBlank();
     }
 
@@ -526,7 +536,7 @@ public class WorkspaceProvisioningService {
         IdentityProvider provider = gitProviderRepository
             .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
             .orElseThrow(() -> new IllegalStateException("IdentityProvider for GitHub not found"));
-        Long providerId = provider.getId();
+        Long providerId = Objects.requireNonNull(provider.getId());
 
         Optional<User> existing = userRepository.findByLoginAndProviderId(accountLogin, providerId);
         if (existing.isPresent()) {

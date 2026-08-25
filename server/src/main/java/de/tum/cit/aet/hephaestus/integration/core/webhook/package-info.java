@@ -7,4 +7,5 @@
  * verified envelopes are published to NATS JetStream.
  */
 @org.springframework.modulith.NamedInterface("webhook")
+@org.jspecify.annotations.NullMarked
 package de.tum.cit.aet.hephaestus.integration.core.webhook;

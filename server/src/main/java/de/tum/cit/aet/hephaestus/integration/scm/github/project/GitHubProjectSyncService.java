@@ -47,9 +47,13 @@ import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.hibernate.Hibernate;
+import org.jspecify.annotations.Nullable;
 import org.springframework.graphql.client.ClientGraphQlResponse;
 import org.springframework.graphql.client.HttpGraphQlClient;
 import org.springframework.stereotype.Service;
@@ -181,24 +185,26 @@ public class GitHubProjectSyncService {
      * @param organizationLogin the GitHub organization login to sync projects for
      * @return sync result containing status and count of projects synced
      */
-    public SyncResult syncProjectsForOrganization(Long scopeId, String organizationLogin) {
+    public SyncResult syncProjectsForOrganization(Long scopeId, @Nullable String organizationLogin) {
         if (organizationLogin == null || organizationLogin.isBlank()) {
             log.warn("Skipped project sync: reason=missingOrgLogin, scopeId={}", scopeId);
             return SyncResult.completed(0);
         }
-        String safeOrgLogin = sanitizeForLog(organizationLogin);
+        String safeOrgLogin = Objects.requireNonNullElse(sanitizeForLog(organizationLogin), "null");
 
         // Resolve organization outside transaction to avoid holding locks
-        Organization organization = transactionTemplate.execute(status -> {
-            Organization org = organizationRepository
-                .findByLoginIgnoreCaseAndProvider_Type(organizationLogin, IdentityProviderType.GITHUB)
-                .orElse(null);
-            if (org != null) {
-                // Eagerly initialize the lazy-loaded provider for use outside the transaction
-                org.getProvider().getId();
-            }
-            return org;
-        });
+        Optional<Organization> organizationResult = Objects.requireNonNull(
+            transactionTemplate.execute(status -> {
+                Organization org = organizationRepository
+                    .findByLoginIgnoreCaseAndProvider_Type(organizationLogin, IdentityProviderType.GITHUB)
+                    .orElse(null);
+                if (org != null) {
+                    org.getProvider().getId();
+                }
+                return Optional.ofNullable(org);
+            })
+        );
+        Organization organization = organizationResult.orElse(null);
 
         if (organization == null) {
             log.warn("Skipped project sync: reason=organizationNotFound, orgLogin={}", safeOrgLogin);
@@ -585,7 +591,7 @@ public class GitHubProjectSyncService {
      * @return sync result containing status and count of items synced
      * @see GitHubProjectItemSyncService for supplementary Issue/PR item sync from the issue/PR side
      */
-    public SyncResult syncProjectItems(Long scopeId, Project project) {
+    public SyncResult syncProjectItems(Long scopeId, @Nullable Project project) {
         if (project == null || project.getNodeId() == null) {
             log.debug("Skipped project item sync: reason=invalidProject");
             return SyncResult.completed(0);
@@ -594,15 +600,10 @@ public class GitHubProjectSyncService {
         String projectNodeId = project.getNodeId();
         Long projectId = project.getId();
 
-        // Eagerly resolve the provider for ProcessingContext (lazy-loaded, needs transaction)
         IdentityProvider provider = transactionTemplate.execute(status -> {
-            Project p = projectRepository.findById(projectId).orElse(null);
-            if (p != null) {
-                IdentityProvider prov = p.getProvider();
-                prov.getId(); // force proxy initialization
-                return prov;
-            }
-            return null;
+            IdentityProvider result = projectRepository.findById(projectId).orElseThrow().getProvider();
+            Hibernate.initialize(result);
+            return result;
         });
 
         HttpGraphQlClient client = graphQlClientProvider.forScope(scopeId);
@@ -705,7 +706,8 @@ public class GitHubProjectSyncService {
             log.info(
                 "Resuming project item sync from checkpoint: projectId={}, cursor={}",
                 projectId,
-                cursor.substring(0, Math.min(20, cursor.length())) + "..."
+                Objects.requireNonNull(cursor).substring(0, Math.min(20, Objects.requireNonNull(cursor).length())) +
+                    "..."
             );
         }
 
@@ -896,7 +898,7 @@ public class GitHubProjectSyncService {
                                     new ItemWithFieldValueCursor(
                                         processedItem.getId(),
                                         itemDto.nodeId(),
-                                        itemDto.fieldValuesEndCursor(),
+                                        Objects.requireNonNull(itemDto.fieldValuesEndCursor()),
                                         initialFieldIds
                                     )
                                 );
@@ -1352,7 +1354,9 @@ public class GitHubProjectSyncService {
      * Clears the cursor and sets the fieldsSyncedAt timestamp.
      */
     private void updateFieldsSyncCompleted(Long projectId, Instant syncedAt) {
-        TransactionTemplate requiresNewTemplate = new TransactionTemplate(transactionTemplate.getTransactionManager());
+        TransactionTemplate requiresNewTemplate = new TransactionTemplate(
+            Objects.requireNonNull(transactionTemplate.getTransactionManager())
+        );
         requiresNewTemplate.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
         requiresNewTemplate.executeWithoutResult(status -> {
             projectRepository.updateFieldsSyncedAt(projectId, syncedAt);
@@ -1576,7 +1580,9 @@ public class GitHubProjectSyncService {
      * Clears the cursor and sets the statusUpdatesSyncedAt timestamp.
      */
     private void updateStatusUpdatesSyncCompleted(Long projectId, Instant syncedAt) {
-        TransactionTemplate requiresNewTemplate = new TransactionTemplate(transactionTemplate.getTransactionManager());
+        TransactionTemplate requiresNewTemplate = new TransactionTemplate(
+            Objects.requireNonNull(transactionTemplate.getTransactionManager())
+        );
         requiresNewTemplate.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
         requiresNewTemplate.executeWithoutResult(status -> {
             projectRepository.updateStatusUpdatesSyncedAt(projectId, syncedAt);
@@ -1623,7 +1629,9 @@ public class GitHubProjectSyncService {
      * for consistent cursor persistence across all sync services.
      */
     private void persistItemSyncCursor(Long projectId, String cursor) {
-        TransactionTemplate requiresNewTemplate = new TransactionTemplate(transactionTemplate.getTransactionManager());
+        TransactionTemplate requiresNewTemplate = new TransactionTemplate(
+            Objects.requireNonNull(transactionTemplate.getTransactionManager())
+        );
         requiresNewTemplate.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
         requiresNewTemplate.executeWithoutResult(status -> {
             backfillStateProvider.updateProjectItemSyncCursor(projectId, cursor);
@@ -1639,7 +1647,9 @@ public class GitHubProjectSyncService {
      * across all sync services.
      */
     private void updateItemsSyncCompleted(Long projectId, Instant syncedAt) {
-        TransactionTemplate requiresNewTemplate = new TransactionTemplate(transactionTemplate.getTransactionManager());
+        TransactionTemplate requiresNewTemplate = new TransactionTemplate(
+            Objects.requireNonNull(transactionTemplate.getTransactionManager())
+        );
         requiresNewTemplate.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
         requiresNewTemplate.executeWithoutResult(status -> {
             backfillStateProvider.updateProjectItemsSyncedAt(projectId, syncedAt);

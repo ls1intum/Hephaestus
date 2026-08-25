@@ -176,17 +176,17 @@ class AgentJobServiceTest extends BaseUnitTest {
     ) {
         return new PracticeRepository.PracticeAutonomyRow() {
             @Override
-            public PracticeAutonomy getPracticeAutonomy() {
+            public @Nullable PracticeAutonomy getPracticeAutonomy() {
                 return practiceAutonomy;
             }
 
             @Override
-            public PracticeAutonomy getAreaAutonomy() {
+            public @Nullable PracticeAutonomy getAreaAutonomy() {
                 return null;
             }
 
             @Override
-            public Long getAreaId() {
+            public @Nullable Long getAreaId() {
                 return null;
             }
 
