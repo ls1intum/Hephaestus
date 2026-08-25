@@ -35,17 +35,17 @@ jobs:
       should_skip: ${{ steps.skip_check.outputs.should_skip }}
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           persist-credentials: false
 
       - id: skip_check
-        uses: fkirc/skip-duplicate-actions@f75f66ce1886f00957d99748a42c724f4330bdcf # v5
+        uses: fkirc/skip-duplicate-actions@b974a9395958c231af965b70070979a577efa578 # v5.3.2
         with:
           do_not_skip: '["workflow_dispatch", "push", "merge_group"]'
 
-      - uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3
+      - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
         id: filter
         with:
           filters: |
@@ -165,10 +165,9 @@ jobs:
               - 'scripts/run-mvnw.ts'
               - '.github/workflows/ci-quality-gates.yml'
 
-      - uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3
+      - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
         id: webapp_image_source
         with:
-          predicate-quantifier: every
           filters: |
             webapp-image-source:
               - 'webapp/src/**'
@@ -203,7 +202,7 @@ jobs:
     steps:
       - name: Link the preview deployments page on the PR
         if: vars.COOLIFY_PROJECT_UUID != '' && vars.COOLIFY_ENVIRONMENT_UUID != ''
-        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
             const { COOLIFY_URL, COOLIFY_PROJECT_UUID, COOLIFY_ENVIRONMENT_UUID, COOLIFY_APP_UUID } = process.env;
@@ -347,7 +346,7 @@ jobs:
           show-waiting-runner: true
 
       - name: Summarize workflow performance
-        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
             const run = await github.rest.actions.getWorkflowRun({
@@ -541,7 +540,7 @@ jobs:
 
       - name: Create commit status
         if: always()
-        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
             const sha = context.payload.pull_request?.head?.sha || context.sha;

@@ -23,19 +23,21 @@ const summary = (startup: number, wall = 200): TestSummary => ({
 	},
 });
 
-await test("enforces absolute context budgets without history", () => {
+await test("does not signal an absolute-budget miss from one profile", () => {
 	const current = summary(121);
 	assert.ok(current.performance);
 	current.performance.contextStarts = 16;
-	assert.deepEqual(regressions(current, []), [
-		"context starts 16 > 15",
-		"context startup 121.0s > 120s",
-	]);
+	assert.deepEqual(regressions(current, []), []);
 });
 
-await test("uses median variance instead of a noisy single run", () => {
-	assert.deepEqual(
-		regressions(summary(100, 250), [summary(100, 198), summary(101, 200), summary(99, 202)]),
-		["wall time 250.0 > variance limit 240.0"],
-	);
+await test("signals only three consecutive misses against five prior profiles", () => {
+	const slow = summary(121, 250);
+	assert.ok(slow.performance);
+	slow.performance.contextStarts = 16;
+	const baseline = [100, 101, 99, 100, 100].map((startup) => summary(startup, 200));
+	assert.deepEqual(regressions(slow, [...baseline, slow, slow]), [
+		"context starts exceeded 15 in three consecutive profiles",
+		"context startup exceeded 120s in three consecutive profiles",
+		"wall time exceeded variance limit 240.0 three times",
+	]);
 });
