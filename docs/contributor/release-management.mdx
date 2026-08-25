@@ -39,7 +39,8 @@ sequenceDiagram
    operator-facing description; the file lands in `.changeset/` and merges with the PR. The
    `verify-changesets` check fails PRs that change shipped code — anything under `server/`, `webapp/`,
    or `docker/` except tests and in-tree docs — without one. `pnpm changeset --empty` (non-interactive)
-   is the explicit opt-out for changes with no user-facing effect; write why in the file body.
+   is the explicit opt-out for changes with no user-facing effect; write why in the file body. Release
+   changesets need an operator-facing summary for the root package.
 2. **The Version PR accumulates.** On every push to `main`, the release workflow maintains a PR
    titled `chore(release): version packages` that previews the next version and the assembled
    `CHANGELOG.md` section. It is safe to leave open — it updates itself. It is opened by
@@ -47,7 +48,8 @@ sequenceDiagram
    rewrites the changelog, and it is re-pushed on every merge to `main`, so running the full matrix
    on it would burn CI without validating anything. Validation happens after the merge — `main` runs
    the full suite and a release is only cut if that run succeeds. Maintainers bypass the branch
-   ruleset, so the absent required checks don't block the merge.
+   ruleset, so the absent required checks don't block the merge. Versioning also moves any
+   `### Next release` section in `MIGRATION.md` under the version being cut.
 3. **Merging the Version PR cuts the release.** The release workflow tags `vX.Y.Z` at the merge
    commit, creates the GitHub Release from the new changelog section, retags the CI-built Docker
    images as `X.Y.Z`, `X.Y`, and `latest`, publishes the signed release-pin asset, and starts the
@@ -62,6 +64,8 @@ A changeset summary becomes the `CHANGELOG.md` entry **verbatim** — write it i
 - **One changeset per user-visible change** — a PR that ships two unrelated visible changes ships two
   changeset files. Unsure whether it's visible? Add one; a reviewer can delete a superfluous note, but a
   missing one is invisible.
+- Once a changeset reaches `main`, revise it in place. If it should not become a release note, convert
+  it to an explained empty changeset instead of deleting or renaming it.
 - **Don't mention automatic migrations** — the release notes get an automatic "back up before
   upgrading" banner whenever a release touches `server/src/main/resources/db/changelog/`, so the
   changeset stays user-facing. Only a migration that requires operator action belongs in the summary
