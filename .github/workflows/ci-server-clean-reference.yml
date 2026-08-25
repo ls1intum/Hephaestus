@@ -1,4 +1,4 @@
-name: Server Clean Reference
+name: Server Phase Reference
 
 on:
   workflow_dispatch:
@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   verify:
-    name: Clean uncached server verification
+    name: Profile clean server phases
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -29,14 +29,58 @@ jobs:
           cache: maven
           cache-dependency-path: "server/**/pom.xml"
 
-      - name: Run clean unit tests
+      - name: Profile generated clients
         working-directory: server
-        run: ./mvnw clean test -pl application -am -Dmaven.build.cache.enabled=false -Dsurefire.includedGroups=unit -DskipCoverage=false --batch-mode
+        run: |
+          mkdir -p ../ci-metrics/generated
+          ./mvnw clean install -pl generated-clients -am -DskipTests \
+            -Dmaven.build.cache.enabled=false -Dprofile=generated-clients -DprofileFormat=JSON \
+            -Dmaven-profiler-report-directory=../ci-metrics/generated --batch-mode
+          cp generated-clients/target/hephaestus-generated-clients-*.jar ../ci-metrics/generated-clients-first.jar
 
-      - name: Run architecture tests
+      - name: Verify generated artifact reproducibility
         working-directory: server
-        run: ./mvnw test -pl application -am -Dmaven.build.cache.enabled=false -Parchitecture-tests --batch-mode
+        run: |
+          mkdir -p ../ci-metrics/reproducibility
+          ./mvnw clean package -pl generated-clients -am -DskipTests \
+            -Dmaven.build.cache.enabled=false -Dprofile=reproducibility -DprofileFormat=JSON \
+            -Dmaven-profiler-report-directory=../ci-metrics/reproducibility --batch-mode
+          cmp ../ci-metrics/generated-clients-first.jar generated-clients/target/hephaestus-generated-clients-*.jar
+          sha256sum ../ci-metrics/generated-clients-first.jar \
+            generated-clients/target/hephaestus-generated-clients-*.jar \
+            > ../ci-metrics/generated-clients-sha256.txt
 
-      - name: Run integration tests
+      - name: Profile application and test compilation
         working-directory: server
-        run: ./mvnw test -pl application -am -Dmaven.build.cache.enabled=false -Dsurefire.includedGroups=integration -Dparallel=none --batch-mode
+        run: |
+          mkdir -p ../ci-metrics/compilation
+          ./mvnw -f application/pom.xml test-compile -DskipTests \
+            -Dmaven.build.cache.enabled=false -Dprofile=compilation -DprofileFormat=JSON \
+            -Dmaven-profiler-report-directory=../ci-metrics/compilation --batch-mode
+
+      - name: Profile unit and architecture execution
+        working-directory: server
+        run: |
+          mkdir -p ../ci-metrics/unit-architecture
+          ./mvnw -f application/pom.xml test -Parchitecture-tests -DskipCoverage=false \
+            -Dmaven.build.cache.enabled=false -Dprofile=unit-architecture -DprofileFormat=JSON \
+            -Dmaven-profiler-report-directory=../ci-metrics/unit-architecture --batch-mode
+
+      - name: Profile integration execution
+        working-directory: server
+        run: |
+          mkdir -p ../ci-metrics/integration
+          ./mvnw -f application/pom.xml test -Dsurefire.includedGroups=integration -Dparallel=none \
+            -Dmaven.build.cache.enabled=false -Dprofile=integration -DprofileFormat=JSON \
+            -Dmaven-profiler-report-directory=../ci-metrics/integration --batch-mode
+
+      - name: Upload phase profiles
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0 # v7.0.1
+        with:
+          name: server-phase-reference-${{ github.run_id }}
+          path: |
+            ci-metrics
+            server/application/target/surefire-reports
+          if-no-files-found: error
+          retention-days: 30

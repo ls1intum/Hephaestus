@@ -6,11 +6,8 @@
         <artifactId>hephaestus-server-parent</artifactId>
         <version>0.0.0-development</version>
         <relativePath>../pom.xml</relativePath>
-        <!-- lookup parent from repository -->
     </parent>
-    <groupId>de.tum.cit.aet</groupId>
     <artifactId>hephaestus-application</artifactId>
-    <version>0.0.0-development</version>
     <name>Hephaestus</name>
     <description>AI-driven learning for better software development</description>
     <url />
@@ -27,7 +24,6 @@
         <url />
     </scm>
     <properties>
-        <java.version>21</java.version>
         <app.profiles>local</app.profiles>
         <!-- Test Configuration -->
         <maven.test.failure.ignore>false</maven.test.failure.ignore>
@@ -45,18 +41,11 @@
         <surefire.includedGroups>unit</surefire.includedGroups>
         <failsafe.excludedGroups>live</failsafe.excludedGroups>
         <failsafe.includedGroups>integration</failsafe.includedGroups>
-        <!-- GraphQL Codegen Skip (auto-set by 'quick' profile when target/generated-sources exists) -->
-        <!-- Outline OpenAPI model codegen skip (auto-set by 'quick' profile alongside the GraphQL one) -->
         <!-- Coverage Configuration. Enabled in the unit-test CI job, which is the tier that exercises
              the gated pure-class packages; -DskipCoverage=true turns the agent and the gates off for
              the local fast path and for the arch/integration jobs, whose reports would cover a
              different slice of the code and cannot be judged against these floors. -->
         <skipCoverage>true</skipCoverage>
-        <!-- Encoding -->
-        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
-        <!-- Maven wrapper version -->
-        <maven.wrapper.version>3.9.12</maven.wrapper.version>
         <!-- Local development port for Liquibase plugin (override via -Dpostgres.port=XXXX) -->
         <postgres.port>5432</postgres.port>
         <resilience4j.version>2.4.0</resilience4j.version>
@@ -361,12 +350,6 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-graphql</artifactId>
-        </dependency>
-        <!-- GraphQL Codegen Runtime (base classes for generated code) -->
-        <dependency>
-            <groupId>io.github.kobylynskyi</groupId>
-            <artifactId>graphql-java-codegen</artifactId>
-            <version>${graphql-codegen.version}</version>
         </dependency>
         <dependency>
             <groupId>io.github.resilience4j</groupId>

@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { expect, fn, screen, userEvent, within } from "storybook/test";
+import { expect, fn, screen, userEvent, waitFor, within } from "storybook/test";
 import type { SlackMonitoredChannel } from "@/api/types.gen";
 import { daysBefore } from "@/components/common/story-clock";
 import { AdminSlackChannelsSettings } from "./AdminSlackChannelsSettings";
@@ -326,6 +326,6 @@ export const MutationError: Story = {
 		);
 		await userEvent.click(within(dialog).getByRole("button", { name: /^add channel$/i }));
 		// Rejected mutation ⇒ the dialog stays open for a retry.
-		await screen.findByRole("dialog");
+		await waitFor(() => expect(screen.getByRole("dialog")).toBeVisible());
 	},
 };

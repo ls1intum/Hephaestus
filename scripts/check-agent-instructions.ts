@@ -168,11 +168,6 @@ const INTENTIONALLY_MISSING_PATHS = [
 	},
 	{
 		document: "docs/contributor/local-development.mdx",
-		value: "server/src/main/resources/application-local.yml",
-		reason: "a developer-local override that the setup guide instructs readers to create",
-	},
-	{
-		document: "docs/contributor/local-development.mdx",
 		value: "webapp/.env",
 		reason: "a developer-local environment file that must stay untracked",
 	},

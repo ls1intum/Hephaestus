@@ -29,7 +29,9 @@ Generation is part of the generated module's standard Maven lifecycle. Tests run
 build does not infer behavior from files under `target/`, skip tests through an incremental profile,
 or transfer application class directories between jobs.
 
-The generated JAR is reproducible and is the only server module eligible for remote build reuse.
+The generated JAR is configured for reproducible output and is the only server module eligible for
+remote build reuse. The scheduled Server Phase Reference workflow verifies that two clean builds are
+byte-for-byte identical.
 Application output is deliberately excluded because handwritten code and resources change together
 and because caching it would recreate the unsafe whole-application boundary.
 

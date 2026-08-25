@@ -121,6 +121,8 @@ jobs:
               - 'opencode.json'
             application-server-image:
               - 'server/application/src/main/**'
+              - 'server/application/pom.xml'
+              - 'server/generated-clients/**'
               - 'server/pom.xml'
               - 'server/mvnw'
               - 'server/.mvn/**'
@@ -132,6 +134,8 @@ jobs:
               - 'webapp/package.json'
               - 'webapp/playwright.config.ts'
               - 'server/application/src/main/**'
+              - 'server/application/pom.xml'
+              - 'server/generated-clients/**'
               - 'server/pom.xml'
               - 'server/compose.yaml'
               - 'docker/postgres/**'

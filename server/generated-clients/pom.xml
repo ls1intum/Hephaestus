@@ -60,23 +60,19 @@
                         <configuration>
                             <!-- GitHub schema is ~70k lines (~1.4MB), skip size limit check -->
                             <skipSchemaSizeLimit>true</skipSchemaSizeLimit>
-                            <!-- Schema location -->
                             <graphqlSchemas>
                                 <rootDir>${project.basedir}/src/main/resources/graphql/github</rootDir>
                             </graphqlSchemas>
-                            <!-- Output configuration -->
                             <outputDir>${project.build.directory}/generated-sources/graphql-github</outputDir>
                             <packageName>de.tum.cit.aet.hephaestus.integration.scm.github.graphql</packageName>
                             <apiPackageName>de.tum.cit.aet.hephaestus.integration.scm.github.graphql.api</apiPackageName>
                             <modelPackageName>de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model
                             </modelPackageName>
                             <modelNamePrefix>GH</modelNamePrefix>
-                            <!-- Client-side code generation (for consuming GitHub API) -->
                             <generateClient>true</generateClient>
                             <generateApis>false</generateApis>
                             <generateDataFetchingEnvironmentArgumentInApis>false
                             </generateDataFetchingEnvironmentArgumentInApis>
-                            <!-- Model generation options -->
                             <generateBuilder>true</generateBuilder>
                             <generateEqualsAndHashCode>true</generateEqualsAndHashCode>
                             <generateToString>true</generateToString>
@@ -89,14 +85,11 @@
                                 <fieldWithoutResolver>nodes</fieldWithoutResolver>
                                 <fieldWithoutResolver>relay</fieldWithoutResolver>
                             </fieldsWithoutResolvers>
-                            <!-- Java config -->
                             <generatedLanguage>JAVA</generatedLanguage>
-                            <!-- Use @Generated annotation with @SuppressWarnings to silence IDE warnings on generated code -->
                             <addGeneratedAnnotation>true</addGeneratedAnnotation>
                             <generatedAnnotation>jakarta.annotation.Generated</generatedAnnotation>
                             <modelValidationAnnotation>@jakarta.annotation.Generated("graphql-codegen")
                             </modelValidationAnnotation>
-                            <!-- GitHub-specific scalar mappings -->
                             <customTypesMapping>
                                 <DateTime>java.time.OffsetDateTime</DateTime>
                                 <Date>java.time.LocalDate</Date>
@@ -110,14 +103,11 @@
                                 <Base64String>java.lang.String</Base64String>
                                 <BigInt>java.math.BigInteger</BigInt>
                             </customTypesMapping>
-                            <!-- Naming conventions -->
                             <modelNameSuffix />
                             <requestSuffix>Request</requestSuffix>
                             <responseSuffix>Response</responseSuffix>
                             <responseProjectionSuffix>ResponseProjection</responseProjectionSuffix>
-                            <!-- Use custom template for ResponseProjection to add @SuppressWarnings("unused") -->
-                            <!-- This suppresses false positive warnings for the projectionDepthOnFields field -->
-                            <!-- which is used internally by the all$() method -->
+                            <!-- The template suppresses the internally used projectionDepthOnFields field. -->
                             <customTemplatesRoot>${project.basedir}/src/main/resources/graphql/templates
                             </customTemplatesRoot>
                             <customTemplates>
@@ -125,8 +115,6 @@
                             </customTemplates>
                         </configuration>
                     </execution>
-                    <!-- GitLab GraphQL Code Generator -->
-                    <!-- Generates type-safe Java classes from GitLab GraphQL schema -->
                     <execution>
                         <id>generate-gitlab-graphql-client</id>
                         <goals>
@@ -135,7 +123,6 @@
                         <configuration>
                             <!-- GitLab schema is large, skip size limit check -->
                             <skipSchemaSizeLimit>true</skipSchemaSizeLimit>
-                            <!-- Schema location -->
                             <graphqlSchemas>
                                 <rootDir>${project.basedir}/src/main/resources/graphql/gitlab</rootDir>
                             </graphqlSchemas>
@@ -146,12 +133,10 @@
                             <modelPackageName>de.tum.cit.aet.hephaestus.integration.scm.gitlab.graphql.model
                             </modelPackageName>
                             <modelNamePrefix>GL</modelNamePrefix>
-                            <!-- Client-side code generation (for consuming GitLab API) -->
                             <generateClient>true</generateClient>
                             <generateApis>false</generateApis>
                             <generateDataFetchingEnvironmentArgumentInApis>false
                             </generateDataFetchingEnvironmentArgumentInApis>
-                            <!-- Model generation options -->
                             <generateBuilder>true</generateBuilder>
                             <generateEqualsAndHashCode>true</generateEqualsAndHashCode>
                             <generateToString>true</generateToString>
@@ -161,13 +146,11 @@
                             <!-- GitLab schema has types with 300+ fields (e.g., Project).
                                  All-args constructors for these exceed the JVM 255-parameter limit. -->
                             <generateNoArgsConstructorOnly>true</generateNoArgsConstructorOnly>
-                            <!-- Java config -->
                             <generatedLanguage>JAVA</generatedLanguage>
                             <addGeneratedAnnotation>true</addGeneratedAnnotation>
                             <generatedAnnotation>jakarta.annotation.Generated</generatedAnnotation>
                             <modelValidationAnnotation>@jakarta.annotation.Generated("graphql-codegen")
                             </modelValidationAnnotation>
-                            <!-- GitLab-specific scalar mappings -->
                             <customTypesMapping>
                                 <Time>java.time.OffsetDateTime</Time>
                                 <ISO8601DateTime>java.time.OffsetDateTime</ISO8601DateTime>
@@ -201,12 +184,10 @@
                                 <InstanceAmazonS3ConfigurationID>java.lang.String</InstanceAmazonS3ConfigurationID>
                                 <JsonString>java.lang.String</JsonString>
                             </customTypesMapping>
-                            <!-- Naming conventions -->
                             <modelNameSuffix />
                             <requestSuffix>Request</requestSuffix>
                             <responseSuffix>Response</responseSuffix>
                             <responseProjectionSuffix>ResponseProjection</responseProjectionSuffix>
-                            <!-- Use same custom template as GitHub for @SuppressWarnings -->
                             <customTemplatesRoot>${project.basedir}/src/main/resources/graphql/templates
                             </customTemplatesRoot>
                             <customTemplates>
@@ -228,7 +209,6 @@
                             <goal>run</goal>
                         </goals>
                         <configuration>
-                            <!-- Skip if codegen was skipped -->
                             <target>
                                 <!-- Delete Relay files that depend on missing Query root type -->
                                 <delete failonerror="false">
@@ -291,7 +271,6 @@
                 <artifactId>openapi-generator-maven-plugin</artifactId>
                 <version>${openapi-generator.version}</version>
                 <executions>
-                    <!-- Outline's maintained upstream spec -->
                     <execution>
                         <id>outline-spec3</id>
                         <phase>generate-sources</phase>
@@ -335,7 +314,6 @@
                             <configOptions>
                                 <useJakartaEe>true</useJakartaEe>
                                 <openApiNullable>false</openApiNullable>
-                                <!-- Emit packages directly under the output dir (no src/main/java prefix) -->
                                 <sourceFolder>.</sourceFolder>
                                 <hideGenerationTimestamp>true</hideGenerationTimestamp>
                                 <!-- Unknown-enum tolerance on the reactive decode path; full rationale + -->
@@ -358,8 +336,7 @@
                             <output>${project.build.directory}/generated-sources/openapi-outline</output>
                             <modelPackage>de.tum.cit.aet.hephaestus.integration.outline.client.model</modelPackage>
                             <modelNamePrefix>Outline</modelNamePrefix>
-                            <!-- Same collision-avoiding rename as the spec3 execution (harmless if -->
-                            <!-- the supplement omits these schemas); keeps both executions in step. -->
+                            <!-- Keep collision-avoiding names consistent across both specs. -->
                             <modelNameMappings>
                                 <modelNameMapping>Collection=OutlineCollectionModel</modelNameMapping>
                                 <modelNameMapping>Document=OutlineDocumentModel</modelNameMapping>
