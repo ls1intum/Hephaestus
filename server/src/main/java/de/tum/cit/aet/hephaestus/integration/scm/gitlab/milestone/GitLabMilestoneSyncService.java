@@ -18,6 +18,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -79,7 +80,7 @@ public class GitLabMilestoneSyncService {
      */
     public SyncResult syncMilestonesForRepository(Long scopeId, Repository repository) {
         String projectPath = repository.getNameWithOwner();
-        String safeProjectPath = sanitizeForLog(projectPath);
+        String safeProjectPath = Objects.requireNonNullElse(sanitizeForLog(projectPath), "<unknown>");
 
         log.info("Starting milestone sync: scopeId={}, projectPath={}", scopeId, safeProjectPath);
 
@@ -135,7 +136,7 @@ public class GitLabMilestoneSyncService {
                 graphQlClientProvider.recordSuccess();
 
                 @SuppressWarnings({ "unchecked", "rawtypes" })
-                List<Map<String, Object>> nodes = (List) response
+                List<Map<String, Object>> nodes = (List) Objects.requireNonNull(response)
                     .field("project.milestones.nodes")
                     .toEntityList(Map.class);
 
@@ -157,7 +158,9 @@ public class GitLabMilestoneSyncService {
                     }
                 }
 
-                GitLabPageInfo pageInfo = response.field("project.milestones.pageInfo").toEntity(GitLabPageInfo.class);
+                GitLabPageInfo pageInfo = Objects.requireNonNull(response)
+                    .field("project.milestones.pageInfo")
+                    .toEntity(GitLabPageInfo.class);
                 cursor = pageInfo != null ? pageInfo.endCursor() : null;
                 page++;
 
@@ -309,7 +312,7 @@ public class GitLabMilestoneSyncService {
                 graphQlClientProvider.recordSuccess();
 
                 @SuppressWarnings({ "unchecked", "rawtypes" })
-                List<Map<String, Object>> nodes = (List) response
+                List<Map<String, Object>> nodes = (List) Objects.requireNonNull(response)
                     .field("group.milestones.nodes")
                     .toEntityList(Map.class);
 
@@ -328,7 +331,9 @@ public class GitLabMilestoneSyncService {
                     }
                 }
 
-                GitLabPageInfo pageInfo = response.field("group.milestones.pageInfo").toEntity(GitLabPageInfo.class);
+                GitLabPageInfo pageInfo = Objects.requireNonNull(response)
+                    .field("group.milestones.pageInfo")
+                    .toEntity(GitLabPageInfo.class);
                 cursor = pageInfo != null ? pageInfo.endCursor() : null;
                 page++;
 

@@ -30,6 +30,7 @@ import liquibase.database.Database;
 import liquibase.database.DatabaseFactory;
 import liquibase.database.jvm.JdbcConnection;
 import liquibase.resource.ClassLoaderResourceAccessor;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import tools.jackson.core.type.TypeReference;
@@ -767,7 +768,7 @@ class PracticeCatalogInstallationMigrationIntegrationTest {
         }
     }
 
-    private static String scalar(String sql) throws SQLException {
+    private static @Nullable String scalar(String sql) throws SQLException {
         try (
             Connection connection = connect();
             Statement statement = connection.createStatement();

@@ -13,6 +13,7 @@ import jakarta.validation.ConstraintViolationException;
 import jakarta.validation.Path;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
@@ -42,22 +43,38 @@ public class WorkspaceControllerAdvice {
 
     @ExceptionHandler(EntityNotFoundException.class)
     ProblemDetail handleNotFound(EntityNotFoundException exception) {
-        return problem(HttpStatus.NOT_FOUND, "Resource not found", exception.getMessage());
+        return problem(
+            HttpStatus.NOT_FOUND,
+            "Resource not found",
+            Objects.requireNonNullElse(exception.getMessage(), "Unexpected error")
+        );
     }
 
     @ExceptionHandler({ InvalidWorkspaceSlugException.class, IllegalArgumentException.class })
     ProblemDetail handleBadRequest(RuntimeException exception) {
-        return problem(HttpStatus.BAD_REQUEST, "Invalid workspace request", userFacingDetail(exception.getMessage()));
+        return problem(
+            HttpStatus.BAD_REQUEST,
+            "Invalid workspace request",
+            userFacingDetail(Objects.requireNonNullElse(exception.getMessage(), "Unexpected error"))
+        );
     }
 
     @ExceptionHandler(WorkspaceSlugConflictException.class)
     ProblemDetail handleConflict(WorkspaceSlugConflictException exception) {
-        return problem(HttpStatus.CONFLICT, "Workspace slug conflict", userFacingDetail(exception.getMessage()));
+        return problem(
+            HttpStatus.CONFLICT,
+            "Workspace slug conflict",
+            userFacingDetail(Objects.requireNonNullElse(exception.getMessage(), "Unexpected error"))
+        );
     }
 
     @ExceptionHandler(RepositoryAlreadyMonitoredException.class)
     ProblemDetail handleRepositoryConflict(RepositoryAlreadyMonitoredException exception) {
-        return problem(HttpStatus.CONFLICT, "Repository already monitored", userFacingDetail(exception.getMessage()));
+        return problem(
+            HttpStatus.CONFLICT,
+            "Repository already monitored",
+            userFacingDetail(Objects.requireNonNullElse(exception.getMessage(), "Unexpected error"))
+        );
     }
 
     @ExceptionHandler(RepositoryManagementNotAllowedException.class)
@@ -65,13 +82,17 @@ public class WorkspaceControllerAdvice {
         return problem(
             HttpStatus.BAD_REQUEST,
             "Repository management not allowed",
-            userFacingDetail(exception.getMessage())
+            userFacingDetail(Objects.requireNonNullElse(exception.getMessage(), "Unexpected error"))
         );
     }
 
     @ExceptionHandler({ WorkspaceLifecycleViolationException.class, WorkspacePurgeBlockedException.class })
     ProblemDetail handleLifecycleViolation(RuntimeException exception) {
-        return problem(HttpStatus.CONFLICT, "Workspace lifecycle violation", userFacingDetail(exception.getMessage()));
+        return problem(
+            HttpStatus.CONFLICT,
+            "Workspace lifecycle violation",
+            userFacingDetail(Objects.requireNonNullElse(exception.getMessage(), "Unexpected error"))
+        );
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

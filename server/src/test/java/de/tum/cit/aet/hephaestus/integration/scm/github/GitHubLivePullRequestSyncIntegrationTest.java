@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.scm.github;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncResult;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
@@ -50,7 +51,7 @@ class GitHubLivePullRequestSyncIntegrationTest extends AbstractGitHubLiveSyncInt
 
         // 2. Create a feature branch with a commit
         String branchName = "feature-" + nextEphemeralSlug("branch");
-        fixtureService.createBranch(repoInfo.nodeId(), branchName, repoInfo.headCommitSha());
+        fixtureService.createBranch(repoInfo.nodeId(), branchName, headCommitSha(repoInfo));
 
         // Create a file on the feature branch
         String filePath = "test-" + nextEphemeralSlug("file") + ".txt";
@@ -65,7 +66,7 @@ class GitHubLivePullRequestSyncIntegrationTest extends AbstractGitHubLiveSyncInt
             prTitle,
             prBody,
             branchName,
-            repoInfo.defaultBranch()
+            defaultBranch(repoInfo)
         );
 
         // 4. Sync repository first
@@ -87,7 +88,7 @@ class GitHubLivePullRequestSyncIntegrationTest extends AbstractGitHubLiveSyncInt
         assertThat(storedPR.getBody()).isEqualTo(prBody);
         assertThat(storedPR.getNumber()).isEqualTo(createdPR.number());
         assertThat(storedPR.getState()).isEqualTo(PullRequest.State.OPEN);
-        assertThat(storedPR.getRepository().getId()).isEqualTo(localRepo.getId());
+        assertThat(storedPR.requireRepository().getId()).isEqualTo(localRepo.getId());
     }
 
     @Test
@@ -144,7 +145,7 @@ class GitHubLivePullRequestSyncIntegrationTest extends AbstractGitHubLiveSyncInt
 
         // 2. Create first PR
         String branchName1 = "feature-" + nextEphemeralSlug("branch1");
-        fixtureService.createBranch(repoInfo.nodeId(), branchName1, repoInfo.headCommitSha());
+        fixtureService.createBranch(repoInfo.nodeId(), branchName1, headCommitSha(repoInfo));
         fixtureService.createCommitOnBranch(repository.fullName(), branchName1, "Add file 1", "file1.txt", "Content 1");
         String prTitle1 = "IT PR " + nextEphemeralSlug("pr1");
         var pr1 = fixtureService.createPullRequest(
@@ -152,12 +153,12 @@ class GitHubLivePullRequestSyncIntegrationTest extends AbstractGitHubLiveSyncInt
             prTitle1,
             "First PR",
             branchName1,
-            repoInfo.defaultBranch()
+            defaultBranch(repoInfo)
         );
 
         // 3. Create second PR
         String branchName2 = "feature-" + nextEphemeralSlug("branch2");
-        fixtureService.createBranch(repoInfo.nodeId(), branchName2, repoInfo.headCommitSha());
+        fixtureService.createBranch(repoInfo.nodeId(), branchName2, headCommitSha(repoInfo));
         fixtureService.createCommitOnBranch(repository.fullName(), branchName2, "Add file 2", "file2.txt", "Content 2");
         String prTitle2 = "IT PR " + nextEphemeralSlug("pr2");
         var pr2 = fixtureService.createPullRequest(
@@ -165,7 +166,7 @@ class GitHubLivePullRequestSyncIntegrationTest extends AbstractGitHubLiveSyncInt
             prTitle2,
             "Second PR",
             branchName2,
-            repoInfo.defaultBranch()
+            defaultBranch(repoInfo)
         );
 
         // 4. Sync repository first
@@ -188,5 +189,17 @@ class GitHubLivePullRequestSyncIntegrationTest extends AbstractGitHubLiveSyncInt
             .findByRepositoryIdAndNumber(localRepo.getId(), pr2.number())
             .orElseThrow();
         assertThat(storedPR2.getTitle()).isEqualTo(prTitle2);
+    }
+
+    private static String defaultBranch(GitHubTestFixtureService.RepositoryInfo repository) {
+        String branch = repository.defaultBranch();
+        assertNotNull(branch);
+        return branch;
+    }
+
+    private static String headCommitSha(GitHubTestFixtureService.RepositoryInfo repository) {
+        String sha = repository.headCommitSha();
+        assertNotNull(sha);
+        return sha;
     }
 }

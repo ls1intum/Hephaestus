@@ -25,6 +25,7 @@ import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
@@ -141,7 +142,7 @@ class LeaguePointsUpdateTaskTest extends BaseUnitTest {
         return user;
     }
 
-    private static Workspace workspace(long id, Instant lastCycle) {
+    private static Workspace workspace(long id, @Nullable Instant lastCycle) {
         Workspace w = new Workspace();
         w.setId(id);
         w.setLeaderboardLeagueCycleAt(lastCycle);

@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.core.auth.export;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
@@ -64,6 +65,7 @@ class AccountExportServiceTest extends BaseUnitTest {
         account.setPrimaryEmail("ada@example.com");
         account.setAppRole(Account.AppRole.USER);
         account.setStatus(Account.Status.ACTIVE);
+        account.setCreatedAt(clock.instant());
 
         IdentityLink link = new IdentityLink();
         link.setProviderId(55L);
@@ -112,6 +114,7 @@ class AccountExportServiceTest extends BaseUnitTest {
                 assertThat(m.role()).isEqualTo("MEMBER");
             });
         assertThat(bundle.featureFlags()).containsExactly("mentor_access");
+        assertNotNull(bundle.preferences());
         assertThat(bundle.preferences().participateInResearch()).isTrue();
         assertThat(bundle.preferences().practiceFeedbackDeliveryEnabled()).isFalse();
         // The preferences could only carry these values if the bundle resolved the login "ada" from

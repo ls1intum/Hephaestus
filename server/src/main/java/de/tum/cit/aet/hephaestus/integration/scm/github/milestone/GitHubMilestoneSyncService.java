@@ -31,6 +31,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.milestone.dto.GitHubMile
 import de.tum.cit.aet.hephaestus.integration.scm.github.user.dto.GitHubUserDTO;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import org.slf4j.Logger;
@@ -96,7 +97,10 @@ public class GitHubMilestoneSyncService {
             return 0;
         }
 
-        String safeNameWithOwner = sanitizeForLog(repository.getNameWithOwner());
+        String safeNameWithOwner = Objects.requireNonNullElse(
+            sanitizeForLog(repository.getNameWithOwner()),
+            "<unknown>"
+        );
         Optional<RepositoryOwnerAndName> parsedName = GitHubRepositoryNameParser.parse(repository.getNameWithOwner());
         if (parsedName.isEmpty()) {
             log.warn("Skipped milestone sync: reason=invalidRepoNameFormat, repoName={}", safeNameWithOwner);
@@ -315,6 +319,6 @@ public class GitHubMilestoneSyncService {
      * The processor handles this by using number-based lookup as fallback.
      */
     private GitHubMilestoneDTO convertToDTO(GHMilestone graphQlMilestone) {
-        return GitHubMilestoneDTO.fromMilestone(graphQlMilestone);
+        return Objects.requireNonNull(GitHubMilestoneDTO.fromMilestone(graphQlMilestone));
     }
 }

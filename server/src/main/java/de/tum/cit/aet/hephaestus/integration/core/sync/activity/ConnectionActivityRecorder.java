@@ -13,6 +13,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
@@ -128,7 +129,7 @@ public class ConnectionActivityRecorder {
         );
     }
 
-    private Long resolveConnectionId(long workspaceId, IntegrationKind kind) {
+    private @Nullable Long resolveConnectionId(long workspaceId, IntegrationKind kind) {
         ScopeKindKey key = new ScopeKindKey(workspaceId, kind);
         Long cached = connectionIdCache.get(key);
         if (cached != null) {
@@ -159,7 +160,7 @@ public class ConnectionActivityRecorder {
             claimed.set(Boolean.TRUE);
             return now;
         });
-        return claimed.get();
+        return Boolean.TRUE.equals(claimed.get());
     }
 
     /** Undo a claim whose write failed — only if no later write already moved the slot past {@code claimedAt}. */

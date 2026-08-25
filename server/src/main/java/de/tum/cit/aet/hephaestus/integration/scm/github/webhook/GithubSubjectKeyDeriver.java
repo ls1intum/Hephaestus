@@ -8,6 +8,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
 import java.util.Map;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.JsonNode;
 
@@ -104,7 +105,7 @@ public class GithubSubjectKeyDeriver implements SubjectKeyDeriver {
         return value == null || value.isEmpty() ? PLACEHOLDER : value;
     }
 
-    private static String headerCaseInsensitive(Map<String, String> headers, String name) {
+    private static @Nullable String headerCaseInsensitive(@Nullable Map<String, String> headers, String name) {
         if (headers == null) return null;
         String direct = headers.get(name);
         if (direct != null) return direct;
@@ -116,7 +117,7 @@ public class GithubSubjectKeyDeriver implements SubjectKeyDeriver {
         return null;
     }
 
-    private static String sha256TruncatedHex(byte[] body, String event) {
+    private static String sha256TruncatedHex(byte[] body, @Nullable String event) {
         try {
             MessageDigest md = MessageDigest.getInstance("SHA-256");
             if (body != null) md.update(body);

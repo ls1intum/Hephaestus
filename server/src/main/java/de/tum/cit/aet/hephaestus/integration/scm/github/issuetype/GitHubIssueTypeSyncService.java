@@ -31,8 +31,10 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHIssueTyp
 import java.time.Instant;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.graphql.client.ClientGraphQlResponse;
@@ -101,7 +103,7 @@ public class GitHubIssueTypeSyncService {
             log.debug("Skipped issue type sync: reason=noOrganization, scopeId={}", scopeId);
             return 0;
         }
-        String safeOrgLogin = sanitizeForLog(orgLogin);
+        String safeOrgLogin = Objects.requireNonNullElse(sanitizeForLog(orgLogin), "null");
 
         if (!metadata.needsIssueTypesSync(syncSchedulerProperties.cooldownMinutes())) {
             log.debug("Skipped issue type sync: reason=cooldownActive, scopeId={}", scopeId);
@@ -109,7 +111,12 @@ public class GitHubIssueTypeSyncService {
         }
 
         // Load organization from integration.scm's repository
-        Organization organization = organizationRepository.findById(metadata.organizationId()).orElse(null);
+        Long organizationId = metadata.organizationId();
+        if (organizationId == null) {
+            log.warn("Organization metadata has no database ID: orgLogin={}", safeOrgLogin);
+            return 0;
+        }
+        Organization organization = organizationRepository.findById(organizationId).orElse(null);
         if (organization == null) {
             log.warn("Organization not found in database: orgLogin={}", safeOrgLogin);
             return 0;
@@ -329,8 +336,8 @@ public class GitHubIssueTypeSyncService {
     public IssueType findOrCreateFromWebhook(
         String nodeId,
         String name,
-        String description,
-        String color,
+        @Nullable String description,
+        @Nullable String color,
         boolean isEnabled,
         Organization organization
     ) {
@@ -364,7 +371,7 @@ public class GitHubIssueTypeSyncService {
         }
     }
 
-    private IssueType.Color parseColor(String colorString) {
+    private IssueType.Color parseColor(@Nullable String colorString) {
         if (colorString == null || colorString.isBlank()) {
             return IssueType.Color.GRAY;
         }

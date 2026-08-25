@@ -11,6 +11,7 @@ import liquibase.database.Database;
 import liquibase.database.DatabaseFactory;
 import liquibase.database.jvm.JdbcConnection;
 import liquibase.resource.ClassLoaderResourceAccessor;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.PostgreSQLContainer;
@@ -25,16 +26,18 @@ public final class PostgreSQLTestContainer {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(PostgreSQLTestContainer.class);
 
-    private static PostgreSQLContainer<?> container;
+    private static @Nullable PostgreSQLContainer<?> container;
     private static boolean migratedTemplateReady;
 
     private PostgreSQLTestContainer() {}
 
     public static synchronized PostgreSQLContainer<?> getInstance() {
-        if (container == null) {
-            container = createContainer();
+        PostgreSQLContainer<?> current = container;
+        if (current == null) {
+            current = createContainer();
+            container = current;
         }
-        return container;
+        return current;
     }
 
     public static synchronized TestDatabase createDatabase(String name) {

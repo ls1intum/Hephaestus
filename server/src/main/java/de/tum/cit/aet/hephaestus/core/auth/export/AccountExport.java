@@ -50,7 +50,7 @@ public class AccountExport {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    private @Nullable Long id;
 
     /** Owner. Not a JPA association — kept as a bare FK id to avoid an entity edge into the
      * account aggregate from the export aggregate; the export only ever needs the id. */
@@ -64,7 +64,7 @@ public class AccountExport {
 
     @CreationTimestamp
     @Column(name = "requested_at", nullable = false, updatable = false)
-    private Instant requestedAt;
+    private @Nullable Instant requestedAt;
 
     @Column(name = "completed_at")
     @Nullable
@@ -81,8 +81,7 @@ public class AccountExport {
 
     /** The generated JSON bundle. Null until READY; nulled again on EXPIRED. */
     @Column(name = "payload")
-    @Nullable
-    private byte[] payload;
+    private byte@Nullable [] payload;
 
     public AccountExport(Long accountId) {
         this.accountId = accountId;

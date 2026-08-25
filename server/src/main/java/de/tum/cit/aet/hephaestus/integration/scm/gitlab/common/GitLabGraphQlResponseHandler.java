@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.integration.scm.gitlab.common;
 
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabExceptionClassifier.Category;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabExceptionClassifier.ClassificationResult;
+import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -56,9 +57,10 @@ public class GitLabGraphQlResponseHandler {
      * @return action to take, or {@code CONTINUE} if response is valid
      */
     public HandleResult handle(@Nullable ClientGraphQlResponse response, String context, Logger log) {
-        if (response != null && response.isValid()) {
+        if (response != null && Objects.requireNonNull(response).isValid()) {
             // Check for partial errors even on valid responses
-            if (response.getErrors() != null && !response.getErrors().isEmpty()) {
+            var errors = Objects.requireNonNull(response).getErrors();
+            if (errors != null && !errors.isEmpty()) {
                 var classification = exceptionClassifier.classifyGraphQlResponse(response);
                 if (classification != null) {
                     log.warn(
@@ -100,11 +102,8 @@ public class GitLabGraphQlResponseHandler {
         }
 
         // No classification possible — generic failure
-        log.warn(
-            "GraphQL request failed (unclassified): context={}, errors={}",
-            context,
-            response != null ? response.getErrors() : "null response"
-        );
+        var errors = response == null ? "null response" : Objects.requireNonNull(response).getErrors();
+        log.warn("GraphQL request failed (unclassified): context={}, errors={}", context, errors);
         return new HandleResult(HandleResult.Action.ABORT, null);
     }
 

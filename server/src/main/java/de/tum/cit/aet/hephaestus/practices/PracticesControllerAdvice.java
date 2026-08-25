@@ -6,6 +6,7 @@ import de.tum.cit.aet.hephaestus.practices.curated.CuratedPreconditionRequiredEx
 import de.tum.cit.aet.hephaestus.practices.curated.StaleCuratedEntryException;
 import de.tum.cit.aet.hephaestus.practices.curated.adoption.CatalogAdoptionPreconditionRequiredException;
 import de.tum.cit.aet.hephaestus.practices.curated.adoption.StaleCatalogAdoptionPlanException;
+import java.util.Objects;
 import java.util.Optional;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
@@ -24,37 +25,65 @@ public class PracticesControllerAdvice {
 
     @ExceptionHandler(PracticeSlugConflictException.class)
     ProblemDetail handleSlugConflict(PracticeSlugConflictException exception) {
-        return problem(HttpStatus.CONFLICT, "Practice slug conflict", exception.getMessage());
+        return problem(
+            HttpStatus.CONFLICT,
+            "Practice slug conflict",
+            Objects.toString(exception.getMessage(), "Request failed")
+        );
     }
 
     @ExceptionHandler(PracticeAreaSlugConflictException.class)
     ProblemDetail handleAreaSlugConflict(PracticeAreaSlugConflictException exception) {
-        return problem(HttpStatus.CONFLICT, "Practice area slug conflict", exception.getMessage());
+        return problem(
+            HttpStatus.CONFLICT,
+            "Practice area slug conflict",
+            Objects.toString(exception.getMessage(), "Request failed")
+        );
     }
 
     @ExceptionHandler(CuratedCatalogConflictException.class)
     ProblemDetail handleCuratedConflict(CuratedCatalogConflictException exception) {
-        return problem(HttpStatus.CONFLICT, "Practice catalog conflict", exception.getMessage());
+        return problem(
+            HttpStatus.CONFLICT,
+            "Practice catalog conflict",
+            Objects.toString(exception.getMessage(), "Request failed")
+        );
     }
 
     @ExceptionHandler(StaleCuratedEntryException.class)
     ProblemDetail handleStaleCuratedEntry(StaleCuratedEntryException exception) {
-        return problem(HttpStatus.PRECONDITION_FAILED, "Practice catalog changed", exception.getMessage());
+        return problem(
+            HttpStatus.PRECONDITION_FAILED,
+            "Practice catalog changed",
+            Objects.toString(exception.getMessage(), "Request failed")
+        );
     }
 
     @ExceptionHandler(CuratedPreconditionRequiredException.class)
     ProblemDetail handleCuratedPreconditionRequired(CuratedPreconditionRequiredException exception) {
-        return problem(HttpStatus.PRECONDITION_REQUIRED, "Practice catalog version required", exception.getMessage());
+        return problem(
+            HttpStatus.PRECONDITION_REQUIRED,
+            "Practice catalog version required",
+            Objects.toString(exception.getMessage(), "Request failed")
+        );
     }
 
     @ExceptionHandler(StaleCatalogAdoptionPlanException.class)
     ProblemDetail handleStaleAdoptionPlan(StaleCatalogAdoptionPlanException exception) {
-        return problem(HttpStatus.PRECONDITION_FAILED, "Practice adoption preview changed", exception.getMessage());
+        return problem(
+            HttpStatus.PRECONDITION_FAILED,
+            "Practice adoption preview changed",
+            Objects.toString(exception.getMessage(), "Request failed")
+        );
     }
 
     @ExceptionHandler(CatalogAdoptionPreconditionRequiredException.class)
     ProblemDetail handleAdoptionPreconditionRequired(CatalogAdoptionPreconditionRequiredException exception) {
-        return problem(HttpStatus.PRECONDITION_REQUIRED, "Practice adoption preview required", exception.getMessage());
+        return problem(
+            HttpStatus.PRECONDITION_REQUIRED,
+            "Practice adoption preview required",
+            Objects.toString(exception.getMessage(), "Request failed")
+        );
     }
 
     private ProblemDetail problem(HttpStatus status, String title, String detail) {

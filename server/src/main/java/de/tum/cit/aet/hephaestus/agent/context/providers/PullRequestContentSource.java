@@ -32,6 +32,7 @@ import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.regex.Matcher;
@@ -247,7 +248,10 @@ public class PullRequestContentSource implements EvidenceSource, ReviewContextBu
                     String cloneUrl = serverUrl + "/" + repoFullName + ".git";
                     gitRepositoryManager.ensureRepository(repositoryId, cloneUrl, token);
                     fetched = true;
-                    long pullRequestNumber = requireLong(metadata, "pr_number");
+                    long pullRequestNumber = requireLong(
+                        Objects.requireNonNull(metadata, "pull request job metadata is required"),
+                        "pr_number"
+                    );
                     Optional<String> reviewHeadRef = source.reviewHeadRef(pullRequestNumber);
                     if (headSha != null && !headSha.isBlank() && reviewHeadRef.isPresent()) {
                         boolean pinnedHeadFetched = gitRepositoryManager.fetchRemoteCommit(
@@ -400,6 +404,9 @@ public class PullRequestContentSource implements EvidenceSource, ReviewContextBu
         boolean headVerified
     ) {
         String headSha = metadata.has("commit_sha") ? metadata.get("commit_sha").asString() : null;
+        if (headSha == null || headSha.isBlank()) {
+            throw new JobPreparationException("Cannot compute diff because commit_sha is missing");
+        }
         String targetBranch = requireText(metadata, "target_branch");
         String sourceBranch = requireText(metadata, "source_branch");
         Path repoPath = gitRepositoryManager.getRepositoryPath(repositoryId);

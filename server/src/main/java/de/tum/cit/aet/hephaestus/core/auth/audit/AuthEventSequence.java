@@ -2,7 +2,6 @@ package de.tum.cit.aet.hephaestus.core.auth.audit;
 
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import jakarta.persistence.EntityManager;
-import jakarta.persistence.PersistenceContext;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -17,8 +16,11 @@ import org.springframework.transaction.annotation.Transactional;
 @Component
 public class AuthEventSequence {
 
-    @PersistenceContext
-    private EntityManager entityManager;
+    private final EntityManager entityManager;
+
+    AuthEventSequence(EntityManager entityManager) {
+        this.entityManager = entityManager;
+    }
 
     @Transactional(propagation = Propagation.MANDATORY)
     public Long next() {

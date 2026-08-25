@@ -85,16 +85,6 @@ class ConfigSnapshotTest extends BaseUnitTest {
             assertThat(snapshot.timeoutSeconds()).isEqualTo(600);
             assertThat(snapshot.allowInternet()).isFalse();
         }
-
-        @ParameterizedTest(name = "from() rejects a null {0}")
-        @ValueSource(strings = { "binding", "resolver" })
-        void shouldRejectANullArgument(String missingArgument) {
-            boolean bindingIsMissing = "binding".equals(missingArgument);
-
-            assertThatThrownBy(() ->
-                ConfigSnapshot.from(bindingIsMissing ? null : createBinding(), bindingIsMissing ? resolver : null)
-            ).isInstanceOf(NullPointerException.class);
-        }
     }
 
     @Nested

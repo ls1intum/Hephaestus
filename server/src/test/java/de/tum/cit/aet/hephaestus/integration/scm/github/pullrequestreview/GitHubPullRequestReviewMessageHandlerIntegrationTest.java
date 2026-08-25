@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.scm.github.pullrequestreview;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
@@ -22,6 +23,7 @@ import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -61,7 +63,7 @@ class GitHubPullRequestReviewMessageHandlerIntegrationTest extends BaseIntegrati
 
     private IdentityProvider gitProvider;
     private Repository testRepository;
-    private PullRequest testPullRequest;
+    private PullRequest testPullRequest = new PullRequest();
 
     @BeforeEach
     void setUp() {
@@ -138,19 +140,21 @@ class GitHubPullRequestReviewMessageHandlerIntegrationTest extends BaseIntegrati
         GitHubPullRequestReviewEventDTO event = loadPayload("pull_request_review.submitted");
 
         // Create the PR that the review belongs to
-        createTestPullRequest(event.pullRequest().getDatabaseId(), event.pullRequest().number());
+        createTestPullRequest(required(event.pullRequest().getDatabaseId()), event.pullRequest().number());
 
         // Verify review doesn't exist initially (lookup by native ID + provider)
-        assertThat(reviewRepository.findByNativeIdAndProviderId(event.review().id(), gitProvider.getId())).isEmpty();
+        assertThat(
+            reviewRepository.findByNativeIdAndProviderId(required(event.review().id()), gitProviderId())
+        ).isEmpty();
 
         handler.handleEvent(event);
 
         // Then (lookup by native ID + provider, since JPA PK is auto-generated)
-        assertThat(reviewRepository.findByNativeIdAndProviderId(event.review().id(), gitProvider.getId()))
+        assertThat(reviewRepository.findByNativeIdAndProviderId(required(event.review().id()), gitProviderId()))
             .isPresent()
             .get()
             .satisfies(review -> {
-                assertThat(review.getNativeId()).isEqualTo(event.review().id());
+                assertThat(review.getNativeId()).isEqualTo(required(event.review().id()));
                 assertThat(review.getBody()).isEqualTo(event.review().body());
                 assertThat(review.getHtmlUrl()).isEqualTo(event.review().htmlUrl());
             });
@@ -160,7 +164,7 @@ class GitHubPullRequestReviewMessageHandlerIntegrationTest extends BaseIntegrati
     void shouldUpdateReviewOnEditedEvent() throws Exception {
         // Given - first create the review
         GitHubPullRequestReviewEventDTO submitEvent = loadPayload("pull_request_review.submitted");
-        createTestPullRequest(submitEvent.pullRequest().getDatabaseId(), submitEvent.pullRequest().number());
+        createTestPullRequest(required(submitEvent.pullRequest().getDatabaseId()), submitEvent.pullRequest().number());
         handler.handleEvent(submitEvent);
 
         // Load edited event
@@ -168,7 +172,7 @@ class GitHubPullRequestReviewMessageHandlerIntegrationTest extends BaseIntegrati
 
         handler.handleEvent(editEvent);
 
-        assertThat(reviewRepository.findByNativeIdAndProviderId(editEvent.review().id(), gitProvider.getId()))
+        assertThat(reviewRepository.findByNativeIdAndProviderId(required(editEvent.review().id()), gitProviderId()))
             .isPresent()
             .get()
             .satisfies(review -> {
@@ -180,12 +184,15 @@ class GitHubPullRequestReviewMessageHandlerIntegrationTest extends BaseIntegrati
     void shouldHandleDismissedEvent() throws Exception {
         // Given - load dismissed event first to get the correct review ID
         GitHubPullRequestReviewEventDTO dismissEvent = loadPayload("pull_request_review.dismissed");
-        createTestPullRequest(dismissEvent.pullRequest().getDatabaseId(), dismissEvent.pullRequest().number());
+        createTestPullRequest(
+            required(dismissEvent.pullRequest().getDatabaseId()),
+            dismissEvent.pullRequest().number()
+        );
 
         // Create the review first (simulate submitted state) with the native ID that will be dismissed
         PullRequest pr = testPullRequest;
         PullRequestReview existingReview = new PullRequestReview();
-        existingReview.setNativeId(dismissEvent.review().id());
+        existingReview.setNativeId(required(dismissEvent.review().id()));
         existingReview.setProvider(gitProvider);
         existingReview.setState(PullRequestReview.State.APPROVED);
         existingReview.setPullRequest(pr);
@@ -195,7 +202,7 @@ class GitHubPullRequestReviewMessageHandlerIntegrationTest extends BaseIntegrati
         handler.handleEvent(dismissEvent);
 
         // Then - review should be marked as dismissed
-        assertThat(reviewRepository.findByNativeIdAndProviderId(dismissEvent.review().id(), gitProvider.getId()))
+        assertThat(reviewRepository.findByNativeIdAndProviderId(required(dismissEvent.review().id()), gitProviderId()))
             .isPresent()
             .get()
             .satisfies(review -> {
@@ -207,5 +214,16 @@ class GitHubPullRequestReviewMessageHandlerIntegrationTest extends BaseIntegrati
         ClassPathResource resource = new ClassPathResource("github/" + filename + ".json");
         String json = resource.getContentAsString(StandardCharsets.UTF_8);
         return objectMapper.readValue(json, GitHubPullRequestReviewEventDTO.class);
+    }
+
+    private Long gitProviderId() {
+        Long id = gitProvider.getId();
+        assertNotNull(id);
+        return id;
+    }
+
+    private static <T> T required(@Nullable T value) {
+        assertNotNull(value);
+        return value;
     }
 }

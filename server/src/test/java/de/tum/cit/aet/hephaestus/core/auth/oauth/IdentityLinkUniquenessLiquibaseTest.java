@@ -16,6 +16,7 @@ import liquibase.database.Database;
 import liquibase.database.DatabaseFactory;
 import liquibase.database.jvm.JdbcConnection;
 import liquibase.resource.ClassLoaderResourceAccessor;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -143,8 +144,13 @@ class IdentityLinkUniquenessLiquibaseTest {
         }
     }
 
-    private static void insertIdentityLink(Connection c, long accountId, long providerId, String subject, String teamId)
-        throws Exception {
+    private static void insertIdentityLink(
+        Connection c,
+        long accountId,
+        long providerId,
+        String subject,
+        @Nullable String teamId
+    ) throws Exception {
         try (
             PreparedStatement ps = c.prepareStatement(
                 "INSERT INTO identity_link (account_id, provider_id, subject, team_id) VALUES (?, ?, ?, ?)"

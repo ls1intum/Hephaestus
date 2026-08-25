@@ -14,6 +14,7 @@ import java.time.OffsetDateTime;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
@@ -99,7 +100,7 @@ public class GitLabIssueDependencySyncService {
         Repository repository,
         @Nullable OffsetDateTime updatedAfter
     ) {
-        String safeProjectPath = sanitizeForLog(repository.getNameWithOwner());
+        String safeProjectPath = Objects.requireNonNullElse(sanitizeForLog(repository.getNameWithOwner()), "<unknown>");
 
         // Issues only: GitLab keeps issue IIDs and merge-request IIDs in separate per-project namespaces
         // (issue #5 and MR !5 coexist), both under the single-table `issue` table. Iterating the
@@ -313,7 +314,10 @@ public class GitLabIssueDependencySyncService {
             long linkedProjectId = projectIdNum.longValue();
             if (linkedProjectId != repository.getNativeId()) {
                 Repository crossRepo = repositoryRepository
-                    .findByNativeIdAndProviderId(linkedProjectId, repository.getProvider().getId())
+                    .findByNativeIdAndProviderId(
+                        linkedProjectId,
+                        Objects.requireNonNull(repository.getProvider().getId())
+                    )
                     .orElse(null);
                 if (crossRepo != null) {
                     return issueRepository.findByRepositoryIdAndNumber(crossRepo.getId(), linkedIid).orElse(null);

@@ -210,8 +210,8 @@ public class IssueAgentJobEventListener {
         IssueReviewSubmissionRequest request = new IssueReviewSubmissionRequest(
             issue.getId(),
             issue.getNumber(),
-            issue.getRepository().getId(),
-            issue.getRepository().getNameWithOwner(),
+            issue.requireRepository().getId(),
+            issue.requireRepository().getNameWithOwner(),
             issue.getTitle(),
             issue.getBody() != null ? issue.getBody() : "",
             issue.getState() != null ? issue.getState().name() : "OPEN",

@@ -68,7 +68,7 @@ public class PracticeArea {
 
     /** Optional blurb shown on the area card. */
     @Column(name = "description", columnDefinition = "TEXT")
-    private String description;
+    private @Nullable String description;
 
     /**
      * Optional lucide icon name (PascalCase, e.g. {@code "ShieldAlert"}) giving the area a glanceable
@@ -76,7 +76,7 @@ public class PracticeArea {
      * when unset or unknown, so this is presentation-only and never load-bearing.
      */
     @Column(name = "icon", length = 64)
-    private String icon;
+    private @Nullable String icon;
 
     /**
      * Optional colour key (a palette family, e.g. {@code "rose"}) for the area's chip. Paired with the
@@ -84,7 +84,7 @@ public class PracticeArea {
      * maps the key to accessible classes and falls back when unset.
      */
     @Column(name = "color", length = 32)
-    private String color;
+    private @Nullable String color;
 
     @Column(name = "visible_in_practice_dashboards", nullable = false)
     private boolean visibleInPracticeDashboards = true;

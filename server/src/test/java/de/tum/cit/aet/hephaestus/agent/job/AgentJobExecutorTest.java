@@ -127,7 +127,8 @@ class AgentJobExecutorTest extends BaseUnitTest {
 
     private AgentJobExecutor executor;
 
-    private static final de.tum.cit.aet.hephaestus.agent.usage.LlmAdmissionService NO_LIVE_ADMISSION = null;
+    private static final de.tum.cit.aet.hephaestus.agent.usage.@org.jspecify.annotations.Nullable LlmAdmissionService NO_LIVE_ADMISSION =
+        null;
 
     private static final AgentProperties AGENT_PROPS = new AgentProperties(
         true,
@@ -727,7 +728,11 @@ class AgentJobExecutorTest extends BaseUnitTest {
                 AgentJobRepository.ProvenanceStamp.class
             );
             verify(jobRepository).updateProvenanceDigests(eq(jobId), isNull(), eq(0), stamp.capture());
-            assertThat(stamp.getValue().reviewReadiness().path("decisions").get(0).path("ready").asBoolean()).isFalse();
+            var provenance = stamp.getValue();
+            org.junit.jupiter.api.Assertions.assertNotNull(provenance);
+            var storedReadiness = provenance.reviewReadiness();
+            org.junit.jupiter.api.Assertions.assertNotNull(storedReadiness);
+            assertThat(storedReadiness.path("decisions").get(0).path("ready").asBoolean()).isFalse();
             ArgumentCaptor<JsonNode> output = ArgumentCaptor.forClass(JsonNode.class);
             verify(jobRepository).transitionToEvidenceRefused(eq(jobId), isNull(), eq(0), any(), output.capture());
             assertThat(output.getValue().path("outcome").asString()).isEqualTo("INSUFFICIENT_EVIDENCE");
@@ -1583,9 +1588,9 @@ class AgentJobExecutorTest extends BaseUnitTest {
             verify(jobRepository, times(3)).transitionStatus(any(), eq(AgentJobStatus.COMPLETED), any(), any(), any());
             verify(jobRepository, never()).transitionStatus(any(), eq(AgentJobStatus.FAILED), any(), any(), any());
             verify(usageRecorder, never()).record(any(), any());
-            assertThat(
-                meterRegistry.find("agent.job.execution.duration").tag("status", "PERSISTENCE_FAILED").timer().count()
-            ).isEqualTo(1L);
+            var timer = meterRegistry.find("agent.job.execution.duration").tag("status", "PERSISTENCE_FAILED").timer();
+            org.junit.jupiter.api.Assertions.assertNotNull(timer);
+            assertThat(timer.count()).isEqualTo(1L);
         }
     }
 
@@ -2122,7 +2127,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
             "/output",
             SecurityProfile.DEFAULT,
             new NetworkPolicy(false, null, "test-token"),
-            null,
+            Map.of(),
             "prompt-digest"
         );
         when(practiceAgent.buildSandboxSpec(any())).thenReturn(agentSpec);
@@ -2141,7 +2146,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
             "/output",
             null,
             null,
-            null,
+            Map.of(),
             "prompt-digest"
         );
     }
@@ -2170,7 +2175,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
             "/output",
             null,
             null,
-            null,
+            Map.of(),
             null
         );
         when(practiceAgent.buildSandboxSpec(any())).thenReturn(agentSpec);

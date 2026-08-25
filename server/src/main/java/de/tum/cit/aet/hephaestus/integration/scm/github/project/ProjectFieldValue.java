@@ -18,6 +18,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Represents a field value for an item in a GitHub Projects V2 project.
@@ -58,7 +59,7 @@ public class ProjectFieldValue {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "item_id", nullable = false)
     @ToString.Exclude
-    private ProjectItem item;
+    private @Nullable ProjectItem item;
 
     /**
      * The field definition this value is for.

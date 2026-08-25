@@ -26,6 +26,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationSyncRunner;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncResourceState;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJob;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobConflictException;
+import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobHandle;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobRepository;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobRequest;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobService;
@@ -455,7 +456,7 @@ class SyncStatusServiceTest extends BaseUnitTest {
     @Test
     void triggerSync_newJob_dispatchesAsyncAndReturnsCreatedTrue() {
         SyncJob created = pendingJob();
-        SyncJobService.Started started = new SyncJobService.Started(created, null);
+        SyncJobService.Started started = new SyncJobService.Started(created, mock(SyncJobHandle.class));
         when(
             syncJobService.beginJob(
                 new SyncJobRequest(
@@ -529,7 +530,7 @@ class SyncStatusServiceTest extends BaseUnitTest {
         // async body. The row must be finalized (failStarted, so it doesn't hold the one-active slot)
         // and the TaskRejectedException must propagate so the controller maps it to 503 — not a 500.
         SyncJob created = pendingJob();
-        SyncJobService.Started started = new SyncJobService.Started(created, null);
+        SyncJobService.Started started = new SyncJobService.Started(created, mock(SyncJobHandle.class));
         when(syncJobService.beginJob(any())).thenReturn(started);
         doThrow(new TaskRejectedException("executor saturated")).when(taskExecutor).execute(any());
 
@@ -668,6 +669,7 @@ class SyncStatusServiceTest extends BaseUnitTest {
             null
         );
         job.setId(JOB_ID);
+        job.setCreatedAt(Instant.now());
         return job;
     }
 
@@ -691,6 +693,7 @@ class SyncStatusServiceTest extends BaseUnitTest {
             null
         );
         job.setId(JOB_ID);
+        job.setCreatedAt(Instant.now());
         return job;
     }
 

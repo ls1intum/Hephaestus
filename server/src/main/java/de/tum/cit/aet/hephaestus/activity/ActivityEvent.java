@@ -13,6 +13,7 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.Immutable;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Minimal immutable activity event - the Stripe/Square approach.
@@ -92,7 +93,7 @@ public class ActivityEvent {
     /** The user who performed the action (nullable for system events) */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "actor_id")
-    private User actor;
+    private @Nullable User actor;
 
     @NotNull
     @ManyToOne(fetch = FetchType.LAZY)

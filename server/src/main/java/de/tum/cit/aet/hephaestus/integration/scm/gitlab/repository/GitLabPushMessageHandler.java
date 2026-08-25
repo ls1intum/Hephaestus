@@ -35,6 +35,7 @@ import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeParseException;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
@@ -128,7 +129,11 @@ public class GitLabPushMessageHandler extends AbstractIntegrationMessageHandler<
         }
 
         String projectPath = event.project().pathWithNamespace();
-        String safeProjectPath = sanitizeForLog(projectPath);
+        if (projectPath == null) {
+            log.warn("Received push event with missing project path");
+            return;
+        }
+        String safeProjectPath = Objects.requireNonNullElse(sanitizeForLog(projectPath), "<unknown>");
 
         if (event.isBranchDeletion()) {
             log.debug("Skipped push event: reason=branchDeletion, projectPath={}", safeProjectPath);
@@ -172,7 +177,7 @@ public class GitLabPushMessageHandler extends AbstractIntegrationMessageHandler<
                 boolean scopeActive = scopeId != null && syncTargetProvider.isScopeActiveForSync(scopeId);
 
                 if (scopeActive) {
-                    processCommitsViaLocalGit(event, repository, scopeId);
+                    processCommitsViaLocalGit(event, repository, Objects.requireNonNull(scopeId));
                 } else {
                     log.debug("Skipped local git: reason=scopeNotActive, scopeId={}", scopeId);
                     processCommitsViaWebhook(event, repository, false);
@@ -248,6 +253,9 @@ public class GitLabPushMessageHandler extends AbstractIntegrationMessageHandler<
         String repoName = sanitizeForLog(repository.getNameWithOwner());
         String beforeSha = event.before();
         String afterSha = event.after();
+        if (afterSha == null) {
+            return;
+        }
 
         try {
             String serverUrl = tokenService.resolveServerUrl(scopeId);
@@ -300,7 +308,7 @@ public class GitLabPushMessageHandler extends AbstractIntegrationMessageHandler<
             return false;
         }
 
-        Long providerId = repository.getProvider().getId();
+        Long providerId = Objects.requireNonNull(repository.getProvider().getId());
         Long authorId = authorResolver.resolveAndBackfillByEmail(info.authorEmail(), providerId);
         Long committerId = authorResolver.resolveAndBackfillByEmail(info.committerEmail(), providerId);
 
@@ -465,7 +473,7 @@ public class GitLabPushMessageHandler extends AbstractIntegrationMessageHandler<
             UUID.randomUUID(),
             Instant.now(),
             scopeId,
-            RepositoryRef.from(repository),
+            Objects.requireNonNull(RepositoryRef.from(repository)),
             DataSource.WEBHOOK,
             null,
             UUID.randomUUID().toString(),
@@ -502,7 +510,7 @@ public class GitLabPushMessageHandler extends AbstractIntegrationMessageHandler<
         }
 
         Organization org = organizationRepository
-            .findByLoginIgnoreCaseAndProviderId(groupPath, provider.getId())
+            .findByLoginIgnoreCaseAndProviderId(groupPath, Objects.requireNonNull(provider.getId()))
             .orElse(null);
 
         if (org != null) {
@@ -572,7 +580,7 @@ public class GitLabPushMessageHandler extends AbstractIntegrationMessageHandler<
         return value.length() <= maxLength ? value : value.substring(0, maxLength);
     }
 
-    private boolean isInitialPush(String sha) {
+    private boolean isInitialPush(@Nullable String sha) {
         return sha == null || ZERO_SHA.equals(sha);
     }
 }

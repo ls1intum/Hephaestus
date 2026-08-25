@@ -4,7 +4,9 @@ import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
+import java.util.Objects;
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 /**
  * One piece of work that carries the habit a in-app message is about.
@@ -22,12 +24,12 @@ public record InAppEvidenceDTO(
     @NonNull @Schema(description = "Kind of work, e.g. scm.pull_request") String artifactKind,
     @NonNull @Schema(description = "Identifier of the work within its kind") Long artifactId,
     @NonNull @Schema(description = "When the measurement behind this occurrence was taken") Instant observedAt,
-    @Schema(description = "What the review recorded on this piece of work") String summary
+    @Schema(description = "What the review recorded on this piece of work") @Nullable String summary
 ) {
     public static InAppEvidenceDTO from(Observation observation) {
         ArtifactKind kind = observation.getArtifactKind();
         return new InAppEvidenceDTO(
-            kind == null ? null : kind.value(),
+            Objects.requireNonNull(kind).value(),
             observation.getArtifactId(),
             observation.getObservedAt(),
             observation.getSummary()

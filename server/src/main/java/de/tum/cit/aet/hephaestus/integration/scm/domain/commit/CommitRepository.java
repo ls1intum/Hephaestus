@@ -6,6 +6,7 @@ import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import org.jspecify.annotations.Nullable;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
@@ -89,7 +90,7 @@ public interface CommitRepository extends JpaRepository<Commit, Long> {
     int bulkUpdateAuthorIdByEmail(
         @Param("email") String email,
         @Param("repositoryId") Long repositoryId,
-        @Param("authorId") Long authorId
+        @Param("authorId") @Nullable Long authorId
     );
 
     /** Sets {@code committer_id} only where still NULL, so a concurrent resolver's write is never clobbered. */
@@ -105,7 +106,7 @@ public interface CommitRepository extends JpaRepository<Commit, Long> {
     int bulkUpdateCommitterIdByEmail(
         @Param("email") String email,
         @Param("repositoryId") Long repositoryId,
-        @Param("committerId") Long committerId
+        @Param("committerId") @Nullable Long committerId
     );
 
     /**
@@ -166,7 +167,7 @@ public interface CommitRepository extends JpaRepository<Commit, Long> {
     int bulkUpdateAuthorId(
         @Param("shas") List<String> shas,
         @Param("repositoryId") Long repositoryId,
-        @Param("authorId") Long authorId
+        @Param("authorId") @Nullable Long authorId
     );
 
     /** Sets {@code committer_id} only where still NULL, so a concurrent resolver's write is never clobbered. */
@@ -182,7 +183,7 @@ public interface CommitRepository extends JpaRepository<Commit, Long> {
     int bulkUpdateCommitterId(
         @Param("shas") List<String> shas,
         @Param("repositoryId") Long repositoryId,
-        @Param("committerId") Long committerId
+        @Param("committerId") @Nullable Long committerId
     );
 
     /**
@@ -224,19 +225,19 @@ public interface CommitRepository extends JpaRepository<Commit, Long> {
     void upsertCommit(
         @Param("sha") String sha,
         @Param("message") String message,
-        @Param("messageBody") String messageBody,
-        @Param("htmlUrl") String htmlUrl,
-        @Param("authoredAt") Instant authoredAt,
-        @Param("committedAt") Instant committedAt,
-        @Param("additions") Integer additions,
-        @Param("deletions") Integer deletions,
-        @Param("changedFiles") Integer changedFiles,
+        @Param("messageBody") @Nullable String messageBody,
+        @Param("htmlUrl") @Nullable String htmlUrl,
+        @Param("authoredAt") @Nullable Instant authoredAt,
+        @Param("committedAt") @Nullable Instant committedAt,
+        @Param("additions") @Nullable Integer additions,
+        @Param("deletions") @Nullable Integer deletions,
+        @Param("changedFiles") @Nullable Integer changedFiles,
         @Param("lastSyncAt") Instant lastSyncAt,
         @Param("repositoryId") Long repositoryId,
-        @Param("authorId") Long authorId,
-        @Param("committerId") Long committerId,
-        @Param("authorEmail") String authorEmail,
-        @Param("committerEmail") String committerEmail
+        @Param("authorId") @Nullable Long authorId,
+        @Param("committerId") @Nullable Long committerId,
+        @Param("authorEmail") @Nullable String authorEmail,
+        @Param("committerEmail") @Nullable String committerEmail
     );
 
     /**
@@ -345,24 +346,24 @@ public interface CommitRepository extends JpaRepository<Commit, Long> {
     )
     void updateEnrichmentMetadata(
         @Param("commitId") Long commitId,
-        @Param("additions") Integer additions,
-        @Param("deletions") Integer deletions,
-        @Param("changedFiles") Integer changedFiles,
-        @Param("authoredAt") Instant authoredAt,
-        @Param("committedAt") Instant committedAt,
-        @Param("message") String message,
-        @Param("messageBody") String messageBody,
-        @Param("htmlUrl") String htmlUrl,
-        @Param("signatureValid") Boolean signatureValid,
-        @Param("authoredByCommitter") Boolean authoredByCommitter,
-        @Param("committedViaWeb") Boolean committedViaWeb,
-        @Param("parentCount") Integer parentCount,
-        @Param("signatureState") String signatureState,
-        @Param("signatureWasSignedByGitHub") Boolean signatureWasSignedByGitHub,
-        @Param("signatureSignerLogin") String signatureSignerLogin,
-        @Param("parentShas") String parentShas,
-        @Param("statusCheckRollupState") String statusCheckRollupState,
-        @Param("onBehalfOfLogin") String onBehalfOfLogin
+        @Param("additions") @Nullable Integer additions,
+        @Param("deletions") @Nullable Integer deletions,
+        @Param("changedFiles") @Nullable Integer changedFiles,
+        @Param("authoredAt") @Nullable Instant authoredAt,
+        @Param("committedAt") @Nullable Instant committedAt,
+        @Param("message") @Nullable String message,
+        @Param("messageBody") @Nullable String messageBody,
+        @Param("htmlUrl") @Nullable String htmlUrl,
+        @Param("signatureValid") @Nullable Boolean signatureValid,
+        @Param("authoredByCommitter") @Nullable Boolean authoredByCommitter,
+        @Param("committedViaWeb") @Nullable Boolean committedViaWeb,
+        @Param("parentCount") @Nullable Integer parentCount,
+        @Param("signatureState") @Nullable String signatureState,
+        @Param("signatureWasSignedByGitHub") @Nullable Boolean signatureWasSignedByGitHub,
+        @Param("signatureSignerLogin") @Nullable String signatureSignerLogin,
+        @Param("parentShas") @Nullable String parentShas,
+        @Param("statusCheckRollupState") @Nullable String statusCheckRollupState,
+        @Param("onBehalfOfLogin") @Nullable String onBehalfOfLogin
     );
 
     /**
@@ -395,8 +396,8 @@ public interface CommitRepository extends JpaRepository<Commit, Long> {
     int updateParentMetadataBySha(
         @Param("repositoryId") Long repositoryId,
         @Param("sha") String sha,
-        @Param("parentCount") Integer parentCount,
-        @Param("parentShas") String parentShas
+        @Param("parentCount") @Nullable Integer parentCount,
+        @Param("parentShas") @Nullable String parentShas
     );
 
     /** N most recent commits by an author as of {@code asOf}. Used by the AtomicChanges achievement evaluator. */
@@ -409,7 +410,7 @@ public interface CommitRepository extends JpaRepository<Commit, Long> {
         """
     )
     List<Commit> findTopNByAuthorIdOrderByAuthoredAtDesc(
-        @Param("authorId") Long authorId,
+        @Param("authorId") @Nullable Long authorId,
         @Param("asOf") Instant asOf,
         Pageable pageable
     );
@@ -441,5 +442,8 @@ public interface CommitRepository extends JpaRepository<Commit, Long> {
         """,
         nativeQuery = true
     )
-    List<String> findDistinctFileExtensionsByAuthorId(@Param("authorId") Long authorId, @Param("asOf") Instant asOf);
+    List<String> findDistinctFileExtensionsByAuthorId(
+        @Param("authorId") @Nullable Long authorId,
+        @Param("asOf") Instant asOf
+    );
 }

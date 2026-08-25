@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.integration.scm.domain.discussion;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import java.time.Instant;
 import java.util.Optional;
+import org.jspecify.annotations.Nullable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -97,21 +98,21 @@ public interface DiscussionRepository extends JpaRepository<Discussion, Long> {
         @Param("repositoryId") Long repositoryId,
         @Param("number") int number,
         @Param("title") String title,
-        @Param("body") String body,
-        @Param("htmlUrl") String htmlUrl,
+        @Param("body") @Nullable String body,
+        @Param("htmlUrl") @Nullable String htmlUrl,
         @Param("state") String state,
-        @Param("stateReason") String stateReason,
+        @Param("stateReason") @Nullable String stateReason,
         @Param("isLocked") boolean isLocked,
-        @Param("activeLockReason") String activeLockReason,
-        @Param("closedAt") Instant closedAt,
-        @Param("answerChosenAt") Instant answerChosenAt,
+        @Param("activeLockReason") @Nullable String activeLockReason,
+        @Param("closedAt") @Nullable Instant closedAt,
+        @Param("answerChosenAt") @Nullable Instant answerChosenAt,
         @Param("commentCount") int commentCount,
         @Param("upvoteCount") int upvoteCount,
         @Param("lastSyncAt") Instant lastSyncAt,
-        @Param("createdAt") Instant createdAt,
-        @Param("updatedAt") Instant updatedAt,
-        @Param("authorId") Long authorId,
-        @Param("categoryId") String categoryId,
-        @Param("answerChosenById") Long answerChosenById
+        @Param("createdAt") @Nullable Instant createdAt,
+        @Param("updatedAt") @Nullable Instant updatedAt,
+        @Param("authorId") @Nullable Long authorId,
+        @Param("categoryId") @Nullable String categoryId,
+        @Param("answerChosenById") @Nullable Long answerChosenById
     );
 }

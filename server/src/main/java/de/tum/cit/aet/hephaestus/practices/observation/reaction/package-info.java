@@ -6,4 +6,5 @@
  * {@code observation} / {@code model} / {@code feedback} interfaces.
  */
 @org.springframework.modulith.NamedInterface("reaction")
+@org.jspecify.annotations.NullMarked
 package de.tum.cit.aet.hephaestus.practices.observation.reaction;

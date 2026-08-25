@@ -4,4 +4,5 @@
  * session lifecycle, and auth only.
  */
 @org.springframework.modulith.NamedInterface("worker-hub")
+@org.jspecify.annotations.NullMarked
 package de.tum.cit.aet.hephaestus.core.runtime.hub;

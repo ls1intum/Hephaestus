@@ -20,20 +20,20 @@ import org.jspecify.annotations.Nullable;
 public record GitLabMergeRequestEventDTO(
     @JsonProperty("object_kind") @NonNull String objectKind,
     @JsonProperty("event_type") @NonNull String eventType,
-    @NonNull GitLabWebhookUser user,
-    @NonNull GitLabWebhookProject project,
-    @JsonProperty("object_attributes") @NonNull ObjectAttributes objectAttributes,
+    @Nullable GitLabWebhookUser user,
+    @Nullable GitLabWebhookProject project,
+    @JsonProperty("object_attributes") @Nullable ObjectAttributes objectAttributes,
     @Nullable List<GitLabWebhookLabel> labels,
     @Nullable List<GitLabWebhookUser> assignees,
     @Nullable List<GitLabWebhookUser> reviewers
 ) {
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record ObjectAttributes(
-        @NonNull Long id,
-        @NonNull Integer iid,
+        @Nullable Long id,
+        @Nullable Integer iid,
         @NonNull String title,
         String description,
-        @NonNull String state,
+        @Nullable String state,
         @NonNull String action,
         @JsonProperty("source_branch") @NonNull String sourceBranch,
         @JsonProperty("target_branch") @NonNull String targetBranch,

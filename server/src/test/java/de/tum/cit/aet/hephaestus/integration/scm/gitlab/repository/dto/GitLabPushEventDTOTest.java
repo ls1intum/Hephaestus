@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.scm.gitlab.repository.dto;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.io.IOException;
@@ -43,6 +44,7 @@ class GitLabPushEventDTOTest extends BaseUnitTest {
             // Project info
             assertThat(dto.project()).isNotNull();
             assertThat(dto.project().id()).isEqualTo(246765L);
+            assertNotNull(dto.project());
             assertThat(dto.project().name()).isEqualTo("demo-repository");
             assertThat(dto.project().pathWithNamespace()).isEqualTo("hephaestustest/demo-repository");
             assertThat(dto.project().webUrl()).isEqualTo("https://gitlab.lrz.de/hephaestustest/demo-repository");
@@ -75,6 +77,7 @@ class GitLabPushEventDTOTest extends BaseUnitTest {
             GitLabPushEventDTO dto = objectMapper.readValue(json, GitLabPushEventDTO.class);
 
             assertThat(dto.objectKind()).isEqualTo("push");
+            assertNotNull(dto.project());
             assertThat(dto.project().name()).isEqualTo("test");
         }
     }

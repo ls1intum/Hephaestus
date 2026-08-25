@@ -53,7 +53,7 @@ class CredentialBundleConverterTest extends BaseUnitTest {
         @Test
         void bearerToken_specialChars_roundTrips() {
             CredentialBundleConverter c = enabled();
-            String weird = "xoxb-\"backslash\\quote\" \tTAB‫RTL‬ 🚀 \\(notSwiftInterp)";
+            String weird = "xoxb-\"backslash\\quote\" \tTAB\u202bRTL\u202c 🚀 \\(notSwiftInterp)";
             BearerToken tok = new BearerToken(weird, null);
 
             BearerToken decoded = (BearerToken) c.decrypt(c.encrypt(tok, CTX_A), CTX_A);

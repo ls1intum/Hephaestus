@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.cit.aet.hephaestus.testconfig.LlmCatalogTestFixtures;
 import de.tum.cit.aet.hephaestus.workspace.AbstractWorkspaceIntegrationTest;
+import java.util.Objects;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
@@ -33,18 +34,20 @@ class LlmConnectionAdminControllerIntegrationTest extends AbstractWorkspaceInteg
             "sk-test-secret-1234",
             true
         );
-        return webTestClient
-            .post()
-            .uri("/admin/llm/connections")
-            .headers(h -> h.setBearerAuth(ADMIN_TOKEN))
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(request)
-            .exchange()
-            .expectStatus()
-            .isCreated()
-            .expectBody(LlmConnectionDTO.class)
-            .returnResult()
-            .getResponseBody();
+        return Objects.requireNonNull(
+            webTestClient
+                .post()
+                .uri("/admin/llm/connections")
+                .headers(h -> h.setBearerAuth(ADMIN_TOKEN))
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(request)
+                .exchange()
+                .expectStatus()
+                .isCreated()
+                .expectBody(LlmConnectionDTO.class)
+                .returnResult()
+                .getResponseBody()
+        );
     }
 
     @Test

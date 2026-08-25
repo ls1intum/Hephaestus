@@ -11,6 +11,7 @@ import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -53,8 +54,8 @@ class ReviewRunSummaryQueryService {
 
     private ReviewRunSummaryDTO from(
         ReviewRunSummaryRow review,
-        ReviewObservationCounts observationCounts,
-        ReviewFeedbackCounts feedbackCounts
+        @Nullable ReviewObservationCounts observationCounts,
+        @Nullable ReviewFeedbackCounts feedbackCounts
     ) {
         return ReviewRunSummaryDTO.from(
             review,

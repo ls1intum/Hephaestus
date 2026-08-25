@@ -10,6 +10,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.ReentrantLock;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
@@ -51,7 +52,7 @@ final class MentorSseChannel implements MentorChannel {
      */
     private final AtomicBoolean closed = new AtomicBoolean(false);
     private final AtomicLong lastSendNanos = new AtomicLong(System.nanoTime());
-    private final AtomicReference<Runnable> disconnectHook = new AtomicReference<>();
+    private final AtomicReference<@Nullable Runnable> disconnectHook = new AtomicReference<>();
     /**
      * Serialises every write to {@link #emitter} ({@link SseEmitter#send} is NOT thread-safe;
      * heartbeat tick + chunk writes would otherwise byte-interleave). {@link ReentrantLock} not
@@ -59,7 +60,7 @@ final class MentorSseChannel implements MentorChannel {
      * the carrier OS thread for the full critical section incl. socket writes.
      */
     private final ReentrantLock writeLock = new ReentrantLock();
-    private volatile ScheduledFuture<?> heartbeat;
+    private volatile @Nullable ScheduledFuture<?> heartbeat;
 
     MentorSseChannel(SseEmitter emitter, ObjectMapper objectMapper, ScheduledExecutorService scheduler) {
         this.emitter = emitter;

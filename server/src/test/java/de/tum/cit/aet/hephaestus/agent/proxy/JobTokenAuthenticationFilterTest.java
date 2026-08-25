@@ -22,6 +22,7 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletResponse;
 import java.math.BigDecimal;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
@@ -176,7 +177,7 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
 
             var authCapture = new AtomicReference<Authentication>();
             doAnswer(invocation -> {
-                authCapture.set(SecurityContextHolder.getContext().getAuthentication());
+                authCapture.set(Objects.requireNonNull(SecurityContextHolder.getContext().getAuthentication()));
                 return null;
             })
                 .when(filterChain)
@@ -318,7 +319,7 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
             ).thenReturn(Optional.of(job));
             var authCapture = new AtomicReference<Authentication>();
             doAnswer(invocation -> {
-                authCapture.set(SecurityContextHolder.getContext().getAuthentication());
+                authCapture.set(Objects.requireNonNull(SecurityContextHolder.getContext().getAuthentication()));
                 return null;
             })
                 .when(filterChain)
@@ -332,7 +333,9 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
             request.addHeader("Authorization", authorizationHeader);
 
             filter.doFilterInternal(request, new MockHttpServletResponse(), filterChain);
-            return authCapture.get();
+            Authentication authentication = authCapture.get();
+            org.junit.jupiter.api.Assertions.assertNotNull(authentication);
+            return authentication;
         }
 
         @Test
@@ -409,7 +412,7 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
 
             var authCapture = new AtomicReference<Authentication>();
             doAnswer(invocation -> {
-                authCapture.set(SecurityContextHolder.getContext().getAuthentication());
+                authCapture.set(Objects.requireNonNull(SecurityContextHolder.getContext().getAuthentication()));
                 return null;
             })
                 .when(filterChain)
@@ -423,7 +426,10 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
             filter.doFilterInternal(request, response, filterChain);
 
             assertThat(response.getStatus()).isEqualTo(HttpServletResponse.SC_OK);
-            ProxyRouting routing = (ProxyRouting) ((JobTokenAuthentication) authCapture.get()).getPrincipal();
+            Authentication authentication = authCapture.get();
+            org.junit.jupiter.api.Assertions.assertNotNull(authentication);
+            org.junit.jupiter.api.Assertions.assertInstanceOf(JobTokenAuthentication.class, authentication);
+            ProxyRouting routing = (ProxyRouting) ((JobTokenAuthentication) authentication).getPrincipal();
             assertThat(routing.apiProtocol()).isEqualTo("openai-completions");
         }
 
@@ -504,7 +510,7 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
             ).thenReturn(Optional.of(job));
             var authCapture = new AtomicReference<Authentication>();
             doAnswer(invocation -> {
-                authCapture.set(SecurityContextHolder.getContext().getAuthentication());
+                authCapture.set(Objects.requireNonNull(SecurityContextHolder.getContext().getAuthentication()));
                 return null;
             })
                 .when(filterChain)
@@ -515,7 +521,10 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
             request.addHeader("Authorization", "Bearer " + VALID_TOKEN);
             filter.doFilterInternal(request, new MockHttpServletResponse(), filterChain);
 
-            return (ProxyRouting) ((JobTokenAuthentication) authCapture.get()).getPrincipal();
+            Authentication authentication = authCapture.get();
+            org.junit.jupiter.api.Assertions.assertNotNull(authentication);
+            org.junit.jupiter.api.Assertions.assertInstanceOf(JobTokenAuthentication.class, authentication);
+            return (ProxyRouting) ((JobTokenAuthentication) authentication).getPrincipal();
         }
     }
 
@@ -523,7 +532,7 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
         return createRunningJob(null);
     }
 
-    private AgentJob createRunningJob(LlmPriceSnapshot price) {
+    private AgentJob createRunningJob(@org.jspecify.annotations.Nullable LlmPriceSnapshot price) {
         var job = new AgentJob();
         job.setJobToken(VALID_TOKEN);
         ConfigSnapshot snapshot = new ConfigSnapshot(
@@ -599,7 +608,7 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
             ).thenReturn(Optional.of(createRunningJob()));
             var authInsideChain = new AtomicReference<Authentication>();
             doAnswer(invocation -> {
-                authInsideChain.set(SecurityContextHolder.getContext().getAuthentication());
+                authInsideChain.set(Objects.requireNonNull(SecurityContextHolder.getContext().getAuthentication()));
                 return null;
             })
                 .when(filterChain)

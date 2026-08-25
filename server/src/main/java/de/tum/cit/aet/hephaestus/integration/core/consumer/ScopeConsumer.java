@@ -13,6 +13,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -52,7 +53,7 @@ public final class ScopeConsumer {
     private static final long STOP_TIMEOUT_MILLIS = 10_000;
 
     /** Null for the installation-wide consumer; never null for scope consumers. */
-    private final Long scopeId;
+    private final @Nullable Long scopeId;
     private final String consumerName;
     private final String streamName;
     private final ConsumerContext context;
@@ -60,8 +61,8 @@ public final class ScopeConsumer {
     private final Consumer<Message> messageHandler;
 
     private volatile String[] currentSubjects;
-    private volatile MessageConsumer subscription;
-    private volatile Thread processorThread;
+    private volatile @Nullable MessageConsumer subscription;
+    private volatile @Nullable Thread processorThread;
     private final AtomicBoolean running = new AtomicBoolean(false);
 
     /**
@@ -71,13 +72,13 @@ public final class ScopeConsumer {
     private final BlockingQueue<Message> messageQueue = new LinkedBlockingQueue<>();
 
     public ScopeConsumer(
-        Long scopeId,
+        @Nullable Long scopeId,
         String consumerName,
-        String streamName,
+        @Nullable String streamName,
         ConsumerContext context,
         StreamContext streamContext,
         String[] subjects,
-        Consumer<Message> messageHandler
+        @Nullable Consumer<Message> messageHandler
     ) {
         if (consumerName == null || consumerName.isBlank()) {
             throw new IllegalArgumentException("consumerName must not be blank");
@@ -114,7 +115,7 @@ public final class ScopeConsumer {
         return streamName;
     }
 
-    public Long scopeId() {
+    public @Nullable Long scopeId() {
         return scopeId;
     }
 
@@ -175,7 +176,7 @@ public final class ScopeConsumer {
      * configuration is updated first; once that succeeds, the local subscription is
      * recycled. Idempotent: identical subject sets are a no-op.
      */
-    public synchronized void updateSubjects(String[] newSubjects) throws IOException, JetStreamApiException {
+    public synchronized void updateSubjects(String@Nullable [] newSubjects) throws IOException, JetStreamApiException {
         if (newSubjects == null) {
             throw new IllegalArgumentException("newSubjects must not be null");
         }

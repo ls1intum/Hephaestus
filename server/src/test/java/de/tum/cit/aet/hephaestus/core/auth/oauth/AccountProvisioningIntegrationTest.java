@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.core.auth.oauth;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
 import de.tum.cit.aet.hephaestus.core.auth.domain.AccountRepository;
@@ -11,6 +12,7 @@ import de.tum.cit.aet.hephaestus.core.auth.provider.LoginProviderRepository;
 import de.tum.cit.aet.hephaestus.testconfig.RealAuthIntegrationTest;
 import java.util.List;
 import java.util.Map;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -69,15 +71,15 @@ class AccountProvisioningIntegrationTest extends RealAuthIntegrationTest {
             .account();
 
         // Two distinct accounts: the shared email did NOT fold the second identity into the first.
-        assertThat(viaGitlab.getId()).isNotEqualTo(viaGithub.getId());
+        assertThat(persistedId(viaGitlab.getId())).isNotEqualTo(persistedId(viaGithub.getId()));
         // Both store the email as contact metadata (proving it WAS seen, just never used as a key).
         assertThat(viaGithub.getPrimaryEmail()).isEqualTo(sharedEmail);
         assertThat(viaGitlab.getPrimaryEmail()).isEqualTo(sharedEmail);
         // Each account owns exactly its own identity link, on its own provider+subject.
-        assertThat(identityLinkRepository.findActiveByAccountId(viaGithub.getId()))
+        assertThat(identityLinkRepository.findActiveByAccountId(persistedId(viaGithub.getId())))
             .extracting(IdentityLink::getSubject)
             .containsExactly("gh-subject-victim");
-        assertThat(identityLinkRepository.findActiveByAccountId(viaGitlab.getId()))
+        assertThat(identityLinkRepository.findActiveByAccountId(persistedId(viaGitlab.getId())))
             .extracting(IdentityLink::getSubject)
             .containsExactly("gl-subject-attacker");
     }
@@ -105,7 +107,7 @@ class AccountProvisioningIntegrationTest extends RealAuthIntegrationTest {
             .account();
 
         // Even within ONE provider, the subject is the key — a shared email never merges subjects.
-        assertThat(second.getId()).isNotEqualTo(first.getId());
+        assertThat(persistedId(second.getId())).isNotEqualTo(persistedId(first.getId()));
     }
 
     @Test
@@ -131,9 +133,9 @@ class AccountProvisioningIntegrationTest extends RealAuthIntegrationTest {
             )
             .account();
 
-        assertThat(secondLogin.getId()).isEqualTo(firstLogin.getId());
+        assertThat(persistedId(secondLogin.getId())).isEqualTo(persistedId(firstLogin.getId()));
         // Idempotent: still exactly one identity link for the account.
-        assertThat(identityLinkRepository.findActiveByAccountId(firstLogin.getId())).hasSize(1);
+        assertThat(identityLinkRepository.findActiveByAccountId(persistedId(firstLogin.getId()))).hasSize(1);
     }
 
     private void seedProvider(String registrationId, LoginProvider.ProviderType type) {
@@ -156,5 +158,10 @@ class AccountProvisioningIntegrationTest extends RealAuthIntegrationTest {
             Map.of("id", subject, "login", login, "email", email, "email_verified", emailVerified),
             "id"
         );
+    }
+
+    private static long persistedId(@Nullable Long id) {
+        assertNotNull(id);
+        return id;
     }
 }

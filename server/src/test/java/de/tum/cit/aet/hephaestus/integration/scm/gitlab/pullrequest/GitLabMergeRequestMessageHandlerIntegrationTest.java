@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.integration.scm.gitlab.pullrequest;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
@@ -310,7 +311,7 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
 
             transactionTemplate.executeWithoutResult(status -> {
                 long nativeId = GitLabMergeRequestProcessor.generateApprovalNativeId(NATIVE_MR4_ID, NATIVE_APPROVER_ID);
-                var review = reviewRepository.findByNativeIdAndProviderId(nativeId, savedProvider.getId());
+                var review = reviewRepository.findByNativeIdAndProviderId(nativeId, persistedId(savedProvider));
                 assertThat(review).isPresent();
                 assertThat(review.get().getState()).isEqualTo(PullRequestReview.State.DISMISSED);
             });
@@ -391,7 +392,9 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
 
             transactionTemplate.executeWithoutResult(status -> {
                 long nativeId = GitLabMergeRequestProcessor.generateApprovalNativeId(NATIVE_MR4_ID, NATIVE_APPROVER_ID);
-                assertThat(reviewRepository.findByNativeIdAndProviderId(nativeId, savedProvider.getId())).isPresent();
+                assertThat(
+                    reviewRepository.findByNativeIdAndProviderId(nativeId, persistedId(savedProvider))
+                ).isPresent();
             });
 
             // Unapprove MR !4 — should dismiss the review (not delete, not CHANGES_REQUESTED)
@@ -400,7 +403,7 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
 
             transactionTemplate.executeWithoutResult(status -> {
                 long nativeId = GitLabMergeRequestProcessor.generateApprovalNativeId(NATIVE_MR4_ID, NATIVE_APPROVER_ID);
-                var review = reviewRepository.findByNativeIdAndProviderId(nativeId, savedProvider.getId());
+                var review = reviewRepository.findByNativeIdAndProviderId(nativeId, persistedId(savedProvider));
                 assertThat(review).isPresent();
                 assertThat(review.get().getState()).isEqualTo(PullRequestReview.State.DISMISSED);
             });
@@ -432,7 +435,7 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
             transactionTemplate.executeWithoutResult(status -> {
                 issueRepository.upsertCore(
                     /* nativeId */ 888888L,
-                    /* providerId */ savedProvider.getId(),
+                    /* providerId */ persistedId(savedProvider),
                     /* number */ MR3_IID, // Same number as MR !3
                     /* title */ "Issue with same IID",
                     /* body */ "This is an issue with the same IID as the MR",
@@ -542,7 +545,7 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
 
             transactionTemplate.executeWithoutResult(status -> {
                 var author = userRepository
-                    .findByNativeIdAndProviderId(NATIVE_AUTHOR_ID, savedProvider.getId())
+                    .findByNativeIdAndProviderId(NATIVE_AUTHOR_ID, persistedId(savedProvider))
                     .orElseThrow();
                 assertThat(author.getLogin()).isEqualTo(FIXTURE_AUTHOR_LOGIN);
                 assertThat(author.getProvider().getType()).isEqualTo(IdentityProviderType.GITLAB);
@@ -599,5 +602,11 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
         workspace.setAccountLogin(FIXTURE_ORG_LOGIN);
         workspace.setAccountType(AccountType.ORG);
         workspaceRepository.save(workspace);
+    }
+
+    private static long persistedId(IdentityProvider provider) {
+        Long id = provider.getId();
+        assertNotNull(id);
+        return id;
     }
 }

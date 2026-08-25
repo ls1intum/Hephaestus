@@ -13,6 +13,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.milestone.dto.GitHubMile
 import de.tum.cit.aet.hephaestus.integration.scm.github.user.GitHubUserProcessor;
 import de.tum.cit.aet.hephaestus.integration.scm.github.user.dto.GitHubUserDTO;
 import java.time.Instant;
+import java.util.Objects;
 import java.util.Optional;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
@@ -72,8 +73,8 @@ public class GitHubMilestoneProcessor {
      * @return the persisted Milestone entity
      */
     @Transactional
-    public Milestone process(
-        GitHubMilestoneDTO dto,
+    public @Nullable Milestone process(
+        @Nullable GitHubMilestoneDTO dto,
         Repository repository,
         @Nullable GitHubUserDTO creatorDto,
         ProcessingContext context
@@ -117,7 +118,7 @@ public class GitHubMilestoneProcessor {
 
         // Set provider for new milestones
         if (isNew) {
-            milestone.setProvider(context.provider());
+            milestone.setProvider(Objects.requireNonNull(context.provider()));
         }
         if (dto.number() > 0) {
             milestone.setNumber(dto.number());
@@ -161,7 +162,7 @@ public class GitHubMilestoneProcessor {
 
         // Set creator if provided
         if (creatorDto != null) {
-            User creator = findOrCreateUser(creatorDto, context.providerId());
+            User creator = findOrCreateUser(creatorDto, Objects.requireNonNull(context.providerId()));
             milestone.setCreator(creator);
         }
 
@@ -217,13 +218,13 @@ public class GitHubMilestoneProcessor {
      * @param context processing context with scope information
      */
     @Transactional
-    public void delete(Long nativeId, ProcessingContext context) {
+    public void delete(@Nullable Long nativeId, ProcessingContext context) {
         if (nativeId == null) {
             return;
         }
 
         milestoneRepository
-            .findByNativeIdAndProviderId(nativeId, context.providerId())
+            .findByNativeIdAndProviderId(nativeId, Objects.requireNonNull(context.providerId()))
             .ifPresent(milestone -> {
                 Long milestoneId = milestone.getId();
                 // Clean up issue references via direct database UPDATE before deletion.

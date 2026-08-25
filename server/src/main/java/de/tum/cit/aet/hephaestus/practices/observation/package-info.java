@@ -4,4 +4,5 @@
  * deeper under {@code feedback.dto}.
  */
 @org.springframework.modulith.NamedInterface("observation")
+@org.jspecify.annotations.NullMarked
 package de.tum.cit.aet.hephaestus.practices.observation;

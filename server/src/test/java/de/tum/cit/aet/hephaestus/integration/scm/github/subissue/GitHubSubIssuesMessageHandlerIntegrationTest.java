@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.scm.github.subissue;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
@@ -20,6 +21,7 @@ import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -132,7 +134,7 @@ class GitHubSubIssuesMessageHandlerIntegrationTest extends BaseIntegrationTest {
         GitHubSubIssuesEventDTO event = loadPayload("sub_issues.sub_issue_added");
 
         // Create parent issue
-        createTestIssue(event.parentIssue().getDatabaseId(), event.parentIssue().number(), "Parent Issue");
+        createTestIssue(required(event.parentIssue().getDatabaseId()), event.parentIssue().number(), "Parent Issue");
 
         handler.handleEvent(event);
 
@@ -145,8 +147,8 @@ class GitHubSubIssuesMessageHandlerIntegrationTest extends BaseIntegrationTest {
         GitHubSubIssuesEventDTO event = loadPayload("sub_issues.sub_issue_removed");
 
         // Create parent issue and sub issue
-        createTestIssue(event.parentIssue().getDatabaseId(), event.parentIssue().number(), "Parent Issue");
-        createTestIssue(event.subIssue().getDatabaseId(), event.subIssue().number(), "Sub Issue");
+        createTestIssue(required(event.parentIssue().getDatabaseId()), event.parentIssue().number(), "Parent Issue");
+        createTestIssue(required(event.subIssue().getDatabaseId()), event.subIssue().number(), "Sub Issue");
 
         handler.handleEvent(event);
 
@@ -158,5 +160,10 @@ class GitHubSubIssuesMessageHandlerIntegrationTest extends BaseIntegrationTest {
         ClassPathResource resource = new ClassPathResource("github/" + filename + ".json");
         String json = resource.getContentAsString(StandardCharsets.UTF_8);
         return objectMapper.readValue(json, GitHubSubIssuesEventDTO.class);
+    }
+
+    private static <T> T required(@Nullable T value) {
+        assertNotNull(value);
+        return value;
     }
 }

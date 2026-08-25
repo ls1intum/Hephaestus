@@ -23,6 +23,7 @@ import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.testconfig.TestEntities;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import java.util.List;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
@@ -32,6 +33,11 @@ import org.mockito.ArgumentCaptor;
  * startLine) anchor swap is verified.
  */
 class DiffNotePosterTest extends BaseUnitTest {
+
+    private static List<InlineFeedback> posted(RecordingChannel channel) {
+        assertThat(channel.posted).isNotNull();
+        return channel.posted;
+    }
 
     private final PullRequestCommentPoster commentPoster = mock(PullRequestCommentPoster.class);
     private final PracticeFeedbackCommentFormatter commentFormatter = new PracticeFeedbackCommentFormatter(
@@ -54,8 +60,12 @@ class DiffNotePosterTest extends BaseUnitTest {
     /** A recording channel that captures the observations it was asked to post (and whether clear was invoked). */
     private static final class RecordingChannel implements InlineFeedbackChannel {
 
+        @Nullable
         List<InlineFeedback> posted;
+
         boolean cleared;
+
+        @Nullable
         RuntimeException clearThrows;
 
         @Override
@@ -112,7 +122,7 @@ class DiffNotePosterTest extends BaseUnitTest {
 
         poster.reconcileInlineNotes(gitlabJob(), List.of(single));
 
-        FeedbackAnchor.DiffAnchor anchor = (FeedbackAnchor.DiffAnchor) channel.posted.get(0).anchor();
+        FeedbackAnchor.DiffAnchor anchor = (FeedbackAnchor.DiffAnchor) posted(channel).get(0).anchor();
         assertThat(anchor.newLineNumber()).isEqualTo(10);
         assertThat(anchor.startLine()).isNull();
     }
@@ -163,7 +173,7 @@ class DiffNotePosterTest extends BaseUnitTest {
 
         poster.reconcileInlineNotes(gitlabJob(), List.of(note));
 
-        FeedbackAnchor.DiffAnchor anchor = (FeedbackAnchor.DiffAnchor) channel.posted.get(0).anchor();
+        FeedbackAnchor.DiffAnchor anchor = (FeedbackAnchor.DiffAnchor) posted(channel).get(0).anchor();
         assertThat(anchor.filePath()).isEqualTo("src/components/Button.tsx");
     }
 

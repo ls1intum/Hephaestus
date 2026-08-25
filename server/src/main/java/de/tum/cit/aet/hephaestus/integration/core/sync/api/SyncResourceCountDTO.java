@@ -4,6 +4,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.SyncResourceCount;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 @Schema(description = "One entity class mirrored within a resource (issues, pull requests, comments, messages, …)")
 public record SyncResourceCountDTO(
@@ -22,6 +23,7 @@ public record SyncResourceCountDTO(
         description = "When this class was last synced. Null means the integration does not track a " +
             "per-class watermark — not that the class has never synced."
     )
+    @Nullable
     Instant lastSyncedAt
 ) {
     public static SyncResourceCountDTO from(SyncResourceCount count) {

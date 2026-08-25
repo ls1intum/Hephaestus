@@ -18,7 +18,7 @@ class ReviewSubjectResolver {
 
     private final UserRepository userRepository;
 
-    Map<Long, ReviewSubjectDTO> resolve(Collection<@Nullable Long> userIds) {
+    Map<Long, ReviewSubjectDTO> resolve(Collection<? extends @Nullable Long> userIds) {
         Set<Long> ids = userIds.stream().filter(Objects::nonNull).collect(Collectors.toSet());
         if (ids.isEmpty()) {
             return Map.of();

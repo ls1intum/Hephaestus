@@ -46,6 +46,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -447,11 +448,11 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
         );
     }
 
-    private Observation problem(ObjectNode evidence, String recurrenceKey) {
+    private Observation problem(@Nullable ObjectNode evidence, @Nullable String recurrenceKey) {
         return problem(evidence, recurrenceKey, UUID.randomUUID());
     }
 
-    private Observation problem(ObjectNode evidence, String recurrenceKey, UUID id) {
+    private Observation problem(@Nullable ObjectNode evidence, @Nullable String recurrenceKey, UUID id) {
         Observation o = mock(Observation.class);
         lenient().when(o.getId()).thenReturn(id);
         lenient().when(o.getPresence()).thenReturn(Presence.ABSENT);

@@ -13,4 +13,5 @@
  * cycle with {@code integration.scm} (workspace adapters already implement integration.spi SPIs).
  */
 @org.springframework.modulith.ApplicationModule(displayName = "Workspace (Tenancy)")
+@org.jspecify.annotations.NullMarked
 package de.tum.cit.aet.hephaestus.workspace;

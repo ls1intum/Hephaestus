@@ -98,15 +98,13 @@
         <openapi-generator.version>7.19.0</openapi-generator.version>
         <postgresql.version>42.7.11</postgresql.version>
         <therapi.version>0.15.0</therapi.version>
+        <error-prone.version>2.50.0</error-prone.version>
+        <nullaway.version>0.14.0</nullaway.version>
         <shedlock.version>5.16.0</shedlock.version>
         <bucket4j.version>8.19.0</bucket4j.version>
     </properties>
     <dependencies>
-        <!-- JSpecify nullness annotations (@NonNull/@Nullable). The forward-looking standard
-             adopted by Spring Framework 7 / Boot 4, replacing the deprecated
-             org.springframework.lang.* annotations. Version managed by the Spring Boot BOM.
-             A custom ModelConverter (JSpecifyRequiredModelConverter) teaches SpringDoc to read
-             these for OpenAPI `required`, since swagger-core only recognises the Spring ones. -->
+        <!-- JSpecify annotations also drive the OpenAPI required-field converter. -->
         <dependency>
             <groupId>org.jspecify</groupId>
             <artifactId>jspecify</artifactId>
@@ -490,6 +488,11 @@
                     <!-- Suppress warnings for generated code using deprecated GitHub API values -->
                     <compilerArgs>
                         <arg>-Xlint:all,-deprecation</arg>
+                        <arg>-XDcompilePolicy=simple</arg>
+                        <arg>--should-stop=ifError=FLOW</arg>
+                        <arg>-XDaddTypeAnnotationsToSymbol=true</arg>
+                        <!-- javac requires the Error Prone plugin and its options in one compiler argument. -->
+                        <arg>-Xplugin:ErrorProne -XepDisableAllChecks -Xep:NullAway:ERROR -Xep:RequireExplicitNullMarking:ERROR -XepExcludedPaths:.*[\\/]target[\\/]generated-sources[\\/].* -XepOpt:NullAway:AnnotatedPackages=de.tum.cit.aet.hephaestus -XepOpt:NullAway:JSpecifyMode=true -XepOpt:NullAway:TreatGeneratedAsUnannotated=true -XepOpt:NullAway:HandleTestAssertionLibraries=true</arg>
                     </compilerArgs>
                     <showWarnings>false</showWarnings>
                     <annotationProcessorPaths>
@@ -505,6 +508,16 @@
                             <groupId>com.github.therapi</groupId>
                             <artifactId>therapi-runtime-javadoc-scribe</artifactId>
                             <version>${therapi.version}</version>
+                        </path>
+                        <path>
+                            <groupId>com.google.errorprone</groupId>
+                            <artifactId>error_prone_core</artifactId>
+                            <version>${error-prone.version}</version>
+                        </path>
+                        <path>
+                            <groupId>com.uber.nullaway</groupId>
+                            <artifactId>nullaway</artifactId>
+                            <version>${nullaway.version}</version>
                         </path>
                     </annotationProcessorPaths>
                 </configuration>

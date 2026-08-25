@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
@@ -30,6 +31,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabWebhookClie
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.List;
@@ -37,6 +39,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.UnaryOperator;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Tag;
@@ -45,6 +48,7 @@ import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.invocation.InvocationOnMock;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.http.HttpHeaders;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 
@@ -179,7 +183,9 @@ class GitLabWebhookServiceTest extends BaseUnitTest {
     }
 
     private ConnectionConfig.GitLabConfig currentConfig(long workspaceId) {
-        return gitLabConfigs.get(workspaceId);
+        ConnectionConfig.GitLabConfig config = gitLabConfigs.get(workspaceId);
+        assertNotNull(config);
+        return config;
     }
 
     @Nested
@@ -298,7 +304,13 @@ class GitLabWebhookServiceTest extends BaseUnitTest {
             when(webhookClient.lookupGroup(1L, "my-org")).thenReturn(new GroupInfo(42L, "My Org", "my-org"));
             when(webhookClient.listGroupWebhooks(1L, 42L)).thenReturn(List.of());
             when(webhookClient.registerGroupWebhook(eq(1L), eq(42L), any(WebhookConfig.class))).thenThrow(
-                WebClientResponseException.create(403, "Forbidden", null, null, null)
+                WebClientResponseException.create(
+                    403,
+                    "Forbidden",
+                    HttpHeaders.EMPTY,
+                    new byte[0],
+                    StandardCharsets.UTF_8
+                )
             );
 
             WebhookSetupResult result = webhookService.registerWebhook(workspace);
@@ -384,7 +396,9 @@ class GitLabWebhookServiceTest extends BaseUnitTest {
 
             webhookService.rotateTokenIfNeeded(workspace);
 
-            assertThat(gitLabBearerTokens.get(1L).token()).isEqualTo("glpat-new-token");
+            BearerToken token = gitLabBearerTokens.get(1L);
+            assertNotNull(token);
+            assertThat(token.token()).isEqualTo("glpat-new-token");
             verify(connectionService).rotateBearerToken(eq(1L), eq(IntegrationKind.GITLAB), any(BearerToken.class));
             verify(tokenService).invalidateCache(1L);
         }

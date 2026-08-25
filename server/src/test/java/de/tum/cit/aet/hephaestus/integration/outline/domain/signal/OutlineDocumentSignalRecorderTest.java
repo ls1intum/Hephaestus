@@ -15,6 +15,7 @@ import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocumentSnaps
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.time.Instant;
 import java.util.Optional;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -129,7 +130,11 @@ class OutlineDocumentSignalRecorderTest extends BaseUnitTest {
         verify(ledger, never()).record(any(), any(), any());
     }
 
-    private static OutlineDocumentSnapshot snapshot(Long id, String contentHash, Instant deletedAt) {
+    private static OutlineDocumentSnapshot snapshot(
+        Long id,
+        @Nullable String contentHash,
+        @Nullable Instant deletedAt
+    ) {
         return new OutlineDocumentSnapshot(
             id,
             "outline-uuid",

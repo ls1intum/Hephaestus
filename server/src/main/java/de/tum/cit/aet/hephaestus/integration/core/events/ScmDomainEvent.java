@@ -74,7 +74,7 @@ public final class ScmDomainEvent {
             IssueTyped,
             IssueUntyped
     {
-        ScmEventPayload.IssueData issue();
+        ScmEventPayload.@Nullable IssueData issue();
     }
 
     public record IssueCreated(ScmEventPayload.IssueData issue, EventContext context) implements IssueEvent {}
@@ -96,7 +96,7 @@ public final class ScmDomainEvent {
     /** Deleted event is separate - entity no longer exists, only ID available. */
     public record IssueDeleted(Long issueId, EventContext context) implements IssueEvent {
         @Override
-        public ScmEventPayload.IssueData issue() {
+        public ScmEventPayload.@Nullable IssueData issue() {
             return null;
         }
     }
@@ -242,7 +242,11 @@ public final class ScmDomainEvent {
         EventContext context
     ) implements CommentEvent {}
 
-    public record CommentDeleted(Long commentId, Long issueId, EventContext context) implements CommentEvent {}
+    public record CommentDeleted(
+        Long commentId,
+        @Nullable Long issueId,
+        EventContext context
+    ) implements CommentEvent {}
 
     public sealed interface ReviewEvent
         extends Event, ContextualEvent
@@ -346,9 +350,9 @@ public final class ScmDomainEvent {
      * as a signal that previously unresolved {@code actor_id} references across the
      * repository's ledger can now be re-evaluated.
      */
-    public record CommitAuthorsReconciled(Long repositoryId, EventContext context) implements CommitEvent {
+    public record CommitAuthorsReconciled(@Nullable Long repositoryId, EventContext context) implements CommitEvent {
         @Override
-        public ScmEventPayload.CommitData commit() {
+        public ScmEventPayload.@Nullable CommitData commit() {
             return null;
         }
     }
@@ -363,7 +367,7 @@ public final class ScmDomainEvent {
             DiscussionAnswered,
             DiscussionDeleted
     {
-        ScmEventPayload.DiscussionData discussion();
+        ScmEventPayload.@Nullable DiscussionData discussion();
     }
 
     public record DiscussionCreated(
@@ -397,7 +401,7 @@ public final class ScmDomainEvent {
     /** Deleted event is separate - entity no longer exists, only ID available. */
     public record DiscussionDeleted(Long discussionId, EventContext context) implements DiscussionEvent {
         @Override
-        public ScmEventPayload.DiscussionData discussion() {
+        public ScmEventPayload.@Nullable DiscussionData discussion() {
             return null;
         }
     }
@@ -424,7 +428,7 @@ public final class ScmDomainEvent {
 
     public record DiscussionCommentDeleted(
         Long commentId,
-        Long discussionId,
+        @Nullable Long discussionId,
         EventContext context
     ) implements DiscussionCommentEvent {}
 }

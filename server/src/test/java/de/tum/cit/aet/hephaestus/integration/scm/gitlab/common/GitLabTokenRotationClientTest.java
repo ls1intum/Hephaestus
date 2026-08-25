@@ -10,6 +10,7 @@ import static org.mockito.Mockito.when;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabTokenRotationClient.RotatedToken;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabTokenRotationClient.TokenInfo;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.Map;
@@ -21,6 +22,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.HttpHeaders;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClient.RequestBodySpec;
 import org.springframework.web.reactive.function.client.WebClient.RequestBodyUriSpec;
@@ -124,7 +126,13 @@ class GitLabTokenRotationClientTest extends BaseUnitTest {
             when(uriSpec.uri(anyString())).thenReturn(headersSpec);
             when(headersSpec.header(anyString(), anyString())).thenReturn(headersSpec);
             when(headersSpec.retrieve()).thenThrow(
-                WebClientResponseException.create(401, "Unauthorized", null, null, null)
+                WebClientResponseException.create(
+                    401,
+                    "Unauthorized",
+                    HttpHeaders.EMPTY,
+                    new byte[0],
+                    StandardCharsets.UTF_8
+                )
             );
 
             assertThatThrownBy(() -> rotationClient.getTokenInfo(SCOPE_ID)).isInstanceOf(
@@ -196,7 +204,15 @@ class GitLabTokenRotationClientTest extends BaseUnitTest {
             Mockito.doReturn(bodySpec).when(bodyUriSpec).uri(anyString());
             Mockito.doReturn(bodySpec).when(bodySpec).header(anyString(), anyString());
             Mockito.doReturn(bodySpec).when(bodySpec).bodyValue(any());
-            when(bodySpec.retrieve()).thenThrow(WebClientResponseException.create(403, "Forbidden", null, null, null));
+            when(bodySpec.retrieve()).thenThrow(
+                WebClientResponseException.create(
+                    403,
+                    "Forbidden",
+                    HttpHeaders.EMPTY,
+                    new byte[0],
+                    StandardCharsets.UTF_8
+                )
+            );
 
             assertThatThrownBy(() -> rotationClient.rotateToken(SCOPE_ID, LocalDate.of(2026, 9, 1))).isInstanceOf(
                 WebClientResponseException.class

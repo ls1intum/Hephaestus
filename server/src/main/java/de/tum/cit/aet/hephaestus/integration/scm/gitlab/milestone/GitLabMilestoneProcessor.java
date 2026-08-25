@@ -21,6 +21,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeParseException;
+import java.util.Objects;
 import java.util.Optional;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
@@ -123,7 +124,7 @@ public class GitLabMilestoneProcessor extends BaseGitLabProcessor {
             } else {
                 milestone.setNativeId(dto.nativeId());
             }
-            milestone.setProvider(context.provider());
+            milestone.setProvider(Objects.requireNonNull(context.provider()));
         } else if (!dto.groupMilestone() && milestone.getNativeId() < 0) {
             // Existing milestone was stored with deterministic ID but now has real ID
             milestone.setNativeId(dto.nativeId());
@@ -132,7 +133,7 @@ public class GitLabMilestoneProcessor extends BaseGitLabProcessor {
         milestone.setNumber(dto.iid());
 
         if (dto.title() != null) {
-            milestone.setTitle(sanitize(dto.title()));
+            milestone.setTitle(Objects.requireNonNullElse(sanitize(dto.title()), ""));
         }
         if (isNew || dto.description() != null) {
             milestone.setDescription(sanitize(dto.description()));
@@ -209,7 +210,7 @@ public class GitLabMilestoneProcessor extends BaseGitLabProcessor {
      * @param context     processing context with scope information
      */
     @Transactional
-    public void delete(Long milestoneId, ProcessingContext context) {
+    public void delete(@Nullable Long milestoneId, ProcessingContext context) {
         if (milestoneId == null) {
             return;
         }

@@ -8,6 +8,7 @@ import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityLink;
 import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityLinkRepository;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import java.util.HashSet;
+import java.util.Objects;
 import java.util.Set;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -79,8 +80,9 @@ public class JwtPrincipalFactory {
         if (account.getStatus() != Account.Status.ACTIVE) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "account is not active");
         }
-        String login = resolveLogin(account);
-        Set<String> roles = new HashSet<>(accountFeatureRepository.findFlagsByAccountId(account.getId()));
+        Long accountId = Objects.requireNonNull(account.getId(), "Account must be persisted");
+        String login = resolveLogin(accountId);
+        Set<String> roles = new HashSet<>(accountFeatureRepository.findFlagsByAccountId(accountId));
         // Privilege separation: the instance-admin authority derives ONLY from Account.appRole, never
         // from a grantable account_feature row. Strip any feature flag that collides with a reserved
         // instance authority so a `/admin/users`-granted flag can't inject super-admin (account_feature
@@ -89,7 +91,7 @@ public class JwtPrincipalFactory {
         if (account.getAppRole() == Account.AppRole.APP_ADMIN) {
             roles.add("app_admin");
         }
-        return new JwtPrincipal(account.getId(), login, account.getDisplayName(), roles);
+        return new JwtPrincipal(accountId, login, account.getDisplayName(), roles);
     }
 
     /**
@@ -104,14 +106,14 @@ public class JwtPrincipalFactory {
      * matches no real {@code User.login} — it fails safe (no spurious access) without locking out an
      * account whose provider returned no username (account-level, {@code sub}-based resolution still works).
      */
-    private String resolveLogin(Account account) {
+    private String resolveLogin(Long accountId) {
         return identityLinkRepository
-            .findActiveByAccountId(account.getId())
+            .findActiveByAccountId(accountId)
             .stream()
             .filter(il -> il.getUsernameAtSignup() != null && !il.getUsernameAtSignup().isBlank())
             .max(JwtPrincipalFactory::byLastLogin)
             .map(IdentityLink::getUsernameAtSignup)
-            .orElse("account:" + account.getId());
+            .orElse("account:" + accountId);
     }
 
     private static int byLastLogin(IdentityLink a, IdentityLink b) {

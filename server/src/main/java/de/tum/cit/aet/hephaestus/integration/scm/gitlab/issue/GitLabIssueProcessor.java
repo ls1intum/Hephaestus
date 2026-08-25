@@ -30,6 +30,7 @@ import java.time.Instant;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import org.jspecify.annotations.Nullable;
@@ -98,14 +99,18 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
 
     @Nullable
     private Issue processInternal(GitLabIssueEventDTO event, ProcessingContext context) {
+        var attrs = event.objectAttributes();
+        if (attrs == null || attrs.id() == null || attrs.iid() == null) {
+            log.warn("Skipped issue event with missing object attributes or identifiers");
+            return null;
+        }
         if (event.isConfidential()) {
-            log.debug("Skipped confidential issue: iid={}", event.objectAttributes().iid());
+            log.debug("Skipped confidential issue: iid={}", attrs.iid());
             return null;
         }
 
-        var attrs = event.objectAttributes();
-        User author = resolveWebhookAuthor(event, context.providerId());
-        Long providerId = context.repository().getProvider().getId();
+        User author = resolveWebhookAuthor(event, Objects.requireNonNull(context.providerId()));
+        Long providerId = Objects.requireNonNull(Objects.requireNonNull(context.repository()).getProvider().getId());
         Long milestoneId = resolveWebhookMilestoneId(attrs.milestoneId(), providerId);
         Issue issue = upsertIssue(
             attrs.id(),
@@ -119,15 +124,19 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
             attrs.closedAt(),
             author,
             milestoneId,
-            context.repository(),
+            Objects.requireNonNull(context.repository()),
             context
         );
 
         if (issue == null) return null;
 
         // Update relationships
-        boolean changed = updateLabels(event.labels(), issue.getLabels(), context.repository());
-        changed |= updateAssignees(event.assignees(), issue.getAssignees(), context.providerId());
+        boolean changed = updateLabels(event.labels(), issue.getLabels(), Objects.requireNonNull(context.repository()));
+        changed |= updateAssignees(
+            event.assignees(),
+            issue.getAssignees(),
+            Objects.requireNonNull(context.providerId())
+        );
         if (changed) {
             issue = issueRepository.save(issue);
         }
@@ -155,7 +164,7 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
             return false;
         }
         int number = attrs.iid();
-        long repositoryId = context.repository().getId();
+        long repositoryId = Objects.requireNonNull(context.repository()).getId();
         // Issue-typed tombstone: a confidential-issue IID must never touch a live merge request that
         // happens to share the IID — GitLab issues and MRs are separate per-project namespaces.
         int tombstoned = issueRepository.tombstoneIssuesByRepositoryIdAndNumbers(
@@ -189,7 +198,7 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
             return issue;
         }
         for (GitLabWebhookLabel labelDto : addedLabels) {
-            Label label = findOrCreateLabel(labelDto, context.repository());
+            Label label = findOrCreateLabel(labelDto, Objects.requireNonNull(context.repository()));
             if (label != null) {
                 eventPublisher.publishEvent(
                     new ScmDomainEvent.IssueLabeled(
@@ -206,14 +215,14 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
     /**
      * Label data extracted from GraphQL response for sync processing.
      */
-    public record SyncLabelData(String globalId, String title, @Nullable String color) {}
+    public record SyncLabelData(@Nullable String globalId, @Nullable String title, @Nullable String color) {}
 
     /**
      * Assignee data extracted from GraphQL response for sync processing.
      */
     public record SyncAssigneeData(
-        String globalId,
-        String username,
+        @Nullable String globalId,
+        @Nullable String username,
         @Nullable String name,
         @Nullable String avatarUrl,
         @Nullable String webUrl
@@ -223,13 +232,13 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
      * All data needed to sync a single GitLab issue from GraphQL.
      */
     public record SyncIssueData(
-        String globalId,
-        String iid,
-        String title,
+        @Nullable String globalId,
+        @Nullable String iid,
+        @Nullable String title,
         @Nullable String description,
-        String state,
+        @Nullable String state,
         boolean confidential,
-        String webUrl,
+        @Nullable String webUrl,
         @Nullable String createdAt,
         @Nullable String updatedAt,
         @Nullable String closedAt,
@@ -255,6 +264,10 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
     @Transactional
     @Nullable
     public Issue processFromSync(SyncIssueData data, Repository repository, @Nullable Long scopeId) {
+        if (data.globalId() == null || data.iid() == null || data.title() == null || data.state() == null) {
+            log.warn("Skipped issue processing: reason=missingRequiredData");
+            return null;
+        }
         if (data.confidential()) {
             log.debug("Skipped confidential issue from sync: iid={}", data.iid());
             return null;
@@ -276,7 +289,7 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
             return null;
         }
 
-        Long providerId = repository.getProvider().getId();
+        Long providerId = Objects.requireNonNull(repository.getProvider().getId());
 
         // Check if existing
         Optional<Issue> existingOpt = issueRepository.findByRepositoryIdAndNumber(repository.getId(), issueNumber);
@@ -314,7 +327,7 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
             nativeId,
             providerId,
             issueNumber,
-            sanitize(data.title()),
+            Objects.requireNonNullElse(sanitize(data.title()), ""),
             sanitize(data.description()),
             issueState.name(),
             stateReason,
@@ -425,7 +438,11 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
      */
     @Nullable
     private User resolveWebhookAuthor(GitLabIssueEventDTO event, Long providerId) {
-        Long authorId = event.objectAttributes().authorId();
+        var attrs = event.objectAttributes();
+        if (attrs == null) {
+            return null;
+        }
+        Long authorId = attrs.authorId();
         if (authorId == null) {
             return null;
         }
@@ -454,9 +471,9 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
     private Issue upsertIssue(
         Long rawId,
         Integer iid,
-        String title,
+        @Nullable String title,
         @Nullable String description,
-        String state,
+        @Nullable String state,
         @Nullable String htmlUrl,
         @Nullable String createdAt,
         @Nullable String updatedAt,
@@ -473,7 +490,7 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
 
         long nativeId = rawId;
         int issueNumber = iid;
-        Long providerId = repository.getProvider().getId();
+        Long providerId = Objects.requireNonNull(repository.getProvider().getId());
 
         Optional<Issue> existingOpt = issueRepository.findByRepositoryIdAndNumber(repository.getId(), issueNumber);
         boolean isNew = existingOpt.isEmpty();
@@ -485,7 +502,7 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
             nativeId,
             providerId,
             issueNumber,
-            sanitize(title),
+            Objects.requireNonNullElse(sanitize(title), ""),
             sanitize(description),
             issueState.name(),
             null, // stateReason

@@ -34,6 +34,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Stream;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -111,7 +112,7 @@ class SlackChannelConsentServiceTest extends BaseUnitTest {
         return new TransactionTemplate(
             new PlatformTransactionManager() {
                 @Override
-                public TransactionStatus getTransaction(TransactionDefinition definition) {
+                public TransactionStatus getTransaction(@Nullable TransactionDefinition definition) {
                     return new SimpleTransactionStatus();
                 }
 
@@ -124,7 +125,7 @@ class SlackChannelConsentServiceTest extends BaseUnitTest {
         );
     }
 
-    private SlackMonitoredChannel channel(ConsentState state, Instant announcedAt) {
+    private SlackMonitoredChannel channel(ConsentState state, @Nullable Instant announcedAt) {
         SlackMonitoredChannel c = new SlackMonitoredChannel();
         c.setId(1L);
         c.setWorkspaceId(WS);
@@ -404,6 +405,7 @@ class SlackChannelConsentServiceTest extends BaseUnitTest {
 
     @Test
     void register_revokedChannel_setsUpAgainAsPendingAndClearsAnnouncement() {
+        @Nullable
         Instant announcedAt = Instant.parse("2020-01-01T00:00:00Z");
         SlackMonitoredChannel existing = channel(ConsentState.REVOKED, announcedAt);
         existing.setChannelName("old-name");

@@ -15,6 +15,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -118,12 +119,12 @@ class GithubWebhookSignatureVerifierTest extends BaseUnitTest {
 
     // Helpers
 
-    private static GithubWebhookSignatureVerifier newVerifier(String secret) {
+    private static GithubWebhookSignatureVerifier newVerifier(@Nullable String secret) {
         return new GithubWebhookSignatureVerifier(new GithubWebhookSecretSource(propsWithSecret(secret)));
     }
 
     /** Builds a fully-populated WebhookProperties (record requires all components). */
-    private static WebhookProperties propsWithSecret(String secret) {
+    private static WebhookProperties propsWithSecret(@Nullable String secret) {
         return new WebhookProperties(
             /* externalUrl */ null,
             secret,

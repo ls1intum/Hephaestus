@@ -7,4 +7,5 @@
  * {@link org.springframework.modulith.NamedInterface} contracts.
  */
 @org.springframework.modulith.ApplicationModule(displayName = "Core")
+@org.jspecify.annotations.NullMarked
 package de.tum.cit.aet.hephaestus.core;

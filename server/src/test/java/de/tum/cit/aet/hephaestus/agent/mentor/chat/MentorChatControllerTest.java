@@ -15,6 +15,7 @@ import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembership.WorkspaceRole;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import java.util.Set;
 import java.util.UUID;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -147,7 +148,7 @@ class MentorChatControllerTest extends BaseUnitTest {
         return body(threadId, null, text);
     }
 
-    private static MentorChatRequestBody body(UUID threadId, String messageId, String text) {
+    private static MentorChatRequestBody body(UUID threadId, @Nullable String messageId, String text) {
         ObjectNode root = MAPPER.createObjectNode();
         if (messageId != null) {
             root.put("id", messageId);

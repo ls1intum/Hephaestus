@@ -237,7 +237,7 @@ public class SlackMessageService {
      * Begin a streamed assistant reply in {@code threadTs}; returns the streaming message {@code ts} to append
      * to. {@code markdownText} is standard Markdown (Slack renders it, incl. tables) — not Slack mrkdwn.
      */
-    public String startStream(long workspaceId, String channel, String threadTs, String markdownText) {
+    public String startStream(long workspaceId, String channel, @Nullable String threadTs, String markdownText) {
         if (!egressGuard.deliveryAllowed("slack.write")) {
             throw new SlackSendException(workspaceId, channel, "silent_mode_engaged");
         }
@@ -358,7 +358,7 @@ public class SlackMessageService {
      * Set the assistant "thinking…" status on a thread. Best-effort: only assistant threads support it, so a
      * failure (e.g. a plain DM thread) is swallowed.
      */
-    public void setStatus(long workspaceId, String channel, String threadTs, String status) {
+    public void setStatus(long workspaceId, String channel, @Nullable String threadTs, String status) {
         if (!egressGuard.deliveryAllowed("slack.write")) {
             return;
         }

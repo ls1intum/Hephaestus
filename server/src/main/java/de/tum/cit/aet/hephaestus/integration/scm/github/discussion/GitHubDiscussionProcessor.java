@@ -19,6 +19,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.discussion.dto.GitHubDis
 import de.tum.cit.aet.hephaestus.integration.scm.github.user.GitHubUserProcessor;
 import java.time.Instant;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -75,18 +76,22 @@ public class GitHubDiscussionProcessor extends BaseGitHubProcessor {
      * @return the created or updated Discussion entity, or null if processing failed
      */
     @Transactional
-    public Discussion process(GitHubDiscussionDTO dto, ProcessingContext context) {
+    public @Nullable Discussion process(GitHubDiscussionDTO dto, ProcessingContext context) {
         return processInternal(dto, context);
     }
 
-    private Discussion processInternal(GitHubDiscussionDTO dto, ProcessingContext context) {
+    private @Nullable Discussion processInternal(GitHubDiscussionDTO dto, ProcessingContext context) {
         Long dbId = dto.getDatabaseId();
         if (dbId == null) {
             log.warn("Skipped discussion processing: reason=missingDatabaseId, discussionNumber={}", dto.number());
             return null;
         }
 
-        Repository repository = context.repository();
+        Repository repository = Objects.requireNonNull(
+            context.repository(),
+            "Discussion processing requires a repository"
+        );
+        Long providerId = Objects.requireNonNull(context.providerId(), "Discussion processing requires a provider");
 
         // Check if this is an update and apply stale-data protection
         Optional<Discussion> existingOpt = discussionRepository.findByRepositoryIdAndNumber(
@@ -114,9 +119,8 @@ public class GitHubDiscussionProcessor extends BaseGitHubProcessor {
         }
 
         // Resolve related entities BEFORE the upsert
-        User author = dto.author() != null ? findOrCreateUser(dto.author(), context.providerId()) : null;
-        User answerChosenBy =
-            dto.answerChosenBy() != null ? findOrCreateUser(dto.answerChosenBy(), context.providerId()) : null;
+        User author = dto.author() != null ? findOrCreateUser(dto.author(), providerId) : null;
+        User answerChosenBy = dto.answerChosenBy() != null ? findOrCreateUser(dto.answerChosenBy(), providerId) : null;
         DiscussionCategory category = dto.category() != null ? findOrCreateCategory(dto.category(), repository) : null;
 
         // Use atomic upsert to handle concurrent inserts
@@ -128,10 +132,10 @@ public class GitHubDiscussionProcessor extends BaseGitHubProcessor {
 
         discussionRepository.upsertCore(
             dbId,
-            context.providerId(),
+            providerId,
             repository.getId(),
             dto.number(),
-            sanitize(dto.title()),
+            Objects.requireNonNullElse(sanitize(dto.title()), ""),
             sanitize(dto.body()),
             dto.htmlUrl(),
             state.name(),
@@ -160,7 +164,11 @@ public class GitHubDiscussionProcessor extends BaseGitHubProcessor {
             );
 
         // Handle ManyToMany relationships (labels) - these can't be done in the upsert
-        boolean labelsChanged = updateLabels(dto.labels(), discussion.getLabels(), repository);
+        boolean labelsChanged = updateLabels(
+            Objects.requireNonNullElse(dto.labels(), List.of()),
+            discussion.getLabels(),
+            repository
+        );
 
         // Save relationship changes
         if (labelsChanged) {
@@ -206,7 +214,10 @@ public class GitHubDiscussionProcessor extends BaseGitHubProcessor {
         // With synthetic PKs, we cannot use deleteById(nativeId) because the PK is
         // auto-generated and differs from the native provider ID. Look up by natural key instead.
         discussionRepository
-            .findByRepositoryIdAndNumber(context.repository().getId(), dto.number())
+            .findByRepositoryIdAndNumber(
+                Objects.requireNonNull(context.repository(), "Discussion deletion requires a repository").getId(),
+                dto.number()
+            )
             .ifPresent(discussion -> {
                 Long discussionId = discussion.getId();
                 discussionRepository.delete(discussion);
@@ -224,7 +235,7 @@ public class GitHubDiscussionProcessor extends BaseGitHubProcessor {
      * @return the updated Discussion entity, or null if processing failed
      */
     @Transactional
-    public Discussion processClosed(GitHubDiscussionDTO dto, ProcessingContext context) {
+    public @Nullable Discussion processClosed(GitHubDiscussionDTO dto, ProcessingContext context) {
         Discussion discussion = processInternal(dto, context);
         if (discussion != null) {
             String stateReason = dto.stateReason() != null ? dto.stateReason() : null;
@@ -249,7 +260,7 @@ public class GitHubDiscussionProcessor extends BaseGitHubProcessor {
      * @return the updated Discussion entity, or null if processing failed
      */
     @Transactional
-    public Discussion processReopened(GitHubDiscussionDTO dto, ProcessingContext context) {
+    public @Nullable Discussion processReopened(GitHubDiscussionDTO dto, ProcessingContext context) {
         Discussion discussion = processInternal(dto, context);
         if (discussion != null) {
             eventPublisher.publishEvent(
@@ -272,7 +283,7 @@ public class GitHubDiscussionProcessor extends BaseGitHubProcessor {
      * @return the updated Discussion entity, or null if processing failed
      */
     @Transactional
-    public Discussion processAnswered(GitHubDiscussionDTO dto, ProcessingContext context) {
+    public @Nullable Discussion processAnswered(GitHubDiscussionDTO dto, ProcessingContext context) {
         Discussion discussion = processInternal(dto, context);
         if (discussion != null) {
             // The answer comment's database ID, if available from the DTO

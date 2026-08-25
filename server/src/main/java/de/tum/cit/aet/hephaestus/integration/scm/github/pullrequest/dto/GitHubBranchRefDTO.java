@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.integration.scm.github.pullrequest.dto;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import org.jspecify.annotations.Nullable;
 
 /**
  * DTO representing a branch reference in a pull request (head or base).
@@ -10,5 +11,5 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 public record GitHubBranchRefDTO(
     @JsonProperty("ref") String ref,
     @JsonProperty("sha") String sha,
-    @JsonProperty("label") String label
+    @JsonProperty("label") @Nullable String label
 ) {}

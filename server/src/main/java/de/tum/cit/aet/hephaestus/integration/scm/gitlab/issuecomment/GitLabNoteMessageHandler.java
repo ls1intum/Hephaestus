@@ -16,6 +16,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabWebhookCont
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.issuecomment.dto.GitLabNoteEventDTO;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.pullrequest.GitLabMergeRequestProcessor;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.pullrequestreviewcomment.GitLabDiffNoteWebhookProcessor;
+import java.util.Objects;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -101,7 +102,7 @@ public class GitLabNoteMessageHandler extends AbstractIntegrationMessageHandler<
             log.warn("Received note event with missing project path");
             return;
         }
-        String safeProjectPath = sanitizeForLog(projectPath);
+        String safeProjectPath = Objects.requireNonNullElse(sanitizeForLog(projectPath), "<unknown>");
         GitLabEventAction action = event.actionType();
         String noteableType = event.noteableType();
 
@@ -186,10 +187,9 @@ public class GitLabNoteMessageHandler extends AbstractIntegrationMessageHandler<
         if (event.user() == null || event.user().id() == null) return;
 
         // Don't create CHANGES_REQUESTED for the MR author commenting on their own PR
-        if (context.repository() == null) return;
-        var pullRequest = pullRequestRepository
-            .findByRepositoryIdAndNumber(context.repository().getId(), mr.iid())
-            .orElse(null);
+        var repository = context.repository();
+        if (repository == null) return;
+        var pullRequest = pullRequestRepository.findByRepositoryIdAndNumber(repository.getId(), mr.iid()).orElse(null);
         if (pullRequest == null) return;
 
         // Self-review guard: skip if reviewer == MR author
@@ -201,66 +201,76 @@ public class GitLabNoteMessageHandler extends AbstractIntegrationMessageHandler<
             return;
         }
 
-        User reviewer = userRepository
-            .findByNativeIdAndProviderId(event.user().id(), context.providerId())
-            .orElse(null);
+        Long providerId = context.providerId();
+        if (providerId == null) return;
+        User reviewer = userRepository.findByNativeIdAndProviderId(event.user().id(), providerId).orElse(null);
         if (reviewer == null) return;
 
         mergeRequestProcessor.processRequestedChangesFromNote(pullRequest, reviewer, context);
     }
 
     private void handleBotCommand(GitLabNoteEventDTO event, ProcessingContext context, String safeProjectPath) {
+        var attrs = event.objectAttributes();
+        if (attrs == null) {
+            return;
+        }
         var mr = event.mergeRequest();
         if (mr == null || mr.iid() == null) {
             log.warn(
                 "Bot command on MR note but no embedded merge_request data: projectPath={}, noteId={}",
                 safeProjectPath,
-                event.objectAttributes().id()
+                attrs.id()
             );
             return;
         }
 
-        if (context.repository() == null) {
-            log.warn(
-                "Bot command: cannot resolve repository, projectPath={}, noteId={}",
-                safeProjectPath,
-                event.objectAttributes().id()
-            );
+        var repository = context.repository();
+        if (repository == null) {
+            log.warn("Bot command: cannot resolve repository, projectPath={}, noteId={}", safeProjectPath, attrs.id());
             return;
         }
 
         // Dropped here rather than published unattributed: a command without a named author cannot be
         // authorized downstream, and the subscriber would still spend real budget on it.
-        if (event.user() == null || event.user().id() == null || context.providerId() == null) {
+        var user = event.user();
+        Long providerId = context.providerId();
+        Long scopeId = context.scopeId();
+        if (user == null || user.id() == null || providerId == null || scopeId == null) {
             log.warn(
                 "Bot command: no identifiable author on the note payload, projectPath={}, mrIid={}, noteId={}",
                 safeProjectPath,
                 mr.iid(),
-                event.objectAttributes().id()
+                attrs.id()
             );
             return;
         }
 
         log.info(
             "Bot command detected: command={}, projectPath={}, mrIid={}, author={}, noteId={}",
-            event.objectAttributes().note().strip(),
+            attrs.note().strip(),
             safeProjectPath,
             mr.iid(),
-            event.user().username(),
-            event.objectAttributes().id()
+            user.username(),
+            attrs.id()
         );
+
+        String username = user.username();
+        if (username == null) {
+            log.warn("Bot command: note author has no username, projectPath={}, mrIid={}", safeProjectPath, mr.iid());
+            return;
+        }
 
         eventPublisher.publishEvent(
             new BotCommandReceivedEvent(
                 IntegrationKind.GITLAB,
-                context.repository().getId(),
+                repository.getId(),
                 mr.iid(),
-                event.objectAttributes().note(),
-                event.user().username(),
-                context.providerId(),
-                event.user().id().longValue(),
-                event.objectAttributes().id(),
-                context.scopeId()
+                attrs.note(),
+                username,
+                providerId,
+                user.id().longValue(),
+                attrs.id(),
+                scopeId
             )
         );
     }

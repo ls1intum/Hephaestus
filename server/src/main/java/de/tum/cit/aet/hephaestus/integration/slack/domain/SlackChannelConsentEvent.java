@@ -35,7 +35,7 @@ public class SlackChannelConsentEvent {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    private @Nullable Long id;
 
     @Column(name = "workspace_id", nullable = false)
     private Long workspaceId;
@@ -69,7 +69,7 @@ public class SlackChannelConsentEvent {
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
-    private Instant createdAt;
+    private @Nullable Instant createdAt;
 
     public SlackChannelConsentEvent(
         Long workspaceId,

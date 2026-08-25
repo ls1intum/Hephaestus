@@ -27,6 +27,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
 import org.hibernate.annotations.ColumnDefault;
+import org.jspecify.annotations.Nullable;
 
 /**
  * What model, and with what execution limits, a workspace runs a given {@link AgentPurpose} on.
@@ -90,7 +91,7 @@ public class WorkspaceAgentBinding implements ModelBindingSource {
         foreignKey = @ForeignKey(name = "fk_workspace_agent_binding_instance_model")
     )
     @ToString.Exclude
-    private LlmModel instanceModel;
+    private @Nullable LlmModel instanceModel;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(
@@ -98,7 +99,7 @@ public class WorkspaceAgentBinding implements ModelBindingSource {
         foreignKey = @ForeignKey(name = "fk_workspace_agent_binding_workspace_model")
     )
     @ToString.Exclude
-    private WorkspaceLlmModel workspaceModel;
+    private @Nullable WorkspaceLlmModel workspaceModel;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;

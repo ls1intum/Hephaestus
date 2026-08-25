@@ -9,6 +9,7 @@ import io.nats.client.Connection;
 import io.nats.client.Dispatcher;
 import io.nats.client.Message;
 import jakarta.annotation.PreDestroy;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
@@ -54,7 +55,7 @@ public class SyncPushService {
     private final Counter natsPublishFailure;
     private final Counter natsReceiveSuccess;
     private final Counter natsReceiveFailure;
-    private volatile Dispatcher dispatcher;
+    private volatile @Nullable Dispatcher dispatcher;
 
     public SyncPushService(
         SyncEventHub hub,

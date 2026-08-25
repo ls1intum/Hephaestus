@@ -99,24 +99,24 @@ public class RepositoryToMonitor {
      * Pagination cursor for issue sync. Persisted to allow resumption if sync
      * fails mid-pagination. Cleared when sync completes successfully.
      */
-    private String issueSyncCursor;
+    private @Nullable String issueSyncCursor;
 
     /**
      * Pagination cursor for pull request sync. Persisted to allow resumption if sync
      * fails mid-pagination. Cleared when sync completes successfully.
      */
-    private String pullRequestSyncCursor;
+    private @Nullable String pullRequestSyncCursor;
 
     /**
      * Pagination cursor for discussion sync. Persisted to allow resumption if sync
      * fails mid-pagination. Cleared when sync completes successfully.
      */
-    private String discussionSyncCursor;
+    private @Nullable String discussionSyncCursor;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "workspace_id", nullable = false)
     @ToString.Exclude
-    private Workspace workspace;
+    private @Nullable Workspace workspace;
 
     // Backfill Status Helper Methods
 

@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.core.auth.oauth;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
 import de.tum.cit.aet.hephaestus.core.auth.domain.AccountRepository;
@@ -12,6 +13,7 @@ import de.tum.cit.aet.hephaestus.core.auth.provider.LoginProviderRepository;
 import de.tum.cit.aet.hephaestus.testconfig.RealAuthIntegrationTest;
 import java.util.List;
 import java.util.Map;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -70,15 +72,15 @@ class OutlineIdentityLinkIntegrationTest extends RealAuthIntegrationTest {
             "outline-link",
             OUTLINE_USER,
             outlinePrincipal(OUTLINE_USER, OUTLINE_TEAM, "dev@example.com"),
-            AuthIntentCookie.Intent.link(github.getId(), "/settings")
+            AuthIntentCookie.Intent.link(persistedId(github.getId()), "/settings")
         );
 
         assertThat(linked.identityLinked()).isTrue();
-        assertThat(linked.account().getId()).isEqualTo(github.getId());
+        assertThat(linked.account().getId()).isEqualTo(persistedId(github.getId()));
         // The link attached to the existing account — it did NOT JIT a new one.
         assertThat(accountRepository.count()).isEqualTo(accountsAfterLogin);
 
-        List<IdentityLink> links = identityLinkRepository.findActiveByAccountId(github.getId());
+        List<IdentityLink> links = identityLinkRepository.findActiveByAccountId(persistedId(github.getId()));
         assertThat(links).extracting(IdentityLink::getSubject).containsExactlyInAnyOrder("gh-2", OUTLINE_USER);
         IdentityLink outline = links
             .stream()
@@ -144,7 +146,7 @@ class OutlineIdentityLinkIntegrationTest extends RealAuthIntegrationTest {
             "outline-conflict",
             OUTLINE_USER,
             outlinePrincipal(OUTLINE_USER, OUTLINE_TEAM, "owner@example.com"),
-            AuthIntentCookie.Intent.link(owner.getId(), "/settings")
+            AuthIntentCookie.Intent.link(persistedId(owner.getId()), "/settings")
         );
 
         Account attacker = service
@@ -163,15 +165,15 @@ class OutlineIdentityLinkIntegrationTest extends RealAuthIntegrationTest {
                 "outline-conflict",
                 OUTLINE_USER,
                 outlinePrincipal(OUTLINE_USER, OUTLINE_TEAM, "attacker@example.com"),
-                AuthIntentCookie.Intent.link(attacker.getId(), "/settings")
+                AuthIntentCookie.Intent.link(persistedId(attacker.getId()), "/settings")
             )
         ).isInstanceOf(AccountLinkConflictException.class);
 
         // The link still hangs off the original owner, and the attacker gained nothing.
-        assertThat(identityLinkRepository.findActiveByAccountId(attacker.getId()))
+        assertThat(identityLinkRepository.findActiveByAccountId(persistedId(attacker.getId())))
             .extracting(IdentityLink::getSubject)
             .containsExactly("gh-attacker");
-        assertThat(identityLinkRepository.findActiveByAccountId(owner.getId()))
+        assertThat(identityLinkRepository.findActiveByAccountId(persistedId(owner.getId())))
             .extracting(IdentityLink::getSubject)
             .contains(OUTLINE_USER);
     }
@@ -205,5 +207,10 @@ class OutlineIdentityLinkIntegrationTest extends RealAuthIntegrationTest {
             Map.of("id", subject, "team_id", teamId, "team_name", "Acme", "name", "Ada Lovelace", "email", email),
             "id"
         );
+    }
+
+    private static long persistedId(@Nullable Long id) {
+        assertNotNull(id);
+        return id;
     }
 }

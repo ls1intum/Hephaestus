@@ -8,7 +8,6 @@ import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditPort;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.workspace.audit.WorkspaceAuditSnapshots;
 import jakarta.persistence.EntityManager;
-import jakarta.persistence.PersistenceContext;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -47,18 +46,19 @@ public class WorkspaceMembershipService {
     private final WorkspaceMembershipRepository workspaceMembershipRepository;
     private final WorkspaceRepository workspaceRepository;
 
-    @PersistenceContext
-    private EntityManager entityManager;
+    private final EntityManager entityManager;
 
     private final ConfigAuditPort configAudit;
 
     public WorkspaceMembershipService(
         WorkspaceMembershipRepository workspaceMembershipRepository,
         WorkspaceRepository workspaceRepository,
+        EntityManager entityManager,
         ConfigAuditPort configAudit
     ) {
         this.workspaceMembershipRepository = workspaceMembershipRepository;
         this.workspaceRepository = workspaceRepository;
+        this.entityManager = entityManager;
         this.configAudit = configAudit;
     }
 

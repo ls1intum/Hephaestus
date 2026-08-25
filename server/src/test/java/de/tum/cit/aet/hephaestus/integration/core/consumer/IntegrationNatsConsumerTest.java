@@ -29,6 +29,7 @@ import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -64,7 +65,12 @@ class IntegrationNatsConsumerTest {
     void purgeFenceRejectsQueuedConsumerRestart() {
         NatsSubscriptionProvider subscriptions = mock(NatsSubscriptionProvider.class);
         IntegrationNatsConsumer consumer = new IntegrationNatsConsumer(
-            new NatsConnectionProperties(true, "nats://localhost:4222", "heph", null),
+            new NatsConnectionProperties(
+                true,
+                "nats://localhost:4222",
+                "heph",
+                new NatsConnectionProperties.Consumer(Duration.ofSeconds(60))
+            ),
             NatsConsumerPropertiesFixture.defaults(),
             subscriptions,
             mock(IntegrationMessageDispatcher.class),
@@ -86,7 +92,12 @@ class IntegrationNatsConsumerTest {
     void rolledBackPurgeRestartsConsumption() throws Exception {
         CountDownLatch restarted = new CountDownLatch(1);
         IntegrationNatsConsumer consumer = new IntegrationNatsConsumer(
-            new NatsConnectionProperties(true, "nats://localhost:4222", "heph", null),
+            new NatsConnectionProperties(
+                true,
+                "nats://localhost:4222",
+                "heph",
+                new NatsConnectionProperties.Consumer(Duration.ofSeconds(60))
+            ),
             NatsConsumerPropertiesFixture.defaults(),
             scopeId -> Optional.empty(),
             mock(IntegrationMessageDispatcher.class),
@@ -213,18 +224,20 @@ class IntegrationNatsConsumerTest {
 
         private static final Long SCOPE_ID = 7L;
 
-        private IntegrationMessageDispatcher dispatcher;
-        private ConnectionActivityRecorder activityRecorder;
-        private IntegrationNatsConsumer consumer;
-        private Message message;
+        private final IntegrationMessageDispatcher dispatcher = mock(IntegrationMessageDispatcher.class);
+        private final ConnectionActivityRecorder activityRecorder = mock(ConnectionActivityRecorder.class);
+        private final Message message = mock(Message.class);
+        private IntegrationNatsConsumer consumer = newConsumer();
 
         private IntegrationNatsConsumer newConsumer() {
-            dispatcher = mock(IntegrationMessageDispatcher.class);
-            activityRecorder = mock(ConnectionActivityRecorder.class);
-            message = mock(Message.class);
             when(message.getSubject()).thenReturn("github.acme.repo.issues");
             return new IntegrationNatsConsumer(
-                new NatsConnectionProperties(true, "nats://localhost:4222", "heph", null),
+                new NatsConnectionProperties(
+                    true,
+                    "nats://localhost:4222",
+                    "heph",
+                    new NatsConnectionProperties.Consumer(Duration.ofSeconds(60))
+                ),
                 NatsConsumerPropertiesFixture.withFastPoisonBackoff(),
                 scopeId -> Optional.empty(),
                 dispatcher,
@@ -294,7 +307,7 @@ class IntegrationNatsConsumerTest {
         private static final String SCM_STREAM = "github";
         private static final String OUTLINE_STREAM = "outline";
 
-        private FakeFleet fleet;
+        private @Nullable FakeFleet fleet;
 
         private FakeFleet fleetFailingOn(String... failingStreams) {
             fleet = new FakeFleet(Set.of(failingStreams));
@@ -360,7 +373,12 @@ class IntegrationNatsConsumerTest {
 
             FakeFleet(Set<String> failingStreams) {
                 super(
-                    new NatsConnectionProperties(true, "nats://localhost:4222", "heph", null),
+                    new NatsConnectionProperties(
+                        true,
+                        "nats://localhost:4222",
+                        "heph",
+                        new NatsConnectionProperties.Consumer(Duration.ofSeconds(60))
+                    ),
                     NatsConsumerPropertiesFixture.withFastPoisonBackoff(),
                     scopeId ->
                         Optional.of(

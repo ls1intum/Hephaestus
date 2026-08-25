@@ -6,6 +6,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.AuthMode;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider.SyncTarget;
 import java.util.Optional;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Factory for creating SyncTarget instances from workspace and repository monitor entities.
@@ -79,7 +80,7 @@ public final class SyncTargetFactory {
         );
     }
 
-    private static String resolveBearerToken(
+    private static @Nullable String resolveBearerToken(
         ConnectionService connectionService,
         long workspaceId,
         IntegrationKind kind

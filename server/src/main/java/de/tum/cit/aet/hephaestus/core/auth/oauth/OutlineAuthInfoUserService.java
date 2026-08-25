@@ -84,7 +84,7 @@ public class OutlineAuthInfoUserService implements OAuth2UserService<OAuth2UserR
      * Flattens Outline's nested {@code {data:{user,team}}} payload into principal attributes.
      * Fails closed when the user id or team id is missing.
      */
-    static Map<String, Object> toAttributes(Map<String, Object> body) {
+    static Map<String, Object> toAttributes(@Nullable Map<String, Object> body) {
         Map<String, Object> data = nestedObject(body, "data");
         Map<String, Object> user = nestedObject(data, "user");
         Map<String, Object> team = nestedObject(data, "team");
@@ -116,7 +116,7 @@ public class OutlineAuthInfoUserService implements OAuth2UserService<OAuth2UserR
         return new OAuth2AuthenticationException(new OAuth2Error(code, description, null), description, cause);
     }
 
-    private static Map<String, Object> nestedObject(Map<String, Object> parent, String key) {
+    private static Map<String, Object> nestedObject(@Nullable Map<String, Object> parent, String key) {
         if (parent != null && parent.get(key) instanceof Map<?, ?> nested) {
             @SuppressWarnings("unchecked")
             Map<String, Object> typed = (Map<String, Object>) nested;
@@ -125,11 +125,11 @@ public class OutlineAuthInfoUserService implements OAuth2UserService<OAuth2UserR
         return Map.of();
     }
 
-    private static String stringValue(Map<String, Object> map, String key) {
+    private static @Nullable String stringValue(Map<String, Object> map, String key) {
         return (map.get(key) instanceof String s && !s.isBlank()) ? s : null;
     }
 
-    private static void putIfPresent(Map<String, Object> attributes, String key, String value) {
+    private static void putIfPresent(Map<String, Object> attributes, String key, @Nullable String value) {
         if (value != null) {
             attributes.put(key, value);
         }

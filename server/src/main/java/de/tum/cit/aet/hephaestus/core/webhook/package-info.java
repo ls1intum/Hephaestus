@@ -11,4 +11,5 @@
  * <p>Lives in {@code core} so both feature modules can depend on it without forming a cycle.
  */
 @org.springframework.modulith.NamedInterface("webhook")
+@org.jspecify.annotations.NullMarked
 package de.tum.cit.aet.hephaestus.core.webhook;

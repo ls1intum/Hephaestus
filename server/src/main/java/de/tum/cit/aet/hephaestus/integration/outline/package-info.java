@@ -35,4 +35,5 @@
         "agent::documentation-source",
     }
 )
+@org.jspecify.annotations.NullMarked
 package de.tum.cit.aet.hephaestus.integration.outline;

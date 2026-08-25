@@ -9,6 +9,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.util.List;
+import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -43,7 +44,7 @@ public class AccountAdminController {
     public record AdminAccountViewDTO(
         Long id,
         String displayName,
-        String primaryEmail,
+        @Nullable String primaryEmail,
         String appRole,
         String status
     ) {}
@@ -90,7 +91,7 @@ public class AccountAdminController {
 
     private static AdminAccountViewDTO toView(Account a) {
         return new AdminAccountViewDTO(
-            a.getId(),
+            Objects.requireNonNull(a.getId()),
             a.getDisplayName(),
             a.getPrimaryEmail(),
             a.getAppRole().name(),

@@ -4,4 +4,5 @@
  * argument resolver. Used everywhere a request needs to know its workspace.
  */
 @org.springframework.modulith.NamedInterface("context")
+@org.jspecify.annotations.NullMarked
 package de.tum.cit.aet.hephaestus.workspace.context;

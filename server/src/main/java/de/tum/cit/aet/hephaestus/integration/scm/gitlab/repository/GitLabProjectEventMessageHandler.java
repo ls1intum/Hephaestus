@@ -15,6 +15,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRep
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabEventType;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabProperties;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.repository.dto.GitLabProjectEventDTO;
+import java.util.Objects;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -64,7 +65,7 @@ public class GitLabProjectEventMessageHandler extends AbstractIntegrationMessage
 
     @Override
     protected void handleEvent(GitLabProjectEventDTO event) {
-        String safePath = sanitizeForLog(event.pathWithNamespace());
+        String safePath = sanitizeForLog(Objects.requireNonNull(event.pathWithNamespace()));
         log.debug(
             "Received project event: eventName={}, path={}, projectId={}",
             event.eventName(),
@@ -93,7 +94,7 @@ public class GitLabProjectEventMessageHandler extends AbstractIntegrationMessage
     }
 
     private void handleProjectCreate(GitLabProjectEventDTO event, IdentityProvider provider) {
-        Long providerId = provider.getId();
+        Long providerId = Objects.requireNonNull(provider.getId());
         long nativeId = event.projectId();
 
         // Check if already exists
@@ -107,18 +108,18 @@ public class GitLabProjectEventMessageHandler extends AbstractIntegrationMessage
         repo.setNativeId(nativeId);
         repo.setProvider(provider);
         repo.setName(event.name());
-        repo.setNameWithOwner(event.pathWithNamespace());
+        repo.setNameWithOwner(Objects.requireNonNull(event.pathWithNamespace()));
         repo.setPrivate("private".equalsIgnoreCase(event.projectVisibility()));
 
         // Construct HTML URL from server URL + path
         String serverUrl = gitLabProperties.defaultServerUrl();
         if (serverUrl != null && event.pathWithNamespace() != null) {
             String baseUrl = serverUrl.endsWith("/") ? serverUrl : serverUrl + "/";
-            repo.setHtmlUrl(baseUrl + event.pathWithNamespace());
+            repo.setHtmlUrl(baseUrl + Objects.requireNonNull(event.pathWithNamespace()));
         }
 
         // Link to organization if the group is already synced
-        String groupPath = extractGroupPath(event.pathWithNamespace());
+        String groupPath = extractGroupPath(Objects.requireNonNull(event.pathWithNamespace()));
         if (groupPath != null) {
             Organization org = organizationRepository
                 .findByLoginIgnoreCaseAndProviderId(groupPath, providerId)
@@ -132,12 +133,12 @@ public class GitLabProjectEventMessageHandler extends AbstractIntegrationMessage
         log.info(
             "Created repository from project event: nativeId={}, path={}",
             nativeId,
-            sanitizeForLog(event.pathWithNamespace())
+            sanitizeForLog(Objects.requireNonNull(event.pathWithNamespace()))
         );
     }
 
     private void handleProjectDestroy(GitLabProjectEventDTO event, IdentityProvider provider) {
-        Long providerId = provider.getId();
+        Long providerId = Objects.requireNonNull(provider.getId());
         long nativeId = event.projectId();
 
         repositoryRepository
@@ -148,20 +149,20 @@ public class GitLabProjectEventMessageHandler extends AbstractIntegrationMessage
                     log.info(
                         "Deleted repository from project event: nativeId={}, path={}",
                         nativeId,
-                        sanitizeForLog(event.pathWithNamespace())
+                        sanitizeForLog(Objects.requireNonNull(event.pathWithNamespace()))
                     );
                 },
                 () ->
                     log.debug(
                         "Repository not found for deletion: nativeId={}, path={}",
                         nativeId,
-                        sanitizeForLog(event.pathWithNamespace())
+                        sanitizeForLog(Objects.requireNonNull(event.pathWithNamespace()))
                     )
             );
     }
 
     private void handleProjectRenameOrTransfer(GitLabProjectEventDTO event, IdentityProvider provider) {
-        Long providerId = provider.getId();
+        Long providerId = Objects.requireNonNull(provider.getId());
         long nativeId = event.projectId();
 
         repositoryRepository
@@ -218,7 +219,7 @@ public class GitLabProjectEventMessageHandler extends AbstractIntegrationMessage
                         "Repository not found for {}: nativeId={}, path={}",
                         event.eventName(),
                         nativeId,
-                        sanitizeForLog(event.pathWithNamespace())
+                        sanitizeForLog(Objects.requireNonNull(event.pathWithNamespace()))
                     )
             );
     }

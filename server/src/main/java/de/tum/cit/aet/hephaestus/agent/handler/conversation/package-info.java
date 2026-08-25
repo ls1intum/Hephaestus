@@ -5,4 +5,5 @@
  * the {@code practices.feedback} ledger write-orchestration, see {@code FeedbackLedgerOwnershipTest}) so the
  * cross-module dependency on the {@code practices.feedback} named interface stays within the sanctioned agent writer.
  */
+@org.jspecify.annotations.NullMarked
 package de.tum.cit.aet.hephaestus.agent.handler.conversation;

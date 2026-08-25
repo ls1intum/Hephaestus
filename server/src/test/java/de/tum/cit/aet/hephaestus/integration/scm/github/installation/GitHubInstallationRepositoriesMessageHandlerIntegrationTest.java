@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.scm.github.installation;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
@@ -17,6 +18,7 @@ import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -101,7 +103,7 @@ class GitHubInstallationRepositoriesMessageHandlerIntegrationTest extends BaseIn
     @Test
     void shouldHandleAddedEvent() throws Exception {
         GitHubInstallationRepositoriesEventDTO event = loadPayload("installation_repositories.added");
-        setupTestWorkspace(event.installation().id(), "HephaestusTest");
+        setupTestWorkspace(required(event.installation()).id(), "HephaestusTest");
 
         handler.handleEvent(event);
 
@@ -112,7 +114,7 @@ class GitHubInstallationRepositoriesMessageHandlerIntegrationTest extends BaseIn
     @Test
     void shouldHandleRemovedEvent() throws Exception {
         GitHubInstallationRepositoriesEventDTO event = loadPayload("installation_repositories.removed");
-        setupTestWorkspace(event.installation().id(), "HephaestusTest");
+        setupTestWorkspace(required(event.installation()).id(), "HephaestusTest");
 
         handler.handleEvent(event);
 
@@ -147,7 +149,7 @@ class GitHubInstallationRepositoriesMessageHandlerIntegrationTest extends BaseIn
             null, // repositoriesRemoved null
             baseEvent.sender()
         );
-        setupTestWorkspace(baseEvent.installation().id(), "HephaestusTest");
+        setupTestWorkspace(required(baseEvent.installation()).id(), "HephaestusTest");
 
         // When - should not throw
         handler.handleEvent(event);
@@ -158,5 +160,10 @@ class GitHubInstallationRepositoriesMessageHandlerIntegrationTest extends BaseIn
         ClassPathResource resource = new ClassPathResource("github/" + filename + ".json");
         String json = resource.getContentAsString(StandardCharsets.UTF_8);
         return objectMapper.readValue(json, GitHubInstallationRepositoriesEventDTO.class);
+    }
+
+    private static <T> T required(@Nullable T value) {
+        assertNotNull(value);
+        return value;
     }
 }

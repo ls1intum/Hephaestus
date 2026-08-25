@@ -55,7 +55,7 @@ public class HmacOAuthStateService implements OAuthStateService {
     private final OAuthStateNonceStore nonceStore;
 
     /** Test factory: HMAC + TTL only, no single-use enforcement. */
-    public static HmacOAuthStateService withoutNonceStore(String secret, Duration ttl) {
+    public static HmacOAuthStateService withoutNonceStore(@Nullable String secret, Duration ttl) {
         return new HmacOAuthStateService(secret, ttl, (OAuthStateNonceStore) null);
     }
 
@@ -169,7 +169,7 @@ public class HmacOAuthStateService implements OAuthStateService {
     }
 
     @Override
-    public StateBinding consume(String state) {
+    public StateBinding consume(@Nullable String state) {
         if (state == null || state.isBlank()) {
             throw new IllegalArgumentException("OAuth state missing");
         }

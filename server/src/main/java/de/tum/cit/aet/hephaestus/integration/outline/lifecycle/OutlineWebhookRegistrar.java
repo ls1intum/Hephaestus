@@ -13,6 +13,7 @@ import de.tum.cit.aet.hephaestus.integration.outline.webhook.OutlineWebhookEvent
 import java.security.SecureRandom;
 import java.util.HexFormat;
 import java.util.Optional;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
@@ -128,7 +129,7 @@ public class OutlineWebhookRegistrar {
      * Whether the stored subscription still exists upstream and is enabled. {@code null} when the
      * upstream listing itself failed (unknown — the caller must not churn on that).
      */
-    private Boolean isSubscriptionHealthy(String serverUrl, String token, String subscriptionId) {
+    private @Nullable Boolean isSubscriptionHealthy(String serverUrl, String token, String subscriptionId) {
         try {
             for (OutlineWebhookSubscription subscription : outlineApiClient.listWebhookSubscriptions(
                 serverUrl,

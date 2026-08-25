@@ -13,6 +13,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackDeliveryException;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubGraphQlClientProvider;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.List;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -121,7 +122,7 @@ class GithubPrNodeIdResolverTest extends BaseUnitTest {
     }
 
     @SuppressWarnings("unchecked")
-    private ClientGraphQlResponse mockGraphQlResponse(String fieldPath, String value) {
+    private ClientGraphQlResponse mockGraphQlResponse(String fieldPath, @Nullable String value) {
         ClientGraphQlResponse response = mock(ClientGraphQlResponse.class);
         ClientResponseField field = mock(ClientResponseField.class);
         when(response.field(eq(fieldPath))).thenReturn(field);

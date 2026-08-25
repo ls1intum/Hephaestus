@@ -15,6 +15,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.ReentrantLock;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -56,7 +57,7 @@ public class SlackStreamingMentorChannel implements MentorChannel {
     private final SlackMessageService slack;
     private final long workspaceId;
     private final String channel;
-    private final String threadTs;
+    private final @Nullable String threadTs;
     private final Duration gracefulShutdownTimeout;
     private final Duration forcedShutdownTimeout;
     private final long initialFlushDelayMillis;
@@ -77,16 +78,21 @@ public class SlackStreamingMentorChannel implements MentorChannel {
     private final AtomicBoolean contentDelivered = new AtomicBoolean(false);
     private final AtomicBoolean silentModeSuppressed = new AtomicBoolean(false);
 
-    private volatile Runnable disconnectHook;
+    private volatile @Nullable Runnable disconnectHook;
     /** The streaming message ts: {@code null} until the first successful open, set exactly once ({@link #openOrAppend}). */
     private final AtomicReference<String> streamTs = new AtomicReference<>();
     /** Serializes the open-or-append decision so the stream is opened exactly once across the flush + runner threads. */
     private final ReentrantLock streamLock = new ReentrantLock();
-    private volatile ScheduledFuture<?> flushTask;
+    private volatile @Nullable ScheduledFuture<?> flushTask;
     private int consecutiveFailures; // flush-thread only
     private int consecutiveRateLimits; // flush-thread only
 
-    public SlackStreamingMentorChannel(SlackMessageService slack, long workspaceId, String channel, String threadTs) {
+    public SlackStreamingMentorChannel(
+        SlackMessageService slack,
+        long workspaceId,
+        String channel,
+        @Nullable String threadTs
+    ) {
         this(
             slack,
             workspaceId,
@@ -103,7 +109,7 @@ public class SlackStreamingMentorChannel implements MentorChannel {
         SlackMessageService slack,
         long workspaceId,
         String channel,
-        String threadTs,
+        @Nullable String threadTs,
         Duration gracefulShutdownTimeout,
         Duration forcedShutdownTimeout,
         long initialFlushDelayMillis,
@@ -232,7 +238,7 @@ public class SlackStreamingMentorChannel implements MentorChannel {
      * word is never split), capped at {@value #MAX_APPEND_CHARS}. Returns {@code null} when nothing is safe to
      * send yet. {@code force} (terminal) drains everything.
      */
-    private String drain(boolean force) {
+    private @Nullable String drain(boolean force) {
         lock.lock();
         try {
             int len = pending.length();
@@ -357,7 +363,7 @@ public class SlackStreamingMentorChannel implements MentorChannel {
         }
     }
 
-    private void finish(String suffix) {
+    private void finish(@Nullable String suffix) {
         if (!done.compareAndSet(false, true)) {
             return; // idempotent terminal
         }

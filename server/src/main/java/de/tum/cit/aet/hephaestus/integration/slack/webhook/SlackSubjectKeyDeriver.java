@@ -7,6 +7,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
 import java.util.Map;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
@@ -82,14 +83,14 @@ public class SlackSubjectKeyDeriver implements SubjectKeyDeriver {
         return "slack-" + sha256TruncatedHex(composite.getBytes(StandardCharsets.UTF_8));
     }
 
-    private static String textAt(JsonNode node, String field) {
+    private static String textAt(@Nullable JsonNode node, String field) {
         if (node == null || node.isMissingNode() || node.isNull()) {
             return "";
         }
         return node.path(field).asString("");
     }
 
-    private static String teamId(JsonNode root) {
+    private static String teamId(@Nullable JsonNode root) {
         if (root == null) {
             return "";
         }
@@ -101,7 +102,7 @@ public class SlackSubjectKeyDeriver implements SubjectKeyDeriver {
         return firstAuthorization.path("team_id").asString("");
     }
 
-    private static String eventType(JsonNode event) {
+    private static String eventType(@Nullable JsonNode event) {
         if (event == null || event.isMissingNode() || event.isNull()) {
             return "unknown";
         }
@@ -119,7 +120,7 @@ public class SlackSubjectKeyDeriver implements SubjectKeyDeriver {
         return type.isBlank() ? "unknown" : type;
     }
 
-    private static String scopeFor(JsonNode event, String eventType) {
+    private static String scopeFor(@Nullable JsonNode event, String eventType) {
         if (event == null || event.isMissingNode() || event.isNull()) {
             return "workspace";
         }

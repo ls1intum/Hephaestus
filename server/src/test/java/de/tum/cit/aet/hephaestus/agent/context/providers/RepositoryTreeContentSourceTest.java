@@ -19,6 +19,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
@@ -163,7 +164,7 @@ class RepositoryTreeContentSourceTest extends BaseUnitTest {
         );
     }
 
-    private static AgentJob job(long repositoryId, String commitSha) {
+    private static AgentJob job(long repositoryId, @Nullable String commitSha) {
         JsonMapper mapper = JsonMapper.builder().build();
         ObjectNode metadata = mapper.createObjectNode();
         metadata.put("repository_id", repositoryId);

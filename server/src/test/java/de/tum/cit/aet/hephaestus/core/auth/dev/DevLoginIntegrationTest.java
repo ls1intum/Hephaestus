@@ -33,7 +33,7 @@ class DevLoginIntegrationTest extends RealAuthIntegrationTest {
     @Test
     void devLoginMintsAcceptedCookie_andGetUserReturnsTheDevAccount() {
         // No XSRF token is sent: success here also proves the CSRF carve-out for the pre-auth POST.
-        String cookie = webTestClient
+        var responseCookie = webTestClient
             .post()
             .uri("/auth/dev-login")
             .contentType(MediaType.APPLICATION_JSON)
@@ -45,8 +45,9 @@ class DevLoginIntegrationTest extends RealAuthIntegrationTest {
             .exists(cookieName)
             .returnResult(Void.class)
             .getResponseCookies()
-            .getFirst(cookieName)
-            .getValue();
+            .getFirst(cookieName);
+        org.junit.jupiter.api.Assertions.assertNotNull(responseCookie);
+        String cookie = responseCookie.getValue();
 
         webTestClient
             .get()
@@ -101,19 +102,19 @@ class DevLoginIntegrationTest extends RealAuthIntegrationTest {
     }
 
     private String devLogin(String json) {
-        return Objects.requireNonNull(
-            webTestClient
-                .post()
-                .uri("/auth/dev-login")
-                .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(json)
-                .exchange()
-                .expectStatus()
-                .isNoContent()
-                .returnResult(Void.class)
-                .getResponseCookies()
-                .getFirst(cookieName)
-        ).getValue();
+        var cookie = webTestClient
+            .post()
+            .uri("/auth/dev-login")
+            .contentType(MediaType.APPLICATION_JSON)
+            .bodyValue(json)
+            .exchange()
+            .expectStatus()
+            .isNoContent()
+            .returnResult(Void.class)
+            .getResponseCookies()
+            .getFirst(cookieName);
+        org.junit.jupiter.api.Assertions.assertNotNull(cookie);
+        return cookie.getValue();
     }
 
     private long accountIdFrom(String cookie) {
@@ -127,6 +128,10 @@ class DevLoginIntegrationTest extends RealAuthIntegrationTest {
             .expectBody(Map.class)
             .returnResult()
             .getResponseBody();
-        return ((Number) Objects.requireNonNull(body).get("id")).longValue();
+        org.junit.jupiter.api.Assertions.assertNotNull(body);
+        Object id = body.get("id");
+        org.junit.jupiter.api.Assertions.assertNotNull(id);
+        assertThat(id).isInstanceOf(Number.class);
+        return ((Number) id).longValue();
     }
 }

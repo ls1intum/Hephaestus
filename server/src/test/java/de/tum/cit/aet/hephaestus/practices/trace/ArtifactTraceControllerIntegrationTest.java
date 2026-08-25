@@ -29,6 +29,7 @@ import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembership;
 import java.time.Instant;
 import java.util.Map;
 import java.util.UUID;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -296,8 +297,8 @@ class ArtifactTraceControllerIntegrationTest extends AbstractWorkspaceIntegratio
         Workspace ws,
         SignalName signal,
         SignalState state,
-        SignalStateReason reason,
-        UUID jobId
+        @Nullable SignalStateReason reason,
+        @Nullable UUID jobId
     ) {
         ArtifactSignal row = new ArtifactSignal();
         row.setId(UUID.randomUUID());

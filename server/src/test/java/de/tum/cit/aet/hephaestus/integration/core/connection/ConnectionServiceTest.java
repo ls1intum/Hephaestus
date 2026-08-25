@@ -492,7 +492,7 @@ class ConnectionServiceTest extends BaseUnitTest {
          * {@code UnfinishedStubbingException}.
          */
         private ConnectionRepository.OutlineSubscriptionProjection projection(
-            @org.jspecify.annotations.Nullable Long workspaceId,
+            Long workspaceId,
             @org.jspecify.annotations.Nullable String secret
         ) {
             return new ConnectionRepository.OutlineSubscriptionProjection() {
@@ -507,7 +507,7 @@ class ConnectionServiceTest extends BaseUnitTest {
                 }
 
                 @Override
-                public String getSigningSecret() {
+                public @org.jspecify.annotations.Nullable String getSigningSecret() {
                     return secret;
                 }
             };

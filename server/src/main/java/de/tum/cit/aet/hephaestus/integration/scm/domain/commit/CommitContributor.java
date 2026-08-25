@@ -20,6 +20,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Entity representing a contributor to a Git commit.
@@ -93,6 +94,7 @@ public class CommitContributor {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "commit_id", nullable = false)
     @ToString.Exclude
+    @Nullable
     private Commit commit;
 
     /**

@@ -1,5 +1,7 @@
 package de.tum.cit.aet.hephaestus.core.auth.spi;
 
+import org.jspecify.annotations.Nullable;
+
 /**
  * Narrow SPI that resolves an OAuth client {@code registrationId} to the persistent
  * {@code git_provider} row id, creating the row on first sight. Implemented in
@@ -33,7 +35,7 @@ public interface GitProviderRegistry {
      * @param gitProviderId the {@code git_provider} row id, or {@code null}
      * @return the provider type name, or {@code "UNKNOWN"} when the id is {@code null} or no row exists
      */
-    String providerTypeName(Long gitProviderId);
+    String providerTypeName(@Nullable Long gitProviderId);
 
     /**
      * Resolve the server-url origin (e.g. {@code https://github.com}, {@code https://gitlab.lrz.de}) for
@@ -44,5 +46,6 @@ public interface GitProviderRegistry {
      * @param gitProviderId the {@code git_provider} row id, or {@code null}
      * @return the server-url origin, or {@code null} when the id is {@code null} or no row exists
      */
-    String providerServerUrl(Long gitProviderId);
+    @Nullable
+    String providerServerUrl(@Nullable Long gitProviderId);
 }

@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.scm.domain.issuetype;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
@@ -91,7 +92,7 @@ class IssueTypeRepositoryIntegrationTest extends BaseIntegrationTest {
         persistIssueType("gid://gitlab/WorkItems::Type/1", "Issue", rootOrg);
 
         Optional<IssueType> resolved = issueTypeRepository.findFirstByProviderIdAndNameIgnoreCase(
-            gitlabProvider.getId(),
+            persistedId(gitlabProvider),
             "Issue"
         );
 
@@ -105,13 +106,13 @@ class IssueTypeRepositoryIntegrationTest extends BaseIntegrationTest {
         persistIssueType("gid://gitlab/WorkItems::Type/2", "Task", rootOrg);
 
         assertThat(
-            issueTypeRepository.findFirstByProviderIdAndNameIgnoreCase(gitlabProvider.getId(), "task")
+            issueTypeRepository.findFirstByProviderIdAndNameIgnoreCase(persistedId(gitlabProvider), "task")
         ).isPresent();
         assertThat(
-            issueTypeRepository.findFirstByProviderIdAndNameIgnoreCase(gitlabProvider.getId(), "TASK")
+            issueTypeRepository.findFirstByProviderIdAndNameIgnoreCase(persistedId(gitlabProvider), "TASK")
         ).isPresent();
         assertThat(
-            issueTypeRepository.findFirstByProviderIdAndNameIgnoreCase(gitlabProvider.getId(), "tAsK")
+            issueTypeRepository.findFirstByProviderIdAndNameIgnoreCase(persistedId(gitlabProvider), "tAsK")
         ).isPresent();
     }
 
@@ -121,7 +122,7 @@ class IssueTypeRepositoryIntegrationTest extends BaseIntegrationTest {
         persistIssueType("gid://other/WorkItems::Type/99", "Bug", otherOrg);
 
         Optional<IssueType> resolved = issueTypeRepository.findFirstByProviderIdAndNameIgnoreCase(
-            gitlabProvider.getId(),
+            persistedId(gitlabProvider),
             "Bug"
         );
 
@@ -135,7 +136,7 @@ class IssueTypeRepositoryIntegrationTest extends BaseIntegrationTest {
         issueTypeRepository.save(disabled);
 
         Optional<IssueType> resolved = issueTypeRepository.findFirstByProviderIdAndNameIgnoreCase(
-            gitlabProvider.getId(),
+            persistedId(gitlabProvider),
             "Incident"
         );
 
@@ -148,11 +149,17 @@ class IssueTypeRepositoryIntegrationTest extends BaseIntegrationTest {
         persistIssueType("gid://gitlab/WorkItems::Type/11", "Epic", subgroupOrg);
 
         Optional<IssueType> resolved = issueTypeRepository.findFirstByProviderIdAndNameIgnoreCase(
-            gitlabProvider.getId(),
+            persistedId(gitlabProvider),
             "Epic"
         );
 
         assertThat(resolved).isPresent();
         assertThat(resolved.get().getId()).isEqualTo(rootType.getId());
+    }
+
+    private static long persistedId(IdentityProvider provider) {
+        Long id = provider.getId();
+        assertNotNull(id);
+        return id;
     }
 }

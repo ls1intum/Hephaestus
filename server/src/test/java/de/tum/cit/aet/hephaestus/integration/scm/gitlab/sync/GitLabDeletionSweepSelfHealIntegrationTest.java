@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.scm.gitlab.sync;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
@@ -48,7 +49,7 @@ class GitLabDeletionSweepSelfHealIntegrationTest extends BaseIntegrationTest {
     private IdentityProviderRepository providerRepository;
 
     private Repository repository;
-    private Long providerId;
+    private long providerId;
 
     @BeforeEach
     void setUp() {
@@ -59,7 +60,9 @@ class GitLabDeletionSweepSelfHealIntegrationTest extends BaseIntegrationTest {
             .orElseGet(() ->
                 providerRepository.save(new IdentityProvider(IdentityProviderType.GITLAB, "https://gitlab.com"))
             );
-        providerId = provider.getId();
+        Long savedProviderId = provider.getId();
+        assertNotNull(savedProviderId);
+        providerId = savedProviderId;
 
         Organization org = new Organization();
         org.setNativeId(PROVIDER_NATIVE);

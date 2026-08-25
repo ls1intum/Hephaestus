@@ -10,4 +10,5 @@
  * classes — so subscribers can be implemented per-kind without circular imports.
  */
 @org.springframework.modulith.NamedInterface("spi")
+@org.jspecify.annotations.NullMarked
 package de.tum.cit.aet.hephaestus.leaderboard.spi;

@@ -37,6 +37,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -445,14 +446,14 @@ class ConversationalFeedbackPreparerTest extends BaseUnitTest {
         return move(practiceSlug, ComposedFeedbackUnit.Action.NEW, null);
     }
 
-    private static ComposedFeedbackUnit supersede(String practiceSlug, String supersedesThreadKey) {
+    private static ComposedFeedbackUnit supersede(String practiceSlug, @Nullable String supersedesThreadKey) {
         return move(practiceSlug, ComposedFeedbackUnit.Action.SUPERSEDE, supersedesThreadKey);
     }
 
     private static ComposedFeedbackUnit move(
         String practiceSlug,
         ComposedFeedbackUnit.Action action,
-        String supersedesThreadKey
+        @Nullable String supersedesThreadKey
     ) {
         return new ComposedFeedbackUnit(
             FeedbackChannel.IN_CHAT,
@@ -485,7 +486,7 @@ class ConversationalFeedbackPreparerTest extends BaseUnitTest {
         );
     }
 
-    private Observation problem(long about, String practiceSlug, Severity severity) {
+    private Observation problem(long about, @Nullable String practiceSlug, Severity severity) {
         Observation observation = mock(Observation.class);
         UUID id = UUID.randomUUID();
         lenient().when(observation.getId()).thenReturn(id);

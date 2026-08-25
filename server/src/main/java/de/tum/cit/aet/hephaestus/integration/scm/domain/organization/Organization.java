@@ -11,6 +11,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Represents an organizational grouping entity from a Git provider.
@@ -44,7 +45,7 @@ public class Organization extends BaseGitServiceEntity {
     private String name;
 
     @Column(name = "avatar_url")
-    private String avatarUrl;
+    private @Nullable String avatarUrl;
 
     @NonNull
     @Column(name = "html_url")

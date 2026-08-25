@@ -289,7 +289,7 @@ class ManualReviewRequestsTest extends BaseUnitTest {
     @Test
     void aPullRequestWithNoHeadCommitIsRefusedBeforeAnythingIsRecorded() {
         PullRequest pr = pullRequest();
-        pr.setHeadRefOid(null);
+        org.springframework.test.util.ReflectionTestUtils.setField(pr, "headRefOid", null);
 
         ManualReviewOutcome outcome = requests.requestPullRequestReview(workspace, pr, requesters());
 

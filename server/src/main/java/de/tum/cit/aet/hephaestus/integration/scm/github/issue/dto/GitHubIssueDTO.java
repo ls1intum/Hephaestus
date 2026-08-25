@@ -29,27 +29,27 @@ import org.jspecify.annotations.Nullable;
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record GitHubIssueDTO(
-    @JsonProperty("id") Long id,
-    @JsonProperty("database_id") Long databaseId,
-    @JsonProperty("node_id") String nodeId,
+    @JsonProperty("id") @Nullable Long id,
+    @JsonProperty("database_id") @Nullable Long databaseId,
+    @JsonProperty("node_id") @Nullable String nodeId,
     @JsonProperty("number") int number,
-    @JsonProperty("title") String title,
-    @JsonProperty("body") String body,
-    @JsonProperty("state") String state,
-    @JsonProperty("state_reason") String stateReason,
-    @JsonProperty("html_url") String htmlUrl,
+    @JsonProperty("title") @Nullable String title,
+    @JsonProperty("body") @Nullable String body,
+    @JsonProperty("state") @Nullable String state,
+    @JsonProperty("state_reason") @Nullable String stateReason,
+    @JsonProperty("html_url") @Nullable String htmlUrl,
     @JsonProperty("comments") int commentsCount,
-    @JsonProperty("created_at") Instant createdAt,
-    @JsonProperty("updated_at") Instant updatedAt,
-    @JsonProperty("closed_at") Instant closedAt,
+    @JsonProperty("created_at") @Nullable Instant createdAt,
+    @JsonProperty("updated_at") @Nullable Instant updatedAt,
+    @JsonProperty("closed_at") @Nullable Instant closedAt,
     @JsonProperty("locked") boolean locked,
-    @JsonProperty("user") GitHubUserDTO author,
-    @JsonProperty("assignees") List<GitHubUserDTO> assignees,
-    @JsonProperty("labels") List<GitHubLabelDTO> labels,
-    @JsonProperty("milestone") GitHubMilestoneDTO milestone,
-    @JsonProperty("type") GitHubIssueTypeDTO issueType,
-    @JsonProperty("repository") GitHubRepositoryRefDTO repository,
-    @JsonProperty("pull_request") PullRequestRef pullRequest
+    @JsonProperty("user") @Nullable GitHubUserDTO author,
+    @JsonProperty("assignees") @Nullable List<GitHubUserDTO> assignees,
+    @JsonProperty("labels") @Nullable List<GitHubLabelDTO> labels,
+    @JsonProperty("milestone") @Nullable GitHubMilestoneDTO milestone,
+    @JsonProperty("type") @Nullable GitHubIssueTypeDTO issueType,
+    @JsonProperty("repository") @Nullable GitHubRepositoryRefDTO repository,
+    @JsonProperty("pull_request") @Nullable PullRequestRef pullRequest
 ) {
     /**
      * Returns true if this issue is actually a pull request.
@@ -69,7 +69,7 @@ public record GitHubIssueDTO(
     /**
      * Get the database ID, preferring databaseId over id for GraphQL responses.
      */
-    public Long getDatabaseId() {
+    public @Nullable Long getDatabaseId() {
         return databaseId != null ? databaseId : id;
     }
 

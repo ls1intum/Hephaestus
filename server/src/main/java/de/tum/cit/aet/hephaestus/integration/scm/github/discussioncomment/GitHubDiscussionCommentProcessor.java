@@ -17,6 +17,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.discussioncomment.dto.Gi
 import de.tum.cit.aet.hephaestus.integration.scm.github.user.GitHubUserProcessor;
 import java.time.Instant;
 import java.util.HashSet;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import lombok.extern.slf4j.Slf4j;
@@ -62,7 +63,11 @@ public class GitHubDiscussionCommentProcessor extends BaseGitHubProcessor {
      * @return the created or updated DiscussionComment entity, or null if processing failed
      */
     @Transactional
-    public DiscussionComment process(GitHubDiscussionCommentDTO dto, Discussion discussion, ProcessingContext context) {
+    public @Nullable DiscussionComment process(
+        GitHubDiscussionCommentDTO dto,
+        Discussion discussion,
+        ProcessingContext context
+    ) {
         Long dbId = dto.getDatabaseId();
         if (dbId == null) {
             log.warn("Skipped discussion comment processing: reason=missingDatabaseId");
@@ -70,20 +75,18 @@ public class GitHubDiscussionCommentProcessor extends BaseGitHubProcessor {
         }
 
         // Check if this is an update
-        Optional<DiscussionComment> existingOpt = commentRepository.findByNativeIdAndProviderId(
-            dbId,
-            context.providerId()
-        );
+        Long providerId = Objects.requireNonNull(context.providerId());
+        Optional<DiscussionComment> existingOpt = commentRepository.findByNativeIdAndProviderId(dbId, providerId);
         boolean isNew = existingOpt.isEmpty();
 
         // Resolve related entities
-        User author = dto.author() != null ? findOrCreateUser(dto.author(), context.providerId()) : null;
+        User author = dto.author() != null ? findOrCreateUser(dto.author(), providerId) : null;
 
         // Get or create the comment
         DiscussionComment comment = existingOpt.orElseGet(() -> {
             DiscussionComment c = new DiscussionComment();
             c.setNativeId(dbId);
-            c.setProvider(context.provider());
+            c.setProvider(Objects.requireNonNull(context.provider()));
             return c;
         });
 
@@ -122,7 +125,7 @@ public class GitHubDiscussionCommentProcessor extends BaseGitHubProcessor {
         comment = commentRepository.save(comment);
 
         // Publish domain events
-        Long discussionId = discussion.getId();
+        Long discussionId = Objects.requireNonNull(discussion.getId());
         if (isNew) {
             eventPublisher.publishEvent(
                 new ScmDomainEvent.DiscussionCommentCreated(
@@ -165,7 +168,7 @@ public class GitHubDiscussionCommentProcessor extends BaseGitHubProcessor {
         }
 
         commentRepository
-            .findByNativeIdAndProviderId(dbId, context.providerId())
+            .findByNativeIdAndProviderId(dbId, Objects.requireNonNull(context.providerId()))
             .ifPresent(comment -> {
                 Long discussionId = comment.getDiscussion() != null ? comment.getDiscussion().getId() : null;
 

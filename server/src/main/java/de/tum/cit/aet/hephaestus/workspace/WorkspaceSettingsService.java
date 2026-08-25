@@ -18,6 +18,7 @@ import java.time.format.DateTimeParseException;
 import java.util.Optional;
 import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
@@ -91,15 +92,20 @@ public class WorkspaceSettingsService {
      * @return the updated workspace
      */
     @Transactional
-    public Workspace updateNotifications(Long workspaceId, Boolean enabled, String team, String channelId) {
+    public Workspace updateNotifications(
+        Long workspaceId,
+        @Nullable Boolean enabled,
+        @Nullable String team,
+        @Nullable String channelId
+    ) {
         return updateNotificationsInTransaction(workspaceId, enabled, team, channelId);
     }
 
     private Workspace updateNotificationsInTransaction(
         Long workspaceId,
-        Boolean enabled,
-        String team,
-        String channelId
+        @Nullable Boolean enabled,
+        @Nullable String team,
+        @Nullable String channelId
     ) {
         Workspace workspace = requireWorkspace(workspaceId);
 
@@ -143,8 +149,8 @@ public class WorkspaceSettingsService {
         Integer day,
         String time,
         Boolean enabled,
-        String team,
-        String channelId
+        @Nullable String team,
+        @Nullable String channelId
     ) {
         updateScheduleInTransaction(workspaceId, day, time);
         return updateNotificationsInTransaction(workspaceId, enabled, team, channelId);

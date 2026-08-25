@@ -7,6 +7,7 @@ import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import java.time.DayOfWeek;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.springframework.scheduling.support.CronExpression;
 
@@ -22,7 +23,7 @@ class LeaderboardScheduleResolverTest extends BaseUnitTest {
     );
     private final LeaderboardScheduleResolver resolver = new LeaderboardScheduleResolver(globalDefault);
 
-    private static Workspace workspace(Integer day, String time) {
+    private static Workspace workspace(@Nullable Integer day, @Nullable String time) {
         Workspace w = new Workspace();
         w.setId(1L);
         w.setLeaderboardScheduleDay(day);

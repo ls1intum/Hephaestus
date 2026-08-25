@@ -27,23 +27,23 @@ import org.jspecify.annotations.Nullable;
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record GitHubUserDTO(
-    @JsonProperty("id") Long id,
-    @JsonProperty("database_id") Long databaseId,
+    @JsonProperty("id") @Nullable Long id,
+    @JsonProperty("database_id") @Nullable Long databaseId,
     @JsonProperty("login") String login,
-    @JsonProperty("avatar_url") String avatarUrl,
-    @JsonProperty("html_url") String htmlUrl,
-    @JsonProperty("name") String name,
-    @JsonProperty("email") String email,
+    @JsonProperty("avatar_url") @Nullable String avatarUrl,
+    @JsonProperty("html_url") @Nullable String htmlUrl,
+    @JsonProperty("name") @Nullable String name,
+    @JsonProperty("email") @Nullable String email,
     // Profile fields - populated from full user fetch, may be null from webhooks
-    @JsonProperty("bio") String bio,
-    @JsonProperty("company") String company,
-    @JsonProperty("location") String location,
-    @JsonProperty("blog") String blog,
-    @JsonProperty("followers") Integer followers,
-    @JsonProperty("following") Integer following,
+    @JsonProperty("bio") @Nullable String bio,
+    @JsonProperty("company") @Nullable String company,
+    @JsonProperty("location") @Nullable String location,
+    @JsonProperty("blog") @Nullable String blog,
+    @JsonProperty("followers") @Nullable Integer followers,
+    @JsonProperty("following") @Nullable Integer following,
     // Timestamp fields - populated from full user fetch via GraphQL
-    @JsonProperty("created_at") Instant createdAt,
-    @JsonProperty("updated_at") Instant updatedAt,
+    @JsonProperty("created_at") @Nullable Instant createdAt,
+    @JsonProperty("updated_at") @Nullable Instant updatedAt,
     // User type - determined from GitHub API type field or GraphQL __typename
     @JsonProperty("type") User.Type type
 ) {
@@ -52,13 +52,13 @@ public record GitHubUserDTO(
      * Profile fields default to null, type defaults to USER.
      */
     public GitHubUserDTO(
-        Long id,
-        Long databaseId,
+        @Nullable Long id,
+        @Nullable Long databaseId,
         String login,
-        String avatarUrl,
-        String htmlUrl,
-        String name,
-        String email
+        @Nullable String avatarUrl,
+        @Nullable String htmlUrl,
+        @Nullable String name,
+        @Nullable String email
     ) {
         this(
             id,
@@ -84,13 +84,13 @@ public record GitHubUserDTO(
      * Constructor with type for creating user DTOs with explicit type information.
      */
     public GitHubUserDTO(
-        Long id,
-        Long databaseId,
+        @Nullable Long id,
+        @Nullable Long databaseId,
         String login,
-        String avatarUrl,
-        String htmlUrl,
-        String name,
-        String email,
+        @Nullable String avatarUrl,
+        @Nullable String htmlUrl,
+        @Nullable String name,
+        @Nullable String email,
         User.Type type
     ) {
         this(
@@ -116,7 +116,7 @@ public record GitHubUserDTO(
     /**
      * Get the database ID, preferring databaseId over id for GraphQL responses.
      */
-    public Long getDatabaseId() {
+    public @Nullable Long getDatabaseId() {
         return databaseId != null ? databaseId : id;
     }
 

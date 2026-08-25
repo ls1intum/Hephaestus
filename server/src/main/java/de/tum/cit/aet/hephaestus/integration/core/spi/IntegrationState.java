@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.core.spi;
 
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 
 /**
@@ -40,6 +41,6 @@ public enum IntegrationState {
     );
 
     public boolean canTransitionTo(IntegrationState next) {
-        return LEGAL.get(this).contains(next);
+        return Objects.requireNonNull(LEGAL.get(this)).contains(next);
     }
 }

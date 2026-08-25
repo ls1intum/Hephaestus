@@ -6,4 +6,5 @@
  * <p>Named interface: {@code installation}.
  */
 @org.springframework.modulith.NamedInterface("installation")
+@org.jspecify.annotations.NullMarked
 package de.tum.cit.aet.hephaestus.integration.scm.github.installation;

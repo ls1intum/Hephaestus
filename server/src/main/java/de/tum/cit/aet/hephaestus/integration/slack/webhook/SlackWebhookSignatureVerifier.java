@@ -7,6 +7,7 @@ import de.tum.cit.aet.hephaestus.integration.slack.events.SlackSignatureVerifier
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Map;
+import org.jspecify.annotations.Nullable;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.JsonNode;
@@ -67,7 +68,7 @@ public class SlackWebhookSignatureVerifier implements WebhookSignatureVerifier {
         return new VerificationResult.Verified();
     }
 
-    private static String header(Map<String, String> headers, String name) {
+    private static @Nullable String header(@Nullable Map<String, String> headers, String name) {
         if (headers == null) {
             return null;
         }

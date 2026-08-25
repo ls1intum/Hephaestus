@@ -20,6 +20,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabProperties;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.organization.dto.GitLabMemberEventDTO;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.user.GitLabUserClassifier;
 import java.util.List;
+import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -78,7 +79,9 @@ public class GitLabMemberMessageHandler extends AbstractIntegrationMessageHandle
         this.gitProviderRepository = gitProviderRepository;
         this.gitLabProperties = gitLabProperties;
         this.membershipListener = membershipListener;
-        this.requiresNewTransaction = new TransactionTemplate(transactionTemplate.getTransactionManager());
+        this.requiresNewTransaction = new TransactionTemplate(
+            Objects.requireNonNull(transactionTemplate.getTransactionManager())
+        );
         this.requiresNewTransaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
     }
 
@@ -95,14 +98,16 @@ public class GitLabMemberMessageHandler extends AbstractIntegrationMessageHandle
             event.groupAccess()
         );
 
-        Long providerId = gitProviderRepository
-            .findByTypeAndServerUrl(IdentityProviderType.GITLAB, gitLabProperties.defaultServerUrl())
-            .orElseThrow(() ->
-                new IllegalStateException(
-                    "IdentityProvider not found for type=GITLAB, serverUrl=" + gitLabProperties.defaultServerUrl()
+        Long providerId = Objects.requireNonNull(
+            gitProviderRepository
+                .findByTypeAndServerUrl(IdentityProviderType.GITLAB, gitLabProperties.defaultServerUrl())
+                .orElseThrow(() ->
+                    new IllegalStateException(
+                        "IdentityProvider not found for type=GITLAB, serverUrl=" + gitLabProperties.defaultServerUrl()
+                    )
                 )
-            )
-            .getId();
+                .getId()
+        );
 
         // Look up the organization by the group's native ID
         Organization org = organizationRepository.findByNativeIdAndProviderId(event.groupId(), providerId).orElse(null);

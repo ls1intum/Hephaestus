@@ -34,7 +34,7 @@ public interface AccountWorkspaceMembershipQuery {
         Long workspaceId,
         String workspaceSlug,
         String workspaceName,
-        String role,
-        Long memberId
+        @org.jspecify.annotations.Nullable String role,
+        @org.jspecify.annotations.Nullable Long memberId
     ) {}
 }

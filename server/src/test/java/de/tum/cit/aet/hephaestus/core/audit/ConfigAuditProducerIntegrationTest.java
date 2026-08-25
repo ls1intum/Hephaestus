@@ -13,7 +13,6 @@ import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembership;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembershipService;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceSettingsService;
 import jakarta.persistence.EntityManager;
-import jakarta.persistence.PersistenceContext;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -37,8 +36,12 @@ class ConfigAuditProducerIntegrationTest extends AbstractWorkspaceIntegrationTes
     @Autowired
     private ConfigAuditEventRepository repository;
 
-    @PersistenceContext
-    private EntityManager entityManager;
+    private final EntityManager entityManager;
+
+    @Autowired
+    ConfigAuditProducerIntegrationTest(EntityManager entityManager) {
+        this.entityManager = entityManager;
+    }
 
     @Test
     @Transactional

@@ -5,6 +5,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 @Schema(description = "Unified sync-observability status for one connection")
 public record ConnectionSyncStatusDTO(
@@ -12,10 +13,10 @@ public record ConnectionSyncStatusDTO(
     @NonNull @Schema(description = "Integration kind") IntegrationKind kind,
     @NonNull @Schema(description = "Raw connection lifecycle state") IntegrationState connectionState,
     @NonNull @Schema(description = "Derived health") ConnectionHealth health,
-    @Schema(description = "Most recent successful job's finish time") Instant lastSuccessfulSyncAt,
-    @Schema(description = "Currently PENDING/RUNNING job, if any") SyncJobDTO activeJob,
-    @Schema(description = "Most recently finished job, if any") SyncJobDTO lastJob,
-    @Schema(description = "When the next periodic reconciliation is expected") Instant nextScheduledSyncAt,
+    @Schema(description = "Most recent successful job's finish time") @Nullable Instant lastSuccessfulSyncAt,
+    @Schema(description = "Currently PENDING/RUNNING job, if any") @Nullable SyncJobDTO activeJob,
+    @Schema(description = "Most recently finished job, if any") @Nullable SyncJobDTO lastJob,
+    @Schema(description = "When the next periodic reconciliation is expected") @Nullable Instant nextScheduledSyncAt,
     @Schema(
         description = "The periodic reconciliation's cadence in seconds, when the schedule has a regular one. " +
             "This is what makes a resource's lastSyncedAt judgeable: \"synced 4h ago\" is only stale if the " +
@@ -23,12 +24,15 @@ public record ConnectionSyncStatusDTO(
             "irregular or unparseable — clients must then decline to judge staleness rather than assume a " +
             "default, exactly as the server's own stale rollup does."
     )
+    @Nullable
     Long syncIntervalSeconds,
     @Schema(description = "Whether the vendor webhook registration is present; null if not applicable/unknown")
+    @Nullable
     Boolean webhookRegistered,
     @Schema(description = "When the last inbound webhook/event was processed for this connection, if any")
+    @Nullable
     Instant lastEventProcessedAt,
-    @Schema(description = "Current rate-limit budget, if known") RateLimitSnapshotDTO rateLimit,
+    @Schema(description = "Current rate-limit budget, if known") @Nullable RateLimitSnapshotDTO rateLimit,
     @NonNull
     @Schema(
         description = "Whether this kind's runner offers an explicitly triggerable backfill pass. Reflects the " +
@@ -36,6 +40,6 @@ public record ConnectionSyncStatusDTO(
             "available while the automatic cycle is administratively paused."
     )
     Boolean backfillSupported,
-    @Schema(description = "Connection-level backfill rollup, if applicable") BackfillSummaryDTO backfill,
+    @Schema(description = "Connection-level backfill rollup, if applicable") @Nullable BackfillSummaryDTO backfill,
     @NonNull @Schema(description = "Resource-level rollup") ResourceCountsDTO resourceCounts
 ) {}

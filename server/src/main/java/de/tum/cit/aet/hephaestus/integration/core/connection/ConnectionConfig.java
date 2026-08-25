@@ -46,7 +46,7 @@ public sealed interface ConnectionConfig
 
     /** GitLab — supports both legacy plaintext token verifier and 19.0+ HMAC whsec_*. */
     record GitLabConfig(
-        String serverUrl,
+        @Nullable String serverUrl,
         @Nullable Long gitlabGroupId,
         @Nullable Long gitlabWebhookId,
         SigningMode signingMode,

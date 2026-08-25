@@ -5,6 +5,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 /**
  * One card on a developer's own practice pages: a process-level message about a habit in their work, what
@@ -30,10 +31,10 @@ public record InAppFeedbackDTO(
     @NonNull @Schema(description = "The message, as Markdown; ends with the habit to try next") String body,
     @NonNull @Schema(description = "Practice this habit belongs to") String practiceSlug,
     @NonNull String practiceName,
-    @Schema(description = "Area the practice sits in; null when the practice has none") String areaSlug,
-    @Schema(description = "Area display name; null when the practice has none") String areaName,
-    @Schema(description = "Why this practice matters, in the learner's framing") String whyItMatters,
-    @Schema(description = "What good looks like, in the learner's framing") String whatGoodLooksLike,
+    @Schema(description = "Area the practice sits in; null when the practice has none") @Nullable String areaSlug,
+    @Schema(description = "Area display name; null when the practice has none") @Nullable String areaName,
+    @Schema(description = "Why this practice matters, in the learner's framing") @Nullable String whyItMatters,
+    @Schema(description = "What good looks like, in the learner's framing") @Nullable String whatGoodLooksLike,
     @NonNull
     @Schema(description = "The pieces of work the habit was observed on, newest first")
     List<InAppEvidenceDTO> evidence,
@@ -41,5 +42,5 @@ public record InAppFeedbackDTO(
     @Schema(description = "How many pieces of work carry it — the length of the evidence list")
     Integer occurrenceCount,
     @NonNull @Schema(description = "When the message was composed") Instant preparedAt,
-    @Schema(description = "When this developer first opened it; null until they have") Instant readAt
+    @Schema(description = "When this developer first opened it; null until they have") @Nullable Instant readAt
 ) {}

@@ -29,7 +29,7 @@ public interface ConnectionStrategy {
     ConnectFinalization finalizeConnect(IntegrationRef ref, Map<String, String> callbackParams);
 
     /** Revoke vendor-side (best-effort) and signal local state change. */
-    void revoke(IntegrationRef ref);
+    void revoke(@org.jspecify.annotations.Nullable IntegrationRef ref);
 
     /** Strict provider-only teardown used before a transactional workspace purge. */
     default void revokeProvider(IntegrationRef ref) {
@@ -57,12 +57,12 @@ public interface ConnectionStrategy {
          */
         record Completed(
             String instanceKey,
-            CredentialBundle credentials,
+            @Nullable CredentialBundle credentials,
             @Nullable String displayName,
             @Nullable ConnectionConfig config
         ) implements ConnectFinalization {
             /** 3-arg overload for strategies that don't need to upgrade the config blob. */
-            public Completed(String instanceKey, CredentialBundle credentials, @Nullable String displayName) {
+            public Completed(String instanceKey, @Nullable CredentialBundle credentials, @Nullable String displayName) {
                 this(instanceKey, credentials, displayName, null);
             }
         }

@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.scm.gitlab.label;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
@@ -194,6 +195,7 @@ class GitLabLabelProcessorIntegrationTest extends BaseIntegrationTest {
             Label label = labelProcessor.process(dto, testRepository, testContext());
             eventListener.clear();
 
+            assertNotNull(label);
             labelProcessor.delete(label.getId(), testContext());
 
             assertThat(labelRepository.findById(label.getId())).isEmpty();

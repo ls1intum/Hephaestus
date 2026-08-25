@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
@@ -102,7 +103,7 @@ class ReviewThreadContentSourceTest extends BaseUnitTest {
         PullRequestReviewThread.State state,
         String path,
         Integer line,
-        User resolvedBy
+        @Nullable User resolvedBy
     ) {
         PullRequestReviewThread t = new PullRequestReviewThread();
         t.setState(state);
@@ -112,7 +113,7 @@ class ReviewThreadContentSourceTest extends BaseUnitTest {
         return t;
     }
 
-    private PullRequestReviewComment comment(String login, String body) {
+    private PullRequestReviewComment comment(@Nullable String login, String body) {
         var c = new PullRequestReviewComment();
         c.setBody(body);
         if (login != null) {

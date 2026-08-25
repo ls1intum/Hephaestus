@@ -45,7 +45,7 @@ public final class GitHubProjectEvent {
     /** Entity no longer exists; only ID + title survive for downstream cleanup. */
     public record ProjectDeleted(Long projectId, String projectTitle, EventContext context) implements ProjectEvent {
         @Override
-        public GitHubProjectEventPayload.ProjectData project() {
+        public GitHubProjectEventPayload.@Nullable ProjectData project() {
             return null;
         }
     }
@@ -94,7 +94,7 @@ public final class GitHubProjectEvent {
 
     public record ProjectItemDeleted(Long itemId, Long projectId, EventContext context) implements ProjectItemEvent {
         @Override
-        public GitHubProjectEventPayload.ProjectItemData item() {
+        public GitHubProjectEventPayload.@Nullable ProjectItemData item() {
             return null;
         }
     }
@@ -139,7 +139,7 @@ public final class GitHubProjectEvent {
         EventContext context
     ) implements ProjectStatusUpdateEvent {
         @Override
-        public GitHubProjectEventPayload.ProjectStatusUpdateData statusUpdate() {
+        public GitHubProjectEventPayload.@Nullable ProjectStatusUpdateData statusUpdate() {
             return null;
         }
     }

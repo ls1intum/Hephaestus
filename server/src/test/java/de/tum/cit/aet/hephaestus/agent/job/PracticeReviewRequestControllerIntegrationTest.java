@@ -349,9 +349,11 @@ class PracticeReviewRequestControllerIntegrationTest extends AbstractWorkspaceIn
 
     private long persistPullRequest(Repository repository, User prAuthor, int number) {
         Instant now = Instant.now();
+        Long providerId = repository.getProvider().getId();
+        org.junit.jupiter.api.Assertions.assertNotNull(providerId);
         pullRequestRepository.upsertCore(
             9200L + number,
-            repository.getProvider().getId(),
+            providerId,
             number,
             "A change worth reviewing",
             "Body",

@@ -23,6 +23,7 @@ import lombok.NoArgsConstructor;
 import org.hibernate.annotations.Immutable;
 import org.hibernate.annotations.OnDelete;
 import org.hibernate.annotations.OnDeleteAction;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Immutable record of a developer's reaction to a delivered unit of {@link Feedback}.
@@ -111,7 +112,7 @@ public class Reaction {
      * table keyed off {@code FeedbackObservation}), which is out of scope.
      */
     @Column(name = "recurrence_key", length = 64)
-    private String recurrenceKey;
+    private @Nullable String recurrenceKey;
 
     /**
      * The user who submitted this reaction — always the feedback's recipient, since only the recipient may

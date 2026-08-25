@@ -762,6 +762,7 @@ public class OutlineDocumentSyncService {
         // Nothing to persist: skip the write transaction and the full-entity load it would incur.
         if (
             bodyUnchanged &&
+            existingRow != null &&
             Objects.equals(existingRow.collectionId(), desiredCollectionId) &&
             Objects.equals(existingRow.collectionSlug(), desiredCollectionSlug) &&
             Objects.equals(existingRow.parentDocumentId(), desiredParentDocumentId) &&
@@ -870,7 +871,7 @@ public class OutlineDocumentSyncService {
         ExportBudget budget,
         Instant now
     ) {
-        String documentId = meta.getId();
+        String documentId = Objects.requireNonNull(meta.getId(), "Outline document must have an id");
         OutlineDocumentSnapshot snapshot = existing.get(documentId);
         boolean needsExport = snapshot == null || snapshot.isDeleted() || !snapshot.hasBody();
         if (needsExport && !budget.tryConsume()) {

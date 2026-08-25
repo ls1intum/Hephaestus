@@ -16,8 +16,11 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubEventAction
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubEventType;
 import de.tum.cit.aet.hephaestus.integration.scm.github.project.ProjectIntegrityService;
 import de.tum.cit.aet.hephaestus.integration.scm.github.repository.dto.GitHubRepositoryEventDTO;
+import de.tum.cit.aet.hephaestus.integration.scm.github.repository.dto.GitHubRepositoryRefDTO;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -89,7 +92,11 @@ public class GitHubRepositoryMessageHandler extends AbstractIntegrationMessageHa
         }
 
         String fullName = repositoryRef.fullName();
-        String safeFullName = sanitizeForLog(fullName);
+        if (fullName == null) {
+            log.warn("Received repository event with missing repository name: action={}", event.action());
+            return;
+        }
+        String safeFullName = Objects.requireNonNull(sanitizeForLog(fullName));
         Long repositoryId = repositoryRef.id();
         GitHubEventAction.Repository action = event.actionType();
 
@@ -204,9 +211,13 @@ public class GitHubRepositoryMessageHandler extends AbstractIntegrationMessageHa
      * resolves the monitor by {@code nativeId}.
      */
     private void handleRepositoryMoved(GitHubRepositoryEventDTO event, String safeNewFullName) {
-        String newFullName = event.repository().fullName();
-        String newName = event.repository().name();
-        Long nativeId = event.repository().id();
+        GitHubRepositoryRefDTO repositoryRef = event.repository();
+        if (repositoryRef == null) {
+            return;
+        }
+        String newFullName = repositoryRef.fullName();
+        String newName = repositoryRef.name();
+        Long nativeId = repositoryRef.id();
         String previousNameWithOwner = event.getPreviousNameWithOwner();
         String safeOldFullName = sanitizeForLog(previousNameWithOwner);
 
@@ -253,7 +264,10 @@ public class GitHubRepositoryMessageHandler extends AbstractIntegrationMessageHa
      * {@code (nativeId, providerId)} key — the only identity a transfer preserves — and falls back to
      * the previous {@code owner/name} for legacy rows whose {@code native_id} was never captured.
      */
-    private Optional<Repository> resolveMovedRepository(Long nativeId, String previousNameWithOwner) {
+    private Optional<Repository> resolveMovedRepository(
+        @Nullable Long nativeId,
+        @Nullable String previousNameWithOwner
+    ) {
         if (nativeId != null) {
             Long providerId = gitProviderRepository
                 .findByTypeAndServerUrl(IdentityProviderType.GITHUB, GITHUB_SERVER_URL)

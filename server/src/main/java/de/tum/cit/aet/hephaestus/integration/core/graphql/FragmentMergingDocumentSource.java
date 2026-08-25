@@ -146,7 +146,7 @@ public class FragmentMergingDocumentSource extends ResourceDocumentSource {
      * Parses raw GraphQL content into a map of fragment name to complete fragment text
      * (including the {@code fragment Name on Type { ... }} block).
      */
-    static Map<String, String> parseFragments(String rawContent) {
+    static Map<String, String> parseFragments(@org.jspecify.annotations.Nullable String rawContent) {
         if (rawContent == null || rawContent.isBlank()) {
             return Collections.emptyMap();
         }

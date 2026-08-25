@@ -4,6 +4,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.EventTypeKey;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SubjectParser;
 import java.util.Arrays;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
 
 /**
@@ -26,7 +27,7 @@ public class GitlabSubjectParser implements SubjectParser {
     }
 
     @Override
-    public EventTypeKey parse(String fullSubject) {
+    public EventTypeKey parse(@Nullable String fullSubject) {
         if (fullSubject == null || fullSubject.isBlank()) {
             throw new IllegalArgumentException("subject must not be blank");
         }

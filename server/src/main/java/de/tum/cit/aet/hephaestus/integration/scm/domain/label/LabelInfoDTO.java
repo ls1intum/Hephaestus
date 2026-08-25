@@ -5,13 +5,14 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryInf
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.List;
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 @Schema(description = "Information about a label from a repository")
 public record LabelInfoDTO(
     @NonNull @Schema(description = "Unique identifier of the label") Long id,
     @NonNull @Schema(description = "Name of the label") String name,
     @NonNull @Schema(description = "Hex color code of the label (without #)", example = "d73a4a") String color,
-    @Schema(description = "Repository the label belongs to") RepositoryInfoDTO repository
+    @Nullable @Schema(description = "Repository the label belongs to") RepositoryInfoDTO repository
 ) {
     /**
      * Create a LabelInfoDTO from a Label entity.
@@ -31,7 +32,7 @@ public record LabelInfoDTO(
      * Create minimal repository info without loading the repository's labels collection.
      * This breaks the circular reference: Label -> Repository -> Labels.
      */
-    private static RepositoryInfoDTO createMinimalRepositoryInfo(Repository repository) {
+    private static @Nullable RepositoryInfoDTO createMinimalRepositoryInfo(@Nullable Repository repository) {
         if (repository == null) {
             return null;
         }

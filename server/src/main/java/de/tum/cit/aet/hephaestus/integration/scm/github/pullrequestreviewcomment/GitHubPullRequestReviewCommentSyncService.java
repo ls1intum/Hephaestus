@@ -44,7 +44,9 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.user.dto.GitHubUserDTO;
 import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.graphql.client.ClientGraphQlResponse;
@@ -125,7 +127,7 @@ public class GitHubPullRequestReviewCommentSyncService {
             return 0;
         }
 
-        Repository repository = pullRequest.getRepository();
+        Repository repository = pullRequest.requireRepository();
         if (repository == null) {
             log.warn("Skipped review comment sync: reason=prHasNoRepository, prId={}", pullRequest.getId());
             return 0;
@@ -413,7 +415,7 @@ public class GitHubPullRequestReviewCommentSyncService {
         PullRequestReviewThread thread = getOrCreateThreadFromDto(threadId, threadDto, pullRequest, firstComment);
 
         // Create processing context for sync operations to enable activity event creation
-        ProcessingContext context = ProcessingContext.forSync(scopeId, pullRequest.getRepository());
+        ProcessingContext context = ProcessingContext.forSync(scopeId, pullRequest.requireRepository());
 
         int synced = 0;
         PullRequestReviewComment rootComment = null;
@@ -422,7 +424,7 @@ public class GitHubPullRequestReviewCommentSyncService {
             if (dto != null) {
                 PullRequestReviewComment comment = commentProcessor.processCreated(
                     dto,
-                    pullRequest.getRepository().getId(),
+                    pullRequest.requireRepository().getId(),
                     pullRequest.getNumber(),
                     context
                 );
@@ -657,13 +659,13 @@ public class GitHubPullRequestReviewCommentSyncService {
         PullRequest pullRequest,
         GHPullRequestReviewComment firstComment
     ) {
-        Long providerId = pullRequest.getRepository().getProvider().getId();
+        Long providerId = Objects.requireNonNull(pullRequest.requireRepository().getProvider().getId());
         return threadRepository
             .findByNativeIdAndProviderId(threadId, providerId)
             .orElseGet(() -> {
                 PullRequestReviewThread thread = new PullRequestReviewThread();
                 thread.setNativeId(threadId);
-                thread.setProvider(pullRequest.getRepository().getProvider());
+                thread.setProvider(pullRequest.requireRepository().getProvider());
                 thread.setNodeId(threadDto.nodeId());
                 thread.setPullRequest(pullRequest);
                 thread.setPath(threadDto.path());
@@ -692,11 +694,13 @@ public class GitHubPullRequestReviewCommentSyncService {
                     // Set resolvedBy user if available (already converted to DTO)
                     GitHubUserDTO resolvedByDto = threadDto.resolvedBy();
                     if (resolvedByDto != null) {
-                        User resolvedBy = userProcessor.ensureExists(
-                            resolvedByDto,
-                            pullRequest.getRepository().getProvider().getId()
-                        );
-                        thread.setResolvedBy(resolvedBy);
+                        if (resolvedByDto != null) {
+                            User resolvedBy = userProcessor.ensureExists(
+                                resolvedByDto,
+                                Objects.requireNonNull(pullRequest.requireRepository().getProvider().getId())
+                            );
+                            thread.setResolvedBy(resolvedBy);
+                        }
                     }
                 } else {
                     thread.setState(PullRequestReviewThread.State.UNRESOLVED);
@@ -709,7 +713,7 @@ public class GitHubPullRequestReviewCommentSyncService {
     /**
      * Maps a diff side string to the entity Side enum.
      */
-    private PullRequestReviewComment.Side mapDiffSideString(String diffSide) {
+    private PullRequestReviewComment.@Nullable Side mapDiffSideString(@Nullable String diffSide) {
         if (diffSide == null) {
             return null;
         }
@@ -781,7 +785,7 @@ public class GitHubPullRequestReviewCommentSyncService {
         );
 
         // Create processing context for sync operations to enable activity event creation
-        ProcessingContext context = ProcessingContext.forSync(scopeId, pullRequest.getRepository());
+        ProcessingContext context = ProcessingContext.forSync(scopeId, pullRequest.requireRepository());
 
         int synced = 0;
         PullRequestReviewComment rootComment = null;
@@ -790,7 +794,7 @@ public class GitHubPullRequestReviewCommentSyncService {
             if (dto != null) {
                 PullRequestReviewComment comment = commentProcessor.processCreated(
                     dto,
-                    pullRequest.getRepository().getId(),
+                    pullRequest.requireRepository().getId(),
                     pullRequest.getNumber(),
                     context
                 );
@@ -830,13 +834,13 @@ public class GitHubPullRequestReviewCommentSyncService {
         PullRequest pullRequest,
         GHPullRequestReviewComment firstComment
     ) {
-        Long providerId = pullRequest.getRepository().getProvider().getId();
+        Long providerId = Objects.requireNonNull(pullRequest.requireRepository().getProvider().getId());
         return threadRepository
             .findByNativeIdAndProviderId(threadId, providerId)
             .orElseGet(() -> {
                 PullRequestReviewThread thread = new PullRequestReviewThread();
                 thread.setNativeId(threadId);
-                thread.setProvider(pullRequest.getRepository().getProvider());
+                thread.setProvider(pullRequest.requireRepository().getProvider());
                 thread.setNodeId(graphQlThread.getId());
                 thread.setPullRequest(pullRequest);
                 thread.setPath(graphQlThread.getPath());
@@ -863,11 +867,13 @@ public class GitHubPullRequestReviewCommentSyncService {
                     GHUser graphQlResolvedBy = graphQlThread.getResolvedBy();
                     if (graphQlResolvedBy != null) {
                         GitHubUserDTO resolvedByDto = GitHubUserDTO.fromUser(graphQlResolvedBy);
-                        User resolvedBy = userProcessor.ensureExists(
-                            resolvedByDto,
-                            pullRequest.getRepository().getProvider().getId()
-                        );
-                        thread.setResolvedBy(resolvedBy);
+                        if (resolvedByDto != null) {
+                            User resolvedBy = userProcessor.ensureExists(
+                                resolvedByDto,
+                                Objects.requireNonNull(pullRequest.requireRepository().getProvider().getId())
+                            );
+                            thread.setResolvedBy(resolvedBy);
+                        }
                     }
                 } else {
                     thread.setState(PullRequestReviewThread.State.UNRESOLVED);
@@ -881,7 +887,7 @@ public class GitHubPullRequestReviewCommentSyncService {
      * Extracts the database ID from a GraphQL comment.
      * Uses fullDatabaseId if available, otherwise falls back to deprecated databaseId.
      */
-    private Long extractDatabaseId(GHPullRequestReviewComment graphQlComment) {
+    private @Nullable Long extractDatabaseId(@Nullable GHPullRequestReviewComment graphQlComment) {
         if (graphQlComment == null) {
             return null;
         }
@@ -907,7 +913,7 @@ public class GitHubPullRequestReviewCommentSyncService {
      * @param thread         the thread this comment belongs to
      * @return the DTO for processing, or null if databaseId is missing
      */
-    private GitHubReviewCommentDTO convertToDTO(
+    private @Nullable GitHubReviewCommentDTO convertToDTO(
         GHPullRequestReviewComment graphQlComment,
         PullRequestReviewThread thread
     ) {
@@ -1002,7 +1008,7 @@ public class GitHubPullRequestReviewCommentSyncService {
     /**
      * Maps a GraphQL GHDiffSide to the entity Side enum.
      */
-    private PullRequestReviewComment.Side mapDiffSide(GHDiffSide diffSide) {
+    private PullRequestReviewComment.@Nullable Side mapDiffSide(@Nullable GHDiffSide diffSide) {
         if (diffSide == null) {
             return null;
         }
@@ -1031,7 +1037,7 @@ public class GitHubPullRequestReviewCommentSyncService {
             return 0;
         }
 
-        Repository repository = pullRequest.getRepository();
+        Repository repository = pullRequest.requireRepository();
         if (repository == null) {
             log.warn("Skipped remaining thread sync: reason=prHasNoRepository, prId={}", pullRequest.getId());
             return 0;

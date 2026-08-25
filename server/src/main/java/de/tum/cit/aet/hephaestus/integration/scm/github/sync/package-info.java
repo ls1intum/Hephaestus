@@ -8,4 +8,5 @@
  * pagers, processors) stays internal to the GitHub adapter.
  */
 @org.springframework.modulith.NamedInterface("sync")
+@org.jspecify.annotations.NullMarked
 package de.tum.cit.aet.hephaestus.integration.scm.github.sync;

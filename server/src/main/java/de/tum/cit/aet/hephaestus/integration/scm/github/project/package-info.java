@@ -8,4 +8,5 @@
  * <p>Named interface: {@code project}.
  */
 @org.springframework.modulith.NamedInterface("project")
+@org.jspecify.annotations.NullMarked
 package de.tum.cit.aet.hephaestus.integration.scm.github.project;

@@ -284,9 +284,10 @@ class ReviewSweepSpendGuardIntegrationTest extends BaseIntegrationTest {
 
     private long persistPullRequest(IdentityProvider provider, Repository repository, User author) {
         Instant now = Instant.now();
+        Long providerId = java.util.Objects.requireNonNull(provider.getId());
         pullRequestRepository.upsertCore(
             5201L,
-            provider.getId(),
+            providerId,
             12,
             "A change the webhook never announced",
             "Body",

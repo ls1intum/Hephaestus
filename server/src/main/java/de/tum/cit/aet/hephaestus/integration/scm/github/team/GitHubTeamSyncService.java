@@ -53,6 +53,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.graphql.client.ClientGraphQlResponse;
@@ -132,7 +133,7 @@ public class GitHubTeamSyncService {
             log.warn("Skipped team sync: reason=missingOrgLogin, scopeId={}", scopeId);
             return 0;
         }
-        String safeOrgLogin = sanitizeForLog(organizationLogin);
+        String safeOrgLogin = Objects.requireNonNull(sanitizeForLog(organizationLogin));
 
         // Resolve the organization's provider for ProcessingContext (within @Transactional).
         // Provider-type-scoped so a same-login GitLab org cannot collide (ADR-0012).
@@ -368,7 +369,7 @@ public class GitHubTeamSyncService {
      * @param context           the processing context
      * @return the persisted Team entity, or null if processing failed
      */
-    private Team processTeam(GHTeam graphQlTeam, String organizationLogin, ProcessingContext context) {
+    private @Nullable Team processTeam(GHTeam graphQlTeam, String organizationLogin, ProcessingContext context) {
         GitHubTeamEventDTO.GitHubTeamDTO dto = convertToDTO(graphQlTeam);
         Team team = teamProcessor.process(dto, organizationLogin, context);
 
@@ -505,7 +506,7 @@ public class GitHubTeamSyncService {
 
             // Convert GraphQL User to GitHubUserDTO and ensure user exists
             GitHubUserDTO userDTO = convertUserToDTO(graphQlUser);
-            User user = userProcessor.ensureExists(userDTO, team.getProvider().getId());
+            User user = userProcessor.ensureExists(userDTO, Objects.requireNonNull(team.getProvider().getId()));
 
             if (user != null) {
                 syncedMemberIds.add(user.getId());
@@ -599,7 +600,7 @@ public class GitHubTeamSyncService {
         }
 
         Set<TeamRepositoryPermission> freshPermissions = new HashSet<>();
-        Long providerId = team.getProvider().getId();
+        Long providerId = Objects.requireNonNull(team.getProvider().getId());
 
         for (var repoEdge : allRepoEdges) {
             if (repoEdge == null || repoEdge.getNode() == null || repoEdge.getNode().getDatabaseId() == null) {
@@ -1004,14 +1005,14 @@ public class GitHubTeamSyncService {
      */
     private void removeDeletedTeams(String organizationLogin, Set<Long> syncedTeamIds, ProcessingContext context) {
         List<Team> existingTeams = teamRepository.findAllByOrganizationIgnoreCase(organizationLogin);
-        Long providerId = context.providerId();
+        Long providerId = Objects.requireNonNull(context.providerId());
         int removed = 0;
 
         for (Team team : existingTeams) {
             // Only delete teams on this provider — a same-login GitLab group must not be swept by a GitHub sync.
             if (
                 team.getProvider() != null &&
-                team.getProvider().getId().equals(providerId) &&
+                Objects.requireNonNull(team.getProvider().getId()).equals(providerId) &&
                 !syncedTeamIds.contains(team.getNativeId())
             ) {
                 teamProcessor.delete(team.getNativeId(), context);
@@ -1080,7 +1081,7 @@ public class GitHubTeamSyncService {
      * @param privacy the GraphQL GHTeamPrivacy enum value
      * @return the privacy string, or null if privacy is null
      */
-    private String mapPrivacy(GHTeamPrivacy privacy) {
+    private @Nullable String mapPrivacy(@Nullable GHTeamPrivacy privacy) {
         if (privacy == null) {
             return null;
         }

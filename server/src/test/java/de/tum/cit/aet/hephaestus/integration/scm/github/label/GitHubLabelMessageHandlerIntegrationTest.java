@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.scm.github.label;
 
 import static org.assertj.core.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
@@ -24,6 +25,7 @@ import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.util.Objects;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -156,12 +158,12 @@ class GitHubLabelMessageHandlerIntegrationTest extends BaseIntegrationTest {
     @Test
     void shouldProcessCreatedLabelEvents() throws Exception {
         GitHubLabelEventDTO event = loadPayload("label.created");
-        assertThat(labelRepository.findByNativeIdAndProviderId(FIXTURE_LABEL_ID, gitProvider.getId())).isEmpty();
+        assertThat(labelRepository.findByNativeIdAndProviderId(FIXTURE_LABEL_ID, providerId())).isEmpty();
 
         handler.handleEvent(event);
 
         // Then - verify ALL persisted fields against hardcoded fixture values
-        Label label = labelRepository.findByNativeIdAndProviderId(FIXTURE_LABEL_ID, gitProvider.getId()).orElseThrow();
+        Label label = labelRepository.findByNativeIdAndProviderId(FIXTURE_LABEL_ID, providerId()).orElseThrow();
 
         // Core schema fields (mapped to DB columns)
         assertThat(label.getNativeId()).isEqualTo(FIXTURE_LABEL_ID);
@@ -181,7 +183,9 @@ class GitHubLabelMessageHandlerIntegrationTest extends BaseIntegrationTest {
     void shouldProcessEditedLabelEvents() throws Exception {
         // Given - create existing label with stale data
         GitHubLabelEventDTO event = loadPayload("label.edited");
-        Long labelId = event.label().id();
+        GitHubLabelDTO eventLabel = event.label();
+        assertNotNull(eventLabel);
+        Long labelId = Objects.requireNonNull(eventLabel.id());
 
         Label existingLabel = new Label();
         existingLabel.setNativeId(labelId);
@@ -195,10 +199,10 @@ class GitHubLabelMessageHandlerIntegrationTest extends BaseIntegrationTest {
         handler.handleEvent(event);
 
         // Then - verify all mutable fields are updated from DTO
-        Label label = labelRepository.findByNativeIdAndProviderId(labelId, gitProvider.getId()).orElseThrow();
-        assertThat(label.getName()).isEqualTo(event.label().name());
-        assertThat(label.getColor()).isEqualTo(event.label().color());
-        assertThat(label.getDescription()).isEqualTo(event.label().description());
+        Label label = labelRepository.findByNativeIdAndProviderId(labelId, providerId()).orElseThrow();
+        assertThat(label.getName()).isEqualTo(eventLabel.name());
+        assertThat(label.getColor()).isEqualTo(eventLabel.color());
+        assertThat(label.getDescription()).isEqualTo(eventLabel.description());
 
         // Verify repository association preserved (not overwritten)
         assertThat(label.getRepository().getId()).isEqualTo(testRepository.getId());
@@ -207,22 +211,25 @@ class GitHubLabelMessageHandlerIntegrationTest extends BaseIntegrationTest {
     @Test
     void shouldProcessDeletedLabelEvents() throws Exception {
         GitHubLabelEventDTO event = loadPayload("label.deleted");
+        GitHubLabelDTO eventLabel = event.label();
+        assertNotNull(eventLabel);
+        Long labelId = Objects.requireNonNull(eventLabel.id());
 
         // Create existing label
         Label existingLabel = new Label();
-        existingLabel.setNativeId(event.label().id());
+        existingLabel.setNativeId(labelId);
         existingLabel.setProvider(gitProvider);
-        existingLabel.setName(event.label().name());
-        existingLabel.setColor(event.label().color());
+        existingLabel.setName(eventLabel.name());
+        existingLabel.setColor(eventLabel.color());
         existingLabel.setRepository(testRepository);
         labelRepository.save(existingLabel);
 
         // Verify it exists
-        assertThat(labelRepository.findByNativeIdAndProviderId(event.label().id(), gitProvider.getId())).isPresent();
+        assertThat(labelRepository.findByNativeIdAndProviderId(labelId, providerId())).isPresent();
 
         handler.handleEvent(event);
 
-        assertThat(labelRepository.findByNativeIdAndProviderId(event.label().id(), gitProvider.getId())).isEmpty();
+        assertThat(labelRepository.findByNativeIdAndProviderId(labelId, providerId())).isEmpty();
     }
 
     private GitHubLabelEventDTO loadPayload(String filename) throws IOException {
@@ -298,7 +305,7 @@ class GitHubLabelMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
             handler.handleEvent(event);
 
-            assertThat(labelRepository.findByNativeIdAndProviderId(labelId, gitProvider.getId()))
+            assertThat(labelRepository.findByNativeIdAndProviderId(labelId, providerId()))
                 .isPresent()
                 .get()
                 .satisfies(label -> {
@@ -334,7 +341,7 @@ class GitHubLabelMessageHandlerIntegrationTest extends BaseIntegrationTest {
             handler.handleEvent(event);
 
             // Then - description should be null now
-            assertThat(labelRepository.findByNativeIdAndProviderId(labelId, gitProvider.getId()))
+            assertThat(labelRepository.findByNativeIdAndProviderId(labelId, providerId()))
                 .isPresent()
                 .get()
                 .extracting(Label::getDescription)
@@ -350,9 +357,7 @@ class GitHubLabelMessageHandlerIntegrationTest extends BaseIntegrationTest {
             handler.handleEvent(event);
 
             // Then - only one label should exist
-            assertThat(
-                labelRepository.findByNativeIdAndProviderId(event.label().id(), gitProvider.getId())
-            ).isPresent();
+            assertThat(labelRepository.findByNativeIdAndProviderId(FIXTURE_LABEL_ID, providerId())).isPresent();
             assertThat(labelRepository.count()).isEqualTo(1);
         }
 
@@ -360,7 +365,7 @@ class GitHubLabelMessageHandlerIntegrationTest extends BaseIntegrationTest {
         void shouldHandleDeletionOfNonExistentLabel() throws Exception {
             // Given - label doesn't exist
             GitHubLabelEventDTO event = loadPayload("label.deleted");
-            assertThat(labelRepository.findByNativeIdAndProviderId(event.label().id(), gitProvider.getId())).isEmpty();
+            assertThat(labelRepository.findByNativeIdAndProviderId(FIXTURE_LABEL_ID, providerId())).isEmpty();
 
             // When/Then - should not throw
             assertThatCode(() -> handler.handleEvent(event)).doesNotThrowAnyException();
@@ -403,7 +408,7 @@ class GitHubLabelMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
             // Then — use TransactionTemplate for lazy-loaded repository access
             transactionTemplate.executeWithoutResult(status -> {
-                assertThat(labelRepository.findByNativeIdAndProviderId(event.label().id(), gitProvider.getId()))
+                assertThat(labelRepository.findByNativeIdAndProviderId(FIXTURE_LABEL_ID, providerId()))
                     .isPresent()
                     .get()
                     .satisfies(label -> {
@@ -419,13 +424,15 @@ class GitHubLabelMessageHandlerIntegrationTest extends BaseIntegrationTest {
             GitHubLabelEventDTO event = loadPayload("label.created");
             handler.handleEvent(event);
 
+            assertNotNull(event.label());
             var foundLabel = labelRepository.findByRepositoryIdAndName(testRepository.getId(), event.label().name());
 
             assertThat(foundLabel)
                 .isPresent()
                 .get()
                 .satisfies(label -> {
-                    assertThat(label.getNativeId()).isEqualTo(event.label().id());
+                    assertThat(label.getNativeId()).isEqualTo(FIXTURE_LABEL_ID);
+                    assertNotNull(event.label());
                     assertThat(label.getName()).isEqualTo(event.label().name());
                 });
         }
@@ -448,9 +455,7 @@ class GitHubLabelMessageHandlerIntegrationTest extends BaseIntegrationTest {
             GitHubLabelEventDTO createEvent = loadPayload("label.created");
             handler.handleEvent(createEvent);
 
-            Label label = labelRepository
-                .findByNativeIdAndProviderId(createEvent.label().id(), gitProvider.getId())
-                .orElseThrow();
+            Label label = labelRepository.findByNativeIdAndProviderId(FIXTURE_LABEL_ID, providerId()).orElseThrow();
 
             Issue issue = new Issue();
             issue.setNativeId(12345L);
@@ -466,8 +471,9 @@ class GitHubLabelMessageHandlerIntegrationTest extends BaseIntegrationTest {
             Long savedIssueId = savedIssue.getId();
 
             // When - edit the label
+            assertNotNull(createEvent.label());
             GitHubLabelDTO editedDto = new GitHubLabelDTO(
-                createEvent.label().id(),
+                FIXTURE_LABEL_ID,
                 createEvent.label().nodeId(),
                 "renamed-documentation",
                 "Updated description",
@@ -491,5 +497,11 @@ class GitHubLabelMessageHandlerIntegrationTest extends BaseIntegrationTest {
                     });
             });
         }
+    }
+
+    private Long providerId() {
+        Long id = gitProvider.getId();
+        assertNotNull(id);
+        return id;
     }
 }

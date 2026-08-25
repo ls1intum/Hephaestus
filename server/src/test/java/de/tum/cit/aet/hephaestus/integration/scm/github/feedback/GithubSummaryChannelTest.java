@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.integration.scm.github.feedback;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -30,6 +31,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHIssueCom
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHPageInfo;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.List;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
@@ -79,7 +81,7 @@ class GithubSummaryChannelTest extends BaseUnitTest {
 
         SummaryHandle handle = channel.postSummary(target, new FeedbackContent("body", "marker"));
 
-        assertThat(handle).isNotNull();
+        assertNotNull(handle);
         assertThat(handle.externalId()).isEqualTo("IC_comment456");
     }
 
@@ -188,6 +190,7 @@ class GithubSummaryChannelTest extends BaseUnitTest {
         var outcome = channel.updateSummary(target, "IC_prior", new FeedbackContent("new body", "marker"));
 
         assertThat(outcome.kind()).isEqualTo(SummaryChannel.UpdateOutcome.Kind.EDITED);
+        assertNotNull(outcome.handle());
         assertThat(outcome.handle().externalId()).isEqualTo("IC_edited");
         verify(spec).variable("id", "IC_prior");
     }
@@ -311,7 +314,7 @@ class GithubSummaryChannelTest extends BaseUnitTest {
     }
 
     @SuppressWarnings("unchecked")
-    private ClientGraphQlResponse mockGraphQlResponse(String fieldPath, String value) {
+    private ClientGraphQlResponse mockGraphQlResponse(String fieldPath, @Nullable String value) {
         ClientGraphQlResponse response = mock(ClientGraphQlResponse.class);
         ClientResponseField field = mock(ClientResponseField.class);
         when(response.field(fieldPath)).thenReturn(field);
@@ -371,7 +374,7 @@ class GithubSummaryChannelTest extends BaseUnitTest {
         null
     );
 
-    private HttpGraphQlClient graphQlClient;
+    private HttpGraphQlClient graphQlClient = mock(HttpGraphQlClient.class);
 
     private HttpGraphQlClient.RequestSpec mockRequestChain() {
         graphQlClient = mock(HttpGraphQlClient.class);
@@ -390,21 +393,19 @@ class GithubSummaryChannelTest extends BaseUnitTest {
         String commentsPath,
         List<GHIssueComment> nodes,
         boolean hasPreviousPage,
-        String startCursor
+        @Nullable String startCursor
     ) {
         ClientGraphQlResponse response = mock(ClientGraphQlResponse.class);
         ClientResponseField field = mock(ClientResponseField.class);
         when(response.field(commentsPath)).thenReturn(field);
+        var pageInfo = GHPageInfo.builder()
+            .setHasPreviousPage(hasPreviousPage)
+            .setHasNextPage(!hasPreviousPage)
+            .setEndCursor("forward-cursor-decoy");
+        if (startCursor != null) pageInfo.setStartCursor(startCursor);
         GHIssueCommentConnection connection = GHIssueCommentConnection.builder()
             .setNodes(nodes)
-            .setPageInfo(
-                GHPageInfo.builder()
-                    .setHasPreviousPage(hasPreviousPage)
-                    .setStartCursor(startCursor)
-                    .setHasNextPage(!hasPreviousPage)
-                    .setEndCursor("forward-cursor-decoy")
-                    .build()
-            )
+            .setPageInfo(pageInfo.build())
             .setTotalCount(nodes.size())
             .build();
         when(field.toEntity(GHIssueCommentConnection.class)).thenReturn(connection);
@@ -477,6 +478,7 @@ class GithubSummaryChannelTest extends BaseUnitTest {
         ExistingSummaryLookup result = channel.findExistingSummary(PR_TARGET, "<!-- marker:job-1 -->");
 
         assertThat(result.kind()).isEqualTo(ExistingSummaryLookup.Kind.FOUND);
+        assertNotNull(result.handle());
         assertThat(result.handle().externalId()).isEqualTo("IC_2");
         verify(spec, times(1)).execute();
     }
@@ -559,6 +561,7 @@ class GithubSummaryChannelTest extends BaseUnitTest {
         ExistingSummaryLookup result = channel.findExistingSummary(PR_TARGET, "<!-- marker:job-1 -->");
 
         assertThat(result.kind()).isEqualTo(ExistingSummaryLookup.Kind.FOUND);
+        assertNotNull(result.handle());
         assertThat(result.handle().externalId()).isEqualTo("IC_1");
         verify(spec, times(2)).execute();
     }

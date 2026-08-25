@@ -84,6 +84,10 @@ public class GitHubPullRequestReviewMessageHandler
         // hasn't arrived yet. This creates a minimal PR stub from the webhook data
         // instead of losing the review.
         if (event.actionType() == GitHubEventAction.PullRequestReview.DISMISSED) {
+            if (reviewDto.id() == null) {
+                log.warn("Skipped review dismissal: reason=missingReviewId");
+                return;
+            }
             reviewProcessor.processDismissed(reviewDto.id(), context);
         } else {
             reviewProcessor.processWithParentCreation(reviewDto, prDto, context);

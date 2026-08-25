@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Stream;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -176,7 +177,7 @@ class SlackWeeklyLeaderboardTaskTest extends BaseUnitTest {
         return w;
     }
 
-    private static ConnectionConfig.SlackConfig slackConfig(String channelId, String teamLabel) {
+    private static ConnectionConfig.SlackConfig slackConfig(@Nullable String channelId, @Nullable String teamLabel) {
         return new ConnectionConfig.SlackConfig("T1", "Acme", channelId, teamLabel, null, Set.of());
     }
 

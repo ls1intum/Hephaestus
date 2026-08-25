@@ -576,7 +576,7 @@ public class FeedbackLedgerRecorder {
 
     /** Stores the exact separately composed human-approval body before any provider side effect. */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void recordProposal(AgentJob job, DeliveryContent delivery, List<ValidatedObservation> proposed) {
+    public void recordProposal(AgentJob job, @Nullable DeliveryContent delivery, List<ValidatedObservation> proposed) {
         final int position = 7_000;
         if (delivery == null || delivery.mrNote() == null || delivery.mrNote().isBlank()) return;
         if (feedbackRepository.existsByAgentJobIdAndPosition(job.getId(), position)) return;
@@ -682,7 +682,7 @@ public class FeedbackLedgerRecorder {
      * reads DELIVERED-only, so it never feeds coaching.
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void recordUndelivered(AgentJob job, DeliveryContent delivery) {
+    public void recordUndelivered(AgentJob job, @Nullable DeliveryContent delivery) {
         if (job.getWorkspace() == null) {
             return; // a no-workspace integrity failure has no recipient/artifact to bind
         }

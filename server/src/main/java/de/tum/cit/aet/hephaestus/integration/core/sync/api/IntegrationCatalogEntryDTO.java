@@ -4,6 +4,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
 import io.swagger.v3.oas.annotations.media.Schema;
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 /**
  * One row of the integrations catalog — every kind the manifest registry knows about, joined against
@@ -17,6 +18,6 @@ public record IntegrationCatalogEntryDTO(
     @NonNull
     @Schema(description = "Whether this workspace has a (non-UNINSTALLED) connection for this kind")
     Boolean connected,
-    @Schema(description = "Connection id, if connected") Long connectionId,
-    @Schema(description = "Connection state, if connected") IntegrationState connectionState
+    @Schema(description = "Connection id, if connected") @Nullable Long connectionId,
+    @Schema(description = "Connection state, if connected") @Nullable IntegrationState connectionState
 ) {}

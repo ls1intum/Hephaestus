@@ -14,6 +14,7 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderTyp
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabProperties;
 import de.tum.cit.aet.hephaestus.testconfig.RealAuthIntegrationTest;
+import java.util.Objects;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.web.reactive.server.WebTestClient;
@@ -106,17 +107,22 @@ class AccountControllerIntegrationTest extends RealAuthIntegrationTest {
                 )
             );
 
+        Long providerId = Objects.requireNonNull(provider.getId(), "Persisted identity provider must have an ID");
         Account account = accountRepository.save(new Account("GitLab User"));
 
         IdentityLink link = new IdentityLink();
         link.setAccount(account);
-        link.setProviderId(provider.getId());
+        link.setProviderId(providerId);
         link.setSubject(String.valueOf(GITLAB_NATIVE_ID));
         link.setUsernameAtSignup(GITLAB_LOGIN);
         link.setDisplayName("GitLab User");
         link = identityLinkRepository.save(link);
 
         HephaestusJwtIssuer.Token token = jwtIssuer.issue(principalFactory.forAccount(account), null, null);
-        return new SeededIdentity(token.value(), link.getId(), provider.getId());
+        return new SeededIdentity(
+            token.value(),
+            Objects.requireNonNull(link.getId(), "Persisted identity link must have an ID"),
+            providerId
+        );
     }
 }

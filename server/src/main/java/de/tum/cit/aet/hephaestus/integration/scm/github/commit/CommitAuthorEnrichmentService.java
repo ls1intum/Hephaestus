@@ -28,6 +28,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
@@ -203,11 +204,15 @@ public class CommitAuthorEnrichmentService {
         // event and backfills COMMIT_CREATED rows whose actor_id was NULL at ingest time.
         // Must publish regardless of which phase did the work — a Phase-2-only enrichment
         // would otherwise silently fail to trigger the activity backfill.
-        if (total > 0) {
+        if (total > 0 && scopeId != null && repository != null) {
             eventPublisher.publishEvent(
                 new ScmDomainEvent.CommitAuthorsReconciled(
                     repositoryId,
-                    EventContext.forSync(scopeId, RepositoryRef.from(repository), IdentityProviderType.GITHUB)
+                    EventContext.forSync(
+                        scopeId,
+                        Objects.requireNonNull(RepositoryRef.from(repository)),
+                        IdentityProviderType.GITHUB
+                    )
                 )
             );
         }
@@ -714,11 +719,11 @@ public class CommitAuthorEnrichmentService {
         log.debug("Upserted {} users from commit enrichment: repo={}", processed, nameWithOwner);
     }
 
-    private static String normalizeString(Object value) {
+    private static @Nullable String normalizeString(@Nullable Object value) {
         return CommitUtils.normalizeString(value);
     }
 
-    private static Long toLong(Object value) {
+    private static @Nullable Long toLong(@Nullable Object value) {
         if (value instanceof Number number) {
             return number.longValue();
         }

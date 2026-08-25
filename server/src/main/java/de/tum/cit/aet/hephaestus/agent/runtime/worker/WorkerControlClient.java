@@ -23,6 +23,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -35,6 +36,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiConsumer;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
@@ -66,23 +68,23 @@ public class WorkerControlClient {
 
     private final LinkedBlockingQueue<FrameEnvelope> outbound = new LinkedBlockingQueue<>(OUTBOUND_QUEUE_CAPACITY);
     private final LinkedBlockingQueue<WorkerControlFrame> inbound = new LinkedBlockingQueue<>(INBOUND_QUEUE_CAPACITY);
-    private final AtomicReference<WebSocket> webSocket = new AtomicReference<>();
+    private final AtomicReference<@Nullable WebSocket> webSocket = new AtomicReference<>();
     private final AtomicBoolean connected = new AtomicBoolean(false);
     private final AtomicReference<Instant> lastInboundAt = new AtomicReference<>(Instant.EPOCH);
     private final AtomicReference<CountDownLatch> welcomeLatch = new AtomicReference<>(new CountDownLatch(1));
     private final AtomicBoolean running = new AtomicBoolean(false);
     private final Random random = new Random();
 
-    private volatile Thread outboundThread;
-    private volatile Thread inboundThread;
-    private volatile Thread connectionThread;
+    private volatile @Nullable Thread outboundThread;
+    private volatile @Nullable Thread inboundThread;
+    private volatile @Nullable Thread connectionThread;
 
     /**
      * Handler for hub-originated {@link CancelJob} frames: {@code (jobId, reason)}. Wired by
      * {@code WorkerConfiguration} to the job executor's local-cancel path. Kept as a callback so the
      * transport layer stays decoupled from job execution.
      */
-    private volatile BiConsumer<UUID, String> cancelHandler;
+    private volatile @Nullable BiConsumer<UUID, String> cancelHandler;
 
     public WorkerControlClient(
         WorkerProperties properties,
@@ -154,13 +156,13 @@ public class WorkerControlClient {
      * Register the handler invoked when the hub sends a {@link CancelJob}. Idempotent; the last
      * registration wins. {@code null} disables handling (frames are logged and dropped).
      */
-    public void setCancelHandler(BiConsumer<UUID, String> handler) {
+    public void setCancelHandler(@Nullable BiConsumer<UUID, String> handler) {
         this.cancelHandler = handler;
     }
 
     /** Sentinel {@link Instant#EPOCH} when no frame has been received yet. */
     public Instant lastInboundAt() {
-        return lastInboundAt.get();
+        return Objects.requireNonNull(lastInboundAt.get());
     }
 
     private void runOutboundLoop() {
@@ -215,7 +217,8 @@ public class WorkerControlClient {
                         return;
                     }
                     connected.set(true);
-                    welcomeLatch.get().countDown();
+                    CountDownLatch latch = welcomeLatch.get();
+                    if (latch != null) latch.countDown();
                     log.info("Worker control channel connected; session={}", welcome.sessionId());
                 }
                 case ForceReconnect r -> {
@@ -330,6 +333,7 @@ public class WorkerControlClient {
 
     private String exchangeRegistrationToken() throws IOException, InterruptedException {
         URI endpoint = properties.control().endpoint();
+        if (endpoint == null) throw new IOException("worker control endpoint is not configured");
         URI exchangeUri = URI.create(httpBaseFrom(endpoint) + "/api/workers/exchange");
         String workerId = properties.resolvedWorkerId();
         String body = objectMapper.writeValueAsString(
@@ -355,6 +359,7 @@ public class WorkerControlClient {
 
     private void openWebSocket(String jwt) throws InterruptedException, IOException {
         URI endpoint = properties.control().endpoint();
+        if (endpoint == null) throw new IOException("worker control endpoint is not configured");
         try {
             WebSocket ws = httpClient
                 .newWebSocketBuilder()
@@ -373,7 +378,8 @@ public class WorkerControlClient {
             );
             ws.sendText(codec.encode(hello), true).toCompletableFuture().get(5, TimeUnit.SECONDS);
         } catch (ExecutionException e) {
-            throw new IOException("WSS open failed: " + e.getCause().getMessage(), e);
+            Throwable cause = e.getCause();
+            throw new IOException("WSS open failed: " + (cause == null ? e.getMessage() : cause.getMessage()), e);
         } catch (TimeoutException e) {
             throw new IOException("WSS open timed out", e);
         }
@@ -403,7 +409,7 @@ public class WorkerControlClient {
         return t;
     }
 
-    private static void interrupt(Thread t) {
+    private static void interrupt(@Nullable Thread t) {
         if (t != null) {
             t.interrupt();
         }
@@ -444,7 +450,7 @@ public class WorkerControlClient {
         public CompletionStage<?> onClose(WebSocket webSocket, int statusCode, String reason) {
             log.info("Worker control channel closed: code={}, reason={}", statusCode, reason);
             connected.set(false);
-            return null;
+            return CompletableFuture.completedFuture(null);
         }
 
         @Override

@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.integration.scm.gitlab.issue;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
@@ -272,7 +273,7 @@ class GitLabIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
             // Wrap in transaction to avoid LazyInitializationException when accessing provider
             transactionTemplate.executeWithoutResult(status -> {
                 var author = userRepository
-                    .findByNativeIdAndProviderId(NATIVE_USER_ID, savedProvider.getId())
+                    .findByNativeIdAndProviderId(NATIVE_USER_ID, persistedId(savedProvider))
                     .orElseThrow();
                 assertThat(author.getLogin()).isEqualTo(FIXTURE_AUTHOR_LOGIN);
                 assertThat(author.getProvider().getType()).isEqualTo(IdentityProviderType.GITLAB);
@@ -403,5 +404,11 @@ class GitLabIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
             .stream()
             .map(l -> l.getName())
             .collect(Collectors.toSet());
+    }
+
+    private static long persistedId(IdentityProvider provider) {
+        Long id = provider.getId();
+        assertNotNull(id);
+        return id;
     }
 }

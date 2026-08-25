@@ -13,6 +13,7 @@ import de.tum.cit.aet.hephaestus.leaderboard.spi.LeaderboardDigestReadyEvent;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import java.time.Instant;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -103,7 +104,7 @@ public class SlackWeeklyLeaderboardTask implements LeaderboardNotificationTask {
                 window.after(),
                 window.before(),
                 topEntries,
-                normalizeBaseUrl(applicationProperties.hostUrl())
+                normalizeBaseUrl(Objects.requireNonNull(applicationProperties.hostUrl()))
             )
         );
     }

@@ -16,6 +16,7 @@ import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocumentEvent
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocumentRepository;
 import de.tum.cit.aet.hephaestus.integration.outline.lifecycle.OutlineWebhookRegistrar;
 import java.util.Map;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -123,7 +124,7 @@ public class OutlineConnectionStrategy implements ConnectionStrategy {
      */
     @Override
     @Transactional
-    public void revoke(IntegrationRef ref) {
+    public void revoke(@Nullable IntegrationRef ref) {
         log.info(
             "Outline revoke called for workspace={} instanceKey={} (tokens are revoked in Outline; state change handled by caller)",
             ref == null ? null : ref.workspaceId(),

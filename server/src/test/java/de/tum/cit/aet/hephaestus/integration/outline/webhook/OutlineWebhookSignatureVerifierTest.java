@@ -16,6 +16,7 @@ import java.util.Map;
 import java.util.Optional;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -64,7 +65,7 @@ class OutlineWebhookSignatureVerifierTest extends BaseUnitTest {
         }
     }
 
-    private static WebhookRequest request(String signatureHeader, byte[] body) {
+    private static WebhookRequest request(@Nullable String signatureHeader, byte[] body) {
         Map<String, String> headers = signatureHeader == null ? Map.of() : Map.of("Outline-Signature", signatureHeader);
         return new WebhookRequest(body, headers);
     }

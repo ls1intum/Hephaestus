@@ -5,6 +5,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
+import org.jspecify.annotations.Nullable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -50,12 +51,12 @@ public interface ProjectStatusUpdateRepository extends JpaRepository<ProjectStat
         @Param("providerId") Long providerId,
         @Param("nodeId") String nodeId,
         @Param("projectId") Long projectId,
-        @Param("body") String body,
-        @Param("bodyHtml") String bodyHtml,
-        @Param("startDate") LocalDate startDate,
-        @Param("targetDate") LocalDate targetDate,
-        @Param("status") String status,
-        @Param("creatorId") Long creatorId,
+        @Param("body") @Nullable String body,
+        @Param("bodyHtml") @Nullable String bodyHtml,
+        @Param("startDate") @Nullable LocalDate startDate,
+        @Param("targetDate") @Nullable LocalDate targetDate,
+        @Param("status") @Nullable String status,
+        @Param("creatorId") @Nullable Long creatorId,
         @Param("createdAt") Instant createdAt,
         @Param("updatedAt") Instant updatedAt
     );

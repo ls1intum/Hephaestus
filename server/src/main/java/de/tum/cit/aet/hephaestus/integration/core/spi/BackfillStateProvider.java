@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.integration.core.spi;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider.SyncTarget;
 import java.time.Instant;
 import java.util.Optional;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Provides backfill state management for repository synchronization.
@@ -31,7 +32,12 @@ public interface BackfillStateProvider {
      * @param checkpoint     the current checkpoint (lowest issue number synced), or null to keep current
      * @param lastRunAt      when the backfill was last run, or null to keep current
      */
-    void updateIssueBackfillState(Long syncTargetId, Integer highWaterMark, Integer checkpoint, Instant lastRunAt);
+    void updateIssueBackfillState(
+        Long syncTargetId,
+        @Nullable Integer highWaterMark,
+        @Nullable Integer checkpoint,
+        @Nullable Instant lastRunAt
+    );
 
     /**
      * Updates the pull request backfill state for a sync target.
@@ -43,9 +49,9 @@ public interface BackfillStateProvider {
      */
     void updatePullRequestBackfillState(
         Long syncTargetId,
-        Integer highWaterMark,
-        Integer checkpoint,
-        Instant lastRunAt
+        @Nullable Integer highWaterMark,
+        @Nullable Integer checkpoint,
+        @Nullable Instant lastRunAt
     );
 
     /**
@@ -110,5 +116,5 @@ public interface BackfillStateProvider {
      * @param kind    the entity kind whose cursor is being persisted
      * @param cursor  the GraphQL pagination cursor, or null to clear (sync complete)
      */
-    void updateSyncCursor(Long scopeId, SyncCursorKind kind, String cursor);
+    void updateSyncCursor(Long scopeId, SyncCursorKind kind, @Nullable String cursor);
 }

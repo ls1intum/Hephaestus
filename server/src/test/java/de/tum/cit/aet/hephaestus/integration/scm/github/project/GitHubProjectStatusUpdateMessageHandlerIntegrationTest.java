@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.scm.github.project;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
@@ -96,6 +97,7 @@ class GitHubProjectStatusUpdateMessageHandlerIntegrationTest extends BaseIntegra
             .satisfies(update -> {
                 assertThat(update.getNativeId()).isEqualTo(FIXTURE_STATUS_UPDATE_ID);
                 assertThat(update.getNodeId()).isEqualTo(FIXTURE_STATUS_UPDATE_NODE_ID);
+                assertNotNull(update.getProject());
                 assertThat(update.getProject().getId()).isEqualTo(testProject.getId());
                 assertThat(update.getBody()).isEqualTo(FIXTURE_CREATED_BODY);
                 assertThat(update.getStatus()).isEqualTo(ProjectStatusUpdate.Status.ON_TRACK);

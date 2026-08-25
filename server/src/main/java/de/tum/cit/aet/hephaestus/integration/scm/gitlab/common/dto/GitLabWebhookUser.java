@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.dto;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Shared DTO for GitLab webhook user objects.
@@ -17,9 +18,9 @@ import com.fasterxml.jackson.annotation.JsonProperty;
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record GitLabWebhookUser(
-    Long id,
-    String username,
-    String name,
-    @JsonProperty("avatar_url") String avatarUrl,
-    String email
+    @Nullable Long id,
+    @Nullable String username,
+    @Nullable String name,
+    @JsonProperty("avatar_url") @Nullable String avatarUrl,
+    @Nullable String email
 ) {}

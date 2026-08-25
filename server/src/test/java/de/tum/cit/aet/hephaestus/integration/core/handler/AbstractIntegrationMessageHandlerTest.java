@@ -151,7 +151,7 @@ class AbstractIntegrationMessageHandlerTest extends BaseUnitTest {
 
     private class TestHandler extends AbstractIntegrationMessageHandler<String> {
 
-        TestHandler(IntegrationKind kind, String eventType) {
+        TestHandler(@org.jspecify.annotations.Nullable IntegrationKind kind, String eventType) {
             super(kind, eventType, String.class, deserializer, transactionTemplate);
         }
 

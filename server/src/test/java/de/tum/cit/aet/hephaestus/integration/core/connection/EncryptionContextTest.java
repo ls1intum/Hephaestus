@@ -21,7 +21,12 @@ import org.junit.jupiter.api.Test;
  */
 class EncryptionContextTest extends BaseUnitTest {
 
-    private static byte[] aad(long ws, IntegrationKind kind, String instanceKey, String column) {
+    private static byte[] aad(
+        long ws,
+        IntegrationKind kind,
+        @org.jspecify.annotations.Nullable String instanceKey,
+        String column
+    ) {
         return new EncryptionContext(ws, kind, instanceKey, column).toAad();
     }
 

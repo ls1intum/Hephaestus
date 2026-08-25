@@ -19,4 +19,5 @@
  * lane's own router still runs afterwards, unchanged in role — giving the model more context is a reason
  * the gate has more to refuse, not a reason to relax it.
  */
+@org.jspecify.annotations.NullMarked
 package de.tum.cit.aet.hephaestus.agent.handler.composition;

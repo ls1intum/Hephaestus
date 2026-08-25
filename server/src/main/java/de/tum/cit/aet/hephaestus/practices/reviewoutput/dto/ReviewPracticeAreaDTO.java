@@ -8,8 +8,8 @@ import org.jspecify.annotations.Nullable;
 public record ReviewPracticeAreaDTO(
     @NonNull String slug,
     @NonNull String name,
-    @Schema(description = "Lucide icon name") String icon,
-    @Schema(description = "Palette color key") String color
+    @Schema(description = "Lucide icon name") @Nullable String icon,
+    @Schema(description = "Palette color key") @Nullable String color
 ) {
     public static ReviewPracticeAreaDTO from(PracticeArea area) {
         return new ReviewPracticeAreaDTO(area.getSlug(), area.getName(), area.getIcon(), area.getColor());
@@ -21,6 +21,6 @@ public record ReviewPracticeAreaDTO(
         @Nullable String icon,
         @Nullable String color
     ) {
-        return slug == null ? null : new ReviewPracticeAreaDTO(slug, name, icon, color);
+        return slug == null || name == null ? null : new ReviewPracticeAreaDTO(slug, name, icon, color);
     }
 }

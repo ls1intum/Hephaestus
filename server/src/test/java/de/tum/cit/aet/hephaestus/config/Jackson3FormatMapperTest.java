@@ -1,9 +1,11 @@
 package de.tum.cit.aet.hephaestus.config;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.mock;
 
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import org.hibernate.HibernateException;
+import org.hibernate.type.descriptor.WrapperOptions;
 import org.hibernate.type.descriptor.java.JavaType;
 import org.hibernate.type.descriptor.java.spi.JavaTypeRegistry;
 import org.junit.jupiter.api.Test;
@@ -19,7 +21,7 @@ class Jackson3FormatMapperTest extends BaseUnitTest {
 
     @Test
     void malformedJsonWrapsException() {
-        assertThatThrownBy(() -> mapper.fromString("{not json", javaTypeOf(JsonNode.class), null))
+        assertThatThrownBy(() -> mapper.fromString("{not json", javaTypeOf(JsonNode.class), mock(WrapperOptions.class)))
             .isInstanceOf(HibernateException.class)
             .hasRootCauseInstanceOf(JacksonException.class);
     }

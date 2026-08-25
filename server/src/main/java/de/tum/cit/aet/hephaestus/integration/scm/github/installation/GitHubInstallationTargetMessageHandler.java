@@ -12,6 +12,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.Organizatio
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubEventAction;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubEventType;
 import de.tum.cit.aet.hephaestus.integration.scm.github.installation.dto.GitHubInstallationTargetEventDTO;
+import java.util.Objects;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -105,6 +106,6 @@ public class GitHubInstallationTargetMessageHandler
             .findByTypeAndServerUrl(IdentityProviderType.GITHUB, GITHUB_SERVER_URL)
             .orElseThrow(() -> new IllegalStateException("IdentityProvider not found for GitHub"))
             .getId();
-        organizationService.upsertIdentity(account.id(), login, providerId);
+        organizationService.upsertIdentity(account.id(), login, Objects.requireNonNull(providerId));
     }
 }

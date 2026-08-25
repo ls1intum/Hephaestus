@@ -44,6 +44,7 @@ import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -166,14 +167,14 @@ public class AgentJobExecutor {
     private final Timer claimLatency;
     private final Counter infraRetryRequeued;
     private final AtomicBoolean running = new AtomicBoolean(false);
-    private volatile Thread pollThread;
+    private volatile @Nullable Thread pollThread;
     private final Phaser inFlight = new Phaser(1); // 1 = the executor itself; deregistered on stop
     /** Scopes drain and hub-initiated cancels to this worker's own jobs; also its free-capacity signal. */
     private final Set<UUID> localRunningJobs = ConcurrentHashMap.newKeySet();
     private final Optional<WorkerCapacityState> capacityState;
     private final Optional<WorkerProperties> workerProperties;
     /** Null only when the worker role is off; stamped on claimed jobs to fence terminal writes. */
-    private final String workerId;
+    private final @Nullable String workerId;
     /** Poll-thread-owned, hence unsynchronized. */
     private boolean lastClaimPoolRejected;
 
@@ -683,7 +684,9 @@ public class AgentJobExecutor {
 
         // The claim transaction is long gone, so the handler needs a transaction of its own here to
         // resolve lazy JPA proxies, and a re-fetch that eagerly loads the workspace.
-        TransactionTemplate readOnlyTx = new TransactionTemplate(transactionTemplate.getTransactionManager());
+        TransactionTemplate readOnlyTx = new TransactionTemplate(
+            Objects.requireNonNull(transactionTemplate.getTransactionManager())
+        );
         readOnlyTx.setReadOnly(true);
         PreparedJobInputs preparedInputs = readOnlyTx.execute(status -> {
             AgentJob managedJob = jobRepository.findByIdWithWorkspace(jobId).orElse(job);
@@ -773,7 +776,7 @@ public class AgentJobExecutor {
         log.debug("Provenance digests: jobId={}, prompt={}, inputs={}", jobId, promptDigest, inputsDigest);
     }
 
-    private JsonNode evidenceSnapshot(
+    private @Nullable JsonNode evidenceSnapshot(
         Map<String, byte[]> inputFiles,
         @Nullable AutomatedReviewReadinessReport automatedReviewReadinessReport
     ) {
@@ -1147,7 +1150,7 @@ public class AgentJobExecutor {
      *
      * @return rows updated (0 if no longer RUNNING or no longer owned by this worker)
      */
-    private int transitionTerminal(UUID jobId, AgentJobStatus status, Instant now, String error) {
+    private int transitionTerminal(UUID jobId, AgentJobStatus status, Instant now, @Nullable String error) {
         return workerId != null
             ? jobRepository.transitionStatusOwnedBy(jobId, status, now, error, Set.of(AgentJobStatus.RUNNING), workerId)
             : jobRepository.transitionStatus(jobId, status, now, error, Set.of(AgentJobStatus.RUNNING));
@@ -1381,7 +1384,7 @@ public class AgentJobExecutor {
         }
     }
 
-    private static String truncateErrorMessage(String message) {
+    private static String truncateErrorMessage(@Nullable String message) {
         if (message == null) {
             return "Unknown error";
         }

@@ -10,6 +10,8 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreview.PullRe
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreview.PullRequestReviewRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import java.time.Instant;
+import java.util.Objects;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -65,13 +67,13 @@ public class GitLabReviewReconciler {
      * @return the reconciled review, or {@code null} when inputs are invalid
      */
     @Transactional(propagation = Propagation.REQUIRED)
-    public PullRequestReview findOrCreateCommentedReview(
+    public @Nullable PullRequestReview findOrCreateCommentedReview(
         PullRequest pr,
         User author,
         String discussionGlobalId,
-        Instant earliestNoteCreatedAt,
+        @Nullable Instant earliestNoteCreatedAt,
         IdentityProvider provider,
-        ProcessingContext ctx
+        @Nullable ProcessingContext ctx
     ) {
         if (pr == null || author == null || author.getNativeId() == null || discussionGlobalId == null) {
             log.warn(
@@ -94,7 +96,7 @@ public class GitLabReviewReconciler {
         }
 
         long reviewNativeId = generateCommentedReviewNativeId(discussionGlobalId, author.getNativeId());
-        Long providerId = provider.getId();
+        Long providerId = Objects.requireNonNull(provider.getId());
 
         return reviewRepository
             .findByNativeIdAndProviderId(reviewNativeId, providerId)
@@ -104,8 +106,8 @@ public class GitLabReviewReconciler {
 
     private PullRequestReview updateReview(
         PullRequestReview existing,
-        Instant earliestNoteCreatedAt,
-        ProcessingContext ctx
+        @Nullable Instant earliestNoteCreatedAt,
+        @Nullable ProcessingContext ctx
     ) {
         if (earliestNoteCreatedAt != null) {
             Instant currentSubmittedAt = existing.getSubmittedAt();
@@ -133,8 +135,8 @@ public class GitLabReviewReconciler {
         PullRequest pr,
         User author,
         IdentityProvider provider,
-        Instant earliestNoteCreatedAt,
-        ProcessingContext ctx
+        @Nullable Instant earliestNoteCreatedAt,
+        @Nullable ProcessingContext ctx
     ) {
         Instant submittedAt =
             earliestNoteCreatedAt != null

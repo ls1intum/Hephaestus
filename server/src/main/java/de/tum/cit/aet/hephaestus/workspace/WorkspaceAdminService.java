@@ -59,7 +59,7 @@ public class WorkspaceAdminService {
             ws.getId(),
             ws.getWorkspaceSlug(),
             ws.getDisplayName(),
-            ws.getStatus() != null ? ws.getStatus().name() : null,
+            ws.getStatus().name(),
             ws.getAccountLogin(),
             providerType,
             owner != null ? owner.getLogin() : null,

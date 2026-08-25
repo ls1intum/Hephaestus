@@ -12,6 +12,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabTokenServic
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.feedback.GitlabMrResolver.MrCoordinates;
 import java.net.URI;
 import java.time.Duration;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -62,7 +63,7 @@ public class GitlabApprovalChannel implements ApprovalChannel {
     }
 
     @Override
-    public void approve(SummaryChannel.FeedbackTarget target, String message) {
+    public void approve(SummaryChannel.FeedbackTarget target, @Nullable String message) {
         long scopeId = target.ref().workspaceId();
         if (gitLabProvider.isRateLimitCritical(scopeId)) {
             throw new FeedbackDeliveryException("GitLab rate limit critical — skipping approval for scope " + scopeId);

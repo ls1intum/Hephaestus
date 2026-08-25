@@ -41,14 +41,14 @@ public record GitHubPullRequestReviewEventDTO(
      */
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record GitHubReviewDTO(
-        @JsonProperty("id") Long id,
+        @JsonProperty("id") @Nullable Long id,
         @JsonProperty("node_id") String nodeId,
         @JsonProperty("body") String body,
-        @JsonProperty("state") String state,
-        @JsonProperty("html_url") String htmlUrl,
-        @JsonProperty("user") GitHubUserDTO author,
-        @JsonProperty("submitted_at") Instant submittedAt,
-        @JsonProperty("commit_id") String commitId,
+        @JsonProperty("state") @Nullable String state,
+        @JsonProperty("html_url") @Nullable String htmlUrl,
+        @JsonProperty("user") @Nullable GitHubUserDTO author,
+        @JsonProperty("submitted_at") @Nullable Instant submittedAt,
+        @JsonProperty("commit_id") @Nullable String commitId,
         @Nullable Instant createdAt,
         @Nullable Instant updatedAt,
         @Nullable Boolean authorCanPushToRepository

@@ -74,11 +74,14 @@ class AccountExportRetentionIntegrationTest extends BaseIntegrationTest {
         account.setPrimaryEmailVerifiedAt(clock.instant());
         account.setStatus(Account.Status.ACTIVE);
         Long accountId = accountRepository.save(account).getId();
+        org.junit.jupiter.api.Assertions.assertNotNull(accountId);
 
         AccountExport export = new AccountExport(accountId);
         export.setStatus(AccountExport.Status.READY);
         export.setExpiresAt(expiresAt);
         export.setPayload("{\"pii\":true}".getBytes());
-        return accountExportRepository.save(export).getId();
+        Long exportId = accountExportRepository.save(export).getId();
+        org.junit.jupiter.api.Assertions.assertNotNull(exportId);
+        return exportId;
     }
 }

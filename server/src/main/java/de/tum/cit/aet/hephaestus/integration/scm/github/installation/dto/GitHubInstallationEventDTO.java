@@ -7,6 +7,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubWebhookEven
 import de.tum.cit.aet.hephaestus.integration.scm.github.repository.dto.GitHubRepositoryRefDTO;
 import de.tum.cit.aet.hephaestus.integration.scm.github.user.dto.GitHubUserDTO;
 import java.util.List;
+import org.jspecify.annotations.Nullable;
 
 /**
  * DTO for GitHub installation webhook events.
@@ -14,9 +15,9 @@ import java.util.List;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record GitHubInstallationEventDTO(
     @JsonProperty("action") String action,
-    @JsonProperty("installation") GitHubInstallationDTO installation,
-    @JsonProperty("repositories") List<GitHubRepositoryRefDTO> repositories,
-    @JsonProperty("sender") GitHubUserDTO sender
+    @JsonProperty("installation") @Nullable GitHubInstallationDTO installation,
+    @JsonProperty("repositories") @Nullable List<GitHubRepositoryRefDTO> repositories,
+    @JsonProperty("sender") @Nullable GitHubUserDTO sender
 ) implements GitHubWebhookEvent {
     @Override
     public GitHubEventAction.Installation actionType() {
@@ -24,7 +25,7 @@ public record GitHubInstallationEventDTO(
     }
 
     @Override
-    public GitHubRepositoryRefDTO repository() {
+    public @Nullable GitHubRepositoryRefDTO repository() {
         return null; // Installation events don't have a single repository
     }
 

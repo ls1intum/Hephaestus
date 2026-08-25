@@ -14,11 +14,13 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreview.PullRe
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewcomment.PullRequestReviewComment;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewcomment.PullRequestReviewCommentRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewthread.PullRequestReviewThread;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.time.Instant;
 import java.util.HashSet;
 import java.util.Optional;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Tag;
@@ -59,6 +61,10 @@ class GitLabPullRequestReviewCommentProcessorTest extends BaseUnitTest {
         pr = new PullRequest();
         pr.setId(PR_ID);
         pr.setProvider(provider);
+        Repository repository = new Repository();
+        repository.setId(300L);
+        repository.setNameWithOwner("group/project");
+        pr.setRepository(repository);
 
         thread = new PullRequestReviewThread();
         thread.setId(THREAD_ID);
@@ -373,14 +379,14 @@ class GitLabPullRequestReviewCommentProcessorTest extends BaseUnitTest {
     // Helpers
 
     private static GitLabPullRequestReviewCommentProcessor.DiffNoteData buildDiffNoteData(
-        String newPath,
-        String oldPath,
-        String filePath,
-        Integer newLine,
-        Integer oldLine,
-        String headSha,
-        String baseSha,
-        String startSha
+        @Nullable String newPath,
+        @Nullable String oldPath,
+        @Nullable String filePath,
+        @Nullable Integer newLine,
+        @Nullable Integer oldLine,
+        @Nullable String headSha,
+        @Nullable String baseSha,
+        @Nullable String startSha
     ) {
         return new GitLabPullRequestReviewCommentProcessor.DiffNoteData(
             NOTE_GLOBAL_ID,

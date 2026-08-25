@@ -1,5 +1,7 @@
 package de.tum.cit.aet.hephaestus.agent.sandbox.docker.interactive;
 
+import org.jspecify.annotations.Nullable;
+
 /**
  * Strip C0 + C1 control chars and BiDi overrides from caller- or runner-supplied strings before
  * passing them to a logging framework: defeats log-line injection (CR/LF), terminal-escape attacks
@@ -11,11 +13,11 @@ final class LogSafe {
 
     private LogSafe() {}
 
-    static String sanitise(String value) {
+    static String sanitise(@Nullable String value) {
         return sanitise(value, MAX_LEN);
     }
 
-    static String sanitise(String value, int maxLen) {
+    static String sanitise(@Nullable String value, int maxLen) {
         if (value == null) {
             return "<null>";
         }

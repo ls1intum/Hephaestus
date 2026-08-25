@@ -22,6 +22,7 @@ import lombok.ToString;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Represents a custom field configuration in a GitHub Projects V2 project.
@@ -88,7 +89,7 @@ public class ProjectField {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "project_id", nullable = false)
     @ToString.Exclude
-    private Project project;
+    private @Nullable Project project;
 
     /**
      * The name of the field (e.g., "Status", "Priority", "Sprint").

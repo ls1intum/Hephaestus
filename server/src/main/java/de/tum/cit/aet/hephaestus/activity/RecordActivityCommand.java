@@ -48,7 +48,7 @@ public record RecordActivityCommand(
         Long workspaceId,
         ActivityEventType eventType,
         Instant occurredAt,
-        User actor,
+        @Nullable User actor,
         ActivityTargetType targetType,
         Long targetId,
         double xp

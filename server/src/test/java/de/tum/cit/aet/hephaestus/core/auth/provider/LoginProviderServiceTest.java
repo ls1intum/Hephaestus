@@ -20,6 +20,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
@@ -89,7 +90,11 @@ class LoginProviderServiceTest extends BaseUnitTest {
         );
     }
 
-    private static LoginProviderService.Draft gitlabDraft(String registrationId, String baseUrl, String scopes) {
+    private static LoginProviderService.Draft gitlabDraft(
+        String registrationId,
+        String baseUrl,
+        @Nullable String scopes
+    ) {
         return new LoginProviderService.Draft(
             registrationId,
             LoginProvider.ProviderType.GITLAB,
@@ -101,7 +106,11 @@ class LoginProviderServiceTest extends BaseUnitTest {
         );
     }
 
-    private static LoginProviderService.Draft outlineDraft(String registrationId, String baseUrl, String scopes) {
+    private static LoginProviderService.Draft outlineDraft(
+        String registrationId,
+        String baseUrl,
+        @Nullable String scopes
+    ) {
         return new LoginProviderService.Draft(
             registrationId,
             LoginProvider.ProviderType.OUTLINE,

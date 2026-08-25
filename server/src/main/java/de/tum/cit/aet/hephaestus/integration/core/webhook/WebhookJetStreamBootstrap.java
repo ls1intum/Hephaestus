@@ -360,7 +360,7 @@ public class WebhookJetStreamBootstrap {
          */
         private boolean consider(
             String field,
-            Object from,
+            @Nullable Object from,
             Object to,
             @Nullable String loss,
             boolean allowDestructive

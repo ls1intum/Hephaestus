@@ -11,6 +11,7 @@ import java.util.LinkedHashSet;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
@@ -72,7 +73,7 @@ public class AccountPreferencesService {
      * analytics consent.
      */
     @Transactional
-    public UserSettingsDTO updateUserSettings(User user, UserSettingsDTO userSettings, String subjectId) {
+    public UserSettingsDTO updateUserSettings(User user, UserSettingsDTO userSettings, @Nullable String subjectId) {
         log.info("Updating user settings: userLogin={}", user.getLogin());
         UserPreferences preferences = loadOrCreatePreferences(user);
 
@@ -191,7 +192,7 @@ public class AccountPreferencesService {
         );
     }
 
-    private boolean deletePosthogIdentities(User user, String primaryDistinctId) {
+    private boolean deletePosthogIdentities(User user, @Nullable String primaryDistinctId) {
         PosthogClient client = posthogClientProvider.getIfAvailable();
         if (client == null) {
             log.debug("Skipped PostHog deletion: reason=clientDisabled");

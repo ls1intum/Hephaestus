@@ -351,26 +351,6 @@ class ScopeConsumerTest {
 
             consumer.stop();
         }
-
-        @Test
-        void rejectsNullSubjects() throws IOException, JetStreamApiException {
-            ConsumerContext ctx = mock(ConsumerContext.class);
-            MessageConsumer subscription = mock(MessageConsumer.class);
-            when(ctx.consume(any(MessageHandler.class))).thenReturn(subscription);
-
-            ScopeConsumer consumer = new ScopeConsumer(
-                SCOPE_ID,
-                CONSUMER_NAME,
-                STREAM,
-                ctx,
-                mock(StreamContext.class),
-                SUBJECTS,
-                msg -> {}
-            );
-            consumer.start();
-            assertThatThrownBy(() -> consumer.updateSubjects(null)).isInstanceOf(IllegalArgumentException.class);
-            consumer.stop();
-        }
     }
 
     private static Message messageWithSubject(String subject) {

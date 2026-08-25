@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.workspace;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
@@ -34,6 +35,7 @@ import de.tum.cit.aet.hephaestus.testconfig.WorkspaceTestFixtures;
 import de.tum.cit.aet.hephaestus.workspace.adapter.ScmWorkspacePurgeAdapter;
 import java.time.Instant;
 import java.util.List;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -346,7 +348,7 @@ class ScmWorkspaceErasureIntegrationTest extends BaseIntegrationTest {
     }
 
     private List<Team> teamsFor(Organization organization) {
-        return teamRepository.findByOrganizationIgnoreCaseAndProviderId(organization.getLogin(), gitProvider.getId());
+        return teamRepository.findByOrganizationIgnoreCaseAndProviderId(organization.getLogin(), gitProviderId());
     }
 
     private Organization persistOrganization(long nativeId, String login) {
@@ -380,7 +382,7 @@ class ScmWorkspaceErasureIntegrationTest extends BaseIntegrationTest {
     }
 
     /** The workspace's {@code organization_id} FK, read as a column so no lazy proxy is involved. */
-    private Long organizationIdOf(Workspace workspace) {
+    private @Nullable Long organizationIdOf(Workspace workspace) {
         return jdbcTemplate.queryForObject(
             "SELECT organization_id FROM workspace WHERE id = ?",
             Long.class,
@@ -389,7 +391,9 @@ class ScmWorkspaceErasureIntegrationTest extends BaseIntegrationTest {
     }
 
     private long countRows(String table) {
-        return jdbcTemplate.queryForObject("SELECT COUNT(*) FROM " + table, Long.class);
+        Long count = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM " + table, Long.class);
+        assertNotNull(count);
+        return count;
     }
 
     private Repository persistRepository(long nativeId, String nameWithOwner) {
@@ -426,5 +430,11 @@ class ScmWorkspaceErasureIntegrationTest extends BaseIntegrationTest {
         monitor.setNameWithOwner(nameWithOwner);
         monitor.setWorkspace(workspace);
         repositoryToMonitorRepository.save(monitor);
+    }
+
+    private Long gitProviderId() {
+        Long id = gitProvider.getId();
+        assertNotNull(id);
+        return id;
     }
 }

@@ -227,7 +227,7 @@ public class CommitAuthorResolver {
      * Excludes noreply / bot addresses and anything that is not a plausible
      * institutional identifier. Kept package-private for testability.
      */
-    static boolean isBackfillEligible(String email) {
+    static boolean isBackfillEligible(@Nullable String email) {
         if (email == null || email.isBlank()) {
             return false;
         }

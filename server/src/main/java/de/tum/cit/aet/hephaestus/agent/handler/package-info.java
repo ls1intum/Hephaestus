@@ -19,4 +19,5 @@
  * {@code integration.scm} named interfaces, so they belong in {@code agent}: relocating delivery into
  * {@code integration} would invert into a Modulith cycle.
  */
+@org.jspecify.annotations.NullMarked
 package de.tum.cit.aet.hephaestus.agent.handler;

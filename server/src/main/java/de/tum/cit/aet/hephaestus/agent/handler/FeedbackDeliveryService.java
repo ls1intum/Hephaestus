@@ -14,6 +14,7 @@ import de.tum.cit.aet.hephaestus.practices.observation.TrendDelta;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.jspecify.annotations.Nullable;
@@ -95,7 +96,7 @@ class FeedbackDeliveryService {
         }
 
         try {
-            doDeliverEligible(job, delivery, summaryComposer, decision.artifact());
+            doDeliverEligible(job, delivery, summaryComposer, Objects.requireNonNull(decision.artifact()));
         } catch (JobDeliverySuppressedException e) {
             log.info("Delivery suppressed at egress: jobId={}", job.getId());
             recordGateSuppressed(job, delivery, FeedbackSuppressionReason.INSTANCE_SILENCED);
@@ -263,7 +264,7 @@ class FeedbackDeliveryService {
 
         if (update != null && update.kind() == PullRequestCommentPoster.UpdateResult.Kind.TRANSIENT) {
             // A transient edit failure must not create a duplicate summary.
-            job.setDeliveryCommentId(priorRef);
+            job.setDeliveryCommentId(Objects.requireNonNull(priorRef));
             log.warn(
                 "Summary edit transient — kept prior summary, no fresh post: jobId={}, commentId={}",
                 job.getId(),
@@ -273,7 +274,9 @@ class FeedbackDeliveryService {
         }
 
         boolean editedInPlace = update != null && update.kind() == PullRequestCommentPoster.UpdateResult.Kind.EDITED;
-        String commentId = editedInPlace ? update.externalId() : commentPoster.postFormattedBody(job, formatted);
+        String commentId = editedInPlace
+            ? Objects.requireNonNull(update).externalId()
+            : commentPoster.postFormattedBody(job, formatted);
         if (commentId == null) {
             throw new JobDeliveryException(
                 "Summary note post returned no comment id despite a non-empty body: jobId=" + job.getId()

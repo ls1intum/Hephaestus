@@ -23,6 +23,7 @@ import de.tum.cit.aet.hephaestus.testconfig.LlmCatalogTestFixtures;
 import de.tum.cit.aet.hephaestus.workspace.AbstractWorkspaceIntegrationTest;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
+import java.util.Objects;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -104,7 +105,7 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
         MockHttpServletResponse response = new MockHttpServletResponse();
         AtomicReference<Authentication> authentication = new AtomicReference<>();
         filter.doFilter(request, response, (filteredRequest, filteredResponse) ->
-            authentication.set(SecurityContextHolder.getContext().getAuthentication())
+            authentication.set(Objects.requireNonNull(SecurityContextHolder.getContext().getAuthentication()))
         );
         return new AuthenticationResult(response.getStatus(), authentication.get());
     }

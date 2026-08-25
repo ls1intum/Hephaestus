@@ -59,6 +59,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.AbstractExecutorService;
@@ -72,6 +73,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -240,13 +242,15 @@ class MentorChatServiceTest extends BaseUnitTest {
         when(persistence.persistInFlight(any(), any(), any(), any(), any())).thenAnswer(inv -> {
             UUID assistantId = inv.getArgument(2, UUID.class);
             MentorLlmConfig admitted = inv.getArgument(4, MentorLlmConfig.class);
+            var priceSnapshot = admitted.priceSnapshot();
+            org.junit.jupiter.api.Assertions.assertNotNull(priceSnapshot);
             return new MentorTurnPersistence.TurnPersistenceCookie(
                 THREAD_ID,
                 UUID.randomUUID(),
                 assistantId,
                 Instant.now(),
                 admitted.upstreamModelId(),
-                admitted.priceSnapshot()
+                priceSnapshot
             );
         });
         when(workspaceContextBuilder.build(any())).thenReturn(new LinkedHashMap<>());
@@ -294,7 +298,7 @@ class MentorChatServiceTest extends BaseUnitTest {
         verify(persistence, never()).interrupt(any(), any(), any());
         assertThat(turnLock.activeKeys()).isZero();
         assertOutcomeRecorded(MentorChatMetrics.Outcome.SUCCESS);
-        assertThat(meterRegistry.find("mentor.turn.duration").timer().count()).isEqualTo(1L);
+        assertThat(meterRegistry.timer("mentor.turn.duration").count()).isEqualTo(1L);
     }
 
     @Test
@@ -498,7 +502,7 @@ class MentorChatServiceTest extends BaseUnitTest {
             throw new AssertionError(e);
         }
         assertOutcomeRecorded(MentorChatMetrics.Outcome.ERROR);
-        assertThat(meterRegistry.find("llm.budget.blocked").tag("surface", "mentor").counter().count()).isEqualTo(1d);
+        assertThat(meterRegistry.counter("llm.budget.blocked", "surface", "mentor").count()).isEqualTo(1d);
     }
 
     @Test
@@ -520,7 +524,7 @@ class MentorChatServiceTest extends BaseUnitTest {
             throw new AssertionError(e);
         }
         assertOutcomeRecorded(MentorChatMetrics.Outcome.ERROR);
-        assertThat(meterRegistry.find("llm.budget.blocked").tag("surface", "mentor").counter().count()).isEqualTo(1d);
+        assertThat(meterRegistry.counter("llm.budget.blocked", "surface", "mentor").count()).isEqualTo(1d);
     }
 
     @Test
@@ -745,7 +749,7 @@ class MentorChatServiceTest extends BaseUnitTest {
                     // 100k input tokens at the fixture's $10/M — a whole dollar of this turn's own spend.
                     proxyCredentialRegistry.accumulate(attempt.sourceId(), new ProxyTokenUsage(100_000, 0, 0, 0));
                 }
-                seen.set(proxyCredentialRegistry.validate(token).orElseThrow().attempt());
+                seen.set(Objects.requireNonNull(proxyCredentialRegistry.validate(token).orElseThrow().attempt()));
             }
             scripted.accept(frame);
         };
@@ -827,15 +831,13 @@ class MentorChatServiceTest extends BaseUnitTest {
     }
 
     private void assertOutcomeRecorded(MentorChatMetrics.Outcome expected) {
-        assertThat(meterRegistry.find("mentor.turn.started").counter().count()).as("mentor.turn.started").isEqualTo(1d);
-        assertThat(meterRegistry.find("mentor.turn.completed").tag("outcome", expected.tag()).counter().count())
+        assertThat(meterRegistry.counter("mentor.turn.started").count()).as("mentor.turn.started").isEqualTo(1d);
+        assertThat(meterRegistry.counter("mentor.turn.completed", "outcome", expected.tag()).count())
             .as("mentor.turn.completed{outcome=%s}", expected.tag())
             .isEqualTo(1d);
         long otherOutcomes = Arrays.stream(MentorChatMetrics.Outcome.values())
             .filter(o -> o != expected)
-            .mapToLong(o ->
-                Math.round(meterRegistry.find("mentor.turn.completed").tag("outcome", o.tag()).counter().count())
-            )
+            .mapToLong(o -> Math.round(meterRegistry.counter("mentor.turn.completed", "outcome", o.tag()).count()))
             .sum();
         assertThat(otherOutcomes).as("no other outcome counter bumped").isZero();
     }
@@ -895,7 +897,7 @@ class MentorChatServiceTest extends BaseUnitTest {
             }
 
             @Override
-            public InteractiveSandboxService getObject(Object... args) {
+            public InteractiveSandboxService getObject(@Nullable Object... args) {
                 return svc;
             }
 

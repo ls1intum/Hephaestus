@@ -38,6 +38,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
@@ -220,7 +221,10 @@ public class PracticeDetectionDeliveryService {
         for (int i = 0; i < admittedObservations.size(); i++) {
             ValidatedObservation observation = admittedObservations.get(i);
 
-            PracticeRevision revision = revisionsBySlug.get(observation.practiceSlug());
+            PracticeRevision revision = Objects.requireNonNull(
+                revisionsBySlug.get(observation.practiceSlug()),
+                "Validated practice revision is missing"
+            );
             Practice practice = revision.getPractice();
 
             // The position the observation was SUBMITTED at, not its position among those admitted: this key
@@ -258,7 +262,7 @@ public class PracticeDetectionDeliveryService {
             );
             deliveredObservations.add(observation.withKeys(new ObservationKeys(occurrenceKey, recurrenceKey)));
 
-            Long practiceRevisionId = revision.getId();
+            Long practiceRevisionId = Objects.requireNonNull(revision.getId(), "Practice revision must be persisted");
 
             // Enforced here because the native insertIfAbsent path bypasses Observation's @PrePersist
             // (ADR-0022): severity is an impact band for a BAD observation only.
@@ -365,7 +369,15 @@ public class PracticeDetectionDeliveryService {
             );
         }
         JsonNode evidence = observation.evidence();
-        JsonNode citations = evidence == null ? null : evidence.get("citations");
+        if (evidence == null) {
+            throw new JobDeliveryException(
+                "Observation has no source-bound evidence citation: slug=" +
+                    observation.practiceSlug() +
+                    ", jobId=" +
+                    job.getId()
+            );
+        }
+        JsonNode citations = evidence.get("citations");
         if (citations == null || !citations.isArray() || citations.isEmpty()) {
             throw new JobDeliveryException(
                 "Observation has no source-bound evidence citation: slug=" +
@@ -781,7 +793,7 @@ public class PracticeDetectionDeliveryService {
         return true;
     }
 
-    private static String parseDiffPath(String value) {
+    private static @Nullable String parseDiffPath(String value) {
         String path = value.trim();
         if ("/dev/null".equals(path)) {
             return null;
@@ -1025,7 +1037,7 @@ public class PracticeDetectionDeliveryService {
         }
     }
 
-    static String firstLocationPath(JsonNode evidence) {
+    static @Nullable String firstLocationPath(@Nullable JsonNode evidence) {
         if (evidence == null || evidence.isNull()) {
             return null;
         }

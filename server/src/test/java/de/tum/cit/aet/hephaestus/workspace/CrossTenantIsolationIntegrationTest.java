@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.workspace;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import de.tum.cit.aet.hephaestus.activity.ActivityEventRepository;
 import de.tum.cit.aet.hephaestus.activity.ActivityEventType;
@@ -17,6 +18,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.team.TeamRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.team.membership.TeamMembership;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.team.membership.TeamMembershipRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserInfoDTO;
 import de.tum.cit.aet.hephaestus.leaderboard.LeaderboardEntryDTO;
 import de.tum.cit.aet.hephaestus.mentor.ChatThread;
 import de.tum.cit.aet.hephaestus.mentor.ChatThreadRepository;
@@ -44,6 +46,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -490,7 +493,7 @@ class CrossTenantIsolationIntegrationTest extends AbstractWorkspaceIntegrationTe
         return seedInAppUnit(ws, headline, null);
     }
 
-    private Feedback seedInAppUnit(Workspace ws, String headline, String threadKey) {
+    private Feedback seedInAppUnit(Workspace ws, String headline, @Nullable String threadKey) {
         Practice practice = new Practice();
         practice.setAutomatedReviewPolicy(PracticeTestEvidence.pullRequest());
         practice.setWorkspace(ws);
@@ -614,7 +617,7 @@ class CrossTenantIsolationIntegrationTest extends AbstractWorkspaceIntegrationTe
 
             Integer score = leaderboardEntries(workspaceA)
                 .stream()
-                .filter(e -> e.user().login().equals("mentor"))
+                .filter(e -> userOf(e).login().equals("mentor"))
                 .findFirst()
                 .orElseThrow()
                 .score();
@@ -768,8 +771,14 @@ class CrossTenantIsolationIntegrationTest extends AbstractWorkspaceIntegrationTe
     private List<String> leaderboardLogins(Workspace workspace) {
         return leaderboardEntries(workspace)
             .stream()
-            .map(e -> e.user().login())
+            .map(e -> userOf(e).login())
             .toList();
+    }
+
+    private static UserInfoDTO userOf(LeaderboardEntryDTO entry) {
+        UserInfoDTO user = entry.user();
+        assertNotNull(user);
+        return user;
     }
 
     private List<LeaderboardEntryDTO> leaderboardEntries(Workspace workspace) {

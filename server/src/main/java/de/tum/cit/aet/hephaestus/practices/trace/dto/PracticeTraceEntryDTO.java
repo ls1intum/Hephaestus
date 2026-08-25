@@ -9,6 +9,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 /**
  * One practice's answer for one artifact, on two axes that must not be collapsed.
@@ -29,14 +30,16 @@ public record PracticeTraceEntryDTO(
     @NonNull @Schema(description = "The outcome in a sentence, phrased as what would change it") String explanation,
     @NonNull @Schema(description = "The signals this practice watches") List<SignalName> watches,
     @Schema(description = "The occurrence this answer is about; null when nothing it watches happened")
+    @Nullable
     SignalName occasionedBy,
     @Schema(
         description = "That occurrence's id in this trace's signals list. The name alone cannot identify " +
             "it — the same signal recurs on every revision — so this is what a link should follow."
     )
+    @Nullable
     UUID occasionedById,
-    @Schema(description = "When the answer was settled") Instant decidedAt,
-    @Schema(description = "The review this answer came from, when one ran") UUID reviewId,
+    @Schema(description = "When the answer was settled") @Nullable Instant decidedAt,
+    @Schema(description = "The review this answer came from, when one ran") @Nullable UUID reviewId,
     @NonNull @Schema(description = "Measurements this practice produced on this artifact") Integer observationCount,
     @NonNull @Schema(description = "Interventions actually delivered to a person") Integer deliveredCount,
     @NonNull

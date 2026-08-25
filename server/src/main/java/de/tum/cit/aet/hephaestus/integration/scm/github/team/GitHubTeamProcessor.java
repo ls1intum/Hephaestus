@@ -7,9 +7,11 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext
 import de.tum.cit.aet.hephaestus.integration.scm.domain.team.Team;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.team.TeamRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.github.team.dto.GitHubTeamEventDTO;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
@@ -34,7 +36,11 @@ public class GitHubTeamProcessor {
     }
 
     @Transactional
-    public Team process(GitHubTeamEventDTO.GitHubTeamDTO dto, String orgLogin, @NonNull ProcessingContext context) {
+    public @Nullable Team process(
+        GitHubTeamEventDTO.GitHubTeamDTO dto,
+        String orgLogin,
+        @NonNull ProcessingContext context
+    ) {
         if (dto == null || dto.id() == null) {
             log.warn("Skipped team processing: reason=nullOrMissingId");
             return null;
@@ -47,19 +53,22 @@ public class GitHubTeamProcessor {
             existingTeam = teamRepository.findByOrganizationIgnoreCaseAndNameAndProviderId(
                 orgLogin,
                 dto.name(),
-                context.providerId()
+                Objects.requireNonNull(context.providerId())
             );
         }
 
         // Fall back to nativeId lookup if natural key not found (handles renames)
         if (existingTeam.isEmpty()) {
-            existingTeam = teamRepository.findByNativeIdAndProviderId(dto.id(), context.providerId());
+            existingTeam = teamRepository.findByNativeIdAndProviderId(
+                Objects.requireNonNull(dto.id()),
+                Objects.requireNonNull(context.providerId())
+            );
         }
 
         Team team = existingTeam.orElseGet(() -> {
             Team t = new Team();
-            t.setNativeId(dto.id());
-            t.setProvider(context.provider());
+            t.setNativeId(Objects.requireNonNull(dto.id()));
+            t.setProvider(Objects.requireNonNull(context.provider()));
             return t;
         });
 
@@ -160,7 +169,7 @@ public class GitHubTeamProcessor {
         }
 
         teamRepository
-            .findByNativeIdAndProviderId(nativeId, context.providerId())
+            .findByNativeIdAndProviderId(nativeId, Objects.requireNonNull(context.providerId()))
             .ifPresent(team -> {
                 Long teamId = team.getId();
                 String teamName = team.getName();
@@ -201,7 +210,7 @@ public class GitHubTeamProcessor {
      *
      * @return the saved team, or null if unable to resolve
      */
-    private Team handleSlugConflict(
+    private @Nullable Team handleSlugConflict(
         Team team,
         String orgLogin,
         GitHubTeamEventDTO.GitHubTeamDTO dto,
@@ -214,7 +223,7 @@ public class GitHubTeamProcessor {
         Optional<Team> conflicting = teamRepository.findByOrganizationIgnoreCaseAndSlugAndProviderId(
             orgLogin,
             teamSlug,
-            context.providerId()
+            Objects.requireNonNull(context.providerId())
         );
         if (conflicting.isEmpty()) {
             // Conflict resolved concurrently

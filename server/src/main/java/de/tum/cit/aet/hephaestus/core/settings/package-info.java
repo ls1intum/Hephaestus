@@ -5,4 +5,5 @@
  * <p>Cross-module consumers reach this package only through the {@code core.settings.spi} named
  * interface, mirroring {@code core.auth.spi}.
  */
+@org.jspecify.annotations.NullMarked
 package de.tum.cit.aet.hephaestus.core.settings;

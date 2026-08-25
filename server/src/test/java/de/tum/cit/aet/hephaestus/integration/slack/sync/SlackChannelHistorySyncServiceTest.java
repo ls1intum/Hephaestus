@@ -30,6 +30,7 @@ import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -86,7 +87,7 @@ class SlackChannelHistorySyncServiceTest extends BaseUnitTest {
             .thenReturn(Optional.of(ConsentState.ACTIVE));
     }
 
-    private SlackMonitoredChannel channel(Instant announcedAt, String watermark) {
+    private SlackMonitoredChannel channel(@Nullable Instant announcedAt, @Nullable String watermark) {
         SlackMonitoredChannel c = new SlackMonitoredChannel();
         c.setWorkspaceId(WS);
         c.setSlackTeamId(TEAM);
@@ -101,7 +102,7 @@ class SlackChannelHistorySyncServiceTest extends BaseUnitTest {
         when(monitoredChannelRepository.findForHistorySync(WS, ConsentState.ACTIVE)).thenReturn(List.of(channels));
     }
 
-    private static Message plain(String ts, String user, String text) {
+    private static Message plain(String ts, @Nullable String user, String text) {
         Message m = new Message();
         m.setTs(ts);
         m.setUser(user);

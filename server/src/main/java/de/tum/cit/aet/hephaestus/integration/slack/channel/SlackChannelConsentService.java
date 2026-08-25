@@ -349,12 +349,16 @@ public class SlackChannelConsentService {
         }
     }
 
-    private String resolveChannelName(long workspaceId, String slackChannelId, @Nullable String fallbackName) {
+    private @Nullable String resolveChannelName(
+        long workspaceId,
+        String slackChannelId,
+        @Nullable String fallbackName
+    ) {
         var info = slackMessageService.lookupConversation(workspaceId, slackChannelId);
         return resolveName(fallbackName, info == null ? null : info.orElse(null));
     }
 
-    private static String resolveName(@Nullable String fallbackName, @Nullable SlackConversationInfo info) {
+    private static @Nullable String resolveName(@Nullable String fallbackName, @Nullable SlackConversationInfo info) {
         if (info != null && info.channelName() != null && !info.channelName().isBlank()) {
             return info.channelName();
         }

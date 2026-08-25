@@ -14,6 +14,7 @@ import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitorRepository;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import de.tum.cit.aet.hephaestus.workspace.settings.PracticeReviewSettings;
+import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -62,17 +63,19 @@ class PracticeFeedbackDeliveryPolicy {
         Issue issue = integralId(metadata, "issue_id")
             .flatMap(issueRepository::findByIdWithAuthorAndRepository)
             .orElse(null);
-        if (!isEligibleTarget(issue, metadata, "issue_number", workspaceId) || issue.getAuthor() == null) {
+        if (!isEligibleTarget(issue, metadata, "issue_number", workspaceId)) {
             return Decision.suppressed(FeedbackSuppressionReason.ARTIFACT_GONE);
         }
-        boolean closedWhenQueued = "closed".equalsIgnoreCase(metadata.path("state").asString(""));
-        if (closedWhenQueued || issue.getState() == Issue.State.CLOSED) {
+        Issue eligibleIssue = Objects.requireNonNull(issue);
+        if (eligibleIssue.getAuthor() == null) return Decision.suppressed(FeedbackSuppressionReason.ARTIFACT_GONE);
+        boolean closedWhenQueued = metadata != null && "closed".equalsIgnoreCase(metadata.path("state").asString(""));
+        if (closedWhenQueued || eligibleIssue.getState() == Issue.State.CLOSED) {
             return Decision.suppressed(FeedbackSuppressionReason.ARTIFACT_CLOSED);
         }
-        if (!recipientAllowsDelivery(issue)) {
+        if (!recipientAllowsDelivery(eligibleIssue)) {
             return Decision.suppressed(FeedbackSuppressionReason.RECIPIENT_OPTED_OUT);
         }
-        return Decision.allowed(issue);
+        return Decision.allowed(eligibleIssue);
     }
 
     @Transactional(readOnly = true)
@@ -89,27 +92,31 @@ class PracticeFeedbackDeliveryPolicy {
         PullRequest pullRequest = integralId(metadata, "pull_request_id")
             .flatMap(pullRequestRepository::findByIdWithAuthorAndRepository)
             .orElse(null);
-        if (!isEligibleTarget(pullRequest, metadata, "pr_number", workspaceId) || pullRequest.getAuthor() == null) {
+        if (!isEligibleTarget(pullRequest, metadata, "pr_number", workspaceId)) {
             return Decision.suppressed(FeedbackSuppressionReason.ARTIFACT_GONE);
         }
-        if (pullRequest.getState() == Issue.State.CLOSED) {
+        PullRequest eligiblePullRequest = Objects.requireNonNull(pullRequest);
+        if (eligiblePullRequest.getAuthor() == null) {
+            return Decision.suppressed(FeedbackSuppressionReason.ARTIFACT_GONE);
+        }
+        if (eligiblePullRequest.getState() == Issue.State.CLOSED) {
             return Decision.suppressed(FeedbackSuppressionReason.ARTIFACT_CLOSED);
         }
 
         PracticeReviewSettings settings = workspace.getReviewSettings();
         if (
-            pullRequest.getState() == Issue.State.MERGED &&
+            eligiblePullRequest.getState() == Issue.State.MERGED &&
             !settings.resolveDeliverToMerged(reviewProperties.deliverToMerged())
         ) {
             return Decision.suppressed(FeedbackSuppressionReason.ARTIFACT_MERGED);
         }
-        if (!recipientAllowsDelivery(pullRequest)) {
+        if (!recipientAllowsDelivery(eligiblePullRequest)) {
             return Decision.suppressed(FeedbackSuppressionReason.RECIPIENT_OPTED_OUT);
         }
-        return Decision.allowed(pullRequest);
+        return Decision.allowed(eligiblePullRequest);
     }
 
-    static boolean matchesArtifact(Issue artifact, JsonNode metadata, String numberKey) {
+    static boolean matchesArtifact(Issue artifact, @Nullable JsonNode metadata, String numberKey) {
         return (
             artifact.getDeletedAt() == null &&
             artifact.getRepository() != null &&
@@ -132,6 +139,7 @@ class PracticeFeedbackDeliveryPolicy {
     ) {
         return (
             artifact != null &&
+            artifact.getRepository() != null &&
             matchesArtifact(artifact, metadata, numberKey) &&
             repositoryToMonitorRepository.existsByWorkspaceIdAndNameWithOwner(
                 workspaceId,
@@ -141,6 +149,9 @@ class PracticeFeedbackDeliveryPolicy {
     }
 
     private boolean recipientAllowsDelivery(Issue artifact) {
+        if (artifact.getAuthor() == null || artifact.getAuthor().getId() == null) {
+            return false;
+        }
         return accountPreferencesQuery
             .preferencesForUserId(artifact.getAuthor().getId())
             .map(AccountPreferencesQuery.PreferencesView::practiceFeedbackDeliveryEnabled)

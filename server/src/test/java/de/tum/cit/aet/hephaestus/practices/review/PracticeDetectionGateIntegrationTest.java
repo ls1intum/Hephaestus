@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.practices.review;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import de.tum.cit.aet.hephaestus.agent.catalog.WorkspaceLlmConnection;
 import de.tum.cit.aet.hephaestus.agent.catalog.WorkspaceLlmConnectionRepository;
@@ -152,9 +153,11 @@ class PracticeDetectionGateIntegrationTest extends BaseIntegrationTest {
 
     private PullRequest createPullRequest(boolean isDraft, Set<Label> labels, Set<User> assignees) {
         Instant now = Instant.now();
+        Long providerId = provider.getId();
+        assertNotNull(providerId);
         pullRequestRepository.upsertCore(
             7001L,
-            provider.getId(),
+            providerId,
             100,
             "Gate Test PR",
             "Body",

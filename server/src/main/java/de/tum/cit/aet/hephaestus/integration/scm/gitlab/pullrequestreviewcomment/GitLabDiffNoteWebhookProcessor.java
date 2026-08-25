@@ -26,6 +26,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.gitlab.pullrequestreviewthread.
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.user.GitLabUserService;
 import java.time.Instant;
 import java.util.Map;
+import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -107,7 +108,7 @@ public class GitLabDiffNoteWebhookProcessor extends BaseGitLabProcessor {
         // Find parent MR, creating a minimal stub if it doesn't exist yet
         // (diff note webhooks can arrive before the MR webhook)
         PullRequest pr = pullRequestRepository
-            .findByRepositoryIdAndNumber(context.repository().getId(), embeddedMr.iid())
+            .findByRepositoryIdAndNumber(Objects.requireNonNull(context.repository()).getId(), embeddedMr.iid())
             .orElse(null);
 
         if (pr == null) {
@@ -122,7 +123,7 @@ public class GitLabDiffNoteWebhookProcessor extends BaseGitLabProcessor {
             }
         }
 
-        IdentityProvider provider = context.provider();
+        IdentityProvider provider = Objects.requireNonNull(context.provider());
 
         // Extract position data from the webhook payload
         @SuppressWarnings("unchecked")
@@ -178,7 +179,7 @@ public class GitLabDiffNoteWebhookProcessor extends BaseGitLabProcessor {
         PullRequestReviewThread thread = threadProcessor.findOrCreateWebhookThread(webhookThreadData, pr, provider);
 
         // Resolve author
-        User author = findOrCreateUser(event.user(), context.providerId());
+        User author = findOrCreateUser(event.user(), Objects.requireNonNull(context.providerId()));
 
         // Create the diff note data
         String noteGlobalId = "gid://gitlab/DiffNote/" + attrs.id();
@@ -229,7 +230,7 @@ public class GitLabDiffNoteWebhookProcessor extends BaseGitLabProcessor {
             provider,
             inReplyTo,
             review,
-            context.scopeId()
+            Objects.requireNonNull(context.scopeId())
         );
         PullRequestReviewComment comment = reviewCommentProcessor.findOrCreateComment(noteData, commentContext);
 
@@ -261,7 +262,7 @@ public class GitLabDiffNoteWebhookProcessor extends BaseGitLabProcessor {
         } catch (DataIntegrityViolationException e) {
             log.debug("Concurrent MR creation, looking up: iid={}", dto.iid());
             return pullRequestRepository
-                .findByRepositoryIdAndNumber(context.repository().getId(), dto.iid())
+                .findByRepositoryIdAndNumber(Objects.requireNonNull(context.repository()).getId(), dto.iid())
                 .orElse(null);
         }
     }
@@ -271,16 +272,16 @@ public class GitLabDiffNoteWebhookProcessor extends BaseGitLabProcessor {
         GitLabNoteEventDTO.EmbeddedMergeRequest dto,
         ProcessingContext context
     ) {
-        Repository repository = context.repository();
+        Repository repository = Objects.requireNonNull(context.repository());
         if (repository == null || dto.id() == null) return null;
 
         Issue.State mappedState = convertMrState(dto.state());
 
         PullRequest pr = new PullRequest();
         pr.setNativeId(dto.id());
-        pr.setProvider(context.provider());
+        pr.setProvider(Objects.requireNonNull(context.provider()));
         pr.setNumber(dto.iid());
-        pr.setTitle(sanitize(dto.title()));
+        pr.setTitle(Objects.requireNonNullElse(sanitize(dto.title()), ""));
         pr.setBody(sanitize(dto.description()));
         pr.setState(mappedState);
         pr.setHtmlUrl(dto.url());

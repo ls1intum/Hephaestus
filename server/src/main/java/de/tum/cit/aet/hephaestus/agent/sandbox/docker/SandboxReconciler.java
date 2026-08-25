@@ -16,6 +16,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
@@ -205,7 +206,7 @@ public class SandboxReconciler {
         return container.createdAt() == null || container.createdAt().isAfter(clock.instant().minus(REAP_GRACE));
     }
 
-    private static Optional<UUID> parseUuid(String value) {
+    private static Optional<UUID> parseUuid(@Nullable String value) {
         if (value == null) {
             return Optional.empty();
         }

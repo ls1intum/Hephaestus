@@ -20,6 +20,7 @@ import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -56,7 +57,7 @@ class SandboxReconcilerTest extends BaseUnitTest {
         );
     }
 
-    private static DockerOperations.ContainerInfo container(String id, UUID jobId, Instant createdAt) {
+    private static DockerOperations.ContainerInfo container(String id, UUID jobId, @Nullable Instant createdAt) {
         return new DockerOperations.ContainerInfo(
             id,
             "test",

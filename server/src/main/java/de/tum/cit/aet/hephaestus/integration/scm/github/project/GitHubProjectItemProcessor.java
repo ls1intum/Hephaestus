@@ -12,8 +12,10 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.events.GitHubProjectEven
 import de.tum.cit.aet.hephaestus.integration.scm.github.project.dto.GitHubProjectItemDTO;
 import de.tum.cit.aet.hephaestus.integration.scm.github.user.GitHubUserProcessor;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import lombok.extern.slf4j.Slf4j;
+import org.jspecify.annotations.Nullable;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -59,7 +61,11 @@ public class GitHubProjectItemProcessor extends BaseGitHubProcessor {
      * @return the persisted ProjectItem entity
      */
     @Transactional
-    public ProjectItem process(GitHubProjectItemDTO dto, Project project, ProcessingContext context) {
+    public @Nullable ProjectItem process(
+        @Nullable GitHubProjectItemDTO dto,
+        Project project,
+        ProcessingContext context
+    ) {
         return processInternal(dto, project, context, null);
     }
 
@@ -73,15 +79,20 @@ public class GitHubProjectItemProcessor extends BaseGitHubProcessor {
      * @return the persisted ProjectItem entity
      */
     @Transactional
-    public ProjectItem process(GitHubProjectItemDTO dto, Project project, ProcessingContext context, Long actorId) {
+    public @Nullable ProjectItem process(
+        @Nullable GitHubProjectItemDTO dto,
+        Project project,
+        ProcessingContext context,
+        @Nullable Long actorId
+    ) {
         return processInternal(dto, project, context, actorId);
     }
 
-    private ProjectItem processInternal(
-        GitHubProjectItemDTO dto,
+    private @Nullable ProjectItem processInternal(
+        @Nullable GitHubProjectItemDTO dto,
         Project project,
         ProcessingContext context,
-        Long actorId
+        @Nullable Long actorId
     ) {
         if (dto == null) {
             log.warn(
@@ -130,7 +141,7 @@ public class GitHubProjectItemProcessor extends BaseGitHubProcessor {
         // Perform atomic upsert
         projectItemRepository.upsertCore(
             dbId,
-            context.providerId(),
+            Objects.requireNonNull(context.providerId(), "Project item processing requires a provider"),
             dto.nodeId(),
             project.getId(),
             contentType.name(),
@@ -184,7 +195,11 @@ public class GitHubProjectItemProcessor extends BaseGitHubProcessor {
      * @return the updated ProjectItem entity
      */
     @Transactional
-    public ProjectItem processArchived(GitHubProjectItemDTO dto, Project project, ProcessingContext context) {
+    public @Nullable ProjectItem processArchived(
+        @Nullable GitHubProjectItemDTO dto,
+        Project project,
+        ProcessingContext context
+    ) {
         return processArchivedInternal(dto, project, context, null);
     }
 
@@ -198,20 +213,20 @@ public class GitHubProjectItemProcessor extends BaseGitHubProcessor {
      * @return the updated ProjectItem entity
      */
     @Transactional
-    public ProjectItem processArchived(
+    public @Nullable ProjectItem processArchived(
         GitHubProjectItemDTO dto,
         Project project,
         ProcessingContext context,
-        Long actorId
+        @Nullable Long actorId
     ) {
         return processArchivedInternal(dto, project, context, actorId);
     }
 
-    private ProjectItem processArchivedInternal(
-        GitHubProjectItemDTO dto,
+    private @Nullable ProjectItem processArchivedInternal(
+        @Nullable GitHubProjectItemDTO dto,
         Project project,
         ProcessingContext context,
-        Long actorId
+        @Nullable Long actorId
     ) {
         if (dto == null) {
             return null;
@@ -241,7 +256,11 @@ public class GitHubProjectItemProcessor extends BaseGitHubProcessor {
      * @return the updated ProjectItem entity
      */
     @Transactional
-    public ProjectItem processRestored(GitHubProjectItemDTO dto, Project project, ProcessingContext context) {
+    public @Nullable ProjectItem processRestored(
+        @Nullable GitHubProjectItemDTO dto,
+        Project project,
+        ProcessingContext context
+    ) {
         return processRestoredInternal(dto, project, context, null);
     }
 
@@ -255,20 +274,20 @@ public class GitHubProjectItemProcessor extends BaseGitHubProcessor {
      * @return the updated ProjectItem entity
      */
     @Transactional
-    public ProjectItem processRestored(
+    public @Nullable ProjectItem processRestored(
         GitHubProjectItemDTO dto,
         Project project,
         ProcessingContext context,
-        Long actorId
+        @Nullable Long actorId
     ) {
         return processRestoredInternal(dto, project, context, actorId);
     }
 
-    private ProjectItem processRestoredInternal(
-        GitHubProjectItemDTO dto,
+    private @Nullable ProjectItem processRestoredInternal(
+        @Nullable GitHubProjectItemDTO dto,
         Project project,
         ProcessingContext context,
-        Long actorId
+        @Nullable Long actorId
     ) {
         if (dto == null) {
             return null;
@@ -298,7 +317,11 @@ public class GitHubProjectItemProcessor extends BaseGitHubProcessor {
      * @return the updated ProjectItem entity
      */
     @Transactional
-    public ProjectItem processConverted(GitHubProjectItemDTO dto, Project project, ProcessingContext context) {
+    public @Nullable ProjectItem processConverted(
+        GitHubProjectItemDTO dto,
+        Project project,
+        ProcessingContext context
+    ) {
         return processConvertedInternal(dto, project, context, null);
     }
 
@@ -312,20 +335,20 @@ public class GitHubProjectItemProcessor extends BaseGitHubProcessor {
      * @return the updated ProjectItem entity
      */
     @Transactional
-    public ProjectItem processConverted(
+    public @Nullable ProjectItem processConverted(
         GitHubProjectItemDTO dto,
         Project project,
         ProcessingContext context,
-        Long actorId
+        @Nullable Long actorId
     ) {
         return processConvertedInternal(dto, project, context, actorId);
     }
 
-    private ProjectItem processConvertedInternal(
+    private @Nullable ProjectItem processConvertedInternal(
         GitHubProjectItemDTO dto,
         Project project,
         ProcessingContext context,
-        Long actorId
+        @Nullable Long actorId
     ) {
         ProjectItem item = processInternal(dto, project, context, actorId);
         if (item != null) {
@@ -350,7 +373,11 @@ public class GitHubProjectItemProcessor extends BaseGitHubProcessor {
      * @return the updated ProjectItem entity
      */
     @Transactional
-    public ProjectItem processReordered(GitHubProjectItemDTO dto, Project project, ProcessingContext context) {
+    public @Nullable ProjectItem processReordered(
+        GitHubProjectItemDTO dto,
+        Project project,
+        ProcessingContext context
+    ) {
         return processReorderedInternal(dto, project, context, null);
     }
 
@@ -364,20 +391,20 @@ public class GitHubProjectItemProcessor extends BaseGitHubProcessor {
      * @return the updated ProjectItem entity
      */
     @Transactional
-    public ProjectItem processReordered(
+    public @Nullable ProjectItem processReordered(
         GitHubProjectItemDTO dto,
         Project project,
         ProcessingContext context,
-        Long actorId
+        @Nullable Long actorId
     ) {
         return processReorderedInternal(dto, project, context, actorId);
     }
 
-    private ProjectItem processReorderedInternal(
+    private @Nullable ProjectItem processReorderedInternal(
         GitHubProjectItemDTO dto,
         Project project,
         ProcessingContext context,
-        Long actorId
+        @Nullable Long actorId
     ) {
         ProjectItem item = processInternal(dto, project, context, actorId);
         if (item != null) {
@@ -429,7 +456,11 @@ public class GitHubProjectItemProcessor extends BaseGitHubProcessor {
      * @return number of Draft Issues removed
      */
     @Transactional
-    public int removeStaleDraftIssues(Long projectId, List<String> syncedDraftIssueNodeIds, ProcessingContext context) {
+    public int removeStaleDraftIssues(
+        @Nullable Long projectId,
+        @Nullable List<String> syncedDraftIssueNodeIds,
+        ProcessingContext context
+    ) {
         if (projectId == null) {
             return 0;
         }
@@ -474,7 +505,11 @@ public class GitHubProjectItemProcessor extends BaseGitHubProcessor {
      * @return number of Issue/PR items removed
      */
     @Transactional
-    public int removeStaleIssuePrItems(Long projectId, List<String> syncedIssuePrNodeIds, ProcessingContext context) {
+    public int removeStaleIssuePrItems(
+        @Nullable Long projectId,
+        @Nullable List<String> syncedIssuePrNodeIds,
+        ProcessingContext context
+    ) {
         if (projectId == null) {
             return 0;
         }
@@ -532,7 +567,7 @@ public class GitHubProjectItemProcessor extends BaseGitHubProcessor {
      * @param dto the project item DTO containing the GitHub issue database ID
      * @return the issue ID if it exists locally, null otherwise
      */
-    private Long resolveIssueId(GitHubProjectItemDTO dto) {
+    private @Nullable Long resolveIssueId(GitHubProjectItemDTO dto) {
         if (dto.issueId() == null) {
             return null;
         }
@@ -563,7 +598,7 @@ public class GitHubProjectItemProcessor extends BaseGitHubProcessor {
      * @param dto the project item DTO containing creator information
      * @return the creator's user ID if they exist locally, null otherwise
      */
-    private Long resolveCreatorId(GitHubProjectItemDTO dto) {
+    private @Nullable Long resolveCreatorId(GitHubProjectItemDTO dto) {
         if (dto.creator() == null || dto.creator().getDatabaseId() == null) {
             return null;
         }

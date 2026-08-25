@@ -2699,7 +2699,7 @@ export type PullRequestInfo = {
     /**
      * URL to the pull request on the git provider
      */
-    htmlUrl: string;
+    htmlUrl?: string;
     /**
      * Unique identifier of the pull request
      */
@@ -2749,7 +2749,7 @@ export type PullRequestBaseInfo = {
     /**
      * URL to the pull request on the git provider
      */
-    htmlUrl: string;
+    htmlUrl?: string;
     /**
      * Unique identifier of the pull request
      */

@@ -37,7 +37,7 @@ public class EncryptedStringConverter implements AttributeConverter<String, Stri
     /** Hoisted to avoid re-seeding /dev/random on every encrypt; SecureRandom is thread-safe. */
     private static final SecureRandom IV_GENERATOR = new SecureRandom();
 
-    private final SecretKey secretKey;
+    private final @Nullable SecretKey secretKey;
     private final boolean enabled;
 
     /**

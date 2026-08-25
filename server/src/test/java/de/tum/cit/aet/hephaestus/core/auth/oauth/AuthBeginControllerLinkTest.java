@@ -15,6 +15,7 @@ import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import jakarta.servlet.http.Cookie;
 import java.security.SecureRandom;
 import java.util.Optional;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
@@ -74,7 +75,7 @@ class AuthBeginControllerLinkTest extends BaseUnitTest {
         return Jwt.withTokenValue("t").header("alg", "ES256").subject(sub).claim("scope", "x").build();
     }
 
-    private AuthIntentCookie.Intent readIntent(MockHttpServletResponse res) {
+    private AuthIntentCookie.@Nullable Intent readIntent(MockHttpServletResponse res) {
         Cookie written = res.getCookie(AuthIntentCookie.COOKIE_NAME);
         if (written == null) {
             return null;
@@ -190,6 +191,7 @@ class AuthBeginControllerLinkTest extends BaseUnitTest {
 
         assertThat(view.getUrl()).isEqualTo("/oauth2/authorization/github");
         AuthIntentCookie.Intent intent = readIntent(res);
+        org.junit.jupiter.api.Assertions.assertNotNull(intent);
         assertThat(intent.mode()).isEqualTo(AuthIntentCookie.Intent.Mode.LOGIN);
         verifyNoInteractions(jwtDecoder);
     }

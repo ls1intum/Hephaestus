@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.core.auth;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
 import de.tum.cit.aet.hephaestus.core.auth.domain.AccountRepository;
@@ -149,6 +150,7 @@ class SessionRefreshLifecycleIntegrationTest extends RealAuthIntegrationTest {
             .returnResult(Void.class);
         List<ResponseCookie> cookies = result.getResponseCookies().get(XSRF_COOKIE);
         assertThat(cookies).as("XSRF-TOKEN cookie issued on safe GET").isNotEmpty();
+        assertNotNull(cookies);
         return cookies.get(0).getValue();
     }
 }

@@ -12,6 +12,7 @@ import java.time.Instant;
 import java.util.Map;
 import java.util.UUID;
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 @Schema(description = "A practice review observation with its linked feedback outcomes")
 public record ReviewObservationDTO(
@@ -19,15 +20,16 @@ public record ReviewObservationDTO(
     @NonNull UUID agentJobId,
     @NonNull String practiceSlug,
     @NonNull String practiceName,
-    @Schema(description = "Practice area; null when the practice is Unassigned") ReviewPracticeAreaDTO area,
+    @Schema(description = "Practice area; null when the practice is Unassigned") @Nullable ReviewPracticeAreaDTO area,
     @NonNull ReviewArtifactDTO artifact,
     @Schema(description = "Whose work the observation is about; null when the identity is no longer resolvable")
+    @Nullable
     ReviewSubjectDTO subject,
     @NonNull String summary,
     @NonNull Presence presence,
-    @Schema(description = "Assessment: GOOD or BAD (null when NOT_APPLICABLE)") Assessment assessment,
-    @Schema(description = "Severity band (null unless assessment is BAD)") Severity severity,
-    @Schema(description = "Cross-run locus key; null when continuity is unavailable") String recurrenceKey,
+    @Schema(description = "Assessment: GOOD or BAD (null when NOT_APPLICABLE)") @Nullable Assessment assessment,
+    @Schema(description = "Severity band (null unless assessment is BAD)") @Nullable Severity severity,
+    @Schema(description = "Cross-run locus key; null when continuity is unavailable") @Nullable String recurrenceKey,
     @NonNull
     @Schema(
         description = "What occasioned the measurement. BACKFILL came from a confirmed campaign over work " +
@@ -42,7 +44,7 @@ public record ReviewObservationDTO(
 ) {
     public static ReviewObservationDTO from(
         OperatorObservationRow row,
-        ObservationFeedbackDisposition disposition,
+        @Nullable ObservationFeedbackDisposition disposition,
         ReviewArtifactDTO artifact,
         Map<Long, ReviewSubjectDTO> subjects
     ) {

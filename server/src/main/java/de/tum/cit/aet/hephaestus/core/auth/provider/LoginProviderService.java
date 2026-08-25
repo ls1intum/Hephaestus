@@ -148,7 +148,8 @@ public class LoginProviderService {
         LoginProvider provider = new LoginProvider();
         provider.setRegistrationId(registrationId);
         provider.setType(draft.type());
-        provider.setDisplayName(blankToNull(draft.displayName()) == null ? registrationId : draft.displayName().trim());
+        String displayName = blankToNull(draft.displayName());
+        provider.setDisplayName(displayName == null ? registrationId : displayName);
         provider.setBaseUrl(resolveBaseUrl(draft.type(), draft.baseUrl()));
         provider.setClientId(requireValue(draft.clientId(), "clientId"));
         provider.setClientSecret(requireValue(draft.clientSecret(), "clientSecret"));

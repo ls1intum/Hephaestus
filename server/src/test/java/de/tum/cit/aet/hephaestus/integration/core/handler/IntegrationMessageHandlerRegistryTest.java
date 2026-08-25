@@ -59,25 +59,6 @@ class IntegrationMessageHandlerRegistryTest extends BaseUnitTest {
     }
 
     @Test
-    void nullKeyFailsFast() {
-        IntegrationMessageHandler nullKeyed = new IntegrationMessageHandler() {
-            @Override
-            public EventTypeKey key() {
-                return null;
-            }
-
-            @Override
-            public void onMessage(Message msg) {
-                // no-op
-            }
-        };
-
-        assertThatThrownBy(() -> new IntegrationMessageHandlerRegistry(List.of(nullKeyed)))
-            .isInstanceOf(IllegalStateException.class)
-            .hasMessageContaining("null from key()");
-    }
-
-    @Test
     void resolveWithNullKeyReturnsEmpty() {
         IntegrationMessageHandlerRegistry registry = new IntegrationMessageHandlerRegistry(List.of());
 

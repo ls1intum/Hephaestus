@@ -20,6 +20,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
 import org.hibernate.annotations.ColumnDefault;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Instance-owned LLM provider connection: an endpoint the instance can talk to, its credential,
@@ -63,7 +64,7 @@ public class LlmConnection {
     @Convert(converter = EncryptedStringConverter.class)
     @Column(name = "api_key", columnDefinition = "TEXT")
     @ToString.Exclude
-    private String apiKey;
+    private @Nullable String apiKey;
 
     @ColumnDefault("false")
     @Column(name = "enabled", nullable = false)

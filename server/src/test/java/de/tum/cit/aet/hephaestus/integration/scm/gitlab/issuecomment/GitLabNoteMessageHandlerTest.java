@@ -9,6 +9,8 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.common.DataSource;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.NatsMessageDeserializer;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
@@ -29,8 +31,10 @@ import de.tum.cit.aet.hephaestus.integration.scm.gitlab.pullrequestreviewcomment
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import io.nats.client.Message;
 import java.io.IOException;
+import java.time.Instant;
 import java.util.Optional;
 import java.util.function.Consumer;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Tag;
@@ -131,6 +135,25 @@ class GitLabNoteMessageHandlerTest extends BaseUnitTest {
 
             verify(issueCommentProcessor).processMergeRequestNote(eq(event), any(ProcessingContext.class));
             verify(issueCommentProcessor, never()).processIssueNote(any(), any());
+        }
+
+        @Test
+        void mrGeneralNote_withoutRepositoryStillRoutes() throws IOException {
+            GitLabNoteEventDTO event = createMergeRequestNoteEvent("create", false, false, null);
+            ProcessingContext context = new ProcessingContext(
+                1L,
+                null,
+                null,
+                Instant.now(),
+                "test",
+                "create",
+                DataSource.WEBHOOK
+            );
+            when(contextResolver.resolve(eq(PROJECT_PATH), any(), any())).thenReturn(context);
+
+            handler.onMessage(mockMessage(event));
+
+            verify(issueCommentProcessor).processMergeRequestNote(event, context);
         }
 
         @Test
@@ -375,7 +398,7 @@ class GitLabNoteMessageHandlerTest extends BaseUnitTest {
             verify(mergeRequestProcessor, never()).processRequestedChangesFromNote(any(), any(), any());
         }
 
-        private EmbeddedMergeRequest createEmbeddedMergeRequestWithStatus(String detailedMergeStatus) {
+        private EmbeddedMergeRequest createEmbeddedMergeRequestWithStatus(@Nullable String detailedMergeStatus) {
             return new EmbeddedMergeRequest(
                 334047L,
                 2,
@@ -397,6 +420,9 @@ class GitLabNoteMessageHandlerTest extends BaseUnitTest {
         Repository repo = new Repository();
         repo.setId(-246765L);
         repo.setNameWithOwner(PROJECT_PATH);
+        IdentityProvider provider = new IdentityProvider();
+        provider.setId(1L);
+        repo.setProvider(provider);
         return repo;
     }
 
@@ -422,7 +448,7 @@ class GitLabNoteMessageHandlerTest extends BaseUnitTest {
         String action,
         boolean system,
         boolean internal,
-        Object position
+        @Nullable Object position
     ) {
         NoteAttributes attrs = createNoteAttributes("MergeRequest", action, system, internal, position);
         return new GitLabNoteEventDTO(
@@ -446,7 +472,7 @@ class GitLabNoteMessageHandlerTest extends BaseUnitTest {
         String action,
         boolean system,
         boolean internal,
-        Object position
+        @Nullable Object position
     ) {
         return new NoteAttributes(
             4406174L,

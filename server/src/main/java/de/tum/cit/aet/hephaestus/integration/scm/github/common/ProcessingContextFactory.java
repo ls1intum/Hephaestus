@@ -8,6 +8,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
 import java.util.Optional;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -117,7 +118,7 @@ public class ProcessingContextFactory {
      * @param repository the repository to resolve scope for
      * @return the scope ID, or null if no matching workspace found
      */
-    private Long resolveScopeId(Repository repository) {
+    private @Nullable Long resolveScopeId(Repository repository) {
         // Try organization-based lookup first (most common case)
         if (repository.getOrganization() != null) {
             String orgLogin = repository.getOrganization().getLogin();

@@ -34,8 +34,10 @@ public record TracedSignalDTO(
     @Schema(description = "How we came to know: by event, by sync, by hand, or by backfill")
     DiscoveredVia discoveredVia,
     @NonNull SignalState state,
-    @Schema(description = "Why it ended in that state; null once it triggered a review") SignalStateReason stateReason,
-    @Schema(description = "The review this occurrence started, when it started one") UUID reviewId
+    @Schema(description = "Why it ended in that state; null once it triggered a review")
+    @Nullable
+    SignalStateReason stateReason,
+    @Schema(description = "The review this occurrence started, when it started one") @Nullable UUID reviewId
 ) {
     public static TracedSignalDTO from(ArtifactSignal signal, @Nullable String displayName) {
         SignalName name = SignalName.of(signal.getSignalName());

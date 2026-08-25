@@ -45,6 +45,7 @@ import java.time.Instant;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -1104,19 +1105,6 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
         }
 
         @Test
-        void processRequestedChangesFromNote_nullNativeId_skips() {
-            PullRequest pr = createPullRequestEntity();
-            pr.setNativeId(RAW_MR_ID);
-
-            User reviewer = createUserEntity();
-            reviewer.setNativeId(null);
-
-            processor.processRequestedChangesFromNote(pr, reviewer, createContext());
-
-            verify(reviewRepository, never()).findByNativeIdAndProviderId(anyLong(), anyLong());
-        }
-
-        @Test
         void processMissingIdSkips() {
             var attrs = new GitLabMergeRequestEventDTO.ObjectAttributes(
                 null,
@@ -2114,7 +2102,7 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
         );
     }
 
-    private GitLabMergeRequestEventDTO createEventWithState(String action, String state) {
+    private GitLabMergeRequestEventDTO createEventWithState(String action, @Nullable String state) {
         var attrs = new GitLabMergeRequestEventDTO.ObjectAttributes(
             RAW_MR_ID,
             MR_IID,

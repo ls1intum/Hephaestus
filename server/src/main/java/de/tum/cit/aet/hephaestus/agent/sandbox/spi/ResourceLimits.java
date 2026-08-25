@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.agent.sandbox.spi;
 
 import java.time.Duration;
 import java.util.Objects;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Resource constraints for a sandboxed container.
@@ -14,7 +15,7 @@ import java.util.Objects;
  * @param pidsLimit maximum number of processes inside the container
  * @param maxRuntime hard deadline after which the container is killed
  */
-public record ResourceLimits(long memoryBytes, double cpus, int pidsLimit, Duration maxRuntime) {
+public record ResourceLimits(long memoryBytes, double cpus, int pidsLimit, @Nullable Duration maxRuntime) {
     /** Maximum memory: 16 GB — prevents callers from requesting unbounded resources. */
     public static final long MAX_MEMORY_BYTES = 16L * 1024 * 1024 * 1024;
 
@@ -48,13 +49,18 @@ public record ResourceLimits(long memoryBytes, double cpus, int pidsLimit, Durat
         if (pidsLimit > MAX_PIDS) {
             throw new IllegalArgumentException("pidsLimit exceeds maximum (" + MAX_PIDS + "), got: " + pidsLimit);
         }
-        Objects.requireNonNull(maxRuntime, "maxRuntime must not be null");
+        maxRuntime = Objects.requireNonNull(maxRuntime, "maxRuntime must not be null");
         if (maxRuntime.isNegative() || maxRuntime.isZero()) {
             throw new IllegalArgumentException("maxRuntime must be positive, got: " + maxRuntime);
         }
         if (maxRuntime.compareTo(MAX_RUNTIME) > 0) {
             throw new IllegalArgumentException("maxRuntime exceeds maximum (" + MAX_RUNTIME + "), got: " + maxRuntime);
         }
+    }
+
+    @Override
+    public Duration maxRuntime() {
+        return Objects.requireNonNull(maxRuntime);
     }
 
     /** Sensible defaults: 4 GB RAM, 2 CPUs, 512 PIDs, 10 min timeout. */

@@ -19,6 +19,7 @@ import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.jspecify.annotations.Nullable;
 import org.springframework.data.domain.Persistable;
 
 /**
@@ -45,6 +46,7 @@ public class TeamMembership implements Persistable<TeamMembership.Id> {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @MapsId("teamId")
+    @Nullable
     private Team team;
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -108,7 +110,10 @@ public class TeamMembership implements Persistable<TeamMembership.Id> {
     @EqualsAndHashCode
     public static class Id implements Serializable {
 
+        @Nullable
         private Long teamId;
+
+        @Nullable
         private Long userId;
     }
 }

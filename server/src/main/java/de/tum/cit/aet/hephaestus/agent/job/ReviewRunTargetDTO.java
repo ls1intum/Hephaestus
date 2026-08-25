@@ -6,17 +6,18 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewRunTargetLookup.Target;
 import io.swagger.v3.oas.annotations.media.Schema;
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 @Schema(description = "Work reviewed by an agent job")
 public record ReviewRunTargetDTO(
     @NonNull ArtifactKind type,
-    @Schema(description = "Internal artifact entity ID, when recorded") Long id,
-    IntegrationKind provider,
-    @Schema(description = "Provider-visible work-item number") Integer number,
+    @Schema(description = "Internal artifact entity ID, when recorded") @Nullable Long id,
+    @Nullable IntegrationKind provider,
+    @Schema(description = "Provider-visible work-item number") @Nullable Integer number,
     @NonNull String title,
-    String repositoryName,
-    String channelName,
-    String url
+    @Nullable String repositoryName,
+    @Nullable String channelName,
+    @Nullable String url
 ) {
     static ReviewRunTargetDTO from(AgentJob job) {
         return from(ReviewRunTargetMapper.from(job));

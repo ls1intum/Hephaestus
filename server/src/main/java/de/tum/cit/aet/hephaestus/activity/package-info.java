@@ -16,4 +16,5 @@
  * {@code integration/scm/github/project/activity/}.
  */
 @org.springframework.modulith.ApplicationModule(displayName = "Activity Event Log")
+@org.jspecify.annotations.NullMarked
 package de.tum.cit.aet.hephaestus.activity;

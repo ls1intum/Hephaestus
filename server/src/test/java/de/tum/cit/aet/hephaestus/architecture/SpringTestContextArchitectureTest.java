@@ -9,6 +9,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.stream.Collectors;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.boot.test.autoconfigure.json.JsonTest;
@@ -308,6 +309,7 @@ class SpringTestContextArchitectureTest extends HephaestusArchitectureTest {
     private static final class TestBeanFixture {
 
         @TestBean
+        @Nullable
         String dependency;
 
         static String dependency() {

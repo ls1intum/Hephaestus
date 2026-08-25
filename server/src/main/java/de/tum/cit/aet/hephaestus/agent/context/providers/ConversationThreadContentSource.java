@@ -18,6 +18,7 @@ import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ReviewContextBuilder;
 import java.time.Instant;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -83,7 +84,7 @@ public class ConversationThreadContentSource implements EvidenceSource, ReviewCo
     @Transactional(readOnly = true)
     public void contribute(ContextRequest request, Map<String, byte[]> files) {
         AgentJob job = ((ContextRequest.ConversationReviewRequest) request).job();
-        JsonNode metadata = job.getMetadata();
+        JsonNode metadata = Objects.requireNonNull(job.getMetadata(), "conversation job metadata is required");
         if (metadata == null || metadata.isNull() || metadata.isMissingNode()) {
             throw new JobPreparationException("Job has no metadata: jobId=" + job.getId());
         }
@@ -114,7 +115,7 @@ public class ConversationThreadContentSource implements EvidenceSource, ReviewCo
         EvidenceContribution captured = EvidenceSource.super.capture(request, selectedKinds);
         if (!selectedKinds.contains(KIND)) return captured;
         AgentJob job = ((ContextRequest.ConversationReviewRequest) request).job();
-        JsonNode metadata = job.getMetadata();
+        JsonNode metadata = Objects.requireNonNull(job.getMetadata(), "Conversation jobs require metadata");
         JsonNode payload;
         try {
             payload = objectMapper.readTree(captured.files().get(OUTPUT_KEY));
@@ -122,7 +123,8 @@ public class ConversationThreadContentSource implements EvidenceSource, ReviewCo
             throw new IllegalStateException("Serialized conversation thread could not be read", e);
         }
         int messageCount = payload.path("messageCount").asInt();
-        Instant effectiveTime = projection.sourceEffectiveAt(metadata.path("slack_last_ts").asString(null));
+        String slackLastTs = metadata.path("slack_last_ts").asString(null);
+        Instant effectiveTime = projection.sourceEffectiveAt(slackLastTs);
         Map<SourceKind, Instant> effectiveAt = effectiveTime == null ? Map.of() : Map.of(KIND, effectiveTime);
         // An empty payload isn't necessarily a thread with no messages — a paused/withdrawn consent or a
         // deleted thread must not be misreported as a conversation the developer did not have.
@@ -131,8 +133,8 @@ public class ConversationThreadContentSource implements EvidenceSource, ReviewCo
                 ? absenceOf(
                       projection.threadReadability(
                           job.getWorkspace().getId(),
-                          metadata.path("slack_channel_id").asString(null),
-                          metadata.path("slack_thread_ts").asString(null)
+                          metadata.path("slack_channel_id").asText(),
+                          metadata.path("slack_thread_ts").asText()
                       )
                   )
                 : Map.of();

@@ -159,7 +159,7 @@ class ConfigAuditIntegrationTest extends AbstractWorkspaceIntegrationTest {
         List<ConfigAuditEvent> rows = configAuditEventRepository
             .findAll()
             .stream()
-            .filter(row -> row.getWorkspaceId().equals(workspace.getId()))
+            .filter(row -> java.util.Objects.equals(row.getWorkspaceId(), workspace.getId()))
             .filter(row -> row.getEntityType() == ConfigAuditEntityType.PRACTICE_DEFINITION)
             .filter(row -> row.getEntityId().equals(String.valueOf(practice.id())))
             .sorted(java.util.Comparator.comparing(ConfigAuditEvent::getId))

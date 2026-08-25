@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.agent.sandbox.spi;
 
 import java.util.List;
 import java.util.Map;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Security hardening profile for a sandboxed container.
@@ -21,10 +22,10 @@ import java.util.Map;
  *     "rw,noexec,nosuid,nodev,size=1g"})
  */
 public record SecurityProfile(
-    String runtime,
-    String ipcMode,
+    @Nullable String runtime,
+    @Nullable String ipcMode,
     List<String> dropCapabilities,
-    Map<String, String> tmpfsMounts
+    @Nullable Map<String, String> tmpfsMounts
 ) {
     /** Production defaults: maximum hardening with standard tmpfs layout. */
     public static final SecurityProfile DEFAULT = new SecurityProfile(

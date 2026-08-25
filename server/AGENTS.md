@@ -73,6 +73,17 @@ authorization logic.
 never log a token) · `@Transactional` on a controller (service layer only) · expose an entity from a
 controller.
 
+## Null-safety
+
+NullAway checks all handwritten production and test code in JSpecify mode; generated sources are
+excluded. Every new package needs a `package-info.java` containing
+`@org.jspecify.annotations.NullMarked`, and the build rejects missing null-marking scopes and
+`NullAway` suppressions. Use `@Nullable` only for genuine absence and place it on the precise type:
+`List<@Nullable String>` permits null elements; `String @Nullable []` permits a null array reference.
+Fix violations at the contract or implementation boundary. In tests, refine a nullable result once
+before using it rather than adding duplicate assertions. Run `./mvnw test -P'!quick'` after changing a
+nullness contract.
+
 ## Test tiers
 
 | Tag | Runs | Command |
@@ -140,9 +151,9 @@ or on "the only" result, and never write cleanup that another test depends on ha
   `OpenAPIConfiguration.ALLOWED_DOMAIN_OBJECTS`. The webapp client then simply has no type for it, with
   no error anywhere. Domain types the API deliberately exposes (`ProblemDetail`, `PracticeBinding`, …)
   are there for this reason.
-- DTOs are records, and `@NonNull` (`org.jspecify.annotations`) on a component is what puts it in the
-  generated schema's `required` list. A component the API may omit is left off that list — annotate it
-  `@Nullable` or leave it bare; neither changes the spec.
+- DTOs are records. All bare components are non-null under `@NullMarked`; add JSpecify `@NonNull` when
+  that component must also appear in the generated schema's `required` list. A component the API may
+  omit is `@Nullable`, never bare.
 - **Never wrap a DTO component in `Optional<>`.** springdoc unwraps it to the value type but still marks
   it required, so the generated TypeScript declares it non-optional and its response transformer
   converts it unconditionally — a value the server never sends is typed as one it always sends. Use

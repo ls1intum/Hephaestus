@@ -6,6 +6,7 @@ import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.io.IOException;
 import java.util.List;
 import java.util.Objects;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.env.YamlPropertySourceLoader;
 import org.springframework.core.env.PropertySource;
@@ -46,7 +47,7 @@ class WorkerProfileOverlayTest extends BaseUnitTest {
         assertThat(baseValueOf("hephaestus.agent.enabled")).isEqualTo("${AGENT_ENABLED:false}");
     }
 
-    private static Object baseValueOf(String key) throws IOException {
+    private static @Nullable Object baseValueOf(String key) throws IOException {
         return new YamlPropertySourceLoader()
             .load("application.yml", new ClassPathResource("application.yml"))
             .stream()

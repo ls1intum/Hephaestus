@@ -92,7 +92,7 @@ public class GitLabTeamSyncService {
     private final GitLabProperties gitLabProperties;
     private final RepositoryCollaboratorRepository collaboratorRepository;
     private final TransactionTemplate transactionTemplate;
-    private final TeamMembershipListener teamMembershipListener;
+    private final @Nullable TeamMembershipListener teamMembershipListener;
 
     public GitLabTeamSyncService(
         TeamRepository teamRepository,
@@ -143,7 +143,7 @@ public class GitLabTeamSyncService {
             log.warn("Skipped team sync: reason=providerNotResolved, scopeId={}", scopeId);
             return 0;
         }
-        Long providerId = provider.getId();
+        Long providerId = Objects.requireNonNull(provider.getId());
 
         HttpGraphQlClient client = graphQlClientProvider.forScope(scopeId);
 
@@ -325,7 +325,9 @@ public class GitLabTeamSyncService {
         }
         graphQlClientProvider.recordSuccess();
 
-        GitLabGroupResponse rootPayload = response.field("group").toEntity(GitLabGroupResponse.class);
+        GitLabGroupResponse rootPayload = Objects.requireNonNull(response)
+            .field("group")
+            .toEntity(GitLabGroupResponse.class);
         if (rootPayload == null) {
             return null;
         }
@@ -397,7 +399,7 @@ public class GitLabTeamSyncService {
             graphQlClientProvider.recordSuccess();
 
             // Parse nodes
-            List<GitLabDescendantGroupResponse> groups = response
+            List<GitLabDescendantGroupResponse> groups = Objects.requireNonNull(response)
                 .field("group.descendantGroups.nodes")
                 .toEntityList(GitLabDescendantGroupResponse.class);
 
@@ -430,7 +432,9 @@ public class GitLabTeamSyncService {
             }
 
             // Parse page info
-            GitLabPageInfo pageInfo = response.field("group.descendantGroups.pageInfo").toEntity(GitLabPageInfo.class);
+            GitLabPageInfo pageInfo = Objects.requireNonNull(response)
+                .field("group.descendantGroups.pageInfo")
+                .toEntity(GitLabPageInfo.class);
 
             if (pageInfo == null || !pageInfo.hasNextPage()) {
                 break;
@@ -594,7 +598,7 @@ public class GitLabTeamSyncService {
             }
             graphQlClientProvider.recordSuccess();
 
-            List<GitLabGroupMemberResponse> members = response
+            List<GitLabGroupMemberResponse> members = Objects.requireNonNull(response)
                 .field("group.groupMembers.nodes")
                 .toEntityList(GitLabGroupMemberResponse.class);
 
@@ -602,7 +606,7 @@ public class GitLabTeamSyncService {
                 allMembers.addAll(members);
             }
 
-            GitLabPageInfo memberPageInfo = response
+            GitLabPageInfo memberPageInfo = Objects.requireNonNull(response)
                 .field("group.groupMembers.pageInfo")
                 .toEntity(GitLabPageInfo.class);
 
@@ -685,7 +689,7 @@ public class GitLabTeamSyncService {
      * <p>
      * Returns null for access levels that should be skipped.
      */
-    static TeamMembership.Role mapAccessLevel(String accessLevel) {
+    static TeamMembership.@Nullable Role mapAccessLevel(@Nullable String accessLevel) {
         if (accessLevel == null) {
             return TeamMembership.Role.MEMBER;
         }
@@ -834,7 +838,7 @@ public class GitLabTeamSyncService {
                 // Only delete teams from the same provider
                 if (
                     team.getProvider() != null &&
-                    team.getProvider().getId().equals(providerId) &&
+                    Objects.requireNonNull(team.getProvider().getId()).equals(providerId) &&
                     !syncedNativeIds.contains(team.getNativeId())
                 ) {
                     teamProcessor.delete(team.getNativeId(), providerId);
@@ -850,7 +854,7 @@ public class GitLabTeamSyncService {
 
     // Helpers
 
-    private IdentityProvider resolveProvider() {
+    private @Nullable IdentityProvider resolveProvider() {
         return gitProviderRepository
             .findByTypeAndServerUrl(IdentityProviderType.GITLAB, gitLabProperties.defaultServerUrl())
             .orElse(null);

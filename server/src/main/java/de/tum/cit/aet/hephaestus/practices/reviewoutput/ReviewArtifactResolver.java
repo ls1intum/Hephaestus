@@ -12,6 +12,7 @@ import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -41,7 +42,7 @@ class ReviewArtifactResolver {
             .collect(Collectors.toUnmodifiableMap(Function.identity(), ref -> resolve(ref, targets.get(ref.jobId()))));
     }
 
-    private static ReviewArtifactDTO resolve(ArtifactRef ref, Target target) {
+    private static ReviewArtifactDTO resolve(ArtifactRef ref, @Nullable Target target) {
         if (
             target == null ||
             !target.type().equals(ref.type()) ||

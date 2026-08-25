@@ -16,6 +16,7 @@ import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
 import mockwebserver3.MockResponse;
@@ -97,6 +98,7 @@ class LlmProxyControllerTest extends BaseUnitTest {
                 jsonBody()
             );
 
+            assertThat(result).isNotNull();
             assertThat(result.getStatusCode().value()).isEqualTo(429);
             assertThat(String.valueOf(result.getBody()))
                 .contains("Shared-model budget reached")
@@ -116,6 +118,7 @@ class LlmProxyControllerTest extends BaseUnitTest {
                 jsonBody()
             );
 
+            assertThat(result).isNotNull();
             assertThat(result.getStatusCode().value()).isEqualTo(429);
             assertThat(String.valueOf(result.getBody()))
                 .contains("Own-provider budget reached")
@@ -137,6 +140,7 @@ class LlmProxyControllerTest extends BaseUnitTest {
                 jsonBody()
             );
 
+            assertThat(result).isNotNull();
             assertThat(result.getStatusCode().value()).isEqualTo(502);
         }
     }
@@ -160,6 +164,7 @@ class LlmProxyControllerTest extends BaseUnitTest {
                 jsonBody()
             );
 
+            assertThat(result).isNotNull();
             assertThat(result.getStatusCode().value()).isEqualTo(403);
             verifyNoInteractions(resolver);
             verifyNoInteractions(mentorTurnUsageAccumulator);
@@ -191,6 +196,7 @@ class LlmProxyControllerTest extends BaseUnitTest {
 
             var result = controller.proxy(request, new MockHttpServletResponse(), new HttpHeaders(), jsonBody());
 
+            assertThat(result).isNotNull();
             assertThat(result.getStatusCode().value()).isEqualTo(405);
             verifyNoInteractions(resolver);
         }
@@ -202,6 +208,7 @@ class LlmProxyControllerTest extends BaseUnitTest {
 
             var result = controller.proxy(request, new MockHttpServletResponse(), new HttpHeaders(), jsonBody());
 
+            assertThat(result).isNotNull();
             assertThat(result.getStatusCode().value()).isEqualTo(404);
             verifyNoInteractions(resolver);
         }
@@ -214,6 +221,7 @@ class LlmProxyControllerTest extends BaseUnitTest {
 
             var result = controller.proxy(request, new MockHttpServletResponse(), new HttpHeaders(), jsonBody());
 
+            assertThat(result).isNotNull();
             assertThat(result.getStatusCode().value()).isEqualTo(400);
             verifyNoInteractions(resolver);
         }
@@ -225,6 +233,7 @@ class LlmProxyControllerTest extends BaseUnitTest {
 
             var result = controller.proxy(request, new MockHttpServletResponse(), new HttpHeaders(), jsonBody());
 
+            assertThat(result).isNotNull();
             assertThat(result.getStatusCode().value()).isEqualTo(404);
             verifyNoInteractions(resolver);
         }
@@ -243,6 +252,7 @@ class LlmProxyControllerTest extends BaseUnitTest {
                 jsonBody()
             );
 
+            assertThat(result).isNotNull();
             assertThat(result.getStatusCode().value()).isEqualTo(502);
         }
 
@@ -260,6 +270,7 @@ class LlmProxyControllerTest extends BaseUnitTest {
                 jsonBody()
             );
 
+            assertThat(result).isNotNull();
             assertThat(result.getStatusCode().value()).isEqualTo(502);
         }
 
@@ -276,6 +287,7 @@ class LlmProxyControllerTest extends BaseUnitTest {
                 jsonBody()
             );
 
+            assertThat(result).isNotNull();
             assertThat(result.getStatusCode().value()).isEqualTo(502);
             verifyNoInteractions(egressPolicy);
         }
@@ -291,7 +303,9 @@ class LlmProxyControllerTest extends BaseUnitTest {
             );
 
             var prepared = controller.prepareBody(input, "catalog-model", false);
+            org.junit.jupiter.api.Assertions.assertNotNull(prepared);
 
+            assertThat(prepared.body()).isNotNull();
             var tree = OBJECT_MAPPER.readTree(prepared.body());
             assertThat(tree.path("model").asString()).isEqualTo("catalog-model");
             assertThat(tree.has("service_tier")).isFalse();
@@ -312,7 +326,9 @@ class LlmProxyControllerTest extends BaseUnitTest {
             byte[] input = "{\"stream\":true,\"messages\":[]}".getBytes(StandardCharsets.UTF_8);
 
             var prepared = controller.prepareBody(input, "catalog-model", true);
+            org.junit.jupiter.api.Assertions.assertNotNull(prepared);
 
+            assertThat(prepared.body()).isNotNull();
             var tree = OBJECT_MAPPER.readTree(prepared.body());
             assertThat(tree.path("model").asString()).isEqualTo("catalog-model");
             assertThat(tree.path("stream_options").path("include_usage").asBoolean()).isTrue();
@@ -480,10 +496,12 @@ class LlmProxyControllerTest extends BaseUnitTest {
         void theOutgoingRequestAsksForUsage() throws Exception {
             proxyStream("[DONE]");
 
-            RecordedRequest sent = upstream.takeRequest(5, TimeUnit.SECONDS);
-            assertThat(sent).isNotNull();
+            RecordedRequest sent = Objects.requireNonNull(upstream.takeRequest(5, TimeUnit.SECONDS));
             assertThat(
-                OBJECT_MAPPER.readTree(sent.getBody().utf8()).path("stream_options").path("include_usage").asBoolean()
+                OBJECT_MAPPER.readTree(Objects.requireNonNull(sent.getBody()).utf8())
+                    .path("stream_options")
+                    .path("include_usage")
+                    .asBoolean()
             ).isTrue();
         }
 
@@ -521,8 +539,10 @@ class LlmProxyControllerTest extends BaseUnitTest {
             controllerProxy(response);
 
             assertThat(response.getContentAsString()).contains("served anyway");
-            assertThat(upstream.takeRequest(5, TimeUnit.SECONDS).getBody().utf8()).contains("stream_options");
-            assertThat(upstream.takeRequest(5, TimeUnit.SECONDS).getBody().utf8()).doesNotContain("stream_options");
+            RecordedRequest initial = Objects.requireNonNull(upstream.takeRequest(5, TimeUnit.SECONDS));
+            RecordedRequest retry = Objects.requireNonNull(upstream.takeRequest(5, TimeUnit.SECONDS));
+            assertThat(Objects.requireNonNull(initial.getBody()).utf8()).contains("stream_options");
+            assertThat(Objects.requireNonNull(retry.getBody()).utf8()).doesNotContain("stream_options");
         }
     }
 

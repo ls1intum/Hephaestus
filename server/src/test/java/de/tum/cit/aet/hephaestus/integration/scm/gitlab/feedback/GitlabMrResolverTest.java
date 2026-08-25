@@ -12,6 +12,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.gitlab.feedback.GitlabMrResolve
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.feedback.GitlabMrResolver.MrInfo;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.List;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -161,7 +162,7 @@ class GitlabMrResolverTest extends BaseUnitTest {
         when(spec.execute()).thenReturn(result);
     }
 
-    private static void stubField(ClientGraphQlResponse response, String path, String value) {
+    private static void stubField(ClientGraphQlResponse response, String path, @Nullable String value) {
         ClientResponseField field = mock(ClientResponseField.class);
         when(field.<String>getValue()).thenReturn(value);
         when(response.field(path)).thenReturn(field);

@@ -8,8 +8,10 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.events.GitHubProjectEven
 import de.tum.cit.aet.hephaestus.integration.scm.github.project.dto.GitHubProjectStatusUpdateDTO;
 import java.time.Instant;
 import java.util.List;
+import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jspecify.annotations.Nullable;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,7 +29,11 @@ public class GitHubProjectStatusUpdateProcessor {
     private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
-    public ProjectStatusUpdate process(GitHubProjectStatusUpdateDTO dto, Project project, ProcessingContext context) {
+    public @Nullable ProjectStatusUpdate process(
+        GitHubProjectStatusUpdateDTO dto,
+        Project project,
+        ProcessingContext context
+    ) {
         if (dto == null) {
             log.warn(
                 "Skipped status update processing: reason=nullDto, projectId={}",
@@ -65,7 +71,7 @@ public class GitHubProjectStatusUpdateProcessor {
         // Atomic upsert
         statusUpdateRepository.upsertCore(
             dbId,
-            context.providerId(),
+            Objects.requireNonNull(context.providerId()),
             dto.nodeId(),
             project.getId(),
             sanitize(dto.body()),
@@ -145,7 +151,7 @@ public class GitHubProjectStatusUpdateProcessor {
         return removed;
     }
 
-    private String sanitize(String input) {
+    private @Nullable String sanitize(@Nullable String input) {
         if (input == null) {
             return null;
         }

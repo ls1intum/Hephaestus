@@ -19,12 +19,12 @@ public record PiPlanSpec(
     @Nullable Integer contextWindow,
     @Nullable Integer maxOutputTokens,
     boolean supportsReasoning,
-    String jobToken,
+    @Nullable String jobToken,
     boolean allowInternet,
     int timeoutSeconds,
     PiRunnerProfile runnerProfile,
     Map<String, byte[]> extraInputs,
-    String precomputeStep
+    @Nullable String precomputeStep
 ) {
     public PiPlanSpec {
         if (apiProtocol == null || apiProtocol.isBlank()) {

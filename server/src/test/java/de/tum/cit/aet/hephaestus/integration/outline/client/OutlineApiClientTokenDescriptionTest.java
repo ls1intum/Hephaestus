@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.integration.outline.client;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import de.tum.cit.aet.hephaestus.core.security.OutlineOriginPolicy;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
@@ -70,6 +71,7 @@ class OutlineApiClientTokenDescriptionTest extends BaseUnitTest {
         Optional<OutlineApiClient.OutlineTokenDescription> described = client.describeToken(SERVER_URL, TOKEN);
 
         ClientRequest request = captured.get();
+        assertNotNull(request);
         assertThat(request.method()).isEqualTo(HttpMethod.POST);
         assertThat(request.url().toString()).isEqualTo("https://wiki.example.com/api/apiKeys.list");
         assertThat(request.headers().getFirst(HttpHeaders.AUTHORIZATION)).isEqualTo("Bearer " + TOKEN);

@@ -15,6 +15,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubEventType;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.ProcessingContextFactory;
 import de.tum.cit.aet.hephaestus.integration.scm.github.repository.dto.GitHubMemberEventDTO;
 import de.tum.cit.aet.hephaestus.integration.scm.github.user.GitHubUserProcessor;
+import java.util.Objects;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -73,13 +74,13 @@ public class GitHubMemberMessageHandler extends AbstractIntegrationMessageHandle
         }
 
         // Ensure user exists via processor
-        User user = userProcessor.ensureExists(memberDto, context.providerId());
+        User user = userProcessor.ensureExists(memberDto, Objects.requireNonNull(context.providerId()));
         if (user == null) {
             log.warn("Skipped member event: reason=userNotFound, userLogin={}", sanitizeForLog(memberDto.login()));
             return;
         }
 
-        Repository repository = context.repository();
+        Repository repository = Objects.requireNonNull(context.repository());
 
         switch (event.actionType()) {
             case GitHubEventAction.Member.ADDED -> handleCollaboratorAdded(repository, user, event);

@@ -17,6 +17,7 @@ import de.tum.cit.aet.hephaestus.practices.review.GateDecision;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewDetectionGate;
 import de.tum.cit.aet.hephaestus.practices.review.TriggerMode;
 import java.time.Instant;
+import java.util.Objects;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -112,15 +113,19 @@ public class DevTriggerController {
         }
 
         Prepared prepared = transactionTemplate.execute(status ->
-            issueId != null ? prepareIssue(workspaceId, issueId, signal) : preparePullRequest(workspaceId, prId, signal)
+            issueId != null
+                ? prepareIssue(workspaceId, issueId, signal)
+                : preparePullRequest(workspaceId, Objects.requireNonNull(prId), signal)
         );
 
         if (prepared == null || prepared.request() == null) {
-            return prepared == null ? "No submission prepared" : prepared.message();
+            return prepared == null
+                ? "No submission prepared"
+                : Objects.requireNonNullElse(prepared.message(), "No submission prepared");
         }
         return agentJobService.submitPrepared(
             workspaceId,
-            prepared.jobType(),
+            Objects.requireNonNull(prepared.jobType()),
             (JobSubmissionRequest) prepared.request(),
             prepared.signalKey()
         );

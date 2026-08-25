@@ -23,7 +23,7 @@ public record GitLabDescendantGroupResponse(
     String fullPath,
     String name,
     @Nullable String description,
-    String webUrl,
+    @Nullable String webUrl,
     @Nullable String visibility,
     @Nullable ParentRef parent
 ) {

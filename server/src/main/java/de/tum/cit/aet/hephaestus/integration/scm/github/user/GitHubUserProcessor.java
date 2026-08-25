@@ -5,6 +5,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.github.user.dto.GitHubUserDTO;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
+import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -77,13 +78,15 @@ public class GitHubUserProcessor {
     private final TransactionTemplate requiresNewTransaction;
 
     @PersistenceContext
-    private EntityManager entityManager;
+    private @Nullable EntityManager entityManager;
 
     public GitHubUserProcessor(UserRepository userRepository, TransactionTemplate transactionTemplate) {
         this.userRepository = userRepository;
         // Create a REQUIRES_NEW template so the upsert runs in its own transaction.
         // This isolates deadlock rollbacks from the caller's transaction.
-        this.requiresNewTransaction = new TransactionTemplate(transactionTemplate.getTransactionManager());
+        this.requiresNewTransaction = new TransactionTemplate(
+            Objects.requireNonNull(transactionTemplate.getTransactionManager())
+        );
         this.requiresNewTransaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
     }
 
@@ -123,7 +126,7 @@ public class GitHubUserProcessor {
 
         // Flush any pending Hibernate changes before the native SQL to ensure
         // consistency between Hibernate's cache and the database.
-        entityManager.flush();
+        entityManager().flush();
 
         // Execute the upsert in a REQUIRES_NEW transaction with deadlock retry.
         // This isolates the upsert from the caller's transaction so that if
@@ -138,7 +141,7 @@ public class GitHubUserProcessor {
         if (result != null) {
             // Refresh to ensure we have the latest data (handles L1 cache staleness
             // if the entity was previously loaded in this transaction).
-            entityManager.refresh(result);
+            entityManager().refresh(result);
         } else {
             // Should not happen after a successful upsert, but handle gracefully
             log.warn("User not found after upsert: nativeId={}, providerId={}, login={}", userId, providerId, login);
@@ -157,9 +160,9 @@ public class GitHubUserProcessor {
         Long userId,
         Long providerId,
         String login,
-        String name,
-        String avatarUrl,
-        String htmlUrl,
+        @Nullable String name,
+        @Nullable String avatarUrl,
+        @Nullable String htmlUrl,
         User.Type userType,
         GitHubUserDTO dto
     ) {
@@ -269,5 +272,9 @@ public class GitHubUserProcessor {
     @Nullable
     public User ensureExists(GitHubUserDTO dto, Long providerId) {
         return findOrCreate(dto, providerId);
+    }
+
+    private EntityManager entityManager() {
+        return Objects.requireNonNull(entityManager);
     }
 }

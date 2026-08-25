@@ -42,7 +42,12 @@ class TestTierTagCompletenessTest {
     );
     private static final Pattern BLOCK_COMMENT = Pattern.compile("/\\*.*?\\*/", Pattern.DOTALL);
 
-    private record TypeInfo(Set<String> tags, String superType, boolean isAbstract, boolean hasTestMethods) {}
+    private record TypeInfo(
+        Set<String> tags,
+        @org.jspecify.annotations.Nullable String superType,
+        boolean isAbstract,
+        boolean hasTestMethods
+    ) {}
 
     @Test
     void everyConcreteTestClassResolvesToATierTag() {
@@ -90,7 +95,8 @@ class TestTierTagCompletenessTest {
         if (info.tags().stream().anyMatch(TIER_TAGS::contains)) {
             return true;
         }
-        return resolvesToTier(info.superType(), types, seen);
+        String superType = info.superType();
+        return superType != null && resolvesToTier(superType, types, seen);
     }
 
     private static void parse(Path file, Map<String, TypeInfo> types) {

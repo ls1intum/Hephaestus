@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.core.sync.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 
@@ -31,6 +32,7 @@ import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -232,8 +234,9 @@ class SyncControllerIntegrationTest extends AbstractWorkspaceIntegrationTest {
         release.countDown();
         firstCaller.join(5000);
 
-        SyncJobDTO firstJob = firstResponse
-            .get()
+        WebTestClient.ResponseSpec response = firstResponse.get();
+        assertNotNull(response);
+        SyncJobDTO firstJob = response
             .expectStatus()
             .isEqualTo(HttpStatus.ACCEPTED)
             .expectBody(SyncJobDTO.class)
@@ -552,11 +555,18 @@ class SyncControllerIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     /** A trigger call made WHILE another job is running answers 200 with the still-active job. */
     private SyncJobDTO duplicateJobDuringRun(String bearerToken) {
-        return triggerRequest(bearerToken)
-            .expectStatus()
-            .isOk()
-            .expectBody(SyncJobDTO.class)
-            .returnResult()
-            .getResponseBody();
+        return required(
+            triggerRequest(bearerToken)
+                .expectStatus()
+                .isOk()
+                .expectBody(SyncJobDTO.class)
+                .returnResult()
+                .getResponseBody()
+        );
+    }
+
+    private static <T> T required(@Nullable T value) {
+        assertNotNull(value);
+        return value;
     }
 }

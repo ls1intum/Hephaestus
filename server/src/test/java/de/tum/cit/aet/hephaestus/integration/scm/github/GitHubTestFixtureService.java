@@ -1,5 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.scm.github;
 
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.time.Duration;
@@ -8,7 +10,9 @@ import java.util.Base64;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.TimeUnit;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.graphql.client.ClientGraphQlResponse;
@@ -101,10 +105,11 @@ public class GitHubTestFixtureService {
         }
 
         Map<String, Object> repo = response.field("createRepository.repository").toEntity(Map.class);
-        String nodeId = (String) repo.get("id");
-        Long databaseId = ((Number) repo.get("databaseId")).longValue();
-        String nameWithOwner = (String) repo.get("nameWithOwner");
-        String url = (String) repo.get("url");
+        assertNotNull(repo);
+        String nodeId = requiredField(repo, "id", String.class);
+        Long databaseId = requiredField(repo, "databaseId", Number.class).longValue();
+        String nameWithOwner = requiredField(repo, "nameWithOwner", String.class);
+        String url = requiredField(repo, "url", String.class);
 
         // If autoInit, we need to create initial commit via REST
         // (GraphQL createRepository doesn't support autoInit directly)
@@ -210,7 +215,12 @@ public class GitHubTestFixtureService {
         }
 
         Map<String, Object> label = response.field("createLabel.label").toEntity(Map.class);
-        return new CreatedLabel((String) label.get("id"), (String) label.get("name"), (String) label.get("color"));
+        assertNotNull(label);
+        return new CreatedLabel(
+            requiredField(label, "id", String.class),
+            requiredField(label, "name", String.class),
+            requiredField(label, "color", String.class)
+        );
     }
 
     /**
@@ -328,7 +338,8 @@ public class GitHubTestFixtureService {
             .retrieve()
             .bodyToFlux(MilestoneResponse.class)
             .collectList()
-            .block(Duration.ofSeconds(30));
+            .blockOptional(Duration.ofSeconds(30))
+            .orElseThrow(() -> new IllegalStateException("GitHub milestone listing returned no response"));
     }
 
     // ISSUE OPERATIONS
@@ -369,11 +380,12 @@ public class GitHubTestFixtureService {
         }
 
         Map<String, Object> issue = response.field("createIssue.issue").toEntity(Map.class);
+        assertNotNull(issue);
         return new CreatedIssue(
-            (String) issue.get("id"),
-            ((Number) issue.get("databaseId")).longValue(),
-            ((Number) issue.get("number")).intValue(),
-            (String) issue.get("title")
+            requiredField(issue, "id", String.class),
+            requiredField(issue, "databaseId", Number.class).longValue(),
+            requiredField(issue, "number", Number.class).intValue(),
+            requiredField(issue, "title", String.class)
         );
     }
 
@@ -410,10 +422,11 @@ public class GitHubTestFixtureService {
         }
 
         Map<String, Object> comment = response.field("addComment.commentEdge.node").toEntity(Map.class);
+        assertNotNull(comment);
         return new CreatedIssueComment(
-            (String) comment.get("id"),
-            ((Number) comment.get("databaseId")).longValue(),
-            (String) comment.get("body")
+            requiredField(comment, "id", String.class),
+            requiredField(comment, "databaseId", Number.class).longValue(),
+            requiredField(comment, "body", String.class)
         );
     }
 
@@ -471,12 +484,13 @@ public class GitHubTestFixtureService {
         }
 
         Map<String, Object> pr = response.field("createPullRequest.pullRequest").toEntity(Map.class);
+        assertNotNull(pr);
         return new CreatedPullRequest(
-            (String) pr.get("id"),
-            ((Number) pr.get("databaseId")).longValue(),
-            ((Number) pr.get("number")).intValue(),
-            (String) pr.get("title"),
-            (String) pr.get("headRefOid")
+            requiredField(pr, "id", String.class),
+            requiredField(pr, "databaseId", Number.class).longValue(),
+            requiredField(pr, "number", Number.class).intValue(),
+            requiredField(pr, "title", String.class),
+            requiredField(pr, "headRefOid", String.class)
         );
     }
 
@@ -531,11 +545,12 @@ public class GitHubTestFixtureService {
         }
 
         Map<String, Object> review = response.field("addPullRequestReview.pullRequestReview").toEntity(Map.class);
+        assertNotNull(review);
         return new CreatedReview(
-            (String) review.get("id"),
-            ((Number) review.get("databaseId")).longValue(),
-            (String) review.get("body"),
-            (String) review.get("state")
+            requiredField(review, "id", String.class),
+            requiredField(review, "databaseId", Number.class).longValue(),
+            requiredField(review, "body", String.class),
+            requiredField(review, "state", String.class)
         );
     }
 
@@ -661,7 +676,9 @@ public class GitHubTestFixtureService {
             );
         }
 
-        return response.field("createCommitOnBranch.commit.oid").toEntity(String.class);
+        return Optional.ofNullable(
+            response.field("createCommitOnBranch.commit.oid").toEntity(String.class)
+        ).orElseThrow(() -> new IllegalStateException("GitHub commit mutation returned no commit ID"));
     }
 
     // TEAM OPERATIONS (REST API)
@@ -820,7 +837,9 @@ public class GitHubTestFixtureService {
             );
         }
 
-        return response.field("organization.id").toEntity(String.class);
+        return Optional.ofNullable(response.field("organization.id").toEntity(String.class)).orElseThrow(() ->
+            new IllegalStateException("GitHub organization query returned no ID")
+        );
     }
 
     /**
@@ -852,9 +871,10 @@ public class GitHubTestFixtureService {
         }
 
         List<Map<String, Object>> nodes = response.field("organization.membersWithRole.nodes").toEntity(List.class);
-        return nodes
+        return Optional.ofNullable(nodes)
+            .orElseThrow(() -> new IllegalStateException("GitHub organization query returned no members"))
             .stream()
-            .map(n -> (String) n.get("login"))
+            .map(n -> requiredField(n, "login", String.class))
             .toList();
     }
 
@@ -897,15 +917,16 @@ public class GitHubTestFixtureService {
         }
 
         Map<String, Object> repo = response.field("repository").toEntity(Map.class);
+        assertNotNull(repo);
         Map<String, Object> defaultBranch = (Map<String, Object>) repo.get("defaultBranchRef");
         Map<String, Object> target = defaultBranch != null ? (Map<String, Object>) defaultBranch.get("target") : null;
 
         return new RepositoryInfo(
-            (String) repo.get("id"),
-            ((Number) repo.get("databaseId")).longValue(),
-            (String) repo.get("nameWithOwner"),
-            defaultBranch != null ? (String) defaultBranch.get("name") : null,
-            target != null ? (String) target.get("oid") : null
+            requiredField(repo, "id", String.class),
+            requiredField(repo, "databaseId", Number.class).longValue(),
+            requiredField(repo, "nameWithOwner", String.class),
+            defaultBranch != null ? requiredField(defaultBranch, "name", String.class) : null,
+            target != null ? requiredField(target, "oid", String.class) : null
         );
     }
 
@@ -944,11 +965,23 @@ public class GitHubTestFixtureService {
 
         return nodes
             .stream()
-            .map(n -> new LabelInfo((String) n.get("id"), (String) n.get("name"), (String) n.get("color")))
+            .map(n ->
+                new LabelInfo(
+                    requiredField(n, "id", String.class),
+                    requiredField(n, "name", String.class),
+                    requiredField(n, "color", String.class)
+                )
+            )
             .toList();
     }
 
     // HELPER METHODS
+
+    private static <T> T requiredField(Map<String, Object> source, String name, Class<T> type) {
+        T value = type.cast(source.get(name));
+        assertNotNull(value);
+        return value;
+    }
 
     private void createInitialCommit(String fullName) {
         String[] parts = fullName.split("/");
@@ -1025,8 +1058,8 @@ public class GitHubTestFixtureService {
         String nodeId,
         Long databaseId,
         String fullName,
-        String defaultBranch,
-        String headCommitSha
+        @Nullable String defaultBranch,
+        @Nullable String headCommitSha
     ) {}
 
     public record LabelInfo(String nodeId, String name, String color) {}

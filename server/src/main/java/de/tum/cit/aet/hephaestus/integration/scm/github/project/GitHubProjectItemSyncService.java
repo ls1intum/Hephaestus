@@ -93,7 +93,7 @@ public class GitHubProjectItemSyncService {
      */
     @Transactional
     public int processEmbeddedItems(
-        EmbeddedProjectItemsDTO embeddedItems,
+        @Nullable EmbeddedProjectItemsDTO embeddedItems,
         ProcessingContext context,
         Long parentIssueId
     ) {
@@ -130,7 +130,7 @@ public class GitHubProjectItemSyncService {
      */
     public int syncRemainingProjectItems(
         Long scopeId,
-        String issueNodeId,
+        @Nullable String issueNodeId,
         boolean isPullRequest,
         Repository repository,
         String startCursor,
@@ -383,7 +383,7 @@ public class GitHubProjectItemSyncService {
         return projectRepository.findByNodeId(projectRef.nodeId()).orElse(null);
     }
 
-    private ClassificationResult classifyGraphQlErrors(ClientGraphQlResponse response) {
+    private @Nullable ClassificationResult classifyGraphQlErrors(@Nullable ClientGraphQlResponse response) {
         ClassificationResult classification = exceptionClassifier.classifyGraphQlResponse(response);
         if (classification != null) {
             return classification;

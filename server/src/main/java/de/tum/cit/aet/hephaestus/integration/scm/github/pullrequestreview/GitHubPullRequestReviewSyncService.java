@@ -37,9 +37,11 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHPullRequ
 import de.tum.cit.aet.hephaestus.integration.scm.github.pullrequestreview.dto.GitHubPullRequestReviewEventDTO.GitHubReviewDTO;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Stream;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.graphql.client.ClientGraphQlResponse;
@@ -171,7 +173,12 @@ public class GitHubPullRequestReviewSyncService {
      * @param inlineCount  number of reviews already synced inline (for accurate overflow detection)
      * @return number of reviews synced
      */
-    public int syncRemainingReviews(Long scopeId, PullRequest pullRequest, String startCursor, int inlineCount) {
+    public int syncRemainingReviews(
+        Long scopeId,
+        PullRequest pullRequest,
+        @Nullable String startCursor,
+        int inlineCount
+    ) {
         if (pullRequest == null || pullRequest.getRepository() == null) {
             log.warn(
                 "Skipped review sync: reason=prOrRepositoryNull, prId={}",
@@ -182,7 +189,7 @@ public class GitHubPullRequestReviewSyncService {
 
         Repository repository = pullRequest.getRepository();
         String nameWithOwner = repository.getNameWithOwner();
-        String safeNameWithOwner = sanitizeForLog(nameWithOwner);
+        String safeNameWithOwner = Objects.requireNonNullElse(sanitizeForLog(nameWithOwner), "null");
         Optional<RepositoryOwnerAndName> parsedName = GitHubRepositoryNameParser.parse(nameWithOwner);
         if (parsedName.isEmpty()) {
             log.warn("Skipped review sync: reason=invalidRepoNameFormat, repoName={}", safeNameWithOwner);
@@ -506,6 +513,7 @@ public class GitHubPullRequestReviewSyncService {
      * @return the persisted review entity, or null if processing was skipped
      */
     @Transactional
+    @Nullable
     public PullRequestReview processInlineReview(
         GitHubReviewDTO reviewDTO,
         Long pullRequestId,
