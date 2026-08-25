@@ -85,6 +85,25 @@ class ApprovedFeedbackDeliveryListener {
             }
             return;
         }
+        String approvedBody = feedback.getBody();
+        String safeBody = PullRequestCommentPoster.sanitize(approvedBody);
+        if (safeBody.isBlank()) {
+            feedbackRepository.markApprovedSuppressed(
+                event.workspaceId(),
+                feedback.getId(),
+                FeedbackSuppressionReason.EMPTY_AFTER_SANITIZE.name()
+            );
+            return;
+        }
+        if (!safeBody.equals(approvedBody)) {
+            feedbackRepository.markApprovedSuppressed(
+                event.workspaceId(),
+                feedback.getId(),
+                FeedbackSuppressionReason.APPROVAL_STALE.name()
+            );
+            return;
+        }
+
         PracticeFeedbackDispatchService.Result result = dispatchService.dispatchApproved(job, feedback);
         if (result.status() == PracticeFeedbackDispatchService.Result.Status.SUPPRESSED) {
             FeedbackSuppressionReason reason = result.refusal();

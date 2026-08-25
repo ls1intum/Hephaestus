@@ -465,7 +465,7 @@ class ConversationalFeedbackPreparerTest extends BaseUnitTest {
             "The test arrives after the review, not with the change",
             null,
             null,
-            new ComposedFeedbackUnit.ConversationBrief(OBSERVED, REALISATION, EVIDENCE, SELF_CHECK),
+            new ComposedFeedbackUnit.ConversationBrief(OBSERVED, REALISATION, EVIDENCE, SELF_CHECK, null),
             null
         );
     }

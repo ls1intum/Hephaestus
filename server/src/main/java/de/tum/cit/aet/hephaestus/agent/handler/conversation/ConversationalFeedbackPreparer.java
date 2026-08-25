@@ -172,7 +172,8 @@ public class ConversationalFeedbackPreparer {
                     brief.situation(),
                     brief.capability(),
                     brief.evidenceSummary(),
-                    brief.inConversationSignal()
+                    brief.inConversationSignal(),
+                    brief.alreadySaid()
                 );
             }
 

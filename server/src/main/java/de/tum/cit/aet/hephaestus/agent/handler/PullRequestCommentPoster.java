@@ -42,7 +42,7 @@ class PullRequestCommentPoster {
      *  Lookbehind covers start-of-line, whitespace, punctuation, and markdown formatting chars
      *  ({@code * _ ~ > | -}) to prevent bypass via {@code *@user*}, {@code >@user}, or {@code - @user}. */
     private static final Pattern AT_MENTION = Pattern.compile(
-        "(?<=^|[\\s(\\[\"'*_~>|#!+={}\\-])@([a-zA-Z0-9][-a-zA-Z0-9._]*)",
+        "(?<=^|[\\s(\\[\"'*_~>|#!+={}\\-,.:;/)])@([a-zA-Z0-9][-a-zA-Z0-9._]*)",
         Pattern.MULTILINE
     );
 
@@ -421,6 +421,8 @@ class PullRequestCommentPoster {
         result = result.replace("\r\n", "\n").replace("\r", "\n");
         result = INVISIBLE_CHARS.matcher(result).replaceAll("");
         result = HTML_COMMENT.matcher(result).replaceAll("");
+        // An unterminated opener matches nothing above, and runs to end of document in both renderers.
+        result = result.replace("<!--", "");
 
         // Autolinks become plain links first, so the tag stripping below does not eat them.
         result = AUTOLINK.matcher(result).replaceAll("$1");
@@ -453,11 +455,76 @@ class PullRequestCommentPoster {
         result = EXCESSIVE_NEWLINES.matcher(result).replaceAll("\n\n");
 
         result = result.strip();
-        if (result.length() > MAX_BODY_LENGTH) {
-            result = result.substring(0, MAX_BODY_LENGTH) + "\n\n[... truncated — comment exceeded length limit]";
+        String truncationNotice = "\n\n[... truncated — comment exceeded length limit]";
+        boolean truncated = result.length() > MAX_BODY_LENGTH;
+        if (truncated) {
+            int bodyBudget = MAX_BODY_LENGTH - truncationNotice.length();
+            result = result.substring(0, bodyBudget);
+            result = balanceCodeFencesWithin(result, bodyBudget) + truncationNotice;
+        } else {
+            result = balanceCodeFences(result);
         }
 
         return result;
+    }
+
+    /**
+     * Closes a fenced block the body leaves open. Counting fences is not enough: CommonMark ends a block
+     * only on a fence of the same character and at least the opening length that carries no info string, so
+     * an inner fence is content, a `~~~` is a fence, and an indented line is not one.
+     */
+    static String balanceCodeFences(String text) {
+        Fence fence = unclosedFence(text);
+        return fence == null ? text : text + "\n" + fence.closingDelimiter();
+    }
+
+    private static String balanceCodeFencesWithin(String text, int maxLength) {
+        String result = text;
+        Fence fence;
+        while ((fence = unclosedFence(result)) != null) {
+            String closing = "\n" + fence.closingDelimiter();
+            if (result.length() + closing.length() <= maxLength) {
+                return result + closing;
+            }
+            result = result.substring(0, fence.offset()) + result.substring(fence.offset() + fence.length());
+        }
+        return result;
+    }
+
+    private static @Nullable Fence unclosedFence(String text) {
+        Fence open = null;
+        int lineStart = 0;
+        while (lineStart <= text.length()) {
+            int lineEnd = text.indexOf('\n', lineStart);
+            if (lineEnd < 0) lineEnd = text.length();
+            String line = text.substring(lineStart, lineEnd);
+            String stripped = line.stripLeading();
+            int indentation = line.length() - stripped.length();
+            if (indentation < 4 && !stripped.isEmpty()) {
+                char marker = stripped.charAt(0);
+                int run = 0;
+                while (run < stripped.length() && stripped.charAt(run) == marker) run++;
+                if ((marker == '`' || marker == '~') && run >= 3) {
+                    String info = stripped.substring(run);
+                    if (open == null) {
+                        if (marker != '`' || info.indexOf('`') < 0) {
+                            open = new Fence(marker, run, lineStart + indentation);
+                        }
+                    } else if (marker == open.marker() && run >= open.length() && info.isBlank()) {
+                        open = null;
+                    }
+                }
+            }
+            if (lineEnd == text.length()) break;
+            lineStart = lineEnd + 1;
+        }
+        return open;
+    }
+
+    private record Fence(char marker, int length, int offset) {
+        String closingDelimiter() {
+            return String.valueOf(marker).repeat(length);
+        }
     }
 
     static String requireMetadataText(@Nullable JsonNode metadata, String field) {

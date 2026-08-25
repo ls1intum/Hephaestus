@@ -22,6 +22,8 @@ export interface ComposedFeedbackEnvelope {
 	observations?: unknown[];
 	preparedThreadKeys?: string[];
 	units?: ComposedFeedbackUnit[];
+	/** How the review opens, in the composer's words. */
+	lead?: string | null;
 }
 
 /**

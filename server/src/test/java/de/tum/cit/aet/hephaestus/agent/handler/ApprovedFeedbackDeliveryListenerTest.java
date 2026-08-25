@@ -112,6 +112,36 @@ class ApprovedFeedbackDeliveryListenerTest {
     }
 
     @Test
+    void shouldRefuseAnApprovedBodyThatDoesNotMatchItsProviderSafePreview() {
+        Fixture fixture = fixture("Exact proposal <script>changed</script>");
+        allow(fixture);
+
+        fixture.listener().deliver(event(fixture.feedback()));
+
+        verify(fixture.feedbackRepository()).markApprovedSuppressed(
+            7L,
+            fixture.feedback().getId(),
+            FeedbackSuppressionReason.APPROVAL_STALE.name()
+        );
+        verifyNoInteractions(fixture.dispatchService());
+    }
+
+    @Test
+    void shouldSuppressRatherThanPostAProposalThatSanitizesToNothing() {
+        Fixture fixture = fixture("LGTM");
+        allow(fixture);
+
+        fixture.listener().deliver(event(fixture.feedback()));
+
+        verify(fixture.feedbackRepository()).markApprovedSuppressed(
+            7L,
+            fixture.feedback().getId(),
+            FeedbackSuppressionReason.EMPTY_AFTER_SANITIZE.name()
+        );
+        verifyNoInteractions(fixture.dispatchService());
+    }
+
+    @Test
     void suppressesWhenApprovedContentNoLongerMatches() {
         Fixture fixture = fixture();
         when(fixture.approvalRepository().findByFeedbackIdAndWorkspaceId(fixture.feedback().getId(), 7L)).thenReturn(
@@ -143,13 +173,17 @@ class ApprovedFeedbackDeliveryListenerTest {
     }
 
     private static Fixture fixture() {
+        return fixture("Exact proposal");
+    }
+
+    private static Fixture fixture(String body) {
         FeedbackRepository feedbackRepository = mock(FeedbackRepository.class);
         FeedbackApprovalRepository approvalRepository = mock(FeedbackApprovalRepository.class);
         AgentJobRepository jobRepository = mock(AgentJobRepository.class);
         PracticeFeedbackDeliveryPolicy policy = mock(PracticeFeedbackDeliveryPolicy.class);
         PracticeFeedbackDispatchService dispatchService = mock(PracticeFeedbackDispatchService.class);
         FeedbackApprovalEligibility eligibility = mock(FeedbackApprovalEligibility.class);
-        Feedback feedback = proposal(UUID.randomUUID(), UUID.randomUUID());
+        Feedback feedback = proposal(UUID.randomUUID(), UUID.randomUUID(), body);
         AgentJob job = agentJob();
         when(feedbackRepository.findByIdAndWorkspaceId(feedback.getId(), 7L)).thenReturn(Optional.of(feedback));
         when(approvalRepository.findByFeedbackIdAndWorkspaceId(feedback.getId(), 7L)).thenReturn(
@@ -187,7 +221,7 @@ class ApprovedFeedbackDeliveryListenerTest {
         return new ApprovedFeedbackReadyEvent(7L, feedback.getId());
     }
 
-    private static Feedback proposal(UUID feedbackId, UUID jobId) {
+    private static Feedback proposal(UUID feedbackId, UUID jobId, String body) {
         return Feedback.builder()
             .id(feedbackId)
             .agentJobId(jobId)
@@ -198,7 +232,7 @@ class ApprovedFeedbackDeliveryListenerTest {
             .channel(FeedbackChannel.IN_CONTEXT)
             .position(7_000)
             .deliveryState(FeedbackDeliveryState.PREPARED)
-            .body("Exact proposal")
+            .body(body)
             .source(FeedbackSource.AGENT)
             .build();
     }

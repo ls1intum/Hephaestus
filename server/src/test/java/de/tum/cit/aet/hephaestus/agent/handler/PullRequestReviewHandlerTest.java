@@ -19,6 +19,7 @@ import de.tum.cit.aet.hephaestus.agent.context.EvidencePlan;
 import de.tum.cit.aet.hephaestus.agent.context.PreparedEvidence;
 import de.tum.cit.aet.hephaestus.agent.context.WorkspaceContextBuilder;
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionDeliveryService.DeliveryResult;
+import de.tum.cit.aet.hephaestus.agent.handler.spi.ExistingDeliveryLookup;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobPreparationException;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobSubmission;
@@ -82,6 +83,9 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
     @Mock
     private FeedbackDeliveryService feedbackService;
 
+    @Mock
+    private de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository observationRepository;
+
     private static final Long WORKSPACE_ID = 99L;
 
     private PracticeDetectionResultParser resultParser;
@@ -120,9 +124,19 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
                 org.mockito.Mockito.mock(de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository.class),
                 org.mockito.Mockito.mock(FeedbackLedgerRecorder.class)
             ),
-            org.mockito.Mockito.mock(de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository.class)
+            observationRepository
         );
         lenient().when(cas.get(anyString())).thenReturn(java.util.Optional.of(new byte[0]));
+    }
+
+    @Test
+    void shouldRecoverTheSummaryForTheSameReviewJob() {
+        AgentJob job = jobWithMetadata(sampleJobMetadata());
+        ExistingDeliveryLookup found = ExistingDeliveryLookup.found("IC_existing");
+        when(feedbackService.findExistingSummary(job)).thenReturn(found);
+
+        assertThat(handler.findExistingDelivery(job)).isSameAs(found);
+        verify(feedbackService).findExistingSummary(job);
     }
 
     private PullRequestReviewSubmissionRequest sampleRequest() {
@@ -468,6 +482,75 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
 
         private void admit(AgentJob job, String rawOutputJson) {
             handler.admitObservations(job, objectMapper.readTree(rawOutputJson).path("observations"));
+        }
+
+        private de.tum.cit.aet.hephaestus.practices.model.Observation persisted(
+            Practice practice,
+            String summary,
+            de.tum.cit.aet.hephaestus.practices.model.Severity severity
+        ) {
+            var observation = org.mockito.Mockito.mock(de.tum.cit.aet.hephaestus.practices.model.Observation.class);
+            lenient().when(observation.getPractice()).thenReturn(practice);
+            lenient().when(observation.getSummary()).thenReturn(summary);
+            lenient()
+                .when(observation.getPresence())
+                .thenReturn(de.tum.cit.aet.hephaestus.practices.model.Presence.ABSENT);
+            lenient()
+                .when(observation.getAssessment())
+                .thenReturn(de.tum.cit.aet.hephaestus.practices.model.Assessment.BAD);
+            lenient().when(observation.getSeverity()).thenReturn(severity);
+            lenient().when(observation.getEvidenceRationale()).thenReturn("Reasoning for " + practice.getSlug() + ".");
+            lenient().when(observation.getOccurrenceKey()).thenReturn("occ-" + practice.getSlug());
+            lenient().when(observation.getRecurrenceKey()).thenReturn("rk-" + practice.getSlug());
+            return observation;
+        }
+
+        @Test
+        void shouldUseLeadOnlyForAutoPostedNoteWhenProposalAlsoExists() {
+            String lead = "The retry path is covered now, but the description never says why it changed.";
+            ObjectNode metadata = sampleJobMetadata();
+            metadata.put(ObservationAdmissionService.DIGEST_METADATA_KEY, "digest-1");
+            AgentJob job = jobWithMetadata(metadata);
+            ObjectNode output = objectMapper.createObjectNode();
+            ObjectNode feedback = output.putObject("feedback");
+            feedback.put("admissionDigest", "digest-1");
+            feedback.put("lead", lead);
+            job.setOutput(output);
+
+            Practice approvalGated = createPractice("error-handling", "Error Handling", "criteria");
+            approvalGated.setAutonomy(de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy.HUMAN_APPROVAL);
+            Practice automatic = createPractice("describe-what-and-why", "Describe What And Why", "criteria");
+            when(practiceRepository.findByWorkspaceId(WORKSPACE_ID)).thenReturn(
+                java.util.List.of(approvalGated, automatic)
+            );
+            // Built before the stubbing call: persisted() stubs, and Mockito rejects a stub nested in when().
+            var gated = persisted(
+                approvalGated,
+                "Unhandled error path",
+                de.tum.cit.aet.hephaestus.practices.model.Severity.MAJOR
+            );
+            var auto = persisted(
+                automatic,
+                "No rationale sentence",
+                de.tum.cit.aet.hephaestus.practices.model.Severity.MINOR
+            );
+            when(observationRepository.findByAgentJobId(job.getId())).thenReturn(java.util.List.of(gated, auto));
+
+            handler.deliver(job);
+
+            var proposal = org.mockito.ArgumentCaptor.forClass(PracticeDetectionResultParser.DeliveryContent.class);
+            var summary = org.mockito.ArgumentCaptor.forClass(PracticeDetectionResultParser.DeliveryContent.class);
+            verify(feedbackService).recordProposal(org.mockito.ArgumentMatchers.eq(job), proposal.capture(), any());
+            verify(feedbackService).deliverFeedback(
+                org.mockito.ArgumentMatchers.eq(job),
+                summary.capture(),
+                org.mockito.ArgumentMatchers.eq(java.util.Set.of("describe-what-and-why"))
+            );
+
+            assertThat(summary.getValue().mrNote()).startsWith(lead);
+            assertThat(proposal.getValue().mrNote())
+                .as("two comments on one change must not open on the same sentence")
+                .doesNotContain(lead);
         }
 
         @Test

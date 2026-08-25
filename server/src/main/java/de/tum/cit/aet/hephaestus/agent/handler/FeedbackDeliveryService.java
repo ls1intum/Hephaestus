@@ -15,7 +15,6 @@ import de.tum.cit.aet.hephaestus.practices.observation.TrendDelta;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties;
 import java.util.List;
 import java.util.Set;
-import java.util.stream.Collectors;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -55,7 +54,7 @@ class FeedbackDeliveryService {
     }
 
     void deliverFeedback(AgentJob job, @Nullable DeliveryContent delivery) {
-        deliverFeedback(job, delivery, null, Set.of());
+        deliverFeedback(job, delivery, Set.of());
     }
 
     void recordProposal(
@@ -66,22 +65,11 @@ class FeedbackDeliveryService {
         feedbackLedgerRecorder.recordProposal(job, delivery, observations);
     }
 
-    ExistingDeliveryLookup findExistingDeliveryCommentId(AgentJob job) {
+    ExistingDeliveryLookup findExistingSummary(AgentJob job) {
         return commentPoster.findExistingSummaryComment(job);
     }
 
-    @FunctionalInterface
-    interface InlineAwareSummaryComposer {
-        @Nullable
-        String compose(Set<String> deliveredObservationFingerprints);
-    }
-
-    void deliverFeedback(
-        AgentJob job,
-        @Nullable DeliveryContent delivery,
-        @Nullable InlineAwareSummaryComposer summaryComposer,
-        Set<String> contributingPracticeSlugs
-    ) {
+    void deliverFeedback(AgentJob job, @Nullable DeliveryContent delivery, Set<String> contributingPracticeSlugs) {
         if (delivery == null) {
             log.debug("No delivery content, skipping: jobId={}", job.getId());
             return;
@@ -104,7 +92,7 @@ class FeedbackDeliveryService {
         }
 
         try {
-            doDeliverEligible(job, delivery, summaryComposer, decision.target(), contributingPracticeSlugs);
+            doDeliverEligible(job, delivery, decision.target(), contributingPracticeSlugs);
         } catch (DispatchPolicySuppressedException e) {
             log.info("Delivery suppressed by current dispatch policy: reason={}, jobId={}", e.reason, job.getId());
             recordGateSuppressed(job, delivery, e.reason);
@@ -139,7 +127,6 @@ class FeedbackDeliveryService {
     private void doDeliverEligible(
         AgentJob job,
         DeliveryContent delivery,
-        @Nullable InlineAwareSummaryComposer summaryComposer,
         PullRequest pullRequest,
         Set<String> contributingPracticeSlugs
     ) {
@@ -169,9 +156,6 @@ class FeedbackDeliveryService {
         }
         List<InlineFeedbackChannel.DeliveredSignal> inlineSignals = inlineResult.signals();
 
-        if (summaryOutcome == SummaryOutcome.DELIVERED && !inlineResult.suppressed()) {
-            reEditSummaryWithSignals(job, summaryComposer, inlineSignals, trend, contributingPracticeSlugs);
-        }
         boolean inlineDelivered = inlineResult.posted() > 0;
         if (inlineResult.suppressed() && summaryOutcome != SummaryOutcome.DELIVERED && !inlineDelivered) {
             recordGateSuppressed(job, delivery, FeedbackSuppressionReason.INSTANCE_SILENCED);
@@ -265,7 +249,6 @@ class FeedbackDeliveryService {
     private enum SummaryOutcome {
         DELIVERED,
         NOT_REQUIRED,
-        TRANSIENT_NOOP,
         SKIPPED_EMPTY,
     }
 
@@ -287,19 +270,14 @@ class FeedbackDeliveryService {
         String footer = ProgressFooterRenderer.render(trend);
         String body = footer.isEmpty() ? sanitized : sanitized + "\n\n" + footer;
         String formatted = commentFormatter.format(body, job);
-        String priorRef = feedbackLedgerRecorder.priorLiveSummaryRef(job).orElse(null);
         PracticeFeedbackDispatchService.Result result = dispatchService.dispatchAutomaticSummary(
             job,
             formatted,
-            priorRef,
+            null,
             contributingPracticeSlugs
         );
         if (result.status() == PracticeFeedbackDispatchService.Result.Status.SUPPRESSED) {
             throw new DispatchPolicySuppressedException(result.refusal());
-        }
-        if (result.status() == PracticeFeedbackDispatchService.Result.Status.UNCERTAIN && priorRef != null) {
-            job.setDeliveryCommentId(priorRef);
-            return SummaryOutcome.TRANSIENT_NOOP;
         }
         if (result.status() != PracticeFeedbackDispatchService.Result.Status.SENT || result.externalRef() == null) {
             throw new JobDeliveryException("Summary dispatch is awaiting reconciliation: jobId=" + job.getId());
@@ -317,68 +295,6 @@ class FeedbackDeliveryService {
         private DispatchPolicySuppressedException(FeedbackSuppressionReason reason) {
             super("Policy suppressed the persisted summary dispatch: " + reason);
             this.reason = reason;
-        }
-    }
-
-    private void reEditSummaryWithSignals(
-        AgentJob job,
-        @Nullable InlineAwareSummaryComposer summaryComposer,
-        List<InlineFeedbackChannel.DeliveredSignal> inlineSignals,
-        @Nullable TrendDelta trend,
-        Set<String> contributingPracticeSlugs
-    ) {
-        String summaryRef = job.getDeliveryCommentId();
-        if (summaryComposer == null || summaryRef == null) {
-            return;
-        }
-        Set<String> deliveredKeys = inlineSignals
-            .stream()
-            .filter(signal -> signal.disposition() != InlineFeedbackChannel.Disposition.FAILED)
-            .map(InlineFeedbackChannel.DeliveredSignal::recurrenceKey)
-            .filter(key -> key != null && !key.isBlank())
-            .collect(Collectors.toSet());
-        if (deliveredKeys.isEmpty()) {
-            return;
-        }
-
-        String demoted = summaryComposer.compose(deliveredKeys);
-        if (demoted == null) {
-            return;
-        }
-        String sanitized = PullRequestCommentPoster.sanitize(demoted);
-        if (sanitized.isBlank()) {
-            return;
-        }
-        String footer = ProgressFooterRenderer.render(trend);
-        String body = footer.isEmpty() ? sanitized : sanitized + "\n\n" + footer;
-        String formatted = commentFormatter.format(body, job);
-
-        try {
-            if (
-                !deliveryPolicy
-                    .evaluatePullRequest(job, DeliveryPolicyStage.EGRESS, null, contributingPracticeSlugs)
-                    .allowed()
-            ) return;
-            PullRequestCommentPoster.UpdateResult update = commentPoster.updateFormattedBody(
-                job,
-                summaryRef,
-                formatted
-            );
-            if (update.kind() == PullRequestCommentPoster.UpdateResult.Kind.EDITED) {
-                log.info(
-                    "Summary demoted in place after inline delivery: jobId={}, commentId={}",
-                    job.getId(),
-                    summaryRef
-                );
-            } else {
-                log.debug(
-                    "Summary demotion did not land ({}); keeping full-line summary: jobId={}",
-                    update.kind(),
-                    job.getId()
-                );
-            }
-        } catch (RuntimeException e) {
-            log.warn("Summary demotion failed (delivery unaffected): jobId={}, error={}", job.getId(), e.getMessage());
         }
     }
 
