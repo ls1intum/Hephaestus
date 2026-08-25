@@ -131,10 +131,6 @@ class PracticeFeedbackDispatchRecovery {
             }
             return;
         }
-        if (dispatch.getDestination() == FeedbackDispatchDestination.RE_REVIEW_PING) {
-            // Cosmetic: the summary it points at carries the review, so a lost ping is not a lost delivery.
-            return;
-        }
         if (result.status() == PracticeFeedbackDispatchService.Result.Status.SENT) {
             agentJobRepository.reconcileDispatchDeliveryStatus(
                 dispatch.getAgentJobId(),

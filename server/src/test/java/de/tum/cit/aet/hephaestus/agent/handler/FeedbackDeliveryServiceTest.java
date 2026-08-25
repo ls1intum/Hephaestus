@@ -398,10 +398,6 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             var body = ArgumentCaptor.forClass(String.class);
             verify(commentPoster).updateFormattedBody(eq(job), eq("IC_prior"), body.capture());
             assertThat(body.getValue()).contains("Progress since your last review").contains("Resolved");
-            var pingBody = ArgumentCaptor.forClass(String.class);
-            verify(dispatchService).dispatchReReviewPing(eq(job), pingBody.capture(), any());
-            assertThat(pingBody.getValue()).contains("Re-reviewed");
-            verify(commentPoster, never()).postAside(eq(job), any(String.class), any(String.class));
             verify(commentPoster, never()).postFormattedBody(eq(job), any(String.class));
         }
 

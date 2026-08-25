@@ -13,7 +13,6 @@ import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationTrendService;
 import de.tum.cit.aet.hephaestus.practices.observation.TrendDelta;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -307,16 +306,7 @@ class FeedbackDeliveryService {
         }
         String commentId = result.externalRef();
         job.setDeliveryCommentId(commentId);
-        boolean editedInPlace = priorRef != null && priorRef.equals(commentId);
-        log.info(
-            "Practice summary note delivered: jobId={}, commentId={}, editedInPlace={}",
-            job.getId(),
-            commentId,
-            editedInPlace
-        );
-        if (editedInPlace && trend != null && trend.hasMeaningfulChange()) {
-            postReReviewPing(job, trend, contributingPracticeSlugs);
-        }
+        log.info("Practice summary note delivered: jobId={}, commentId={}", job.getId(), commentId);
         return SummaryOutcome.DELIVERED;
     }
 
@@ -389,27 +379,6 @@ class FeedbackDeliveryService {
             }
         } catch (RuntimeException e) {
             log.warn("Summary demotion failed (delivery unaffected): jobId={}, error={}", job.getId(), e.getMessage());
-        }
-    }
-
-    /** Goes through the dispatcher like every other create, so a retried delivery adds no second ping. */
-    private void postReReviewPing(AgentJob job, TrendDelta trend, Set<String> contributingPracticeSlugs) {
-        List<String> parts = new ArrayList<>();
-        if (trend.countResolved() > 0) {
-            parts.add(trend.countResolved() + " resolved");
-        }
-        if (trend.countNew() > 0) {
-            parts.add(trend.countNew() + " new");
-        }
-        if (trend.countRegressed() > 0) {
-            parts.add(trend.countRegressed() + " slipped back");
-        }
-        String body = "🔁 **Re-reviewed** — " + String.join(", ", parts) + ". See the updated review summary above.";
-        try {
-            var result = dispatchService.dispatchReReviewPing(job, body, contributingPracticeSlugs);
-            log.info("Re-review ping dispatch: jobId={}, status={}", job.getId(), result.status());
-        } catch (RuntimeException e) {
-            log.warn("Re-review ping failed (delivery unaffected): jobId={}, error={}", job.getId(), e.getMessage());
         }
     }
 

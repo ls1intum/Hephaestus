@@ -79,21 +79,6 @@ class PracticeFeedbackDispatchService {
         );
     }
 
-    Result dispatchReReviewPing(AgentJob job, String body, Set<String> contributingPracticeSlugs) {
-        return dispatch(
-            insertIfAbsentAndLoad(
-                job,
-                null,
-                "ping:" + job.getId(),
-                FeedbackDispatchDestination.RE_REVIEW_PING,
-                body,
-                null,
-                contributingPracticeSlugs
-            ),
-            job
-        );
-    }
-
     Result dispatchApproved(AgentJob job, Feedback feedback) {
         return dispatch(
             insertIfAbsentAndLoad(
@@ -178,7 +163,6 @@ class PracticeFeedbackDispatchService {
 
         ExistingDeliveryLookup existing = switch (dispatch.getDestination()) {
             case ARTIFACT_SUMMARY -> commentPoster.findExistingSummaryComment(job);
-            case RE_REVIEW_PING -> commentPoster.findAside(job, pingMarker(dispatch));
             case APPROVED_ARTIFACT_COMMENT -> commentPoster.findApprovedProposal(job, dispatch.approvedFeedbackId());
         };
         if (existing.kind() == ExistingDeliveryLookup.Kind.UNKNOWN) {
@@ -234,9 +218,6 @@ class PracticeFeedbackDispatchService {
     }
 
     private @Nullable String post(FeedbackDispatch dispatch, AgentJob job) {
-        if (dispatch.getDestination() == FeedbackDispatchDestination.RE_REVIEW_PING) {
-            return commentPoster.postAside(job, dispatch.getBody(), pingMarker(dispatch));
-        }
         if (dispatch.getDestination() == FeedbackDispatchDestination.APPROVED_ARTIFACT_COMMENT) {
             if (job.getMetadata() != null && job.getMetadata().has("issue_number")) {
                 return commentPoster.postIssueApprovedProposal(job, dispatch.approvedFeedbackId(), dispatch.getBody());
@@ -361,10 +342,6 @@ class PracticeFeedbackDispatchService {
     private static @Nullable String bounded(@Nullable String value) {
         if (value == null || value.length() <= 512) return value;
         return value.substring(0, 512);
-    }
-
-    private static String pingMarker(FeedbackDispatch dispatch) {
-        return "<!-- hephaestus:re-review-ping:" + dispatch.getAgentJobId() + " -->";
     }
 
     record Result(Status status, @Nullable String externalRef, @Nullable FeedbackSuppressionReason suppressionReason) {

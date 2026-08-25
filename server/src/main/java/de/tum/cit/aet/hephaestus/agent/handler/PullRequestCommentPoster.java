@@ -165,17 +165,6 @@ class PullRequestCommentPoster {
         return postFormattedBody(job, formattedBody, "<!-- hephaestus:approved-feedback:" + feedbackId + " -->");
     }
 
-    @Nullable
-    String postAside(AgentJob job, String formattedBody, String marker) {
-        if (summaryMarkerFor(job).equals(marker)) {
-            throw new IllegalArgumentException(
-                "An aside carrying the summary marker would be adopted as the summary and edited in place: jobId=" +
-                    job.getId()
-            );
-        }
-        return postFormattedBody(job, formattedBody, marker);
-    }
-
     private String postFormattedBody(AgentJob job, String formattedBody, String marker) {
         long workspaceId = job.getWorkspace().getId();
         IntegrationKind kind = requireIntegrationKind(job);
@@ -311,11 +300,6 @@ class PullRequestCommentPoster {
     /** Returns {@code UNKNOWN}, never {@code ABSENT}, when the lookup cannot be completed. */
     ExistingDeliveryLookup findExistingSummaryComment(AgentJob job) {
         return findExistingSummaryComment(job, summaryMarkerFor(job));
-    }
-
-    /** The marker an aside was posted under is the only thing that says whether it already exists. */
-    ExistingDeliveryLookup findAside(AgentJob job, String marker) {
-        return findExistingSummaryComment(job, marker);
     }
 
     ExistingDeliveryLookup findApprovedProposal(AgentJob job, java.util.UUID feedbackId) {

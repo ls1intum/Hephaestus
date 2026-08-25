@@ -180,7 +180,7 @@
             ALTER TABLE feedback_dispatch ADD CONSTRAINT chk_feedback_dispatch_state
                 CHECK (state IN ('PENDING', 'CLAIMED', 'SENT', 'HELD', 'SUPPRESSED', 'UNCERTAIN', 'FAILED'));
             ALTER TABLE feedback_dispatch ADD CONSTRAINT chk_feedback_dispatch_destination
-                CHECK (destination IN ('ARTIFACT_SUMMARY', 'APPROVED_ARTIFACT_COMMENT', 'RE_REVIEW_PING'));
+                CHECK (destination IN ('ARTIFACT_SUMMARY', 'APPROVED_ARTIFACT_COMMENT'));
             ALTER TABLE feedback DROP CONSTRAINT chk_feedback_suppression_reason;
             ALTER TABLE feedback ADD CONSTRAINT chk_feedback_suppression_reason
                 CHECK (suppression_reason IS NULL OR suppression_reason IN (

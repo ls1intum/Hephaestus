@@ -421,27 +421,6 @@ class PullRequestCommentPosterTest extends BaseUnitTest {
                 .isInstanceOf(JobDeliveryException.class)
                 .hasMessageContaining("'owner/repo'");
         }
-
-        @Test
-        void refusesAnAsideThatCarriesTheSummaryMarker() {
-            AgentJob job = createTestJob(IntegrationKind.GITHUB);
-
-            assertThatThrownBy(() ->
-                poster.postAside(job, "Re-reviewed.", PullRequestCommentPoster.summaryMarkerFor(job))
-            ).isInstanceOf(IllegalArgumentException.class);
-
-            verify(githubChannel, never()).postSummary(any(), any());
-        }
-
-        @Test
-        void postsAnAsideUnderItsOwnMarker() {
-            AgentJob job = createTestJob(IntegrationKind.GITHUB);
-            when(githubChannel.postSummary(any(), any())).thenReturn(new SummaryChannel.SummaryHandle("IC_ping"));
-
-            assertThat(
-                poster.postAside(job, "Re-reviewed.", "<!-- hephaestus:re-review-ping:" + job.getId() + " -->")
-            ).isEqualTo("IC_ping");
-        }
     }
 
     private AgentJob createTestJob(@Nullable IntegrationKind kind) {
