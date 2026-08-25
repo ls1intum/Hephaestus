@@ -202,6 +202,7 @@ jobs:
         run: |
           set -euo pipefail
           PER_ARCH_TAG="${{ inputs.registry }}/${{ inputs.image-name }}:ci-${{ github.run_id }}-${{ steps.prep.outputs.platform_pair }}"
+          ../mvnw -B -ntp -f ../pom.xml -pl generated-clients -am install -DskipTests=true
           ../mvnw -B -ntp spring-boot:build-image -DskipTests=true \
             -Dspring-boot.build-image.imageName="$PER_ARCH_TAG" \
             -Dspring-boot.build-image.imagePlatform="${{ matrix.platform }}" \
