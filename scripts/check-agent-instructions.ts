@@ -15,6 +15,9 @@
  *   unmirrored  — a Codex copy of a skill that has drifted from the Claude Code original.
  *   duplicated  — two agent files with one body.
  *
+ * Contributor docs are checked separately for inline-code paths and npm packages that resolve to
+ * nothing in the checkout.
+ *
  * `unread` runs before all of them and reports this gate's own blind spot: an agent file the
  * classifier never opened, which every check below would otherwise read as a file that says nothing.
  *
@@ -25,7 +28,7 @@
 import { execFile } from "node:child_process";
 import { lstat, readFile, readlink } from "node:fs/promises";
 import { resolve } from "node:path";
-import { basename, dirname, join, matchesGlob } from "node:path/posix";
+import { basename, dirname, join, matchesGlob, normalize } from "node:path/posix";
 import { promisify } from "node:util";
 import { asRecord, asStringArray, parseJson } from "./lib/json.ts";
 
@@ -42,6 +45,10 @@ const COMMANDS_ROOT = ".opencode/commands";
  * (https://developers.openai.com/codex/skills), and opencode reads all three.
  */
 const AGENT_ROOTS = [".claude/", ".opencode/", ".agents/"];
+
+const isContributorDoc = (path: string): boolean =>
+	(path.startsWith("docs/contributor/") || !path.includes("/")) &&
+	(path.startsWith("docs/contributor/") ? /\.mdx?$/.test(path) : path.endsWith(".md"));
 
 /**
  * Codex and Claude Code share no skills directory, so a skill both must reach exists twice. That is
@@ -101,6 +108,139 @@ interface Repo {
 	readonly commands: readonly string[];
 }
 
+const NON_NPM_NAMES = new Map([
+	[
+		"docs/contributor/sync-lifecycle.md\0graphql-codegen-maven-plugin",
+		"a Maven plugin artifact, not an npm dependency",
+	],
+	[
+		"docs/contributor/sync-lifecycle.md\0openapi-generator-maven-plugin",
+		"a Maven plugin artifact, not an npm dependency",
+	],
+]);
+
+const INTENTIONALLY_MISSING_PATHS = new Map([
+	[
+		"docs/contributor/agent/workspace-abi.mdx\0.sessions",
+		"a per-run directory created inside the agent workspace",
+	],
+	["MIGRATION.md\0docker/.env", "a deployment-local secrets file that must stay untracked"],
+	["MIGRATION.md\0docker/agent-image-pin.env", "a removed path retained in migration history"],
+	[
+		"MIGRATION.md\0docker/agent-image-pin.local.env",
+		"a removed path retained in migration history",
+	],
+	["AGENTS.md\0server/.env", "a developer-local secrets file that must stay untracked"],
+	[
+		"docs/contributor/local-development.mdx\0server/.env",
+		"a developer-local secrets file that must stay untracked",
+	],
+	[
+		"docs/contributor/local-development.mdx\0server/postgres-data",
+		"a runtime data directory created by PostgreSQL and deliberately untracked",
+	],
+	[
+		"docs/contributor/local-development.mdx\0server/src/main/resources/application-local.yml",
+		"a developer-local override that the setup guide instructs readers to create",
+	],
+	[
+		"docs/contributor/local-development.mdx\0webapp/.env",
+		"a developer-local environment file that must stay untracked",
+	],
+]);
+
+const PACKAGE_NAME = /^(?:@[a-z0-9][a-z0-9._-]*\/[a-z0-9][a-z0-9._-]*|[a-z0-9][a-z0-9._-]*)$/;
+const PACKAGE_SHAPED = /-(?:cli|config|core|js|node|package|plugin|react|sdk|test|ts)$/;
+const FILE_SHAPED = /\.(?:java|js|jsonc?|mdx?|mjs|sh|ts|tsx|xml|ya?ml)$/;
+const RUNTIME_ROOTS = new Set(["inputs", "out"]);
+const exists = (repo: Repo, path: string): boolean =>
+	repo.present.has(path) ||
+	[...repo.present.keys()].some((present) => present.startsWith(`${path}/`));
+
+function staleContributorClaims(repo: Repo): readonly string[] {
+	const roots = new Set([...repo.present.keys()].map((path) => path.split("/", 1)[0]));
+	const manifests = [...repo.present.values()].filter(
+		(file): file is Extract<TrackedFile, { kind: "text" }> =>
+			file.kind === "text" && basename(file.path) === "package.json",
+	);
+	const packages = new Set<string>();
+	for (const manifest of manifests) {
+		const json = asRecord(parseJson(manifest.content), manifest.path);
+		if (typeof json["name"] === "string") packages.add(json["name"]);
+		for (const field of [
+			"dependencies",
+			"devDependencies",
+			"optionalDependencies",
+			"peerDependencies",
+		]) {
+			const dependencies = json[field];
+			if (dependencies === undefined) continue;
+			for (const name of Object.keys(asRecord(dependencies, `${manifest.path} ${field}`))) {
+				packages.add(name);
+			}
+		}
+	}
+
+	const failures: string[] = [];
+	for (const file of repo.present.values()) {
+		if (file.kind !== "text" || !isContributorDoc(file.path)) continue;
+		for (const value of new Set(codeSpans(file.content))) {
+			const candidate = value.replace(/[.,:;]$/, "").replace(/#.*$/, "");
+			if (candidate.includes("…") || candidate.includes("...") || /[*<>{}$\s]/.test(candidate))
+				continue;
+			if (
+				PACKAGE_NAME.test(candidate) &&
+				(candidate.startsWith("@") || packages.has(candidate) || PACKAGE_SHAPED.test(candidate))
+			) {
+				if (!packages.has(candidate) && !NON_NPM_NAMES.has(`${file.path}\0${candidate}`)) {
+					failures.push(
+						`${file.path} names npm package \`${candidate}\`, but no package.json declares it.\n` +
+							"  Declare the dependency in the workspace that uses it, or remove the stale package name.",
+					);
+				}
+				continue;
+			}
+			const firstSegment = candidate.split("/", 1)[0] ?? "";
+			const rooted =
+				roots.has(firstSegment) ||
+				(firstSegment.startsWith(".") && candidate.includes("/")) ||
+				candidate.startsWith("./") ||
+				candidate.startsWith("../");
+			const looksLikePath =
+				!candidate.startsWith("@") &&
+				!candidate.startsWith("~/") &&
+				!candidate.includes(":") &&
+				(rooted ||
+					(candidate.includes("/") && basename(candidate).startsWith(".")) ||
+					(FILE_SHAPED.test(candidate) &&
+						!RUNTIME_ROOTS.has(firstSegment) &&
+						(candidate.includes("/") || /\.mdx?$/.test(candidate))));
+			if (looksLikePath) {
+				const cleaned = normalize(candidate.replace(/\/$/, ""));
+				const relative = normalize(join(dirname(file.path), cleaned));
+				const suffixMatches = candidate.startsWith(".")
+					? []
+					: [...repo.present.keys()].filter(
+							(path) => path.endsWith(`/${cleaned}`) || path.includes(`/${cleaned}/`),
+						);
+				if (
+					!exists(repo, cleaned) &&
+					!exists(repo, relative) &&
+					suffixMatches.length !== 1 &&
+					!INTENTIONALLY_MISSING_PATHS.has(`${file.path}\0${cleaned}`)
+				) {
+					failures.push(
+						`${file.path} names \`${candidate}\`, which looks like a repository path but resolves to nothing in this checkout.\n` +
+							"  Fix the path or remove the stale claim.",
+					);
+				}
+				continue;
+			}
+		}
+	}
+	return failures;
+}
+
 function survey(snapshot: Snapshot): Repo {
 	const byName = new Map<string, string[]>();
 	for (const { path } of snapshot.files) {
@@ -135,24 +275,14 @@ type Readable =
 const readable = (repo: Repo, path: string): Readable =>
 	repo.present.get(path) ?? { kind: "absent" };
 
-/**
- * Markdown with HTML comments, fenced blocks and inline code spans removed: Claude Code's import
- * parser skips the last two, and a gate that read `@Query` out of a prose sentence would fail a file
- * that is entirely correct.
- *
- * Spans are paired within a line. Pairing across lines would join a wrapped span's tail to the next
- * opening backtick and delete the reference between them; per-line pairing instead leaves a genuine
- * newline-spanning span partly unstripped. That is the direction to err in — a reference read out of
- * prose fails loudly, a swallowed one is the silence this gate exists to end.
- */
 const COMMENT_START = "<!--";
 const COMMENT_END = "-->";
 
-export function withoutCode(markdown: string): string {
+function visibleMarkdown(markdown: string): string {
 	const kept: string[] = [];
 	let fence: string | undefined;
 	let commented = false;
-	for (const raw of markdown.split("\n")) {
+	for (const raw of markdown.replaceAll(/\r\n?/g, "\n").split("\n")) {
 		let line = raw;
 		if (commented) {
 			const close = line.indexOf(COMMENT_END);
@@ -160,14 +290,20 @@ export function withoutCode(markdown: string): string {
 			line = line.slice(close + COMMENT_END.length);
 			commented = false;
 		}
-		const marker = /^ {0,3}(`{3,}|~{3,})/.exec(line)?.[1];
+		const fenceMatch = /^ {0,3}(`{3,}|~{3,})(.*)$/.exec(line);
+		const marker = fenceMatch?.[1];
 		if (fence !== undefined) {
-			if (marker !== undefined && marker[0] === fence[0] && marker.length >= fence.length) {
+			if (
+				marker !== undefined &&
+				marker[0] === fence[0] &&
+				marker.length >= fence.length &&
+				(fenceMatch?.[2] ?? "").trim() === ""
+			) {
 				fence = undefined;
 			}
 			continue;
 		}
-		if (marker !== undefined) {
+		if (marker !== undefined && !(marker[0] === "`" && (fenceMatch?.[2] ?? "").includes("`"))) {
 			fence = marker;
 			continue;
 		}
@@ -182,9 +318,44 @@ export function withoutCode(markdown: string): string {
 			}
 			line = `${line.slice(0, open)} ${line.slice(close + COMMENT_END.length)}`;
 		}
-		kept.push(line.replaceAll(/(`+)[^`]*?\1/g, " "));
+		kept.push(line);
 	}
 	return kept.join("\n");
+}
+
+export function codeSpans(markdown: string): readonly string[] {
+	const text = visibleMarkdown(markdown);
+	const spans: string[] = [];
+	for (let start = 0; start < text.length; ) {
+		if (text[start] !== "`") {
+			start += 1;
+			continue;
+		}
+		let ticks = 1;
+		while (text[start + ticks] === "`") ticks += 1;
+		let close = start + ticks;
+		while (close < text.length) {
+			close = text.indexOf("`", close);
+			if (close === -1) break;
+			let closingTicks = 1;
+			while (text[close + closingTicks] === "`") closingTicks += 1;
+			if (closingTicks === ticks) {
+				let content = text.slice(start + ticks, close).replaceAll("\n", " ");
+				if (/^ .* $/.test(content) && !/^ +$/.test(content)) content = content.slice(1, -1);
+				spans.push(content);
+				start = close + ticks;
+				break;
+			}
+			close += closingTicks;
+		}
+		if (close === -1 || close >= text.length) start += ticks;
+	}
+	return spans;
+}
+
+export function withoutCode(markdown: string): string {
+	// Line-bounded pairing prevents malformed wrapping from hiding a later agent import.
+	return visibleMarkdown(markdown).replaceAll(/(`+)[^`\n]*?\1/g, " ");
 }
 
 /**
@@ -494,30 +665,40 @@ export const analyse = (
 		...uncommanded(repo),
 		...unmirrored(repo, codexSkills),
 		...duplicated(repo),
+		...staleContributorClaims(repo),
 	];
 };
 
-if (process.argv[1] === import.meta.filename) {
+export async function scan(root: string = REPO_ROOT): Promise<Snapshot> {
 	const { stdout } = await promisify(execFile)(
 		"git",
 		["ls-files", "-z", "--cached", "--others", "--exclude-standard"],
-		{ cwd: REPO_ROOT, maxBuffer: 64 * 1024 * 1024 },
+		{ cwd: root, maxBuffer: 64 * 1024 * 1024 },
 	);
 	// Sorted, so the failures print in the same sequence locally and in CI.
 	const listed = [...new Set(stdout.split("\0").filter((path) => path !== ""))].toSorted();
 	const files: TrackedFile[] = [];
 	for (const path of listed) {
 		// A path git still tracks but the working tree no longer has is a deletion in progress.
-		const stats = await lstat(resolve(REPO_ROOT, path)).catch(() => undefined);
+		const stats = await lstat(resolve(root, path)).catch(() => undefined);
 		if (stats === undefined) continue;
 		if (stats.isSymbolicLink()) {
-			files.push({ path, kind: "symlink", target: await readlink(resolve(REPO_ROOT, path)) });
-		} else if (isAgentMarkdown(path) || path === OPENCODE_CONFIG) {
-			files.push({ path, kind: "text", content: await readFile(resolve(REPO_ROOT, path), "utf8") });
+			files.push({ path, kind: "symlink", target: await readlink(resolve(root, path)) });
+		} else if (
+			isAgentMarkdown(path) ||
+			isContributorDoc(path) ||
+			basename(path) === "package.json" ||
+			path === OPENCODE_CONFIG
+		) {
+			files.push({ path, kind: "text", content: await readFile(resolve(root, path), "utf8") });
 		} else files.push({ path, kind: "opaque" });
 	}
+	return { files };
+}
 
-	const repo = survey({ files });
+if (process.argv[1] === import.meta.filename) {
+	const snapshot = await scan();
+	const repo = survey(snapshot);
 	const skills = (repo.byName.get("SKILL.md") ?? []).filter(
 		(path) => dirname(dirname(path)) === SKILLS_ROOT,
 	);
@@ -532,7 +713,7 @@ if (process.argv[1] === import.meta.filename) {
 		process.exit(1);
 	}
 
-	const failures = analyse({ files }, CODEX_SKILLS);
+	const failures = analyse(snapshot, CODEX_SKILLS);
 	if (failures.length > 0) {
 		for (const failure of failures) console.error(`${failure}\n`);
 		process.exit(1);
@@ -543,6 +724,6 @@ if (process.argv[1] === import.meta.filename) {
 	console.log(
 		`check-agent-instructions: ${repo.guides.length} AGENTS.md reach Claude Code and opencode; ` +
 			`${skills.length} skills, ${mirrored} of them mirrored for Codex, ` +
-			`${repo.commands.length} opencode commands.`,
+			`${repo.commands.length} opencode commands; contributor-doc paths and packages resolve.`,
 	);
 }
