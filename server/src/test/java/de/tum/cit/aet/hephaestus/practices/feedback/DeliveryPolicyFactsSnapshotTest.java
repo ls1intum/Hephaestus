@@ -8,10 +8,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.ObjectMapper;
 
-/**
- * The snapshot is written into a JSON column and read back through the same record, so a renamed
- * component silently reinterprets every row already stored. This pins the stored names.
- */
+/** Renaming a component reinterprets every row already stored, because the column is read back through it. */
 @DisplayName("Delivery policy facts snapshot")
 class DeliveryPolicyFactsSnapshotTest extends BaseUnitTest {
 

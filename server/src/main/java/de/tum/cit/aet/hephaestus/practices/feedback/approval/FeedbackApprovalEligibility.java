@@ -38,11 +38,8 @@ public class FeedbackApprovalEligibility {
 
     /**
      * The brake that would refuse this workspace's feedback at egress right now, or null if none would.
-     *
-     * <p>Approving is the one decision a human cannot take back: the proposal leaves the queue whatever
-     * happens next. So a brake the operator can lift has to refuse the decision itself rather than let it
-     * succeed and be discarded on the way out — an approval that reports success and destroys the
-     * proposal is worse than no approval at all.
+     * Approving spends the proposal whatever happens next, so a brake the operator can lift has to refuse
+     * the decision rather than let it succeed and be discarded on the way out.
      */
     @Transactional(readOnly = true)
     public @Nullable FeedbackSuppressionReason brakeOnDelivery(Long workspaceId) {

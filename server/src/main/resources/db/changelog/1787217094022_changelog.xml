@@ -22,16 +22,13 @@
             ALTER TABLE workspace ADD CONSTRAINT chk_workspace_practice_delivery_status
                 CHECK (practice_delivery_status IN ('ACTIVE', 'PAUSED'));
         ]]></sql>
-        <!-- Keyed by what they mean rather than by a surrogate: a workspace covers a monitored repository
-             once, and a person once. Base branches are an owned list nothing points into, so they ride on
-             the row they qualify instead of in a table of their own. -->
         <createTable tableName="practice_review_repository_target">
             <column name="workspace_id" type="BIGINT"><constraints nullable="false"/></column>
             <column name="repository_monitor_id" type="BIGINT"><constraints nullable="false"/></column>
             <column name="base_branches" type="JSONB" defaultValue="[]"><constraints nullable="false"/></column>
         </createTable>
-        <!-- Column order follows Hibernate's, which sorts an @IdClass alphabetically; the index below is
-             what serves the workspace lookups, since the key does not lead with the tenant. -->
+        <!-- Hibernate sorts an @IdClass alphabetically and the schema gate diffs against that, so the key
+             cannot lead with the tenant; the index is what serves the workspace lookups instead. -->
         <addPrimaryKey tableName="practice_review_repository_target" columnNames="repository_monitor_id,workspace_id" constraintName="pk_practice_review_repository_target"/>
         <createIndex tableName="practice_review_repository_target" indexName="idx_practice_review_repository_target_workspace"><column name="workspace_id"/></createIndex>
         <addUniqueConstraint tableName="repository_to_monitor" columnNames="workspace_id,id" constraintName="uk_repository_to_monitor_workspace_id"/>
@@ -55,8 +52,7 @@
                AND (jsonb_array_length(COALESCE(practice_review_scope -> 'repositories', '[]'::jsonb)) > 0
                     OR jsonb_array_length(COALESCE(practice_review_scope -> 'targetBranches', '[]'::jsonb)) > 0);
 
-            -- The old shape held one branch list for the whole workspace; every selected repository
-            -- inherits it, which is what it meant.
+            -- One branch list covered the whole workspace, so every selected repository inherits it.
             INSERT INTO practice_review_repository_target (workspace_id, repository_monitor_id, base_branches)
             SELECT w.id, r.id, COALESCE(w.practice_review_scope -> 'targetBranches', '[]'::jsonb)
               FROM workspace w

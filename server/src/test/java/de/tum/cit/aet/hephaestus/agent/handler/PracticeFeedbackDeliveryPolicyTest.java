@@ -95,10 +95,7 @@ class PracticeFeedbackDeliveryPolicyTest extends BaseUnitTest {
         ).isInstanceOf(IllegalArgumentException.class);
     }
 
-    /**
-     * The resolver owns the order of the checks, but this class owns which fact lands in which slot.
-     * These two pin the adjacent revision and pause slots against being wired to each other's fact.
-     */
+    /** The resolver owns the check order; this class owns which fact lands in which slot. */
     @Test
     void aPausedWorkspaceIsRefusedForThePauseAndNotForTheRevision() {
         AgentJob job = conversationJob();

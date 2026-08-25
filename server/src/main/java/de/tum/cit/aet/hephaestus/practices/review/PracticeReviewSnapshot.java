@@ -20,10 +20,8 @@ record PracticeReviewSnapshot(
     @Nullable String defaultAutonomy
 ) implements ConfigAuditSnapshot {
     /**
-     * Deliberately excludes {@code deliveryStatus}. A revision bump discards every review already in
-     * flight, and pausing is the one control an operator reaches for expecting to be able to undo it:
-     * the pause itself already refuses delivery under its own name, so counting it here would spend
-     * the whole in-flight queue to say something the next check says better.
+     * Excludes {@code deliveryStatus} deliberately: a revision bump discards every review in flight, and
+     * the pause already refuses delivery under its own name while it is on.
      */
     boolean samePolicyAs(PracticeReviewSnapshot other) {
         return (

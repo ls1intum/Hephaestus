@@ -69,11 +69,6 @@ class FeedbackApprovalServiceTest {
             .thenAnswer(invocation -> invocation.getArgument(0));
     }
 
-    /**
-     * Approving is the one decision a reviewer cannot take back — the proposal leaves the queue whatever
-     * happens next. A brake the operator can lift must therefore refuse the decision rather than let it
-     * report success and be discarded on the way out.
-     */
     @Test
     void shouldRefuseApprovalWhileSendingIsPausedAndLeaveTheProposalDecidable() {
         when(eligibility.brakeOnDelivery(7L)).thenReturn(FeedbackSuppressionReason.WORKSPACE_DELIVERY_PAUSED);

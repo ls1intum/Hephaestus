@@ -15,10 +15,7 @@ import lombok.Setter;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
-/**
- * One monitored repository a workspace reviews, and the base branches of it that are in scope. Keyed by
- * the pair it means rather than by a surrogate, so the row cannot exist twice for one repository.
- */
+/** One monitored repository a workspace reviews, and the base branches of it that are in scope. */
 @Entity
 @Table(name = "practice_review_repository_target")
 @IdClass(PracticeReviewRepositoryTarget.Key.class)

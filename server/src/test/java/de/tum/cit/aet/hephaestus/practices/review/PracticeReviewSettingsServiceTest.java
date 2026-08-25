@@ -154,11 +154,6 @@ class PracticeReviewSettingsServiceTest extends BaseUnitTest {
         assertThat(view.reviewScope()).isEqualTo(selectedEmpty);
     }
 
-    /**
-     * A revision bump discards every review in flight. Pausing is the control an operator reaches for
-     * expecting to undo it, and the pause refuses delivery under its own name while it is on, so it must
-     * not spend the queue on the way in or out.
-     */
     @Test
     void pausingAndResumingLeaveWorkAlreadyInFlightAlone() {
         writesWorkspace();

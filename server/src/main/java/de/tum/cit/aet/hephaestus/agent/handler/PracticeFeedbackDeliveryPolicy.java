@@ -496,7 +496,6 @@ public class PracticeFeedbackDeliveryPolicy {
         return feedbackId != null && (stage == DeliveryPolicyStage.APPROVED || stage == DeliveryPolicyStage.EGRESS);
     }
 
-    /** The snapshot column is the persisted tri-state: null where consent was never asked for. */
     private static @Nullable Boolean recordedConsent(FactAnswer consent) {
         return switch (consent) {
             case PASSES -> Boolean.TRUE;
@@ -506,9 +505,9 @@ public class PracticeFeedbackDeliveryPolicy {
     }
 
     /**
-     * Silent Mode and the workspace pause stop what leaves Hephaestus. An in-app unit is read by the
-     * developer on their own page here and leaves nothing, so neither brake has anything to say about
-     * it — gating it would blank that page as a side effect of quietening a pull request.
+     * Silent Mode and the workspace pause stop what leaves Hephaestus. An in-app unit is read on the
+     * developer's own page here and leaves nothing, so gating it would blank that page as a side effect
+     * of quietening a pull request.
      */
     private static boolean egressBrakesApply(DeliveryPolicySurface surface) {
         return surface != DeliveryPolicySurface.IN_APP;

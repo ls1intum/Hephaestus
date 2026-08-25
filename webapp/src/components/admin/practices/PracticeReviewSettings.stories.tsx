@@ -440,10 +440,7 @@ export const SendingPaused: Story = {
 	},
 };
 
-/**
- * Building the pilot population is the common path and every step of it is an increment the counters
- * already report, so none of it interrupts. Only opening a dimension back up to everyone asks.
- */
+/** The common path: every step is an increment the counters already report, so none of it interrupts. */
 export const BuildingThePopulationNeverInterrupts: Story = {
 	args: {
 		policy: {

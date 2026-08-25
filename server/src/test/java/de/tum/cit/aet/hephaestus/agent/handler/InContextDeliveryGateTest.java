@@ -103,11 +103,7 @@ class InContextDeliveryGateTest extends BaseUnitTest {
         assertThat(gate.admitInContext(job(), List.of(observation("loud", "occ-1")))).isEmpty();
     }
 
-    /**
-     * Pausing drops what would have been sent automatically, so resuming never releases a backlog at the
-     * developers. It deliberately does not empty the approval queue: a human reads each proposal before it
-     * goes anywhere, and the staleness and artifact checks still run when they decide.
-     */
+    /** Deliberate: automatic feedback is dropped so a resume releases no backlog, but a human still owns the queue. */
     @Test
     void pausingSendingKeepsTheApprovalQueueForAHumanToDecideOn() {
         Workspace paused = new Workspace();

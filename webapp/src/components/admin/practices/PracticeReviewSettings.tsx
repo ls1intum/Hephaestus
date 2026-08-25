@@ -366,11 +366,7 @@ function ReviewedWorkSection({
 			.map((id) => ({ value: id, label: `Member ${id} (unavailable)` })),
 	];
 	const applyScope = (next: WorkspaceReviewScope) => policy.onUpdate({ reviewScope: next });
-	/**
-	 * Opening a dimension to everyone is the one coverage change that is a step change rather than an
-	 * increment, so it is the one that asks. Adding a repository or a person moves a counter already on
-	 * screen and is undone by removing it again.
-	 */
+	/** The one coverage change that is a step change rather than an increment, so the one that asks. */
 	const confirmOpeningToEveryone = (next: WorkspaceReviewScope) => {
 		setPendingScope(next);
 		coverage.preview.onPreview(next);

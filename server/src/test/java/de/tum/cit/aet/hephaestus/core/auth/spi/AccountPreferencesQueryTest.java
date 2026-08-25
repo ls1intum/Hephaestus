@@ -9,10 +9,7 @@ import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-/**
- * Every feedback lane asks this one question, so a lane cannot resolve an absent preferences row
- * differently from its neighbour.
- */
+/** Every feedback lane asks this one question, so two lanes cannot answer an absent row differently. */
 @DisplayName("Practice feedback delivery consent")
 class AccountPreferencesQueryTest extends BaseUnitTest {
 
