@@ -147,6 +147,8 @@ Available examples include `label.created`, `repository.created`, `create`, `pus
 
 ## Maven recipes
 
+From `server/`:
+
 ```bash
 ./mvnw test                         # Unit tests
 ./mvnw test -Parchitecture-tests     # ArchUnit + Modulith verification
@@ -162,7 +164,7 @@ tag set directly, or the profiles above, which set it for you.
 
 ## Live external-service tests
 
-Some regressions can only be validated against real systems — the GitHub API, a real LLM endpoint, a Docker daemon. Live tests are tagged `@Tag("live")` and **excluded from every other tier**; they only run under `./mvnw test -Plive-tests`. The profile flips Surefire's group filter and adds `failIfNoSpecifiedTests=false` so single-test invocations don't fail when the gating env var is unset.
+Some regressions can only be validated against real systems — the GitHub API, a real LLM endpoint, a Docker daemon. Live tests are tagged `@Tag("live")` and **excluded from every other tier**; they only run under `cd server && ./mvnw test -Plive-tests`. The profile flips Surefire's group filter and adds `failIfNoSpecifiedTests=false` so single-test invocations don't fail when the gating env var is unset.
 
 ### Meta-annotation cheat sheet
 

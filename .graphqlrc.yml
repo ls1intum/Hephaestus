@@ -1,5 +1,3 @@
-# GraphQL.vscode-graphql uses this file for schema-aware editing.
-
 projects:
   github:
     schema: "server/generated-clients/src/main/resources/graphql/github/schema.github.graphql"

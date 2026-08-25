@@ -325,8 +325,8 @@ Authentication is Hephaestus-native (no Keycloak — see [ADR 0017](https://gith
    (callback `http://localhost:8080/login/oauth2/code/gitlab`, scope `read_user`),
    set `GITLAB_OAUTH_CLIENT_ID` / `GITLAB_OAUTH_CLIENT_SECRET`, and point `GITLAB_OAUTH_BASE_URL` at the
    instance (defaults to `https://gitlab.com`; e.g. `https://gitlab.lrz.de`). Leave the client id blank to hide the GitLab button.
-4. Run the application server with `pnpm dev:server`; it installs or restores the generated-client
-   dependency before invoking the application module. Postgres + NATS start automatically via Spring
+4. Run the application server with `pnpm dev:server`; it builds the generated-client module before
+   invoking the application module. Postgres + NATS start automatically via Spring
    Boot's Docker Compose support. Open the webapp and click **Sign in with GitHub**.
 
 #### Super admin

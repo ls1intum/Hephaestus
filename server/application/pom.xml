@@ -25,18 +25,13 @@
     </scm>
     <properties>
         <app.profiles>local</app.profiles>
-        <!-- Test Configuration -->
         <maven.test.failure.ignore>false</maven.test.failure.ignore>
-        <!-- forkedProcessTimeoutInSeconds; per-fork with forkCount>1. Single source of truth (CI no
-             longer overrides); the CI job's timeout-minutes is the backstop. -->
         <hephaestus.surefire.timeout>1200</hephaestus.surefire.timeout>
         <hephaestus.surefire.forkCount>1</hephaestus.surefire.forkCount>
         <!-- 4g sized for the unit+arch run (ArchUnit + Modulith class graph). -->
         <hephaestus.surefire.maxHeap>4096m</hephaestus.surefire.maxHeap>
-        <!-- Server port for OpenAPI spec generation (overridable via -Dopenapi.server.port=PORT) -->
         <openapi.server.port>38090</openapi.server.port>
         <openapi.jmx.port>9001</openapi.jmx.port>
-        <!-- Tag filtering: unit tests by default, exclude live tests -->
         <surefire.excludedGroups>live</surefire.excludedGroups>
         <surefire.includedGroups>unit</surefire.includedGroups>
         <failsafe.excludedGroups>live</failsafe.excludedGroups>
@@ -46,7 +41,6 @@
              the local fast path and for the arch/integration jobs, whose reports would cover a
              different slice of the code and cannot be judged against these floors. -->
         <skipCoverage>true</skipCoverage>
-        <!-- Local development port for Liquibase plugin (override via -Dpostgres.port=XXXX) -->
         <postgres.port>5432</postgres.port>
         <resilience4j.version>2.4.0</resilience4j.version>
         <okhttp.version>5.3.2</okhttp.version>
@@ -85,7 +79,6 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-actuator</artifactId>
         </dependency>
-        <!-- Caffeine cache with TTL support and Micrometer metrics integration -->
         <dependency>
             <groupId>com.github.ben-manes.caffeine</groupId>
             <artifactId>caffeine</artifactId>
@@ -236,7 +229,6 @@
             <artifactId>spring-security-test</artifactId>
             <scope>test</scope>
         </dependency>
-        <!-- Reactor test for reactive stream testing -->
         <dependency>
             <groupId>io.projectreactor</groupId>
             <artifactId>reactor-test</artifactId>
@@ -257,7 +249,6 @@
             <artifactId>testcontainers</artifactId>
             <scope>test</scope>
         </dependency>
-        <!-- AssertJ for fluent assertions -->
         <dependency>
             <groupId>org.assertj</groupId>
             <artifactId>assertj-core</artifactId>
@@ -267,7 +258,6 @@
             <groupId>tools.jackson.dataformat</groupId>
             <artifactId>jackson-dataformat-yaml</artifactId>
         </dependency>
-        <!-- ArchUnit for architecture testing -->
         <dependency>
             <groupId>com.tngtech.archunit</groupId>
             <artifactId>archunit-junit5</artifactId>
@@ -287,7 +277,6 @@
             <artifactId>jnats</artifactId>
             <version>${jnats.version}</version>
         </dependency>
-        <!-- Docker Java SDK for sandbox container management -->
         <dependency>
             <groupId>com.github.docker-java</groupId>
             <artifactId>docker-java-api</artifactId>
@@ -346,7 +335,6 @@
             <artifactId>sentry-spring-boot-4-starter</artifactId>
             <version>${sentry.version}</version>
         </dependency>
-        <!-- Spring GraphQL Client for GitHub GraphQL API -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-graphql</artifactId>
@@ -356,13 +344,11 @@
             <artifactId>resilience4j-spring-boot4</artifactId>
             <version>${resilience4j.version}</version>
         </dependency>
-        <!-- Resilience4j Micrometer integration for circuit breaker metrics -->
         <dependency>
             <groupId>io.github.resilience4j</groupId>
             <artifactId>resilience4j-micrometer</artifactId>
             <version>${resilience4j.version}</version>
         </dependency>
-        <!-- JGit for local git repository operations -->
         <dependency>
             <groupId>org.eclipse.jgit</groupId>
             <artifactId>org.eclipse.jgit</artifactId>
@@ -400,13 +386,11 @@
     </dependencyManagement>
     <build>
         <plugins>
-            <!-- Prevent deleted or moved sources from leaving orphaned classes. -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
                 <configuration>
                     <release>${java.version}</release>
-                    <!-- Suppress warnings for generated code using deprecated GitHub API values -->
                     <compilerArgs>
                         <arg>-Xlint:all,-deprecation</arg>
                         <arg>-XDcompilePolicy=simple</arg>
@@ -443,7 +427,6 @@
                     </annotationProcessorPaths>
                 </configuration>
             </plugin>
-            <!-- JaCoCo Maven Plugin for Code Coverage -->
             <plugin>
                 <groupId>org.jacoco</groupId>
                 <artifactId>jacoco-maven-plugin</artifactId>
@@ -524,7 +507,6 @@
                     </execution>
                 </executions>
             </plugin>
-            <!-- Surefire Plugin for Unit Tests -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
@@ -537,7 +519,6 @@
                     <argLine>@{argLine} -Xmx${hephaestus.surefire.maxHeap} -Dspring.profiles.active=test -Dfile.encoding=UTF-8
                         -XX:+EnableDynamicAgentLoading -XX:+ExitOnOutOfMemoryError
                     </argLine>
-                    <!-- Test output -->
                     <printSummary>true</printSummary>
                     <redirectTestOutputToFile>false</redirectTestOutputToFile>
                     <forkCount>${hephaestus.surefire.forkCount}</forkCount>
@@ -546,32 +527,27 @@
                     <parallel>methods</parallel>
                     <threadCount>4</threadCount>
                     <perCoreThreadCount>true</perCoreThreadCount>
-                    <!-- Forked JVM timeout settings to prevent hanging -->
                     <forkedProcessTimeoutInSeconds>${hephaestus.surefire.timeout}</forkedProcessTimeoutInSeconds>
                     <forkedProcessExitTimeoutInSeconds>180</forkedProcessExitTimeoutInSeconds>
                     <!-- Enable process checker so forkedProcessTimeoutInSeconds actually works.
                          Without this, Surefire 3.x ignores the timeout and hung forks run forever. -->
                     <enableProcessChecker>ping</enableProcessChecker>
-                    <!-- Tag filtering: run unit tests, exclude live tests -->
                     <groups>${surefire.includedGroups}</groups>
                     <excludedGroups>${surefire.excludedGroups}</excludedGroups>
                 </configuration>
             </plugin>
-            <!-- Failsafe Plugin for Integration Tests -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-failsafe-plugin</artifactId>
                 <configuration>
-                    <!-- EnableDynamicAgentLoading mirrors surefire: without it Byte Buddy cannot
+<!-- EnableDynamicAgentLoading mirrors surefire: without it Byte Buddy cannot
                          self-attach on JDK 21+ and every Mockito-using integration test fails to
                          initialize. -->
                     <argLine>@{argLine} -Xmx4096m -Dspring.profiles.active=test -Dfile.encoding=UTF-8
                         -XX:+EnableDynamicAgentLoading
                     </argLine>
-                    <!-- Tag filtering: run integration tests, exclude live tests -->
                     <groups>${failsafe.includedGroups}</groups>
                     <excludedGroups>${failsafe.excludedGroups}</excludedGroups>
-                    <!-- Failsafe-discovered integration test patterns -->
                     <includes>
                         <include>**/*IntegrationTest.java</include>
                         <include>**/*LiquibaseTest.java</include>
@@ -590,7 +566,6 @@
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
                 <configuration>
-                    <!-- Default configuration for spring-boot:run -->
                     <profiles>${app.profiles}</profiles>
                     <jvmArguments>-Dspring.application.admin.enabled=true -XX:+EnableDynamicAgentLoading
                         --enable-native-access=ALL-UNNAMED
@@ -626,7 +601,6 @@
                     </image>
                 </configuration>
                 <executions>
-                    <!-- OpenAPI spec generation: start server with 'specs' profile -->
                     <execution>
                         <id>start-for-openapi</id>
                         <phase>pre-integration-test</phase>
@@ -634,7 +608,6 @@
                             <goal>start</goal>
                         </goals>
                         <configuration>
-                            <!-- Use 'specs' profile for OpenAPI generation - disables WorkspaceStartupListener -->
                             <profiles>specs</profiles>
                             <jmxPort>${openapi.jmx.port}</jmxPort>
                             <jvmArguments>-Dspring.application.admin.enabled=true -XX:+EnableDynamicAgentLoading
@@ -759,33 +732,9 @@
         </plugins>
     </build>
     <profiles>
-        <!--
-            Live Tests Profile
-
-            Runs ONLY live GitHub API tests that require real GitHub App credentials
-            and make actual network calls. These tests are tagged with 'live' and
-            protected by Maven tag filtering (this profile) and by runtime credential
-            checks using assumeGitHubCredentialsConfigured() with JUnit Assumptions.
-
-            Usage:
-              ./mvnw test -Plive-tests
-
-            Required configuration (via environment variables or application-live-local.yml):
-              - GH_APP_ID: GitHub App ID
-              - GH_APP_INSTALLATION_ID: GitHub App installation ID
-              - GH_APP_PRIVATE_KEY: GitHub App private key (PEM format)
-              - GH_APP_PAT: Personal access token (optional, for certain operations)
-              - GH_APP_ORGANIZATION: Test organization name (default: HephaestusTest)
-
-            This profile is completely opt-in and will NOT run during:
-            - mvn test (runs only @Tag("unit") tests)
-            - mvn verify (runs @Tag("unit") + @Tag("integration") tests)
-            - CI pipelines (unless explicitly activated)
-        -->
         <profile>
             <id>live-tests</id>
             <properties>
-                <!-- Override defaults to run ONLY live tests -->
                 <surefire.excludedGroups />
                 <surefire.includedGroups>live</surefire.includedGroups>
                 <failsafe.excludedGroups />
@@ -799,44 +748,14 @@
                 <failsafe.failIfNoSpecifiedTests>false</failsafe.failIfNoSpecifiedTests>
             </properties>
         </profile>
-        <!--
-            Architecture Tests Profile
-
-            Runs ONLY architecture tests that verify structural constraints using ArchUnit.
-            These tests scan all compiled classes and can be memory-intensive.
-
-            Usage:
-              ./mvnw test -Parchitecture-tests
-
-            These tests verify:
-            - Module boundaries (integration.scm isolation, SPI patterns)
-            - SOLID principles (SRP, DIP, ISP)
-            - Spring best practices (layered architecture, security)
-            - Code quality (complexity limits, naming conventions)
-        -->
         <profile>
             <id>architecture-tests</id>
             <properties>
-                <!-- Override defaults to run ONLY architecture tests -->
                 <surefire.excludedGroups />
                 <surefire.includedGroups>architecture</surefire.includedGroups>
                 <failsafe.excludedGroups />
                 <failsafe.includedGroups />
             </properties>
-            <build>
-                <plugins>
-                    <plugin>
-                        <groupId>org.apache.maven.plugins</groupId>
-                        <artifactId>maven-surefire-plugin</artifactId>
-                        <configuration>
-                            <!-- 4GB: ArchUnit OOMs at 2GB. -->
-                            <argLine>@{argLine} -Xmx4096m -Dspring.profiles.active=test -Dfile.encoding=UTF-8
-                                -XX:+EnableDynamicAgentLoading
-                            </argLine>
-                        </configuration>
-                    </plugin>
-                </plugins>
-            </build>
         </profile>
         <!--
             Mutation testing (PIT) for the security-critical auth logic. Opt-in and NEVER part of CI:

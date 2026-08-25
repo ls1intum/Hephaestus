@@ -58,7 +58,6 @@
                             <goal>generate</goal>
                         </goals>
                         <configuration>
-                            <!-- GitHub schema is ~70k lines (~1.4MB), skip size limit check -->
                             <skipSchemaSizeLimit>true</skipSchemaSizeLimit>
                             <graphqlSchemas>
                                 <rootDir>${project.basedir}/src/main/resources/graphql/github</rootDir>
@@ -79,7 +78,6 @@
                             <generateParameterizedFieldsResolvers>false</generateParameterizedFieldsResolvers>
                             <generateModelsForRootTypes>false</generateModelsForRootTypes>
                             <generateAllMethodInProjection>true</generateAllMethodInProjection>
-                            <!-- Skip Relay types that reference missing Query root type -->
                             <fieldsWithoutResolvers>
                                 <fieldWithoutResolver>node</fieldWithoutResolver>
                                 <fieldWithoutResolver>nodes</fieldWithoutResolver>
@@ -107,7 +105,7 @@
                             <requestSuffix>Request</requestSuffix>
                             <responseSuffix>Response</responseSuffix>
                             <responseProjectionSuffix>ResponseProjection</responseProjectionSuffix>
-                            <!-- The template suppresses the internally used projectionDepthOnFields field. -->
+                            <!-- Exclude generator-internal projection state from the public model. -->
                             <customTemplatesRoot>${project.basedir}/src/main/resources/graphql/templates
                             </customTemplatesRoot>
                             <customTemplates>
@@ -121,12 +119,10 @@
                             <goal>generate</goal>
                         </goals>
                         <configuration>
-                            <!-- GitLab schema is large, skip size limit check -->
                             <skipSchemaSizeLimit>true</skipSchemaSizeLimit>
                             <graphqlSchemas>
                                 <rootDir>${project.basedir}/src/main/resources/graphql/gitlab</rootDir>
                             </graphqlSchemas>
-                            <!-- Output configuration (separate dir to avoid codegen cleanup conflicts) -->
                             <outputDir>${project.build.directory}/generated-sources/graphql-gitlab</outputDir>
                             <packageName>de.tum.cit.aet.hephaestus.integration.scm.gitlab.graphql</packageName>
                             <apiPackageName>de.tum.cit.aet.hephaestus.integration.scm.gitlab.graphql.api</apiPackageName>
@@ -203,64 +199,20 @@
                 <version>3.2.0</version>
                 <executions>
                     <execution>
-                        <id>graphql-post-process</id>
+                        <id>remove-invalid-relay-models</id>
                         <phase>generate-sources</phase>
                         <goals>
                             <goal>run</goal>
                         </goals>
                         <configuration>
                             <target>
-                                <!-- Delete Relay files that depend on missing Query root type -->
-                                <delete failonerror="false">
+                                <!-- The generator emits wrappers for Query.relay although it omits the Query root model. -->
+                                <delete>
                                     <fileset dir="${project.build.directory}/generated-sources/graphql-github/de/tum/cit/aet/hephaestus/integration/scm/github/graphql/model">
                                         <include name="RelayQueryRequest.java" />
                                         <include name="RelayQueryResponse.java" />
                                     </fileset>
                                 </delete>
-                                <!-- Add @SuppressWarnings("deprecation") to classes using deprecated GitHub API fields -->
-                                <!-- flags="gm": g=global, m=multiline (^ matches start of each line) -->
-                                <replaceregexp flags="gm" byline="false">
-                                    <regexp pattern="^(public class (ProjectPendingCardsParametrizedInput|IssueProjectCardsParametrizedInput|PullRequestProjectCardsParametrizedInput|ProjectColumnCardsParametrizedInput))" />
-                                    <substitution expression="@SuppressWarnings(&quot;deprecation&quot;)${line.separator}\1" />
-                                    <fileset dir="${project.build.directory}/generated-sources/graphql-github/de/tum/cit/aet/hephaestus/integration/scm/github/graphql/model">
-                                        <include name="ProjectPendingCardsParametrizedInput.java" />
-                                        <include name="IssueProjectCardsParametrizedInput.java" />
-                                        <include name="PullRequestProjectCardsParametrizedInput.java" />
-                                        <include name="ProjectColumnCardsParametrizedInput.java" />
-                                    </fileset>
-                                </replaceregexp>
-                            </target>
-                        </configuration>
-                    </execution>
-                    <execution>
-                        <id>verify-generated-clients</id>
-                        <phase>process-sources</phase>
-                        <goals>
-                            <goal>run</goal>
-                        </goals>
-                        <configuration>
-                            <target>
-                                <fail message="Generated client output is missing: generated-sources/graphql-github/de/tum/cit/aet/hephaestus/integration/scm/github/graphql/model">
-                                    <condition>
-                                        <not>
-                                            <available file="${project.build.directory}/generated-sources/graphql-github/de/tum/cit/aet/hephaestus/integration/scm/github/graphql/model" type="dir" />
-                                        </not>
-                                    </condition>
-                                </fail>
-                                <fail message="Generated client output is missing: generated-sources/graphql-gitlab/de/tum/cit/aet/hephaestus/integration/scm/gitlab/graphql/model">
-                                    <condition>
-                                        <not>
-                                            <available file="${project.build.directory}/generated-sources/graphql-gitlab/de/tum/cit/aet/hephaestus/integration/scm/gitlab/graphql/model" type="dir" />
-                                        </not>
-                                    </condition>
-                                </fail>
-                                <fail message="Generated client output is missing: generated-sources/openapi-outline/de/tum/cit/aet/hephaestus/integration/outline/client/model">
-                                    <condition>
-                                        <not>
-                                            <available file="${project.build.directory}/generated-sources/openapi-outline/de/tum/cit/aet/hephaestus/integration/outline/client/model" type="dir" />
-                                        </not>
-                                    </condition>
-                                </fail>
                             </target>
                         </configuration>
                     </execution>
@@ -284,28 +236,20 @@
                             <output>${project.build.directory}/generated-sources/openapi-outline</output>
                             <modelPackage>de.tum.cit.aet.hephaestus.integration.outline.client.model</modelPackage>
                             <modelNamePrefix>Outline</modelNamePrefix>
-                            <!-- Rename the two wire models whose simple names collide with the JPA -->
-                            <!-- domain entities (integration.outline.domain.{OutlineCollection, -->
-                            <!-- OutlineDocument}). Mapping bypasses modelNamePrefix, so the value -->
-                            <!-- carries the Outline prefix itself. Keeps both the model and the -->
-                            <!-- entity importable by plain simple name side by side. -->
+                            <!-- Avoid simple-name collisions with JPA entities. -->
                             <modelNameMappings>
                                 <modelNameMapping>Collection=OutlineCollectionModel</modelNameMapping>
                                 <modelNameMapping>Document=OutlineDocumentModel</modelNameMapping>
                             </modelNameMappings>
-                            <!-- Models only: OutlineApiClient hand-writes the transport policy -->
                             <generateApis>false</generateApis>
                             <generateApiTests>false</generateApiTests>
                             <generateApiDocumentation>false</generateApiDocumentation>
                             <generateModelTests>false</generateModelTests>
                             <generateModelDocumentation>false</generateModelDocumentation>
                             <generateSupportingFiles>false</generateSupportingFiles>
-                            <!-- date-time → Instant to match the mirror/domain types -->
                             <typeMappings>
                                 <typeMapping>OffsetDateTime=Instant</typeMapping>
-                                <!-- Outline UUIDs are opaque ids we only ever compare/store as text; -->
-                                <!-- keeping them String avoids UUID.toString() noise across every call site -->
-                                <!-- and matches the mirror/domain column types (transport policy). -->
+                                <!-- Outline IDs remain strings to match persisted domain IDs. -->
                                 <typeMapping>UUID=String</typeMapping>
                             </typeMappings>
                             <importMappings>
@@ -316,8 +260,7 @@
                                 <openApiNullable>false</openApiNullable>
                                 <sourceFolder>.</sourceFolder>
                                 <hideGenerationTimestamp>true</hideGenerationTimestamp>
-                                <!-- Unknown-enum tolerance on the reactive decode path; full rationale + -->
-                                <!-- revert guard in OutlineDeserializationToleranceTest#unknownEnumValueDecodesToUnknownDefaultOnWebClientPath. -->
+                                <!-- Accept enum values added by newer Outline servers. -->
                                 <enumUnknownDefaultCase>true</enumUnknownDefaultCase>
                             </configOptions>
                         </configuration>
@@ -336,7 +279,6 @@
                             <output>${project.build.directory}/generated-sources/openapi-outline</output>
                             <modelPackage>de.tum.cit.aet.hephaestus.integration.outline.client.model</modelPackage>
                             <modelNamePrefix>Outline</modelNamePrefix>
-                            <!-- Keep collision-avoiding names consistent across both specs. -->
                             <modelNameMappings>
                                 <modelNameMapping>Collection=OutlineCollectionModel</modelNameMapping>
                                 <modelNameMapping>Document=OutlineDocumentModel</modelNameMapping>
@@ -349,9 +291,6 @@
                             <generateSupportingFiles>false</generateSupportingFiles>
                             <typeMappings>
                                 <typeMapping>OffsetDateTime=Instant</typeMapping>
-                                <!-- Outline UUIDs are opaque ids we only ever compare/store as text; -->
-                                <!-- keeping them String avoids UUID.toString() noise across every call site -->
-                                <!-- and matches the mirror/domain column types (transport policy). -->
                                 <typeMapping>UUID=String</typeMapping>
                             </typeMappings>
                             <importMappings>
@@ -362,7 +301,6 @@
                                 <openApiNullable>false</openApiNullable>
                                 <sourceFolder>.</sourceFolder>
                                 <hideGenerationTimestamp>true</hideGenerationTimestamp>
-                                <!-- Same unknown-enum tolerance as the spec3 execution above. -->
                                 <enumUnknownDefaultCase>true</enumUnknownDefaultCase>
                             </configOptions>
                         </configuration>

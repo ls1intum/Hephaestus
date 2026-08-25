@@ -2,49 +2,69 @@
 
 **Status:** Accepted
 **Date:** 2026-08-25
+**Authors:** Server foundations
 
 ## Context
 
-The application compiled its handwritten sources together with 11,726 generated GitHub, GitLab, and
-Outline transport classes. An application or test edit could therefore repeat generation and compile
-the entire source set. A CI experiment that transferred the application's `target/classes` avoided
-some repeated compilation but added a producer to the required workflow's critical path and treated
-mutable build output as the reuse boundary.
+The application compiled its handwritten sources together with roughly 12,000 generated GitHub,
+GitLab, and Outline transport classes. Application and test edits therefore shared a compiler
+boundary with inputs that had not changed.
 
-ADR 0001 flattened the application into `server/` because the former nesting had no architectural
-purpose. Generated clients now provide a concrete reason for a reactor: their schemas, generators,
-dependencies, invalidation, and compiled output have a different lifecycle from application code.
+ADR 0001 flattened the application into `server/` because its former nesting represented no
+architectural boundary. Generated clients have an independent lifecycle: schemas, generator
+configuration, dependencies, invalidation, and compiled output change separately from application
+code.
+
+## Decision drivers
+
+- Tests must run by default and must not depend on workspace build state.
+- Every generator input and toolchain change must invalidate reused output.
+- Local and hosted builds should reuse unchanged generated output.
+- CI reuse must not serialize required jobs or allow pull requests to publish shared cache entries.
+- Mutable application build directories are not reusable artifacts.
+
+## Considered options
+
+- **Keep the monolith and infer a quick build from `target/`: rejected.** Filesystem state silently
+  changed test selection and could leave stale generated output.
+- **Transfer compiled application output between jobs: rejected.** Its 2m53s producer increased
+  workflow-to-gate latency to 13m40s and coupled reuse to mutable application classes.
+- **Add a generated module without persisted build output: rejected.** A clean reactor still compiles
+  every module.
+- **Cache module `target/` directories: rejected.** Mutable lifecycle output has no safe ownership or
+  invalidation boundary.
+- **Use a generated module with Maven Build Cache: accepted.** Measurement showed a 24.75s clean
+  package and 1.39–1.47s cache restoration without adding a producer to the workflow critical path.
 
 ## Decision
 
-`server/pom.xml` is the reactor parent for two modules:
+`server/pom.xml` aggregates two modules. `generated-clients` owns the GraphQL and OpenAPI inputs,
+generators, generated sources, runtime GraphQL documents, and its JAR. `application` owns deployable
+code, resources, migrations, and tests and depends on that JAR.
 
-- `generated-clients` owns every GitHub and GitLab GraphQL input, the Outline OpenAPI inputs, their
-  generator configuration, and the resulting JAR. GraphQL documents remain resources in that JAR
-  because the application loads them at runtime.
-- `application` owns the Spring Boot application, database migrations, and every server test. It
-  consumes generated transports only through the generated-client dependency.
+Generation runs in the standard Maven lifecycle. Tests are never skipped based on filesystem state.
+Only generated-client output participates in Maven Build Cache; the application disables restoring
+and saving build output. Pull requests may restore an exact generated entry, while only the default
+branch may publish one.
 
-Generation is part of the generated module's standard Maven lifecycle. Tests run by default. The
-build does not infer behavior from files under `target/`, skip tests through an incremental profile,
-or transfer application class directories between jobs.
-
-The generated JAR is configured for reproducible output and is the only server module eligible for
-remote build reuse. The scheduled Server Phase Reference workflow verifies that two clean builds are
-byte-for-byte identical.
-Application output is deliberately excluded because handwritten code and resources change together
-and because caching it would recreate the unsafe whole-application boundary.
+Maven Build Cache addresses output from effective build inputs. CI persists its local cache using an
+exact source-and-toolchain key. The scheduled Server Phase Reference workflow monitors byte
+reproducibility by comparing two clean generated-client builds with caching disabled.
 
 ## Consequences
 
-- The first clean build still generates and compiles all clients. Later builds can reuse one immutable
-  generated JAR locally and in CI without serializing verification behind a producer job.
-- Changes to generated-client schemas, documents, templates, generator configuration, Java, or their
-  compile dependencies invalidate that module. Application and test-only edits do not.
-- Server commands continue to start at `server/`, but commands targeting the deployable select the
-  `application` module.
-- Source and output paths gain a module segment. CI, release tooling, developer scripts, IDE setup,
-  and contributor documentation must use the reactor rather than reaching into a former monolithic
-  `target/` tree.
-- This supersedes ADR 0001's rejection of application nesting. The added path now represents an
-  enforceable build and dependency boundary rather than an organizational wrapper.
+- Unchanged client inputs do not require regeneration or recompilation when a matching build-cache
+  entry exists.
+- Schema, operation, template, generator, Java, or generated-client dependency changes invalidate
+  reused output. Application and test-only changes do not.
+- Commands start at `server/`; deployable-only invocations target `application` after installing its
+  reactor dependency.
+- Tooling addresses module-owned paths rather than the former monolithic source and output trees.
+- ADR 0001 remains valid for organizational nesting; this reactor adds an enforceable build-lifecycle
+  boundary.
+
+## Revisit when
+
+Reconsider the mechanism if cache validation or reproducibility fails, cache transfer cost erases the
+measured gain, or Maven Build Cache support changes materially. Preserve the generated/application
+ownership boundary unless their lifecycles cease to differ.

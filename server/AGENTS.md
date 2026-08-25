@@ -23,10 +23,6 @@ the Postgres container. For plain terminals: `pnpm dev:server` and `pnpm dev:web
 - **`BufferingApplicationStartup`** is wired in `Application.main()`. With `app.profiles=local`,
   `GET /actuator/startup` returns the timeline; `StartupBudgetIntegrationTest` catches per-step
   regressions in CI.
-- **Generated clients are a separate Maven module.** The first build generates and compiles them;
-  later handwritten application or test edits reuse that module's unchanged output. Run Maven from
-  `server/` so the reactor can build dependencies in the right order.
-
 ## Build traps
 
 Each of these can leave you with the wrong result.
@@ -39,11 +35,10 @@ Each of these can leave you with the wrong result.
   discarded and the default (`unit`) runs. The tag is selected by profile, never by `-Dgroups`:
   `mvn test -Parchitecture-tests`. CI is unaffected; it passes `-Dsurefire.includedGroups`,
   which is the property the POM actually reads.
-- **`clean` is correct but intentionally cold.** It removes both modules' outputs, so the next build
-  regenerates every client. Ordinary development commands omit it and safely amortize unchanged
-  generated clients.
-- **Two Maven runs in one worktree can corrupt each other.** They share module `target/` directories.
-  Let one finish.
+- **`clean` does not guarantee a cold build.** It removes workspace outputs, but Maven Build Cache can
+  restore them. Pass `-Dmaven.build.cache.enabled=false` when measuring a cold build.
+- **Do not run concurrent Maven processes in one checkout.** Both write the same module `target/`
+  directories.
 - **`server/.env` leaks into Maven test JVMs.** A local `MANAGEMENT_PORT` collides across worktrees and
   local OAuth variables make environment-sensitive tests fail only on your machine. Run tests with
   `MANAGEMENT_PORT=0 SERVER_PORT=0`.
