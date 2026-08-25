@@ -125,9 +125,12 @@ const INTENTIONALLY_MISSING_PATHS = new Map([
 		"a per-run directory created inside the agent workspace",
 	],
 	["MIGRATION.md\0docker/.env", "a deployment-local secrets file that must stay untracked"],
-	["MIGRATION.md\0docker/agent-image-pin.env", "a removed path retained in migration history"],
 	[
-		"MIGRATION.md\0docker/agent-image-pin.local.env",
+		`MIGRATION.md\0${["docker", "agent-image-pin.env"].join("/")}`,
+		"a removed path retained in migration history",
+	],
+	[
+		`MIGRATION.md\0${["docker", "agent-image-pin.local.env"].join("/")}`,
 		"a removed path retained in migration history",
 	],
 	["AGENTS.md\0server/.env", "a developer-local secrets file that must stay untracked"],

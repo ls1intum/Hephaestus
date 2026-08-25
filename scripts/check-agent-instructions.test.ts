@@ -7,8 +7,8 @@ import {
 	codeSpans,
 	parse,
 	references,
-	scan,
 	type Snapshot,
+	scan,
 	type TrackedFile,
 	withoutCode,
 } from "./check-agent-instructions.ts";
