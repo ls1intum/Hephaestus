@@ -23,6 +23,10 @@ on:
         required: false
         type: string
         default: "false"
+      server_classes_artifact_name:
+        description: "Artifact containing server/target/classes"
+        required: true
+        type: string
 
 jobs:
   quality-gates:
@@ -107,8 +111,17 @@ jobs:
           cache-type: ${{ matrix.check }}
           os: ${{ runner.os }}
 
+      - name: Restore compiled server classes
+        if: steps.should_run.outputs.run == 'true' && matrix.check != 'webapp-quality'
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: ${{ inputs.server_classes_artifact_name }}
+          path: server/target/classes
+
       - name: Application-server formatting + agent runtime + contracts
         if: steps.should_run.outputs.run == 'true' && matrix.check == 'application-server-quality'
+        env:
+          MAVEN_ARGS: -Dreuse.main.classes=true
         run: |
           pnpm install --frozen-lockfile
 
@@ -268,6 +281,7 @@ jobs:
         env:
           DATABASE_URL: postgresql://fake:fake@localhost:5432/fake
           MODEL_NAME: fake:model
+          MAVEN_ARGS: -Dreuse.main.classes=true
         run: |
           pnpm install --frozen-lockfile
           pnpm run generate:api
@@ -285,6 +299,8 @@ jobs:
         id: database
         continue-on-error: true
         if: steps.should_run.outputs.run == 'true' && matrix.check == 'server-contracts' && always()
+        env:
+          MAVEN_ARGS: -Dreuse.main.classes=true
         run: |
           # The pg_partman image, not stock Postgres: the auth_event changeset that calls
           # partman.create_parent is preconditioned onFail="MARK_RAN" on the extension being

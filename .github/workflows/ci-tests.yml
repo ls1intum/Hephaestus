@@ -24,6 +24,10 @@ on:
         required: false
         type: string
         default: "true"
+      server_classes_artifact_name:
+        description: "Artifact containing server/target/classes"
+        required: true
+        type: string
 
 jobs:
   tests:
@@ -94,17 +98,24 @@ jobs:
           cache-type: ${{ matrix.test-type }}
           os: ${{ runner.os }}
 
+      - name: Restore compiled server classes
+        if: steps.should_run.outputs.run == 'true' && (startsWith(matrix.test-type, 'application-server-') || matrix.test-type == 'webapp-e2e')
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: ${{ inputs.server_classes_artifact_name }}
+          path: server/target/classes
+
       - name: Run server unit and architecture tests
         if: steps.should_run.outputs.run == 'true' && matrix.test-type == 'application-server-verification'
         run: |
           rm -rf server/target/surefire-reports/*
-          pnpm run test:server:verification
+          pnpm run test:server:verification -- -Dreuse.main.classes=true
 
       - name: Run server integration tests
         if: steps.should_run.outputs.run == 'true' && matrix.test-type == 'application-server-integration'
         run: |
           rm -rf server/target/surefire-reports/*
-          pnpm run test:server:integration
+          pnpm run test:server:integration -- -Dreuse.main.classes=true
 
       - name: Run tests
         id: tests
@@ -140,7 +151,8 @@ jobs:
                 cd ../server
                 SERVER_PORT=8080 MANAGEMENT_PORT=8080 POSTGRES_PORT=5432 \
                   APPLICATION_HOST_URL=http://localhost:4200 \
-                  ./mvnw spring-boot:run -Dapp.profiles=e2e,playwright --batch-mode
+                  ./mvnw spring-boot:run -Dreuse.main.classes=true \
+                    -Dapp.profiles=e2e,playwright --batch-mode
               ) > ../e2e-server.log 2>&1 &
               SERVER_PID=$!
 

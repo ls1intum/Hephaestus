@@ -77,8 +77,6 @@
         <!-- Local development port for Liquibase plugin (override via -Dpostgres.port=XXXX) -->
         <postgres.port>5432</postgres.port>
 
-        <!-- Stale class cleanup: always enabled to prevent ghost .class files from CI caches.
-             Override with -DskipCleanStaleClasses=true only for local iterative dev. -->
         <skipCleanStaleClasses>false</skipCleanStaleClasses>
 
         <resilience4j.version>2.4.0</resilience4j.version>
@@ -442,8 +440,7 @@
     </dependencyManagement>
     <build>
         <plugins>
-            <!-- Clean compiled classes to prevent orphaned .class files from deleted/moved sources.
-                 Skipped by the 'quick' profile (skipCleanStaleClasses=true) for incremental builds. -->
+            <!-- Prevent deleted or moved sources from leaving orphaned classes. -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-clean-plugin</artifactId>
@@ -1330,6 +1327,22 @@
                 <skipCleanStaleClasses>true</skipCleanStaleClasses>
                 <!-- maven.main.skip deliberately NOT set — we want incremental compile -->
                 <maven.test.skip>true</maven.test.skip>
+            </properties>
+        </profile>
+
+        <profile>
+            <id>reuse-main-classes</id>
+            <activation>
+                <property>
+                    <name>reuse.main.classes</name>
+                    <value>true</value>
+                </property>
+            </activation>
+            <properties>
+                <graphql.codegen.skip>true</graphql.codegen.skip>
+                <outline.codegen.skip>true</outline.codegen.skip>
+                <skipCleanStaleClasses>true</skipCleanStaleClasses>
+                <maven.main.skip>true</maven.main.skip>
             </properties>
         </profile>
 

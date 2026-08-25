@@ -262,9 +262,52 @@ jobs:
 
           echo "::notice::Queued Coolify deployment ${deployment} for PR #${PR_NUMBER}."
 
+  compile-server:
+    name: "Compile server"
+    needs: [detect-changes]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    env:
+      SHOULD_COMPILE: ${{ needs.detect-changes.outputs.should_skip != 'true' && (needs.detect-changes.outputs.application-server == 'true' || needs.detect-changes.outputs.e2e == 'true' || needs.detect-changes.outputs.ci-config == 'true' || github.event_name != 'pull_request') }}
+    outputs:
+      artifact-name: ${{ format('server-main-classes-{0}-{1}', github.run_id, github.run_attempt) }}
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        if: env.SHOULD_COMPILE == 'true'
+        with:
+          persist-credentials: false
+
+      - uses: ./.github/actions/setup-caches
+        if: env.SHOULD_COMPILE == 'true'
+        with:
+          cache-type: application-server-compile
+          os: ${{ runner.os }}
+
+      - name: Generate API clients
+        if: env.SHOULD_COMPILE == 'true'
+        working-directory: server
+        run: /usr/bin/time -f 'generation wall=%e user=%U system=%S max-rss-kb=%M' ./mvnw generate-sources -P'!quick' -DskipTests --batch-mode
+
+      - name: Compile production classes
+        if: env.SHOULD_COMPILE == 'true'
+        working-directory: server
+        run: /usr/bin/time -f 'main-compilation wall=%e user=%U system=%S max-rss-kb=%M' ./mvnw compile -DskipTests -Dgraphql.codegen.skip=true -Doutline.codegen.skip=true -DskipCleanStaleClasses=true --batch-mode
+
+      - name: Upload compiled server classes
+        if: env.SHOULD_COMPILE == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: ${{ format('server-main-classes-{0}-{1}', github.run_id, github.run_attempt) }}
+          path: server/target/classes
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 6
+
   Quality:
     uses: ./.github/workflows/ci-quality-gates.yml
-    needs: [detect-changes]
+    needs: [detect-changes, compile-server]
     if: |
       needs.detect-changes.outputs.should_skip != 'true' && (
         needs.detect-changes.outputs.any-code == 'true' ||
@@ -277,6 +320,7 @@ jobs:
       webapp_changed: ${{ (needs.detect-changes.outputs.webapp == 'true' || needs.detect-changes.outputs.ci-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
       application_server_changed: ${{ (needs.detect-changes.outputs.application-server == 'true' || needs.detect-changes.outputs.ci-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
       pmd_canary: ${{ (needs.detect-changes.outputs.pmd-canary == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
+      server_classes_artifact_name: ${{ needs.compile-server.outputs.artifact-name }}
 
   Security:
     uses: ./.github/workflows/ci-security-scan.yml
@@ -293,7 +337,7 @@ jobs:
 
   Test:
     uses: ./.github/workflows/ci-tests.yml
-    needs: [detect-changes]
+    needs: [detect-changes, compile-server]
     if: |
       needs.detect-changes.outputs.should_skip != 'true' && (
         needs.detect-changes.outputs.any-code == 'true' ||
@@ -306,6 +350,7 @@ jobs:
       webapp_changed: ${{ (needs.detect-changes.outputs.webapp == 'true' || needs.detect-changes.outputs.ci-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
       application_server_changed: ${{ (needs.detect-changes.outputs.application-server == 'true' || needs.detect-changes.outputs.ci-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
       e2e_changed: ${{ (needs.detect-changes.outputs.e2e == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
+      server_classes_artifact_name: ${{ needs.compile-server.outputs.artifact-name }}
 
   Docker:
     uses: ./.github/workflows/ci-docker-build.yml
@@ -337,7 +382,7 @@ jobs:
     permissions:
       actions: read
       statuses: write
-    needs: [detect-changes, Quality, Security, Test, Docker]
+    needs: [detect-changes, compile-server, Quality, Security, Test, Docker]
     if: always()
     steps:
       - name: Generate workflow timeline
@@ -388,6 +433,7 @@ jobs:
         id: evaluate
         run: |
           echo "detect-changes: ${{ needs.detect-changes.result }}"
+          echo "compile-server: ${{ needs.compile-server.result }}"
           echo "Quality:        ${{ needs.Quality.result }}"
           echo "Security:       ${{ needs.Security.result }}"
           echo "Test:           ${{ needs.Test.result }}"
