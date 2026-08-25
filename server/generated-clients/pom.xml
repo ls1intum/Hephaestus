@@ -1,0 +1,406 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>de.tum.cit.aet</groupId>
+        <artifactId>hephaestus-server-parent</artifactId>
+        <version>0.0.0-development</version>
+        <relativePath>../pom.xml</relativePath>
+    </parent>
+    <artifactId>hephaestus-generated-clients</artifactId>
+    <name>Hephaestus generated clients</name>
+    <dependencies>
+        <dependency>
+            <groupId>io.github.kobylynskyi</groupId>
+            <artifactId>graphql-java-codegen</artifactId>
+            <version>${graphql-codegen.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-annotations</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>jakarta.annotation</groupId>
+            <artifactId>jakarta.annotation-api</artifactId>
+        </dependency>
+    </dependencies>
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>build-helper-maven-plugin</artifactId>
+                <version>3.6.1</version>
+                <executions>
+                    <execution>
+                        <id>add-graphql-source</id>
+                        <phase>generate-sources</phase>
+                        <goals>
+                            <goal>add-source</goal>
+                        </goals>
+                        <configuration>
+                            <sources>
+                                <source>${project.build.directory}/generated-sources/graphql-github</source>
+                                <source>${project.build.directory}/generated-sources/graphql-gitlab</source>
+                                <source>${project.build.directory}/generated-sources/openapi-outline</source>
+                            </sources>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>io.github.kobylynskyi</groupId>
+                <artifactId>graphql-codegen-maven-plugin</artifactId>
+                <version>${graphql-codegen.version}</version>
+                <executions>
+                    <execution>
+                        <id>generate-github-graphql-client</id>
+                        <goals>
+                            <goal>generate</goal>
+                        </goals>
+                        <configuration>
+                            <!-- GitHub schema is ~70k lines (~1.4MB), skip size limit check -->
+                            <skipSchemaSizeLimit>true</skipSchemaSizeLimit>
+                            <!-- Schema location -->
+                            <graphqlSchemas>
+                                <rootDir>${project.basedir}/src/main/resources/graphql/github</rootDir>
+                            </graphqlSchemas>
+                            <!-- Output configuration -->
+                            <outputDir>${project.build.directory}/generated-sources/graphql-github</outputDir>
+                            <packageName>de.tum.cit.aet.hephaestus.integration.scm.github.graphql</packageName>
+                            <apiPackageName>de.tum.cit.aet.hephaestus.integration.scm.github.graphql.api</apiPackageName>
+                            <modelPackageName>de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model
+                            </modelPackageName>
+                            <modelNamePrefix>GH</modelNamePrefix>
+                            <!-- Client-side code generation (for consuming GitHub API) -->
+                            <generateClient>true</generateClient>
+                            <generateApis>false</generateApis>
+                            <generateDataFetchingEnvironmentArgumentInApis>false
+                            </generateDataFetchingEnvironmentArgumentInApis>
+                            <!-- Model generation options -->
+                            <generateBuilder>true</generateBuilder>
+                            <generateEqualsAndHashCode>true</generateEqualsAndHashCode>
+                            <generateToString>true</generateToString>
+                            <generateParameterizedFieldsResolvers>false</generateParameterizedFieldsResolvers>
+                            <generateModelsForRootTypes>false</generateModelsForRootTypes>
+                            <generateAllMethodInProjection>true</generateAllMethodInProjection>
+                            <!-- Skip Relay types that reference missing Query root type -->
+                            <fieldsWithoutResolvers>
+                                <fieldWithoutResolver>node</fieldWithoutResolver>
+                                <fieldWithoutResolver>nodes</fieldWithoutResolver>
+                                <fieldWithoutResolver>relay</fieldWithoutResolver>
+                            </fieldsWithoutResolvers>
+                            <!-- Java config -->
+                            <generatedLanguage>JAVA</generatedLanguage>
+                            <!-- Use @Generated annotation with @SuppressWarnings to silence IDE warnings on generated code -->
+                            <addGeneratedAnnotation>true</addGeneratedAnnotation>
+                            <generatedAnnotation>jakarta.annotation.Generated</generatedAnnotation>
+                            <modelValidationAnnotation>@jakarta.annotation.Generated("graphql-codegen")
+                            </modelValidationAnnotation>
+                            <!-- GitHub-specific scalar mappings -->
+                            <customTypesMapping>
+                                <DateTime>java.time.OffsetDateTime</DateTime>
+                                <Date>java.time.LocalDate</Date>
+                                <URI>java.net.URI</URI>
+                                <HTML>java.lang.String</HTML>
+                                <GitObjectID>java.lang.String</GitObjectID>
+                                <GitSSHRemote>java.lang.String</GitSSHRemote>
+                                <GitTimestamp>java.time.OffsetDateTime</GitTimestamp>
+                                <PreciseDateTime>java.time.OffsetDateTime</PreciseDateTime>
+                                <X509Certificate>java.lang.String</X509Certificate>
+                                <Base64String>java.lang.String</Base64String>
+                                <BigInt>java.math.BigInteger</BigInt>
+                            </customTypesMapping>
+                            <!-- Naming conventions -->
+                            <modelNameSuffix />
+                            <requestSuffix>Request</requestSuffix>
+                            <responseSuffix>Response</responseSuffix>
+                            <responseProjectionSuffix>ResponseProjection</responseProjectionSuffix>
+                            <!-- Use custom template for ResponseProjection to add @SuppressWarnings("unused") -->
+                            <!-- This suppresses false positive warnings for the projectionDepthOnFields field -->
+                            <!-- which is used internally by the all$() method -->
+                            <customTemplatesRoot>${project.basedir}/src/main/resources/graphql/templates
+                            </customTemplatesRoot>
+                            <customTemplates>
+                                <RESPONSE_PROJECTION>response_projection.ftl</RESPONSE_PROJECTION>
+                            </customTemplates>
+                        </configuration>
+                    </execution>
+                    <!-- GitLab GraphQL Code Generator -->
+                    <!-- Generates type-safe Java classes from GitLab GraphQL schema -->
+                    <execution>
+                        <id>generate-gitlab-graphql-client</id>
+                        <goals>
+                            <goal>generate</goal>
+                        </goals>
+                        <configuration>
+                            <!-- GitLab schema is large, skip size limit check -->
+                            <skipSchemaSizeLimit>true</skipSchemaSizeLimit>
+                            <!-- Schema location -->
+                            <graphqlSchemas>
+                                <rootDir>${project.basedir}/src/main/resources/graphql/gitlab</rootDir>
+                            </graphqlSchemas>
+                            <!-- Output configuration (separate dir to avoid codegen cleanup conflicts) -->
+                            <outputDir>${project.build.directory}/generated-sources/graphql-gitlab</outputDir>
+                            <packageName>de.tum.cit.aet.hephaestus.integration.scm.gitlab.graphql</packageName>
+                            <apiPackageName>de.tum.cit.aet.hephaestus.integration.scm.gitlab.graphql.api</apiPackageName>
+                            <modelPackageName>de.tum.cit.aet.hephaestus.integration.scm.gitlab.graphql.model
+                            </modelPackageName>
+                            <modelNamePrefix>GL</modelNamePrefix>
+                            <!-- Client-side code generation (for consuming GitLab API) -->
+                            <generateClient>true</generateClient>
+                            <generateApis>false</generateApis>
+                            <generateDataFetchingEnvironmentArgumentInApis>false
+                            </generateDataFetchingEnvironmentArgumentInApis>
+                            <!-- Model generation options -->
+                            <generateBuilder>true</generateBuilder>
+                            <generateEqualsAndHashCode>true</generateEqualsAndHashCode>
+                            <generateToString>true</generateToString>
+                            <generateParameterizedFieldsResolvers>false</generateParameterizedFieldsResolvers>
+                            <generateModelsForRootTypes>false</generateModelsForRootTypes>
+                            <generateAllMethodInProjection>true</generateAllMethodInProjection>
+                            <!-- GitLab schema has types with 300+ fields (e.g., Project).
+                                 All-args constructors for these exceed the JVM 255-parameter limit. -->
+                            <generateNoArgsConstructorOnly>true</generateNoArgsConstructorOnly>
+                            <!-- Java config -->
+                            <generatedLanguage>JAVA</generatedLanguage>
+                            <addGeneratedAnnotation>true</addGeneratedAnnotation>
+                            <generatedAnnotation>jakarta.annotation.Generated</generatedAnnotation>
+                            <modelValidationAnnotation>@jakarta.annotation.Generated("graphql-codegen")
+                            </modelValidationAnnotation>
+                            <!-- GitLab-specific scalar mappings -->
+                            <customTypesMapping>
+                                <Time>java.time.OffsetDateTime</Time>
+                                <ISO8601DateTime>java.time.OffsetDateTime</ISO8601DateTime>
+                                <ISO8601Date>java.time.LocalDate</ISO8601Date>
+                                <GlobalID>java.lang.String</GlobalID>
+                                <JSON>java.lang.Object</JSON>
+                                <UntrustedRegexp>java.lang.String</UntrustedRegexp>
+                                <Duration>java.lang.String</Duration>
+                                <BigInt>java.math.BigInteger</BigInt>
+                                <TodoableID>java.lang.String</TodoableID>
+                                <UserID>java.lang.String</UserID>
+                                <IterationID>java.lang.String</IterationID>
+                                <MilestoneID>java.lang.String</MilestoneID>
+                                <WorkItemID>java.lang.String</WorkItemID>
+                                <IssueID>java.lang.String</IssueID>
+                                <ProjectID>java.lang.String</ProjectID>
+                                <GroupID>java.lang.String</GroupID>
+                                <LabelsFilterType>java.lang.String</LabelsFilterType>
+                                <NegatedIterationWildcardId>java.lang.String</NegatedIterationWildcardId>
+                                <Upload>java.lang.String</Upload>
+                                <Color>java.lang.String</Color>
+                                <PaymentMethodID>java.lang.String</PaymentMethodID>
+                                <NamespaceID>java.lang.String</NamespaceID>
+                                <AuditEventsStreamingHeadersID>java.lang.String</AuditEventsStreamingHeadersID>
+                                <AuditEventsExternalAuditEventDestinationID>java.lang.String</AuditEventsExternalAuditEventDestinationID>
+                                <GoogleCloudLoggingConfigurationID>java.lang.String</GoogleCloudLoggingConfigurationID>
+                                <AmazonS3ConfigurationID>java.lang.String</AmazonS3ConfigurationID>
+                                <InstanceAuditEventsStreamingHeadersID>java.lang.String</InstanceAuditEventsStreamingHeadersID>
+                                <InstanceExternalAuditEventDestinationID>java.lang.String</InstanceExternalAuditEventDestinationID>
+                                <InstanceGoogleCloudLoggingConfigurationID>java.lang.String</InstanceGoogleCloudLoggingConfigurationID>
+                                <InstanceAmazonS3ConfigurationID>java.lang.String</InstanceAmazonS3ConfigurationID>
+                                <JsonString>java.lang.String</JsonString>
+                            </customTypesMapping>
+                            <!-- Naming conventions -->
+                            <modelNameSuffix />
+                            <requestSuffix>Request</requestSuffix>
+                            <responseSuffix>Response</responseSuffix>
+                            <responseProjectionSuffix>ResponseProjection</responseProjectionSuffix>
+                            <!-- Use same custom template as GitHub for @SuppressWarnings -->
+                            <customTemplatesRoot>${project.basedir}/src/main/resources/graphql/templates
+                            </customTemplatesRoot>
+                            <customTemplates>
+                                <RESPONSE_PROJECTION>response_projection.ftl</RESPONSE_PROJECTION>
+                            </customTemplates>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-antrun-plugin</artifactId>
+                <version>3.2.0</version>
+                <executions>
+                    <execution>
+                        <id>graphql-post-process</id>
+                        <phase>generate-sources</phase>
+                        <goals>
+                            <goal>run</goal>
+                        </goals>
+                        <configuration>
+                            <!-- Skip if codegen was skipped -->
+                            <target>
+                                <!-- Delete Relay files that depend on missing Query root type -->
+                                <delete failonerror="false">
+                                    <fileset dir="${project.build.directory}/generated-sources/graphql-github/de/tum/cit/aet/hephaestus/integration/scm/github/graphql/model">
+                                        <include name="RelayQueryRequest.java" />
+                                        <include name="RelayQueryResponse.java" />
+                                    </fileset>
+                                </delete>
+                                <!-- Add @SuppressWarnings("deprecation") to classes using deprecated GitHub API fields -->
+                                <!-- flags="gm": g=global, m=multiline (^ matches start of each line) -->
+                                <replaceregexp flags="gm" byline="false">
+                                    <regexp pattern="^(public class (ProjectPendingCardsParametrizedInput|IssueProjectCardsParametrizedInput|PullRequestProjectCardsParametrizedInput|ProjectColumnCardsParametrizedInput))" />
+                                    <substitution expression="@SuppressWarnings(&quot;deprecation&quot;)${line.separator}\1" />
+                                    <fileset dir="${project.build.directory}/generated-sources/graphql-github/de/tum/cit/aet/hephaestus/integration/scm/github/graphql/model">
+                                        <include name="ProjectPendingCardsParametrizedInput.java" />
+                                        <include name="IssueProjectCardsParametrizedInput.java" />
+                                        <include name="PullRequestProjectCardsParametrizedInput.java" />
+                                        <include name="ProjectColumnCardsParametrizedInput.java" />
+                                    </fileset>
+                                </replaceregexp>
+                            </target>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>verify-generated-clients</id>
+                        <phase>process-sources</phase>
+                        <goals>
+                            <goal>run</goal>
+                        </goals>
+                        <configuration>
+                            <target>
+                                <fail message="Generated client output is missing: generated-sources/graphql-github/de/tum/cit/aet/hephaestus/integration/scm/github/graphql/model">
+                                    <condition>
+                                        <not>
+                                            <available file="${project.build.directory}/generated-sources/graphql-github/de/tum/cit/aet/hephaestus/integration/scm/github/graphql/model" type="dir" />
+                                        </not>
+                                    </condition>
+                                </fail>
+                                <fail message="Generated client output is missing: generated-sources/graphql-gitlab/de/tum/cit/aet/hephaestus/integration/scm/gitlab/graphql/model">
+                                    <condition>
+                                        <not>
+                                            <available file="${project.build.directory}/generated-sources/graphql-gitlab/de/tum/cit/aet/hephaestus/integration/scm/gitlab/graphql/model" type="dir" />
+                                        </not>
+                                    </condition>
+                                </fail>
+                                <fail message="Generated client output is missing: generated-sources/openapi-outline/de/tum/cit/aet/hephaestus/integration/outline/client/model">
+                                    <condition>
+                                        <not>
+                                            <available file="${project.build.directory}/generated-sources/openapi-outline/de/tum/cit/aet/hephaestus/integration/outline/client/model" type="dir" />
+                                        </not>
+                                    </condition>
+                                </fail>
+                            </target>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.openapitools</groupId>
+                <artifactId>openapi-generator-maven-plugin</artifactId>
+                <version>${openapi-generator.version}</version>
+                <executions>
+                    <!-- Outline's maintained upstream spec -->
+                    <execution>
+                        <id>outline-spec3</id>
+                        <phase>generate-sources</phase>
+                        <goals>
+                            <goal>generate</goal>
+                        </goals>
+                        <configuration>
+                            <inputSpec>${project.basedir}/src/main/resources/openapi/outline/spec3.yml</inputSpec>
+                            <generatorName>java</generatorName>
+                            <library>webclient</library>
+                            <output>${project.build.directory}/generated-sources/openapi-outline</output>
+                            <modelPackage>de.tum.cit.aet.hephaestus.integration.outline.client.model</modelPackage>
+                            <modelNamePrefix>Outline</modelNamePrefix>
+                            <!-- Rename the two wire models whose simple names collide with the JPA -->
+                            <!-- domain entities (integration.outline.domain.{OutlineCollection, -->
+                            <!-- OutlineDocument}). Mapping bypasses modelNamePrefix, so the value -->
+                            <!-- carries the Outline prefix itself. Keeps both the model and the -->
+                            <!-- entity importable by plain simple name side by side. -->
+                            <modelNameMappings>
+                                <modelNameMapping>Collection=OutlineCollectionModel</modelNameMapping>
+                                <modelNameMapping>Document=OutlineDocumentModel</modelNameMapping>
+                            </modelNameMappings>
+                            <!-- Models only: OutlineApiClient hand-writes the transport policy -->
+                            <generateApis>false</generateApis>
+                            <generateApiTests>false</generateApiTests>
+                            <generateApiDocumentation>false</generateApiDocumentation>
+                            <generateModelTests>false</generateModelTests>
+                            <generateModelDocumentation>false</generateModelDocumentation>
+                            <generateSupportingFiles>false</generateSupportingFiles>
+                            <!-- date-time → Instant to match the mirror/domain types -->
+                            <typeMappings>
+                                <typeMapping>OffsetDateTime=Instant</typeMapping>
+                                <!-- Outline UUIDs are opaque ids we only ever compare/store as text; -->
+                                <!-- keeping them String avoids UUID.toString() noise across every call site -->
+                                <!-- and matches the mirror/domain column types (transport policy). -->
+                                <typeMapping>UUID=String</typeMapping>
+                            </typeMappings>
+                            <importMappings>
+                                <importMapping>OffsetDateTime=java.time.Instant</importMapping>
+                            </importMappings>
+                            <configOptions>
+                                <useJakartaEe>true</useJakartaEe>
+                                <openApiNullable>false</openApiNullable>
+                                <!-- Emit packages directly under the output dir (no src/main/java prefix) -->
+                                <sourceFolder>.</sourceFolder>
+                                <hideGenerationTimestamp>true</hideGenerationTimestamp>
+                                <!-- Unknown-enum tolerance on the reactive decode path; full rationale + -->
+                                <!-- revert guard in OutlineDeserializationToleranceTest#unknownEnumValueDecodesToUnknownDefaultOnWebClientPath. -->
+                                <enumUnknownDefaultCase>true</enumUnknownDefaultCase>
+                            </configOptions>
+                        </configuration>
+                    </execution>
+                    <!-- Local supplement: endpoints Outline has not yet documented upstream -->
+                    <execution>
+                        <id>outline-supplement</id>
+                        <phase>generate-sources</phase>
+                        <goals>
+                            <goal>generate</goal>
+                        </goals>
+                        <configuration>
+                            <inputSpec>${project.basedir}/src/main/resources/openapi/outline/outline-supplement.yaml</inputSpec>
+                            <generatorName>java</generatorName>
+                            <library>webclient</library>
+                            <output>${project.build.directory}/generated-sources/openapi-outline</output>
+                            <modelPackage>de.tum.cit.aet.hephaestus.integration.outline.client.model</modelPackage>
+                            <modelNamePrefix>Outline</modelNamePrefix>
+                            <!-- Same collision-avoiding rename as the spec3 execution (harmless if -->
+                            <!-- the supplement omits these schemas); keeps both executions in step. -->
+                            <modelNameMappings>
+                                <modelNameMapping>Collection=OutlineCollectionModel</modelNameMapping>
+                                <modelNameMapping>Document=OutlineDocumentModel</modelNameMapping>
+                            </modelNameMappings>
+                            <generateApis>false</generateApis>
+                            <generateApiTests>false</generateApiTests>
+                            <generateApiDocumentation>false</generateApiDocumentation>
+                            <generateModelTests>false</generateModelTests>
+                            <generateModelDocumentation>false</generateModelDocumentation>
+                            <generateSupportingFiles>false</generateSupportingFiles>
+                            <typeMappings>
+                                <typeMapping>OffsetDateTime=Instant</typeMapping>
+                                <!-- Outline UUIDs are opaque ids we only ever compare/store as text; -->
+                                <!-- keeping them String avoids UUID.toString() noise across every call site -->
+                                <!-- and matches the mirror/domain column types (transport policy). -->
+                                <typeMapping>UUID=String</typeMapping>
+                            </typeMappings>
+                            <importMappings>
+                                <importMapping>OffsetDateTime=java.time.Instant</importMapping>
+                            </importMappings>
+                            <configOptions>
+                                <useJakartaEe>true</useJakartaEe>
+                                <openApiNullable>false</openApiNullable>
+                                <sourceFolder>.</sourceFolder>
+                                <hideGenerationTimestamp>true</hideGenerationTimestamp>
+                                <!-- Same unknown-enum tolerance as the spec3 execution above. -->
+                                <enumUnknownDefaultCase>true</enumUnknownDefaultCase>
+                            </configOptions>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <configuration>
+                    <release>${java.version}</release>
+                    <proc>none</proc>
+                    <showWarnings>false</showWarnings>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>

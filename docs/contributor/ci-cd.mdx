@@ -253,7 +253,7 @@ pnpm run test:webapp           # Unit tests
 
 # Application Server (Java) — includes the integration.core.webhook receiver
 pnpm run format:java:check     # Check formatting
-cd server && ./mvnw test -P'!quick'  # Unit tests — see the testing guide for why `!quick` is mandatory
+cd server && ./mvnw test          # Unit tests, including required reactor dependencies
 
 # Agent runtime (Bun) — the Pi runner and the practice precompute scripts
 pnpm run test:agents           # Runner + precompute specs

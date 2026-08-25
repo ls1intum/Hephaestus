@@ -90,7 +90,7 @@ jobs:
           # changeset entries), with a first-class migration warning when the
           # release touches the Liquibase changelog.
           NOTES=$(mktemp)
-          if [ -n "$PREV_TAG" ] && ! git diff --quiet "$PREV_TAG" "$SHA" -- server/src/main/resources/db/changelog/; then
+          if [ -n "$PREV_TAG" ] && ! git diff --quiet "$PREV_TAG" "$SHA" -- server/application/src/main/resources/db/changelog/; then
             {
               echo "> [!WARNING]"
               echo "> This release contains **schema migrations**. They run automatically on startup — back up your database before upgrading. See the [migration guide](https://github.com/ls1intum/Hephaestus/blob/main/MIGRATION.md)."
@@ -229,7 +229,7 @@ jobs:
       - name: Smoke-test agent-pi
         env:
           IMAGE: ghcr.io/ls1intum/hephaestus/agent-pi@${{ steps.retag.outputs.agent-pi-digest }}
-          LAYOUT: server/src/main/java/de/tum/cit/aet/hephaestus/agent/runtime/SandboxLayout.java
+          LAYOUT: server/application/src/main/java/de/tum/cit/aet/hephaestus/agent/runtime/SandboxLayout.java
         run: |
           set -euo pipefail
           docker pull "$IMAGE"

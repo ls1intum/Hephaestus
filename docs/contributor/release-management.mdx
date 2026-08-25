@@ -67,7 +67,7 @@ A changeset summary becomes the `CHANGELOG.md` entry **verbatim** — write it i
 - Once a changeset reaches `main`, revise it in place. If it should not become a release note, convert
   it to an explained empty changeset instead of deleting or renaming it.
 - **Don't mention automatic migrations** — the release notes get an automatic "back up before
-  upgrading" banner whenever a release touches `server/src/main/resources/db/changelog/`, so the
+  upgrading" banner whenever a release touches `server/application/src/main/resources/db/changelog/`, so the
   changeset stays user-facing. Only a migration that requires operator action belongs in the summary
   (`**Operators:** …` + [`MIGRATION.md`](https://github.com/ls1intum/Hephaestus/blob/main/MIGRATION.md)).
 - **Bump = the operator's upgrade cost**, not code semantics:

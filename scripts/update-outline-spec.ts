@@ -11,7 +11,10 @@
 import { renameSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
-const SPEC_DIR = resolve(import.meta.dirname, "../server/src/main/resources/openapi/outline");
+const SPEC_DIR = resolve(
+	import.meta.dirname,
+	"../server/generated-clients/src/main/resources/openapi/outline",
+);
 const SPEC_FILE = join(SPEC_DIR, "spec3.yml");
 const SPEC_URL = "https://raw.githubusercontent.com/outline/openapi/main/spec3.yml";
 
@@ -91,7 +94,9 @@ async function main(): Promise<void> {
 		console.log(`Downloaded ${Math.round(stats.size / 1024)}KB`);
 		renameSync(tempFile, SPEC_FILE);
 		console.log(`Spec updated successfully: ${SPEC_FILE}`);
-		console.log("\nTo regenerate models: cd server && ./mvnw -o clean compile -P'!quick'");
+		console.log(
+			"\nTo regenerate models: cd server && ./mvnw -pl generated-clients -am compile -DskipTests",
+		);
 	} catch (error) {
 		try {
 			unlinkSync(tempFile);

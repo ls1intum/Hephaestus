@@ -59,7 +59,7 @@ JetBrains alternatives such as IntelliJ (Java) and WebStorm (React/TypeScript) w
 ### Spring profiles and local configuration
 
 For development stick to the `local` profile, which is the default. The other shipped profiles each
-have their own `application-<name>.yml` under `server/src/main/resources/` — `prod` and `specs`, plus
+have their own `application-<name>.yml` under `server/application/src/main/resources/` — `prod` and `specs`, plus
 the per-role and per-purpose overlays (`worker`, `webhook`, `e2e`, `cds-training`) documented where
 they are used.
 
@@ -67,7 +67,7 @@ They are **not** Maven profiles — `./mvnw -Plocal` warns that the profile does
 nothing. Maven passes the active Spring profile through the `app.profiles` property, so the override
 is `-Dapp.profiles=…` (this is what `pnpm dev:server:e2e` does).
 
-Create `server/src/main/resources/application-local.yml` to override defaults. This file is gitignored.
+Create `server/application/src/main/resources/application-local.yml` to override defaults. This file is gitignored.
 
 :::caution Keep it local
 Never commit `application-local.yml`. It may contain secrets and machine-specific configuration.
@@ -325,7 +325,9 @@ Authentication is Hephaestus-native (no Keycloak — see [ADR 0017](https://gith
    (callback `http://localhost:8080/login/oauth2/code/gitlab`, scope `read_user`),
    set `GITLAB_OAUTH_CLIENT_ID` / `GITLAB_OAUTH_CLIENT_SECRET`, and point `GITLAB_OAUTH_BASE_URL` at the
    instance (defaults to `https://gitlab.com`; e.g. `https://gitlab.lrz.de`). Leave the client id blank to hide the GitLab button.
-4. Run the application server with `./mvnw spring-boot:run`; Postgres + NATS start automatically via Spring Boot's Docker Compose support. Open the webapp and click **Sign in with GitHub**.
+4. Run the application server with `pnpm dev:server`; it installs or restores the generated-client
+   dependency before invoking the application module. Postgres + NATS start automatically via Spring
+   Boot's Docker Compose support. Open the webapp and click **Sign in with GitHub**.
 
 #### Super admin
 

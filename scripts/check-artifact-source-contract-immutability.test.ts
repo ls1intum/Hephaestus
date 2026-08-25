@@ -14,7 +14,7 @@ const CHECKER = join(import.meta.dirname, "check-artifact-source-contract-immuta
  */
 const cleanGitEnv = (): NodeJS.ProcessEnv =>
 	Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith("GIT_")));
-const CONTRACTS = "server/src/main/resources/contracts/artifact-source";
+const CONTRACTS = "server/application/src/main/resources/contracts/artifact-source";
 
 type Git = (...args: string[]) => string;
 

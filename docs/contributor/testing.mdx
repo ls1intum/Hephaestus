@@ -14,19 +14,15 @@ Testing keeps regression risk low across services. The application server uses M
 
    ```bash
    # Unit tests only (fast)
-   ./mvnw test -P'!quick'
+   ./mvnw test
 
    # Full suite including integration tests
-   ./mvnw verify -P'!quick'
+   ./mvnw verify
    ```
 
-   :::danger Always deactivate `quick`
-   The `quick` profile activates itself as soon as GraphQL codegen has produced its sources — that
-   is, on every machine that has built the server once. It sets `maven.test.skip=true`, so a bare
-   `./mvnw test` prints **BUILD SUCCESS having run zero tests**, and `./mvnw test-compile` reports
-   success while test sources fail to compile. Pass `-P'!quick'` on every test run — including
-   alongside another profile (`-P'!quick,live-tests'`), because no other profile deactivates it.
-   :::
+   The reactor generates and compiles the clients on the first build. Later application and test
+   edits reuse that unchanged module automatically; no skip profile or preserved generated-source
+   directory is required.
 
 3. Extend the correct base class:
 
@@ -152,11 +148,11 @@ Available examples include `label.created`, `repository.created`, `create`, `pus
 ## Maven recipes
 
 ```bash
-./mvnw test -P'!quick'                        # Unit tests
-./mvnw test -P'!quick,architecture-tests'     # ArchUnit + Modulith verification
-./mvnw verify -P'!quick'                      # Full suite + packaging
-./mvnw test -P'!quick' -Dtest=SomeTest        # Single test class
-./mvnw test -P'!quick' -Dtest=SomeTest#method # Single test method
+./mvnw test                         # Unit tests
+./mvnw test -Parchitecture-tests     # ArchUnit + Modulith verification
+./mvnw verify                       # Full suite + packaging
+./mvnw test -Dtest=SomeTest         # Single test class
+./mvnw test -Dtest=SomeTest#method  # Single test method
 ```
 
 The tag filter is a property, not the `-Dgroups` user property: surefire is configured with
@@ -166,7 +162,7 @@ tag set directly, or the profiles above, which set it for you.
 
 ## Live external-service tests
 
-Some regressions can only be validated against real systems — the GitHub API, a real LLM endpoint, a Docker daemon. Live tests are tagged `@Tag("live")` and **excluded from every other tier**; they only run under `./mvnw test -P'!quick,live-tests'`. The profile flips Surefire's group filter and adds `failIfNoSpecifiedTests=false` so single-test invocations don't fail when the gating env var is unset. It does not deactivate `quick`, so `!quick` has to ride along or the run executes nothing.
+Some regressions can only be validated against real systems — the GitHub API, a real LLM endpoint, a Docker daemon. Live tests are tagged `@Tag("live")` and **excluded from every other tier**; they only run under `./mvnw test -Plive-tests`. The profile flips Surefire's group filter and adds `failIfNoSpecifiedTests=false` so single-test invocations don't fail when the gating env var is unset.
 
 ### Meta-annotation cheat sheet
 
@@ -202,7 +198,7 @@ We ship a focused suite that exercises the live GitHub App installation and veri
 3. **Local config file** – copy the template that lives alongside the tests:
 
     ```bash
-    cd server/src/test/resources
+    cd server/application/src/test/resources
     cp application-live-local.example.yml application-live-local.yml
     ```
 
@@ -225,7 +221,7 @@ We ship a focused suite that exercises the live GitHub App installation and veri
 From `server/` run:
 
 ```bash
-./mvnw test -P'!quick,live-tests'
+./mvnw test -Plive-tests
 ```
 
 The `live-tests` profile tells Maven to run only tests tagged with `@Tag("live")`. This is the **single guard** for live tests – if you don't pass the profile, the tests simply won't run.
@@ -239,7 +235,7 @@ The run takes roughly two minutes and prints the GitHub artefacts it provisions.
 1. Extend `AbstractGitHubLiveSyncIntegrationTest` (or fall back to `BaseGitHubLiveIntegrationTest` when repositories are not needed). These bases set up credential checks, provide the `workspaceRepository`, and expose helpers such as `createEphemeralRepository`, `registerRepositoryToMonitor`, `createEphemeralTeam`, and `seedOrganizationMembers`.
 2. Use the supplied helpers to create and track temporary GitHub artefacts. They automatically register clean-up handlers via `@AfterEach`, so add new resources to the provided lists instead of implementing manual deletion logic.
 3. Keep tests deterministic: rely on `databaseTestUtils.cleanDatabase()` in `@BeforeEach` (already invoked by the base), and generate unique slugs via `nextEphemeralSlug("suffix")` when naming repositories, branches, or teams.
-4. If a scenario needs extra Spring configuration, extend `application-live-local.yml` in `server/src/test/resources/`. The checked-in `.example` file documents every property; copy it on demand and keep secrets out of version control.
+4. If a scenario needs extra Spring configuration, extend `application-live-local.yml` in `server/application/src/test/resources/`. The checked-in `.example` file documents every property; copy it on demand and keep secrets out of version control.
 
 ### Troubleshooting
 

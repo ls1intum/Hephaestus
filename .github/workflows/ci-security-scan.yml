@@ -125,8 +125,8 @@ jobs:
           RELEASED_REF: ${{ github.event_name == 'pull_request' && github.base_ref || 'main' }}
         run: |
           set -euo pipefail
-          CHANGELOG_DIR="server/src/main/resources/db/changelog"
-          MASTER="server/src/main/resources/db/master.xml"
+          CHANGELOG_DIR="server/application/src/main/resources/db/changelog"
+          MASTER="server/application/src/main/resources/db/master.xml"
           FAILED=false
 
           VIOLATIONS=$(git diff --name-only --diff-filter=MDR "$BASE" HEAD -- "$CHANGELOG_DIR")
@@ -177,7 +177,7 @@ jobs:
           if grep -rEnI "$NEEDLE" \
                 --exclude-dir=node_modules --exclude-dir=target --exclude-dir=.git \
                 . \
-              | grep -vE '^\./(MIGRATION\.md|docs/admin/agent-image-digests\.md|docs/decisions/0031-.*\.md|server/src/test/java/de/tum/cit/aet/hephaestus/agent/sandbox/AgentImageReferenceGuardTest\.java):' ; then
+              | grep -vE '^\./(MIGRATION\.md|docs/admin/agent-image-digests\.md|docs/decisions/0031-.*\.md|server/application/src/test/java/de/tum/cit/aet/hephaestus/agent/sandbox/AgentImageReferenceGuardTest\.java):' ; then
             echo "::error::A release-channel agent image tag resolves to another release's image (ADR 0031). Leave the reference unset so it follows this deployment's image tag, or pin a digest."
             exit 1
           fi

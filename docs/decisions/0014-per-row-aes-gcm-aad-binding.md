@@ -143,9 +143,9 @@ Re-open this decision if any of the following land:
 
 ## References
 
-- `server/src/main/java/de/tum/cit/aet/hephaestus/integration/core/connection/EncryptionContext.java`
-- `server/src/main/java/de/tum/cit/aet/hephaestus/integration/core/connection/CredentialBundleConverter.java`
-- `server/src/main/resources/db/changelog/1780313973588_changelog.xml`
+- `server/application/src/main/java/de/tum/cit/aet/hephaestus/integration/core/connection/EncryptionContext.java`
+- `server/application/src/main/java/de/tum/cit/aet/hephaestus/integration/core/connection/CredentialBundleConverter.java`
+- `server/application/src/main/resources/db/changelog/1780313973588_changelog.xml`
   (changesets 8–9: backfill + legacy column drop)
 - AWS Database Encryption SDK — Concepts (record identity): https://docs.aws.amazon.com/database-encryption-sdk/latest/devguide/concepts.html
 - AWS KMS — Encryption Context: https://docs.aws.amazon.com/kms/latest/developerguide/encrypt_context.html

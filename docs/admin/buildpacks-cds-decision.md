@@ -5,7 +5,9 @@ sidebar_position: 4
 description: How and why the application-server image is built with Paketo Cloud Native Buildpacks + Application CDS, and the Java 25 + JEP 483 migration path.
 ---
 
-The `application-server` image is built by `mvn spring-boot:build-image` (Paketo Cloud Native Buildpacks) with Application Class Data Sharing (CDS) enabled. The hand-rolled `Dockerfile` was removed. Spring Boot AOT processing is **off** (see below).
+The `application-server` image is built from the `server/application` module with Spring Boot's
+`build-image` goal (Paketo Cloud Native Buildpacks) and Application Class Data Sharing (CDS)
+enabled. The hand-rolled `Dockerfile` was removed. Spring Boot AOT processing is **off** (see below).
 
 ## Why
 

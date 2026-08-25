@@ -10,7 +10,7 @@ import type { DiffFile, PracticeScript } from "./lib/types";
 
 const SCRIPTS_DIR = resolve(
 	import.meta.dir,
-	"../../../server/src/main/resources/practices/precompute",
+	"../../../server/application/src/main/resources/practices/precompute",
 );
 const LIB_DIR = resolve(import.meta.dir, "lib");
 

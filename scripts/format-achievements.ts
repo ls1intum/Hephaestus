@@ -9,7 +9,7 @@ import path from "node:path";
 
 const ACHIEVEMENTS_FILE = path.join(
 	process.cwd(),
-	"server/src/main/resources/achievements/achievements.yml",
+	"server/application/src/main/resources/achievements/achievements.yml",
 );
 const PREFERRED_ORDER = [
 	"id",

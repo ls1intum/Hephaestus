@@ -262,23 +262,23 @@
 		{
 			// Maven splits a module across `src/test/resources` and `src/main/resources`, so a spec
 			// reaches its subject across that boundary and no alias spans it.
-			"files": ["server/src/test/resources/agent/**"],
+			"files": ["server/application/src/test/resources/agent/**"],
 			"rules": { "import/no-relative-parent-imports": "off" }
 		},
 		{
 			// `tsconfig.agents.json` overlays this directory with `docker/agents/precompute` through
 			// `rootDirs`, and the agent image reproduces that layout under `/opt/precompute`. `../lib/x`
 			// is the spelling both resolve; an alias would typecheck and then fail in the sandbox.
-			"files": ["server/src/main/resources/practices/precompute/**"],
+			"files": ["server/application/src/main/resources/practices/precompute/**"],
 			"rules": { "import/no-relative-parent-imports": "off" }
 		},
 		{
 			// The runner and the precompute scripts execute on Bun inside the agent sandbox, and a CLI
 			// entry point ends the process rather than returning a status nobody reads.
 			"files": [
-				"server/src/main/resources/agent/**",
-				"server/src/test/resources/agent/**",
-				"server/src/main/resources/practices/precompute/**",
+				"server/application/src/main/resources/agent/**",
+				"server/application/src/test/resources/agent/**",
+				"server/application/src/main/resources/practices/precompute/**",
 				"docker/agents/precompute/**",
 				"scripts/**"
 			],

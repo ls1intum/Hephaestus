@@ -6,7 +6,7 @@
 
 ## Context
 
-The Java code under `server/src/main/java/` used `de.tum.in.www1.hephaestus` — a legacy
+The Java code under `server/application/src/main/java/` used `de.tum.in.www1.hephaestus` — a legacy
 TUM naming convention referencing the "Informatics, chair www1" structure. That structure
 has since been reorganized into CIT (Computation, Information and Technology) with
 multiple chairs at `*.cit.tum.de`. The legacy package name no longer reflects organisation

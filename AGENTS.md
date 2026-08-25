@@ -15,8 +15,8 @@ feedback to the developer in-context, in a reflection page, or in conversation.
 
 Node is pinned in `.node-version` and drives the repo's own tooling; the repo is pnpm 11 workspaces.
 `webapp` is the main TypeScript package; `docs` is a second, with its own tooling. The agent sandbox runs no Node at all: the runner
-(`server/src/main/resources/agent/`), the precompute runner and lib (`docker/agents/precompute/`) and
-the per-practice precompute scripts (`server/src/main/resources/practices/precompute/`) are
+(`server/application/src/main/resources/agent/`), the precompute runner and lib (`docker/agents/precompute/`) and
+the per-practice precompute scripts (`server/application/src/main/resources/practices/precompute/`) are
 TypeScript executed directly by Bun, whose version the agent image pins in
 `docker/agents/pi/Dockerfile`. They are type-checked as one project via `tsconfig.agents.json` and
 linted by the root `.oxlintrc.json` and formatted by the root `biome.jsonc`. JDK 21, and Docker
@@ -49,7 +49,7 @@ reflect the final state. Document any skipped gate in the PR description.
 | `pnpm run check` | The full gate — every leg it runs is listed as `check` in the root `package.json` |
 | `pnpm run test:webapp` | Vitest |
 | `pnpm run test:agents` | Agent runtime and precompute specs, on Bun |
-| `mvn test -P'!quick'` | Server unit tests — see `server/AGENTS.md` for the four tiers and why `!quick` is mandatory |
+| `cd server && ./mvnw test` | Server unit tests — see `server/AGENTS.md` for all four tiers |
 
 Naming: `format` applies, `format:check` verifies read-only for CI, `lint` lints, `check` is the
 comprehensive verification. A `:webapp`, `:server` or `:agents` suffix scopes any of them; `:java`
@@ -113,14 +113,14 @@ Holds wherever TypeScript is written here, the Bun agent trees and `scripts/**` 
 | `webapp/src/api/**` | `pnpm run generate:api:application-server:client` |
 | `docs/contributor/erd/schema.mmd` | `pnpm run db:generate-erd-docs` |
 | `webapp/src/routeTree.gen.ts` | TanStack Router Vite plugin |
-| `server/target/generated-sources/graphql-*` | GraphQL codegen, run manually — do not `mvn clean` |
+| `server/generated-clients/target/generated-sources/**` | GraphQL and Outline codegen, owned by the generated-clients Maven module |
 
 Regeneration is destructive: it empties the target directory, so stash local edits first. Commit
 generated clients alongside the API change that caused them.
 
 ## Database changes (Liquibase)
 
-Changelogs live in `server/src/main/resources/db/changelog/` and are included from `master.xml`.
+Changelogs live in `server/application/src/main/resources/db/changelog/` and are included from `master.xml`.
 Draft with `pnpm run db:draft-changelog` (needs Docker; CI sets `CI=true`), then **prune the diff to
 the real deltas** — never commit the raw diff. Then `pnpm run db:generate-erd-docs`.
 
@@ -184,6 +184,5 @@ Each of these fails *quietly* — the command reports success and leaves you wit
 - **That script runs a full Maven `verify`.** On a cold cache the first run downloads the whole Spring
   Boot dependency tree; expect several minutes.
 - **`db:draft-changelog` needs Docker on PATH** and a running daemon.
-- Everything `mvn`-shaped — the `quick` profile silently skipping every test, `mvn clean` wiping the
-  generated GraphQL sources, two Maven runs sharing one `target/`, `server/.env` leaking into test
-  JVMs — is in `server/AGENTS.md` § Build traps. Read it before your first server test run.
+- Maven test selection, concurrent builds, and `server/.env` leaking into test JVMs are covered in
+  `server/AGENTS.md` § Build traps. Read it before your first server test run.
