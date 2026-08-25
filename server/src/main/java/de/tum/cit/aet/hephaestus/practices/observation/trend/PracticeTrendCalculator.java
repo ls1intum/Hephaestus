@@ -5,7 +5,6 @@ import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.LinkedHashMap;

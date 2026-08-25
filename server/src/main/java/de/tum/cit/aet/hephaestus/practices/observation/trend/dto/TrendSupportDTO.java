@@ -3,7 +3,6 @@ package de.tum.cit.aet.hephaestus.practices.observation.trend.dto;
 import de.tum.cit.aet.hephaestus.practices.observation.trend.TrendSupport;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
 public record TrendSupportDTO(
