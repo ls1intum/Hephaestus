@@ -67,7 +67,7 @@ They are **not** Maven profiles — `./mvnw -Plocal` warns that the profile does
 nothing. Maven passes the active Spring profile through the `app.profiles` property, so the override
 is `-Dapp.profiles=…` (this is what `pnpm dev:server:e2e` does).
 
-Create `server/application/src/main/resources/application-local.yml` to override defaults. This file is gitignored.
+Create `application-local.yml` in `server/application/src/main/resources` to override defaults. This file is gitignored.
 
 :::caution Keep it local
 Never commit `application-local.yml`. It may contain secrets and machine-specific configuration.
