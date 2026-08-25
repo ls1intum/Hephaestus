@@ -410,6 +410,7 @@ erDiagram
         TIMESTAMPTZ lease_expires_at
         TIMESTAMPTZ next_attempt_at "NOT NULL"
         INTEGER attempt_count "NOT NULL"
+        VARCHAR(48) suppression_reason
         VARCHAR(512) last_error
         TIMESTAMPTZ created_at "NOT NULL"
         TIMESTAMPTZ updated_at "NOT NULL"
