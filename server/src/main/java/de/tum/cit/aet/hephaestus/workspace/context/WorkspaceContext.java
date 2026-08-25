@@ -28,8 +28,8 @@ public record WorkspaceContext(
     Long id,
     String slug,
     String displayName,
-    AccountType accountType,
-    Long installationId,
+    @Nullable AccountType accountType,
+    @Nullable Long installationId,
     boolean publiclyViewable,
     boolean mentorEnabled,
     Set<WorkspaceRole> roles
@@ -42,7 +42,7 @@ public record WorkspaceContext(
      */
     public static WorkspaceContext fromWorkspace(
         Workspace workspace,
-        Set<WorkspaceRole> roles,
+        @Nullable Set<WorkspaceRole> roles,
         @Nullable Long installationId
     ) {
         return new WorkspaceContext(

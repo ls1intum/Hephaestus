@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.integration.scm.gitlab.issuecomment;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
@@ -141,6 +142,7 @@ class GitLabNoteMessageHandlerIntegrationTest extends BaseIntegrationTest {
                 assertThat(comment.getNativeId()).isEqualTo(NATIVE_NOTE_ID);
                 assertThat(comment.getBody()).isEqualTo(FIXTURE_NOTE_BODY);
                 assertThat(comment.getHtmlUrl()).isEqualTo(FIXTURE_NOTE_URL);
+                assertNotNull(comment.getIssue());
                 assertThat(comment.getIssue().getId()).isEqualTo(savedIssue.getId());
                 assertThat(comment.getAuthor()).isNotNull();
                 assertThat(comment.getAuthor().getLogin()).isEqualTo(FIXTURE_AUTHOR_LOGIN);
@@ -186,6 +188,7 @@ class GitLabNoteMessageHandlerIntegrationTest extends BaseIntegrationTest {
                 IssueComment comment = comments.get(0);
                 assertThat(comment.getNativeId()).isEqualTo(NATIVE_MR_NOTE_ID);
                 assertThat(comment.getBody()).isEqualTo(FIXTURE_MR_NOTE_BODY);
+                assertNotNull(comment.getIssue());
                 assertThat(comment.getIssue().getId()).isEqualTo(savedPr.getId());
             });
 

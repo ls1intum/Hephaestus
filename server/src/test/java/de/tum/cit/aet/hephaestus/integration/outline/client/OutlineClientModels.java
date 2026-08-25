@@ -8,46 +8,49 @@ import de.tum.cit.aet.hephaestus.integration.outline.client.model.OutlineNavigat
 import de.tum.cit.aet.hephaestus.integration.outline.client.model.OutlineTeam;
 import de.tum.cit.aet.hephaestus.integration.outline.client.model.OutlineUser;
 import de.tum.cit.aet.hephaestus.integration.outline.client.model.OutlineWebhookSubscription;
+import java.math.BigDecimal;
+import java.net.URI;
 import java.time.Instant;
 import java.util.List;
+import org.jspecify.annotations.Nullable;
+import org.springframework.test.util.ReflectionTestUtils;
 
-/**
- * Test factory for the generated Outline vendor models. The generated classes set read-only fields only
- * through their {@code @JsonCreator} constructor and writable fields through setters, which makes ad-hoc
- * construction verbose; these helpers reproduce the positional shape of the hand-written DTO records they
- * replaced, so a test reads the same as before and the migration stayed a mechanical rename.
- */
 public final class OutlineClientModels {
 
     private OutlineClientModels() {}
 
-    /** Mirrors the former {@code OutlineDocumentListResponse.Meta} constructor order. */
     public static OutlineDocumentModel document(
-        String id,
-        String url,
-        String title,
-        Instant createdAt,
-        Instant updatedAt,
-        String urlId,
-        String parentDocumentId,
-        String collectionId,
-        OutlineUser createdBy,
-        OutlineUser updatedBy,
-        List<String> collaboratorIds,
-        Instant archivedAt
+        @Nullable String id,
+        @Nullable String url,
+        @Nullable String title,
+        @Nullable Instant createdAt,
+        @Nullable Instant updatedAt,
+        @Nullable String urlId,
+        @Nullable String parentDocumentId,
+        @Nullable String collectionId,
+        @Nullable OutlineUser createdBy,
+        @Nullable OutlineUser updatedBy,
+        @Nullable List<String> collaboratorIds,
+        @Nullable Instant archivedAt
     ) {
-        // Read-only fields (id, url, createdAt, updatedAt, archivedAt) via the JsonCreator constructor;
-        // revision/publishedAt/deletedAt are irrelevant to the sync and left null.
         OutlineDocumentModel document = new OutlineDocumentModel(
-            id,
-            url,
-            null,
-            createdAt,
-            updatedAt,
-            null,
-            archivedAt,
-            null
+            "fixture-id",
+            "https://example.invalid/document",
+            BigDecimal.ZERO,
+            Instant.EPOCH,
+            Instant.EPOCH,
+            Instant.EPOCH,
+            Instant.EPOCH,
+            Instant.EPOCH
         );
+        setField(document, "id", id);
+        setField(document, "url", url);
+        setField(document, "revision", null);
+        setField(document, "createdAt", createdAt);
+        setField(document, "updatedAt", updatedAt);
+        setField(document, "publishedAt", null);
+        setField(document, "archivedAt", archivedAt);
+        setField(document, "deletedAt", null);
         document.setTitle(title);
         document.setUrlId(urlId);
         document.setParentDocumentId(parentDocumentId);
@@ -58,23 +61,53 @@ public final class OutlineClientModels {
         return document;
     }
 
-    /** Mirrors the former {@code OutlineDocumentListResponse.OutlineUser} record. */
-    public static OutlineUser user(String id, String name) {
-        OutlineUser user = new OutlineUser(id, null, null, null, null, null, null, null);
+    public static OutlineUser user(@Nullable String id, @Nullable String name) {
+        OutlineUser user = new OutlineUser(
+            "fixture-id",
+            "#000000",
+            "fixture@example.invalid",
+            false,
+            Instant.EPOCH,
+            Instant.EPOCH,
+            Instant.EPOCH,
+            Instant.EPOCH
+        );
+        setField(user, "id", id);
+        setField(user, "color", null);
+        setField(user, "email", null);
+        setField(user, "isSuspended", null);
+        setField(user, "lastActiveAt", null);
+        setField(user, "createdAt", null);
+        setField(user, "updatedAt", null);
+        setField(user, "deletedAt", null);
         user.setName(name);
         return user;
     }
 
-    /** Mirrors the former {@code OutlineCollectionListResponse.Collection} constructor order. */
     public static OutlineCollectionModel collection(
-        String id,
-        String name,
-        String urlId,
-        String color,
-        String icon,
-        String description
+        @Nullable String id,
+        @Nullable String name,
+        @Nullable String urlId,
+        @Nullable String color,
+        @Nullable String icon,
+        @Nullable String description
     ) {
-        OutlineCollectionModel collection = new OutlineCollectionModel(id, null, urlId, null, null, null, null);
+        OutlineCollectionModel collection = new OutlineCollectionModel(
+            "fixture-id",
+            "https://example.invalid/collection",
+            "fixture-url-id",
+            Instant.EPOCH,
+            Instant.EPOCH,
+            Instant.EPOCH,
+            Instant.EPOCH
+        );
+        setField(collection, "id", id);
+        setField(collection, "url", null);
+        setField(collection, "urlId", urlId);
+        setField(collection, "createdAt", null);
+        setField(collection, "updatedAt", null);
+        setField(collection, "deletedAt", null);
+        setField(collection, "archivedAt", null);
         collection.setName(name);
         collection.setColor(color);
         collection.setIcon(icon);
@@ -82,7 +115,6 @@ public final class OutlineClientModels {
         return collection;
     }
 
-    /** Mirrors the former {@code OutlineCollectionDocumentsResponse.Node} record. */
     public static OutlineNavigationNode node(
         String id,
         String title,
@@ -92,12 +124,10 @@ public final class OutlineClientModels {
         return new OutlineNavigationNode().id(id).title(title).url(url).children(children);
     }
 
-    /** Mirrors the former {@code OutlineApiKeyListResponse.ApiKey} record. */
     public static OutlineApiKey apiKey(String id, String name, String last4, Instant expiresAt, Instant lastActiveAt) {
         return new OutlineApiKey().id(id).name(name).last4(last4).expiresAt(expiresAt).lastActiveAt(lastActiveAt);
     }
 
-    /** Mirrors the former {@code OutlineWebhookSubscriptionListResponse.Subscription} record. */
     public static OutlineWebhookSubscription webhookSubscription(
         String id,
         String name,
@@ -108,15 +138,19 @@ public final class OutlineClientModels {
         return new OutlineWebhookSubscription().id(id).name(name).url(url).enabled(enabled).events(events);
     }
 
-    /** Identity payload of {@code auth.info}. */
     public static OutlineAuth auth(OutlineUser user, OutlineTeam team) {
         return new OutlineAuth().user(user).team(team);
     }
 
-    /** A team reference: read-only id via the constructor, name via setter. */
-    public static OutlineTeam team(String id, String name) {
-        OutlineTeam team = new OutlineTeam(id, null);
+    public static OutlineTeam team(@Nullable String id, @Nullable String name) {
+        OutlineTeam team = new OutlineTeam("fixture-id", URI.create("https://example.invalid/team"));
+        setField(team, "id", id);
+        setField(team, "url", null);
         team.setName(name);
         return team;
+    }
+
+    private static void setField(Object target, String name, @Nullable Object value) {
+        ReflectionTestUtils.setField(target, name, value);
     }
 }

@@ -17,6 +17,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.pullrequest.dto.GitHubPu
 import de.tum.cit.aet.hephaestus.integration.scm.github.pullrequestreview.dto.GitHubPullRequestReviewEventDTO;
 import de.tum.cit.aet.hephaestus.integration.scm.github.user.GitHubUserProcessor;
 import java.time.Instant;
+import java.util.Objects;
 import java.util.Set;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
@@ -75,7 +76,7 @@ public class GitHubPullRequestReviewProcessor extends BaseGitHubProcessor {
      * @return the persisted PullRequestReview entity, or null if processing failed
      */
     @Transactional
-    public PullRequestReview process(
+    public @Nullable PullRequestReview process(
         GitHubPullRequestReviewEventDTO.GitHubReviewDTO dto,
         Long prId,
         @NonNull ProcessingContext context
@@ -117,7 +118,7 @@ public class GitHubPullRequestReviewProcessor extends BaseGitHubProcessor {
      * @return the persisted PullRequestReview entity, or null if processing failed
      */
     @Transactional
-    public PullRequestReview processWithParentCreation(
+    public @Nullable PullRequestReview processWithParentCreation(
         GitHubPullRequestReviewEventDTO.GitHubReviewDTO dto,
         GitHubPullRequestDTO prDto,
         @NonNull ProcessingContext context
@@ -157,13 +158,13 @@ public class GitHubPullRequestReviewProcessor extends BaseGitHubProcessor {
     /**
      * Internal method that processes a review given a resolved parent PR.
      */
-    private PullRequestReview processReviewInternal(
+    private @Nullable PullRequestReview processReviewInternal(
         GitHubPullRequestReviewEventDTO.GitHubReviewDTO dto,
         PullRequest pr,
         @NonNull ProcessingContext context
     ) {
         return reviewRepository
-            .findByNativeIdAndProviderId(dto.id(), context.providerId())
+            .findByNativeIdAndProviderId(Objects.requireNonNull(dto.id()), Objects.requireNonNull(context.providerId()))
             .map(review -> updateReview(review, dto, context))
             .orElseGet(() -> createReview(dto, pr, context));
     }
@@ -177,7 +178,7 @@ public class GitHubPullRequestReviewProcessor extends BaseGitHubProcessor {
     @Transactional
     public void processDismissed(Long reviewNativeId, @NonNull ProcessingContext context) {
         reviewRepository
-            .findByNativeIdAndProviderId(reviewNativeId, context.providerId())
+            .findByNativeIdAndProviderId(reviewNativeId, Objects.requireNonNull(context.providerId()))
             .ifPresent(review -> {
                 review.setDismissed(true);
                 review = reviewRepository.save(review);
@@ -197,7 +198,7 @@ public class GitHubPullRequestReviewProcessor extends BaseGitHubProcessor {
     ) {
         review.setBody(dto.body());
         if (dto.state() != null) {
-            PullRequestReview.State newState = mapState(dto.state());
+            PullRequestReview.State newState = mapState(Objects.requireNonNullElse(dto.state(), "COMMENTED"));
             if (newState == PullRequestReview.State.DISMISSED) {
                 // Don't overwrite original state, just mark as dismissed.
                 // The original state (e.g., APPROVED) should be preserved.
@@ -236,10 +237,10 @@ public class GitHubPullRequestReviewProcessor extends BaseGitHubProcessor {
         @NonNull ProcessingContext context
     ) {
         PullRequestReview review = new PullRequestReview();
-        review.setNativeId(dto.id());
-        review.setProvider(context.provider());
+        review.setNativeId(Objects.requireNonNull(dto.id()));
+        review.setProvider(Objects.requireNonNull(context.provider()));
         review.setBody(dto.body());
-        PullRequestReview.State newState = mapState(dto.state());
+        PullRequestReview.State newState = mapState(Objects.requireNonNullElse(dto.state(), "COMMENTED"));
         if (newState == PullRequestReview.State.DISMISSED) {
             // When creating a review that's already dismissed, we don't know the original state.
             // Set state to DISMISSED and mark as dismissed. This is a best-effort for historical data.
@@ -250,7 +251,9 @@ public class GitHubPullRequestReviewProcessor extends BaseGitHubProcessor {
             review.setDismissed(false);
         }
         // Use submittedAt from DTO, fallback to PR createdAt (review can't predate PR)
-        review.setSubmittedAt(dto.submittedAt() != null ? dto.submittedAt() : pr.getCreatedAt());
+        review.setSubmittedAt(
+            dto.submittedAt() != null ? dto.submittedAt() : Objects.requireNonNullElse(pr.getCreatedAt(), Instant.now())
+        );
         review.setHtmlUrl(dto.htmlUrl() != null ? dto.htmlUrl() : "");
         review.setPullRequest(pr);
         review.setCommitId(dto.commitId());
@@ -259,7 +262,7 @@ public class GitHubPullRequestReviewProcessor extends BaseGitHubProcessor {
         review.setAuthorCanPushToRepository(dto.authorCanPushToRepository());
 
         if (dto.author() != null) {
-            User author = findOrCreateUser(dto.author(), context.providerId());
+            User author = findOrCreateUser(dto.author(), Objects.requireNonNull(context.providerId()));
             if (author != null) {
                 review.setAuthor(author);
             }
@@ -344,11 +347,11 @@ public class GitHubPullRequestReviewProcessor extends BaseGitHubProcessor {
 
         PullRequest pr = new PullRequest();
         pr.setNativeId(prId);
-        pr.setProvider(context.provider());
+        pr.setProvider(Objects.requireNonNull(context.provider()));
         pr.setNumber(dto.number());
-        pr.setTitle(sanitize(dto.title()));
+        pr.setTitle(Objects.requireNonNullElse(sanitize(dto.title()), ""));
         pr.setBody(sanitize(dto.body()));
-        pr.setState(convertState(dto.state()));
+        pr.setState(convertState(Objects.requireNonNullElse(dto.state(), "OPEN")));
         pr.setHtmlUrl(dto.htmlUrl());
         pr.setCreatedAt(dto.createdAt());
         pr.setUpdatedAt(dto.updatedAt());
@@ -377,7 +380,7 @@ public class GitHubPullRequestReviewProcessor extends BaseGitHubProcessor {
 
         // Link author
         if (dto.author() != null) {
-            User author = findOrCreateUser(dto.author(), context.providerId());
+            User author = findOrCreateUser(dto.author(), Objects.requireNonNull(context.providerId()));
             pr.setAuthor(author);
         }
 

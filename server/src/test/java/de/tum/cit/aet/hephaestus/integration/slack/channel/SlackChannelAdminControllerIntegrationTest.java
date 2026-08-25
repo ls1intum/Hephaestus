@@ -5,6 +5,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.verify;
 
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
@@ -34,13 +35,14 @@ import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembership.WorkspaceRole;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+import org.jspecify.annotations.Nullable;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.TestPropertySource;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.reactive.server.WebTestClient;
 
 /**
@@ -90,14 +92,20 @@ class SlackChannelAdminControllerIntegrationTest extends AbstractWorkspaceIntegr
     @Autowired
     private AgentJobRepository agentJobRepository;
 
-    @MockitoBean
+    @Autowired
     private SlackMessageService slackMessageService;
 
     private Workspace workspace;
     private User owner;
 
+    @AfterEach
+    void resetSlackMessageService() {
+        reset(slackMessageService);
+    }
+
     @BeforeEach
     void setUp() {
+        reset(slackMessageService);
         owner = persistUser("slack-chan-owner-" + System.nanoTime());
         workspace = createWorkspace(
             "slack-chan-" + System.nanoTime(),
@@ -285,7 +293,7 @@ class SlackChannelAdminControllerIntegrationTest extends AbstractWorkspaceIntegr
 
     // --- helpers ---
 
-    private WebTestClient.ResponseSpec patchConsent(String channelId, ConsentState target, String reason) {
+    private WebTestClient.ResponseSpec patchConsent(String channelId, ConsentState target, @Nullable String reason) {
         return webTestClient
             .patch()
             .uri("/workspaces/{slug}/slack/channels/{c}", workspace.getWorkspaceSlug(), channelId)
@@ -306,7 +314,7 @@ class SlackChannelAdminControllerIntegrationTest extends AbstractWorkspaceIntegr
         return userRepository.findByLogin("admin").orElseThrow().getId();
     }
 
-    private void seedChannel(long workspaceId, String channelId, ConsentState state, Instant announcedAt) {
+    private void seedChannel(long workspaceId, String channelId, ConsentState state, @Nullable Instant announcedAt) {
         SlackMonitoredChannel channel = new SlackMonitoredChannel();
         channel.setWorkspaceId(workspaceId);
         channel.setSlackTeamId("T1");

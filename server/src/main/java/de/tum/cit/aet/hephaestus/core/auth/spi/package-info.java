@@ -14,4 +14,5 @@
  * may depend on.
  */
 @org.springframework.modulith.NamedInterface("auth-spi")
+@org.jspecify.annotations.NullMarked
 package de.tum.cit.aet.hephaestus.core.auth.spi;

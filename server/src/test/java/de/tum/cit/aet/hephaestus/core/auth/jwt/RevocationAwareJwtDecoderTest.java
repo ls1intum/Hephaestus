@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.core.auth.jwt;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
@@ -41,6 +42,7 @@ import java.util.Date;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.cache.Cache;
@@ -130,7 +132,7 @@ class RevocationAwareJwtDecoderTest extends BaseUnitTest {
     }
 
     /** A signature/issuer/audience-valid token whose jti claim is set verbatim (or omitted when null). */
-    private String mintWithRawJti(String rawJtiOrNull) {
+    private String mintWithRawJti(@Nullable String rawJtiOrNull) {
         JwtClaimsSet.Builder claims = JwtClaimsSet.builder()
             .issuer(ISSUER.toString())
             .subject("42")
@@ -286,6 +288,7 @@ class RevocationAwareJwtDecoderTest extends BaseUnitTest {
         IssuedJwtRepository repo = mock(IssuedJwtRepository.class);
         CacheManager cm = cacheManager();
         Cache cache = cm.getCache(RevocationAwareJwtDecoder.CACHE_NAME);
+        assertNotNull(cache);
         cache.put(jti, Boolean.TRUE); // negative cache: only the REVOKED verdict is stored
 
         RevocationAwareJwtDecoder decoder = decoder(repo, cm);
@@ -307,7 +310,9 @@ class RevocationAwareJwtDecoderTest extends BaseUnitTest {
 
         // ACTIVE is never cached — both calls hit the DB, so a revoke is visible within DB lag, not TTL.
         verify(repo, times(2)).findActive(eq(jti), any());
-        assertThat(cm.getCache(RevocationAwareJwtDecoder.CACHE_NAME).get(jti)).isNull();
+        var cache = cm.getCache(RevocationAwareJwtDecoder.CACHE_NAME);
+        org.junit.jupiter.api.Assertions.assertNotNull(cache);
+        assertThat(cache.get(jti)).isNull();
     }
 
     @Test

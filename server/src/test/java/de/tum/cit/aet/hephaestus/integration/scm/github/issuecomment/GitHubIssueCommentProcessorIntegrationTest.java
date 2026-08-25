@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.scm.github.issuecomment;
 
 import static org.assertj.core.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
@@ -176,9 +177,10 @@ class GitHubIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
 
             IssueComment result = processor.process(dto, testIssue.getNumber(), context);
 
-            assertThat(result).isNotNull();
+            assertNotNull(result);
             assertThat(result.getNativeId()).isEqualTo(TEST_COMMENT_ID);
             assertThat(result.getBody()).isEqualTo("This is a test comment.");
+            assertNotNull(result.getIssue());
             assertThat(result.getIssue().getId()).isEqualTo(testIssue.getId());
 
             // Verify CommentCreated event was published
@@ -232,7 +234,7 @@ class GitHubIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
 
             IssueComment result = processor.process(dto, testIssue.getNumber(), context);
 
-            assertThat(result).isNotNull();
+            assertNotNull(result);
             assertThat(result.getBody()).isEqualTo("Updated body");
 
             // Verify CommentUpdated event was published
@@ -347,7 +349,7 @@ class GitHubIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
             IssueComment result = processor.processWithParentCreation(commentDto, issueDto, context);
 
             // Verify comment was created
-            assertThat(result).isNotNull();
+            assertNotNull(result);
             assertThat(result.getNativeId()).isEqualTo(TEST_COMMENT_ID);
             assertThat(result.getBody()).isEqualTo("Comment on new issue");
 
@@ -359,6 +361,7 @@ class GitHubIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
             assertThat(createdIssue.isPullRequest()).isFalse();
 
             // Verify comment is linked to the new issue
+            assertNotNull(result.getIssue());
             assertThat(result.getIssue().getId()).isEqualTo(createdIssue.getId());
         }
 
@@ -374,7 +377,7 @@ class GitHubIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
             IssueComment result = processor.processWithParentCreation(commentDto, issueDto, context);
 
             // Verify comment was created
-            assertThat(result).isNotNull();
+            assertNotNull(result);
             assertThat(result.getNativeId()).isEqualTo(TEST_COMMENT_ID);
 
             // Verify PullRequest stub was created (not Issue!)
@@ -387,6 +390,7 @@ class GitHubIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
             assertThat(createdPR.isPullRequest()).isTrue();
 
             // Verify comment is linked to the new PR (via Issue base class)
+            assertNotNull(result.getIssue());
             assertThat(result.getIssue().getId()).isEqualTo(createdPR.getId());
         }
 
@@ -403,7 +407,8 @@ class GitHubIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
             IssueComment result = processor.processWithParentCreation(commentDto, issueDto, context);
 
             // Verify comment was created
-            assertThat(result).isNotNull();
+            assertNotNull(result);
+            assertNotNull(result.getIssue());
             assertThat(result.getIssue().getId()).isEqualTo(testIssue.getId());
 
             // Verify no new issue was created
@@ -462,9 +467,7 @@ class GitHubIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
             processor.delete(TEST_COMMENT_ID, createContext());
 
             // Verify comment is deleted
-            assertThat(
-                commentRepository.findByNativeIdAndProviderId(TEST_COMMENT_ID, githubProvider.getId())
-            ).isEmpty();
+            assertThat(commentRepository.findByNativeIdAndProviderId(TEST_COMMENT_ID, githubProviderId())).isEmpty();
 
             // Verify CommentDeleted event was published
             assertThat(eventListener.ofType(ScmDomainEvent.CommentDeleted.class))
@@ -499,9 +502,7 @@ class GitHubIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
             assertThatCode(() -> processor.delete(TEST_COMMENT_ID, createContext())).doesNotThrowAnyException();
 
             // Verify comment is deleted
-            assertThat(
-                commentRepository.findByNativeIdAndProviderId(TEST_COMMENT_ID, githubProvider.getId())
-            ).isEmpty();
+            assertThat(commentRepository.findByNativeIdAndProviderId(TEST_COMMENT_ID, githubProviderId())).isEmpty();
         }
 
         @Test
@@ -518,5 +519,11 @@ class GitHubIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
             // No event should be published for non-existent comment
             assertThat(eventListener.ofType(ScmDomainEvent.CommentDeleted.class)).isEmpty();
         }
+    }
+
+    private Long githubProviderId() {
+        Long id = githubProvider.getId();
+        assertNotNull(id);
+        return id;
     }
 }

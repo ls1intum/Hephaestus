@@ -25,6 +25,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import org.jspecify.annotations.Nullable;
@@ -97,9 +98,11 @@ public class GitLabCommitMergeRequestLinker {
      */
     public SyncResult linkCommits(Long scopeId, Repository repository, @Nullable OffsetDateTime updatedAfter) {
         String projectPath = repository.getNameWithOwner();
-        String safeProjectPath = sanitizeForLog(projectPath);
+        String safeProjectPath = Objects.requireNonNullElse(sanitizeForLog(projectPath), "<unknown>");
         long repositoryId = repository.getId();
-        Long providerId = repository.getProvider() != null ? repository.getProvider().getId() : null;
+        Long providerId = Objects.requireNonNull(
+            repository.getProvider() != null ? Objects.requireNonNull(repository.getProvider().getId()) : null
+        );
 
         log.info(
             "Starting commit→MR linking: scopeId={}, projectPath={}, updatedAfter={}",
@@ -169,7 +172,7 @@ public class GitLabCommitMergeRequestLinker {
                 graphQlClientProvider.recordSuccess();
 
                 @SuppressWarnings({ "unchecked", "rawtypes" })
-                List<Map<String, Object>> nodes = (List) response
+                List<Map<String, Object>> nodes = (List) Objects.requireNonNull(response)
                     .field("project.mergeRequests.nodes")
                     .toEntityList(Map.class);
 
@@ -255,7 +258,7 @@ public class GitLabCommitMergeRequestLinker {
                     }
                 }
 
-                GitLabPageInfo pageInfo = response
+                GitLabPageInfo pageInfo = Objects.requireNonNull(response)
                     .field("project.mergeRequests.pageInfo")
                     .toEntity(GitLabPageInfo.class);
 
@@ -447,7 +450,9 @@ public class GitLabCommitMergeRequestLinker {
 
                 graphQlClientProvider.recordSuccess();
 
-                List<Map<String, Object>> mrNodes = (List<Map<String, Object>>) (List<?>) response
+                List<Map<String, Object>> mrNodes = (List<Map<String, Object>>) (List<?>) Objects.requireNonNull(
+                    response
+                )
                     .field("project.mergeRequests.nodes")
                     .toEntityList(Map.class);
 
@@ -535,7 +540,9 @@ public class GitLabCommitMergeRequestLinker {
 
                 graphQlClientProvider.recordSuccess();
 
-                List<Map<String, Object>> mrNodes = (List<Map<String, Object>>) (List<?>) response
+                List<Map<String, Object>> mrNodes = (List<Map<String, Object>>) (List<?>) Objects.requireNonNull(
+                    response
+                )
                     .field("project.mergeRequests.nodes")
                     .toEntityList(Map.class);
 
@@ -692,7 +699,11 @@ public class GitLabCommitMergeRequestLinker {
             eventPublisher.publishEvent(
                 new ScmDomainEvent.CommitAuthorsReconciled(
                     repositoryId,
-                    EventContext.forSync(scopeId, RepositoryRef.from(repository), IdentityProviderType.GITLAB)
+                    EventContext.forSync(
+                        scopeId,
+                        Objects.requireNonNull(RepositoryRef.from(repository)),
+                        IdentityProviderType.GITLAB
+                    )
                 )
             );
         }

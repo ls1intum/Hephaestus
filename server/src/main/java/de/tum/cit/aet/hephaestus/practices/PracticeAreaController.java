@@ -24,6 +24,7 @@ import jakarta.validation.Valid;
 import java.net.URI;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -66,7 +67,7 @@ public class PracticeAreaController {
         WorkspaceContext workspaceContext,
         @RequestParam(name = "visibleInPracticeDashboardsOnly", required = false) @Parameter(
             description = "Return only areas shown in practice dashboards"
-        ) Boolean visibleInPracticeDashboardsOnly
+        ) @Nullable Boolean visibleInPracticeDashboardsOnly
     ) {
         List<PracticeAreaDTO> areas = presenter.presentAreas(
             workspaceContext.id(),

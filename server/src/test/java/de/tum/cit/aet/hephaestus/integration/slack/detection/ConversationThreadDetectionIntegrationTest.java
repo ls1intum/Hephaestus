@@ -20,6 +20,7 @@ import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.time.Instant;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -87,7 +88,7 @@ class ConversationThreadDetectionIntegrationTest extends BaseIntegrationTest {
     private void seedThread(
         long workspaceId,
         String channelId,
-        String threadTs,
+        @Nullable String threadTs,
         String lastTs,
         int messageCount,
         String participants
@@ -95,7 +96,7 @@ class ConversationThreadDetectionIntegrationTest extends BaseIntegrationTest {
         support.seedThread(workspaceId, channelId, threadTs, lastTs, messageCount, participants);
     }
 
-    private void seedMessage(long workspaceId, String channelId, String ts, String threadTs) {
+    private void seedMessage(long workspaceId, String channelId, String ts, @Nullable String threadTs) {
         support.seedMessage(workspaceId, channelId, ts, threadTs, "hi");
     }
 

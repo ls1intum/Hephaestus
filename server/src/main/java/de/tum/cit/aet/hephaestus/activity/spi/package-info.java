@@ -9,4 +9,5 @@
  * than reaching for {@code ActivityEventService} directly.
  */
 @org.springframework.modulith.NamedInterface("spi")
+@org.jspecify.annotations.NullMarked
 package de.tum.cit.aet.hephaestus.activity.spi;

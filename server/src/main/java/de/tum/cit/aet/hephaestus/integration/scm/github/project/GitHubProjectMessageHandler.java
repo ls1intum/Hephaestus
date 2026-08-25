@@ -15,6 +15,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubEventAction
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubEventType;
 import de.tum.cit.aet.hephaestus.integration.scm.github.project.dto.GitHubProjectEventDTO;
 import lombok.extern.slf4j.Slf4j;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -158,7 +159,7 @@ public class GitHubProjectMessageHandler extends AbstractIntegrationMessageHandl
      * @param ownerType the detected owner type
      * @return the scope ID, or null if not found or not supported
      */
-    private Long resolveScopeId(GitHubProjectEventDTO event, Project.OwnerType ownerType) {
+    private @Nullable Long resolveScopeId(GitHubProjectEventDTO event, Project.OwnerType ownerType) {
         return switch (ownerType) {
             case ORGANIZATION -> {
                 String orgLogin = event.organization() != null ? event.organization().login() : null;

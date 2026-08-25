@@ -14,13 +14,13 @@ import org.jspecify.annotations.Nullable;
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record GitHubRepositoryRefDTO(
-    @JsonProperty("id") Long id,
+    @JsonProperty("id") @Nullable Long id,
     @JsonProperty("node_id") String nodeId,
     @JsonProperty("name") String name,
     @JsonProperty("full_name") String fullName,
     @JsonProperty("private") boolean isPrivate,
-    @JsonProperty("html_url") String htmlUrl,
-    @JsonProperty("default_branch") String defaultBranch
+    @JsonProperty("html_url") @Nullable String htmlUrl,
+    @JsonProperty("default_branch") @Nullable String defaultBranch
 ) {
     /**
      * Creates a GitHubRepositoryRefDTO from a GraphQL GHRepository model.

@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.core.runtime.hub;
 
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.CancelJob;
 import java.util.UUID;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -27,7 +28,7 @@ public class WorkerJobCancelDispatcher {
      *
      * @return {@code true} if the frame was dispatched to a connected worker
      */
-    public boolean dispatch(String workerId, UUID jobId, String reason) {
+    public boolean dispatch(@Nullable String workerId, UUID jobId, String reason) {
         if (workerId == null || workerId.isBlank()) {
             return false;
         }

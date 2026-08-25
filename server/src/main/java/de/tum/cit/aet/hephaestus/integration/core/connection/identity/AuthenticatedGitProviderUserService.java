@@ -9,6 +9,7 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderTyp
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
@@ -201,7 +202,7 @@ public class AuthenticatedGitProviderUserService {
     ) {
         String safeName = name != null ? name : login;
         String safeAvatar = avatarUrl != null ? avatarUrl : "";
-        Long providerId = provider.getId();
+        Long providerId = Objects.requireNonNull(provider.getId(), "Identity provider must be persisted");
 
         userRepository.acquireLoginLock(login, providerId);
         userRepository.freeLoginConflicts(login, nativeId, providerId);

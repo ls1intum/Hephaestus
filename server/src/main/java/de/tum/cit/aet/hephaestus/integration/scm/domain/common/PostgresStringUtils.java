@@ -1,5 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.scm.domain.common;
 
+import org.jspecify.annotations.Nullable;
+
 /**
  * Utility class for sanitizing strings for PostgreSQL storage.
  */
@@ -16,7 +18,7 @@ public final class PostgresStringUtils {
      * @param input The string to sanitize, may be null
      * @return The sanitized string with null bytes removed, or null if input was null
      */
-    public static String sanitize(String input) {
+    public static @Nullable String sanitize(@Nullable String input) {
         if (input == null) {
             return null;
         }

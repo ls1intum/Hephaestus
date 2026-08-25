@@ -3,12 +3,13 @@ package de.tum.cit.aet.hephaestus.integration.scm.domain.organization;
 import java.io.Serializable;
 import java.util.Objects;
 import lombok.NoArgsConstructor;
+import org.jspecify.annotations.Nullable;
 
 @NoArgsConstructor
 public class OrganizationMembershipId implements Serializable {
 
-    private Long organizationId;
-    private Long userId;
+    private @Nullable Long organizationId;
+    private @Nullable Long userId;
 
     @Override
     public boolean equals(Object o) {

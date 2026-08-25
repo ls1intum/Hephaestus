@@ -16,6 +16,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
@@ -77,7 +78,7 @@ public class GitLabSubIssueSyncService {
     @Transactional
     public SyncResult syncSubIssuesForRepository(Long scopeId, Repository repository) {
         String projectPath = repository.getNameWithOwner();
-        String safeProjectPath = sanitizeForLog(projectPath);
+        String safeProjectPath = Objects.requireNonNullElse(sanitizeForLog(projectPath), "<unknown>");
 
         // Issues only: GitLab keeps issue IIDs and merge-request IIDs in separate per-project
         // namespaces (issue #5 and MR !5 coexist), and both live in the single-table `issue` table. The
@@ -135,7 +136,7 @@ public class GitLabSubIssueSyncService {
                 }
 
                 @SuppressWarnings("unchecked")
-                List<Map<String, Object>> nodes = (List<Map<String, Object>>) (List<?>) response
+                List<Map<String, Object>> nodes = (List<Map<String, Object>>) (List<?>) Objects.requireNonNull(response)
                     .field("project.workItems.nodes")
                     .toEntityList(Map.class);
                 if (nodes == null) {
@@ -152,7 +153,9 @@ public class GitLabSubIssueSyncService {
                 }
 
                 // Pagination
-                GitLabPageInfo pageInfo = response.field("project.workItems.pageInfo").toEntity(GitLabPageInfo.class);
+                GitLabPageInfo pageInfo = Objects.requireNonNull(response)
+                    .field("project.workItems.pageInfo")
+                    .toEntity(GitLabPageInfo.class);
                 if (pageInfo == null || !pageInfo.hasNextPage()) break;
                 cursor = pageInfo.endCursor();
                 if (

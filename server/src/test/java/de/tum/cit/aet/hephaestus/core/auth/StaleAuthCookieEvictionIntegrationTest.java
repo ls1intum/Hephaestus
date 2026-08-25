@@ -6,21 +6,13 @@ import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
 import de.tum.cit.aet.hephaestus.core.auth.domain.AccountRepository;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.HephaestusJwtIssuer;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.JwtPrincipalFactory;
-import de.tum.cit.aet.hephaestus.testconfig.PostgreSQLTestContainer;
-import org.junit.jupiter.api.Tag;
+import de.tum.cit.aet.hephaestus.testconfig.RealAuthIntegrationTest;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.webtestclient.autoconfigure.AutoConfigureWebTestClient;
-import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.reactive.server.WebTestClient;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
 /**
  * Proves StaleAuthCookieFilter: a logged-out browser still presenting an INVALID access cookie must
@@ -30,12 +22,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
  * <p>Runs over the LIVE security chain (real RevocationAwareJwtDecoder + real ES256 cookie-JWT), the
  * same setup as {@code SessionRefreshLifecycleIntegrationTest}.
  */
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@ActiveProfiles("test")
-@AutoConfigureWebTestClient
-@Testcontainers
-@Tag("integration")
-class StaleAuthCookieEvictionIntegrationTest {
+class StaleAuthCookieEvictionIntegrationTest extends RealAuthIntegrationTest {
 
     @Autowired
     private WebTestClient webTestClient;
@@ -51,16 +38,6 @@ class StaleAuthCookieEvictionIntegrationTest {
 
     @Value("${hephaestus.auth.cookie-name:__Host-HEPHAESTUS_AT}")
     private String cookieName;
-
-    @DynamicPropertySource
-    static void datasource(DynamicPropertyRegistry registry) {
-        var postgres = PostgreSQLTestContainer.getInstance();
-        registry.add("spring.datasource.url", postgres::getJdbcUrl);
-        registry.add("spring.datasource.username", postgres::getUsername);
-        registry.add("spring.datasource.password", postgres::getPassword);
-        registry.add("spring.datasource.hikari.maximum-pool-size", () -> "10");
-        registry.add("spring.datasource.hikari.minimum-idle", () -> "1");
-    }
 
     @Test
     void staleCookieDoesNotBlockPublicEndpointAndIsCleared() {

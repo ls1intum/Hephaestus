@@ -42,6 +42,7 @@ import java.time.Duration;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Tag;
@@ -1248,7 +1249,7 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
         return user;
     }
 
-    private GitLabIssueEventDTO createEvent(String action, String state, boolean confidential) {
+    private GitLabIssueEventDTO createEvent(String action, @Nullable String state, boolean confidential) {
         var attrs = new GitLabIssueEventDTO.ObjectAttributes(
             RAW_ISSUE_ID,
             ISSUE_IID,
@@ -1278,7 +1279,7 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
     }
 
     /** An {@code action=update} event whose {@code changes.labels} diff adds the given label (null = none). */
-    private GitLabIssueEventDTO createUpdateEventWithAddedLabel(GitLabWebhookLabel addedLabel) {
+    private GitLabIssueEventDTO createUpdateEventWithAddedLabel(@Nullable GitLabWebhookLabel addedLabel) {
         var attrs = new GitLabIssueEventDTO.ObjectAttributes(
             RAW_ISSUE_ID,
             ISSUE_IID,
@@ -1338,7 +1339,7 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
     class AddedLabelsDelta {
 
         private GitLabIssueEventDTO eventWithLabelChange(
-            List<GitLabWebhookLabel> previous,
+            @Nullable List<GitLabWebhookLabel> previous,
             List<GitLabWebhookLabel> current
         ) {
             var changes = new GitLabIssueEventDTO.Changes(new GitLabIssueEventDTO.LabelsChange(previous, current));

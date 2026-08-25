@@ -4,6 +4,7 @@ import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceScopedController;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
+import org.jspecify.annotations.Nullable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -21,10 +22,20 @@ public final class WorkspaceEchoControllers {
     private WorkspaceEchoControllers() {}
 
     /** Echoes the resolved {@link WorkspaceContext} from a workspace-scoped controller. */
-    public record ScopedEcho(String requestPath, String contextSlug, Long contextId, List<String> roles) {}
+    public record ScopedEcho(
+        String requestPath,
+        @Nullable String contextSlug,
+        @Nullable Long contextId,
+        List<String> roles
+    ) {}
 
     /** Echoes the resolved {@link WorkspaceContext} from a plain controller under a workspace path. */
-    public record WorkspaceContextSnapshot(String pathSlug, String contextSlug, Long contextId, List<String> roles) {}
+    public record WorkspaceContextSnapshot(
+        String pathSlug,
+        @Nullable String contextSlug,
+        @Nullable Long contextId,
+        List<String> roles
+    ) {}
 
     @WorkspaceScopedController
     @RequestMapping("/scoped-test")

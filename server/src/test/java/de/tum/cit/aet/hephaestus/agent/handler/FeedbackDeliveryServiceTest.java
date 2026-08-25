@@ -213,8 +213,8 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("with the progress-footer flag on, a meaningful re-review appends the footer and posts an A4 ping")
-        void appendsProgressFooterOnReReview() {
+        @DisplayName("a meaningful re-review appends its progress footer to the new review comment")
+        void shouldAppendProgressFooterToNewCommentOnReReview() {
             var footerService = serviceWithProgressFooter();
             AgentJob job = createJob();
             stubOpenPr();
@@ -232,7 +232,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
         }
 
         @Test
-        void aSecondReviewLeavesASecondCommentRatherThanRewritingTheFirst() {
+        void shouldPostSecondCommentWhenReviewRunsAgain() {
             AgentJob job = createJob();
             stubOpenPr();
             when(commentPoster.postFormattedBody(eq(job), any(String.class))).thenReturn("IC_first", "IC_second");
@@ -484,7 +484,11 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
         void skipsWhenLivePullRequestDoesNotMatchDeliveryTarget() {
             AgentJob job = createJob();
             var pr = createOpenPr();
-            ((ObjectNode) job.getMetadata()).put("repository_id", 999L);
+            ObjectNode metadata = org.junit.jupiter.api.Assertions.assertInstanceOf(
+                ObjectNode.class,
+                job.getMetadata()
+            );
+            metadata.put("repository_id", 999L);
             when(pullRequestRepository.findByIdWithAuthorAndRepository(PULL_REQUEST_ID)).thenReturn(Optional.of(pr));
 
             var delivery = new DeliveryContent("Fix stuff.", List.of(), List.of());
@@ -790,20 +794,6 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
 
             verifyNoInteractions(commentPoster);
             verifyNoInteractions(pullRequestRepository);
-        }
-    }
-
-    @Nested
-    class SummaryDemotion {
-
-        private InlineFeedbackChannel.DeliveredSignal landedSignal(String findingFingerprint) {
-            return new InlineFeedbackChannel.DeliveredSignal(
-                findingFingerprint,
-                new FeedbackAnchor.DiffAnchor("src/Foo.java", 10, null),
-                InlineFeedbackChannel.Disposition.POSTED,
-                "note-1",
-                "thread-1"
-            );
         }
     }
 

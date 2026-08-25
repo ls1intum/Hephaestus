@@ -16,6 +16,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
+import org.jspecify.annotations.Nullable;
 
 @Entity
 @Table(name = "user_preferences")
@@ -29,6 +30,7 @@ public class UserPreferences {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @EqualsAndHashCode.Include
+    @Nullable
     private Long id;
 
     @OneToOne(fetch = FetchType.LAZY)

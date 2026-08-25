@@ -17,6 +17,7 @@ import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -153,7 +154,7 @@ class CatalogAdoptionPlanAssembler {
             : CatalogAreaPracticeAction.BLOCKED;
     }
 
-    private static CatalogAdoptionAvailability availability(String slug, Practice existingPractice) {
+    private static CatalogAdoptionAvailability availability(String slug, @Nullable Practice existingPractice) {
         if (existingPractice == null) {
             return CatalogAdoptionAvailability.AVAILABLE;
         }

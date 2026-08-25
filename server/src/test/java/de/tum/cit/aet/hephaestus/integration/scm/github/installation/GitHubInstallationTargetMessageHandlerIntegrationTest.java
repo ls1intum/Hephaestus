@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.scm.github.installation;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
@@ -17,6 +18,7 @@ import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -102,7 +104,7 @@ class GitHubInstallationTargetMessageHandlerIntegrationTest extends BaseIntegrat
     void shouldHandleRenamedEvent() throws Exception {
         // Given - use installation_target.json which has action: "renamed"
         GitHubInstallationTargetEventDTO event = loadPayload("installation_target");
-        setupTestWorkspace(event.installation().id(), "OldName");
+        setupTestWorkspace(required(event.installation()).id(), "OldName");
 
         handler.handleEvent(event);
 
@@ -114,7 +116,7 @@ class GitHubInstallationTargetMessageHandlerIntegrationTest extends BaseIntegrat
     void shouldHandleRenamedEventForUser() throws Exception {
         // Given - use installation_target_user.json for user account rename
         GitHubInstallationTargetEventDTO event = loadPayload("installation_target_user");
-        setupTestWorkspace(event.installation().id(), "SoloMaintainer");
+        setupTestWorkspace(required(event.installation()).id(), "SoloMaintainer");
 
         handler.handleEvent(event);
 
@@ -152,7 +154,7 @@ class GitHubInstallationTargetMessageHandlerIntegrationTest extends BaseIntegrat
             baseEvent.changes(),
             baseEvent.sender()
         );
-        setupTestWorkspace(baseEvent.installation().id(), "OldName");
+        setupTestWorkspace(required(baseEvent.installation()).id(), "OldName");
 
         // When - should not throw
         handler.handleEvent(event);
@@ -163,5 +165,10 @@ class GitHubInstallationTargetMessageHandlerIntegrationTest extends BaseIntegrat
         ClassPathResource resource = new ClassPathResource("github/" + filename + ".json");
         String json = resource.getContentAsString(StandardCharsets.UTF_8);
         return objectMapper.readValue(json, GitHubInstallationTargetEventDTO.class);
+    }
+
+    private static <T> T required(@Nullable T value) {
+        assertNotNull(value);
+        return value;
     }
 }

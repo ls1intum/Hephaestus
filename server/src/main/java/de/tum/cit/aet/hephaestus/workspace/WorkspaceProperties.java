@@ -85,50 +85,46 @@ public record WorkspaceProperties(
         SELF_SERVICE,
     }
 
-    /**
-     * Compact constructor that ensures nested properties are never null and performs
-     * cross-field validation.
-     *
-     * @param initDefault whether to initialize the default workspace
-     * @param defaultProperties configuration for the default workspace
-     * @throws IllegalStateException if {@code initDefault} is {@code true} but required
-     *                               credentials ({@code login} or {@code token}) are missing
-     */
-    public WorkspaceProperties {
-        if (defaultProperties == null) {
-            defaultProperties = new DefaultProperties(null, null, List.of());
-        }
-        if (gitlabDefault == null) {
-            gitlabDefault = new GitLabDefaultProperties(null, null, null);
-        }
-        if (creationPolicy == null) {
-            creationPolicy = CreationPolicy.ADMIN_ONLY;
-        }
-        // Cross-field validation: when initDefault=true, login and token must be present
+    public WorkspaceProperties(
+        boolean initDefault,
+        @Nullable DefaultProperties defaultProperties,
+        boolean initGitlabDefault,
+        @Nullable GitLabDefaultProperties gitlabDefault,
+        @Nullable CreationPolicy creationPolicy
+    ) {
+        DefaultProperties normalizedDefault =
+            defaultProperties == null ? new DefaultProperties(null, null, List.of()) : defaultProperties;
+        GitLabDefaultProperties normalizedGitlab =
+            gitlabDefault == null ? new GitLabDefaultProperties(null, null, null) : gitlabDefault;
         if (initDefault) {
-            if (defaultProperties.login() == null || defaultProperties.login().isBlank()) {
+            if (normalizedDefault.login() == null || normalizedDefault.login().isBlank()) {
                 throw new IllegalStateException(
                     "hephaestus.workspace.default.login must not be blank when init-default is true"
                 );
             }
-            if (defaultProperties.token() == null || defaultProperties.token().isBlank()) {
+            if (normalizedDefault.token() == null || normalizedDefault.token().isBlank()) {
                 throw new IllegalStateException(
                     "hephaestus.workspace.default.token must not be blank when init-default is true"
                 );
             }
         }
         if (initGitlabDefault) {
-            if (gitlabDefault.login() == null || gitlabDefault.login().isBlank()) {
+            if (normalizedGitlab.login() == null || normalizedGitlab.login().isBlank()) {
                 throw new IllegalStateException(
                     "hephaestus.workspace.gitlab-default.login must not be blank when init-gitlab-default is true"
                 );
             }
-            if (gitlabDefault.token() == null || gitlabDefault.token().isBlank()) {
+            if (normalizedGitlab.token() == null || normalizedGitlab.token().isBlank()) {
                 throw new IllegalStateException(
                     "hephaestus.workspace.gitlab-default.token must not be blank when init-gitlab-default is true"
                 );
             }
         }
+        this.initDefault = initDefault;
+        this.defaultProperties = normalizedDefault;
+        this.initGitlabDefault = initGitlabDefault;
+        this.gitlabDefault = normalizedGitlab;
+        this.creationPolicy = creationPolicy == null ? CreationPolicy.ADMIN_ONLY : creationPolicy;
     }
 
     @AssertTrue(message = "When init-default is true, default.login and default.token must not be blank")

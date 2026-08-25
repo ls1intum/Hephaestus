@@ -12,6 +12,7 @@ import java.security.MessageDigest;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -121,7 +122,7 @@ public class WorkerTokenExchangeController {
         return http.getRemoteAddr();
     }
 
-    private static boolean constantTimeEquals(String a, String b) {
+    private static boolean constantTimeEquals(@Nullable String a, @Nullable String b) {
         if (a == null || b == null) {
             return false;
         }
@@ -130,7 +131,7 @@ public class WorkerTokenExchangeController {
         return MessageDigest.isEqual(ba, bb);
     }
 
-    public record ExchangeRequest(String workerId, String registrationToken) {}
+    public record ExchangeRequest(@Nullable String workerId, @Nullable String registrationToken) {}
 
     public record ExchangeResponse(String token, Instant expiresAt) {}
 }

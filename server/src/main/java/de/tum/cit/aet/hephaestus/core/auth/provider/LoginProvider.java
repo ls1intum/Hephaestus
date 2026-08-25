@@ -122,6 +122,6 @@ public class LoginProvider {
      * meaningful — {@code https://gitlab.lrz.de} and {@code https://gitlab.lrz.de/} are the same instance.
      */
     public void setBaseUrl(String baseUrl) {
-        this.baseUrl = baseUrl == null ? null : baseUrl.trim().replaceAll("/+$", "");
+        this.baseUrl = baseUrl.trim().replaceAll("/+$", "");
     }
 }

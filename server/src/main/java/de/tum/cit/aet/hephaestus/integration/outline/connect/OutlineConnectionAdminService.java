@@ -6,8 +6,9 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.BearerToken;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
-import de.tum.cit.aet.hephaestus.integration.outline.client.OutlineApiClient;
 import de.tum.cit.aet.hephaestus.integration.outline.client.OutlineApiException;
+import de.tum.cit.aet.hephaestus.integration.outline.client.OutlineTokenClient;
+import java.util.Objects;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -28,9 +29,9 @@ public class OutlineConnectionAdminService {
     private static final Logger log = LoggerFactory.getLogger(OutlineConnectionAdminService.class);
 
     private final ConnectionService connectionService;
-    private final OutlineApiClient apiClient;
+    private final OutlineTokenClient apiClient;
 
-    public OutlineConnectionAdminService(ConnectionService connectionService, OutlineApiClient apiClient) {
+    public OutlineConnectionAdminService(ConnectionService connectionService, OutlineTokenClient apiClient) {
         this.connectionService = connectionService;
         this.apiClient = apiClient;
     }
@@ -44,6 +45,7 @@ public class OutlineConnectionAdminService {
     public OutlineTokenStatusDTO tokenStatus(long workspaceId) {
         Connection connection = requireActiveConnection(workspaceId);
         ConnectionConfig.OutlineConfig config = (ConnectionConfig.OutlineConfig) connection.getConfig();
+        String serverUrl = Objects.requireNonNull(config.serverUrl(), "Outline connection must have a server URL");
         String token = connectionService
             .findActiveBearerToken(workspaceId, IntegrationKind.OUTLINE)
             .map(BearerToken::token)
@@ -52,14 +54,14 @@ public class OutlineConnectionAdminService {
             return new OutlineTokenStatusDTO(false, null, null, null, null);
         }
         try {
-            apiClient.validateToken(config.serverUrl(), token);
+            apiClient.validateToken(serverUrl, token);
         } catch (OutlineApiException e) {
             log.debug("outline.admin: token probe rejected for workspaceId={}: {}", workspaceId, e.toString());
             return new OutlineTokenStatusDTO(false, null, null, null, null);
         }
         try {
             return apiClient
-                .describeToken(config.serverUrl(), token)
+                .describeToken(serverUrl, token)
                 .map(d -> new OutlineTokenStatusDTO(true, d.name(), d.last4(), d.expiresAt(), d.lastActiveAt()))
                 .orElseGet(() -> new OutlineTokenStatusDTO(true, null, null, null, null));
         } catch (OutlineApiException e) {

@@ -19,41 +19,19 @@ import org.springframework.core.metrics.StartupStep;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
-/**
- * Asserts no single bean instantiation blows the per-bean budget — catches a slow
- * {@code @PostConstruct} or heavy synchronous work dragged onto the critical startup path. Does not
- * extend {@code BaseIntegrationTest} because {@code useMainMethod = ALWAYS} is required so the
- * {@link BufferingApplicationStartup} wired in {@link Application#main(String[])} is picked up, and
- * that produces a separate context-cache entry.
- */
+/** Guards the application-controlled portion of Spring's startup path against slow bean initialization. */
 @SpringBootTest(useMainMethod = UseMainMethod.ALWAYS)
 @ActiveProfiles("test")
 @Import({ TestSecurityConfig.class, TestAsyncConfiguration.class })
-@Testcontainers
-@Tag("integration")
+@Tag("architecture")
 class StartupBudgetIntegrationTest {
 
-    // spring.beans.instantiate is the per-bean creation step; each fires once per bean. See
-    // https://docs.spring.io/spring-framework/reference/core/aot.html#spring-startup-events
     private static final String BEAN_INSTANTIATE = "spring.beans.instantiate";
 
-    /**
-     * Spring Boot's own JPA warm-up, exempt from the ceiling. What it spends is a JDBC handshake and a
-     * schema export, so its wall clock is set by how busy the database and the machine are rather than by
-     * anything in this application: 2.7s here on idle cores and 5.4s on busy ones, with no code changed
-     * between the two. Budgeting it meant carrying that spread as slack inside the ceiling, and a
-     * {@code verify} run spends the slack — the OpenAPI application starts in the pre-integration-test
-     * phase and is still finishing its own boot when this context begins. Naming the exemption keeps the
-     * ceiling measuring what it is for, which is application beans.
-     */
+    // Database connection and schema export time are external to application bean initialization.
     private static final String JPA_WARM_UP_BEAN = "&entityManagerFactory";
 
-    // Per-bean wall-clock budget: flag a bean doing egregious synchronous work on the boot critical
-    // path (blocking I/O, eager warm-up, a migration in bean init). 6s ≈ 4x the slowest application
-    // bean, so CI CPU contention can't trip it without a real regression. Absolute, not relative:
-    // a ratio gate over a flat distribution can't tell a regression from a busy machine.
     private static final Duration PER_BEAN_CEILING = Duration.ofSeconds(6);
 
     @DynamicPropertySource
@@ -68,7 +46,7 @@ class StartupBudgetIntegrationTest {
     private ApplicationStartup applicationStartup;
 
     @Test
-    void noBeanInstantiationExceedsCeiling() {
+    void shouldKeepBeanInstantiationWithinBudgetWhenApplicationStarts() {
         var events = ((BufferingApplicationStartup) applicationStartup).getBufferedTimeline().getEvents();
 
         var beans = events
@@ -101,7 +79,6 @@ class StartupBudgetIntegrationTest {
             .isLessThan(PER_BEAN_CEILING);
     }
 
-    /** Without the name the failure says a bean is slow but not which, and the timeline is not kept. */
     private static String beanNameOf(StartupTimeline.TimelineEvent event) {
         for (StartupStep.Tag tag : event.getStartupStep().getTags()) {
             if ("beanName".equals(tag.getKey())) {

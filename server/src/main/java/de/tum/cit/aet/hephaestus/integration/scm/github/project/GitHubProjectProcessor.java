@@ -12,8 +12,10 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.events.GitHubProjectEven
 import de.tum.cit.aet.hephaestus.integration.scm.github.project.dto.GitHubProjectDTO;
 import de.tum.cit.aet.hephaestus.integration.scm.github.user.GitHubUserProcessor;
 import java.time.Instant;
+import java.util.Objects;
 import java.util.Set;
 import lombok.extern.slf4j.Slf4j;
+import org.jspecify.annotations.Nullable;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -54,7 +56,12 @@ public class GitHubProjectProcessor extends BaseGitHubProcessor {
      * @return the persisted Project entity
      */
     @Transactional
-    public Project process(GitHubProjectDTO dto, Project.OwnerType ownerType, Long ownerId, ProcessingContext context) {
+    public @Nullable Project process(
+        GitHubProjectDTO dto,
+        Project.OwnerType ownerType,
+        Long ownerId,
+        ProcessingContext context
+    ) {
         return processInternal(dto, ownerType, ownerId, context, null);
     }
 
@@ -69,22 +76,22 @@ public class GitHubProjectProcessor extends BaseGitHubProcessor {
      * @return the persisted Project entity
      */
     @Transactional
-    public Project process(
+    public @Nullable Project process(
         GitHubProjectDTO dto,
         Project.OwnerType ownerType,
         Long ownerId,
         ProcessingContext context,
-        Long actorId
+        @Nullable Long actorId
     ) {
         return processInternal(dto, ownerType, ownerId, context, actorId);
     }
 
-    private Project processInternal(
+    private @Nullable Project processInternal(
         GitHubProjectDTO dto,
         Project.OwnerType ownerType,
         Long ownerId,
         ProcessingContext context,
-        Long actorId
+        @Nullable Long actorId
     ) {
         UpsertResult result = upsertProject(dto, ownerType, ownerId, context);
         if (result == null) {
@@ -132,7 +139,7 @@ public class GitHubProjectProcessor extends BaseGitHubProcessor {
      * @param context processing context with scope information
      * @return UpsertResult containing the project and whether it was new, or null if processing was skipped
      */
-    private UpsertResult upsertProject(
+    private @Nullable UpsertResult upsertProject(
         GitHubProjectDTO dto,
         Project.OwnerType ownerType,
         Long ownerId,
@@ -152,18 +159,18 @@ public class GitHubProjectProcessor extends BaseGitHubProcessor {
         // Check if project already exists
         boolean isNew = !projectRepository.existsByOwnerTypeAndOwnerIdAndNumber(ownerType, ownerId, dto.number());
 
-        // Find or create creator
-        User creator = dto.creator() != null ? findOrCreateUser(dto.creator(), context.providerId()) : null;
+        Long providerId = Objects.requireNonNull(context.providerId(), "Project processing requires a provider");
+        User creator = dto.creator() != null ? findOrCreateUser(dto.creator(), providerId) : null;
 
         // Perform atomic upsert
         projectRepository.upsertCore(
             dbId,
-            context.providerId(),
+            providerId,
             dto.nodeId(),
             ownerType.name(),
             ownerId,
             dto.number(),
-            sanitize(dto.title()),
+            Objects.requireNonNullElse(sanitize(dto.title()), ""),
             sanitize(dto.shortDescription()),
             sanitize(dto.readme()),
             dto.template(),
@@ -204,7 +211,7 @@ public class GitHubProjectProcessor extends BaseGitHubProcessor {
      * @return the updated Project entity
      */
     @Transactional
-    public Project processClosed(
+    public @Nullable Project processClosed(
         GitHubProjectDTO dto,
         Project.OwnerType ownerType,
         Long ownerId,
@@ -224,22 +231,22 @@ public class GitHubProjectProcessor extends BaseGitHubProcessor {
      * @return the updated Project entity
      */
     @Transactional
-    public Project processClosed(
+    public @Nullable Project processClosed(
         GitHubProjectDTO dto,
         Project.OwnerType ownerType,
         Long ownerId,
         ProcessingContext context,
-        Long actorId
+        @Nullable Long actorId
     ) {
         return processClosedInternal(dto, ownerType, ownerId, context, actorId);
     }
 
-    private Project processClosedInternal(
+    private @Nullable Project processClosedInternal(
         GitHubProjectDTO dto,
         Project.OwnerType ownerType,
         Long ownerId,
         ProcessingContext context,
-        Long actorId
+        @Nullable Long actorId
     ) {
         UpsertResult result = upsertProject(dto, ownerType, ownerId, context);
         if (result == null) {
@@ -266,7 +273,7 @@ public class GitHubProjectProcessor extends BaseGitHubProcessor {
      * @return the updated Project entity
      */
     @Transactional
-    public Project processReopened(
+    public @Nullable Project processReopened(
         GitHubProjectDTO dto,
         Project.OwnerType ownerType,
         Long ownerId,
@@ -286,22 +293,22 @@ public class GitHubProjectProcessor extends BaseGitHubProcessor {
      * @return the updated Project entity
      */
     @Transactional
-    public Project processReopened(
+    public @Nullable Project processReopened(
         GitHubProjectDTO dto,
         Project.OwnerType ownerType,
         Long ownerId,
         ProcessingContext context,
-        Long actorId
+        @Nullable Long actorId
     ) {
         return processReopenedInternal(dto, ownerType, ownerId, context, actorId);
     }
 
-    private Project processReopenedInternal(
+    private @Nullable Project processReopenedInternal(
         GitHubProjectDTO dto,
         Project.OwnerType ownerType,
         Long ownerId,
         ProcessingContext context,
-        Long actorId
+        @Nullable Long actorId
     ) {
         UpsertResult result = upsertProject(dto, ownerType, ownerId, context);
         if (result == null) {

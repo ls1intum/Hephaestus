@@ -17,10 +17,12 @@ import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.time.Instant;
 import java.util.UUID;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Integration tests for {@link ActivityEventRepository#backfillCommitActors(Long, double)}.
@@ -30,6 +32,7 @@ import org.springframework.beans.factory.annotation.Autowired;
  * {@code git_commit.author_id} is backfilled via email match, this native UPDATE
  * rewrites the activity-event columns so the contributor actually receives XP.
  */
+@Transactional
 class ActivityEventRepositoryIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
@@ -58,8 +61,6 @@ class ActivityEventRepositoryIntegrationTest extends BaseIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        databaseTestUtils.cleanDatabase();
-
         workspace = new Workspace();
         workspace.setWorkspaceSlug("backfill-workspace");
         workspace.setDisplayName("Backfill Workspace");
@@ -104,7 +105,7 @@ class ActivityEventRepositoryIntegrationTest extends BaseIntegrationTest {
         return repositoryRepository.save(repo);
     }
 
-    private Commit persistCommit(String sha, Repository repo, User commitAuthor) {
+    private Commit persistCommit(String sha, Repository repo, @Nullable User commitAuthor) {
         Commit commit = new Commit();
         commit.setSha(sha);
         commit.setMessage("initial commit");
@@ -116,7 +117,7 @@ class ActivityEventRepositoryIntegrationTest extends BaseIntegrationTest {
         return commitRepository.save(commit);
     }
 
-    private ActivityEvent persistCommitCreatedEvent(Commit commit, User actor, double xp) {
+    private ActivityEvent persistCommitCreatedEvent(Commit commit, @Nullable User actor, double xp) {
         Instant occurredAt = commit.getAuthoredAt();
         ActivityEvent event = ActivityEvent.builder()
             .id(UUID.randomUUID())

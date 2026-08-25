@@ -26,6 +26,7 @@ import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Optional;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Tag;
@@ -367,22 +368,33 @@ class BaseGitLabProcessorTest extends BaseUnitTest {
             );
         }
 
+        @Nullable
         Instant callParseGitLabTimestamp(String timestamp) {
             return parseGitLabTimestamp(timestamp);
         }
 
-        User callFindOrCreateUser(GitLabWebhookUser dto) {
+        @Nullable
+        User callFindOrCreateUser(@Nullable GitLabWebhookUser dto) {
             return findOrCreateUser(dto, 1L);
         }
 
-        User callFindOrCreateUser(String globalId, String username, String name, String avatarUrl, String webUrl) {
+        @Nullable
+        User callFindOrCreateUser(
+            @Nullable String globalId,
+            String username,
+            String name,
+            @Nullable String avatarUrl,
+            @Nullable String webUrl
+        ) {
             return findOrCreateUser(GitLabUserLookup.of(globalId, username, name, avatarUrl, webUrl), 1L);
         }
 
-        Label callFindOrCreateLabel(GitLabWebhookLabel dto, Repository repository) {
+        @Nullable
+        Label callFindOrCreateLabel(@Nullable GitLabWebhookLabel dto, Repository repository) {
             return findOrCreateLabel(dto, repository);
         }
 
+        @Nullable
         ProcessingContext callResolveContext(String path, String action) {
             return resolveContext(path, action);
         }

@@ -11,6 +11,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.TimeoutException;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
@@ -136,11 +137,14 @@ public class GitLabExceptionClassifier {
 
     @Nullable
     public ClassificationResult classifyGraphQlResponse(@Nullable ClientGraphQlResponse response) {
-        if (response == null || response.getErrors() == null || response.getErrors().isEmpty()) {
+        if (response == null) {
             return null;
         }
 
-        List<ResponseError> errors = response.getErrors();
+        var errors = Objects.requireNonNull(response).getErrors();
+        if (errors == null || errors.isEmpty()) {
+            return null;
+        }
 
         for (ResponseError error : errors) {
             Map<String, Object> extensions = error.getExtensions();

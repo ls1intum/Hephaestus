@@ -9,29 +9,37 @@ import java.time.Instant;
 import java.util.Map;
 import java.util.UUID;
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 public record ReviewFeedbackDTO(
     @NonNull UUID id,
     @NonNull UUID agentJobId,
-    @Schema(description = "Work item the feedback targets; null when it is unanchored") ReviewArtifactDTO artifact,
+    @Schema(description = "Work item the feedback targets; null when it is unanchored")
+    @Nullable
+    ReviewArtifactDTO artifact,
     @Schema(description = "Who the feedback is addressed to; null when the identity is no longer resolvable")
+    @Nullable
     ReviewSubjectDTO recipient,
-    @Schema(description = "Whose work the feedback addresses; may equal the recipient") ReviewSubjectDTO subject,
+    @Schema(description = "Whose work the feedback addresses; may equal the recipient")
+    @Nullable
+    ReviewSubjectDTO subject,
     @NonNull FeedbackChannel channel,
     @NonNull FeedbackDeliveryState deliveryState,
     @Schema(description = "Why the feedback was withheld; null unless the state is SUPPRESSED")
+    @Nullable
     FeedbackSuppressionReason suppressionReason,
-    @Schema(description = "The feedback this one replaced; null on a first delivery") UUID replacesId,
+    @Schema(description = "The feedback this one replaced; null on a first delivery") @Nullable UUID replacesId,
     @NonNull Instant createdAt,
-    @Schema(description = "When the feedback was placed; null if it was not delivered") Instant deliveredAt,
+    @Schema(description = "When the feedback was placed; null if it was not delivered") @Nullable Instant deliveredAt,
     @Schema(description = "Leading characters of the composed body; null when the feedback carries no body")
+    @Nullable
     String bodyPreview,
     @Schema(requiredMode = Schema.RequiredMode.REQUIRED) boolean bodyTruncated,
     @NonNull @Schema(description = "Number of observations used to compose the feedback") Long observationCount
 ) {
     public static ReviewFeedbackDTO from(
         OperatorFeedbackRow row,
-        ReviewArtifactDTO artifact,
+        @Nullable ReviewArtifactDTO artifact,
         Map<Long, ReviewSubjectDTO> subjects
     ) {
         return new ReviewFeedbackDTO(

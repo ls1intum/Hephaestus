@@ -9,6 +9,7 @@ import jakarta.validation.Validator;
 import jakarta.validation.ValidatorFactory;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
@@ -59,7 +60,7 @@ class AgentBindingTimeoutRangeTest extends BaseUnitTest {
         assertThat(violationsFor(null)).isEmpty();
     }
 
-    private static Set<ConstraintViolation<AgentBindingRequestDTO>> violationsFor(Integer timeoutSeconds) {
+    private static Set<ConstraintViolation<AgentBindingRequestDTO>> violationsFor(@Nullable Integer timeoutSeconds) {
         AgentBindingRequestDTO request = new AgentBindingRequestDTO(1L, null, timeoutSeconds, null, null, null);
         return validator
             .validate(request)

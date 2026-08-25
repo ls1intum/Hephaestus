@@ -2,37 +2,32 @@ package de.tum.cit.aet.hephaestus.integration.core.spi;
 
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider.SyncTarget;
 import java.time.Instant;
+import org.jspecify.annotations.Nullable;
 
-/**
- * Test-only fluent builder for {@link SyncTarget}. The record's canonical constructor takes 22 positional
- * arguments, most of which are {@code null} in any given test; this keeps the production API free of a
- * "backward-compatible" convenience constructor while letting tests set only the fields a case cares about.
- * All fields default to {@code null} (and {@code nativeId} to {@code null}, the legacy/unresolved value).
- */
 public final class SyncTargetTestBuilder {
 
-    private Long id;
-    private Long scopeId;
-    private Long installationId;
-    private String personalAccessToken;
-    private AuthMode authMode;
-    private String repositoryNameWithOwner;
-    private Instant lastLabelsSyncedAt;
-    private Instant lastMilestonesSyncedAt;
-    private Instant lastIssuesSyncedAt;
-    private Instant lastPullRequestsSyncedAt;
-    private Instant lastDiscussionsSyncedAt;
-    private Instant lastCollaboratorsSyncedAt;
-    private Instant lastFullSyncAt;
-    private Integer issueBackfillHighWaterMark;
-    private Integer issueBackfillCheckpoint;
-    private Integer pullRequestBackfillHighWaterMark;
-    private Integer pullRequestBackfillCheckpoint;
-    private Instant backfillLastRunAt;
-    private String issueSyncCursor;
-    private String pullRequestSyncCursor;
-    private String discussionSyncCursor;
-    private Long nativeId;
+    private Long id = 1L;
+    private Long scopeId = 1L;
+    private @Nullable Long installationId;
+    private @Nullable String personalAccessToken;
+    private AuthMode authMode = AuthMode.INSTALLATION_APP;
+    private String repositoryNameWithOwner = "owner/repository";
+    private @Nullable Instant lastLabelsSyncedAt;
+    private @Nullable Instant lastMilestonesSyncedAt;
+    private @Nullable Instant lastIssuesSyncedAt;
+    private @Nullable Instant lastPullRequestsSyncedAt;
+    private @Nullable Instant lastDiscussionsSyncedAt;
+    private @Nullable Instant lastCollaboratorsSyncedAt;
+    private @Nullable Instant lastFullSyncAt;
+    private @Nullable Integer issueBackfillHighWaterMark;
+    private @Nullable Integer issueBackfillCheckpoint;
+    private @Nullable Integer pullRequestBackfillHighWaterMark;
+    private @Nullable Integer pullRequestBackfillCheckpoint;
+    private @Nullable Instant backfillLastRunAt;
+    private @Nullable String issueSyncCursor;
+    private @Nullable String pullRequestSyncCursor;
+    private @Nullable String discussionSyncCursor;
+    private @Nullable Long nativeId;
 
     private SyncTargetTestBuilder() {}
 
@@ -50,12 +45,12 @@ public final class SyncTargetTestBuilder {
         return this;
     }
 
-    public SyncTargetTestBuilder installationId(Long value) {
+    public SyncTargetTestBuilder installationId(@Nullable Long value) {
         this.installationId = value;
         return this;
     }
 
-    public SyncTargetTestBuilder personalAccessToken(String value) {
+    public SyncTargetTestBuilder personalAccessToken(@Nullable String value) {
         this.personalAccessToken = value;
         return this;
     }
@@ -70,82 +65,82 @@ public final class SyncTargetTestBuilder {
         return this;
     }
 
-    public SyncTargetTestBuilder lastLabelsSyncedAt(Instant value) {
+    public SyncTargetTestBuilder lastLabelsSyncedAt(@Nullable Instant value) {
         this.lastLabelsSyncedAt = value;
         return this;
     }
 
-    public SyncTargetTestBuilder lastMilestonesSyncedAt(Instant value) {
+    public SyncTargetTestBuilder lastMilestonesSyncedAt(@Nullable Instant value) {
         this.lastMilestonesSyncedAt = value;
         return this;
     }
 
-    public SyncTargetTestBuilder lastIssuesSyncedAt(Instant value) {
+    public SyncTargetTestBuilder lastIssuesSyncedAt(@Nullable Instant value) {
         this.lastIssuesSyncedAt = value;
         return this;
     }
 
-    public SyncTargetTestBuilder lastPullRequestsSyncedAt(Instant value) {
+    public SyncTargetTestBuilder lastPullRequestsSyncedAt(@Nullable Instant value) {
         this.lastPullRequestsSyncedAt = value;
         return this;
     }
 
-    public SyncTargetTestBuilder lastDiscussionsSyncedAt(Instant value) {
+    public SyncTargetTestBuilder lastDiscussionsSyncedAt(@Nullable Instant value) {
         this.lastDiscussionsSyncedAt = value;
         return this;
     }
 
-    public SyncTargetTestBuilder lastCollaboratorsSyncedAt(Instant value) {
+    public SyncTargetTestBuilder lastCollaboratorsSyncedAt(@Nullable Instant value) {
         this.lastCollaboratorsSyncedAt = value;
         return this;
     }
 
-    public SyncTargetTestBuilder lastFullSyncAt(Instant value) {
+    public SyncTargetTestBuilder lastFullSyncAt(@Nullable Instant value) {
         this.lastFullSyncAt = value;
         return this;
     }
 
-    public SyncTargetTestBuilder issueBackfillHighWaterMark(Integer value) {
+    public SyncTargetTestBuilder issueBackfillHighWaterMark(@Nullable Integer value) {
         this.issueBackfillHighWaterMark = value;
         return this;
     }
 
-    public SyncTargetTestBuilder issueBackfillCheckpoint(Integer value) {
+    public SyncTargetTestBuilder issueBackfillCheckpoint(@Nullable Integer value) {
         this.issueBackfillCheckpoint = value;
         return this;
     }
 
-    public SyncTargetTestBuilder pullRequestBackfillHighWaterMark(Integer value) {
+    public SyncTargetTestBuilder pullRequestBackfillHighWaterMark(@Nullable Integer value) {
         this.pullRequestBackfillHighWaterMark = value;
         return this;
     }
 
-    public SyncTargetTestBuilder pullRequestBackfillCheckpoint(Integer value) {
+    public SyncTargetTestBuilder pullRequestBackfillCheckpoint(@Nullable Integer value) {
         this.pullRequestBackfillCheckpoint = value;
         return this;
     }
 
-    public SyncTargetTestBuilder backfillLastRunAt(Instant value) {
+    public SyncTargetTestBuilder backfillLastRunAt(@Nullable Instant value) {
         this.backfillLastRunAt = value;
         return this;
     }
 
-    public SyncTargetTestBuilder issueSyncCursor(String value) {
+    public SyncTargetTestBuilder issueSyncCursor(@Nullable String value) {
         this.issueSyncCursor = value;
         return this;
     }
 
-    public SyncTargetTestBuilder pullRequestSyncCursor(String value) {
+    public SyncTargetTestBuilder pullRequestSyncCursor(@Nullable String value) {
         this.pullRequestSyncCursor = value;
         return this;
     }
 
-    public SyncTargetTestBuilder discussionSyncCursor(String value) {
+    public SyncTargetTestBuilder discussionSyncCursor(@Nullable String value) {
         this.discussionSyncCursor = value;
         return this;
     }
 
-    public SyncTargetTestBuilder nativeId(Long value) {
+    public SyncTargetTestBuilder nativeId(@Nullable Long value) {
         this.nativeId = value;
         return this;
     }

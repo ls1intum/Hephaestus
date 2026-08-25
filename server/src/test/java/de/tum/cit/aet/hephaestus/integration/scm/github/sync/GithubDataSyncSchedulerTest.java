@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.scm.github.sync;
 
 import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.argThat;
@@ -47,6 +48,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Consumer;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -145,7 +147,16 @@ class GithubDataSyncSchedulerTest extends BaseUnitTest {
     private static SyncSession session() {
         // Blank accountLogin -> the scheduler's syncTeams short-circuits without needing
         // teamSyncService/organizationRepository stubs.
-        return new SyncSession(WORKSPACE_ID, "acme-workspace", "Acme", "", 100L, null, List.of(), (SyncContext) null);
+        return new SyncSession(
+            WORKSPACE_ID,
+            "acme-workspace",
+            "Acme",
+            "",
+            100L,
+            null,
+            List.of(),
+            new SyncContext(WORKSPACE_ID, "acme-workspace", "Acme", 100L)
+        );
     }
 
     private static Connection activeGithubConnection() {

@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.integration.core.egress;
 
 import de.tum.cit.aet.hephaestus.core.settings.spi.SilentModeQuery;
 import lombok.extern.slf4j.Slf4j;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
 
 /** Final, fail-closed check immediately before an external delivery-write attempt. */
@@ -44,5 +45,5 @@ public class OutboundEgressGuard {
         return new Decision(true, null);
     }
 
-    private record Decision(boolean allowed, RuntimeException cause) {}
+    private record Decision(boolean allowed, @Nullable RuntimeException cause) {}
 }

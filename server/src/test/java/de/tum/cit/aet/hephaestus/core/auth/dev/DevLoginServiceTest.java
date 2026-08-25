@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.core.auth.dev;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -66,9 +67,7 @@ class DevLoginServiceTest extends BaseUnitTest {
     }
 
     private void stubIssuer() {
-        // The mocked repository returns an account with a null id (JPA would assign it), so use lenient
-        // matchers: typed/anyLong matchers reject null in Mockito.
-        when(principalFactory.forAccountId(any())).thenReturn(new JwtPrincipal(7L, "dev", "dev", Set.of()));
+        when(principalFactory.forAccountId(anyLong())).thenReturn(new JwtPrincipal(7L, "dev", "dev", Set.of()));
         when(jwtIssuer.issue(any(), any(), any(), any(), any())).thenReturn(token);
     }
 
@@ -101,7 +100,11 @@ class DevLoginServiceTest extends BaseUnitTest {
     void newUser_createsActiveAccount_andMintsToken() {
         DevLoginService service = service(true, "dev");
         when(accountRepository.findByPrimaryEmail("alice@dev.invalid")).thenReturn(Optional.empty());
-        when(accountRepository.save(any(Account.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(accountRepository.save(any(Account.class))).thenAnswer(inv -> {
+            Account account = inv.getArgument(0);
+            account.setId(7L);
+            return account;
+        });
         stubIssuer();
 
         HephaestusJwtIssuer.Token result = service.devLogin("Alice", "Alice Dev", false, null);
@@ -122,7 +125,11 @@ class DevLoginServiceTest extends BaseUnitTest {
     void admin_createsAppAdminAccount() {
         DevLoginService service = service(true, "dev");
         when(accountRepository.findByPrimaryEmail("root@dev.invalid")).thenReturn(Optional.empty());
-        when(accountRepository.save(any(Account.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(accountRepository.save(any(Account.class))).thenAnswer(inv -> {
+            Account account = inv.getArgument(0);
+            account.setId(7L);
+            return account;
+        });
         stubIssuer();
 
         service.devLogin("root", null, true, null);
@@ -136,6 +143,7 @@ class DevLoginServiceTest extends BaseUnitTest {
     void existingAccount_isReused_notRecreated() {
         DevLoginService service = service(true, "dev");
         Account existing = new Account("alice");
+        existing.setId(7L);
         existing.setPrimaryEmail("alice@dev.invalid");
         existing.setAppRole(Account.AppRole.USER);
         when(accountRepository.findByPrimaryEmail("alice@dev.invalid")).thenReturn(Optional.of(existing));
@@ -152,10 +160,15 @@ class DevLoginServiceTest extends BaseUnitTest {
     void admin_promotesExistingUser_promoteOnly() {
         DevLoginService service = service(true, "dev");
         Account existing = new Account("alice");
+        existing.setId(7L);
         existing.setPrimaryEmail("alice@dev.invalid");
         existing.setAppRole(Account.AppRole.USER);
         when(accountRepository.findByPrimaryEmail("alice@dev.invalid")).thenReturn(Optional.of(existing));
-        when(accountRepository.save(any(Account.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(accountRepository.save(any(Account.class))).thenAnswer(inv -> {
+            Account account = inv.getArgument(0);
+            account.setId(7L);
+            return account;
+        });
         stubIssuer();
 
         service.devLogin("alice", null, true, null);

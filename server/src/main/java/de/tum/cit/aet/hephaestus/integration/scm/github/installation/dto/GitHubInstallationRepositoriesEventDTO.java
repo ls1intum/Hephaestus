@@ -7,6 +7,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubWebhookEven
 import de.tum.cit.aet.hephaestus.integration.scm.github.repository.dto.GitHubRepositoryRefDTO;
 import de.tum.cit.aet.hephaestus.integration.scm.github.user.dto.GitHubUserDTO;
 import java.util.List;
+import org.jspecify.annotations.Nullable;
 
 /**
  * DTO for GitHub installation_repositories webhook events.
@@ -14,10 +15,10 @@ import java.util.List;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record GitHubInstallationRepositoriesEventDTO(
     @JsonProperty("action") String action,
-    @JsonProperty("installation") GitHubInstallationEventDTO.GitHubInstallationDTO installation,
-    @JsonProperty("repositories_added") List<GitHubRepositoryRefDTO> repositoriesAdded,
-    @JsonProperty("repositories_removed") List<GitHubRepositoryRefDTO> repositoriesRemoved,
-    @JsonProperty("sender") GitHubUserDTO sender
+    @JsonProperty("installation") GitHubInstallationEventDTO.@Nullable GitHubInstallationDTO installation,
+    @JsonProperty("repositories_added") @Nullable List<GitHubRepositoryRefDTO> repositoriesAdded,
+    @JsonProperty("repositories_removed") @Nullable List<GitHubRepositoryRefDTO> repositoriesRemoved,
+    @JsonProperty("sender") @Nullable GitHubUserDTO sender
 ) implements GitHubWebhookEvent {
     @Override
     public GitHubEventAction.InstallationRepositories actionType() {
@@ -25,7 +26,7 @@ public record GitHubInstallationRepositoriesEventDTO(
     }
 
     @Override
-    public GitHubRepositoryRefDTO repository() {
+    public @Nullable GitHubRepositoryRefDTO repository() {
         return null; // This event covers multiple repositories
     }
 }

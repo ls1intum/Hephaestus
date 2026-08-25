@@ -58,7 +58,7 @@ public class GitLabGroupProcessor {
      */
     @Transactional
     @Nullable
-    public Organization process(GitLabGroupResponse group, Long providerId) {
+    public Organization process(@Nullable GitLabGroupResponse group, Long providerId) {
         if (group == null || group.id() == null || group.fullPath() == null || group.webUrl() == null) {
             log.warn("Skipped group processing: reason=nullOrMissingFields");
             return null;

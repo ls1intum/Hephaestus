@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.leaderboard;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
@@ -15,6 +16,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Tag;
@@ -152,10 +154,10 @@ class LeaderboardXpQueryServiceTest {
             Map<Long, LeaderboardUserXp> result = service.getLeaderboardData(WORKSPACE_ID, SINCE, UNTIL);
 
             assertThat(result).hasSize(2);
-            assertThat(result.get(100L).totalScore()).isEqualTo(150);
-            assertThat(result.get(100L).eventCount()).isEqualTo(10);
-            assertThat(result.get(200L).totalScore()).isEqualTo(75);
-            assertThat(result.get(200L).eventCount()).isEqualTo(5);
+            assertThat(xp(result, 100L).totalScore()).isEqualTo(150);
+            assertThat(xp(result, 100L).eventCount()).isEqualTo(10);
+            assertThat(xp(result, 200L).totalScore()).isEqualTo(75);
+            assertThat(xp(result, 200L).eventCount()).isEqualTo(5);
         }
 
         @Test
@@ -189,11 +191,13 @@ class LeaderboardXpQueryServiceTest {
 
             Map<Long, LeaderboardUserXp> result = service.getLeaderboardData(WORKSPACE_ID, SINCE, UNTIL);
 
-            LeaderboardUserXp data = result.get(100L);
+            LeaderboardUserXp data = xp(result, 100L);
             assertThat(data).isNotNull();
+            assertNotNull(data);
             assertThat(data.approvals()).isEqualTo(3);
             assertThat(data.changeRequests()).isEqualTo(2);
             assertThat(data.comments()).isEqualTo(1);
+            assertNotNull(data);
             assertThat(data.codeComments()).isEqualTo(1);
             assertThat(data.ownReplies()).isEqualTo(1);
         }
@@ -284,9 +288,9 @@ class LeaderboardXpQueryServiceTest {
                 SINCE,
                 UNTIL
             );
-            assertThat(result.get(100L).ownReplies()).isEqualTo(2);
-            assertThat(result.get(100L).openPullRequests()).isEqualTo(1);
-            assertThat(result.get(100L).reviewedPrCount()).isEqualTo(3);
+            assertThat(xp(result, 100L).ownReplies()).isEqualTo(2);
+            assertThat(xp(result, 100L).openPullRequests()).isEqualTo(1);
+            assertThat(xp(result, 100L).reviewedPrCount()).isEqualTo(3);
             verify(activityEventRepository, never()).findExperiencePointsByWorkspaceAndTimeframe(any(), any(), any());
         }
 
@@ -305,7 +309,8 @@ class LeaderboardXpQueryServiceTest {
 
             Map<Long, LeaderboardUserXp> result = service.getLeaderboardData(WORKSPACE_ID, SINCE, UNTIL);
 
-            LeaderboardUserXp data = result.get(100L);
+            LeaderboardUserXp data = xp(result, 100L);
+            assertNotNull(data);
             assertThat(data.totalScore()).isZero();
             assertThat(data.eventCount()).isZero();
         }
@@ -320,7 +325,7 @@ class LeaderboardXpQueryServiceTest {
         return user;
     }
 
-    private ActivityXpProjection createXpProjection(Long actorId, Double totalXp, Long eventCount) {
+    private ActivityXpProjection createXpProjection(Long actorId, @Nullable Double totalXp, @Nullable Long eventCount) {
         return new ActivityXpProjection() {
             @Override
             public Long getActorId() {
@@ -328,12 +333,12 @@ class LeaderboardXpQueryServiceTest {
             }
 
             @Override
-            public Double getTotalExperiencePoints() {
+            public @Nullable Double getTotalExperiencePoints() {
                 return totalXp;
             }
 
             @Override
-            public Long getEventCount() {
+            public @Nullable Long getEventCount() {
                 return eventCount;
             }
         };
@@ -379,5 +384,11 @@ class LeaderboardXpQueryServiceTest {
                 return count;
             }
         };
+    }
+
+    private static LeaderboardUserXp xp(Map<Long, LeaderboardUserXp> result, long userId) {
+        LeaderboardUserXp xp = result.get(userId);
+        assertNotNull(xp);
+        return xp;
     }
 }

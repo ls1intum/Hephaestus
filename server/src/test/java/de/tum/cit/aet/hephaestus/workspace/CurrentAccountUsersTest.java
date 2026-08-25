@@ -15,6 +15,7 @@ import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.testconfig.MockSecurityContextUtils;
 import java.util.List;
 import java.util.Optional;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -56,7 +57,7 @@ class CurrentAccountUsersTest extends BaseUnitTest {
         );
     }
 
-    private static IdentityLinkView link(long providerId, String login, Long externalActorId) {
+    private static IdentityLinkView link(long providerId, String login, @Nullable Long externalActorId) {
         return new IdentityLinkView(1L, providerId, "subject", login, "Display", null, null, externalActorId, null);
     }
 

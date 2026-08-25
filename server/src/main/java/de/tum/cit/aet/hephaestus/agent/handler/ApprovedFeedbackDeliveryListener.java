@@ -89,25 +89,32 @@ class ApprovedFeedbackDeliveryListener {
             }
             return;
         }
+        String approvedBody = feedback.getBody();
+        String safeBody = PullRequestCommentPoster.sanitize(approvedBody);
+        if (safeBody.isBlank()) {
+            feedbackRepository.markApprovedSuppressed(
+                event.workspaceId(),
+                feedback.getId(),
+                FeedbackSuppressionReason.EMPTY_AFTER_SANITIZE.name()
+            );
+            return;
+        }
+        if (!safeBody.equals(approvedBody)) {
+            feedbackRepository.markApprovedSuppressed(
+                event.workspaceId(),
+                feedback.getId(),
+                FeedbackSuppressionReason.APPROVAL_STALE.name()
+            );
+            return;
+        }
         ExistingDeliveryLookup existing = commentPoster.findApprovedProposal(job, feedback.getId());
         if (existing.kind() == ExistingDeliveryLookup.Kind.UNKNOWN) {
             log.warn("Approved proposal deferred after inconclusive provider lookup: feedbackId={}", feedback.getId());
             return;
         }
         if (existing.kind() == ExistingDeliveryLookup.Kind.ABSENT) {
-            String sanitized = PullRequestCommentPoster.sanitize(feedback.getBody());
-            // A provider rejects an empty comment, and the resulting exception would escape this listener and
-            // strand the approval in PREPARED with nothing to retry it.
-            if (sanitized.isBlank()) {
-                feedbackRepository.markApprovedSuppressed(
-                    event.workspaceId(),
-                    feedback.getId(),
-                    FeedbackSuppressionReason.EMPTY_AFTER_SANITIZE.name()
-                );
-                return;
-            }
             try {
-                commentPoster.postApprovedProposal(job, feedback.getId(), sanitized);
+                commentPoster.postApprovedProposal(job, feedback.getId(), feedback.getBody());
             } catch (JobDeliverySuppressedException exception) {
                 feedbackRepository.markApprovedSuppressed(
                     event.workspaceId(),

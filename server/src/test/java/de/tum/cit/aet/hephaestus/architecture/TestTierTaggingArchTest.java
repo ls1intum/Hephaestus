@@ -48,7 +48,7 @@ import org.junit.jupiter.api.Test;
 @Tag("architecture")
 class TestTierTaggingArchTest {
 
-    private static final Set<String> TIERS = Set.of("unit", "architecture", "integration", "live");
+    private static final Set<String> TIERS = Set.of("unit", "architecture", "database", "integration", "live");
 
     /** The two suffixes Failsafe is configured to discover. Anything else is dead on arrival. */
     private static final Set<String> FAILSAFE_SUFFIXES = Set.of("IntegrationTest", "LiquibaseTest");
@@ -82,7 +82,7 @@ class TestTierTaggingArchTest {
         String name,
         boolean isAbstract,
         boolean isAnnotation,
-        String superName,
+        @org.jspecify.annotations.Nullable String superName,
         Set<String> tags,
         Set<String> annotations,
         boolean declaresTests,
@@ -243,7 +243,7 @@ class TestTierTaggingArchTest {
      *     exactly one top-level type, so the annotations preceding it are unambiguously its own —
      *     {@link #everyTestFileIsNamedAfterTheClassItDeclares()} is what keeps that true.
      */
-    private static TypeDecl parse(Path file) {
+    private static @org.jspecify.annotations.Nullable TypeDecl parse(Path file) {
         String content;
         try {
             content = Files.readString(file);

@@ -7,12 +7,13 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.consumer.IntegrationNatsConsumer;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.BearerToken;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
-import de.tum.cit.aet.hephaestus.integration.outline.client.OutlineApiClient;
+import de.tum.cit.aet.hephaestus.integration.outline.client.OutlineWebhookClient;
 import de.tum.cit.aet.hephaestus.integration.outline.client.model.OutlineWebhookSubscription;
 import de.tum.cit.aet.hephaestus.integration.outline.webhook.OutlineWebhookEvents;
 import java.security.SecureRandom;
 import java.util.HexFormat;
 import java.util.Optional;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
@@ -48,7 +49,7 @@ public class OutlineWebhookRegistrar {
     private static final String SUBSCRIPTION_NAME = "Hephaestus documentation sync";
 
     private final ConnectionService connectionService;
-    private final OutlineApiClient outlineApiClient;
+    private final OutlineWebhookClient outlineApiClient;
     private final EncryptedStringConverter secretCipher;
     private final String externalUrl;
 
@@ -57,7 +58,7 @@ public class OutlineWebhookRegistrar {
 
     public OutlineWebhookRegistrar(
         ConnectionService connectionService,
-        OutlineApiClient outlineApiClient,
+        OutlineWebhookClient outlineApiClient,
         EncryptedStringConverter secretCipher,
         @Value("${hephaestus.webhook.external-url:}") String externalUrl,
         ObjectProvider<IntegrationNatsConsumer> natsConsumer
@@ -128,7 +129,7 @@ public class OutlineWebhookRegistrar {
      * Whether the stored subscription still exists upstream and is enabled. {@code null} when the
      * upstream listing itself failed (unknown — the caller must not churn on that).
      */
-    private Boolean isSubscriptionHealthy(String serverUrl, String token, String subscriptionId) {
+    private @Nullable Boolean isSubscriptionHealthy(String serverUrl, String token, String subscriptionId) {
         try {
             for (OutlineWebhookSubscription subscription : outlineApiClient.listWebhookSubscriptions(
                 serverUrl,

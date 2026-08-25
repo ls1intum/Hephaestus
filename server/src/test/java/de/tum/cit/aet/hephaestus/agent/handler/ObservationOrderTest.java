@@ -10,6 +10,7 @@ import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.json.JsonMapper;
@@ -49,7 +50,7 @@ class ObservationOrderTest extends BaseUnitTest {
         return evidence;
     }
 
-    private static ValidatedObservation observation(String title, Severity severity, int loci) {
+    private static ValidatedObservation observation(String title, @Nullable Severity severity, int loci) {
         return new ValidatedObservation(
             "slug",
             title,

@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.scm.github.organization;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
@@ -18,6 +19,7 @@ import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -106,7 +108,7 @@ class GitHubOrganizationMessageHandlerIntegrationTest extends BaseIntegrationTes
         // User should be created if membership contains user info
         if (event.membership() != null && event.membership().user() != null) {
             assertThat(
-                userRepository.findByNativeIdAndProviderId(event.membership().user().id(), githubProvider.getId())
+                userRepository.findByNativeIdAndProviderId(required(event.membership().user().id()), githubProviderId())
             ).isPresent();
         }
     }
@@ -117,10 +119,10 @@ class GitHubOrganizationMessageHandlerIntegrationTest extends BaseIntegrationTes
         GitHubOrganizationEventDTO addEvent = loadPayload("organization.member_added");
         if (addEvent.membership() != null && addEvent.membership().user() != null) {
             User member = new User();
-            member.setNativeId(addEvent.membership().user().id());
+            member.setNativeId(required(addEvent.membership().user().id()));
             member.setProvider(githubProvider);
             member.setLogin(addEvent.membership().user().login());
-            member.setAvatarUrl(addEvent.membership().user().avatarUrl());
+            member.setAvatarUrl(required(addEvent.membership().user().avatarUrl()));
             member.setCreatedAt(Instant.now());
             member.setUpdatedAt(Instant.now());
             userRepository.save(member);
@@ -155,5 +157,16 @@ class GitHubOrganizationMessageHandlerIntegrationTest extends BaseIntegrationTes
         ClassPathResource resource = new ClassPathResource("github/" + filename + ".json");
         String json = resource.getContentAsString(StandardCharsets.UTF_8);
         return objectMapper.readValue(json, GitHubOrganizationEventDTO.class);
+    }
+
+    private Long githubProviderId() {
+        Long id = githubProvider.getId();
+        assertNotNull(id);
+        return id;
+    }
+
+    private static <T> T required(@Nullable T value) {
+        assertNotNull(value);
+        return value;
     }
 }

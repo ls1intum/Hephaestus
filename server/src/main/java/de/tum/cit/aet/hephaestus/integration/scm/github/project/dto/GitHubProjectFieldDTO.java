@@ -29,10 +29,10 @@ import tools.jackson.databind.json.JsonMapper;
 public record GitHubProjectFieldDTO(
     @JsonProperty("id") String id,
     @JsonProperty("name") String name,
-    @JsonProperty("data_type") String dataType,
-    @JsonProperty("options") List<Option> options,
-    @JsonProperty("created_at") Instant createdAt,
-    @JsonProperty("updated_at") Instant updatedAt
+    @JsonProperty("data_type") @Nullable String dataType,
+    @JsonProperty("options") @Nullable List<Option> options,
+    @JsonProperty("created_at") @Nullable Instant createdAt,
+    @JsonProperty("updated_at") @Nullable Instant updatedAt
 ) {
     // Trivial serialization (List<Option> → JSON string column); no global mapper config needed.
     private static final ObjectMapper objectMapper = JsonMapper.builder().build();
@@ -44,8 +44,8 @@ public record GitHubProjectFieldDTO(
     public record Option(
         @JsonProperty("id") String id,
         @JsonProperty("name") String name,
-        @JsonProperty("color") String color,
-        @JsonProperty("description") String description
+        @JsonProperty("color") @Nullable String color,
+        @JsonProperty("description") @Nullable String description
     ) {}
 
     /**
@@ -85,8 +85,7 @@ public record GitHubProjectFieldDTO(
     /**
      * Convert options to JSON string for storage.
      */
-    @Nullable
-    public String getOptionsJson() {
+    public @Nullable String getOptionsJson() {
         if (options == null || options.isEmpty()) {
             return null;
         }

@@ -16,6 +16,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.user.dto.GitHubUserDTO;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import lombok.extern.slf4j.Slf4j;
@@ -35,14 +36,14 @@ import org.jspecify.annotations.Nullable;
 public abstract class BaseGitHubProcessor {
 
     protected final UserRepository userRepository;
-    protected final LabelRepository labelRepository;
-    protected final MilestoneRepository milestoneRepository;
+    protected final @Nullable LabelRepository labelRepository;
+    protected final @Nullable MilestoneRepository milestoneRepository;
     private final GitHubUserProcessor gitHubUserProcessor;
 
     protected BaseGitHubProcessor(
         UserRepository userRepository,
-        LabelRepository labelRepository,
-        MilestoneRepository milestoneRepository,
+        @Nullable LabelRepository labelRepository,
+        @Nullable MilestoneRepository milestoneRepository,
         GitHubUserProcessor gitHubUserProcessor
     ) {
         this.userRepository = userRepository;
@@ -85,14 +86,15 @@ public abstract class BaseGitHubProcessor {
         if (dto == null || dto.name() == null || dto.name().isBlank()) {
             return null;
         }
+        LabelRepository labels = Objects.requireNonNull(labelRepository);
 
         // ALWAYS check by unique key (repository_id + name) FIRST - this is the constraint we enforce.
-        Optional<Label> existingOpt = labelRepository.findByRepositoryIdAndName(repository.getId(), dto.name());
+        Optional<Label> existingOpt = labels.findByRepositoryIdAndName(repository.getId(), dto.name());
 
         // Fall back to nativeId lookup if name lookup didn't find it (handles label renames)
         if (existingOpt.isEmpty() && dto.id() != null) {
-            Long providerId = repository.getProvider().getId();
-            existingOpt = labelRepository.findByNativeIdAndProviderId(dto.id(), providerId);
+            Long providerId = Objects.requireNonNull(repository.getProvider().getId());
+            existingOpt = labels.findByNativeIdAndProviderId(dto.id(), providerId);
         }
 
         if (existingOpt.isPresent()) {
@@ -103,11 +105,11 @@ public abstract class BaseGitHubProcessor {
         // If another thread inserted first, this returns 0 and we fetch the winner.
         long nativeId =
             dto.id() != null ? dto.id() : LabelIdUtils.generateDeterministicId(repository.getId(), dto.name());
-        Long providerId = repository.getProvider().getId();
-        labelRepository.insertIfAbsent(nativeId, providerId, dto.name(), dto.color(), repository.getId());
+        Long providerId = Objects.requireNonNull(repository.getProvider().getId());
+        labels.insertIfAbsent(nativeId, providerId, dto.name(), dto.color(), repository.getId());
 
         // Always fetch by business key — the PK is auto-generated and unknown here.
-        return labelRepository.findByRepositoryIdAndName(repository.getId(), dto.name()).orElse(null);
+        return labels.findByRepositoryIdAndName(repository.getId(), dto.name()).orElse(null);
     }
 
     /**
@@ -132,16 +134,14 @@ public abstract class BaseGitHubProcessor {
         if (dto == null || dto.number() <= 0) {
             return null;
         }
+        MilestoneRepository milestones = Objects.requireNonNull(milestoneRepository);
 
         // ALWAYS check by unique key (repository_id + number) FIRST - this is the constraint we enforce.
-        Optional<Milestone> existingOpt = milestoneRepository.findByNumberAndRepositoryId(
-            dto.number(),
-            repository.getId()
-        );
+        Optional<Milestone> existingOpt = milestones.findByNumberAndRepositoryId(dto.number(), repository.getId());
 
         // Fall back to ID lookup if number lookup didn't find it (handles edge cases)
         if (existingOpt.isEmpty() && dto.id() != null) {
-            existingOpt = milestoneRepository.findById(dto.id());
+            existingOpt = milestones.findById(dto.id());
         }
 
         if (existingOpt.isPresent()) {
@@ -155,12 +155,12 @@ public abstract class BaseGitHubProcessor {
 
         String title = dto.title() != null ? dto.title() : "Milestone " + dto.number();
         String htmlUrl = dto.htmlUrl() != null ? dto.htmlUrl() : "";
-        String state = parseMilestoneState(dto.state()).name();
+        String state = parseMilestoneState(dto.state() == null ? "open" : dto.state()).name();
         int openIssuesCount = dto.openIssuesCount() != null ? dto.openIssuesCount() : 0;
         int closedIssuesCount = dto.closedIssuesCount() != null ? dto.closedIssuesCount() : 0;
 
-        Long providerId = repository.getProvider().getId();
-        int inserted = milestoneRepository.insertIfAbsent(
+        Long providerId = Objects.requireNonNull(repository.getProvider().getId());
+        int inserted = milestones.insertIfAbsent(
             milestoneId,
             providerId,
             dto.number(),
@@ -178,14 +178,14 @@ public abstract class BaseGitHubProcessor {
 
         if (inserted == 0) {
             // Another thread inserted first - fetch the winner
-            return milestoneRepository.findByNumberAndRepositoryId(dto.number(), repository.getId()).orElse(null);
+            return milestones.findByNumberAndRepositoryId(dto.number(), repository.getId()).orElse(null);
         }
 
         // We inserted - fetch the entity to return a managed instance.
         // Must look up by natural key (number + repository), not by milestoneId,
         // because the table uses auto-generated synthetic PKs (the milestoneId here
         // is the native provider ID stored in native_id, not the synthetic PK).
-        return milestoneRepository.findByNumberAndRepositoryId(dto.number(), repository.getId()).orElse(null);
+        return milestones.findByNumberAndRepositoryId(dto.number(), repository.getId()).orElse(null);
     }
 
     /**

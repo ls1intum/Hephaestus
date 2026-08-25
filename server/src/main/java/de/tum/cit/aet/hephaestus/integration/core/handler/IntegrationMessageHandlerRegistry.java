@@ -54,7 +54,7 @@ public class IntegrationMessageHandlerRegistry {
     /**
      * Resolve the handler bound to the given key.
      */
-    public Optional<IntegrationMessageHandler> resolve(EventTypeKey key) {
+    public Optional<IntegrationMessageHandler> resolve(@org.jspecify.annotations.Nullable EventTypeKey key) {
         if (key == null) {
             return Optional.empty();
         }

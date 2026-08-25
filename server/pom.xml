@@ -39,22 +39,9 @@
              longer overrides); the CI job's timeout-minutes is the backstop. -->
         <hephaestus.surefire.timeout>1200</hephaestus.surefire.timeout>
 
-        <!-- Default 1 so local dev keeps the singleton Testcontainers Postgres a true singleton.
-             CI's integration job raises forkCount (reuse is off there, so each fork gets its own DB)
-             and lowers maxHeap to fit N forks + N containers in the runner's RAM. -->
         <hephaestus.surefire.forkCount>1</hephaestus.surefire.forkCount>
         <!-- 4g sized for the unit+arch run (ArchUnit + Modulith class graph). -->
         <hephaestus.surefire.maxHeap>4096m</hephaestus.surefire.maxHeap>
-
-        <!-- Past this many failures surefire stops and reports every remaining test as *Skipped*, so a
-             run that is really fixing N failures shows 5 and enumerating the rest costs N/5 full builds.
-             0 turns it off; ci-tests.yml passes 0 on every tier for exactly that reason, and a green run
-             pays nothing for it. The default stays 5 for the ad-hoc run that only wants to know whether
-             anything is broken at all.
-
-             The name is load-bearing: this property is what <skipAfterFailureCount> below binds to, so
-             surefire's own -DskipAfterFailureCount matches nothing here and is ignored without a word. -->
-        <hephaestus.surefire.skipAfterFailureCount>5</hephaestus.surefire.skipAfterFailureCount>
 
         <!-- Server port for OpenAPI spec generation (overridable via -Dopenapi.server.port=PORT) -->
         <openapi.server.port>38090</openapi.server.port>
@@ -111,15 +98,13 @@
         <openapi-generator.version>7.19.0</openapi-generator.version>
         <postgresql.version>42.7.11</postgresql.version>
         <therapi.version>0.15.0</therapi.version>
+        <error-prone.version>2.50.0</error-prone.version>
+        <nullaway.version>0.14.0</nullaway.version>
         <shedlock.version>5.16.0</shedlock.version>
         <bucket4j.version>8.19.0</bucket4j.version>
     </properties>
     <dependencies>
-        <!-- JSpecify nullness annotations (@NonNull/@Nullable). The forward-looking standard
-             adopted by Spring Framework 7 / Boot 4, replacing the deprecated
-             org.springframework.lang.* annotations. Version managed by the Spring Boot BOM.
-             A custom ModelConverter (JSpecifyRequiredModelConverter) teaches SpringDoc to read
-             these for OpenAPI `required`, since swagger-core only recognises the Spring ones. -->
+        <!-- JSpecify annotations also drive the OpenAPI required-field converter. -->
         <dependency>
             <groupId>org.jspecify</groupId>
             <artifactId>jspecify</artifactId>
@@ -264,6 +249,11 @@
                     <artifactId>slf4j-simple</artifactId>
                 </exclusion>
             </exclusions>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-jpa-test</artifactId>
+            <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -498,6 +488,11 @@
                     <!-- Suppress warnings for generated code using deprecated GitHub API values -->
                     <compilerArgs>
                         <arg>-Xlint:all,-deprecation</arg>
+                        <arg>-XDcompilePolicy=simple</arg>
+                        <arg>--should-stop=ifError=FLOW</arg>
+                        <arg>-XDaddTypeAnnotationsToSymbol=true</arg>
+                        <!-- javac requires the Error Prone plugin and its options in one compiler argument. -->
+                        <arg>-Xplugin:ErrorProne -XepDisableAllChecks -Xep:NullAway:ERROR -Xep:RequireExplicitNullMarking:ERROR -XepExcludedPaths:.*[\\/]target[\\/]generated-sources[\\/].* -XepOpt:NullAway:AnnotatedPackages=de.tum.cit.aet.hephaestus -XepOpt:NullAway:JSpecifyMode=true -XepOpt:NullAway:TreatGeneratedAsUnannotated=true -XepOpt:NullAway:HandleTestAssertionLibraries=true</arg>
                     </compilerArgs>
                     <showWarnings>false</showWarnings>
                     <annotationProcessorPaths>
@@ -513,6 +508,16 @@
                             <groupId>com.github.therapi</groupId>
                             <artifactId>therapi-runtime-javadoc-scribe</artifactId>
                             <version>${therapi.version}</version>
+                        </path>
+                        <path>
+                            <groupId>com.google.errorprone</groupId>
+                            <artifactId>error_prone_core</artifactId>
+                            <version>${error-prone.version}</version>
+                        </path>
+                        <path>
+                            <groupId>com.uber.nullaway</groupId>
+                            <artifactId>nullaway</artifactId>
+                            <version>${nullaway.version}</version>
                         </path>
                     </annotationProcessorPaths>
                 </configuration>
@@ -990,17 +995,12 @@
                     <!-- Test output -->
                     <printSummary>true</printSummary>
                     <redirectTestOutputToFile>false</redirectTestOutputToFile>
-                    <!-- forkCount>1 (CI integration) distributes classes across parallel JVMs; surefire
-                         owns discovery so it can't drop tests. -->
                     <forkCount>${hephaestus.surefire.forkCount}</forkCount>
                     <reuseForks>true</reuseForks>
-                    <!-- Method parallelism for unit/arch; integration overrides with -Dparallel=none
-                         (shared Postgres per fork must stay serial). -->
+                    <!-- Integration tests override method parallelism because they share database state. -->
                     <parallel>methods</parallel>
                     <threadCount>4</threadCount>
                     <perCoreThreadCount>true</perCoreThreadCount>
-                    <!-- Fail fast on errors -->
-                    <skipAfterFailureCount>${hephaestus.surefire.skipAfterFailureCount}</skipAfterFailureCount>
                     <!-- Forked JVM timeout settings to prevent hanging -->
                     <forkedProcessTimeoutInSeconds>${hephaestus.surefire.timeout}</forkedProcessTimeoutInSeconds>
                     <forkedProcessExitTimeoutInSeconds>180</forkedProcessExitTimeoutInSeconds>

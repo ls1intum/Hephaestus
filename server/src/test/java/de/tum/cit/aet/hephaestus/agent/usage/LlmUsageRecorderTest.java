@@ -19,6 +19,12 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 
 class LlmUsageRecorderTest extends BaseUnitTest {
 
+    private static LlmUsageInsert captured(AtomicReference<LlmUsageInsert> event) {
+        LlmUsageInsert captured = event.get();
+        assertThat(captured).isNotNull();
+        return captured;
+    }
+
     private static LlmUsageRecorder.LlmUsageSample sample(LlmPriceSnapshot price, int attempt) {
         return new LlmUsageRecorder.LlmUsageSample(
             LlmUsageJobType.PULL_REQUEST_REVIEW,
@@ -65,13 +71,13 @@ class LlmUsageRecorderTest extends BaseUnitTest {
 
         recorder.record(7L, sample(priced(), 3));
 
-        assertThat(event.get().sourceType()).isEqualTo("AGENT_JOB");
-        assertThat(event.get().sourceAttempt()).isEqualTo(3);
-        assertThat(event.get().model()).isEqualTo("authoritative-model");
+        assertThat(captured(event).sourceType()).isEqualTo("AGENT_JOB");
+        assertThat(captured(event).sourceAttempt()).isEqualTo(3);
+        assertThat(captured(event).model()).isEqualTo("authoritative-model");
         // 1*1 + 2*2 + .5*3 + .25*4 = 7.5. reasoning is output telemetry, not a second charge.
-        assertThat(event.get().costUsd()).isEqualByComparingTo("7.500000");
-        assertThat(event.get().appliedWorkspaceModelId()).isEqualTo(42L);
-        assertThat(event.get().appliedPer1mInputUsd()).isEqualTo(new BigDecimal("1"));
+        assertThat(captured(event).costUsd()).isEqualByComparingTo("7.500000");
+        assertThat(captured(event).appliedWorkspaceModelId()).isEqualTo(42L);
+        assertThat(captured(event).appliedPer1mInputUsd()).isEqualTo(new BigDecimal("1"));
     }
 
     /**
@@ -131,10 +137,10 @@ class LlmUsageRecorderTest extends BaseUnitTest {
 
         recorder(repository).recordUnverifiable(7L, sample(priced(), 4));
 
-        assertThat(event.get().sourceAttempt()).isEqualTo(4);
-        assertThat(event.get().costUsd()).isNull();
-        assertThat(event.get().pricingState()).isEqualTo("UNPRICED");
-        assertThat(event.get().appliedWorkspaceModelId()).isEqualTo(42L);
+        assertThat(captured(event).sourceAttempt()).isEqualTo(4);
+        assertThat(captured(event).costUsd()).isNull();
+        assertThat(captured(event).pricingState()).isEqualTo("UNPRICED");
+        assertThat(captured(event).appliedWorkspaceModelId()).isEqualTo(42L);
     }
 
     /**
@@ -160,9 +166,9 @@ class LlmUsageRecorderTest extends BaseUnitTest {
 
         recorderWith(registry, capturing(event)).record(7L, sample(missingOutputRate, 1));
 
-        assertThat(event.get().pricingState()).isEqualTo("UNPRICED");
-        assertThat(event.get().costUsd()).isNull();
-        assertThat(event.get().appliedPer1mInputUsd()).isEqualByComparingTo("1");
+        assertThat(captured(event).pricingState()).isEqualTo("UNPRICED");
+        assertThat(captured(event).costUsd()).isNull();
+        assertThat(captured(event).appliedPer1mInputUsd()).isEqualByComparingTo("1");
         assertThat(registry.counter("llm.usage.uncosted").count()).isEqualTo(1.0);
     }
 
@@ -176,7 +182,7 @@ class LlmUsageRecorderTest extends BaseUnitTest {
 
         recorderWith(registry, capturing(event)).record(7L, sampleOfInputTokensOnly(tinyRate, 1));
 
-        assertThat(event.get().costUsd())
+        assertThat(captured(event).costUsd())
             .as("a paid call must stay distinguishable from a free one")
             .isEqualByComparingTo("0.000001");
         assertThat(registry.counter("llm.usage.cost.clamped", "direction", "up_to_minimum").count()).isEqualTo(1.0);
@@ -191,7 +197,7 @@ class LlmUsageRecorderTest extends BaseUnitTest {
 
         recorderWith(registry, capturing(event)).record(7L, sampleOfInputTokensOnly(bigRate, 1_000_000_000_000L));
 
-        assertThat(event.get().costUsd()).isEqualByComparingTo("999999999.999999");
+        assertThat(captured(event).costUsd()).isEqualByComparingTo("999999999.999999");
         assertThat(registry.counter("llm.usage.cost.clamped", "direction", "down_to_maximum").count()).isEqualTo(1.0);
     }
 
@@ -223,13 +229,13 @@ class LlmUsageRecorderTest extends BaseUnitTest {
 
         recorderWith(new SimpleMeterRegistry(), capturing(event)).record(7L, negative);
 
-        assertThat(event.get().sourceAttempt()).isZero();
-        assertThat(event.get().inputTokens()).isZero();
-        assertThat(event.get().outputTokens()).isZero();
-        assertThat(event.get().cacheReadTokens()).isZero();
-        assertThat(event.get().cacheWriteTokens()).isZero();
-        assertThat(event.get().reasoningTokens()).isZero();
-        assertThat(event.get().totalCalls()).as("a recorded event is at least one call").isEqualTo(1);
+        assertThat(captured(event).sourceAttempt()).isZero();
+        assertThat(captured(event).inputTokens()).isZero();
+        assertThat(captured(event).outputTokens()).isZero();
+        assertThat(captured(event).cacheReadTokens()).isZero();
+        assertThat(captured(event).cacheWriteTokens()).isZero();
+        assertThat(captured(event).reasoningTokens()).isZero();
+        assertThat(captured(event).totalCalls()).as("a recorded event is at least one call").isEqualTo(1);
     }
 
     /**
@@ -271,7 +277,7 @@ class LlmUsageRecorderTest extends BaseUnitTest {
             TransactionSynchronizationManager.clearSynchronization();
         }
 
-        assertThat(event.get().costUsd()).as("the charge itself still landed").isEqualByComparingTo("1.000000");
+        assertThat(captured(event).costUsd()).as("the charge itself still landed").isEqualByComparingTo("1.000000");
         assertThat(registry.counter("llm.budget.alert.failure").count()).isEqualTo(1.0);
     }
 

@@ -194,6 +194,8 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
         end.put("type", "agent_end");
         end.putArray("messages");
         UIMessageChunk.Finish finish = (UIMessageChunk.Finish) translator.translate(end, state).getLast();
+        assertThat(finish.messageMetadata()).isNotNull();
+        assertThat(finish.messageMetadata().usage()).isNotNull();
 
         assertThat(finish.messageMetadata().usage().input()).isEqualTo(65);
         assertThat(finish.messageMetadata().usage().output()).isEqualTo(15);
@@ -261,6 +263,8 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
 
         UIMessageChunk.Finish finish = (UIMessageChunk.Finish) out.get(out.size() - 1);
         assertThat(finish.messageMetadata()).isNotNull();
+        assertThat(finish.messageMetadata().usage()).isNotNull();
+        assertThat(finish.messageMetadata()).isNotNull();
         assertThat(finish.messageMetadata().model()).isEqualTo("claude-3-5-haiku-20241022");
         assertThat(finish.messageMetadata().usage()).isNotNull();
         assertThat(finish.messageMetadata().usage().input()).isEqualTo(25);
@@ -285,7 +289,11 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
         List<UIMessageChunk> out = translator.translate(event, state);
 
         UIMessageChunk.Finish finish = (UIMessageChunk.Finish) out.get(out.size() - 1);
-        assertThat(finish.messageMetadata().usage().input()).isEqualTo(999);
+        var metadata = finish.messageMetadata();
+        org.junit.jupiter.api.Assertions.assertNotNull(metadata);
+        var usage = metadata.usage();
+        org.junit.jupiter.api.Assertions.assertNotNull(usage);
+        assertThat(usage.input()).isEqualTo(999);
         assertThat(state.observedCallCount()).isEqualTo(1);
     }
 

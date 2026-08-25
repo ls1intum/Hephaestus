@@ -1,12 +1,14 @@
 package de.tum.cit.aet.hephaestus.core.auth.oauth;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import jakarta.servlet.http.Cookie;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
@@ -29,10 +31,12 @@ class AuthIntentCookieTest extends BaseUnitTest {
     private static Cookie seal(AuthIntentCookie.Intent intent) {
         MockHttpServletResponse res = new MockHttpServletResponse();
         new AuthIntentCookie(KEY).write(res, intent);
-        return res.getCookie(AuthIntentCookie.COOKIE_NAME);
+        Cookie cookie = res.getCookie(AuthIntentCookie.COOKIE_NAME);
+        assertNotNull(cookie);
+        return cookie;
     }
 
-    private static AuthIntentCookie.Intent readBack(AuthIntentCookie reader, Cookie cookie) {
+    private static AuthIntentCookie.@Nullable Intent readBack(AuthIntentCookie reader, Cookie cookie) {
         MockHttpServletRequest req = new MockHttpServletRequest();
         req.setCookies(cookie);
         return reader.read(req);

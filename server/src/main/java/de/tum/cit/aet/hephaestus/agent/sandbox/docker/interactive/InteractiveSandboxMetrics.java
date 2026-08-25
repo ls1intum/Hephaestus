@@ -7,6 +7,7 @@ import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import java.util.EnumMap;
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * Micrometer instruments for the interactive sandbox. Stable names — do not rename without
@@ -110,7 +111,7 @@ public final class InteractiveSandboxMetrics {
     }
 
     Counter evictionsBy(EvictionReason reason) {
-        return evictionsByReason.get(reason);
+        return Objects.requireNonNull(evictionsByReason.get(reason));
     }
 
     private static Counter attachFailure(MeterRegistry registry, String reason) {

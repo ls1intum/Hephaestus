@@ -14,6 +14,7 @@ import java.util.Set;
 import javax.crypto.Cipher;
 import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.oauth2.client.web.AuthorizationRequestRepository;
@@ -94,7 +95,7 @@ public class CookieOAuth2AuthorizationRequestRepository
     }
 
     @Override
-    public OAuth2AuthorizationRequest loadAuthorizationRequest(HttpServletRequest request) {
+    public @Nullable OAuth2AuthorizationRequest loadAuthorizationRequest(HttpServletRequest request) {
         Cookie cookie = findCookie(request);
         if (cookie == null) {
             return null;
@@ -132,7 +133,7 @@ public class CookieOAuth2AuthorizationRequestRepository
     }
 
     @Override
-    public OAuth2AuthorizationRequest removeAuthorizationRequest(
+    public @Nullable OAuth2AuthorizationRequest removeAuthorizationRequest(
         HttpServletRequest request,
         HttpServletResponse response
     ) {
@@ -153,7 +154,7 @@ public class CookieOAuth2AuthorizationRequestRepository
         response.addCookie(cookie);
     }
 
-    private Cookie findCookie(HttpServletRequest request) {
+    private @Nullable Cookie findCookie(HttpServletRequest request) {
         Cookie[] cookies = request.getCookies();
         if (cookies == null) {
             return null;

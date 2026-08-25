@@ -6,4 +6,5 @@
  * named interface scope is the package itself.
  */
 @org.springframework.modulith.NamedInterface("common")
+@org.jspecify.annotations.NullMarked
 package de.tum.cit.aet.hephaestus.integration.scm.github.common;

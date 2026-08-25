@@ -24,6 +24,7 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.jspecify.annotations.Nullable;
@@ -89,7 +90,7 @@ class PracticeCatalogInjector {
                 );
             }
             PracticeRevision prior = revisions.putIfAbsent(revision.getSlug(), revision);
-            if (prior != null && !prior.getId().equals(revision.getId())) {
+            if (prior != null && !Objects.equals(prior.getId(), revision.getId())) {
                 throw new JobPreparationException(
                     "One composition contains multiple revisions of " + revision.getSlug()
                 );

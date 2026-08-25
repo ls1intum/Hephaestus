@@ -1,5 +1,7 @@
 package de.tum.cit.aet.hephaestus.testconfig;
 
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
@@ -16,8 +18,10 @@ public final class TestUserFactory {
     }
 
     public static User ensureUser(UserRepository repository, String login, long fallbackId, IdentityProvider provider) {
+        Long providerId = provider.getId();
+        assertNotNull(providerId);
         return repository
-            .findByLoginAndProviderId(login, provider.getId())
+            .findByLoginAndProviderId(login, providerId)
             .orElseGet(() -> repository.save(createUser(fallbackId, login, provider)));
     }
 

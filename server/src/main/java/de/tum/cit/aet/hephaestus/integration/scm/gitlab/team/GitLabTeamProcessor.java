@@ -7,6 +7,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabSyncConstan
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.graphql.GitLabDescendantGroupResponse;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.graphql.GitLabGroupResponse;
 import java.time.Instant;
+import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -48,7 +49,14 @@ public class GitLabTeamProcessor {
     @Transactional
     @Nullable
     public Team process(GitLabDescendantGroupResponse group, String rootFullPath, IdentityProvider provider) {
-        if (group == null || group.id() == null || group.fullPath() == null) {
+        if (
+            group == null ||
+            group.id() == null ||
+            group.fullPath() == null ||
+            group.name() == null ||
+            group.webUrl() == null ||
+            group.name().isBlank()
+        ) {
             log.warn("Skipped team processing: reason=nullOrMissingId");
             return null;
         }
@@ -61,7 +69,7 @@ public class GitLabTeamProcessor {
             return null;
         }
 
-        Long providerId = provider.getId();
+        Long providerId = Objects.requireNonNull(provider.getId());
         String slug = computeRelativePath(group.fullPath(), rootFullPath);
 
         // Upsert: try nativeId first, then natural key (organization + slug + provider)
@@ -121,7 +129,13 @@ public class GitLabTeamProcessor {
     @Transactional
     @Nullable
     public Team processRoot(GitLabGroupResponse group, String rootFullPath, IdentityProvider provider) {
-        if (group == null || group.id() == null || group.fullPath() == null) {
+        if (
+            group == null ||
+            group.id() == null ||
+            group.fullPath() == null ||
+            group.name() == null ||
+            group.webUrl() == null
+        ) {
             log.warn("Skipped root team processing: reason=nullOrMissingId");
             return null;
         }
@@ -134,7 +148,7 @@ public class GitLabTeamProcessor {
             return null;
         }
 
-        Long providerId = provider.getId();
+        Long providerId = Objects.requireNonNull(provider.getId());
         String slug = rootSlug(group.fullPath());
 
         Team team = teamRepository
@@ -201,7 +215,7 @@ public class GitLabTeamProcessor {
      * Maps GitLab visibility to Team privacy.
      * Private groups → SECRET, public/internal → VISIBLE.
      */
-    static Team.Privacy mapVisibility(String visibility) {
+    static Team.Privacy mapVisibility(@Nullable String visibility) {
         if (visibility == null) {
             return Team.Privacy.VISIBLE;
         }
@@ -232,7 +246,7 @@ public class GitLabTeamProcessor {
      * when descendant teams (whose slugs are the relative path below the root)
      * share the same organization.
      */
-    static String rootSlug(String fullPath) {
+    static String rootSlug(@Nullable String fullPath) {
         if (fullPath == null || fullPath.isBlank()) {
             return "";
         }

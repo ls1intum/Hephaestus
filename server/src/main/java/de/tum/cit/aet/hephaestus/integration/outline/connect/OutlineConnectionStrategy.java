@@ -9,13 +9,14 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.Cred
 import de.tum.cit.aet.hephaestus.integration.core.spi.ConnectionStrategy;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
-import de.tum.cit.aet.hephaestus.integration.outline.client.OutlineApiClient;
 import de.tum.cit.aet.hephaestus.integration.outline.client.OutlineApiClient.OutlineIdentity;
+import de.tum.cit.aet.hephaestus.integration.outline.client.OutlineTokenClient;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineCollectionRepository;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocumentEventRepository;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocumentRepository;
 import de.tum.cit.aet.hephaestus.integration.outline.lifecycle.OutlineWebhookRegistrar;
 import java.util.Map;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -52,7 +53,7 @@ public class OutlineConnectionStrategy implements ConnectionStrategy {
     static final String INPUT_SERVER_URL = "server_url";
     static final String INPUT_TOKEN = "token";
 
-    private final OutlineApiClient outlineApiClient;
+    private final OutlineTokenClient outlineApiClient;
     private final OutlineWebhookRegistrar webhookRegistrar;
     private final OutlineDocumentRepository outlineDocumentRepository;
     private final OutlineCollectionRepository outlineCollectionRepository;
@@ -60,7 +61,7 @@ public class OutlineConnectionStrategy implements ConnectionStrategy {
     private final OutlineOriginPolicy originPolicy;
 
     public OutlineConnectionStrategy(
-        OutlineApiClient outlineApiClient,
+        OutlineTokenClient outlineApiClient,
         OutlineWebhookRegistrar webhookRegistrar,
         OutlineDocumentRepository outlineDocumentRepository,
         OutlineCollectionRepository outlineCollectionRepository,
@@ -123,7 +124,7 @@ public class OutlineConnectionStrategy implements ConnectionStrategy {
      */
     @Override
     @Transactional
-    public void revoke(IntegrationRef ref) {
+    public void revoke(@Nullable IntegrationRef ref) {
         log.info(
             "Outline revoke called for workspace={} instanceKey={} (tokens are revoked in Outline; state change handled by caller)",
             ref == null ? null : ref.workspaceId(),

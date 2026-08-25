@@ -42,7 +42,7 @@ public class Account {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    private @Nullable Long id;
 
     @Column(name = "display_name", nullable = false, length = 255)
     private String displayName;
@@ -71,11 +71,11 @@ public class Account {
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
-    private Instant createdAt;
+    private @Nullable Instant createdAt;
 
     @UpdateTimestamp
     @Column(name = "updated_at", nullable = false)
-    private Instant updatedAt;
+    private @Nullable Instant updatedAt;
 
     /**
      * Set when the account enters {@link Status#DELETING} (start of the GDPR-cooldown window,

@@ -23,6 +23,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.regex.Matcher;
@@ -239,7 +240,9 @@ public class GitLabCommitBackfillService {
                 return false;
             }
 
-            Long providerId = repository.getProvider() != null ? repository.getProvider().getId() : null;
+            Long providerId = Objects.requireNonNull(
+                repository.getProvider() != null ? Objects.requireNonNull(repository.getProvider().getId()) : null
+            );
             Long authorId = authorResolver.resolveAndBackfillByEmail(info.authorEmail(), providerId);
             Long committerId = authorResolver.resolveAndBackfillByEmail(info.committerEmail(), providerId);
 
@@ -408,7 +411,7 @@ public class GitLabCommitBackfillService {
             UUID.randomUUID(),
             Instant.now(),
             scopeId,
-            RepositoryRef.from(repository),
+            Objects.requireNonNull(RepositoryRef.from(repository)),
             DataSource.GRAPHQL_SYNC,
             null,
             UUID.randomUUID().toString(),

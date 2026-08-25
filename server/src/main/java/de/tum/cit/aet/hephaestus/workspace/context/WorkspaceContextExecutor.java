@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.workspace.context;
 
 import java.util.Map;
 import java.util.concurrent.Callable;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.MDC;
 
 /**
@@ -73,7 +74,7 @@ public final class WorkspaceContextExecutor {
      * @return Wrapped runnable that propagates context
      * @throws IllegalArgumentException if runnable is null
      */
-    public static Runnable wrap(Runnable runnable) {
+    public static Runnable wrap(@Nullable Runnable runnable) {
         if (runnable == null) {
             throw new IllegalArgumentException("Runnable must not be null");
         }
@@ -122,7 +123,7 @@ public final class WorkspaceContextExecutor {
      * @return Wrapped callable that propagates context
      * @throws IllegalArgumentException if callable is null
      */
-    public static <T> Callable<T> wrap(Callable<T> callable) {
+    public static <T> Callable<T> wrap(@Nullable Callable<T> callable) {
         if (callable == null) {
             throw new IllegalArgumentException("Callable must not be null");
         }

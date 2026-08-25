@@ -92,10 +92,10 @@ class GitlabDataSyncSchedulerTest extends BaseUnitTest {
             7,
             "0 0 3 * * *",
             15,
-            null,
-            null,
-            null,
-            null
+            new SyncSchedulerProperties.BackfillProperties(false, 50, 100, 60),
+            new SyncSchedulerProperties.FilterProperties(Set.of(), Set.of(), Set.of()),
+            new SyncSchedulerProperties.DiscussionsProperties(false),
+            new SyncSchedulerProperties.ProjectsProperties(false)
         );
 
         // A synchronous Executor so CompletableFuture.runAsync completes inline — no thread races

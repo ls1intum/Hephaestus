@@ -12,6 +12,7 @@ import java.util.HexFormat;
 import java.util.Optional;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.MediaType;
@@ -94,7 +95,7 @@ public class GithubWebhookSignatureVerifier implements WebhookSignatureVerifier 
         return new VerificationResult.Invalid("signature-mismatch");
     }
 
-    private static String headerCaseInsensitive(WebhookRequest request, String name) {
+    private static @Nullable String headerCaseInsensitive(WebhookRequest request, String name) {
         String direct = request.headers().get(name);
         if (direct != null) return direct;
         for (var entry : request.headers().entrySet()) {

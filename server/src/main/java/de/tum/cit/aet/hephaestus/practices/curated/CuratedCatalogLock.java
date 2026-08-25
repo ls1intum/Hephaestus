@@ -2,15 +2,15 @@ package de.tum.cit.aet.hephaestus.practices.curated;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import jakarta.persistence.EntityManager;
-import jakarta.persistence.PersistenceContext;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 @Component
 @WorkspaceAgnostic("Serializes instance catalog snapshots and writes")
+@RequiredArgsConstructor
 public class CuratedCatalogLock {
 
-    @PersistenceContext
-    private EntityManager entityManager;
+    private final EntityManager entityManager;
 
     public void acquire() {
         entityManager

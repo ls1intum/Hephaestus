@@ -31,6 +31,8 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Root tenant entity in Hephaestus's multi-tenant architecture.
@@ -98,22 +100,22 @@ public class Workspace {
     // Used by sync services to determine incremental fetch windows
 
     /** Last sync time for organization users (collaborators with repo access) */
-    private Instant usersSyncedAt;
+    private @Nullable Instant usersSyncedAt;
 
     /** Last sync time for organization teams structure */
-    private Instant teamsSyncedAt;
+    private @Nullable Instant teamsSyncedAt;
 
     /** Last sync time for team membership assignments */
-    private Instant membersSyncedAt;
+    private @Nullable Instant membersSyncedAt;
 
     /** Last sync time for sub-issue relationships (parent-child) via GraphQL */
-    private Instant subIssuesSyncedAt;
+    private @Nullable Instant subIssuesSyncedAt;
 
     /** Last sync time for organization issue types via GraphQL */
-    private Instant issueTypesSyncedAt;
+    private @Nullable Instant issueTypesSyncedAt;
 
     /** Last sync time for issue dependencies (blocked_by/blocking) via GraphQL */
-    private Instant issueDependenciesSyncedAt;
+    private @Nullable Instant issueDependenciesSyncedAt;
 
     // Identity & Display
 
@@ -151,6 +153,7 @@ public class Workspace {
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 20)
     @NotNull(message = "Status is required")
+    @NonNull
     private WorkspaceStatus status = WorkspaceStatus.ACTIVE;
 
     // Repository Monitoring
@@ -196,7 +199,7 @@ public class Workspace {
     @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "organization_id", unique = true, foreignKey = @ForeignKey(name = "fk_workspace_organization"))
     @ToString.Exclude
-    private Organization organization;
+    private @Nullable Organization organization;
 
     // Audit Timestamps
 
@@ -210,11 +213,11 @@ public class Workspace {
 
     /** Day of week for scheduled leaderboard generation (1=Monday, 7=Sunday) */
     @Column(name = "leaderboard_schedule_day")
-    private Integer leaderboardScheduleDay;
+    private @Nullable Integer leaderboardScheduleDay;
 
     /** Time of day for scheduled leaderboard generation (format: "HH:mm", e.g., "09:00") */
     @Column(name = "leaderboard_schedule_time", length = 10)
-    private String leaderboardScheduleTime;
+    private @Nullable String leaderboardScheduleTime;
 
     /**
      * Whether the leaderboard pipeline should attempt Slack delivery on each generation.
@@ -236,7 +239,7 @@ public class Workspace {
      * cycle (lock expiry, manual replay, at-least-once delivery) no-ops instead of double-awarding.
      */
     @Column(name = "leaderboard_league_cycle_at")
-    private Instant leaderboardLeagueCycleAt;
+    private @Nullable Instant leaderboardLeagueCycleAt;
 
     // Feature Flags
 
@@ -258,7 +261,7 @@ public class Workspace {
      * (UTC) rolls over. Set exclusively by instance admins, since it is the host's cost backstop.
      */
     @Column(name = "monthly_llm_budget_usd", precision = 10, scale = 2)
-    private BigDecimal monthlyLlmBudgetUsd;
+    private @Nullable BigDecimal monthlyLlmBudgetUsd;
 
     /**
      * Monthly cap in USD on this workspace's OWN-provider (BYO) spend, set by the workspace's own
@@ -268,7 +271,7 @@ public class Workspace {
      * <p>The API and the UI say "ownProvider"; the field keeps the released column's "byo" spelling.
      */
     @Column(name = "monthly_byo_llm_budget_usd", precision = 10, scale = 2)
-    private BigDecimal monthlyByoLlmBudgetUsd;
+    private @Nullable BigDecimal monthlyByoLlmBudgetUsd;
 
     /**
      * Per-workspace practice-review trigger/delivery overrides; read via {@link #getReviewSettings()}.

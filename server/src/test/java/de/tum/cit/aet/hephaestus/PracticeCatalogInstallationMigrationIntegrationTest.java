@@ -12,6 +12,8 @@ import de.tum.cit.aet.hephaestus.practices.PracticeBinding;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinitionValidator;
 import de.tum.cit.aet.hephaestus.practices.PracticeSignalOptionsFixture;
+import de.tum.cit.aet.hephaestus.testconfig.PostgreSQLTestContainer;
+import de.tum.cit.aet.hephaestus.testconfig.PostgreSQLTestContainer.TestDatabase;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
@@ -28,28 +30,26 @@ import liquibase.database.Database;
 import liquibase.database.DatabaseFactory;
 import liquibase.database.jvm.JdbcConnection;
 import liquibase.resource.ClassLoaderResourceAccessor;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
-import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.json.JsonMapper;
 
-@Testcontainers
-@Tag("integration")
+@Tag("database")
 class PracticeCatalogInstallationMigrationIntegrationTest {
+
+    static {
+        System.setProperty("liquibase.validateXmlChangelogFiles", "false");
+    }
 
     private static final String MARKER_CHANGELOG = "1785274902740_changelog.xml";
     private static final String BEFORE_CATALOG_TAG = "before-instance-curated-catalog";
-    private static final String MASTER = "db/master.xml";
+    private static final String MASTER = "db/practice-catalog-installation-migration-test.xml";
 
-    @Container
-    @SuppressWarnings("resource")
-    private static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:16")
-        .withDatabaseName("hephaestus_practice_catalog_installation_migration")
-        .withUsername("test")
-        .withPassword("test");
+    private static final TestDatabase DATABASE = PostgreSQLTestContainer.createDatabase(
+        "hephaestus_practice_catalog_installation_migration"
+    );
 
     @Test
     void shouldMigrateCatalogStateAndWorkspaceRevisionPointers() throws Exception {
@@ -757,7 +757,7 @@ class PracticeCatalogInstallationMigrationIntegrationTest {
     }
 
     private static Connection connect() throws SQLException {
-        return DriverManager.getConnection(POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword());
+        return DriverManager.getConnection(DATABASE.jdbcUrl(), DATABASE.username(), DATABASE.password());
     }
 
     private static void execute(String... statements) throws SQLException {
@@ -768,7 +768,7 @@ class PracticeCatalogInstallationMigrationIntegrationTest {
         }
     }
 
-    private static String scalar(String sql) throws SQLException {
+    private static @Nullable String scalar(String sql) throws SQLException {
         try (
             Connection connection = connect();
             Statement statement = connection.createStatement();

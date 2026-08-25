@@ -13,12 +13,14 @@ import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabProperties;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.dto.GitLabGroupDTO;
 import de.tum.cit.aet.hephaestus.workspace.dto.GitLabPreflightResponseDTO;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -99,7 +101,13 @@ class GitLabPreflightServiceTest extends BaseUnitTest {
         @DisplayName("returns failure for 401 without group fallback")
         void returnsInvalidFor401WithoutGroupPath() {
             mockGetRequestThrows(
-                WebClientResponseException.create(HttpStatus.UNAUTHORIZED.value(), "Unauthorized", null, null, null)
+                WebClientResponseException.create(
+                    HttpStatus.UNAUTHORIZED.value(),
+                    "Unauthorized",
+                    HttpHeaders.EMPTY,
+                    new byte[0],
+                    StandardCharsets.UTF_8
+                )
             );
 
             GitLabPreflightResponseDTO result = preflightService.validateToken("glpat-bad", null, null);

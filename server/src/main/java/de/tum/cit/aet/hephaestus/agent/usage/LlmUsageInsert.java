@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.agent.usage;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Immutable row passed to the ledger's idempotent native insert: one component per column of
@@ -16,22 +17,22 @@ public record LlmUsageInsert(
     String sourceType,
     UUID sourceId,
     int sourceAttempt,
-    String model,
+    @Nullable String model,
     long inputTokens,
     long outputTokens,
     long cacheReadTokens,
     long cacheWriteTokens,
     long reasoningTokens,
     int totalCalls,
-    BigDecimal costUsd,
+    @Nullable BigDecimal costUsd,
     Instant occurredAt,
     String pricingState,
     String fundingSource,
-    Long appliedPriceId,
-    Long appliedWorkspaceModelId,
-    BigDecimal appliedPer1mInputUsd,
-    BigDecimal appliedPer1mOutputUsd,
-    BigDecimal appliedPer1mCacheReadUsd,
-    BigDecimal appliedPer1mCacheWriteUsd,
+    @Nullable Long appliedPriceId,
+    @Nullable Long appliedWorkspaceModelId,
+    @Nullable BigDecimal appliedPer1mInputUsd,
+    @Nullable BigDecimal appliedPer1mOutputUsd,
+    @Nullable BigDecimal appliedPer1mCacheReadUsd,
+    @Nullable BigDecimal appliedPer1mCacheWriteUsd,
     String usageProvenance
 ) {}

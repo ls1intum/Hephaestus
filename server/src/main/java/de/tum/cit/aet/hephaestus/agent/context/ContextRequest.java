@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.agent.context;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import java.util.Objects;
 import java.util.UUID;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Polymorphic request handed to {@link WorkspaceContextBuilder}. Providers narrow on the
@@ -69,14 +70,14 @@ public sealed interface ContextRequest
         long workspaceId,
         long developerId,
         UUID threadId,
-        UUID currentUserMessageId
+        @Nullable UUID currentUserMessageId
     ) implements ContextRequest {
         public MentorChatRequest(long workspaceId, long developerId, UUID threadId) {
             this(workspaceId, developerId, threadId, null);
         }
 
         public MentorChatRequest {
-            Objects.requireNonNull(threadId, "threadId must not be null");
+            threadId = Objects.requireNonNull(threadId, "threadId must not be null");
             if (workspaceId <= 0) {
                 throw new IllegalArgumentException("workspaceId must be positive, got " + workspaceId);
             }

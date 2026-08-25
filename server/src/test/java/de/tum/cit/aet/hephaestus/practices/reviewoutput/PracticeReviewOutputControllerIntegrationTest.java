@@ -40,6 +40,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -158,8 +159,8 @@ class PracticeReviewOutputControllerIntegrationTest extends AbstractWorkspaceInt
         User about,
         String title,
         String presence,
-        String assessment,
-        String severity,
+        @Nullable String assessment,
+        @Nullable String severity,
         float confidence,
         Long artifactId,
         Instant observedAt
@@ -193,8 +194,8 @@ class PracticeReviewOutputControllerIntegrationTest extends AbstractWorkspaceInt
         User recipient,
         int position,
         FeedbackDeliveryState state,
-        FeedbackSuppressionReason reason,
-        String body
+        @Nullable FeedbackSuppressionReason reason,
+        @Nullable String body
     ) {
         return persistUnit(
             ws,
@@ -216,8 +217,8 @@ class PracticeReviewOutputControllerIntegrationTest extends AbstractWorkspaceInt
         User recipient,
         int position,
         FeedbackDeliveryState state,
-        FeedbackSuppressionReason reason,
-        String body,
+        @Nullable FeedbackSuppressionReason reason,
+        @Nullable String body,
         Instant createdAt
     ) {
         return persistUnit(
@@ -240,8 +241,8 @@ class PracticeReviewOutputControllerIntegrationTest extends AbstractWorkspaceInt
         User recipient,
         int position,
         FeedbackDeliveryState state,
-        FeedbackSuppressionReason reason,
-        String body,
+        @Nullable FeedbackSuppressionReason reason,
+        @Nullable String body,
         Instant createdAt,
         ArtifactKind artifactKind,
         Long artifactId
@@ -449,7 +450,12 @@ class PracticeReviewOutputControllerIntegrationTest extends AbstractWorkspaceInt
         @Test
         @WithAdminUser
         void sortsObservationsByActionabilityWithoutChangingTheDefault() {
-            record ObservationInput(String summary, String presence, String assessment, String severity) {}
+            record ObservationInput(
+                String summary,
+                String presence,
+                @Nullable String assessment,
+                @Nullable String severity
+            ) {}
 
             Instant base = Instant.parse("2026-01-10T00:00:00Z");
             List<ObservationInput> observations = List.of(
@@ -1063,6 +1069,7 @@ class PracticeReviewOutputControllerIntegrationTest extends AbstractWorkspaceInt
         @Test
         @WithAdminUser
         void truncatesBodyOnTheListOnly() {
+            @Nullable
             String body = "x".repeat(FeedbackRepository.BODY_PREVIEW_LENGTH + 200);
             Feedback unit = persistUnit(workspace, job, alice, 0, FeedbackDeliveryState.DELIVERED, null, body);
 

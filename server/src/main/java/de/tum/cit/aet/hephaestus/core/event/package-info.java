@@ -3,4 +3,5 @@
  * dependency-inversion point: declaring it in either feature module would close a cycle.
  */
 @org.springframework.modulith.NamedInterface("event")
+@org.jspecify.annotations.NullMarked
 package de.tum.cit.aet.hephaestus.core.event;

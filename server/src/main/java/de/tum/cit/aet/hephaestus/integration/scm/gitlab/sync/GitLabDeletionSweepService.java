@@ -19,6 +19,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
@@ -328,7 +329,7 @@ public class GitLabDeletionSweepService {
      */
     public SweepOutcome sweepRepository(Long scopeId, Repository repository, @Nullable SyncExecutionHandle handle) {
         String fullPath = repository.getNameWithOwner();
-        String safeProjectPath = sanitizeForLog(fullPath);
+        String safeProjectPath = Objects.requireNonNullElse(sanitizeForLog(fullPath), "<unknown>");
 
         if (fullPath == null || fullPath.isBlank()) {
             log.warn("Skipped GitLab deletion sweep: reason=blankProjectPath, scopeId={}", scopeId);
@@ -546,7 +547,7 @@ public class GitLabDeletionSweepService {
             // empty and well-formed — the exact shape of "this project has nothing", which would tombstone
             // the entire mirrored set. Only an explicit `false` aborts: a null (older GitLab, restricted
             // field) leaves the decision to the emptiness guard rather than blocking every sweep.
-            if (Boolean.FALSE.equals(readBooleanField(response, entity.featureFlagPath))) {
+            if (Boolean.FALSE.equals(readBooleanField(Objects.requireNonNull(response), entity.featureFlagPath))) {
                 log.warn(
                     "GitLab deletion sweep listing refused, feature disabled upstream: context={}, flag={}",
                     context,
@@ -559,11 +560,13 @@ public class GitLabDeletionSweepService {
             List<Integer> pageNumbers;
             GitLabPageInfo pageInfo;
             try {
-                Object countField = response.field(entity.countPath()).getValue();
+                Object countField = Objects.requireNonNull(response).field(entity.countPath()).getValue();
                 pageCount = countField instanceof Number n ? n.intValue() : -1;
 
                 @SuppressWarnings({ "unchecked", "rawtypes" })
-                List<Map<String, Object>> nodes = (List) response.field(entity.nodesPath()).toEntityList(Map.class);
+                List<Map<String, Object>> nodes = (List) Objects.requireNonNull(response)
+                    .field(entity.nodesPath())
+                    .toEntityList(Map.class);
                 pageNumbers = new ArrayList<>(nodes == null ? 0 : nodes.size());
                 if (nodes != null) {
                     for (Map<String, Object> node : nodes) {
@@ -582,7 +585,7 @@ public class GitLabDeletionSweepService {
                     }
                 }
 
-                pageInfo = response.field(entity.pageInfoPath()).toEntity(GitLabPageInfo.class);
+                pageInfo = Objects.requireNonNull(response).field(entity.pageInfoPath()).toEntity(GitLabPageInfo.class);
             } catch (RuntimeException e) {
                 log.warn(
                     "GitLab deletion sweep decode failed: context={}, page={}, message={}, cause={}",
@@ -604,8 +607,7 @@ public class GitLabDeletionSweepService {
             reportedCount = pageCount;
             retryAttempts = 0;
 
-            boolean hasNextPage = pageInfo != null && pageInfo.hasNextPage();
-            if (!hasNextPage) {
+            if (pageInfo == null || !pageInfo.hasNextPage()) {
                 break;
             }
             cursor = pageInfo.endCursor();
@@ -651,7 +653,7 @@ public class GitLabDeletionSweepService {
     @Nullable
     private static Boolean readBooleanField(ClientGraphQlResponse response, String path) {
         try {
-            ClientResponseField field = response.field(path);
+            ClientResponseField field = Objects.requireNonNull(response).field(path);
             Object value = field == null ? null : field.getValue();
             return value instanceof Boolean bool ? bool : null;
         } catch (RuntimeException e) {

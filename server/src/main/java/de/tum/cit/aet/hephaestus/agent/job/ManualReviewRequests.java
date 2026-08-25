@@ -105,11 +105,8 @@ public class ManualReviewRequests {
             );
             return ManualReviewOutcome.forbidden();
         }
-        if (
-            pullRequest.getHeadRefOid() == null ||
-            pullRequest.getHeadRefName() == null ||
-            pullRequest.getBaseRefName() == null
-        ) {
+        String headRefOid = pullRequest.getHeadRefOid();
+        if (headRefOid == null || pullRequest.getHeadRefName() == null || pullRequest.getBaseRefName() == null) {
             // Reported as the artifact being gone, not a gate skip: the mirror hasn't caught up, the
             // workspace didn't decline anything.
             return ManualReviewOutcome.refused(SignalStateReason.ARTIFACT_GONE);
@@ -124,7 +121,7 @@ public class ManualReviewRequests {
                 new PullRequestReviewSubmissionRequest(
                     ScmEventPayload.PullRequestData.from(pullRequest),
                     pullRequest.getHeadRefName(),
-                    pullRequest.getHeadRefOid(),
+                    headRefOid,
                     pullRequest.getBaseRefName(),
                     null,
                     ObservationOrigin.MANUAL
@@ -157,8 +154,8 @@ public class ManualReviewRequests {
                 new IssueReviewSubmissionRequest(
                     issue.getId(),
                     issue.getNumber(),
-                    issue.getRepository().getId(),
-                    issue.getRepository().getNameWithOwner(),
+                    issue.requireRepository().getId(),
+                    issue.requireRepository().getNameWithOwner(),
                     issue.getTitle(),
                     issue.getBody() != null ? issue.getBody() : "",
                     issue.getState() != null ? issue.getState().name() : "OPEN",

@@ -11,6 +11,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.Locale;
+import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -127,7 +128,7 @@ public class DevLoginService {
         // can't be silently kept alive past sessionMaxLifetime by the rolling refresh (OWASP absolute
         // timeout). Reuses the identical issuer seam, so the token stays issued_jwt-backed and revocable.
         return jwtIssuer.issue(
-            principalFactory.forAccountId(account.getId()),
+            principalFactory.forAccountId(Objects.requireNonNull(account.getId())),
             /* impersonator */ null,
             /* impersonationExpiresAt */ null,
             clock.instant().plus(sessionMaxLifetime),

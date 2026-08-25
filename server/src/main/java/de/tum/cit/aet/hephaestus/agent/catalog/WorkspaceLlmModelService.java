@@ -14,6 +14,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -125,7 +126,7 @@ public class WorkspaceLlmModelService {
         return saved;
     }
 
-    private String modelSlug(Long workspaceId, String requested, String displayName) {
+    private String modelSlug(Long workspaceId, @Nullable String requested, String displayName) {
         return CatalogSlug.unique(requested, displayName, slug ->
             modelRepository.findByWorkspaceIdAndSlug(workspaceId, slug).isPresent()
         );
@@ -234,11 +235,11 @@ public class WorkspaceLlmModelService {
     private static void validateAndApplyPrice(
         WorkspaceLlmModel model,
         PricingMode pricingMode,
-        BigDecimal per1mInputUsd,
-        BigDecimal per1mOutputUsd,
-        BigDecimal per1mCacheReadUsd,
-        BigDecimal per1mCacheWriteUsd,
-        String priceNote
+        @Nullable BigDecimal per1mInputUsd,
+        @Nullable BigDecimal per1mOutputUsd,
+        @Nullable BigDecimal per1mCacheReadUsd,
+        @Nullable BigDecimal per1mCacheWriteUsd,
+        @Nullable String priceNote
     ) {
         LlmPriceValidation.validate(
             pricingMode,
@@ -264,7 +265,7 @@ public class WorkspaceLlmModelService {
         }
     }
 
-    private static String blankToNull(String value) {
+    private static @Nullable String blankToNull(@Nullable String value) {
         return value != null && value.isBlank() ? null : value;
     }
 

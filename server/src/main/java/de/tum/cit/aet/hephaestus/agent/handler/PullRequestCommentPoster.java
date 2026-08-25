@@ -17,6 +17,7 @@ import java.util.EnumMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.regex.Pattern;
 import org.jspecify.annotations.Nullable;
@@ -184,9 +185,9 @@ class PullRequestCommentPoster {
             );
             return handle.externalId();
         } catch (OutboundEgressSuppressedException e) {
-            throw new JobDeliverySuppressedException(e.getMessage(), e);
+            throw new JobDeliverySuppressedException(e.toString(), e);
         } catch (FeedbackDeliveryException e) {
-            throw new JobDeliveryException(e.getMessage(), e);
+            throw new JobDeliveryException(e.toString(), e);
         }
     }
 
@@ -214,7 +215,7 @@ class PullRequestCommentPoster {
                 new FeedbackContent(formattedBody, summaryMarkerFor(job))
             );
         } catch (OutboundEgressSuppressedException e) {
-            throw new JobDeliverySuppressedException(e.getMessage(), e);
+            throw new JobDeliverySuppressedException(e.toString(), e);
         }
         return switch (outcome.kind()) {
             case EDITED -> {
@@ -222,9 +223,9 @@ class PullRequestCommentPoster {
                     "Edited feedback summary in place: jobId={}, kind={}, commentId={}",
                     job.getId(),
                     kind,
-                    outcome.handle().externalId()
+                    Objects.requireNonNull(outcome.handle()).externalId()
                 );
-                yield new UpdateResult(UpdateResult.Kind.EDITED, outcome.handle().externalId());
+                yield new UpdateResult(UpdateResult.Kind.EDITED, Objects.requireNonNull(outcome.handle()).externalId());
             }
             case GONE -> {
                 log.info(
@@ -279,7 +280,7 @@ class PullRequestCommentPoster {
         try {
             subjectExternalId = channel.formatIssueSubjectId(repoFullName, issueNumber);
         } catch (IllegalArgumentException e) {
-            throw new JobDeliveryException(e.getMessage(), e);
+            throw new JobDeliveryException(e.toString(), e);
         }
         FeedbackTarget target = new FeedbackTarget(
             new IntegrationRef(kind, workspaceId, null),
@@ -299,9 +300,9 @@ class PullRequestCommentPoster {
             );
             return handle.externalId();
         } catch (OutboundEgressSuppressedException e) {
-            throw new JobDeliverySuppressedException(e.getMessage(), e);
+            throw new JobDeliverySuppressedException(e.toString(), e);
         } catch (FeedbackDeliveryException e) {
-            throw new JobDeliveryException(e.getMessage(), e);
+            throw new JobDeliveryException(e.toString(), e);
         }
     }
 
@@ -342,7 +343,7 @@ class PullRequestCommentPoster {
             }
             SummaryChannel.ExistingSummaryLookup lookup = channel.findExistingSummary(target, marker);
             return switch (lookup.kind()) {
-                case FOUND -> ExistingDeliveryLookup.found(lookup.handle().externalId());
+                case FOUND -> ExistingDeliveryLookup.found(Objects.requireNonNull(lookup.handle()).externalId());
                 case ABSENT -> ExistingDeliveryLookup.absent();
                 case UNKNOWN -> ExistingDeliveryLookup.unknown();
             };
@@ -378,7 +379,7 @@ class PullRequestCommentPoster {
         try {
             subjectExternalId = channel.formatPullRequestSubjectId(repoFullName, prNumber);
         } catch (IllegalArgumentException e) {
-            throw new JobDeliveryException(e.getMessage(), e);
+            throw new JobDeliveryException(e.toString(), e);
         }
 
         String resourceUrl = optionalMetadataText(metadata, "commit_sha");
@@ -396,7 +397,7 @@ class PullRequestCommentPoster {
      * steps below is load-bearing — autolinks must survive tag stripping, and stripping must reach a
      * fixed point before the markdown passes run.
      */
-    static String sanitize(String raw) {
+    static String sanitize(@Nullable String raw) {
         if (raw == null || raw.isEmpty()) {
             return "";
         }
@@ -440,15 +441,14 @@ class PullRequestCommentPoster {
         result = EXCESSIVE_NEWLINES.matcher(result).replaceAll("\n\n");
 
         result = result.strip();
+        String truncationNotice = "\n\n[... truncated — comment exceeded length limit]";
         boolean truncated = result.length() > MAX_BODY_LENGTH;
         if (truncated) {
-            result = result.substring(0, MAX_BODY_LENGTH);
-        }
-        // Last, because the cut above can reopen a block that was balanced upstream, and because everything
-        // below an open fence renders as code — including the AI-generated disclosure this comment carries.
-        result = balanceCodeFences(result);
-        if (truncated) {
-            result += "\n\n[... truncated — comment exceeded length limit]";
+            int bodyBudget = MAX_BODY_LENGTH - truncationNotice.length();
+            result = result.substring(0, bodyBudget);
+            result = balanceCodeFencesWithin(result, bodyBudget) + truncationNotice;
+        } else {
+            result = balanceCodeFences(result);
         }
 
         return result;
@@ -460,36 +460,57 @@ class PullRequestCommentPoster {
      * an inner fence is content, a `~~~` is a fence, and an indented line is not one.
      */
     static String balanceCodeFences(String text) {
-        char openChar = 0;
-        int openLength = 0;
-        for (String line : text.split("\n", -1)) {
-            String stripped = line.stripLeading();
-            if (line.length() - stripped.length() >= 4 || stripped.isEmpty()) {
-                continue;
+        Fence fence = unclosedFence(text);
+        return fence == null ? text : text + "\n" + fence.closingDelimiter();
+    }
+
+    private static String balanceCodeFencesWithin(String text, int maxLength) {
+        String result = text;
+        Fence fence;
+        while ((fence = unclosedFence(result)) != null) {
+            String closing = "\n" + fence.closingDelimiter();
+            if (result.length() + closing.length() <= maxLength) {
+                return result + closing;
             }
-            char marker = stripped.charAt(0);
-            if (marker != '`' && marker != '~') {
-                continue;
-            }
-            int run = 0;
-            while (run < stripped.length() && stripped.charAt(run) == marker) {
-                run++;
-            }
-            if (run < 3) {
-                continue;
-            }
-            String info = stripped.substring(run);
-            if (openLength == 0) {
-                if (marker == '`' && info.indexOf('`') >= 0) {
-                    continue;
-                }
-                openChar = marker;
-                openLength = run;
-            } else if (marker == openChar && run >= openLength && info.isBlank()) {
-                openLength = 0;
-            }
+            result = result.substring(0, fence.offset()) + result.substring(fence.offset() + fence.length());
         }
-        return openLength == 0 ? text : text + "\n" + String.valueOf(openChar).repeat(openLength);
+        return result;
+    }
+
+    private static @Nullable Fence unclosedFence(String text) {
+        Fence open = null;
+        int lineStart = 0;
+        while (lineStart <= text.length()) {
+            int lineEnd = text.indexOf('\n', lineStart);
+            if (lineEnd < 0) lineEnd = text.length();
+            String line = text.substring(lineStart, lineEnd);
+            String stripped = line.stripLeading();
+            int indentation = line.length() - stripped.length();
+            if (indentation < 4 && !stripped.isEmpty()) {
+                char marker = stripped.charAt(0);
+                int run = 0;
+                while (run < stripped.length() && stripped.charAt(run) == marker) run++;
+                if ((marker == '`' || marker == '~') && run >= 3) {
+                    String info = stripped.substring(run);
+                    if (open == null) {
+                        if (marker != '`' || info.indexOf('`') < 0) {
+                            open = new Fence(marker, run, lineStart + indentation);
+                        }
+                    } else if (marker == open.marker() && run >= open.length() && info.isBlank()) {
+                        open = null;
+                    }
+                }
+            }
+            if (lineEnd == text.length()) break;
+            lineStart = lineEnd + 1;
+        }
+        return open;
+    }
+
+    private record Fence(char marker, int length, int offset) {
+        String closingDelimiter() {
+            return String.valueOf(marker).repeat(length);
+        }
     }
 
     static String requireMetadataText(@Nullable JsonNode metadata, String field) {

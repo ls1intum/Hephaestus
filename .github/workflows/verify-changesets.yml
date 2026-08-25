@@ -16,7 +16,7 @@ jobs:
     # when a dependency bump is user-facing.
     if: ${{ !github.event.pull_request.draft && github.event.pull_request.user.type != 'Bot' }}
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
 
@@ -52,7 +52,7 @@ jobs:
           fi
 
           if [ "${#changesets_changed[@]}" -gt 0 ]; then
-            pnpm changeset status --output /tmp/changeset-status.json
+            pnpm changeset status --since "$BASE_SHA" --output /tmp/changeset-status.json
             node scripts/verify-changesets.ts /tmp/changeset-status.json "${changesets_changed[@]}"
           fi
 

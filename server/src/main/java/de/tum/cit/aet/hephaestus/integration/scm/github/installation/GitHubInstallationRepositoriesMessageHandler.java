@@ -9,6 +9,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubEventType;
 import de.tum.cit.aet.hephaestus.integration.scm.github.installation.dto.GitHubInstallationRepositoriesEventDTO;
 import de.tum.cit.aet.hephaestus.integration.scm.github.repository.dto.GitHubRepositoryRefDTO;
 import java.util.List;
+import java.util.Objects;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -71,7 +72,14 @@ public class GitHubInstallationRepositoriesMessageHandler
         if (!added.isEmpty()) {
             List<RepositorySnapshot> addedSnapshots = added
                 .stream()
-                .map(ref -> new RepositorySnapshot(ref.id(), ref.fullName(), ref.name(), ref.isPrivate()))
+                .map(ref ->
+                    new RepositorySnapshot(
+                        Objects.requireNonNull(ref.id()),
+                        ref.fullName(),
+                        ref.name(),
+                        ref.isPrivate()
+                    )
+                )
                 .toList();
             provisioningListener.onRepositoriesAdded(installationId, addedSnapshots);
             log.info(

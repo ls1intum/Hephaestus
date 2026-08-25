@@ -49,6 +49,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -106,7 +107,7 @@ public class GitHubDiscussionSyncService {
      */
     private record CommentWithReplyCursor(
         String commentNodeId,
-        Long commentDatabaseId,
+        @Nullable Long commentDatabaseId,
         Long discussionId,
         int discussionNumber,
         Long repositoryId,
@@ -197,16 +198,18 @@ public class GitHubDiscussionSyncService {
         @Nullable Instant lastSyncTimestamp
     ) {
         // Fetch repository outside of transaction
-        Repository repository = transactionTemplate.execute(status ->
-            repositoryRepository.findById(repositoryId).orElse(null)
+        Optional<Repository> repositoryResult = transactionTemplate.execute(status ->
+            repositoryRepository.findById(repositoryId)
         );
+        @Nullable
+        Repository repository = repositoryResult == null ? null : repositoryResult.orElse(null);
         if (repository == null) {
             log.debug("Skipped discussion sync: reason=repositoryNotFound, repoId={}", repositoryId);
             return SyncResult.completed(0);
         }
 
         String nameWithOwner = repository.getNameWithOwner();
-        String safeNameWithOwner = sanitizeForLog(nameWithOwner);
+        String safeNameWithOwner = Objects.requireNonNullElse(sanitizeForLog(nameWithOwner), "");
         Optional<RepositoryOwnerAndName> parsedName = GitHubRepositoryNameParser.parse(nameWithOwner);
         if (parsedName.isEmpty()) {
             log.warn("Skipped discussion sync: reason=invalidRepoNameFormat, repoName={}", safeNameWithOwner);
@@ -252,7 +255,7 @@ public class GitHubDiscussionSyncService {
         SyncResult.Status abortReason = null;
         int reportedTotalCount = -1;
 
-        if (resuming) {
+        if (initialCursor != null) {
             log.info(
                 "Resuming discussion sync from checkpoint: repoName={}, cursor={}",
                 safeNameWithOwner,
@@ -708,7 +711,10 @@ public class GitHubDiscussionSyncService {
                                         node.getDatabaseId() != null ? node.getDatabaseId().longValue() : null,
                                         discussion.getId(),
                                         discussion.getNumber(),
-                                        context.repository().getId(),
+                                        Objects.requireNonNull(
+                                            context.repository(),
+                                            "Discussion sync requires a repository"
+                                        ).getId(),
                                         repliesPageInfo.getEndCursor()
                                     )
                                 );
@@ -734,7 +740,10 @@ public class GitHubDiscussionSyncService {
                         new DiscussionWithCommentCursor(
                             discussion.getId(),
                             discussion.getNumber(),
-                            context.repository().getId(),
+                            Objects.requireNonNull(
+                                context.repository(),
+                                "Discussion sync requires a repository"
+                            ).getId(),
                             commentPageInfo.getEndCursor()
                         )
                     );
@@ -987,7 +996,7 @@ public class GitHubDiscussionSyncService {
     private int syncRemainingReplies(
         Long scopeId,
         String commentNodeId,
-        Long commentDatabaseId,
+        @Nullable Long commentDatabaseId,
         Long discussionId,
         int discussionNumber,
         Long repositoryId,
@@ -1209,7 +1218,9 @@ public class GitHubDiscussionSyncService {
      * to avoid Spring proxy issues with self-invocation.
      */
     private void persistCursorCheckpoint(Long syncTargetId, String cursor) {
-        TransactionTemplate requiresNewTemplate = new TransactionTemplate(transactionTemplate.getTransactionManager());
+        TransactionTemplate requiresNewTemplate = new TransactionTemplate(
+            Objects.requireNonNull(transactionTemplate.getTransactionManager())
+        );
         requiresNewTemplate.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
         requiresNewTemplate.executeWithoutResult(status -> {
             backfillStateProvider.updateSyncCursor(syncTargetId, SyncCursorKind.DISCUSSION, cursor);
@@ -1225,7 +1236,9 @@ public class GitHubDiscussionSyncService {
      * to avoid Spring proxy issues with self-invocation.
      */
     private void clearCursorCheckpoint(Long syncTargetId) {
-        TransactionTemplate requiresNewTemplate = new TransactionTemplate(transactionTemplate.getTransactionManager());
+        TransactionTemplate requiresNewTemplate = new TransactionTemplate(
+            Objects.requireNonNull(transactionTemplate.getTransactionManager())
+        );
         requiresNewTemplate.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
         requiresNewTemplate.executeWithoutResult(status -> {
             backfillStateProvider.updateSyncCursor(syncTargetId, SyncCursorKind.DISCUSSION, null);

@@ -23,6 +23,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 @Entity
 @Table(
@@ -53,18 +54,19 @@ public class PullRequestReview extends BaseGitServiceEntity {
     @NonNull
     private Instant submittedAt;
 
-    private String commitId;
+    private @Nullable String commitId;
 
-    private Boolean authorCanPushToRepository;
+    private @Nullable Boolean authorCanPushToRepository;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "author_id")
     @ToString.Exclude
-    private User author;
+    private @Nullable User author;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "pull_request_id")
     @ToString.Exclude
+    @Nullable
     private PullRequest pullRequest;
 
     @OneToMany(mappedBy = "review", cascade = CascadeType.REMOVE, orphanRemoval = true)

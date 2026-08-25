@@ -14,6 +14,7 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.Immutable;
+import org.jspecify.annotations.Nullable;
 
 @Entity
 @Immutable
@@ -46,7 +47,7 @@ public class FeedbackApproval {
     private FeedbackRejectionReason rejectionReason;
 
     @Column(name = "rejection_note", length = 500)
-    private String rejectionNote;
+    private @Nullable String rejectionNote;
 
     @Column(name = "content_digest", nullable = false, length = 64)
     private String contentDigest;

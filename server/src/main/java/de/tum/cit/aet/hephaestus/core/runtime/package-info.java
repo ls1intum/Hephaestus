@@ -4,4 +4,5 @@
  * ADR 0008 (webhook role).
  */
 @org.springframework.modulith.NamedInterface("runtime")
+@org.jspecify.annotations.NullMarked
 package de.tum.cit.aet.hephaestus.core.runtime;

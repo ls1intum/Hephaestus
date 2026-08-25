@@ -101,8 +101,10 @@ class ContainerSecurityPolicyTest extends BaseUnitTest {
             );
 
             assertThat(config.ulimits()).containsKey("nofile");
-            assertThat(config.ulimits().get("nofile").soft()).isEqualTo(1024);
-            assertThat(config.ulimits().get("nofile").hard()).isEqualTo(1024);
+            var nofile = config.ulimits().get("nofile");
+            assertThat(nofile).isNotNull();
+            assertThat(nofile.soft()).isEqualTo(1024);
+            assertThat(nofile.hard()).isEqualTo(1024);
         }
     }
 
@@ -503,8 +505,10 @@ class ContainerSecurityPolicyTest extends BaseUnitTest {
             );
 
             assertThat(config.ulimits()).containsKey("core");
-            assertThat(config.ulimits().get("core").soft()).isZero();
-            assertThat(config.ulimits().get("core").hard()).isZero();
+            var core = config.ulimits().get("core");
+            assertThat(core).isNotNull();
+            assertThat(core.soft()).isZero();
+            assertThat(core.hard()).isZero();
         }
     }
 }

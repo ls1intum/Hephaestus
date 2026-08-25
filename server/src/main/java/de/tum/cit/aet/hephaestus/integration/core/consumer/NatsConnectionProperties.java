@@ -26,13 +26,19 @@ public record NatsConnectionProperties(
     @Nullable String durableConsumerName,
     @Valid Consumer consumer
 ) {
-    public NatsConnectionProperties {
+    public NatsConnectionProperties(
+        boolean enabled,
+        @Nullable String server,
+        @Nullable String durableConsumerName,
+        @Nullable Consumer consumer
+    ) {
         if (enabled && (server == null || server.isBlank())) {
             throw new IllegalStateException("hephaestus.sync.nats.server must be set when enabled=true");
         }
-        if (consumer == null) {
-            consumer = new Consumer(Duration.ofSeconds(60));
-        }
+        this.enabled = enabled;
+        this.server = server;
+        this.durableConsumerName = durableConsumerName;
+        this.consumer = consumer == null ? new Consumer(Duration.ofSeconds(60)) : consumer;
     }
 
     /** Connection-side knobs shared between the consumer fleet and the publisher. */

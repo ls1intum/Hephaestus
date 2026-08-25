@@ -1,27 +1,20 @@
 package de.tum.cit.aet.hephaestus.core.auth;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
 import de.tum.cit.aet.hephaestus.core.auth.domain.AccountRepository;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.HephaestusJwtIssuer;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.JwtPrincipalFactory;
-import de.tum.cit.aet.hephaestus.testconfig.RealAuthDatasource;
+import de.tum.cit.aet.hephaestus.testconfig.RealAuthIntegrationTest;
 import java.util.List;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.webtestclient.autoconfigure.AutoConfigureWebTestClient;
-import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.reactive.server.WebTestClient;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
 /**
  * Proves the silent-refresh lifecycle the SPA relies on, end-to-end over the LIVE chain (real
@@ -38,12 +31,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
  *       client keeps refreshing, which is exactly what the keep-alive timer does.</li>
  * </ol>
  */
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@ActiveProfiles("test")
-@AutoConfigureWebTestClient
-@Testcontainers
-@Tag("integration")
-class SessionRefreshLifecycleIntegrationTest {
+class SessionRefreshLifecycleIntegrationTest extends RealAuthIntegrationTest {
 
     private static final String XSRF_COOKIE = "__Host-XSRF-TOKEN";
     private static final String XSRF_HEADER = "X-XSRF-TOKEN";
@@ -62,11 +50,6 @@ class SessionRefreshLifecycleIntegrationTest {
 
     @Value("${hephaestus.auth.cookie-name:__Host-HEPHAESTUS_AT}")
     private String cookieName;
-
-    @DynamicPropertySource
-    static void datasource(DynamicPropertyRegistry registry) {
-        RealAuthDatasource.register(registry);
-    }
 
     @Test
     void userExposesAccessTokenExpiry() {
@@ -167,6 +150,7 @@ class SessionRefreshLifecycleIntegrationTest {
             .returnResult(Void.class);
         List<ResponseCookie> cookies = result.getResponseCookies().get(XSRF_COOKIE);
         assertThat(cookies).as("XSRF-TOKEN cookie issued on safe GET").isNotEmpty();
+        assertNotNull(cookies);
         return cookies.get(0).getValue();
     }
 }

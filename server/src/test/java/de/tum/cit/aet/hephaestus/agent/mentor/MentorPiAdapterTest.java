@@ -14,6 +14,7 @@ import de.tum.cit.aet.hephaestus.agent.runtime.AgentImageProperties;
 import de.tum.cit.aet.hephaestus.agent.runtime.PiPlanSpec;
 import de.tum.cit.aet.hephaestus.agent.runtime.PiRuntimeFactory;
 import de.tum.cit.aet.hephaestus.agent.runtime.PiRuntimeFactory.PiPlan;
+import de.tum.cit.aet.hephaestus.agent.sandbox.ImagePullPolicy;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.InteractiveSandboxSpec;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.NetworkPolicy;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
@@ -21,6 +22,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -59,18 +61,22 @@ class MentorPiAdapterTest extends BaseUnitTest {
     }
 
     private MentorPiAdapter newAdapter() {
-        return new MentorPiAdapter(runtimeFactory, new AgentImageProperties("test-image:latest", null), proxyRegistry);
+        return new MentorPiAdapter(
+            runtimeFactory,
+            new AgentImageProperties("test-image:latest", ImagePullPolicy.IF_NOT_PRESENT),
+            proxyRegistry
+        );
     }
 
-    private static MentorLlmConfig llmConfig(String rawBaseUrl) {
+    private static MentorLlmConfig llmConfig(@Nullable String rawBaseUrl) {
         return llmConfig(rawBaseUrl, false);
     }
 
-    private static MentorLlmConfig llmConfig(String rawBaseUrl, boolean allowInternet) {
+    private static MentorLlmConfig llmConfig(@Nullable String rawBaseUrl, boolean allowInternet) {
         return llmConfig(rawBaseUrl, allowInternet, 120);
     }
 
-    private static MentorLlmConfig llmConfig(String rawBaseUrl, boolean allowInternet, int timeoutSeconds) {
+    private static MentorLlmConfig llmConfig(@Nullable String rawBaseUrl, boolean allowInternet, int timeoutSeconds) {
         String resolvedBaseUrl =
             rawBaseUrl != null && !rawBaseUrl.isBlank() ? rawBaseUrl.trim() : "https://api.openai.com";
         return new MentorLlmConfig(
@@ -90,7 +96,11 @@ class MentorPiAdapterTest extends BaseUnitTest {
         );
     }
 
-    private PiPlanSpec capturePlanSpec(MentorLlmConfig config, Map<String, byte[]> contexts, SessionRestore restore) {
+    private PiPlanSpec capturePlanSpec(
+        MentorLlmConfig config,
+        Map<String, byte[]> contexts,
+        @Nullable SessionRestore restore
+    ) {
         adapter.buildSandboxSpec(REQUEST, config, contexts, restore);
         ArgumentCaptor<PiPlanSpec> captor = ArgumentCaptor.forClass(PiPlanSpec.class);
         verify(runtimeFactory).build(captor.capture());
@@ -98,7 +108,9 @@ class MentorPiAdapterTest extends BaseUnitTest {
     }
 
     private ProxyRouting routingFor(PiPlanSpec spec) {
-        return proxyRegistry.validate(spec.jobToken()).orElseThrow();
+        String jobToken = spec.jobToken();
+        org.junit.jupiter.api.Assertions.assertNotNull(jobToken);
+        return proxyRegistry.validate(jobToken).orElseThrow();
     }
 
     @Test
@@ -171,8 +183,10 @@ class MentorPiAdapterTest extends BaseUnitTest {
     @DisplayName("every sandbox build mints a fresh, non-blank proxy token")
     void mintsProxyToken() {
         PiPlanSpec spec = capturePlanSpec(llmConfig(null), Map.of(), null);
-        assertThat(spec.jobToken()).isNotBlank();
-        assertThat(proxyRegistry.validate(spec.jobToken())).isPresent();
+        String jobToken = spec.jobToken();
+        org.junit.jupiter.api.Assertions.assertNotNull(jobToken);
+        assertThat(jobToken).isNotBlank();
+        assertThat(proxyRegistry.validate(jobToken)).isPresent();
     }
 
     @Test

@@ -46,7 +46,12 @@ class JetStreamPublisherTopologyTest {
             .withBean(WebhookProperties.class, () -> properties)
             // The stream monitor charges loss only to durables under this deployment's own name.
             .withBean(NatsConnectionProperties.class, () ->
-                new NatsConnectionProperties(false, null, "hephaestus", null)
+                new NatsConnectionProperties(
+                    false,
+                    null,
+                    "hephaestus",
+                    new NatsConnectionProperties.Consumer(Duration.ofSeconds(60))
+                )
             )
             .withBean(MeterRegistry.class, SimpleMeterRegistry::new);
     }

@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.scm.github.issue.dto;
 
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHIssue;
+import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -33,7 +34,7 @@ public record IssueWithComments(
 
         String context = "Issue #" + ghIssue.getNumber();
 
-        GitHubIssueDTO dto = GitHubIssueDTO.fromIssue(ghIssue);
+        GitHubIssueDTO dto = Objects.requireNonNull(GitHubIssueDTO.fromIssue(ghIssue));
         EmbeddedCommentsDTO comments = EmbeddedCommentsDTO.fromConnection(ghIssue.getComments(), context);
         EmbeddedProjectItemsDTO projectItems = EmbeddedProjectItemsDTO.fromConnection(
             ghIssue.getProjectItems(),

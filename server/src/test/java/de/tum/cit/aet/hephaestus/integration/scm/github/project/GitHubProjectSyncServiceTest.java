@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.integration.scm.github.project;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -56,6 +57,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Consumer;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -153,12 +155,12 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
             .when(transactionTemplate.execute(any()))
             .thenAnswer(invocation -> {
                 TransactionCallback<?> callback = invocation.getArgument(0);
-                return callback.doInTransaction(null);
+                return callback.doInTransaction(mock(TransactionStatus.class));
             });
         lenient()
             .doAnswer(invocation -> {
                 Consumer<TransactionStatus> callback = invocation.getArgument(0);
-                callback.accept(null);
+                callback.accept(mock(TransactionStatus.class));
                 return null;
             })
             .when(transactionTemplate)
@@ -246,7 +248,7 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
         when(requestSpec.variable(anyString(), any())).thenReturn(requestSpec);
     }
 
-    private ClientGraphQlResponse mockValidGraphQlResponse(String fieldPath, Object entity) {
+    private ClientGraphQlResponse mockValidGraphQlResponse(String fieldPath, @Nullable Object entity) {
         ClientGraphQlResponse response = mock(ClientGraphQlResponse.class);
         ClientResponseField field = mock(ClientResponseField.class);
         lenient().when(response.isValid()).thenReturn(true);
@@ -269,7 +271,9 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
     }
 
     private GHProjectV2Connection createProjectConnection(List<GHProjectV2> nodes, boolean hasNextPage) {
-        GHPageInfo pageInfo = new GHPageInfo(hasNextPage ? "cursor1" : null, hasNextPage, false, null);
+        GHPageInfo pageInfo = new GHPageInfo();
+        pageInfo.setHasNextPage(hasNextPage);
+        if (hasNextPage) pageInfo.setEndCursor("cursor1");
         GHProjectV2Connection connection = new GHProjectV2Connection();
         connection.setNodes(nodes);
         connection.setPageInfo(pageInfo);
@@ -636,7 +640,6 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
         void shouldReturnCompletedZeroWhenProjectNodeIdIsNull() {
             Project project = new Project();
             project.setId(1L);
-            project.setNodeId(null);
 
             SyncResult result = service.syncProjectItems(SCOPE_ID, project);
 
@@ -647,6 +650,7 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
         @Test
         void shouldCompleteWithAllPhasesWhenEmpty() {
             Project project = createProject(10L, "PVT_node10", 1);
+            when(projectRepository.findById(10L)).thenReturn(Optional.of(project));
             mockGraphQlClientForScope();
             mockGraphQlRequestChain();
 
@@ -674,6 +678,7 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
         @Test
         void shouldReturnCompletedWithWarningsWhenFieldSyncFails() {
             Project project = createProject(10L, "PVT_node10", 1);
+            when(projectRepository.findById(10L)).thenReturn(Optional.of(project));
             mockGraphQlClientForScope();
             mockGraphQlRequestChain();
 
@@ -708,7 +713,7 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
             OffsetDateTime updatedAt,
             List<GHProjectV2ItemFieldTextValue> fieldValues,
             boolean hasNextPage,
-            String endCursor
+            @Nullable String endCursor
         ) {
             GHIssue ghIssue = new GHIssue();
             ghIssue.setFullDatabaseId(BigInteger.valueOf(fullDbId));
@@ -716,7 +721,7 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
 
             GHPageInfo fvPageInfo = new GHPageInfo();
             fvPageInfo.setHasNextPage(hasNextPage);
-            fvPageInfo.setEndCursor(endCursor);
+            if (endCursor != null) fvPageInfo.setEndCursor(endCursor);
 
             GHProjectV2ItemFieldValueConnection fvConnection = new GHProjectV2ItemFieldValueConnection();
             fvConnection.setNodes(fieldValues != null ? new ArrayList<>(fieldValues) : List.of());
@@ -754,7 +759,6 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
         private GHProjectV2ItemConnection createItemConnection(List<GHProjectV2Item> items) {
             GHPageInfo pageInfo = new GHPageInfo();
             pageInfo.setHasNextPage(false);
-            pageInfo.setEndCursor(null);
 
             GHProjectV2ItemConnection connection = new GHProjectV2ItemConnection();
             connection.setNodes(items);
@@ -925,7 +929,7 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
             // Since mockGraphQlRequestChain stubs variable(anyString(), any()), we capture via ArgumentCaptor
             verify(requestSpec).variable(eq("filterQuery"), filterQueryCaptor.capture());
             String capturedFilterQuery = filterQueryCaptor.getValue();
-            assertThat(capturedFilterQuery).isNotNull();
+            assertNotNull(capturedFilterQuery);
             assertThat(capturedFilterQuery).startsWith("updated:>");
         }
 
@@ -1157,5 +1161,12 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
 
             assertThat(result).isEmpty();
         }
+    }
+
+    private static GHPageInfo pageInfo(@Nullable String endCursor, boolean hasNextPage) {
+        GHPageInfo pageInfo = new GHPageInfo();
+        pageInfo.setHasNextPage(hasNextPage);
+        if (endCursor != null) pageInfo.setEndCursor(endCursor);
+        return pageInfo;
     }
 }

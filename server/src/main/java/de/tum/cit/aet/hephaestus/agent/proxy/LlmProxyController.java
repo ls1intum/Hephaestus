@@ -80,7 +80,7 @@ class LlmProxyController {
 
     @PostMapping({ "/chat/completions", "/responses" })
     @WorkspaceAgnostic("Authenticated sandbox token carries and constrains the workspace route")
-    public ResponseEntity<?> proxy(
+    public @Nullable ResponseEntity<?> proxy(
         HttpServletRequest request,
         HttpServletResponse response,
         @RequestHeader HttpHeaders incomingHeaders,
@@ -102,7 +102,7 @@ class LlmProxyController {
         }
     }
 
-    private ResponseEntity<?> forward(
+    private @Nullable ResponseEntity<?> forward(
         ProxyRouting routing,
         HttpServletResponse response,
         HttpHeaders incomingHeaders,
@@ -237,7 +237,11 @@ class LlmProxyController {
         return body != null && new String(body, StandardCharsets.UTF_8).contains("stream_options");
     }
 
-    private ResponseEntity<String> validateSafeSurface(HttpServletRequest request, ProxyRouting routing, byte[] body) {
+    private @Nullable ResponseEntity<String> validateSafeSurface(
+        HttpServletRequest request,
+        ProxyRouting routing,
+        byte[] body
+    ) {
         if (!"POST".equals(request.getMethod())) return ResponseEntity.status(405).body("Method not allowed");
         if (request.getQueryString() != null) return ResponseEntity.badRequest().body(
             "Query parameters are not allowed"

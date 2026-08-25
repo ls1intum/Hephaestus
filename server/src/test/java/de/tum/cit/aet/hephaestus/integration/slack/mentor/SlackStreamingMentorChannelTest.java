@@ -20,6 +20,7 @@ import de.tum.cit.aet.hephaestus.agent.mentor.chat.wire.UIMessageChunk;
 import de.tum.cit.aet.hephaestus.integration.slack.messaging.SlackMessageService;
 import de.tum.cit.aet.hephaestus.integration.slack.messaging.SlackSendException;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -97,17 +98,26 @@ class SlackStreamingMentorChannelTest extends BaseUnitTest {
     @DisplayName("streams incrementally (>1 write) and delivers the full text once, in order")
     void streamsIncrementallyAndPreservesContent() throws InterruptedException {
         SlackMessageService slack = slackThatStreamsOk();
-        var channel = new SlackStreamingMentorChannel(slack, WS, CH, THREAD);
+        var channel = new SlackStreamingMentorChannel(
+            slack,
+            WS,
+            CH,
+            THREAD,
+            Duration.ofSeconds(2),
+            Duration.ofSeconds(10),
+            5,
+            10
+        );
 
         String[] words = { "The ", "token ", "validator ", "ships ", "without ", "any ", "unit ", "tests. " };
-        // Feed across tick boundaries so the flush loop opens the stream and appends before the terminal.
-        for (int i = 0; i < words.length; i++) {
+        for (int i = 0; i < 4; i++) {
             channel.send(delta(words[i]));
-            if (i == 3) {
-                Thread.sleep(800); // let a flush tick fire mid-stream
-            }
         }
-        Thread.sleep(800); // a second window so an append lands before we finish
+        waitUntil(() -> starts.get() == 1, 1000);
+        for (int i = 4; i < words.length; i++) {
+            channel.send(delta(words[i]));
+        }
+        waitUntil(() -> appends.get() >= 1, 1000);
         channel.completeWithDone();
         waitUntil(() -> stops.get() >= 1, 4000);
 
@@ -306,17 +316,23 @@ class SlackStreamingMentorChannelTest extends BaseUnitTest {
             .when(slack)
             .stopStream(anyLong(), anyString(), anyString(), any());
 
-        var channel = new SlackStreamingMentorChannel(slack, WS, CH, THREAD);
+        var channel = new SlackStreamingMentorChannel(
+            slack,
+            WS,
+            CH,
+            THREAD,
+            Duration.ofMillis(20),
+            Duration.ofSeconds(2),
+            350,
+            1000
+        );
         channel.send(delta("first words here "));
-        // Wait until the flush tick has entered startStream (now blocked, holding streamLock).
         assertThat(startEntered.await(3, TimeUnit.SECONDS)).as("flush tick should open the stream").isTrue();
 
-        // finish() on another thread: stopFlusher's 2s await times out, shutdownNow can't unblock the tick, so the
-        // second bounded await holds the terminal write until we release — a buggy impl would open a 2nd stream.
         Thread finisher = new Thread(channel::completeWithDone, "finisher");
         finisher.start();
-        Thread.sleep(2500); // past the 2s stopFlusher await, into the window where a double-open would happen
-        released.set(true); // let the in-flight open complete
+        Thread.sleep(50);
+        released.set(true);
         finisher.join(8000);
 
         assertThat(startCalls.get()).as("the stream must be opened exactly once, never twice").isEqualTo(1);

@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.slack.interactivity;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -306,13 +307,15 @@ class SlackAppHomeOptOutErasureIntegrationTest extends BaseIntegrationTest {
             "1700000000.000000",
             arr.toString()
         );
-        return jdbcTemplate.queryForObject(
+        Long id = jdbcTemplate.queryForObject(
             "SELECT id FROM slack_thread WHERE workspace_id = ? AND slack_channel_id = ? AND slack_thread_ts = ?",
             Long.class,
             workspaceId,
             CHANNEL,
             threadTs
         );
+        assertNotNull(id);
+        return id;
     }
 
     private List<Long> participantIds(long threadId) {

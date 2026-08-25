@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.scm.github.jackson;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHProjectV2ItemFieldDateValue;
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHProjectV2ItemFieldIterationValue;
@@ -69,7 +70,7 @@ class GitHubProjectV2ItemFieldValueMixinTest {
 
             GHProjectV2ItemFieldValue result = objectMapper.readValue(json, GHProjectV2ItemFieldValue.class);
 
-            assertThat(result).isNotNull();
+            assertNotNull(result);
             assertThat(result.getClass().getSimpleName()).isEqualTo(expectedClassName);
         }
     }

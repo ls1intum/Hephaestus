@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.agent.proxy;
 
 import de.tum.cit.aet.hephaestus.agent.usage.LlmPriceSnapshot;
 import java.math.BigDecimal;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
 import org.jspecify.annotations.Nullable;
@@ -70,7 +71,7 @@ public final class MentorTurnMeter {
     }
 
     ObservedUsage observed() {
-        return observed.get();
+        return Objects.requireNonNull(observed.get());
     }
 
     /** Reasoning tokens are deliberately absent: they are counted inside the output bucket. */
@@ -78,7 +79,7 @@ public final class MentorTurnMeter {
         if (price == null) {
             return BigDecimal.ZERO;
         }
-        ObservedUsage snapshot = observed.get();
+        ObservedUsage snapshot = Objects.requireNonNull(observed.get());
         BigDecimal cost = price
             .calculateCost(snapshot.inputTokens(), snapshot.outputTokens(), snapshot.cacheReadTokens(), 0)
             .usd();

@@ -10,6 +10,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.time.Instant;
 import java.util.List;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -327,7 +328,7 @@ class ExperiencePointCalculatorTest extends BaseUnitTest {
         return user;
     }
 
-    private PullRequest createPullRequest(User author) {
+    private PullRequest createPullRequest(@Nullable User author) {
         PullRequest pullRequest = new PullRequest();
         pullRequest.setAuthor(author);
         pullRequest.setCommits(1);

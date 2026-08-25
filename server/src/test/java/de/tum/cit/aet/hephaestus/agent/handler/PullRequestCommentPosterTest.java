@@ -19,6 +19,7 @@ import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import java.util.List;
 import java.util.UUID;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -193,12 +194,11 @@ class PullRequestCommentPosterTest extends BaseUnitTest {
 
         @Test
         void shouldStripInvisibleCharacters() {
-            String result = PullRequestCommentPoster.sanitize("Hello‪World‮");
-            assertThat(result).doesNotContain("‪").doesNotContain("‮");
-            assertThat(result).contains("HelloWorld");
+            String result = PullRequestCommentPoster.sanitize("Hello\u202aWorld\u202e");
+            assertThat(result).isEqualTo("HelloWorld");
 
-            result = PullRequestCommentPoster.sanitize("@​username");
-            assertThat(result).doesNotContain("​");
+            result = PullRequestCommentPoster.sanitize("@\u200busername");
+            assertThat(result).isEqualTo("`@username`");
         }
 
         @Test
@@ -219,7 +219,19 @@ class PullRequestCommentPosterTest extends BaseUnitTest {
             String result = PullRequestCommentPoster.sanitize(longContent);
             assertThat(result).contains("[... truncated");
             assertThat(result).startsWith("x".repeat(100));
-            assertThat(result.length()).isLessThanOrEqualTo(PullRequestCommentPoster.MAX_BODY_LENGTH + 100);
+            assertThat(result).hasSizeLessThanOrEqualTo(PullRequestCommentPoster.MAX_BODY_LENGTH);
+        }
+
+        @Test
+        void shouldRemoveAnUnclosableFenceWithoutExceedingTheProviderLimit() {
+            String opener = "`".repeat(1_000);
+            String result = PullRequestCommentPoster.sanitize(
+                opener + " java\n" + "x".repeat(PullRequestCommentPoster.MAX_BODY_LENGTH)
+            );
+
+            assertThat(result).hasSizeLessThanOrEqualTo(PullRequestCommentPoster.MAX_BODY_LENGTH);
+            assertThat(result).doesNotStartWith(opener);
+            assertThat(result).endsWith("[... truncated — comment exceeded length limit]");
         }
 
         @Test
@@ -393,7 +405,11 @@ class PullRequestCommentPosterTest extends BaseUnitTest {
         @Test
         void postIssueFormattedBody_throwsWhenIntegrationKindMissing() {
             AgentJob job = createTestJob(null);
-            ((ObjectNode) job.getMetadata()).put("issue_number", 7);
+            ObjectNode metadata = org.junit.jupiter.api.Assertions.assertInstanceOf(
+                ObjectNode.class,
+                job.getMetadata()
+            );
+            metadata.put("issue_number", 7);
 
             assertThatThrownBy(() -> poster.postIssueFormattedBody(job, "Formatted issue note"))
                 .isInstanceOf(JobDeliveryException.class)
@@ -403,7 +419,11 @@ class PullRequestCommentPosterTest extends BaseUnitTest {
         @Test
         void postIssueFormattedBody_resolvesIssueSubjectAndPosts() {
             AgentJob job = createTestJob(IntegrationKind.GITLAB);
-            ((ObjectNode) job.getMetadata()).put("issue_number", 7);
+            ObjectNode metadata = org.junit.jupiter.api.Assertions.assertInstanceOf(
+                ObjectNode.class,
+                job.getMetadata()
+            );
+            metadata.put("issue_number", 7);
             when(gitlabChannel.formatIssueSubjectId("owner/repo", 7)).thenReturn("owner/repo#7");
             when(gitlabChannel.postSummary(any(), any())).thenReturn(
                 new SummaryChannel.SummaryHandle("gid://gitlab/Note/77")
@@ -458,7 +478,7 @@ class PullRequestCommentPosterTest extends BaseUnitTest {
         }
     }
 
-    private AgentJob createTestJob(IntegrationKind kind) {
+    private AgentJob createTestJob(@Nullable IntegrationKind kind) {
         AgentJob job = new AgentJob();
         job.setId(UUID.fromString("00000000-0000-0000-0000-000000000001"));
         job.setJobType(AgentJobType.PULL_REQUEST_REVIEW);

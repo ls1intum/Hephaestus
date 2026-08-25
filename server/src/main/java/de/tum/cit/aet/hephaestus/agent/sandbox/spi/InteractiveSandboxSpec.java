@@ -5,6 +5,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.regex.Pattern;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Specification for an interactive sandbox. {@code (userId, workspaceId)} is the registry key;
@@ -17,7 +18,7 @@ public record InteractiveSandboxSpec(
     String image,
     List<String> command,
     Map<String, String> environment,
-    NetworkPolicy networkPolicy,
+    @Nullable NetworkPolicy networkPolicy,
     ResourceLimits resourceLimits,
     SecurityProfile securityProfile,
     Map<String, byte[]> inputFiles,
@@ -27,11 +28,11 @@ public record InteractiveSandboxSpec(
     private static final Pattern ENV_KEY = Pattern.compile("^[A-Za-z_][A-Za-z0-9_]*$");
 
     public InteractiveSandboxSpec {
-        Objects.requireNonNull(sessionId, "sessionId must not be null");
-        Objects.requireNonNull(userId, "userId must not be null");
-        Objects.requireNonNull(workspaceId, "workspaceId must not be null");
-        Objects.requireNonNull(image, "image must not be null");
-        Objects.requireNonNull(resourceLimits, "resourceLimits must not be null");
+        sessionId = Objects.requireNonNull(sessionId, "sessionId must not be null");
+        userId = Objects.requireNonNull(userId, "userId must not be null");
+        workspaceId = Objects.requireNonNull(workspaceId, "workspaceId must not be null");
+        image = Objects.requireNonNull(image, "image must not be null");
+        resourceLimits = Objects.requireNonNull(resourceLimits, "resourceLimits must not be null");
         if (userId.isBlank()) {
             throw new IllegalArgumentException("userId must not be blank");
         }

@@ -37,6 +37,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.function.Consumer;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Tag;
@@ -720,7 +721,7 @@ class GitHubProjectItemFieldValueSyncServiceTest extends BaseUnitTest {
             field2Obj.setId("field-2");
             textValue2.setField(field2Obj);
             page1.setNodes(List.of(textValue1, textValue2));
-            GHPageInfo pageInfo1 = new GHPageInfo("cursor1", true, false, null);
+            GHPageInfo pageInfo1 = pageInfo("cursor1", true);
             page1.setPageInfo(pageInfo1);
 
             // Page 2: fields {field-3, field-4}, no next page
@@ -734,7 +735,7 @@ class GitHubProjectItemFieldValueSyncServiceTest extends BaseUnitTest {
             field4Obj.setId("field-4");
             textValue4.setField(field4Obj);
             page2.setNodes(List.of(textValue3, textValue4));
-            GHPageInfo pageInfo2 = new GHPageInfo(null, false, false, null);
+            GHPageInfo pageInfo2 = pageInfo(null, false);
             page2.setPageInfo(pageInfo2);
 
             ClientGraphQlResponse response1 = mock(ClientGraphQlResponse.class);
@@ -810,7 +811,7 @@ class GitHubProjectItemFieldValueSyncServiceTest extends BaseUnitTest {
             fieldObj.setId("field-1");
             textValue.setField(fieldObj);
             connection.setNodes(List.of(textValue));
-            GHPageInfo pageInfo = new GHPageInfo(null, false, false, null);
+            GHPageInfo pageInfo = pageInfo(null, false);
             connection.setPageInfo(pageInfo);
 
             ClientGraphQlResponse response = mock(ClientGraphQlResponse.class);
@@ -874,5 +875,12 @@ class GitHubProjectItemFieldValueSyncServiceTest extends BaseUnitTest {
             // Should NOT clean up stale values since pagination didn't complete
             verify(projectFieldValueRepository, never()).deleteByItemIdAndFieldIdNotIn(any(), any());
         }
+    }
+
+    private static GHPageInfo pageInfo(@Nullable String endCursor, boolean hasNextPage) {
+        GHPageInfo pageInfo = new GHPageInfo();
+        pageInfo.setHasNextPage(hasNextPage);
+        if (endCursor != null) pageInfo.setEndCursor(endCursor);
+        return pageInfo;
     }
 }

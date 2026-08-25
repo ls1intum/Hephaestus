@@ -17,13 +17,13 @@ import org.jspecify.annotations.Nullable;
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record GitLabPushEventDTO(
-    @JsonProperty("object_kind") String objectKind,
-    @JsonProperty("ref") String ref,
-    @JsonProperty("before") String before,
-    @JsonProperty("after") String after,
+    @JsonProperty("object_kind") @Nullable String objectKind,
+    @JsonProperty("ref") @Nullable String ref,
+    @JsonProperty("before") @Nullable String before,
+    @JsonProperty("after") @Nullable String after,
     @JsonProperty("checkout_sha") @Nullable String checkoutSha,
-    @JsonProperty("project_id") Long projectId,
-    @JsonProperty("project") ProjectInfo project,
+    @JsonProperty("project_id") @Nullable Long projectId,
+    @JsonProperty("project") @Nullable ProjectInfo project,
     @JsonProperty("total_commits_count") int totalCommitsCount,
     @JsonProperty("commits") @Nullable List<CommitInfo> commits
 ) {
@@ -71,12 +71,12 @@ public record GitLabPushEventDTO(
      */
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record ProjectInfo(
-        @JsonProperty("id") Long id,
-        @JsonProperty("name") String name,
+        @JsonProperty("id") @Nullable Long id,
+        @JsonProperty("name") @Nullable String name,
         @JsonProperty("description") @Nullable String description,
-        @JsonProperty("web_url") String webUrl,
+        @JsonProperty("web_url") @Nullable String webUrl,
         @JsonProperty("namespace") @Nullable String namespace,
-        @JsonProperty("path_with_namespace") String pathWithNamespace,
+        @JsonProperty("path_with_namespace") @Nullable String pathWithNamespace,
         @JsonProperty("default_branch") @Nullable String defaultBranch,
         @JsonProperty("visibility_level") int visibilityLevel
     ) {

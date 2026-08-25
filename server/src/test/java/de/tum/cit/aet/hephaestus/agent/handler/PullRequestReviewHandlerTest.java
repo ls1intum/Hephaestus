@@ -19,6 +19,7 @@ import de.tum.cit.aet.hephaestus.agent.context.EvidencePlan;
 import de.tum.cit.aet.hephaestus.agent.context.PreparedEvidence;
 import de.tum.cit.aet.hephaestus.agent.context.WorkspaceContextBuilder;
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionDeliveryService.DeliveryResult;
+import de.tum.cit.aet.hephaestus.agent.handler.spi.ExistingDeliveryLookup;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobPreparationException;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobSubmission;
@@ -123,6 +124,16 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
             observationRepository
         );
         lenient().when(cas.get(anyString())).thenReturn(java.util.Optional.of(new byte[0]));
+    }
+
+    @Test
+    void shouldRecoverTheSummaryForTheSameReviewJob() {
+        AgentJob job = jobWithMetadata(sampleJobMetadata());
+        ExistingDeliveryLookup found = ExistingDeliveryLookup.found("IC_existing");
+        when(feedbackService.findExistingSummary(job)).thenReturn(found);
+
+        assertThat(handler.findExistingDelivery(job)).isSameAs(found);
+        verify(feedbackService).findExistingSummary(job);
     }
 
     private PullRequestReviewSubmissionRequest sampleRequest() {
@@ -405,7 +416,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
         @Test
         void throwsWhenMetadataMissing() {
             var job = new AgentJob();
-            job.setMetadata(null);
+            org.springframework.test.util.ReflectionTestUtils.setField(job, "metadata", null);
             assertThatThrownBy(() -> handler.prepareInputs(job))
                 .isInstanceOf(JobPreparationException.class)
                 .hasMessageContaining("no metadata");
@@ -492,7 +503,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
         }
 
         @Test
-        void theLeadOpensTheAutoPostedNoteOnly_neverAlsoTheProposalItWouldDuplicate() {
+        void shouldUseLeadOnlyForAutoPostedNoteWhenProposalAlsoExists() {
             String lead = "The retry path is covered now, but the description never says why it changed.";
             ObjectNode metadata = sampleJobMetadata();
             metadata.put(ObservationAdmissionService.DIGEST_METADATA_KEY, "digest-1");
@@ -712,6 +723,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
             assertThat(secret.assessment()).isEqualTo(Assessment.BAD);
             assertThat(secret.evidenceRationale()).doesNotContain("AKIA1234567890ABCDEF");
             JsonNode evidence = secret.evidence();
+            org.junit.jupiter.api.Assertions.assertNotNull(evidence);
             assertThat(evidence.toString()).doesNotContain("AKIA1234567890ABCDEF");
             assertThat(evidence.path("detector").asString()).isEqualTo("secret-diff-scanner");
             JsonNode citation = evidence.path("citations").get(0);

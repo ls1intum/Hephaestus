@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.integration.scm.github.webhook;
 import de.tum.cit.aet.hephaestus.integration.core.spi.EventTypeKey;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SubjectParser;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
 
 /**
@@ -34,7 +35,7 @@ public class GithubSubjectParser implements SubjectParser {
     }
 
     @Override
-    public EventTypeKey parse(String fullSubject) {
+    public EventTypeKey parse(@Nullable String fullSubject) {
         if (fullSubject == null || fullSubject.isBlank()) {
             throw new IllegalArgumentException("subject must not be blank");
         }

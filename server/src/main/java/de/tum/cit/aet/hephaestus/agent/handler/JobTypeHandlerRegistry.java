@@ -6,6 +6,7 @@ import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Registry of {@link JobTypeHandler} implementations, indexed by {@link AgentJobType}.
@@ -54,8 +55,8 @@ public class JobTypeHandlerRegistry {
      * @param jobType the job type
      * @return the handler (never null — validated at startup)
      */
-    public JobTypeHandler getHandler(AgentJobType jobType) {
+    public JobTypeHandler getHandler(@Nullable AgentJobType jobType) {
         Objects.requireNonNull(jobType, "jobType must not be null");
-        return handlers.get(jobType);
+        return Objects.requireNonNull(handlers.get(jobType), "No handler registered for " + jobType);
     }
 }

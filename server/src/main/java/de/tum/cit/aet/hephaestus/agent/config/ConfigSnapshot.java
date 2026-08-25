@@ -90,7 +90,7 @@ public record ConfigSnapshot(
         );
     }
 
-    public ConfigSnapshot withPriceSnapshot(LlmPriceSnapshot price) {
+    public ConfigSnapshot withPriceSnapshot(@Nullable LlmPriceSnapshot price) {
         return new ConfigSnapshot(
             schemaVersion,
             apiProtocol,

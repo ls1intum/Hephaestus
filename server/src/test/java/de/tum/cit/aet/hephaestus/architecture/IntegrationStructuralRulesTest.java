@@ -111,7 +111,7 @@ class IntegrationStructuralRulesTest extends HephaestusArchitectureTest {
         };
     }
 
-    private static String findVendorLiteral(String identifier) {
+    private static @org.jspecify.annotations.Nullable String findVendorLiteral(String identifier) {
         String lowered = identifier.toLowerCase(Locale.ROOT);
         for (String literal : VENDOR_LITERALS) {
             if (lowered.contains(literal.toLowerCase(Locale.ROOT))) {

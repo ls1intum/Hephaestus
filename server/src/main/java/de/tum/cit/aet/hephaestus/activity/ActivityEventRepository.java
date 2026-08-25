@@ -9,6 +9,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import org.jspecify.annotations.Nullable;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -54,9 +55,9 @@ public interface ActivityEventRepository extends JpaRepository<ActivityEvent, UU
         @Param("eventKey") String eventKey,
         @Param("eventType") String eventType,
         @Param("occurredAt") Instant occurredAt,
-        @Param("actorId") Long actorId,
+        @Param("actorId") @Nullable Long actorId,
         @Param("workspaceId") Long workspaceId,
-        @Param("repositoryId") Long repositoryId,
+        @Param("repositoryId") @Nullable Long repositoryId,
         @Param("targetType") String targetType,
         @Param("targetId") Long targetId,
         @Param("xp") double xp

@@ -234,9 +234,9 @@ class MentorSseChannelTest extends BaseUnitTest {
         private final List<String> dataFrames = new ArrayList<>();
         private boolean completed;
         private boolean failOnNextSend;
-        private Runnable completionCallback;
-        private Runnable timeoutCallback;
-        private Consumer<Throwable> errorCallback;
+        private @org.jspecify.annotations.Nullable Runnable completionCallback;
+        private @org.jspecify.annotations.Nullable Runnable timeoutCallback;
+        private @org.jspecify.annotations.Nullable Consumer<Throwable> errorCallback;
 
         @Override
         public void send(SseEventBuilder builder) throws IOException {

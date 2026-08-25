@@ -1,13 +1,13 @@
 package de.tum.cit.aet.hephaestus.core.auth.audit;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
-import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
 import de.tum.cit.aet.hephaestus.core.auth.domain.AccountRepository;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import java.time.Instant;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.jspecify.annotations.Nullable;
@@ -95,8 +95,13 @@ public class AuthAuditService {
                   .stream()
                   .collect(
                       Collectors.toMap(
-                          Account::getId,
-                          a -> new AccountRef(a.getId(), a.getDisplayName(), a.getPrimaryEmail()),
+                          a -> Objects.requireNonNull(a.getId()),
+                          a ->
+                              new AccountRef(
+                                  Objects.requireNonNull(a.getId()),
+                                  a.getDisplayName(),
+                                  a.getPrimaryEmail()
+                              ),
                           (a, b) -> a
                       )
                   );

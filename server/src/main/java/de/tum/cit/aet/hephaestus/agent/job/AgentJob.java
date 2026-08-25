@@ -109,7 +109,7 @@ public class AgentJob {
 
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "metadata", columnDefinition = "jsonb")
-    private JsonNode metadata;
+    private @Nullable JsonNode metadata;
 
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "output", columnDefinition = "jsonb")
@@ -157,6 +157,7 @@ public class AgentJob {
     private DeliveryStatus deliveryStatus;
 
     @Column(name = "delivery_comment_id", length = 255)
+    @Nullable
     private String deliveryCommentId;
 
     @Column(name = "retry_count", nullable = false)
@@ -179,6 +180,7 @@ public class AgentJob {
      * and hammering a failing upstream. Cleared on claim.
      */
     @Column(name = "hold_reason", length = 32)
+    @Nullable
     private String holdReason;
 
     /**
@@ -213,6 +215,7 @@ public class AgentJob {
      * requeued job's original worker cannot clobber the new owner's.
      */
     @Column(name = "worker_id", length = 255)
+    @Nullable
     private String workerId;
 
     /**
@@ -254,6 +257,7 @@ public class AgentJob {
      * have spent anything, so cancellation and recovery paths test this before recording LLM usage.
      */
     @Column(name = "execution_started_at")
+    @Nullable
     private Instant executionStartedAt;
 
     @Column(name = "completed_at")
@@ -262,28 +266,36 @@ public class AgentJob {
     // LLM usage aggregates (populated at job completion from agent-reported usage)
 
     @Column(name = "llm_model", length = 100)
+    @Nullable
     private String llmModel;
 
     /** Only carried by jobs frozen before the model catalog; the catalog identifies a model by id alone. */
     @Column(name = "llm_model_version", length = 50)
+    @Nullable
     private String llmModelVersion;
 
     @Column(name = "llm_total_calls")
+    @Nullable
     private Integer llmTotalCalls;
 
     @Column(name = "llm_total_input_tokens")
+    @Nullable
     private Integer llmTotalInputTokens;
 
     @Column(name = "llm_total_output_tokens")
+    @Nullable
     private Integer llmTotalOutputTokens;
 
     @Column(name = "llm_total_reasoning_tokens")
+    @Nullable
     private Integer llmTotalReasoningTokens;
 
     @Column(name = "llm_cache_read_tokens")
+    @Nullable
     private Integer llmCacheReadTokens;
 
     @Column(name = "llm_cache_write_tokens")
+    @Nullable
     private Integer llmCacheWriteTokens;
 
     @PrePersist

@@ -19,6 +19,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -310,7 +311,7 @@ class ObservationTrendServiceTest extends BaseUnitTest {
         UUID job,
         String key,
         Presence v,
-        Severity sev,
+        @Nullable Severity sev,
         float conf,
         String slug,
         String title
@@ -332,8 +333,8 @@ class ObservationTrendServiceTest extends BaseUnitTest {
         UUID job,
         String key,
         Presence v,
-        Assessment assessment,
-        Severity sev,
+        @Nullable Assessment assessment,
+        @Nullable Severity sev,
         float conf,
         String slug,
         String title
@@ -355,12 +356,12 @@ class ObservationTrendServiceTest extends BaseUnitTest {
             }
 
             @Override
-            public Assessment getAssessment() {
+            public @Nullable Assessment getAssessment() {
                 return assessment;
             }
 
             @Override
-            public Severity getSeverity() {
+            public @Nullable Severity getSeverity() {
                 return sev;
             }
 

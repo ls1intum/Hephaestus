@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.core.oauth;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
@@ -30,6 +31,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.assertj.core.api.Assertions;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -115,7 +117,9 @@ class OAuthCallbackControllerTest extends BaseUnitTest {
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FOUND);
         assertThat(response.getHeaders().getLocation()).isNotNull();
-        assertThat(response.getHeaders().getLocation().toString()).isEqualTo(PROPS.successRedirect());
+        var location0 = response.getHeaders().getLocation();
+        assertNotNull(location0);
+        assertThat(location0.toString()).isEqualTo(PROPS.successRedirect());
 
         ArgumentCaptor<ConnectFinalization.Completed> completed = ArgumentCaptor.forClass(
             ConnectFinalization.Completed.class
@@ -188,7 +192,9 @@ class OAuthCallbackControllerTest extends BaseUnitTest {
         );
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FOUND);
-        String location = response.getHeaders().getLocation().toString();
+        var location1 = response.getHeaders().getLocation();
+        assertNotNull(location1);
+        String location = location1.toString();
         assertThat(location).contains("status=error");
         assertThat(location).contains("reason=access_denied");
         assertThat(location).contains("kind=SLACK");
@@ -225,7 +231,9 @@ class OAuthCallbackControllerTest extends BaseUnitTest {
             htmlRequest()
         );
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FOUND);
-        assertThat(response.getHeaders().getLocation().toString()).contains("reason=missing_state");
+        var location2 = response.getHeaders().getLocation();
+        assertNotNull(location2);
+        assertThat(location2.toString()).contains("reason=missing_state");
     }
 
     @Test
@@ -325,7 +333,9 @@ class OAuthCallbackControllerTest extends BaseUnitTest {
         );
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FOUND);
-        String location = response.getHeaders().getLocation().toString();
+        var location3 = response.getHeaders().getLocation();
+        assertNotNull(location3);
+        String location = location3.toString();
         assertThat(location).contains("status=error").contains("reason=finalize_failed").contains("kind=SLACK");
         verify(callbackService, never()).completeConnection(any(), any(), any());
     }
@@ -402,7 +412,9 @@ class OAuthCallbackControllerTest extends BaseUnitTest {
         );
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FOUND);
-        assertThat(response.getHeaders().getLocation().toString()).contains("reason=transition_conflict");
+        var location4 = response.getHeaders().getLocation();
+        assertNotNull(location4);
+        assertThat(location4.toString()).contains("reason=transition_conflict");
     }
 
     // Unknown kind
@@ -435,7 +447,9 @@ class OAuthCallbackControllerTest extends BaseUnitTest {
             htmlRequest()
         );
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FOUND);
-        assertThat(response.getHeaders().getLocation().toString()).contains("reason=unknown_kind");
+        var location5 = response.getHeaders().getLocation();
+        assertNotNull(location5);
+        assertThat(location5.toString()).contains("reason=unknown_kind");
     }
 
     // No strategy registered
@@ -489,7 +503,9 @@ class OAuthCallbackControllerTest extends BaseUnitTest {
         );
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FOUND);
-        assertThat(response.getHeaders().getLocation().toString()).isEqualTo(PROPS.successRedirect());
+        var location6 = response.getHeaders().getLocation();
+        assertNotNull(location6);
+        assertThat(location6.toString()).isEqualTo(PROPS.successRedirect());
         verify(callbackService).completeConnection(any(), any(), any());
     }
 
@@ -528,7 +544,7 @@ class OAuthCallbackControllerTest extends BaseUnitTest {
         long id,
         long workspaceId,
         IntegrationKind kind,
-        String instanceKey,
+        @Nullable String instanceKey,
         IntegrationState state
     ) {
         Workspace ws = new Workspace();
@@ -574,9 +590,16 @@ class OAuthCallbackControllerTest extends BaseUnitTest {
     static final class FakeStrategy implements ConnectionStrategy {
 
         private final IntegrationKind kind;
+
+        @Nullable
         ConnectFinalization nextFinalization;
+
+        @Nullable
         RuntimeException throwOnFinalize;
+
         int finalizeCalls = 0;
+
+        @Nullable
         Map<String, String> lastCallbackParams;
 
         FakeStrategy(IntegrationKind kind) {
@@ -594,7 +617,7 @@ class OAuthCallbackControllerTest extends BaseUnitTest {
         }
 
         @Override
-        public ConnectFinalization finalizeConnect(IntegrationRef ref, Map<String, String> callbackParams) {
+        public ConnectFinalization finalizeConnect(@Nullable IntegrationRef ref, Map<String, String> callbackParams) {
             finalizeCalls++;
             lastCallbackParams = callbackParams;
             if (throwOnFinalize != null) throw throwOnFinalize;
@@ -605,7 +628,7 @@ class OAuthCallbackControllerTest extends BaseUnitTest {
         }
 
         @Override
-        public void revoke(IntegrationRef ref) {
+        public void revoke(@Nullable IntegrationRef ref) {
             // unused in this controller
         }
     }

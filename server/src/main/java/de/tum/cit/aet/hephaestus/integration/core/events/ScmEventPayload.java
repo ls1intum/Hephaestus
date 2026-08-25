@@ -15,6 +15,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewthread.
 import de.tum.cit.aet.hephaestus.integration.scm.domain.team.Team;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import java.time.Instant;
+import java.util.Objects;
 import java.util.Optional;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
@@ -49,7 +50,7 @@ public final class ScmEventPayload {
         @Nullable String body,
         Issue.@NonNull State state,
         @Nullable String stateReason,
-        @NonNull String htmlUrl,
+        @Nullable String htmlUrl,
         boolean isPullRequest,
         @NonNull RepositoryRef repository,
         @Nullable Long authorId,
@@ -67,7 +68,7 @@ public final class ScmEventPayload {
                 issue.getStateReason() != null ? issue.getStateReason().name() : null,
                 issue.getHtmlUrl(),
                 issue.isPullRequest(),
-                RepositoryRef.from(issue.getRepository()),
+                Objects.requireNonNull(RepositoryRef.from(issue.getRepository())),
                 issue.getAuthor() != null ? issue.getAuthor().getId() : null,
                 issue.getCreatedAt(),
                 issue.getUpdatedAt(),
@@ -87,7 +88,7 @@ public final class ScmEventPayload {
         int additions,
         int deletions,
         int changedFiles,
-        @NonNull String htmlUrl,
+        @Nullable String htmlUrl,
         @NonNull RepositoryRef repository,
         @Nullable Long authorId,
         @Nullable Instant createdAt,
@@ -109,7 +110,7 @@ public final class ScmEventPayload {
                 pr.getDeletions(),
                 pr.getChangedFiles(),
                 pr.getHtmlUrl(),
-                RepositoryRef.from(pr.getRepository()),
+                Objects.requireNonNull(RepositoryRef.from(pr.getRepository())),
                 pr.getAuthor() != null ? pr.getAuthor().getId() : null,
                 pr.getCreatedAt(),
                 pr.getUpdatedAt(),
@@ -158,7 +159,7 @@ public final class ScmEventPayload {
     public record CommentData(
         @NonNull Long id,
         @Nullable String body,
-        @NonNull String htmlUrl,
+        @Nullable String htmlUrl,
         @Nullable Long authorId,
         @Nullable Instant createdAt,
         @Nullable Long issueId,
@@ -184,7 +185,7 @@ public final class ScmEventPayload {
         @Nullable String body,
         PullRequestReview.@NonNull State state,
         boolean isDismissed,
-        @NonNull String htmlUrl,
+        @Nullable String htmlUrl,
         @Nullable Long authorId,
         @NonNull Long pullRequestId,
         @Nullable Instant submittedAt,
@@ -214,10 +215,10 @@ public final class ScmEventPayload {
 
     public record ReviewCommentData(
         @NonNull Long id,
-        @NonNull String body,
+        @Nullable String body,
         @NonNull String path,
         int line,
-        @NonNull String htmlUrl,
+        @Nullable String htmlUrl,
         @Nullable Long reviewId,
         @Nullable Long authorId,
         @Nullable Instant createdAt,
@@ -344,7 +345,7 @@ public final class ScmEventPayload {
                 discussion.isLocked(),
                 discussion.getCommentsCount(),
                 discussion.getHtmlUrl(),
-                RepositoryRef.from(discussion.getRepository()),
+                Objects.requireNonNull(RepositoryRef.from(discussion.getRepository())),
                 discussion.getAuthor() != null ? discussion.getAuthor().getId() : null,
                 discussion.getCategory() != null ? discussion.getCategory().getName() : null,
                 discussion.getCreatedAt(),
@@ -358,7 +359,7 @@ public final class ScmEventPayload {
     public record DiscussionCommentData(
         @NonNull Long id,
         @Nullable String body,
-        @NonNull String htmlUrl,
+        @Nullable String htmlUrl,
         boolean isAnswer,
         @Nullable Long authorId,
         @Nullable Instant createdAt,

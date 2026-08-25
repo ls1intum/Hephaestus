@@ -19,6 +19,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -203,7 +204,7 @@ public class DocumentContentSource implements EvidenceSource, ReviewContextBuild
         return out.toString();
     }
 
-    private static String nullSafe(String value, String fallback) {
+    private static String nullSafe(@Nullable String value, String fallback) {
         return value == null || value.isBlank() || "null".equals(value) ? fallback : value;
     }
 }

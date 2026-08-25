@@ -40,6 +40,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.hibernate.Hibernate;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -100,7 +101,7 @@ public class UserProfileService {
 
         User userEntity = optionalUser.get();
         int leaguePoints = workspaceMembershipService.getCurrentLeaguePoints(workspaceId, userEntity);
-        UserInfoDTO user = UserInfoDTO.fromUser(userEntity, leaguePoints);
+        UserInfoDTO user = Objects.requireNonNull(UserInfoDTO.fromUser(userEntity, leaguePoints));
 
         Instant firstContribution =
             workspaceId == null
@@ -127,11 +128,11 @@ public class UserProfileService {
     @Transactional(readOnly = true)
     public Optional<ProfileActivityMonitorDTO> getActivityMonitor(
         String login,
-        Long workspaceId,
-        Instant after,
-        Instant before,
-        Set<Long> repositoryIds,
-        Integer limit
+        @Nullable Long workspaceId,
+        @Nullable Instant after,
+        @Nullable Instant before,
+        @Nullable Set<Long> repositoryIds,
+        @Nullable Integer limit
     ) {
         if (workspaceId == null) {
             return Optional.empty();
@@ -195,7 +196,7 @@ public class UserProfileService {
         );
     }
 
-    private TimeRange resolveTimeRange(String login, Instant after, Instant before) {
+    private TimeRange resolveTimeRange(String login, @Nullable Instant after, @Nullable Instant before) {
         Instant resolvedBefore = before == null ? Instant.now() : before;
         Instant resolvedAfter = after == null ? resolvedBefore.minus(DEFAULT_ACTIVITY_WINDOW) : after;
 
@@ -330,17 +331,17 @@ public class UserProfileService {
             .toList();
     }
 
-    private static Long repositoryIdOf(PullRequestBaseInfoDTO pullRequest) {
+    private static @Nullable Long repositoryIdOf(@Nullable PullRequestBaseInfoDTO pullRequest) {
         return pullRequest != null && pullRequest.repository() != null ? pullRequest.repository().id() : null;
     }
 
-    private static Long repositoryIdOf(RepositoryInfoDTO repository) {
+    private static @Nullable Long repositoryIdOf(@Nullable RepositoryInfoDTO repository) {
         return repository != null ? repository.id() : null;
     }
 
     private static <T> List<T> filterByRepository(
         List<T> items,
-        Function<T, Long> repositoryIdExtractor,
+        Function<T, @Nullable Long> repositoryIdExtractor,
         Set<Long> repositoryIds
     ) {
         if (repositoryIds.isEmpty()) {

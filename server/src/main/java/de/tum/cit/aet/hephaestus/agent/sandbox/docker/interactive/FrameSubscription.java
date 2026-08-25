@@ -6,6 +6,7 @@ import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.Disposable;
@@ -32,7 +33,7 @@ final class FrameSubscription implements Disposable {
     private final Runnable onDispose;
     private final AtomicBoolean disposed = new AtomicBoolean(false);
     private final AtomicBoolean errorLoggedAtWarn = new AtomicBoolean(false);
-    private volatile Thread dispatcherThread;
+    private volatile @Nullable Thread dispatcherThread;
 
     FrameSubscription(
         Consumer<JsonNode> listener,

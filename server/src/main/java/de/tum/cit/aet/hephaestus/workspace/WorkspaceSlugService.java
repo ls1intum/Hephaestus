@@ -7,6 +7,8 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
 import java.util.List;
+import java.util.Objects;
+import org.jspecify.annotations.Nullable;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -49,7 +51,7 @@ public class WorkspaceSlugService {
      * @param slug the raw slug input
      * @return normalized slug or null if input is null
      */
-    public String normalize(String slug) {
+    public @Nullable String normalize(@Nullable String slug) {
         if (slug == null) {
             return null;
         }
@@ -96,7 +98,7 @@ public class WorkspaceSlugService {
      * @throws WorkspaceSlugConflictException if no available slug could be found
      */
     public String allocate(String desiredSlug, String suffixSeed) {
-        String normalized = normalize(desiredSlug);
+        String normalized = Objects.requireNonNull(normalize(desiredSlug));
         if (isAvailable(normalized)) {
             return normalized;
         }
@@ -146,7 +148,7 @@ public class WorkspaceSlugService {
      * @param oldSlug the previous slug
      * @return the current slug, or null if not found or redirect expired
      */
-    public String resolveRedirect(String oldSlug) {
+    public @Nullable String resolveRedirect(String oldSlug) {
         return workspaceSlugHistoryRepository
             .findFirstByOldSlugOrderByChangedAtDesc(oldSlug)
             .filter(h -> h.getRedirectExpiresAt() == null || h.getRedirectExpiresAt().isAfter(Instant.now()))
@@ -164,10 +166,10 @@ public class WorkspaceSlugService {
         );
     }
 
-    private String buildCandidate(String baseSlug, String suffix) {
+    private @Nullable String buildCandidate(String baseSlug, String suffix) {
         int maxBaseLen = Math.max(SLUG_MIN_LENGTH, SLUG_MAX_LENGTH - suffix.length());
         String base = baseSlug.length() > maxBaseLen ? baseSlug.substring(0, maxBaseLen) : baseSlug;
-        String candidate = normalize(base + suffix);
+        String candidate = Objects.requireNonNull(normalize(base + suffix));
         if (candidate.length() < SLUG_MIN_LENGTH) {
             return null;
         }

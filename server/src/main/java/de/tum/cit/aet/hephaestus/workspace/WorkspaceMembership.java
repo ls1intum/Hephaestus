@@ -7,6 +7,7 @@ import java.time.Instant;
 import java.util.Locale;
 import lombok.*;
 import org.hibernate.annotations.DynamicUpdate;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Join entity representing a user's membership in a workspace with role-based access control.
@@ -110,7 +111,10 @@ public class WorkspaceMembership {
     @ToString
     public static class Id implements Serializable {
 
+        @Nullable
         private Long workspaceId;
+
+        @Nullable
         private Long userId;
     }
 

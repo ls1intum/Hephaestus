@@ -28,6 +28,7 @@ import de.tum.cit.aet.hephaestus.testconfig.TestEntities;
 import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Tag;
@@ -267,7 +268,7 @@ class GitLabProjectSyncServiceTest extends BaseUnitTest {
     // Helpers
 
     @SuppressWarnings("unchecked")
-    private void mockGraphQlProjectResponse(GitLabProjectResponse projectResponse) {
+    private void mockGraphQlProjectResponse(@Nullable GitLabProjectResponse projectResponse) {
         HttpGraphQlClient client = mock(HttpGraphQlClient.class);
         when(graphQlClientProvider.forScope(any())).thenReturn(client);
 

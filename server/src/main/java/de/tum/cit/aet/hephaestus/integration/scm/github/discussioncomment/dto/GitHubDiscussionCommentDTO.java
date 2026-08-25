@@ -27,27 +27,27 @@ import org.jspecify.annotations.Nullable;
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record GitHubDiscussionCommentDTO(
-    @JsonProperty("id") Long id,
-    @JsonProperty("database_id") Long databaseId,
-    @JsonProperty("node_id") String nodeId,
-    @JsonProperty("body") String body,
-    @JsonProperty("html_url") String htmlUrl,
+    @JsonProperty("id") @Nullable Long id,
+    @JsonProperty("database_id") @Nullable Long databaseId,
+    @JsonProperty("node_id") @Nullable String nodeId,
+    @JsonProperty("body") @Nullable String body,
+    @JsonProperty("html_url") @Nullable String htmlUrl,
     @JsonProperty("is_answer") boolean isAnswer,
     @JsonProperty("is_minimized") boolean isMinimized,
-    @JsonProperty("minimized_reason") String minimizedReason,
-    @JsonProperty("author_association") String authorAssociation,
-    @JsonProperty("created_at") Instant createdAt,
-    @JsonProperty("updated_at") Instant updatedAt,
-    @JsonProperty("user") GitHubUserDTO author,
+    @JsonProperty("minimized_reason") @Nullable String minimizedReason,
+    @JsonProperty("author_association") @Nullable String authorAssociation,
+    @JsonProperty("created_at") @Nullable Instant createdAt,
+    @JsonProperty("updated_at") @Nullable Instant updatedAt,
+    @JsonProperty("user") @Nullable GitHubUserDTO author,
     // For reply threading - contains the parent comment's node ID
-    @JsonProperty("reply_to_id") String replyToNodeId
+    @JsonProperty("reply_to_id") @Nullable String replyToNodeId
 ) {
     /**
      * Get the database ID, preferring databaseId over id for GraphQL responses.
      * <p>
      * Note: Unlike Discussion, DiscussionComment in GraphQL DOES have databaseId.
      */
-    public Long getDatabaseId() {
+    public @Nullable Long getDatabaseId() {
         return databaseId != null ? databaseId : id;
     }
 

@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.integration.scm.domain.label;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import java.util.List;
 import java.util.Optional;
+import org.jspecify.annotations.Nullable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -56,7 +57,7 @@ public interface LabelRepository extends JpaRepository<Label, Long> {
         @Param("nativeId") Long nativeId,
         @Param("providerId") Long providerId,
         @Param("name") String name,
-        @Param("color") String color,
+        @Param("color") @Nullable String color,
         @Param("repositoryId") Long repositoryId
     );
 }

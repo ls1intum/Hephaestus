@@ -5,4 +5,5 @@
  * messages are raw bytes plus headers; see {@code integration/webhook/PublishRequest}.
  */
 @org.springframework.modulith.NamedInterface("events")
+@org.jspecify.annotations.NullMarked
 package de.tum.cit.aet.hephaestus.integration.core.events;

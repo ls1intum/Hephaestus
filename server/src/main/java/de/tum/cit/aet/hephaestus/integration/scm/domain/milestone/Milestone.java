@@ -22,6 +22,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 @Entity
 @Table(
@@ -50,11 +51,11 @@ public class Milestone extends BaseGitServiceEntity {
     private String title;
 
     @Column(columnDefinition = "TEXT")
-    private String description;
+    private @Nullable String description;
 
-    private Instant closedAt;
+    private @Nullable Instant closedAt;
 
-    private Instant dueOn;
+    private @Nullable Instant dueOn;
 
     @Column(name = "open_issues_count", nullable = false)
     private int openIssuesCount;
@@ -65,7 +66,7 @@ public class Milestone extends BaseGitServiceEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "creator_id")
     @ToString.Exclude
-    private User creator;
+    private @Nullable User creator;
 
     @OneToMany(mappedBy = "milestone")
     @ToString.Exclude

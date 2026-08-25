@@ -15,6 +15,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
 import org.hibernate.annotations.CreationTimestamp;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Represents an identity provider instance (e.g., github.com, gitlab.lrz.de, slack.com).
@@ -42,6 +43,7 @@ public class IdentityProvider {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Nullable
     private Long id;
 
     @Enumerated(EnumType.STRING)
@@ -53,6 +55,7 @@ public class IdentityProvider {
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
+    @Nullable
     private Instant createdAt;
 
     public IdentityProvider(IdentityProviderType type, String serverUrl) {

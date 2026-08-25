@@ -17,6 +17,7 @@ import de.tum.cit.aet.hephaestus.workspace.settings.WorkspaceTeamSettingsService
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
@@ -115,7 +116,7 @@ public class WorkspaceService {
         String displayName,
         String accountLogin,
         AccountType accountType,
-        Long ownerUserId
+        @Nullable Long ownerUserId
     ) {
         return createWorkspaceInTransaction(rawSlug, displayName, accountLogin, accountType, ownerUserId);
     }
@@ -125,9 +126,9 @@ public class WorkspaceService {
         String displayName,
         String accountLogin,
         AccountType accountType,
-        Long ownerUserId
+        @Nullable Long ownerUserId
     ) {
-        String slug = workspaceSlugService.normalize(rawSlug);
+        String slug = Objects.requireNonNull(workspaceSlugService.normalize(rawSlug));
         workspaceSlugService.validate(slug);
 
         if (!workspaceSlugService.isAvailable(slug)) {
@@ -163,19 +164,29 @@ public class WorkspaceService {
     }
 
     private Workspace createWorkspaceInTransaction(CreateWorkspaceRequestDTO request) {
+        String workspaceSlug = Objects.requireNonNull(request.workspaceSlug(), "workspaceSlug is required");
+        String displayName = Objects.requireNonNull(request.displayName(), "displayName is required");
+        String accountLogin = Objects.requireNonNull(request.accountLogin(), "accountLogin is required");
+        AccountType accountType = Objects.requireNonNull(request.accountType(), "accountType is required");
+        IntegrationKind kind = Objects.requireNonNull(request.kind(), "kind is required");
+        String personalAccessToken = Objects.requireNonNull(
+            request.personalAccessToken(),
+            "personalAccessToken is required"
+        );
+
         // Always prefer the authenticated user to prevent privilege escalation.
         // Fall back to the deprecated ownerUserId only when no auth context exists (e.g. tests).
         Long ownerUserId = userRepository.getCurrentUser().map(User::getId).orElse(request.ownerUserId());
 
         Workspace workspace = createWorkspaceInTransaction(
-            request.workspaceSlug(),
-            request.displayName(),
-            request.accountLogin(),
-            request.accountType(),
+            workspaceSlug,
+            displayName,
+            accountLogin,
+            accountType,
             ownerUserId
         );
 
-        boolean isGitLab = request.kind() == IntegrationKind.GITLAB;
+        boolean isGitLab = kind == IntegrationKind.GITLAB;
 
         if (isGitLab) {
             // GitLab PAT workspaces monitor all repositories in the group by default.
@@ -196,7 +207,7 @@ public class WorkspaceService {
                     ConnectionConfig.GitLabConfig.SigningMode.PLAINTEXT,
                     Set.of()
                 ),
-                request.personalAccessToken(),
+                personalAccessToken,
                 "create-workspace-" + workspace.getId()
             );
         } else {
@@ -211,8 +222,8 @@ public class WorkspaceService {
                 workspace,
                 IntegrationKind.GITHUB,
                 "pat",
-                new ConnectionConfig.GitHubPatConfig(request.accountLogin(), serverUrl, Set.of()),
-                request.personalAccessToken(),
+                new ConnectionConfig.GitHubPatConfig(accountLogin, serverUrl, Set.of()),
+                personalAccessToken,
                 "create-workspace-" + workspace.getId()
             );
         }
@@ -231,12 +242,14 @@ public class WorkspaceService {
             transactionTemplate.execute(status -> createWorkspaceInTransaction(request))
         );
 
-        eventPublisher.publishEvent(new WorkspaceCreatedEvent(workspace.getId(), request.kind()));
+        eventPublisher.publishEvent(
+            new WorkspaceCreatedEvent(workspace.getId(), Objects.requireNonNull(request.kind(), "kind is required"))
+        );
 
         return workspace;
     }
 
-    private void createOwnerRole(Workspace workspace, Long ownerUserId) {
+    private void createOwnerRole(Workspace workspace, @Nullable Long ownerUserId) {
         if (ownerUserId == null) {
             throw new IllegalStateException(
                 "Cannot create workspace without an owner. " +
@@ -310,16 +323,21 @@ public class WorkspaceService {
         return workspaceSettingsService.updateSchedule(workspace.getId(), day, time);
     }
 
-    public Workspace updateNotifications(String slug, Boolean enabled, String team, String channelId) {
+    public Workspace updateNotifications(
+        String slug,
+        @Nullable Boolean enabled,
+        @Nullable String team,
+        @Nullable String channelId
+    ) {
         Workspace workspace = requireWorkspace(slug);
         return workspaceSettingsService.updateNotifications(workspace.getId(), enabled, team, channelId);
     }
 
     public Workspace updateNotifications(
         WorkspaceContext workspaceContext,
-        Boolean enabled,
-        String team,
-        String channelId
+        @Nullable Boolean enabled,
+        @Nullable String team,
+        @Nullable String channelId
     ) {
         return updateNotifications(requireSlug(workspaceContext), enabled, team, channelId);
     }
@@ -329,8 +347,8 @@ public class WorkspaceService {
         Integer day,
         String time,
         Boolean enabled,
-        String team,
-        String channelId
+        @Nullable String team,
+        @Nullable String channelId
     ) {
         Workspace workspace = requireWorkspace(slug);
         return workspaceSettingsService.updateLeaderboardDigest(workspace.getId(), day, time, enabled, team, channelId);
@@ -341,8 +359,8 @@ public class WorkspaceService {
         Integer day,
         String time,
         Boolean enabled,
-        String team,
-        String channelId
+        @Nullable String team,
+        @Nullable String channelId
     ) {
         return updateLeaderboardDigest(requireSlug(workspaceContext), day, time, enabled, team, channelId);
     }

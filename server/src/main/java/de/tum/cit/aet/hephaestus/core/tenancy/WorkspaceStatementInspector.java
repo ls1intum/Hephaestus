@@ -10,6 +10,7 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.hibernate.resource.jdbc.spi.StatementInspector;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -178,7 +179,7 @@ public class WorkspaceStatementInspector implements StatementInspector {
     }
 
     @Override
-    public String inspect(String sql) {
+    public @Nullable String inspect(@Nullable String sql) {
         if (sql == null || sql.isBlank()) return sql;
         if (mode == TenancyEnforcement.OFF) return sql;
         if (TenancyBypass.isActive()) return sql;

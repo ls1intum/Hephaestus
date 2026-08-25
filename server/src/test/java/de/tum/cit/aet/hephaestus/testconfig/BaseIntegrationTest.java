@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.testconfig;
 
+import de.tum.cit.aet.hephaestus.agent.handler.AgentHandlerTestDoubles;
 import org.junit.jupiter.api.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -8,7 +9,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
-import org.testcontainers.junit.jupiter.Testcontainers;
+import org.springframework.test.context.TestPropertySource;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("test")
@@ -18,12 +19,18 @@ import org.testcontainers.junit.jupiter.Testcontainers;
         TestSecurityConfig.class,
         TestAsyncConfiguration.class,
         RecordingScmEventListener.class,
+        StubInstallationRepositoryEnumerator.class,
+        StubMentorChatStarter.class,
+        SharedTestDoubles.class,
+        AgentHandlerTestDoubles.class,
         WorkspaceEchoControllers.ScopedEchoController.class,
         WorkspaceEchoControllers.WorkspaceContextEchoController.class,
     }
 )
-@Testcontainers
 @Tag("integration")
+@TestPropertySource(
+    properties = { "hephaestus.features.flags.gitlab-workspace-creation=true", "hephaestus.llm.display-currency=" }
+)
 public abstract class BaseIntegrationTest {
 
     @Autowired

@@ -7,18 +7,21 @@ import de.tum.cit.aet.hephaestus.practices.feedback.PlacementType;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.UUID;
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 @Schema(description = "A recorded message placement")
 public record ReviewPlacementDTO(
     @NonNull UUID id,
     @NonNull PlacementType placementType,
-    @Schema(description = "Anchor granularity; null for non-inline placements") PlacementAnchorKind anchorKind,
-    @Schema(description = "Head-side path of the anchored file") String anchorPath,
-    @Schema(description = "First anchored line (1-based)") Integer anchorStartLine,
-    @Schema(description = "Last anchored line (1-based)") Integer anchorEndLine,
-    @Schema(description = "Diff side of the anchor") PlacementAnchorSide anchorSide,
-    @Schema(description = "Provider-native comment identifier") String postedCommentRef,
-    @Schema(description = "Mentor chat-message identifier") UUID chatMessageId
+    @Schema(description = "Anchor granularity; null for non-inline placements")
+    @Nullable
+    PlacementAnchorKind anchorKind,
+    @Schema(description = "Head-side path of the anchored file") @Nullable String anchorPath,
+    @Schema(description = "First anchored line (1-based)") @Nullable Integer anchorStartLine,
+    @Schema(description = "Last anchored line (1-based)") @Nullable Integer anchorEndLine,
+    @Schema(description = "Diff side of the anchor") @Nullable PlacementAnchorSide anchorSide,
+    @Schema(description = "Provider-native comment identifier") @Nullable String postedCommentRef,
+    @Schema(description = "Mentor chat-message identifier") @Nullable UUID chatMessageId
 ) {
     public static ReviewPlacementDTO from(FeedbackPlacement placement) {
         return new ReviewPlacementDTO(

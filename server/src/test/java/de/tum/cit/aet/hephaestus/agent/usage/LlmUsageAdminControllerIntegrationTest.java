@@ -20,13 +20,9 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
-import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.reactive.server.WebTestClient;
 
 @Tag("integration")
-// See LlmUsageControllerIntegrationTest: the unset display currency is stated, not inherited from
-// whatever the developer's optional .env happens to hold.
-@TestPropertySource(properties = "hephaestus.llm.display-currency=")
 class LlmUsageAdminControllerIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     private static final String ADMIN_TOKEN = "mock-jwt-token-for-admin-user";
@@ -53,14 +49,19 @@ class LlmUsageAdminControllerIntegrationTest extends AbstractWorkspaceIntegratio
         seedEvent(workspace, cost, FundingSource.INSTANCE, PricingState.PRICED);
     }
 
-    private void seedEvent(Workspace workspace, String cost, FundingSource funding, PricingState pricing) {
+    private void seedEvent(
+        Workspace workspace,
+        @org.jspecify.annotations.Nullable String cost,
+        FundingSource funding,
+        PricingState pricing
+    ) {
         LlmUsageEvent event = new LlmUsageEvent();
         event.setId(UUID.randomUUID());
         event.setWorkspace(workspace);
         event.setJobType(LlmUsageJobType.PULL_REQUEST_REVIEW);
         event.setSourceType(LlmUsageSourceType.AGENT_JOB);
         event.setSourceId(UUID.randomUUID());
-        event.setCostUsd(pricing == PricingState.UNPRICED ? null : new BigDecimal(cost));
+        event.setCostUsd(cost == null ? null : new BigDecimal(cost));
         // Budgeted spend only counts PRICED + INSTANCE-funded rows — both are the
         // entity defaults, but set them explicitly so this fixture keeps meaning that if the
         // defaults ever change.

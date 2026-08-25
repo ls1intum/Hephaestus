@@ -31,6 +31,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Stream;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -57,7 +58,7 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
         return new WorkspaceContextBuilder(List.of(providers), new SimpleMeterRegistry(), null);
     }
 
-    private static SimpleMeterRegistry sharedRegistry;
+    private static SimpleMeterRegistry sharedRegistry = new SimpleMeterRegistry();
 
     private static WorkspaceContextBuilder builderWithSharedRegistry(ContentSource... providers) {
         sharedRegistry = new SimpleMeterRegistry();
@@ -592,6 +593,7 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
         @DisplayName("null repoKey requests do not serialise globally")
         void nullRepoKeyRequestsCanRunConcurrently() throws Exception {
             CountDownLatch bothInside = new CountDownLatch(2);
+            @Nullable
             CountDownLatch mayFinish = new CountDownLatch(1);
             AtomicInteger inFlight = new AtomicInteger();
             AtomicInteger maxInFlight = new AtomicInteger();
@@ -641,10 +643,10 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
 
     private static final class LatchedProvider implements ContentSource {
 
-        private final CountDownLatch entered;
-        private final CountDownLatch mayFinish;
+        private final @Nullable CountDownLatch entered;
+        private final @Nullable CountDownLatch mayFinish;
 
-        LatchedProvider(CountDownLatch entered, CountDownLatch mayFinish) {
+        LatchedProvider(@Nullable CountDownLatch entered, @Nullable CountDownLatch mayFinish) {
             this.entered = entered;
             this.mayFinish = mayFinish;
         }
@@ -673,13 +675,13 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
     private static final class ConcurrentProbeProvider implements ContentSource {
 
         private final CountDownLatch bothInside;
-        private final CountDownLatch mayFinish;
+        private final @Nullable CountDownLatch mayFinish;
         private final AtomicInteger inFlight;
         private final AtomicInteger maxInFlight;
 
         ConcurrentProbeProvider(
             CountDownLatch bothInside,
-            CountDownLatch mayFinish,
+            @Nullable CountDownLatch mayFinish,
             AtomicInteger inFlight,
             AtomicInteger maxInFlight
         ) {
@@ -700,7 +702,9 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
             maxInFlight.accumulateAndGet(active, Math::max);
             bothInside.countDown();
             try {
-                mayFinish.await();
+                if (mayFinish != null) {
+                    mayFinish.await();
+                }
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
             } finally {

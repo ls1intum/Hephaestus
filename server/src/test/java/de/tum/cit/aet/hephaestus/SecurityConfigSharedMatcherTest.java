@@ -3,7 +3,9 @@ package de.tum.cit.aet.hephaestus;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import de.tum.cit.aet.hephaestus.config.CorsProperties;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.env.MockEnvironment;
 import org.springframework.mock.web.MockHttpServletRequest;
@@ -28,7 +30,16 @@ class SecurityConfigSharedMatcherTest extends BaseUnitTest {
     void cookieSecureFalseUnderProd_failsClosedAtConstruction() {
         MockEnvironment prod = new MockEnvironment();
         prod.setActiveProfiles("prod");
-        assertThatThrownBy(() -> new SecurityConfig(null, prod, false, false, false, "HEPHAESTUS_AT"))
+        assertThatThrownBy(() ->
+            new SecurityConfig(
+                new CorsProperties(List.of("https://example.com")),
+                prod,
+                false,
+                false,
+                false,
+                "HEPHAESTUS_AT"
+            )
+        )
             .isInstanceOf(IllegalStateException.class)
             .hasMessageContaining("cookie-secure");
     }
@@ -37,7 +48,16 @@ class SecurityConfigSharedMatcherTest extends BaseUnitTest {
     void cookieSecureFalseOutsideProd_constructs() {
         MockEnvironment dev = new MockEnvironment();
         dev.setActiveProfiles("dev", "e2e");
-        assertThat(new SecurityConfig(null, dev, false, false, false, "HEPHAESTUS_AT")).isNotNull();
+        assertThat(
+            new SecurityConfig(
+                new CorsProperties(List.of("https://example.com")),
+                dev,
+                false,
+                false,
+                false,
+                "HEPHAESTUS_AT"
+            )
+        ).isNotNull();
     }
 
     @Test

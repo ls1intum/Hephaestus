@@ -8,6 +8,7 @@ import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 @Schema(description = "Complete workspace information including configuration and settings")
 public record WorkspaceDTO(
@@ -23,24 +24,34 @@ public record WorkspaceDTO(
     @Schema(description = "Current lifecycle status of the workspace (PENDING, ACTIVE, ARCHIVED)")
     String status,
     @NonNull @Schema(description = "Git provider account login associated with this workspace") String accountLogin,
-    @Schema(description = "GitHub App installation ID, if linked") Long installationId,
-    @Schema(description = "Integration kind backing this workspace (GITHUB or GITLAB)") String kind,
+    @Schema(description = "GitHub App installation ID, if linked") @Nullable Long installationId,
+    @Schema(description = "Integration kind backing this workspace (GITHUB or GITLAB)") @Nullable String kind,
     @Schema(description = "High-level git provider type for the workspace's SCM connection (null if none bound)")
+    @Nullable
     IdentityProviderType providerType,
-    @Schema(description = "Custom server URL for self-hosted instances (null for cloud defaults)") String serverUrl,
+    @Schema(description = "Custom server URL for self-hosted instances (null for cloud defaults)")
+    @Nullable
+    String serverUrl,
     @NonNull @Schema(description = "Timestamp when the workspace was created") Instant createdAt,
     @NonNull @Schema(description = "Timestamp when the workspace was last updated") Instant updatedAt,
-    @Schema(description = "Timestamp when the GitHub App installation was linked") Instant installationLinkedAt,
+    @Schema(description = "Timestamp when the GitHub App installation was linked")
+    @Nullable
+    Instant installationLinkedAt,
     @Schema(description = "Day of week for leaderboard notifications (1=Monday, 7=Sunday)", example = "1")
+    @Nullable
     Integer leaderboardScheduleDay,
     @Schema(description = "Time for leaderboard notifications in HH:mm format", example = "09:00")
+    @Nullable
     String leaderboardScheduleTime,
     @Schema(description = "Whether leaderboard notifications are enabled") Boolean leaderboardNotificationEnabled,
-    @Schema(description = "Team name for leaderboard notifications") String leaderboardNotificationTeam,
-    @Schema(description = "Slack channel ID for leaderboard notifications") String leaderboardNotificationChannelId,
+    @Schema(description = "Team name for leaderboard notifications") @Nullable String leaderboardNotificationTeam,
+    @Schema(description = "Slack channel ID for leaderboard notifications")
+    @Nullable
+    String leaderboardNotificationChannelId,
     @NonNull @Schema(description = "Whether a Personal Access Token is configured") Boolean hasPersonalAccessToken,
     @NonNull @Schema(description = "Whether Slack token is configured") Boolean hasSlackToken,
     @Schema(description = "ID of the active Slack connection, if any — addresses PATCH /connections/{id}/status")
+    @Nullable
     Long slackConnectionId,
     @NonNull
     @Schema(description = "Whether a GitLab webhook has been auto-registered for this workspace")
@@ -112,7 +123,7 @@ public record WorkspaceDTO(
             workspace.getWorkspaceSlug(),
             workspace.getDisplayName(),
             workspace.getIsPubliclyViewable(),
-            workspace.getStatus() != null ? workspace.getStatus().name() : null,
+            workspace.getStatus().name(),
             workspace.getAccountLogin(),
             installationId,
             providerKind.map(Enum::name).orElse(null),

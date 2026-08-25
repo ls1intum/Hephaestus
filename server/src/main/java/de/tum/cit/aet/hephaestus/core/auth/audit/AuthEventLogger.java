@@ -37,13 +37,13 @@ public class AuthEventLogger {
 
         private final AuthEvent.EventType type;
         private final AuthEvent.Result result;
-        private Long accountId;
-        private Long actingAccountId;
-        private String failureReason;
-        private Long gitProviderId;
-        private Long workspaceId;
-        private Long identityLinkId;
-        private String details;
+        private @Nullable Long accountId;
+        private @Nullable Long actingAccountId;
+        private @Nullable String failureReason;
+        private @Nullable Long gitProviderId;
+        private @Nullable Long workspaceId;
+        private @Nullable Long identityLinkId;
+        private @Nullable String details;
 
         private Draft(AuthEvent.EventType type, AuthEvent.Result result) {
             this.type = type;

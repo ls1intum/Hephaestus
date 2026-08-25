@@ -82,6 +82,7 @@ class ContentAddressedStoreTest extends BaseUnitTest {
         // non-sha key and must NOT be deleted even with an empty live set — guards the put/sweep race.
         String real = cas.put("real".getBytes(StandardCharsets.UTF_8));
         Path fanout = cas.pathFor(real).getParent();
+        org.junit.jupiter.api.Assertions.assertNotNull(fanout);
         Path temp = fanout.resolve(".tmp-123.blob");
         java.nio.file.Files.write(temp, "in-flight".getBytes(StandardCharsets.UTF_8));
 

@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.scm.github.pullrequest;
 
 import static org.assertj.core.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.Mockito.*;
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
@@ -30,6 +31,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -262,7 +264,7 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
             PullRequest pr = pullRequestRepository
                 .findByRepositoryIdAndNumber(testRepository.getId(), PR_26_NUMBER)
                 .orElse(null);
-            assertThat(pr).isNotNull();
+            assertNotNull(pr);
             assertThat(pr.getState()).isEqualTo(PullRequest.State.CLOSED);
             assertThat(pr.isMerged()).isFalse(); // closed.json has merged=false
 
@@ -284,7 +286,7 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
             PullRequest pr = pullRequestRepository
                 .findByRepositoryIdAndNumber(testRepository.getId(), PR_26_NUMBER)
                 .orElse(null);
-            assertThat(pr).isNotNull();
+            assertNotNull(pr);
             assertThat(pr.getState()).isEqualTo(PullRequest.State.OPEN);
         }
     }
@@ -307,7 +309,7 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
             PullRequest pr = pullRequestRepository
                 .findByRepositoryIdAndNumber(testRepository.getId(), PR_26_NUMBER)
                 .orElse(null);
-            assertThat(pr).isNotNull();
+            assertNotNull(pr);
             assertThat(pr.isDraft()).isFalse();
 
             // Verify PullRequestReady event was published
@@ -323,7 +325,7 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
             PullRequest pr = pullRequestRepository
                 .findByRepositoryIdAndNumber(testRepository.getId(), PR_26_NUMBER)
                 .orElse(null);
-            assertThat(pr).isNotNull();
+            assertNotNull(pr);
             assertThat(pr.isDraft()).isTrue();
 
             // Verify PullRequestDrafted event was published
@@ -349,7 +351,7 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
             PullRequest pr = pullRequestRepository
                 .findByRepositoryIdAndNumber(testRepository.getId(), PR_26_NUMBER)
                 .orElse(null);
-            assertThat(pr).isNotNull();
+            assertNotNull(pr);
 
             // Verify PullRequestSynchronized event was published
             assertThat(eventListener.ofType(ScmDomainEvent.PullRequestSynchronized.class)).hasSize(1);
@@ -376,12 +378,12 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
                 PullRequest pr = pullRequestRepository
                     .findByRepositoryIdAndNumber(testRepository.getId(), PR_26_NUMBER)
                     .orElse(null);
-                assertThat(pr).isNotNull();
+                assertNotNull(pr);
                 assertThat(labelNames(pr)).contains(FIXTURE_LABEL_NAME);
             });
 
             // Verify label was created in repository
-            assertThat(labelRepository.findByNativeIdAndProviderId(FIXTURE_LABEL_ID, testProvider.getId())).isPresent();
+            assertThat(labelRepository.findByNativeIdAndProviderId(FIXTURE_LABEL_ID, testProviderId())).isPresent();
 
             // Verify Labeled event was published
             assertThat(eventListener.ofType(ScmDomainEvent.PullRequestLabeled.class)).hasSize(1);
@@ -420,7 +422,7 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
                 PullRequest pr = pullRequestRepository
                     .findByRepositoryIdAndNumber(testRepository.getId(), PR_26_NUMBER)
                     .orElse(null);
-                assertThat(pr).isNotNull();
+                assertNotNull(pr);
                 assertThat(pr.getAssignees()).isNotEmpty();
                 assertThat(userLogins(pr.getAssignees())).contains(FIXTURE_AUTHOR_LOGIN);
             });
@@ -439,7 +441,7 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
             PullRequest pr = pullRequestRepository
                 .findByRepositoryIdAndNumber(testRepository.getId(), PR_26_NUMBER)
                 .orElse(null);
-            assertThat(pr).isNotNull();
+            assertNotNull(pr);
         }
     }
 
@@ -459,7 +461,7 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
                 PullRequest pr = pullRequestRepository
                     .findByRepositoryIdAndNumber(testRepository.getId(), PR_26_NUMBER)
                     .orElse(null);
-                assertThat(pr).isNotNull();
+                assertNotNull(pr);
                 assertThat(pr.getMilestone()).isNotNull();
                 assertThat(pr.getMilestone().getTitle()).isEqualTo(FIXTURE_MILESTONE_TITLE);
                 assertThat(pr.getMilestone().getNumber()).isEqualTo(2);
@@ -467,7 +469,7 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
 
             // Verify milestone was created in repository
             assertThat(
-                milestoneRepository.findByNativeIdAndProviderId(FIXTURE_MILESTONE_ID, testProvider.getId())
+                milestoneRepository.findByNativeIdAndProviderId(FIXTURE_MILESTONE_ID, testProviderId())
             ).isPresent();
         }
 
@@ -486,7 +488,7 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
                 PullRequest pr = pullRequestRepository
                     .findByRepositoryIdAndNumber(testRepository.getId(), PR_26_NUMBER)
                     .orElse(null);
-                assertThat(pr).isNotNull();
+                assertNotNull(pr);
                 // Milestone is null in the demilestoned payload itself
                 assertThat(pr.getMilestone()).isNull();
             });
@@ -507,7 +509,7 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
             PullRequest pr = pullRequestRepository
                 .findByRepositoryIdAndNumber(testRepository.getId(), PR_26_NUMBER)
                 .orElse(null);
-            assertThat(pr).isNotNull();
+            assertNotNull(pr);
             // Note: The fixture has requested_teams but no user reviewers in requested_reviewers
             // The handler processes this via the generic process() method
         }
@@ -524,7 +526,7 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
             PullRequest pr = pullRequestRepository
                 .findByRepositoryIdAndNumber(testRepository.getId(), PR_26_NUMBER)
                 .orElse(null);
-            assertThat(pr).isNotNull();
+            assertNotNull(pr);
         }
     }
 
@@ -546,7 +548,7 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
             PullRequest pr = pullRequestRepository
                 .findByRepositoryIdAndNumber(testRepository.getId(), PR_26_NUMBER)
                 .orElse(null);
-            assertThat(pr).isNotNull();
+            assertNotNull(pr);
         }
 
         @Test
@@ -562,7 +564,7 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
             PullRequest pr = pullRequestRepository
                 .findByRepositoryIdAndNumber(testRepository.getId(), PR_26_NUMBER)
                 .orElse(null);
-            assertThat(pr).isNotNull();
+            assertNotNull(pr);
         }
     }
 
@@ -615,7 +617,7 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
 
             // Verify the DTO is using the fallback correctly
             // In webhook payloads, databaseId will be null and id will have the value
-            assertThat(event.pullRequest().getDatabaseId()).isEqualTo(PR_26_ID);
+            assertThat(required(event.pullRequest()).getDatabaseId()).isEqualTo(PR_26_ID);
 
             handler.handleEvent(event);
 
@@ -633,9 +635,7 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
             handler.handleEvent(loadPayload("pull_request.opened"));
 
             // Then - author created with exact fixture values
-            var author = userRepository
-                .findByNativeIdAndProviderId(FIXTURE_AUTHOR_ID, testProvider.getId())
-                .orElseThrow();
+            var author = userRepository.findByNativeIdAndProviderId(FIXTURE_AUTHOR_ID, testProviderId()).orElseThrow();
             assertThat(author.getLogin()).isEqualTo(FIXTURE_AUTHOR_LOGIN);
             assertThat(author.getAvatarUrl()).isEqualTo(FIXTURE_AUTHOR_AVATAR_URL);
             assertThat(author.getHtmlUrl()).isEqualTo(FIXTURE_AUTHOR_HTML_URL);
@@ -676,7 +676,7 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
             PullRequest pr = pullRequestRepository
                 .findByRepositoryIdAndNumber(testRepository.getId(), PR_26_NUMBER)
                 .orElse(null);
-            assertThat(pr).isNotNull();
+            assertNotNull(pr);
             assertThat(pr.getState()).isEqualTo(PullRequest.State.OPEN);
 
             // 2. Add label
@@ -741,7 +741,7 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
 
             // PR identification
             var pr = event.pullRequest();
-            assertThat(pr).isNotNull();
+            assertNotNull(pr);
             assertThat(pr.getDatabaseId()).isEqualTo(PR_26_ID);
             assertThat(pr.number()).isEqualTo(PR_26_NUMBER);
 
@@ -797,9 +797,9 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
             GitHubPullRequestEventDTO event = objectMapper.readValue(payload, GitHubPullRequestEventDTO.class);
 
             assertThat(event.action()).isEqualTo("milestoned");
-            assertThat(event.pullRequest().milestone()).isNotNull();
-            assertThat(event.pullRequest().milestone().id()).isEqualTo(FIXTURE_MILESTONE_ID);
-            assertThat(event.pullRequest().milestone().title()).isEqualTo(FIXTURE_MILESTONE_TITLE);
+            assertThat(required(required(event.pullRequest()).milestone())).isNotNull();
+            assertThat(required(required(event.pullRequest()).milestone()).id()).isEqualTo(FIXTURE_MILESTONE_ID);
+            assertThat(required(required(event.pullRequest()).milestone()).title()).isEqualTo(FIXTURE_MILESTONE_TITLE);
         }
     }
 
@@ -869,5 +869,16 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
 
     private Set<String> userLogins(Set<User> users) {
         return users.stream().map(User::getLogin).collect(Collectors.toSet());
+    }
+
+    private Long testProviderId() {
+        Long id = testProvider.getId();
+        assertNotNull(id);
+        return id;
+    }
+
+    private static <T> T required(@Nullable T value) {
+        assertNotNull(value);
+        return value;
     }
 }

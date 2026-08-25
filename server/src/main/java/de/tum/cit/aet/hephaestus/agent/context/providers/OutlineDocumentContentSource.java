@@ -550,7 +550,7 @@ public class OutlineDocumentContentSource implements EvidenceSource {
      * show resolved display info only — raw subject UUIDs are machine noise and never render in the
      * human-facing byline.
      */
-    private static String renderByline(ProjectedDocument doc) {
+    private static @Nullable String renderByline(ProjectedDocument doc) {
         StringBuilder byline = new StringBuilder();
         if (doc.collectionName() != null && !doc.collectionName().isBlank()) {
             byline.append("_Collection: ").append(doc.collectionName()).append("_");
@@ -603,7 +603,7 @@ public class OutlineDocumentContentSource implements EvidenceSource {
      * collaborators render by name; the unnamed remainder collapses into "+N more" rather than leaking
      * raw subject UUIDs into human-facing text.
      */
-    private static String renderContributors(ProjectedDocument doc) {
+    private static @Nullable String renderContributors(ProjectedDocument doc) {
         List<ProjectedDocument.Collaborator> collaborators = doc.collaborators();
         if (collaborators.isEmpty()) {
             return null;

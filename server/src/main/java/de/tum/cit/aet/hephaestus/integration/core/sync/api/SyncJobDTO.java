@@ -8,6 +8,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
 import java.util.Map;
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 @Schema(description = "One sync_job row — a single INITIAL/RECONCILIATION/BACKFILL pass for a connection")
 public record SyncJobDTO(
@@ -16,14 +17,16 @@ public record SyncJobDTO(
     @NonNull @Schema(description = "What initiated this job") SyncJobTrigger trigger,
     @NonNull @Schema(description = "Job status") SyncJobStatus status,
     @NonNull @Schema(description = "Whether a cooperative cancel was requested") Boolean cancelRequested,
-    @Schema(description = "When the job started running") Instant startedAt,
-    @Schema(description = "When the job finished (any terminal status)") Instant finishedAt,
+    @Schema(description = "When the job started running") @Nullable Instant startedAt,
+    @Schema(description = "When the job finished (any terminal status)") @Nullable Instant finishedAt,
     @NonNull @Schema(description = "When the job row was created") Instant createdAt,
-    @Schema(description = "Coarse progress: items processed so far") Integer itemsProcessed,
-    @Schema(description = "Coarse progress: total items, if known") Integer itemsTotal,
-    @Schema(description = "Per-phase progress detail, integration-specific shape") Map<String, Object> progress,
-    @Schema(description = "Truncated error summary, set on FAILED") String errorSummary,
-    @Schema(description = "Account id of the admin who triggered this job, if MANUAL") Long triggeredByUserId
+    @Schema(description = "Coarse progress: items processed so far") @Nullable Integer itemsProcessed,
+    @Schema(description = "Coarse progress: total items, if known") @Nullable Integer itemsTotal,
+    @Schema(description = "Per-phase progress detail, integration-specific shape")
+    @Nullable
+    Map<String, Object> progress,
+    @Schema(description = "Truncated error summary, set on FAILED") @Nullable String errorSummary,
+    @Schema(description = "Account id of the admin who triggered this job, if MANUAL") @Nullable Long triggeredByUserId
 ) {
     public static SyncJobDTO from(SyncJob job) {
         return new SyncJobDTO(

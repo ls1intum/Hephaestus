@@ -17,6 +17,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.gitlab.label.dto.GitLabLabelDTO
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -69,7 +70,7 @@ public class GitLabLabelSyncService {
      */
     public SyncResult syncLabelsForRepository(Long scopeId, Repository repository) {
         String projectPath = repository.getNameWithOwner();
-        String safeProjectPath = sanitizeForLog(projectPath);
+        String safeProjectPath = Objects.requireNonNullElse(sanitizeForLog(projectPath), "<unknown>");
 
         log.info("Starting label sync: scopeId={}, projectPath={}", scopeId, safeProjectPath);
 
@@ -125,7 +126,9 @@ public class GitLabLabelSyncService {
                 graphQlClientProvider.recordSuccess();
 
                 @SuppressWarnings({ "unchecked", "rawtypes" })
-                List<Map<String, Object>> nodes = (List) response.field("project.labels.nodes").toEntityList(Map.class);
+                List<Map<String, Object>> nodes = (List) Objects.requireNonNull(response)
+                    .field("project.labels.nodes")
+                    .toEntityList(Map.class);
 
                 if (nodes == null || nodes.isEmpty()) {
                     break;
@@ -145,7 +148,9 @@ public class GitLabLabelSyncService {
                     }
                 }
 
-                GitLabPageInfo pageInfo = response.field("project.labels.pageInfo").toEntity(GitLabPageInfo.class);
+                GitLabPageInfo pageInfo = Objects.requireNonNull(response)
+                    .field("project.labels.pageInfo")
+                    .toEntity(GitLabPageInfo.class);
                 cursor = pageInfo != null ? pageInfo.endCursor() : null;
                 page++;
 

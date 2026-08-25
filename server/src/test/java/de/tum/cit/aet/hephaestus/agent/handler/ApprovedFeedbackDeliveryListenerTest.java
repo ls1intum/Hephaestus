@@ -147,7 +147,7 @@ class ApprovedFeedbackDeliveryListenerTest {
     }
 
     @Test
-    void shouldSanitizeTheApprovedProposalBeforeItReachesTheProvider() {
+    void shouldRefuseAnApprovedBodyThatDoesNotMatchItsProviderSafePreview() {
         FeedbackRepository feedbackRepository = mock(FeedbackRepository.class);
         FeedbackApprovalRepository approvalRepository = mock(FeedbackApprovalRepository.class);
         AgentJobRepository jobRepository = mock(AgentJobRepository.class);
@@ -174,7 +174,9 @@ class ApprovedFeedbackDeliveryListenerTest {
             eligible()
         ).deliver(new ApprovedFeedbackReadyEvent(7L, feedbackId));
 
-        verify(poster).postApprovedProposal(job, feedbackId, "Ask alert(1) `@octocat` about it.");
+        verify(poster, never()).postApprovedProposal(any(), any(), any());
+        verify(feedbackRepository).markApprovedSuppressed(7L, feedbackId, "APPROVAL_STALE");
+        verify(feedbackRepository, never()).markApprovedDelivered(7L, feedbackId);
     }
 
     @Test

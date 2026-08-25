@@ -6,6 +6,7 @@ import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import java.util.EnumMap;
 import java.util.Map;
+import java.util.Objects;
 import org.springframework.stereotype.Component;
 
 /**
@@ -91,7 +92,7 @@ public class MentorChatMetrics {
     }
 
     public void recordCompleted(Outcome outcome) {
-        completedByOutcome.get(outcome).increment();
+        Objects.requireNonNull(completedByOutcome.get(outcome)).increment();
     }
 
     public Timer.Sample startTimer() {

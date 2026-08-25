@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.scm.domain.issue;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
@@ -16,7 +17,9 @@ import java.time.Instant;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.transaction.annotation.Transactional;
 
+@Transactional
 class PracticeFeedbackArtifactRepositoryIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
@@ -39,8 +42,6 @@ class PracticeFeedbackArtifactRepositoryIntegrationTest extends BaseIntegrationT
 
     @BeforeEach
     void setUp() {
-        databaseTestUtils.cleanDatabase();
-
         IdentityProvider provider = identityProviderRepository.save(
             new IdentityProvider(IdentityProviderType.GITHUB, "https://github.example")
         );
@@ -58,7 +59,7 @@ class PracticeFeedbackArtifactRepositoryIntegrationTest extends BaseIntegrationT
         Instant now = Instant.now();
         issueRepository.upsertCore(
             3001L,
-            provider.getId(),
+            persistedId(provider),
             42,
             "Issue",
             "body",
@@ -82,7 +83,7 @@ class PracticeFeedbackArtifactRepositoryIntegrationTest extends BaseIntegrationT
         );
         pullRequestRepository.upsertCore(
             4001L,
-            provider.getId(),
+            persistedId(provider),
             42,
             "Pull request",
             "body",
@@ -124,8 +125,9 @@ class PracticeFeedbackArtifactRepositoryIntegrationTest extends BaseIntegrationT
     void issueFinderFetchesDeliveryAssociationsAndExcludesPullRequests() {
         Issue issue = issueRepository.findByIdWithAuthorAndRepository(issueId).orElseThrow();
 
+        assertNotNull(issue.getAuthor());
         assertThat(issue.getAuthor().getLogin()).isEqualTo("developer");
-        assertThat(issue.getRepository().getNameWithOwner()).isEqualTo("owner/repo");
+        assertThat(issue.requireRepository().getNameWithOwner()).isEqualTo("owner/repo");
         assertThat(issueRepository.findByIdWithAuthorAndRepository(pullRequestId)).isEmpty();
     }
 
@@ -133,7 +135,14 @@ class PracticeFeedbackArtifactRepositoryIntegrationTest extends BaseIntegrationT
     void pullRequestFinderFetchesDeliveryAssociations() {
         var pullRequest = pullRequestRepository.findByIdWithAuthorAndRepository(pullRequestId).orElseThrow();
 
+        assertNotNull(pullRequest.getAuthor());
         assertThat(pullRequest.getAuthor().getLogin()).isEqualTo("developer");
-        assertThat(pullRequest.getRepository().getNameWithOwner()).isEqualTo("owner/repo");
+        assertThat(pullRequest.requireRepository().getNameWithOwner()).isEqualTo("owner/repo");
+    }
+
+    private static long persistedId(IdentityProvider provider) {
+        Long id = provider.getId();
+        assertNotNull(id);
+        return id;
     }
 }

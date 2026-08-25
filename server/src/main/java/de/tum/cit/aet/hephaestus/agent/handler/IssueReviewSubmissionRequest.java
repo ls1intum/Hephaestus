@@ -18,7 +18,7 @@ public record IssueReviewSubmissionRequest(
     @Nullable String url,
     @Nullable Instant updatedAt,
     @Nullable SignalName triggerSignal,
-    ObservationOrigin observationOrigin
+    @Nullable ObservationOrigin observationOrigin
 ) implements JobSubmissionRequest {
     public IssueReviewSubmissionRequest {
         Objects.requireNonNull(repositoryFullName, "repositoryFullName must not be null");

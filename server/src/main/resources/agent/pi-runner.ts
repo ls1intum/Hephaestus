@@ -935,6 +935,14 @@ interface ConversationNotes {
 
 const LEAD_MAX_LENGTH = 240;
 
+function boundedLead(text: string): string | undefined {
+	if (text.length <= LEAD_MAX_LENGTH) return text;
+	const prefix = text.slice(0, LEAD_MAX_LENGTH + 1);
+	let end = -1;
+	for (const match of prefix.matchAll(/[.!?](?=\s|$)/g)) end = match.index;
+	return end < 0 ? undefined : prefix.slice(0, end + 1).trim();
+}
+
 interface ReportSummaryDetails {
 	stored: number;
 }
@@ -957,7 +965,6 @@ function buildSummaryTool() {
 				lead: {
 					type: "string",
 					minLength: 1,
-					maxLength: LEAD_MAX_LENGTH,
 					description: "One or two sentences orienting the reader in this change.",
 				},
 			},
@@ -972,14 +979,13 @@ function buildSummaryTool() {
 			if (!trimmed) {
 				return refuse("A lead needs one or two sentences; skip the call instead.");
 			}
-			// Truncating mid-word would ship the cut to the reader, so an over-long lead is sent back to be
-			// rewritten, as an over-long feedback unit is.
-			if (trimmed.length > LEAD_MAX_LENGTH) {
+			const lead = boundedLead(trimmed);
+			if (!lead) {
 				return refuse(
-					`A lead is at most ${LEAD_MAX_LENGTH} characters; this one is ${trimmed.length}.`,
+					`A lead is at most ${LEAD_MAX_LENGTH} characters and needs a complete sentence within that limit.`,
 				);
 			}
-			composedFeedback.lead = trimmed;
+			composedFeedback.lead = lead;
 			persistComposedFeedback();
 			return Promise.resolve({
 				content: [{ type: "text", text: "Stored the opening line." }],

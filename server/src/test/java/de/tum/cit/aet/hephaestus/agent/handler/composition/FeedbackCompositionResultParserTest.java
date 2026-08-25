@@ -53,10 +53,13 @@ class FeedbackCompositionResultParserTest extends BaseUnitTest {
             .satisfies(unit -> {
                 assertThat(unit.channel()).isEqualTo(FeedbackChannel.IN_CONTEXT);
                 assertThat(unit.basedOn()).containsExactly("obs-0");
-                assertThat(unit.placement().diffAnchor()).isNotNull();
-                assertThat(unit.placement().diffAnchor().path()).isEqualTo("src/billing/InvoiceTotals.java");
-                assertThat(unit.placement().diffAnchor().side()).isEqualTo("NEW");
-                assertThat(unit.placement().diffAnchor().startLine()).isEqualTo(47);
+                var placement = unit.placement();
+                assertThat(placement).isNotNull();
+                var anchor = placement.diffAnchor();
+                assertThat(anchor).isNotNull();
+                assertThat(anchor.path()).isEqualTo("src/billing/InvoiceTotals.java");
+                assertThat(anchor.side()).isEqualTo("NEW");
+                assertThat(anchor.startLine()).isEqualTo(47);
             });
     }
 
@@ -78,10 +81,10 @@ class FeedbackCompositionResultParserTest extends BaseUnitTest {
         assertThat(units)
             .singleElement()
             .satisfies(unit -> {
-                assertThat(unit.placement().kind()).isEqualTo(
-                    ComposedFeedbackUnit.InContextPlacement.PlacementKind.ARTIFACT
-                );
-                assertThat(unit.placement().diffAnchor()).isNull();
+                var placement = unit.placement();
+                assertThat(placement).isNotNull();
+                assertThat(placement.kind()).isEqualTo(ComposedFeedbackUnit.InContextPlacement.PlacementKind.ARTIFACT);
+                assertThat(placement.diffAnchor()).isNull();
             });
     }
 
@@ -413,7 +416,7 @@ class FeedbackCompositionResultParserTest extends BaseUnitTest {
     }
 
     @Test
-    void readsTheLeadTheReviewWroteAndStripsTheWhitespaceAroundIt() {
+    void shouldReadTrimmedLeadWhenReviewComposedOne() {
         JsonNode jobOutput = raw(
             """
             { "lead": "  You kept this to one concern; the description just never says why.  ",
@@ -428,25 +431,25 @@ class FeedbackCompositionResultParserTest extends BaseUnitTest {
 
     @ParameterizedTest
     @ValueSource(strings = { "{ \"units\": [] }", "{ \"lead\": null }", "{ \"lead\": \"\" }", "{ \"lead\": \"   \" }" })
-    void aLeadThatSaysNothingIsNoLead(String feedbackJson) {
+    void shouldReturnNoLeadWhenTextIsBlankOrAbsent(String feedbackJson) {
         assertThat(parser.lead(raw(feedbackJson))).isNull();
     }
 
     @ParameterizedTest
     @ValueSource(strings = { "{ \"lead\": 42 }", "{ \"lead\": true }", "{ \"lead\": [\"a\"] }", "{ \"lead\": {} }" })
-    void aLeadThatIsNotTextIsNoLead(String feedbackJson) {
+    void shouldReturnNoLeadWhenValueIsNotText(String feedbackJson) {
         assertThat(parser.lead(raw(feedbackJson))).isNull();
     }
 
     @Test
-    void aLeadTooLargeToBeAnOpeningIsNoLead() {
+    void shouldReturnNoLeadWhenPayloadExceedsCeiling() {
         assertThat(parser.lead(raw("{ \"lead\": \"" + "x".repeat(5_000) + "\" }")))
             .as("the payload ceiling is a bound on what the envelope may carry, not a place to trim prose")
             .isNull();
     }
 
     @Test
-    void noJobOutputIsNoLead() {
+    void shouldReturnNoLeadWhenJobOutputIsMissing() {
         assertThat(parser.lead(null)).isNull();
     }
 

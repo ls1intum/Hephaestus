@@ -109,15 +109,15 @@ public class Practice {
     @JoinColumn(name = "practice_area_id", foreignKey = @ForeignKey(name = "fk_practice_area"))
     @OnDelete(action = OnDeleteAction.SET_NULL)
     @ToString.Exclude
-    private PracticeArea area;
+    private @Nullable PracticeArea area;
 
     /** Catalog slug retained across workspace edits. */
     @Column(name = "source_curated_slug", length = 64)
-    private String sourceCuratedSlug;
+    private @Nullable String sourceCuratedSlug;
 
     /** Catalog comparison fingerprint captured when the workspace copy is created. */
     @Column(name = "source_curated_fingerprint", length = 96)
-    private String sourceCuratedFingerprint;
+    private @Nullable String sourceCuratedFingerprint;
 
     @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "current_revision_id", foreignKey = @ForeignKey(name = "fk_practice_current_revision"))
@@ -155,7 +155,7 @@ public class Practice {
      */
     @Column(name = "why_it_matters", columnDefinition = "TEXT")
     @ToString.Exclude
-    private String whyItMatters;
+    private @Nullable String whyItMatters;
 
     /**
      * Developer-facing exemplar: a concrete instance of doing this well, not the rubric. MUST NOT restate
@@ -164,7 +164,7 @@ public class Practice {
      */
     @Column(name = "what_good_looks_like", columnDefinition = "TEXT")
     @ToString.Exclude
-    private String whatGoodLooksLike;
+    private @Nullable String whatGoodLooksLike;
 
     /**
      * Optional Bun/TypeScript static-analysis script that runs before the AI agent and produces structured
@@ -172,7 +172,7 @@ public class Practice {
      */
     @Column(name = "precompute_script", columnDefinition = "TEXT")
     @ToString.Exclude
-    private String precomputeScript;
+    private @Nullable String precomputeScript;
 
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "automated_review_policy", columnDefinition = "jsonb", nullable = false)
@@ -189,8 +189,7 @@ public class Practice {
      */
     @Column(name = "autonomy", length = PracticeAutonomy.MAX_LENGTH)
     @Enumerated(EnumType.STRING)
-    @Nullable
-    private PracticeAutonomy autonomy;
+    private @Nullable PracticeAutonomy autonomy;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;

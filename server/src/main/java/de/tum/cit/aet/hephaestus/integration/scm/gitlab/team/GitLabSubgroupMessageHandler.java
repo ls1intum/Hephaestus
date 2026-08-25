@@ -12,6 +12,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabEventType;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabProperties;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.graphql.GitLabDescendantGroupResponse;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.team.dto.GitLabSubgroupEventDTO;
+import java.util.Objects;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -120,7 +121,7 @@ public class GitLabSubgroupMessageHandler extends AbstractIntegrationMessageHand
     }
 
     private void handleSubgroupDestroy(GitLabSubgroupEventDTO event, IdentityProvider provider) {
-        teamProcessor.delete(event.groupId(), provider.getId());
+        teamProcessor.delete(event.groupId(), Objects.requireNonNull(provider.getId()));
         log.info(
             "Deleted team from subgroup event: fullPath={}, groupId={}",
             sanitizeForLog(event.fullPath()),

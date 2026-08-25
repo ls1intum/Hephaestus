@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.scm.gitlab.repository;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
@@ -81,23 +82,28 @@ class GitLabProjectProcessorTest extends BaseUnitTest {
             Repository result = processor.processGraphQlResponse(project, org, gitLabProvider);
 
             assertThat(result).isNotNull();
+            assertNotNull(result);
             assertThat(result.getNativeId()).isEqualTo(123L);
             assertThat(result.getName()).isEqualTo("my-project");
             assertThat(result.getNameWithOwner()).isEqualTo("my-org/my-project");
             assertThat(result.getHtmlUrl()).isEqualTo("https://gitlab.com/my-org/my-project");
+            assertNotNull(result);
             assertThat(result.getDescription()).isEqualTo("A cool project");
             assertThat(result.getVisibility()).isEqualTo(Repository.Visibility.PUBLIC);
             assertThat(result.isPrivate()).isFalse();
             assertThat(result.isArchived()).isFalse();
+            assertNotNull(result);
             assertThat(result.isDisabled()).isFalse();
             assertThat(result.isHasDiscussionsEnabled()).isFalse();
             assertThat(result.getDefaultBranch()).isEqualTo("develop");
             assertThat(result.getOrganization()).isEqualTo(org);
+            assertNotNull(result);
             assertThat(result.getCreatedAt()).isEqualTo(Instant.parse("2024-01-15T10:30:00Z"));
             assertThat(result.getPushedAt()).isEqualTo(Instant.parse("2024-06-20T14:00:00Z"));
             assertThat(result.getUpdatedAt()).isEqualTo(Instant.parse("2024-06-20T14:00:00Z"));
             // lastSyncAt is set AFTER issue sync completes (in WorkspaceActivationService),
             // not during project discovery
+            assertNotNull(result);
             assertThat(result.getLastSyncAt()).isNull();
         }
 
@@ -108,6 +114,7 @@ class GitLabProjectProcessorTest extends BaseUnitTest {
 
             Repository result = processor.processGraphQlResponse(project, null, gitLabProvider);
 
+            assertNotNull(result);
             assertThat(result.getVisibility()).isEqualTo(Repository.Visibility.PRIVATE);
             assertThat(result.isPrivate()).isTrue();
         }
@@ -119,6 +126,7 @@ class GitLabProjectProcessorTest extends BaseUnitTest {
 
             Repository result = processor.processGraphQlResponse(project, null, gitLabProvider);
 
+            assertNotNull(result);
             assertThat(result.getVisibility()).isEqualTo(Repository.Visibility.INTERNAL);
             assertThat(result.isPrivate()).isFalse();
         }
@@ -142,6 +150,7 @@ class GitLabProjectProcessorTest extends BaseUnitTest {
 
             Repository result = processor.processGraphQlResponse(project, null, gitLabProvider);
 
+            assertNotNull(result);
             assertThat(result.getDefaultBranch()).isEqualTo("main");
         }
 
@@ -164,6 +173,7 @@ class GitLabProjectProcessorTest extends BaseUnitTest {
 
             Repository result = processor.processGraphQlResponse(project, null, gitLabProvider);
 
+            assertNotNull(result);
             assertThat(result.isArchived()).isTrue();
         }
 
@@ -177,6 +187,7 @@ class GitLabProjectProcessorTest extends BaseUnitTest {
 
             Repository result = processor.processGraphQlResponse(project, null, gitLabProvider);
 
+            assertNotNull(result);
             assertThat(result.getName()).isEqualTo("project");
             // Verify save was called (not insert)
             ArgumentCaptor<Repository> captor = ArgumentCaptor.forClass(Repository.class);
@@ -234,6 +245,7 @@ class GitLabProjectProcessorTest extends BaseUnitTest {
             Repository result = processor.processGraphQlResponse(project, null, gitLabProvider);
 
             assertThat(result).isNotNull();
+            assertNotNull(result);
             assertThat(result.getCreatedAt()).isEqualTo(existingCreatedAt);
         }
 
@@ -321,10 +333,12 @@ class GitLabProjectProcessorTest extends BaseUnitTest {
             Repository result = processor.processPushEvent(projectInfo, gitLabProvider);
 
             assertThat(result).isNotNull();
+            assertNotNull(result);
             assertThat(result.getNativeId()).isEqualTo(246765L);
             assertThat(result.getName()).isEqualTo("demo-repository");
             assertThat(result.getNameWithOwner()).isEqualTo("hephaestustest/demo-repository");
             assertThat(result.getHtmlUrl()).isEqualTo("https://gitlab.lrz.de/hephaestustest/demo-repository");
+            assertNotNull(result);
             assertThat(result.getVisibility()).isEqualTo(Repository.Visibility.PRIVATE);
             assertThat(result.isPrivate()).isTrue();
             assertThat(result.getDefaultBranch()).isEqualTo("main");
@@ -347,6 +361,7 @@ class GitLabProjectProcessorTest extends BaseUnitTest {
 
             Repository result = processor.processPushEvent(projectInfo, gitLabProvider);
 
+            assertNotNull(result);
             assertThat(result.getVisibility()).isEqualTo(Repository.Visibility.PUBLIC);
             assertThat(result.isPrivate()).isFalse();
         }
@@ -416,6 +431,7 @@ class GitLabProjectProcessorTest extends BaseUnitTest {
 
             Repository result = processor.processPushEvent(projectInfo, gitLabProvider);
 
+            assertNotNull(result);
             assertThat(result.getName()).isEqualTo("new-name");
             assertThat(result.getDefaultBranch()).isEqualTo("develop");
             assertThat(result.isArchived()).isTrue(); // preserved from existing entity

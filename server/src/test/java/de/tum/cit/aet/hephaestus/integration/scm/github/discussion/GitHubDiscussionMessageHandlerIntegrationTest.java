@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.scm.github.discussion;
 
 import static org.assertj.core.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
@@ -273,7 +274,7 @@ class GitHubDiscussionMessageHandlerIntegrationTest extends BaseIntegrationTest 
             Discussion discussion = discussionRepository
                 .findByRepositoryIdAndNumber(testRepository.getId(), 27)
                 .orElse(null);
-            assertThat(discussion).isNotNull();
+            assertNotNull(discussion);
             assertThat(discussion.getState()).isEqualTo(Discussion.State.CLOSED);
             assertThat(discussion.getStateReason()).isEqualTo(Discussion.StateReason.RESOLVED);
 
@@ -295,7 +296,7 @@ class GitHubDiscussionMessageHandlerIntegrationTest extends BaseIntegrationTest 
             Discussion discussion = discussionRepository
                 .findByRepositoryIdAndNumber(testRepository.getId(), 27)
                 .orElse(null);
-            assertThat(discussion).isNotNull();
+            assertNotNull(discussion);
             assertThat(discussion.getState()).isEqualTo(Discussion.State.OPEN);
 
             // Verify Reopened event was published
@@ -393,12 +394,12 @@ class GitHubDiscussionMessageHandlerIntegrationTest extends BaseIntegrationTest 
                 Discussion discussion = discussionRepository
                     .findByRepositoryIdAndNumber(testRepository.getId(), 27)
                     .orElse(null);
-                assertThat(discussion).isNotNull();
+                assertNotNull(discussion);
                 assertThat(labelNames(discussion)).contains(FIXTURE_LABEL_NAME);
             });
 
             // Verify label was created in repository
-            assertThat(labelRepository.findByNativeIdAndProviderId(FIXTURE_LABEL_ID, gitProvider.getId())).isPresent();
+            assertThat(labelRepository.findByNativeIdAndProviderId(FIXTURE_LABEL_ID, gitProviderId())).isPresent();
         }
 
         @Test
@@ -436,7 +437,7 @@ class GitHubDiscussionMessageHandlerIntegrationTest extends BaseIntegrationTest 
             Discussion discussion = discussionRepository
                 .findByRepositoryIdAndNumber(testRepository.getId(), 27)
                 .orElse(null);
-            assertThat(discussion).isNotNull();
+            assertNotNull(discussion);
             assertThat(discussion.isLocked()).isTrue();
             assertThat(discussion.getActiveLockReason()).isEqualTo(Discussion.LockReason.RESOLVED);
             // Note: fixture has state="locked" but isClosed() only matches "closed",
@@ -458,7 +459,7 @@ class GitHubDiscussionMessageHandlerIntegrationTest extends BaseIntegrationTest 
             Discussion discussion = discussionRepository
                 .findByRepositoryIdAndNumber(testRepository.getId(), 27)
                 .orElse(null);
-            assertThat(discussion).isNotNull();
+            assertNotNull(discussion);
             assertThat(discussion.isLocked()).isFalse();
         }
     }
@@ -589,9 +590,7 @@ class GitHubDiscussionMessageHandlerIntegrationTest extends BaseIntegrationTest 
             handler.handleEvent(loadPayload("discussion.created"));
 
             // Then - author created with exact fixture values
-            var author = userRepository
-                .findByNativeIdAndProviderId(FIXTURE_AUTHOR_ID, gitProvider.getId())
-                .orElseThrow();
+            var author = userRepository.findByNativeIdAndProviderId(FIXTURE_AUTHOR_ID, gitProviderId()).orElseThrow();
             assertThat(author.getLogin()).isEqualTo(FIXTURE_AUTHOR_LOGIN);
             assertThat(author.getAvatarUrl()).isEqualTo(FIXTURE_AUTHOR_AVATAR_URL);
             assertThat(author.getHtmlUrl()).isEqualTo(FIXTURE_AUTHOR_HTML_URL);
@@ -667,5 +666,11 @@ class GitHubDiscussionMessageHandlerIntegrationTest extends BaseIntegrationTest 
             .stream()
             .map(l -> l.getName())
             .collect(Collectors.toSet());
+    }
+
+    private Long gitProviderId() {
+        Long id = gitProvider.getId();
+        assertNotNull(id);
+        return id;
     }
 }

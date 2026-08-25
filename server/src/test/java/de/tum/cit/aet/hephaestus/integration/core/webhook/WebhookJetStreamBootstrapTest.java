@@ -28,6 +28,7 @@ import java.io.IOException;
 import java.time.Duration;
 import java.time.ZonedDateTime;
 import java.util.Map;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -508,7 +509,7 @@ class WebhookJetStreamBootstrapTest extends BaseUnitTest {
     /** A live stream at the configured shape and limits, which the argument then perturbs. */
     private StreamInfo existing(
         java.util.function.UnaryOperator<StreamConfiguration.Builder> perturb,
-        StreamState state
+        @Nullable StreamState state
     ) {
         StreamConfiguration config = perturb
             .apply(

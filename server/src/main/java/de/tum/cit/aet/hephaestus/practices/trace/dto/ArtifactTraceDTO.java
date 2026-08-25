@@ -4,6 +4,7 @@ import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.List;
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 /**
  * The whole answer to "what did Hephaestus do about this piece of work, and why".
@@ -18,9 +19,11 @@ public record ArtifactTraceDTO(
     @NonNull
     @Schema(description = "The label a person recognises; the kind's display name when the mirror cannot name it")
     String title,
-    @Schema(description = "The number the provider shows, for kinds that have one") Integer number,
-    @Schema(description = "Repository, collection or channel it sits in") String container,
-    @Schema(description = "Where to open it upstream; absent for a deleted or unlinkable artifact") String url,
+    @Schema(description = "The number the provider shows, for kinds that have one") @Nullable Integer number,
+    @Schema(description = "Repository, collection or channel it sits in") @Nullable String container,
+    @Schema(description = "Where to open it upstream; absent for a deleted or unlinkable artifact")
+    @Nullable
+    String url,
     @NonNull
     @Schema(description = "Everything recorded about this artifact, oldest first")
     List<TracedSignalDTO> signals,

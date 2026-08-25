@@ -1,5 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.scm.gitlab.common;
 
+import org.jspecify.annotations.Nullable;
+
 /**
  * Enum representing GitLab webhook event actions.
  * <p>
@@ -43,7 +45,7 @@ public enum GitLabEventAction {
      * @param action the action string from {@code object_attributes.action}
      * @return the matching enum value, or {@link #UNKNOWN} if not found
      */
-    public static GitLabEventAction fromString(String action) {
+    public static GitLabEventAction fromString(@Nullable String action) {
         if (action == null || action.isBlank()) {
             return UNKNOWN;
         }

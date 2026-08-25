@@ -14,6 +14,7 @@ import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -55,7 +56,10 @@ class OutlineIdentityResolverTest extends BaseUnitTest {
         return new AccountIdentityQuery.IdentityLinkView(1L, 2L, subject, login, null, null, null, null, null);
     }
 
-    private static AccountWorkspaceMembershipQuery.WorkspaceMembershipView membership(long workspaceId, Long memberId) {
+    private static AccountWorkspaceMembershipQuery.WorkspaceMembershipView membership(
+        long workspaceId,
+        @Nullable Long memberId
+    ) {
         return new AccountWorkspaceMembershipQuery.WorkspaceMembershipView(
             workspaceId,
             "ws",

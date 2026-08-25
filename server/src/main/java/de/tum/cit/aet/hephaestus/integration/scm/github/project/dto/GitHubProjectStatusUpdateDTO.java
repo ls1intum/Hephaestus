@@ -23,22 +23,22 @@ import org.jspecify.annotations.Nullable;
 @JsonIgnoreProperties(ignoreUnknown = true)
 @Slf4j
 public record GitHubProjectStatusUpdateDTO(
-    @JsonProperty("id") Long id,
-    @JsonProperty("database_id") Long databaseId,
+    @JsonProperty("id") @Nullable Long id,
+    @JsonProperty("database_id") @Nullable Long databaseId,
     @JsonProperty("node_id") String nodeId,
     @JsonProperty("body") String body,
     @JsonProperty("body_html") String bodyHtml,
-    @JsonProperty("start_date") LocalDate startDate,
-    @JsonProperty("target_date") LocalDate targetDate,
-    @JsonProperty("status") String status,
-    @JsonProperty("creator") GitHubUserDTO creator,
-    @JsonProperty("created_at") Instant createdAt,
-    @JsonProperty("updated_at") Instant updatedAt
+    @JsonProperty("start_date") @Nullable LocalDate startDate,
+    @JsonProperty("target_date") @Nullable LocalDate targetDate,
+    @JsonProperty("status") @Nullable String status,
+    @JsonProperty("creator") @Nullable GitHubUserDTO creator,
+    @JsonProperty("created_at") @Nullable Instant createdAt,
+    @JsonProperty("updated_at") @Nullable Instant updatedAt
 ) {
     /**
      * Get the database ID, preferring databaseId over id for GraphQL responses.
      */
-    public Long getDatabaseId() {
+    public @Nullable Long getDatabaseId() {
         return databaseId != null ? databaseId : id;
     }
 

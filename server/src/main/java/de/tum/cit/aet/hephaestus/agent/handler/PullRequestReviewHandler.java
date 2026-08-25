@@ -44,6 +44,7 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.TreeSet;
 import org.jspecify.annotations.Nullable;
@@ -151,7 +152,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         ObjectNode metadata = objectMapper.createObjectNode();
         metadata.put(
             PracticeDetectionDeliveryService.ORIGIN_METADATA_KEY,
-            submissionRequest.observationOrigin().name()
+            Objects.requireNonNull(submissionRequest.observationOrigin()).name()
         );
         metadata.put("repository_id", pullRequestData.repository().id());
         metadata.put("repository_full_name", pullRequestData.repository().nameWithOwner());
@@ -440,7 +441,12 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         if (!secretObservations.isEmpty()) {
             Set<String> scannerLocations = secretObservations
                 .stream()
-                .flatMap(f -> f.evidence().path("citations").valueStream())
+                .flatMap(f -> {
+                    JsonNode evidence = f.evidence();
+                    return evidence == null
+                        ? java.util.stream.Stream.empty()
+                        : evidence.path("citations").valueStream();
+                })
                 .map(citation -> citation.path("path").asString() + ":" + citation.path("startLine").asInt())
                 .collect(java.util.stream.Collectors.toSet());
             scopedObservations.removeIf(
@@ -548,10 +554,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
      */
     @Override
     public ExistingDeliveryLookup findExistingDelivery(AgentJob job) {
-        // Measurement has no provider-side delivery. Its durable effect is the persisted observation
-        // set plus the idempotent composition request, so an unrelated earlier review comment must
-        // never make recovery skip this handler.
-        return ExistingDeliveryLookup.absent();
+        return feedbackService.findExistingSummary(job);
     }
 
     private List<PracticeDetectionResultParser.ValidatedObservation> scanForSecrets(@Nullable String diff) {

@@ -30,6 +30,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.UnaryOperator;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -70,7 +71,7 @@ class OutlineWebhookRegistrarTest extends BaseUnitTest {
      * null. {@code lenient()} because most no-op tests never reach the reconcile call at all.
      */
     @SuppressWarnings("unchecked")
-    private static <T> ObjectProvider<T> providerOf(T bean) {
+    private static <T> ObjectProvider<T> providerOf(@Nullable T bean) {
         ObjectProvider<T> provider = mock(ObjectProvider.class);
         if (bean != null) {
             Mockito.lenient()
@@ -88,7 +89,7 @@ class OutlineWebhookRegistrarTest extends BaseUnitTest {
         return registrar(externalUrl, natsConsumer);
     }
 
-    private OutlineWebhookRegistrar registrar(String externalUrl, IntegrationNatsConsumer consumer) {
+    private OutlineWebhookRegistrar registrar(String externalUrl, @Nullable IntegrationNatsConsumer consumer) {
         return new OutlineWebhookRegistrar(
             connectionService,
             outlineApiClient,
@@ -122,7 +123,7 @@ class OutlineWebhookRegistrarTest extends BaseUnitTest {
         ).thenReturn(subscriptionId);
     }
 
-    private static ConnectionConfig.OutlineConfig config(String subscriptionId, String secret) {
+    private static ConnectionConfig.OutlineConfig config(@Nullable String subscriptionId, @Nullable String secret) {
         return new ConnectionConfig.OutlineConfig(SERVER_URL, subscriptionId, secret, Set.of());
     }
 

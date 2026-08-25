@@ -20,25 +20,32 @@ jobs:
       contents: read
     outputs:
       webapp: ${{ steps.filter.outputs.webapp }}
+      webapp-image: ${{ steps.filter.outputs.webapp-image == 'true' || steps.webapp_image_source.outputs.webapp-image-source == 'true' }}
       application-server: ${{ steps.filter.outputs.application-server }}
+      application-server-image: ${{ steps.filter.outputs.application-server-image }}
       e2e: ${{ steps.filter.outputs.e2e }}
       agent-images: ${{ steps.filter.outputs.agent-images }}
+      release-pin-fetcher: ${{ steps.filter.outputs.release-pin-fetcher }}
+      postgres-image: ${{ steps.filter.outputs.postgres-image }}
       docs: ${{ steps.filter.outputs.docs }}
       ci-config: ${{ steps.filter.outputs.ci-config }}
+      docker-config: ${{ steps.filter.outputs.docker-config }}
+      pmd-canary: ${{ steps.filter.outputs.pmd-canary }}
       any-code: ${{ steps.filter.outputs.webapp == 'true' || steps.filter.outputs.application-server == 'true' || steps.filter.outputs.agent-images == 'true' }}
       should_skip: ${{ steps.skip_check.outputs.should_skip }}
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - id: skip_check
-        uses: fkirc/skip-duplicate-actions@f75f66ce1886f00957d99748a42c724f4330bdcf # v5
+        uses: fkirc/skip-duplicate-actions@b974a9395958c231af965b70070979a577efa578 # v5.3.2
         with:
           do_not_skip: '["workflow_dispatch", "push", "merge_group"]'
 
-      - uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3
+      - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
         id: filter
         with:
           filters: |
@@ -58,6 +65,20 @@ jobs:
               - 'pnpm-workspace.yaml'
               - '.npmrc'
               - '.node-version'
+            webapp-image:
+              - 'webapp/public/**'
+              - 'webapp/docker/**'
+              - 'webapp/Dockerfile'
+              - 'webapp/index.html'
+              - 'webapp/package.json'
+              - 'webapp/tsconfig.json'
+              - 'webapp/vite.config.ts'
+              - 'webapp/vite.shared.ts'
+              - 'docs/package.json'
+              - 'package.json'
+              - 'pnpm-lock.yaml'
+              - 'pnpm-workspace.yaml'
+              - '.npmrc'
             application-server:
               - 'server/**'
               # check:env, check:contracts, check:diagrams and db-utils.sh all live here and run on
@@ -98,6 +119,11 @@ jobs:
               - '.opencode/**'
               - '.agents/**'
               - 'opencode.json'
+            application-server-image:
+              - 'server/src/main/**'
+              - 'server/pom.xml'
+              - 'server/mvnw'
+              - 'server/.mvn/**'
             e2e:
               - 'webapp/e2e/**'
               - 'webapp/src/**'
@@ -120,11 +146,34 @@ jobs:
               - '.github/actions/setup-pnpm-node/**'
             agent-images:
               - 'docker/agents/**'
+            release-pin-fetcher:
+              - 'docker/release-pin-fetcher/**'
+            postgres-image:
+              - 'docker/postgres/**'
             docs:
               - 'docs/**'
             ci-config:
               - '.github/workflows/**'
               - '.github/actions/**'
+            docker-config:
+              - '.github/workflows/ci-docker-build.yml'
+              - '.github/workflows/reusable-docker-build.yml'
+            pmd-canary:
+              - 'server/pmd-ruleset.xml'
+              - 'server/pom.xml'
+              - 'package.json'
+              - 'scripts/run-mvnw.ts'
+              - '.github/workflows/ci-quality-gates.yml'
+
+      - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
+        id: webapp_image_source
+        with:
+          filters: |
+            webapp-image-source:
+              - 'webapp/src/**'
+              - '!webapp/src/**/*.test.*'
+              - '!webapp/src/**/*.stories.*'
+              - '!webapp/src/test/**'
 
   # Coolify creates previews for trusted same-repository pull requests. This job waits for the
   # immutable application-server image, then updates the preview to the exact head commit. Coolify's
@@ -153,7 +202,7 @@ jobs:
     steps:
       - name: Link the preview deployments page on the PR
         if: vars.COOLIFY_PROJECT_UUID != '' && vars.COOLIFY_ENVIRONMENT_UUID != ''
-        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
             const { COOLIFY_URL, COOLIFY_PROJECT_UUID, COOLIFY_ENVIRONMENT_UUID, COOLIFY_APP_UUID } = process.env;
@@ -227,6 +276,7 @@ jobs:
       should_skip: ${{ needs.detect-changes.outputs.should_skip }}
       webapp_changed: ${{ (needs.detect-changes.outputs.webapp == 'true' || needs.detect-changes.outputs.ci-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
       application_server_changed: ${{ (needs.detect-changes.outputs.application-server == 'true' || needs.detect-changes.outputs.ci-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
+      pmd_canary: ${{ (needs.detect-changes.outputs.pmd-canary == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
 
   Security:
     uses: ./.github/workflows/ci-security-scan.yml
@@ -259,6 +309,8 @@ jobs:
 
   Docker:
     uses: ./.github/workflows/ci-docker-build.yml
+    # Image builds consume the detected source tree, not Quality outputs. Running both branches at
+    # once keeps image and preview confidence without adding Docker as a second CI stage.
     needs: [detect-changes]
     # Every same-repository pull request gets a Coolify preview pinned to SOURCE_COMMIT, so it needs
     # an application-server tag at its head commit even when it touches only docs or the preview
@@ -273,9 +325,11 @@ jobs:
     secrets: inherit
     with:
       should_skip: ${{ needs.detect-changes.outputs.should_skip }}
-      webapp_changed: ${{ (needs.detect-changes.outputs.webapp == 'true' || needs.detect-changes.outputs.ci-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
-      application_server_changed: ${{ (needs.detect-changes.outputs.application-server == 'true' || needs.detect-changes.outputs.ci-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
-      agent_images_changed: ${{ (needs.detect-changes.outputs.agent-images == 'true' || needs.detect-changes.outputs.ci-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
+      webapp_changed: ${{ (needs.detect-changes.outputs.webapp-image == 'true' || needs.detect-changes.outputs.docker-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
+      application_server_changed: ${{ (needs.detect-changes.outputs.application-server-image == 'true' || needs.detect-changes.outputs.docker-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
+      agent_images_changed: ${{ (needs.detect-changes.outputs.agent-images == 'true' || needs.detect-changes.outputs.docker-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
+      release_pin_fetcher_changed: ${{ (needs.detect-changes.outputs.release-pin-fetcher == 'true' || needs.detect-changes.outputs.docker-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
+      postgres_image_changed: ${{ (needs.detect-changes.outputs.postgres-image == 'true' || needs.detect-changes.outputs.docker-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
 
   all-ci-passed:
     name: "CI Status Gate"
@@ -290,6 +344,45 @@ jobs:
         uses: Kesin11/actions-timeline@7c7e0821d38f27460f4a71ef874a1c8cf23602e4 # v2
         with:
           show-waiting-runner: true
+
+      - name: Summarize workflow performance
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const run = await github.rest.actions.getWorkflowRun({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              run_id: context.runId,
+            });
+            const jobs = await github.paginate(github.rest.actions.listJobsForWorkflowRun, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              run_id: context.runId,
+              per_page: 100,
+              filter: 'latest',
+            });
+            const finished = jobs.filter((job) => job.started_at && job.completed_at);
+            const seconds = (start, end) => (Date.parse(end) - Date.parse(start)) / 1000;
+            const elapsed = seconds(run.data.created_at, new Date().toISOString());
+            const runnerSeconds = finished.reduce(
+              (total, job) => total + seconds(job.started_at, job.completed_at),
+              0,
+            );
+            const startDelays = finished.map((job) => seconds(job.created_at, job.started_at));
+            const format = (value) => `${Math.floor(value / 60)}m ${Math.round(value % 60)}s`;
+
+            await core.summary
+              .addHeading('Workflow performance', 3)
+              .addTable([
+                [{ data: 'Metric', header: true }, { data: 'Value', header: true }],
+                ['Workflow-to-gate sample', format(elapsed)],
+                ['Completed runner time', format(runnerSeconds)],
+                ['Longest job creation-to-start delay', format(Math.max(0, ...startDelays))],
+              ])
+              .addRaw(
+                'The creation-to-start delay includes dependency waiting; use the timeline above to distinguish dependency time from runner waiting. Cache hits and misses remain visible in each native cache action log.',
+              )
+              .write();
 
       - name: Evaluate CI results
         id: evaluate
@@ -447,7 +540,7 @@ jobs:
 
       - name: Create commit status
         if: always()
-        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
             const sha = context.payload.pull_request?.head?.sha || context.sha;

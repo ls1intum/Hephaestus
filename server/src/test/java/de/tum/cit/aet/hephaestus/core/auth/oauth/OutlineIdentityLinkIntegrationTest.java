@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.core.auth.oauth;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
 import de.tum.cit.aet.hephaestus.core.auth.domain.AccountRepository;
@@ -9,21 +10,15 @@ import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityLink;
 import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityLinkRepository;
 import de.tum.cit.aet.hephaestus.core.auth.provider.LoginProvider;
 import de.tum.cit.aet.hephaestus.core.auth.provider.LoginProviderRepository;
-import de.tum.cit.aet.hephaestus.testconfig.RealAuthDatasource;
+import de.tum.cit.aet.hephaestus.testconfig.RealAuthIntegrationTest;
 import java.util.List;
 import java.util.Map;
-import org.junit.jupiter.api.Tag;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.context.annotation.Import;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.core.user.DefaultOAuth2User;
 import org.springframework.security.oauth2.core.user.OAuth2User;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
 /**
  * Authenticated Outline identity link, against a REAL Postgres. Drives {@link AccountProvisioningService}
@@ -39,11 +34,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
  * orphan account behind; (3) an Outline identity already linked to a DIFFERENT account cannot be
  * re-bound ({@code identity_already_linked}) — that would be account takeover.
  */
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@ActiveProfiles("test")
-@Testcontainers
-@Tag("integration")
-class OutlineIdentityLinkIntegrationTest {
+class OutlineIdentityLinkIntegrationTest extends RealAuthIntegrationTest {
 
     /** Outline's subject is the immutable user UUID; the tenant key is the team UUID. */
     private static final String OUTLINE_USER = "0aa1bb2c-user";
@@ -60,11 +51,6 @@ class OutlineIdentityLinkIntegrationTest {
 
     @Autowired
     private LoginProviderRepository loginProviderRepository;
-
-    @DynamicPropertySource
-    static void datasource(DynamicPropertyRegistry registry) {
-        RealAuthDatasource.register(registry);
-    }
 
     @Test
     void linkingOutlineAttachesExactlyOneOutlineIdentityToTheSameAccount() {
@@ -86,15 +72,15 @@ class OutlineIdentityLinkIntegrationTest {
             "outline-link",
             OUTLINE_USER,
             outlinePrincipal(OUTLINE_USER, OUTLINE_TEAM, "dev@example.com"),
-            AuthIntentCookie.Intent.link(github.getId(), "/settings")
+            AuthIntentCookie.Intent.link(persistedId(github.getId()), "/settings")
         );
 
         assertThat(linked.identityLinked()).isTrue();
-        assertThat(linked.account().getId()).isEqualTo(github.getId());
+        assertThat(linked.account().getId()).isEqualTo(persistedId(github.getId()));
         // The link attached to the existing account — it did NOT JIT a new one.
         assertThat(accountRepository.count()).isEqualTo(accountsAfterLogin);
 
-        List<IdentityLink> links = identityLinkRepository.findActiveByAccountId(github.getId());
+        List<IdentityLink> links = identityLinkRepository.findActiveByAccountId(persistedId(github.getId()));
         assertThat(links).extracting(IdentityLink::getSubject).containsExactlyInAnyOrder("gh-2", OUTLINE_USER);
         IdentityLink outline = links
             .stream()
@@ -160,7 +146,7 @@ class OutlineIdentityLinkIntegrationTest {
             "outline-conflict",
             OUTLINE_USER,
             outlinePrincipal(OUTLINE_USER, OUTLINE_TEAM, "owner@example.com"),
-            AuthIntentCookie.Intent.link(owner.getId(), "/settings")
+            AuthIntentCookie.Intent.link(persistedId(owner.getId()), "/settings")
         );
 
         Account attacker = service
@@ -179,15 +165,15 @@ class OutlineIdentityLinkIntegrationTest {
                 "outline-conflict",
                 OUTLINE_USER,
                 outlinePrincipal(OUTLINE_USER, OUTLINE_TEAM, "attacker@example.com"),
-                AuthIntentCookie.Intent.link(attacker.getId(), "/settings")
+                AuthIntentCookie.Intent.link(persistedId(attacker.getId()), "/settings")
             )
         ).isInstanceOf(AccountLinkConflictException.class);
 
         // The link still hangs off the original owner, and the attacker gained nothing.
-        assertThat(identityLinkRepository.findActiveByAccountId(attacker.getId()))
+        assertThat(identityLinkRepository.findActiveByAccountId(persistedId(attacker.getId())))
             .extracting(IdentityLink::getSubject)
             .containsExactly("gh-attacker");
-        assertThat(identityLinkRepository.findActiveByAccountId(owner.getId()))
+        assertThat(identityLinkRepository.findActiveByAccountId(persistedId(owner.getId())))
             .extracting(IdentityLink::getSubject)
             .contains(OUTLINE_USER);
     }
@@ -221,5 +207,10 @@ class OutlineIdentityLinkIntegrationTest {
             Map.of("id", subject, "team_id", teamId, "team_name", "Acme", "name", "Ada Lovelace", "email", email),
             "id"
         );
+    }
+
+    private static long persistedId(@Nullable Long id) {
+        assertNotNull(id);
+        return id;
     }
 }

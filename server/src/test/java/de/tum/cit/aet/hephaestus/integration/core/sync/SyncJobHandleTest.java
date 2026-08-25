@@ -9,6 +9,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -34,8 +35,8 @@ class SyncJobHandleTest extends BaseUnitTest {
         @Override
         public void writeProgress(
             long jobId,
-            Integer itemsProcessed,
-            Integer itemsTotal,
+            @Nullable Integer itemsProcessed,
+            @Nullable Integer itemsTotal,
             Map<String, Object> progressDetail
         ) {
             processed.add(itemsProcessed);

@@ -7,6 +7,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestR
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.cache.Cache;
@@ -130,18 +131,18 @@ public class MentorContextInvalidator {
      * Best-effort resolution of {@code workspaceId} from event context. Returns {@code null}
      * when the event lacks the necessary linkage — the caller is then a no-op.
      */
-    private Long resolveWorkspaceId(EventContext context) {
+    private @Nullable Long resolveWorkspaceId(@Nullable EventContext context) {
         if (context == null || context.repository() == null) return null;
         // The ScmDomainEvent context carries a RepositoryRef — we resolve to workspace via the
         // RepositoryToMonitor join (same approach the context queries use).
         return workspaceRepository.findWorkspaceIdByRepositoryId(context.repository().id()).orElse(null);
     }
 
-    private void evictPerUser(Long workspaceId, Long userId) {
+    private void evictPerUser(Long workspaceId, @Nullable Long userId) {
         evictPerUser(workspaceId, userId, PER_USER_CACHES);
     }
 
-    private void evictPerUser(Long workspaceId, Long userId, List<String> cacheNames) {
+    private void evictPerUser(Long workspaceId, @Nullable Long userId, List<String> cacheNames) {
         if (workspaceId == null || userId == null) return;
         String key = workspaceId + ":" + userId;
         for (String cacheName : cacheNames) {

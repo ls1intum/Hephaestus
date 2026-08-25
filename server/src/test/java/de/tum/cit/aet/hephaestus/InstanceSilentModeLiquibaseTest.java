@@ -3,12 +3,13 @@ package de.tum.cit.aet.hephaestus;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import de.tum.cit.aet.hephaestus.testconfig.PostgreSQLTestContainer;
+import de.tum.cit.aet.hephaestus.testconfig.PostgreSQLTestContainer.TestDatabase;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.util.ArrayList;
 import java.util.List;
 import liquibase.Contexts;
 import liquibase.LabelExpression;
@@ -17,30 +18,24 @@ import liquibase.changelog.ChangeSet;
 import liquibase.database.DatabaseFactory;
 import liquibase.database.jvm.JdbcConnection;
 import liquibase.resource.ClassLoaderResourceAccessor;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
-import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
-@Testcontainers
-@Tag("integration")
+@Tag("database")
 class InstanceSilentModeLiquibaseTest {
 
     private static final String CHANGELOG = "1785739495153_changelog.xml";
-    private static final String MASTER = "db/master.xml";
+    private static final String MASTER = "db/instance-silent-mode-test.xml";
     private static final Contexts CONTEXTS = new Contexts("prod");
 
-    @Container
-    @SuppressWarnings("resource")
-    private static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:16")
-        .withDatabaseName("hephaestus_silent_mode_migration")
-        .withUsername("test")
-        .withPassword("test");
+    private static final TestDatabase DATABASE = PostgreSQLTestContainer.createDatabase(
+        "hephaestus_silent_mode_migration"
+    );
 
     @Test
     void shouldFailSafeWithoutOverwritingOperatorChoicesWhenUpgrading() throws Exception {
-        updateUntilBeforeFollowup();
+        createPreMigrationSchema();
 
         updateFollowup();
         assertThat(scalar("SELECT silent_mode_engaged::text FROM instance_settings WHERE id = 1")).isEqualTo("true");
@@ -80,21 +75,25 @@ class InstanceSilentModeLiquibaseTest {
         ).isInstanceOf(SQLException.class);
     }
 
-    private static void updateUntilBeforeFollowup() throws Exception {
-        try (Liquibase liquibase = liquibase()) {
-            List<ChangeSet> pending = liquibase.listUnrunChangeSets(CONTEXTS, new LabelExpression());
-            List<Integer> indexes = indexesOf(pending);
-            assertThat(indexes).isNotEmpty();
-            liquibase.update(indexes.getFirst(), CONTEXTS, new LabelExpression());
-        }
+    private static void createPreMigrationSchema() throws SQLException {
+        execute(
+            "CREATE TABLE instance_settings (" +
+                "id BIGINT PRIMARY KEY, " +
+                "silent_mode_engaged BOOLEAN NOT NULL, " +
+                "silent_mode_reason VARCHAR(500), " +
+                "silent_mode_changed_at TIMESTAMP WITH TIME ZONE, " +
+                "silent_mode_changed_by VARCHAR(255))"
+        );
+        execute("INSERT INTO instance_settings (id, silent_mode_engaged) VALUES (1, FALSE)");
     }
 
     private static void updateFollowup() throws Exception {
         try (Liquibase liquibase = liquibase()) {
             List<ChangeSet> pending = liquibase.listUnrunChangeSets(CONTEXTS, new LabelExpression());
-            List<Integer> indexes = indexesOf(pending);
-            assertThat(indexes).hasSize(3).startsWith(0);
-            liquibase.update(indexes.size(), CONTEXTS, new LabelExpression());
+            assertThat(pending)
+                .hasSize(3)
+                .allSatisfy(changeSet -> assertThat(changeSet.getFilePath()).endsWith(CHANGELOG));
+            liquibase.update(pending.size(), CONTEXTS, new LabelExpression());
         }
     }
 
@@ -104,23 +103,13 @@ class InstanceSilentModeLiquibaseTest {
         }
     }
 
-    private static List<Integer> indexesOf(List<ChangeSet> changeSets) {
-        List<Integer> indexes = new ArrayList<>();
-        for (int index = 0; index < changeSets.size(); index++) {
-            if (changeSets.get(index).getFilePath().endsWith(CHANGELOG)) {
-                indexes.add(index);
-            }
-        }
-        return indexes;
-    }
-
     private static Liquibase liquibase() throws Exception {
         var database = DatabaseFactory.getInstance().findCorrectDatabaseImplementation(new JdbcConnection(connect()));
         return new Liquibase(MASTER, new ClassLoaderResourceAccessor(), database);
     }
 
     private static Connection connect() throws SQLException {
-        return DriverManager.getConnection(POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword());
+        return DriverManager.getConnection(DATABASE.jdbcUrl(), DATABASE.username(), DATABASE.password());
     }
 
     private static void execute(String sql) throws SQLException {
@@ -129,7 +118,7 @@ class InstanceSilentModeLiquibaseTest {
         }
     }
 
-    private static String scalar(String sql) throws SQLException {
+    private static @Nullable String scalar(String sql) throws SQLException {
         try (
             Connection connection = connect();
             Statement statement = connection.createStatement();

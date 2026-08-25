@@ -126,7 +126,7 @@ public class GitlabSummaryChannel implements SummaryChannel {
 
         // Surface TOP-LEVEL GraphQL errors with their real reason — createNote returns no payload at all when
         // the instance is read-only, the gid is unresolvable, or permission is denied.
-        List<String> topLevelErrors = response
+        List<String> topLevelErrors = Objects.requireNonNull(response)
             .getErrors()
             .stream()
             .map(e -> e.getMessage())
@@ -136,12 +136,12 @@ public class GitlabSummaryChannel implements SummaryChannel {
             throw new FeedbackDeliveryException("GitLab createNote failed: " + topLevelErrors);
         }
 
-        List<String> mutationErrors = response.field("createNote.errors").getValue();
+        List<String> mutationErrors = Objects.requireNonNull(response).field("createNote.errors").getValue();
         if (mutationErrors != null && !mutationErrors.isEmpty()) {
             throw new FeedbackDeliveryException("GitLab createNote failed: " + mutationErrors);
         }
 
-        String noteId = response.field("createNote.note.id").getValue();
+        String noteId = Objects.requireNonNull(response).field("createNote.note.id").getValue();
         if (noteId == null) {
             throw new FeedbackDeliveryException("No note ID in createNote response");
         }
@@ -191,7 +191,7 @@ public class GitlabSummaryChannel implements SummaryChannel {
         // A DELETED note surfaces as a TOP-LEVEL GraphQL error (the global id resolves to nothing), NOT a
         // mutation-payload error — GitLab returns no `updateNote` object at all. Left unchecked, that falls
         // through to the no-id branch below and is mis-read as TRANSIENT, so an orphaned summary never re-posts.
-        List<String> topLevelErrors = response
+        List<String> topLevelErrors = Objects.requireNonNull(response)
             .getErrors()
             .stream()
             .map(e -> e.getMessage())
@@ -203,14 +203,14 @@ public class GitlabSummaryChannel implements SummaryChannel {
                 : UpdateOutcome.transientFailure("GitLab updateNote top-level errors: " + topLevelErrors);
         }
 
-        List<String> mutationErrors = response.field("updateNote.errors").getValue();
+        List<String> mutationErrors = Objects.requireNonNull(response).field("updateNote.errors").getValue();
         if (mutationErrors != null && !mutationErrors.isEmpty()) {
             return looksGone(mutationErrors)
                 ? UpdateOutcome.gone("GitLab updateNote: " + mutationErrors)
                 : UpdateOutcome.transientFailure("GitLab updateNote failed: " + mutationErrors);
         }
 
-        String noteId = response.field("updateNote.note.id").getValue();
+        String noteId = Objects.requireNonNull(response).field("updateNote.note.id").getValue();
         if (noteId == null) {
             // The mutation neither confirmed gone nor returned an id — treat as transient, don't double-post.
             return UpdateOutcome.transientFailure("No note id in updateNote response");
@@ -268,11 +268,13 @@ public class GitlabSummaryChannel implements SummaryChannel {
                     .variable("before", cursor)
                     .execute()
                     .block(GRAPHQL_TIMEOUT);
-                if (response == null || !response.getErrors().isEmpty()) {
+                if (response == null || !Objects.requireNonNull(response).getErrors().isEmpty()) {
                     return ExistingSummaryLookup.unknown();
                 }
 
-                List<Map<String, Object>> notes = response.field(notesPath + ".nodes").getValue();
+                List<Map<String, Object>> notes = Objects.requireNonNull(response)
+                    .field(notesPath + ".nodes")
+                    .getValue();
                 if (notes == null) {
                     return ExistingSummaryLookup.unknown();
                 }
@@ -284,7 +286,7 @@ public class GitlabSummaryChannel implements SummaryChannel {
                     }
                 }
 
-                GitLabBackwardPageInfo pageInfo = response
+                GitLabBackwardPageInfo pageInfo = Objects.requireNonNull(response)
                     .field(notesPath + ".pageInfo")
                     .toEntity(GitLabBackwardPageInfo.class);
                 if (pageInfo == null) {

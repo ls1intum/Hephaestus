@@ -67,6 +67,14 @@ These guidelines keep every service aligned. Keep changes focused. Mention any d
 - Expose dedicated DTO mappers in the package instead of sprinkling conversion logic across layers.
 - Treat `Optional` as a signal for missing data. Avoid returning `null` from repository methods.
 
+### Null safety
+
+- Add a JSpecify `@NullMarked` `package-info.java` to every handwritten Java package.
+- Bare types are non-null. Use `@Nullable` only when absence is part of the contract. On API DTOs, use explicit `@NonNull` for components that must be `required` in OpenAPI.
+- Type-use annotations describe exactly what is nullable: `List<@Nullable String>` permits null elements; `String @Nullable []` permits a null array reference.
+- Fix NullAway errors at the contract or implementation boundary. Suppressions and classes without an explicit null-marking scope fail the quality gate.
+- Run `pnpm run check:java-nullness` for the policy check and `cd server && ./mvnw test-compile -P'!quick' -DskipTests` for compiler analysis.
+
 ### Safe workflows
 
 - Configuration overrides stay in `application-*.yml`. Do not commit `application-local.yml`.

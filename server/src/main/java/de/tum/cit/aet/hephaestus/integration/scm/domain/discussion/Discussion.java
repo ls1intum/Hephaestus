@@ -29,6 +29,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Entity representing a GitHub Discussion.
@@ -118,7 +119,7 @@ public class Discussion extends BaseGitServiceEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "author_id")
     @ToString.Exclude
-    private User author;
+    private @Nullable User author;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "category_id")

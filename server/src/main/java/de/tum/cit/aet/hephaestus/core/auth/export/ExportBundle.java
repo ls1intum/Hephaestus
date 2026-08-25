@@ -53,9 +53,9 @@ public record ExportBundle(
     public record Preferences(boolean participateInResearch, boolean practiceFeedbackDeliveryEnabled) {}
 
     public record AuthEvent(
-        Instant occurredAt,
-        String eventType,
-        String result,
+        @Nullable Instant occurredAt,
+        @Nullable String eventType,
+        @Nullable String result,
         @Nullable String ip,
         @Nullable String userAgent
     ) {}

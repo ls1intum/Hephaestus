@@ -17,4 +17,5 @@
  * {@code documentation-source} named interface.
  */
 @org.springframework.modulith.NamedInterface("documentation-source")
+@org.jspecify.annotations.NullMarked
 package de.tum.cit.aet.hephaestus.agent.documentation;

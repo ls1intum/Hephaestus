@@ -42,6 +42,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -117,7 +118,7 @@ public class IntegrationNatsConsumer {
     private final Map<Long, Integer> scopeReconcileAttempts = new ConcurrentHashMap<>();
 
     /** Installation consumer — single-instance, mutable across restarts. */
-    private volatile ScopeConsumer installationConsumer;
+    private volatile @Nullable ScopeConsumer installationConsumer;
 
     /** Virtual-thread executor for scope setup and installation kicks. */
     private final ExecutorService virtualThreadExecutor = Executors.newVirtualThreadPerTaskExecutor();
@@ -129,7 +130,7 @@ public class IntegrationNatsConsumer {
         return thread;
     });
 
-    private Connection natsConnection;
+    private @Nullable Connection natsConnection;
 
     private final NatsConnectionProperties connectionProperties;
     private final NatsConsumerProperties consumerProperties;
@@ -583,7 +584,10 @@ public class IntegrationNatsConsumer {
             JetStreamOptions jsOptions = JetStreamOptions.builder()
                 .requestTimeout(connectionProperties.consumer().requestTimeout())
                 .build();
-            StreamContext streamContext = natsConnection.getStreamContext(streamName, jsOptions);
+            StreamContext streamContext = Objects.requireNonNull(natsConnection).getStreamContext(
+                streamName,
+                jsOptions
+            );
             ConsumerContext consumerContext = createOrUpdateConsumer(streamContext, consumerName, subjects);
 
             ScopeConsumer scope = new ScopeConsumer(
@@ -641,7 +645,10 @@ public class IntegrationNatsConsumer {
             JetStreamOptions jsOptions = JetStreamOptions.builder()
                 .requestTimeout(connectionProperties.consumer().requestTimeout())
                 .build();
-            StreamContext streamContext = natsConnection.getStreamContext(streamName, jsOptions);
+            StreamContext streamContext = Objects.requireNonNull(natsConnection).getStreamContext(
+                streamName,
+                jsOptions
+            );
             ConsumerContext consumerContext = createOrUpdateConsumer(streamContext, consumerName, subjects);
 
             ScopeConsumer installation = new ScopeConsumer(
@@ -724,7 +731,7 @@ public class IntegrationNatsConsumer {
     static ConsumerConfiguration newConsumerConfiguration(
         String[] subjects,
         NatsConsumerProperties consumerProperties,
-        String durableName
+        @Nullable String durableName
     ) {
         ConsumerConfiguration.Builder builder = ConsumerConfiguration.builder()
             .filterSubjects(subjects)
@@ -740,7 +747,9 @@ public class IntegrationNatsConsumer {
         if (!isBlank(durableName)) {
             // Only a durable is worth reaping: JetStream already deletes an ephemeral seconds after
             // its last pull, so a threshold here would lengthen that rather than bound it.
-            builder.durable(durableName).inactiveThreshold(consumerProperties.inactiveThreshold());
+            builder
+                .durable(Objects.requireNonNull(durableName))
+                .inactiveThreshold(consumerProperties.inactiveThreshold());
         }
         return builder.build();
     }
@@ -750,10 +759,10 @@ public class IntegrationNatsConsumer {
         if (isBlank(name)) {
             return "hephaestus";
         }
-        return name;
+        return Objects.requireNonNull(name);
     }
 
-    private static boolean isBlank(String s) {
+    private static boolean isBlank(@Nullable String s) {
         return s == null || s.isBlank();
     }
 
@@ -770,7 +779,7 @@ public class IntegrationNatsConsumer {
      *                events aren't tied to a single workspace). Used only to record webhook-liveness
      *                via {@link ConnectionActivityRecorder} — never affects dispatch/ACK/NAK.
      */
-    void handleMessage(Long scopeId, Message msg) {
+    void handleMessage(@Nullable Long scopeId, Message msg) {
         if (shuttingDown.get()) {
             safeNak(msg);
             return;
@@ -793,6 +802,9 @@ public class IntegrationNatsConsumer {
                 // event) and still return normally; that event genuinely arrived, so stamping it is correct. Health
                 // derivation does not read this field, so the coarse-freshness semantics carry no correctness risk.
                 EventTypeKey key = resolvedHandler.key();
+                if (key == null) {
+                    throw new IllegalStateException("Integration handler returned a null key");
+                }
                 activityRecorder.recordEventProcessed(scopeId, key.kind(), key.eventType());
             }
         } catch (Exception e) {

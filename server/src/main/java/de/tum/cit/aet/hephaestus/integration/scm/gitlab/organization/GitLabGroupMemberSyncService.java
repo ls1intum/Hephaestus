@@ -27,6 +27,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.graphql.GitLabPag
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.user.GitLabUserClassifier;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
@@ -73,7 +74,7 @@ public class GitLabGroupMemberSyncService {
     private final UserRepository userRepository;
     private final IdentityProviderRepository gitProviderRepository;
     private final GitLabProperties gitLabProperties;
-    private final OrganizationMembershipListener organizationMembershipListener;
+    private final @Nullable OrganizationMembershipListener organizationMembershipListener;
     private final TransactionTemplate requiresNewTransaction;
 
     public GitLabGroupMemberSyncService(
@@ -94,7 +95,9 @@ public class GitLabGroupMemberSyncService {
         this.gitLabProperties = gitLabProperties;
         this.organizationMembershipListener = organizationMembershipListener;
         // Isolated transaction for each user upsert — matches GitHubUserProcessor pattern.
-        this.requiresNewTransaction = new TransactionTemplate(transactionTemplate.getTransactionManager());
+        this.requiresNewTransaction = new TransactionTemplate(
+            Objects.requireNonNull(transactionTemplate.getTransactionManager())
+        );
         this.requiresNewTransaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
     }
 
@@ -113,7 +116,7 @@ public class GitLabGroupMemberSyncService {
      * @param organization  the Organization entity for this group
      * @return the number of unique members synced, or -1 on failure
      */
-    public int syncGroupMemberships(Long scopeId, String groupFullPath, Organization organization) {
+    public int syncGroupMemberships(Long scopeId, @Nullable String groupFullPath, @Nullable Organization organization) {
         if (organization == null || groupFullPath == null || groupFullPath.isBlank()) {
             log.warn(
                 "Skipped group membership sync: reason=missingArgs, scopeId={}, groupPath={}",
@@ -125,7 +128,7 @@ public class GitLabGroupMemberSyncService {
 
         String safeGroupPath = sanitizeForLog(groupFullPath);
         IdentityProvider provider = resolveProvider();
-        Long providerId = provider.getId();
+        Long providerId = Objects.requireNonNull(provider.getId());
 
         Set<Long> syncedUserIds = new HashSet<>();
         String cursor = null;
@@ -171,7 +174,7 @@ public class GitLabGroupMemberSyncService {
 
                 graphQlClientProvider.recordSuccess();
 
-                List<GitLabGroupMemberResponse> members = response
+                List<GitLabGroupMemberResponse> members = Objects.requireNonNull(response)
                     .field("group.groupMembers.nodes")
                     .toEntityList(GitLabGroupMemberResponse.class);
 
@@ -191,7 +194,9 @@ public class GitLabGroupMemberSyncService {
                 }
 
                 // Check pagination
-                GitLabPageInfo pageInfo = response.field("group.groupMembers.pageInfo").toEntity(GitLabPageInfo.class);
+                GitLabPageInfo pageInfo = Objects.requireNonNull(response)
+                    .field("group.groupMembers.pageInfo")
+                    .toEntity(GitLabPageInfo.class);
 
                 if (pageInfo == null || !pageInfo.hasNextPage()) {
                     syncCompletedNormally = true;

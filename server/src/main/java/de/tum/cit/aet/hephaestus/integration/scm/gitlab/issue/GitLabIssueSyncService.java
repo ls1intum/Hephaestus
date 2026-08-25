@@ -17,6 +17,7 @@ import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -76,7 +77,7 @@ public class GitLabIssueSyncService {
      */
     public SyncResult syncIssues(Long scopeId, Repository repository, @Nullable OffsetDateTime updatedAfter) {
         String projectPath = repository.getNameWithOwner();
-        String safeProjectPath = sanitizeForLog(projectPath);
+        String safeProjectPath = Objects.requireNonNullElse(sanitizeForLog(projectPath), "<unknown>");
 
         log.info(
             "Starting issue sync: scopeId={}, projectPath={}, updatedAfter={}",
@@ -142,7 +143,7 @@ public class GitLabIssueSyncService {
                 // Extract reported total count on first page for post-sync verification
                 if (page == 0) {
                     try {
-                        Object countField = response.field("project.issues.count").getValue();
+                        Object countField = Objects.requireNonNull(response).field("project.issues.count").getValue();
                         if (countField instanceof Number number) {
                             reportedTotalCount = number.intValue();
                             log.info(
@@ -158,7 +159,9 @@ public class GitLabIssueSyncService {
 
                 // Extract issues from response using dot-notation paths
                 @SuppressWarnings({ "unchecked", "rawtypes" })
-                List<Map<String, Object>> nodes = (List) response.field("project.issues.nodes").toEntityList(Map.class);
+                List<Map<String, Object>> nodes = (List) Objects.requireNonNull(response)
+                    .field("project.issues.nodes")
+                    .toEntityList(Map.class);
 
                 if (nodes == null || nodes.isEmpty()) {
                     break;
@@ -182,7 +185,9 @@ public class GitLabIssueSyncService {
                 }
 
                 // Pagination
-                GitLabPageInfo pageInfo = response.field("project.issues.pageInfo").toEntity(GitLabPageInfo.class);
+                GitLabPageInfo pageInfo = Objects.requireNonNull(response)
+                    .field("project.issues.pageInfo")
+                    .toEntity(GitLabPageInfo.class);
 
                 if (pageInfo == null || !pageInfo.hasNextPage()) {
                     break;
@@ -268,7 +273,7 @@ public class GitLabIssueSyncService {
         int maxItems
     ) {
         String projectPath = repository.getNameWithOwner();
-        String safeProjectPath = sanitizeForLog(projectPath);
+        String safeProjectPath = Objects.requireNonNullElse(sanitizeForLog(projectPath), "<unknown>");
 
         int totalProcessed = 0;
         int minIid = Integer.MAX_VALUE;
@@ -312,7 +317,9 @@ public class GitLabIssueSyncService {
                 graphQlClientProvider.recordSuccess();
 
                 @SuppressWarnings({ "unchecked", "rawtypes" })
-                List<Map<String, Object>> nodes = (List) response.field("project.issues.nodes").toEntityList(Map.class);
+                List<Map<String, Object>> nodes = (List) Objects.requireNonNull(response)
+                    .field("project.issues.nodes")
+                    .toEntityList(Map.class);
 
                 if (nodes == null || nodes.isEmpty()) break;
 
@@ -339,7 +346,9 @@ public class GitLabIssueSyncService {
 
                 remaining -= nodes.size();
 
-                GitLabPageInfo pageInfo = response.field("project.issues.pageInfo").toEntity(GitLabPageInfo.class);
+                GitLabPageInfo pageInfo = Objects.requireNonNull(response)
+                    .field("project.issues.pageInfo")
+                    .toEntity(GitLabPageInfo.class);
 
                 if (pageInfo == null || !pageInfo.hasNextPage()) break;
 
@@ -679,7 +688,9 @@ public class GitLabIssueSyncService {
 
                 // Navigate: project.issues.nodes[0].labels
                 @SuppressWarnings("rawtypes")
-                List issueNodesRaw = response.field("project.issues.nodes").toEntityList(Map.class);
+                List issueNodesRaw = Objects.requireNonNull(response)
+                    .field("project.issues.nodes")
+                    .toEntityList(Map.class);
                 @SuppressWarnings("unchecked")
                 List<Map<String, Object>> issueNodes = (List<Map<String, Object>>) issueNodesRaw;
 
@@ -798,7 +809,9 @@ public class GitLabIssueSyncService {
 
                 // Navigate: project.issues.nodes[0].assignees
                 @SuppressWarnings("rawtypes")
-                List assigneeIssueNodesRaw = response.field("project.issues.nodes").toEntityList(Map.class);
+                List assigneeIssueNodesRaw = Objects.requireNonNull(response)
+                    .field("project.issues.nodes")
+                    .toEntityList(Map.class);
                 @SuppressWarnings("unchecked")
                 List<Map<String, Object>> issueNodes = (List<Map<String, Object>>) assigneeIssueNodesRaw;
 

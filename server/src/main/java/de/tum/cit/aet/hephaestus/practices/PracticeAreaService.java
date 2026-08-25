@@ -71,7 +71,7 @@ public class PracticeAreaService {
         Map<String, PracticeArea> bySlug = areas.stream().collect(Collectors.toMap(PracticeArea::getSlug, a -> a));
         int order = 0;
         for (String slug : orderedSlugs) {
-            PracticeArea area = bySlug.get(slug);
+            PracticeArea area = Objects.requireNonNull(bySlug.get(slug));
             area.setDisplayOrder(order++);
             practiceAreaRepository.save(area);
         }
@@ -104,7 +104,7 @@ public class PracticeAreaService {
         PracticeArea area = new PracticeArea();
         area.setWorkspace(workspace);
         area.setSlug(slug);
-        area.setName(attributes.name());
+        area.setName(Objects.requireNonNull(attributes.name()));
         area.setDescription(attributes.description());
         area.setDisplayOrder(
             attributes.displayOrder() != null

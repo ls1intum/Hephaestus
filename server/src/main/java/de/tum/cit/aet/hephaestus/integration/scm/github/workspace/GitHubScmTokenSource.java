@@ -43,8 +43,12 @@ public class GitHubScmTokenSource implements ScmTokenSource {
         // GitHub App first: mint a short-lived installation token.
         Optional<ConnectionConfig.GitHubAppConfig> appConfig = connectionService.findActiveGitHubAppConfig(scopeId);
         if (appConfig.isPresent()) {
+            Long installationId = appConfig.get().installationId();
+            if (installationId == null) {
+                return Optional.empty();
+            }
             try {
-                String token = gitHubAppTokenService.getOrRefreshToken(appConfig.get().installationId());
+                String token = gitHubAppTokenService.getOrRefreshToken(installationId);
                 return (token == null || token.isBlank()) ? Optional.empty() : Optional.of(token);
             } catch (Exception e) {
                 log.warn(

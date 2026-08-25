@@ -19,6 +19,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Entity representing a file change within a Git commit.
@@ -80,7 +81,7 @@ public class CommitFileChange {
      * The previous filename, if the file was renamed.
      */
     @Column(length = 1024)
-    private String previousFilename;
+    private @Nullable String previousFilename;
 
     // Relationships
 
@@ -90,6 +91,7 @@ public class CommitFileChange {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "commit_id", nullable = false)
     @ToString.Exclude
+    @Nullable
     private Commit commit;
 
     // Enums

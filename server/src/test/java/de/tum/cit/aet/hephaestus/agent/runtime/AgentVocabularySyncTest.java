@@ -82,7 +82,7 @@ class AgentVocabularySyncTest extends BaseUnitTest {
     }
 
     @Test
-    void conversationNoteShapeMatches() throws IOException {
+    void shouldKeepConversationNoteShapeInSync() throws IOException {
         List<String> javaFields = Arrays.stream(ComposedFeedbackUnit.ConversationBrief.class.getRecordComponents())
             .map(component -> component.getName())
             .toList();

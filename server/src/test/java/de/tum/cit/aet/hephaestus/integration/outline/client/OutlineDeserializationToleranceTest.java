@@ -10,8 +10,8 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.jackson.autoconfigure.JacksonAutoConfiguration;
+import org.springframework.boot.test.autoconfigure.json.JsonTest;
 import org.springframework.boot.test.context.ConfigDataApplicationContextInitializer;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpStatus;
 import org.springframework.test.context.ContextConfiguration;
@@ -28,8 +28,11 @@ import tools.jackson.databind.json.JsonMapper;
  * a body carrying unknown fields at both the envelope level and inside a generated model.
  */
 @Tag("unit")
-@SpringBootTest(classes = JacksonAutoConfiguration.class)
-@ContextConfiguration(initializers = ConfigDataApplicationContextInitializer.class)
+@JsonTest
+@ContextConfiguration(
+    classes = JacksonAutoConfiguration.class,
+    initializers = ConfigDataApplicationContextInitializer.class
+)
 class OutlineDeserializationToleranceTest {
 
     @Autowired

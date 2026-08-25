@@ -115,14 +115,19 @@ public class PracticeService {
         Map<String, Practice> bySlug = bucket.stream().collect(Collectors.toMap(Practice::getSlug, p -> p));
         int order = 0;
         for (String slug : orderedSlugs) {
-            Practice p = bySlug.get(slug);
+            Practice p = Objects.requireNonNull(bySlug.get(slug));
             p.setDisplayOrder(order++);
             practiceRepository.save(p);
         }
     }
 
     @Transactional
-    public List<Practice> placePractice(WorkspaceContext ctx, String practiceSlug, String areaSlug, int position) {
+    public List<Practice> placePractice(
+        WorkspaceContext ctx,
+        String practiceSlug,
+        @Nullable String areaSlug,
+        int position
+    ) {
         lockWorkspace(ctx);
         Practice practice = practiceRepository
             .findByWorkspaceIdAndSlug(ctx.id(), practiceSlug)
@@ -165,7 +170,7 @@ public class PracticeService {
         return allPractices;
     }
 
-    private List<Practice> practicesInArea(List<Practice> allPractices, Long areaId, Practice excluded) {
+    private List<Practice> practicesInArea(List<Practice> allPractices, @Nullable Long areaId, Practice excluded) {
         return allPractices
             .stream()
             .filter(practice -> Objects.equals(areaId, practice.getArea() == null ? null : practice.getArea().getId()))
@@ -189,7 +194,7 @@ public class PracticeService {
 
     @Transactional
     public Practice createPractice(WorkspaceContext ctx, CreatePracticeRequestDTO request) {
-        return createPractice(ctx, request.slug(), definition(request), null, null, null);
+        return createPractice(ctx, required(request.slug(), "slug"), definition(request), null, null, null);
     }
 
     @Transactional
@@ -224,12 +229,13 @@ public class PracticeService {
         Workspace workspace = lockWorkspace(ctx);
 
         Practice practice = new Practice();
+        String areaSlug = definition.areaSlug();
         var area =
-            definition.areaSlug() == null
+            areaSlug == null
                 ? null
                 : practiceAreaRepository
-                      .findByWorkspaceIdAndSlug(ctx.id(), definition.areaSlug())
-                      .orElseThrow(() -> new EntityNotFoundException("PracticeArea", definition.areaSlug()));
+                      .findByWorkspaceIdAndSlug(ctx.id(), areaSlug)
+                      .orElseThrow(() -> new EntityNotFoundException("PracticeArea", areaSlug));
         practice.setWorkspace(workspace);
         practice.setSourceCuratedSlug(sourceCuratedSlug);
         practice.setSourceCuratedFingerprint(sourceCuratedFingerprint);
@@ -456,16 +462,17 @@ public class PracticeService {
         log.info("Deleted practice '{}' (slug={}) from workspace {}", practice.getName(), slug, ctx.slug());
     }
 
-    private Integer currentRevisionNumber(Practice practice) {
+    private @Nullable Integer currentRevisionNumber(Practice practice) {
         return practiceRevisionService.currentRevisionNumber(practice);
     }
 
     private PracticeDefinition definition(CreatePracticeRequestDTO request) {
-        ArtifactKind artifactKind = PracticeBinding.artifactKindOf(request.bindings());
+        List<PracticeBinding> bindings = required(request.bindings(), "bindings");
+        ArtifactKind artifactKind = PracticeBinding.artifactKindOf(bindings);
         return new PracticeDefinition(
-            request.name(),
-            request.bindings(),
-            request.criteria(),
+            required(request.name(), "name"),
+            bindings,
+            required(request.criteria(), "criteria"),
             request.precomputeScript(),
             request.automatedReviewPolicy() == null
                 ? evidenceDefaults.policyFor(artifactKind)
@@ -474,6 +481,13 @@ public class PracticeService {
             request.whatGoodLooksLike(),
             request.areaSlug()
         );
+    }
+
+    private static <T> T required(@Nullable T value, String field) {
+        if (value == null) {
+            throw new IllegalArgumentException(field + " is required");
+        }
+        return value;
     }
 
     /**
@@ -529,7 +543,7 @@ public class PracticeService {
         practice.setWhatGoodLooksLike(definition.whatGoodLooksLike());
     }
 
-    private static String patch(String current, String replacement, boolean clear) {
+    private static @Nullable String patch(@Nullable String current, @Nullable String replacement, boolean clear) {
         return replacement != null ? replacement : clear ? null : current;
     }
 }

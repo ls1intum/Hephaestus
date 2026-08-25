@@ -9,6 +9,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace.GitLabWebhookService;
 import de.tum.cit.aet.hephaestus.workspace.ScmWorkspaceContentEraser;
 import java.util.Map;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -91,7 +92,7 @@ public class GitlabConnectionStrategy implements ConnectionStrategy {
     }
 
     @Override
-    public void revoke(IntegrationRef ref) {
+    public void revoke(@Nullable IntegrationRef ref) {
         if (ref == null) {
             return;
         }

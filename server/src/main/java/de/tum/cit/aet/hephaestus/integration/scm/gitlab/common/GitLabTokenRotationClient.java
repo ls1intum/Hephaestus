@@ -5,6 +5,7 @@ import de.tum.cit.aet.hephaestus.integration.core.egress.EgressExemption;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.util.Map;
+import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -78,15 +79,15 @@ public class GitLabTokenRotationClient {
             throw new IllegalStateException("Empty response from GitLab token self-introspection");
         }
 
-        Number idValue = (Number) response.get("id");
+        Number idValue = (Number) Objects.requireNonNull(response).get("id");
         if (idValue == null) {
             throw new IllegalStateException(
                 "GitLab token introspection response missing 'id' field: scopeId=" + scopeId
             );
         }
         long id = idValue.longValue();
-        String name = (String) response.get("name");
-        String expiresAtStr = (String) response.get("expires_at");
+        String name = (String) Objects.requireNonNull(response).get("name");
+        String expiresAtStr = (String) Objects.requireNonNull(response).get("expires_at");
         LocalDate expiresAt = expiresAtStr != null ? LocalDate.parse(expiresAtStr) : null;
 
         return new TokenInfo(id, name, expiresAt);
@@ -118,14 +119,14 @@ public class GitLabTokenRotationClient {
             throw new IllegalStateException("Empty response from GitLab token rotation");
         }
 
-        String newToken = (String) response.get("token");
+        String newToken = (String) Objects.requireNonNull(response).get("token");
         if (newToken == null || newToken.isBlank()) {
             throw new IllegalStateException(
                 "GitLab rotation response missing 'token' field. Old token is revoked. Manual intervention required: scopeId=" +
                     scopeId
             );
         }
-        String newExpiresAtStr = (String) response.get("expires_at");
+        String newExpiresAtStr = (String) Objects.requireNonNull(response).get("expires_at");
         LocalDate newExpiresAt = newExpiresAtStr != null ? LocalDate.parse(newExpiresAtStr) : expiresAt;
 
         log.info("Rotated GitLab PAT: scopeId={}, newExpiresAt={}", scopeId, newExpiresAt);
@@ -139,7 +140,7 @@ public class GitLabTokenRotationClient {
      * @param name      the token name
      * @param expiresAt expiry date (null if no expiry)
      */
-    public record TokenInfo(long id, String name, @Nullable LocalDate expiresAt) {}
+    public record TokenInfo(long id, @Nullable String name, @Nullable LocalDate expiresAt) {}
 
     /**
      * Result of a token rotation.

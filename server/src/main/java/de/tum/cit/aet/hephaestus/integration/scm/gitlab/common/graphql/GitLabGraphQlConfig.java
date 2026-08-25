@@ -16,6 +16,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabRateLimitTr
 import io.netty.resolver.DefaultAddressResolverGroup;
 import java.time.Duration;
 import java.util.List;
+import java.util.Objects;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -156,13 +157,16 @@ public class GitLabGraphQlConfig {
                     request
                         .attribute(GitLabGraphQlClientProvider.SCOPE_ID_ATTRIBUTE)
                         .ifPresent(scopeIdObj ->
-                            rateLimitTracker.updateFromHeaders((Long) scopeIdObj, response.headers().asHttpHeaders())
+                            rateLimitTracker.updateFromHeaders(
+                                (Long) scopeIdObj,
+                                Objects.requireNonNull(response).headers().asHttpHeaders()
+                            )
                         );
                 });
     }
 
     private void logRateLimitInfo(ClientResponse response) {
-        HttpHeaders headers = response.headers().asHttpHeaders();
+        HttpHeaders headers = Objects.requireNonNull(response).headers().asHttpHeaders();
 
         String remaining = headers.getFirst(HEADER_RATE_LIMIT_REMAINING);
         String limit = headers.getFirst(HEADER_RATE_LIMIT_LIMIT);
@@ -188,7 +192,7 @@ public class GitLabGraphQlConfig {
             }
         }
 
-        if (response.statusCode().value() == 429) {
+        if (Objects.requireNonNull(response).statusCode().value() == 429) {
             log.error("Exceeded GitLab rate limit: status=429, resetEpoch={}", reset);
         }
     }
@@ -198,14 +202,16 @@ public class GitLabGraphQlConfig {
             next
                 .exchange(request)
                 .flatMap(response -> {
-                    HttpStatusCode status = response.statusCode();
+                    HttpStatusCode status = Objects.requireNonNull(response).statusCode();
 
                     if (status.is4xxClientError() && status.value() != 429) {
                         return Mono.just(response);
                     }
 
                     if (status.is5xxServerError() || status.value() == 429) {
-                        return response.releaseBody().then(Mono.error(new RetryableStatusException(status.value())));
+                        return Objects.requireNonNull(response)
+                            .releaseBody()
+                            .then(Mono.error(new RetryableStatusException(status.value())));
                     }
 
                     return Mono.just(response);

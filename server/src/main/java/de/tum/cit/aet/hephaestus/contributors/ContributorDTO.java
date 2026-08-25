@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import io.swagger.v3.oas.annotations.media.Schema;
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Data transfer object representing a GitHub contributor.
@@ -33,7 +34,7 @@ public record ContributorDTO(
          * Converts to ContributorDTO with full name from user API.
          * Falls back to login if name is not available.
          */
-        public ContributorDTO toContributorDTO(String fullName) {
+        public ContributorDTO toContributorDTO(@Nullable String fullName) {
             return new ContributorDTO(
                 id,
                 login,

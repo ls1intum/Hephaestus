@@ -173,7 +173,9 @@ public class LlmModelResolver {
             if (!isUsableInstanceModel(ref)) {
                 return null;
             }
-            LlmModel model = llmModelRepository.findById(ref.modelId()).orElse(null);
+            Long modelId = ref.modelId();
+            if (modelId == null) return null;
+            LlmModel model = llmModelRepository.findById(modelId).orElse(null);
             if (model == null) return null;
             return llmConnectionRepository
                 .findById(ref.connectionId())
@@ -194,8 +196,11 @@ public class LlmModelResolver {
             if (!isUsableWorkspaceModel(ref)) {
                 return null;
             }
+            Long modelId = ref.modelId();
+            Long workspaceId = ref.workspaceId();
+            if (modelId == null || workspaceId == null) return null;
             WorkspaceLlmModel model = workspaceLlmModelRepository
-                .findByIdAndWorkspaceId(ref.modelId(), ref.workspaceId())
+                .findByIdAndWorkspaceId(modelId, workspaceId)
                 .orElse(null);
             if (model == null) return null;
             return workspaceLlmConnectionRepository
@@ -217,27 +222,31 @@ public class LlmModelResolver {
     }
 
     private boolean isUsableInstanceModel(ConnectionRef ref) {
-        if (ref.modelId() == null || ref.workspaceId() == null) {
+        Long modelId = ref.modelId();
+        Long workspaceId = ref.workspaceId();
+        if (modelId == null || workspaceId == null) {
             return false;
         }
         return llmModelRepository
-            .findById(ref.modelId())
+            .findById(modelId)
             .filter(LlmModel::isEnabled)
             .filter(model -> model.getConnection().getId().equals(ref.connectionId()))
             .filter(
                 model ->
                     model.getVisibility() == ModelVisibility.PUBLIC ||
-                    grantRepository.existsByIdModelIdAndIdWorkspaceId(model.getId(), ref.workspaceId())
+                    grantRepository.existsByIdModelIdAndIdWorkspaceId(model.getId(), workspaceId)
             )
             .isPresent();
     }
 
     private boolean isUsableWorkspaceModel(ConnectionRef ref) {
-        if (ref.modelId() == null || ref.workspaceId() == null) {
+        Long modelId = ref.modelId();
+        Long workspaceId = ref.workspaceId();
+        if (modelId == null || workspaceId == null) {
             return false;
         }
         return workspaceLlmModelRepository
-            .findByIdAndWorkspaceId(ref.modelId(), ref.workspaceId())
+            .findByIdAndWorkspaceId(modelId, workspaceId)
             .filter(WorkspaceLlmModel::isEnabled)
             .filter(model -> model.getConnection().getId().equals(ref.connectionId()))
             .isPresent();

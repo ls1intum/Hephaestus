@@ -7,4 +7,5 @@
  * via {@code core.runtime.worker.protocol}.
  */
 @org.springframework.modulith.NamedInterface("worker-runtime")
+@org.jspecify.annotations.NullMarked
 package de.tum.cit.aet.hephaestus.agent.runtime.worker;

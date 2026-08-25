@@ -3,4 +3,5 @@
  * provisioning surfaces group-sync outcomes to the workspace lifecycle UI.
  */
 @org.springframework.modulith.NamedInterface("organization")
+@org.jspecify.annotations.NullMarked
 package de.tum.cit.aet.hephaestus.integration.scm.gitlab.organization;

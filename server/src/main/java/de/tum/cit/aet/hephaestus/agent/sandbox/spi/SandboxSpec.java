@@ -1,9 +1,12 @@
 package de.tum.cit.aet.hephaestus.agent.sandbox.spi;
 
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Complete specification for a sandboxed container execution.
@@ -27,9 +30,9 @@ public record SandboxSpec(
     String image,
     List<String> command,
     Map<String, String> environment,
-    NetworkPolicy networkPolicy,
+    @Nullable NetworkPolicy networkPolicy,
     ResourceLimits resourceLimits,
-    SecurityProfile securityProfile,
+    @Nullable SecurityProfile securityProfile,
     Map<String, byte[]> inputFiles,
     /** Inputs staged by host path and streamed into the container, never read into this process. */
     Map<String, java.nio.file.Path> inputFilesOnDisk,
@@ -38,16 +41,16 @@ public record SandboxSpec(
 ) {
     /** For runs whose inputs are all held in memory. */
     public SandboxSpec(
-        java.util.UUID jobId,
+        UUID jobId,
         String image,
-        java.util.List<String> command,
-        Map<String, String> environment,
-        NetworkPolicy networkPolicy,
+        @Nullable List<String> command,
+        @Nullable Map<String, String> environment,
+        @Nullable NetworkPolicy networkPolicy,
         ResourceLimits resourceLimits,
-        SecurityProfile securityProfile,
-        Map<String, byte[]> inputFiles,
+        @Nullable SecurityProfile securityProfile,
+        @Nullable Map<String, byte[]> inputFiles,
         String outputPath,
-        Map<String, String> volumeMounts
+        @Nullable Map<String, String> volumeMounts
     ) {
         this(
             jobId,
@@ -64,21 +67,36 @@ public record SandboxSpec(
         );
     }
 
-    public SandboxSpec {
-        Objects.requireNonNull(jobId, "jobId must not be null");
-        Objects.requireNonNull(image, "image must not be null");
-        Objects.requireNonNull(resourceLimits, "resourceLimits must not be null");
-        Objects.requireNonNull(outputPath, "outputPath must not be null");
-        if (image.isBlank()) {
+    public SandboxSpec(
+        UUID jobId,
+        String image,
+        @Nullable List<String> command,
+        @Nullable Map<String, String> environment,
+        @Nullable NetworkPolicy networkPolicy,
+        ResourceLimits resourceLimits,
+        @Nullable SecurityProfile securityProfile,
+        @Nullable Map<String, byte[]> inputFiles,
+        @Nullable Map<String, java.nio.file.Path> inputFilesOnDisk,
+        String outputPath,
+        @Nullable Map<String, String> volumeMounts
+    ) {
+        this.jobId = Objects.requireNonNull(jobId, "jobId must not be null");
+        this.image = Objects.requireNonNull(image, "image must not be null");
+        this.resourceLimits = Objects.requireNonNull(resourceLimits, "resourceLimits must not be null");
+        this.outputPath = Objects.requireNonNull(outputPath, "outputPath must not be null");
+        if (this.image.isBlank()) {
             throw new IllegalArgumentException("image must not be blank");
         }
-        if (outputPath.isBlank()) {
+        if (this.outputPath.isBlank()) {
             throw new IllegalArgumentException("outputPath must not be blank");
         }
-        command = command != null ? command : List.of();
-        environment = environment != null ? environment : Map.of();
-        inputFiles = inputFiles != null ? Map.copyOf(inputFiles) : Map.of();
-        inputFilesOnDisk = inputFilesOnDisk != null ? Map.copyOf(inputFilesOnDisk) : Map.of();
-        volumeMounts = volumeMounts != null ? volumeMounts : Map.of();
+        this.command = command != null ? List.copyOf(command) : List.of();
+        this.environment = environment != null ? Map.copyOf(environment) : Map.of();
+        this.networkPolicy = networkPolicy;
+        this.securityProfile = securityProfile;
+        this.inputFiles = inputFiles != null ? Map.copyOf(inputFiles) : Map.of();
+        this.inputFilesOnDisk = inputFilesOnDisk != null ? Map.copyOf(inputFilesOnDisk) : Map.of();
+        this.volumeMounts =
+            volumeMounts != null ? Collections.unmodifiableMap(new LinkedHashMap<>(volumeMounts)) : Map.of();
     }
 }

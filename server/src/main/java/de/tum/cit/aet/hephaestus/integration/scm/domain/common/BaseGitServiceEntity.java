@@ -14,6 +14,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Base class for all git service entities synced from external providers.
@@ -49,9 +50,9 @@ public abstract class BaseGitServiceEntity {
     @Column(name = "native_id", nullable = false)
     protected Long nativeId;
 
-    protected Instant createdAt;
+    protected @Nullable Instant createdAt;
 
-    protected Instant updatedAt;
+    protected @Nullable Instant updatedAt;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "provider_id", nullable = false)

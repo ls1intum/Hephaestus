@@ -11,6 +11,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.time.Instant;
 import java.util.List;
+import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -84,7 +85,7 @@ public class AccountWebController {
     public ResponseEntity<CurrentUserViewDTO> currentUser() {
         Account account = accountService.requireById(CurrentAccount.requireId());
         Long impersonatorId = CurrentAccount.impersonatorId();
-        var identities = accountService.activeIdentities(account.getId());
+        var identities = accountService.activeIdentities(Objects.requireNonNull(account.getId()));
         // Primary identity = most recently used active link (login source for the SPA).
         IdentityLink primary = identities.stream().findFirst().orElse(null);
         List<LinkedProviderDTO> linkedProviders = identities
@@ -100,7 +101,7 @@ public class AccountWebController {
         boolean hasGitLab = linkedProviders.stream().anyMatch(p -> "GITLAB".equals(p.type()));
         return ResponseEntity.ok(
             new CurrentUserViewDTO(
-                account.getId(),
+                Objects.requireNonNull(account.getId()),
                 account.getDisplayName(),
                 account.getPrimaryEmail(),
                 account.getAppRole().name(),

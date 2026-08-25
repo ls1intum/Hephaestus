@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.core.oauth.state;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -36,7 +37,7 @@ class OAuthStateNonceCleanupJobTest extends BaseUnitTest {
         job.cleanupExpired();
 
         verify(repository).deleteByIssuedAtBefore(any(Instant.class));
-        assertThat(registry.find("oauth.state.nonce.pruned").counter().count()).isEqualTo(5.0);
+        assertThat(counterValue(registry)).isEqualTo(5.0);
     }
 
     @Test
@@ -47,7 +48,7 @@ class OAuthStateNonceCleanupJobTest extends BaseUnitTest {
 
         job.cleanupExpired();
 
-        assertThat(registry.find("oauth.state.nonce.pruned").counter().count()).isEqualTo(0.0);
+        assertThat(counterValue(registry)).isEqualTo(0.0);
     }
 
     @Test
@@ -70,5 +71,11 @@ class OAuthStateNonceCleanupJobTest extends BaseUnitTest {
         // Should not throw — null is normalised.
         job.cleanupExpired();
         verify(repository).deleteByIssuedAtBefore(any(Instant.class));
+    }
+
+    private static double counterValue(SimpleMeterRegistry registry) {
+        var counter = registry.find("oauth.state.nonce.pruned").counter();
+        assertNotNull(counter);
+        return counter.count();
     }
 }

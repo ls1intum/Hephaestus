@@ -6,6 +6,7 @@ import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineCollection.Sy
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Admin control-plane view of one mirrored Outline collection: its catalog identity (name, urlId,
@@ -17,11 +18,11 @@ import org.jspecify.annotations.NonNull;
 public record OutlineCollectionDTO(
     @NonNull @Schema(description = "Internal registry row id") Long id,
     @NonNull @Schema(description = "Outline collection id (UUID; the natural key)") String collectionId,
-    @Schema(description = "Collection name as shown in Outline, if known") String name,
-    @Schema(description = "Outline url id (the short slug in collection URLs)") String urlId,
-    @Schema(description = "Collection color as configured in Outline") String color,
-    @Schema(description = "Collection icon as configured in Outline") String icon,
-    @Schema(description = "Collection description as shown in Outline") String description,
+    @Schema(description = "Collection name as shown in Outline, if known") @Nullable String name,
+    @Schema(description = "Outline url id (the short slug in collection URLs)") @Nullable String urlId,
+    @Schema(description = "Collection color as configured in Outline") @Nullable String color,
+    @Schema(description = "Collection icon as configured in Outline") @Nullable String icon,
+    @Schema(description = "Collection description as shown in Outline") @Nullable String description,
     @NonNull
     @Schema(description = "Mirror lifecycle state (PAUSED freezes sync but keeps documents)")
     MirrorState state,
@@ -32,11 +33,17 @@ public record OutlineCollectionDTO(
     @Schema(
         description = "Documents upstream reported for this collection at the last enumeration (coverage denominator)"
     )
+    @Nullable
     Integer documentsUpstream,
     @Schema(description = "Exports the last pass skipped because the shared budget ran out (0 on a clean pass)")
+    @Nullable
     Integer exportsSkippedForBudget,
-    @Schema(description = "When this collection last completed a full reconcile pass, if any") Instant lastSyncedAt,
-    @Schema(description = "Last sync failure for this collection, cleared on the next clean pass") String lastSyncError,
+    @Schema(description = "When this collection last completed a full reconcile pass, if any")
+    @Nullable
+    Instant lastSyncedAt,
+    @Schema(description = "Last sync failure for this collection, cleared on the next clean pass")
+    @Nullable
+    String lastSyncError,
     @NonNull @Schema(description = "When the collection was registered for mirroring") Instant createdAt
 ) {
     /** Projects a registry row plus its live document count into the DTO. */

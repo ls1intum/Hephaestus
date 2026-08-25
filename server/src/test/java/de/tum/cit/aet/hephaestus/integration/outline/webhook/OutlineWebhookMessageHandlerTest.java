@@ -26,6 +26,7 @@ import java.time.Instant;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Stream;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -68,16 +69,16 @@ class OutlineWebhookMessageHandlerTest extends BaseUnitTest {
         );
     }
 
-    private static Message message(String subscriptionId, String event, String payloadId) {
+    private static Message message(String subscriptionId, String event, @Nullable String payloadId) {
         return message(subscriptionId, event, payloadId, null, null);
     }
 
     private static Message message(
         String subscriptionId,
         String event,
-        String payloadId,
-        String actorId,
-        String createdAt
+        @Nullable String payloadId,
+        @Nullable String actorId,
+        @Nullable String createdAt
     ) {
         Message msg = Mockito.mock(Message.class);
         String payload = payloadId == null ? "{}" : "{\"id\":\"" + payloadId + "\"}";

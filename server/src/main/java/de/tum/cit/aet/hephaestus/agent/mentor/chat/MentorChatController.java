@@ -13,6 +13,7 @@ import jakarta.validation.Valid;
 import java.time.Duration;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.MediaType;
@@ -38,7 +39,7 @@ public class MentorChatController {
     private static final Logger log = LoggerFactory.getLogger(MentorChatController.class);
     private static final long EMITTER_TIMEOUT_MS = Duration.ofMinutes(10).toMillis();
 
-    private final MentorChatService mentorChatService;
+    private final MentorChatStarter mentorChatStarter;
     private final ObjectMapper objectMapperBean;
     private final MentorAgentProperties mentorAgentProperties;
 
@@ -79,7 +80,7 @@ public class MentorChatController {
             userMessage,
             clientUserMessageId
         );
-        mentorChatService.start(serviceRequest, emitter);
+        mentorChatStarter.start(serviceRequest, emitter);
         return emitter;
     }
 
@@ -89,7 +90,7 @@ public class MentorChatController {
         response.setHeader("X-Accel-Buffering", "no");
     }
 
-    private static String extractUserMessage(JsonNode message) {
+    private static @Nullable String extractUserMessage(@Nullable JsonNode message) {
         if (message == null || !message.isObject() || !message.has("parts") || !message.get("parts").isArray()) {
             return null;
         }
@@ -109,7 +110,7 @@ public class MentorChatController {
      * transport). Persistence requires it so the client's optimistic row resolves to the
      * server-side id for vote/regenerate. Null/non-UUID values fall back to a server-side mint.
      */
-    private static UUID extractMessageId(JsonNode message) {
+    private static @Nullable UUID extractMessageId(@Nullable JsonNode message) {
         if (message == null || !message.isObject()) return null;
         String raw = textOrNull(message, "id");
         if (raw == null || raw.isBlank()) return null;
@@ -121,7 +122,7 @@ public class MentorChatController {
         }
     }
 
-    private static String textOrNull(JsonNode node, String field) {
+    private static @Nullable String textOrNull(JsonNode node, String field) {
         return node.has(field) && node.get(field).isString() ? node.get(field).asString() : null;
     }
 

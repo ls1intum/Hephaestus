@@ -4,6 +4,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.RateLimitSnapshot;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 /**
  * What a vendor actually reported about its rate limit. Every numeric field is optional because a
@@ -19,16 +20,21 @@ public record RateLimitSnapshotDTO(
     @Schema(
         description = "Window ceiling, if the vendor reported one. Survives window rollover — a ceiling is window-invariant."
     )
+    @Nullable
     Integer limit,
     @Schema(
         description = "Remaining budget, if reported and still inside the observed window. Null once the window has rolled over."
     )
+    @Nullable
     Integer remaining,
-    @Schema(description = "When the observed window ends, if reported and still in the future") Instant resetAt,
+    @Schema(description = "When the observed window ends, if reported and still in the future")
+    @Nullable
+    Instant resetAt,
     @NonNull @Schema(description = "When the underlying vendor response was seen") Instant observedAt,
     @Schema(
         description = "An observed 429's back-off deadline (observedAt + Retry-After); null if the vendor never told us to back off"
     )
+    @Nullable
     Instant throttledUntil
 ) {
     public static RateLimitSnapshotDTO from(RateLimitSnapshot snapshot) {

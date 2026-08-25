@@ -13,4 +13,5 @@
  *       compatibility and works without {@code CAP_CHOWN} (which the security policy drops).
  * </ul>
  */
+@org.jspecify.annotations.NullMarked
 package de.tum.cit.aet.hephaestus.agent.sandbox.docker.interactive;

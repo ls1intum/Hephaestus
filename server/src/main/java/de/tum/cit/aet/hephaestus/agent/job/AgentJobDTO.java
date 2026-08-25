@@ -6,6 +6,7 @@ import java.net.URI;
 import java.time.Instant;
 import java.util.UUID;
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.ObjectNode;
 
@@ -15,7 +16,7 @@ public record AgentJobDTO(
     @NonNull @Schema(description = "Job type") AgentJobType jobType,
     @NonNull @Schema(description = "Current job status") AgentJobStatus status,
     @NonNull @Schema(description = "Work item reviewed by this job") ReviewRunTargetDTO target,
-    @Schema(description = "Job metadata (routing/display info)") Object metadata,
+    @Schema(description = "Job metadata (routing/display info)") @Nullable Object metadata,
     @Schema(description = "Job output (agent results)") Object output,
     @NonNull
     @Schema(
@@ -33,6 +34,7 @@ public record AgentJobDTO(
     @Schema(
         description = "Upstream model this job was admitted on, frozen at submit time (e.g. gpt-5.4-mini). Available from submission, unlike llmModel, which the runner reports only once the job has run."
     )
+    @Nullable
     String model,
     @Schema(description = "Container exit code") Integer exitCode,
     @Schema(description = "Human-readable error message") String errorMessage,
@@ -40,7 +42,7 @@ public record AgentJobDTO(
         description = "Delivery status: null = not applicable, PENDING = awaiting delivery, DELIVERED = posted, FAILED = delivery error"
     )
     DeliveryStatus deliveryStatus,
-    @Schema(description = "Git provider comment/note ID for posted feedback") String deliveryCommentId,
+    @Schema(description = "Git provider comment/note ID for posted feedback") @Nullable String deliveryCommentId,
     @NonNull @Schema(description = "Number of retry attempts") Integer retryCount,
     @NonNull
     @Schema(
@@ -55,22 +57,24 @@ public record AgentJobDTO(
             "the cap is raised or the month rolls over. Absent means no such hold — a future availableAt " +
             "is then an ordinary retry backoff."
     )
+    @Nullable
     String holdReason,
     @NonNull @Schema(description = "Timestamp when the job was created") Instant createdAt,
     @Schema(description = "Timestamp when the job started running") Instant startedAt,
     @Schema(description = "Timestamp when the job completed") Instant completedAt,
-    @Schema(description = "LLM model used (e.g. gpt-5.4-mini, openai/gpt-oss-120b)") String llmModel,
+    @Schema(description = "LLM model used (e.g. gpt-5.4-mini, openai/gpt-oss-120b)") @Nullable String llmModel,
     @Schema(
         description = "Model version/snapshot date (e.g. 2026-03-17). Only jobs from before the model catalog " +
             "carry one; absent on everything newer."
     )
+    @Nullable
     String llmModelVersion,
-    @Schema(description = "Total LLM API calls (steps) during execution") Integer llmTotalCalls,
-    @Schema(description = "Total input tokens consumed") Integer llmTotalInputTokens,
-    @Schema(description = "Total output tokens generated") Integer llmTotalOutputTokens,
-    @Schema(description = "Total reasoning/thinking tokens") Integer llmTotalReasoningTokens,
-    @Schema(description = "Tokens read from prompt cache") Integer llmCacheReadTokens,
-    @Schema(description = "Tokens written to prompt cache") Integer llmCacheWriteTokens
+    @Schema(description = "Total LLM API calls (steps) during execution") @Nullable Integer llmTotalCalls,
+    @Schema(description = "Total input tokens consumed") @Nullable Integer llmTotalInputTokens,
+    @Schema(description = "Total output tokens generated") @Nullable Integer llmTotalOutputTokens,
+    @Schema(description = "Total reasoning/thinking tokens") @Nullable Integer llmTotalReasoningTokens,
+    @Schema(description = "Tokens read from prompt cache") @Nullable Integer llmCacheReadTokens,
+    @Schema(description = "Tokens written to prompt cache") @Nullable Integer llmCacheWriteTokens
 ) {
     public static AgentJobDTO from(AgentJob job) {
         JsonNode snapshot = job.getConfigSnapshot();
@@ -137,7 +141,7 @@ public record AgentJobDTO(
         }
     }
 
-    private static String snapshotString(JsonNode snapshot, String field) {
+    private static @Nullable String snapshotString(JsonNode snapshot, String field) {
         if (snapshot == null || !snapshot.has(field) || snapshot.get(field).isNull()) {
             return null;
         }

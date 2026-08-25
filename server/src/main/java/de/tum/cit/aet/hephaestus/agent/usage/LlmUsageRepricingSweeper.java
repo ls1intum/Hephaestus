@@ -107,7 +107,7 @@ public class LlmUsageRepricingSweeper {
             }
             tally.merge(outcome, 1, Integer::sum);
         }
-        meterRegistry.counter("llm.usage.reprice.unresolved").increment(tally.get(Outcome.UNIDENTIFIABLE));
+        meterRegistry.counter("llm.usage.reprice.unresolved").increment(tally.getOrDefault(Outcome.UNIDENTIFIABLE, 0));
         log.info(
             "llm.usage.reprice: {} unpriced event(s) this month; {} repriced, {} still awaiting a catalogue price, " +
                 "{} name a model this instance cannot identify",

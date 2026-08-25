@@ -3,7 +3,9 @@ package de.tum.cit.aet.hephaestus.analytics.posthog;
 import java.net.URI;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.Objects;
 import java.util.Set;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -36,11 +38,14 @@ public class PosthogClient {
             log.error("Failed to initialize PostHog client: reason=missing_credentials");
             throw new PosthogClientException("PostHog configuration requires project ID and personal API key");
         }
-        this.projectId = posthogProperties.projectId();
+        this.projectId = Objects.requireNonNull(posthogProperties.projectId());
         String resolvedHost = normalizeHost(posthogProperties.apiHost());
         this.restClient = RestClient.builder()
             .baseUrl(resolvedHost)
-            .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + posthogProperties.personalApiKey())
+            .defaultHeader(
+                HttpHeaders.AUTHORIZATION,
+                "Bearer " + Objects.requireNonNull(posthogProperties.personalApiKey())
+            )
             .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
             .build();
         log.info("Activated PostHog client: projectId={}, host={}", projectId, resolvedHost);
@@ -112,7 +117,7 @@ public class PosthogClient {
         }
     }
 
-    private String extractPersonId(JsonNode personNode) {
+    private @Nullable String extractPersonId(JsonNode personNode) {
         if (personNode.hasNonNull("uuid")) {
             return personNode.get("uuid").asString();
         }
@@ -122,7 +127,7 @@ public class PosthogClient {
         return null;
     }
 
-    private String normalizeHost(String apiHost) {
+    private String normalizeHost(@Nullable String apiHost) {
         if (!StringUtils.hasText(apiHost)) {
             throw new PosthogClientException("PostHog apiHost must not be empty");
         }

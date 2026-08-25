@@ -128,7 +128,7 @@ public class GitHubPushMessageHandler extends AbstractIntegrationMessageHandler<
 
         // Only process commits to the default branch
         String defaultBranch = repository.getDefaultBranch();
-        if (!isDefaultBranch(event.ref(), defaultBranch)) {
+        if (defaultBranch == null || !isDefaultBranch(event.ref(), defaultBranch)) {
             log.debug(
                 "Skipped push event: reason=notDefaultBranch, branch={}, defaultBranch={}, repoName={}",
                 getBranchName(event.ref()),
@@ -237,7 +237,11 @@ public class GitHubPushMessageHandler extends AbstractIntegrationMessageHandler<
         String repoName = sanitizeForLog(repository.getNameWithOwner());
         int processed = 0;
 
-        for (var webhookCommit : event.commits()) {
+        var commits = event.commits();
+        if (commits == null) {
+            return;
+        }
+        for (var webhookCommit : commits) {
             String message = extractHeadline(webhookCommit.message());
             String messageBody = extractBody(webhookCommit.message());
             // webhookCommit.url() returns the API URL (api.github.com/...),
@@ -289,7 +293,7 @@ public class GitHubPushMessageHandler extends AbstractIntegrationMessageHandler<
         log.info(
             "Processed push commits via webhook: processed={}, total={}, branch={}, fallback={}, repoName={}",
             processed,
-            event.commits().size(),
+            commits.size(),
             getBranchName(event.ref()),
             asFallback,
             repoName
@@ -442,7 +446,7 @@ public class GitHubPushMessageHandler extends AbstractIntegrationMessageHandler<
         return sha == null || ZERO_SHA.equals(sha);
     }
 
-    private String extractHeadline(String message) {
+    private String extractHeadline(@Nullable String message) {
         if (message == null || message.isBlank()) return "";
         int newlineIndex = message.indexOf('\n');
         if (newlineIndex > 0) {
@@ -451,7 +455,7 @@ public class GitHubPushMessageHandler extends AbstractIntegrationMessageHandler<
         return message.trim();
     }
 
-    private String extractBody(String message) {
+    private @Nullable String extractBody(@Nullable String message) {
         if (message == null || message.isBlank()) return null;
         int newlineIndex = message.indexOf('\n');
         if (newlineIndex > 0 && newlineIndex < message.length() - 1) {

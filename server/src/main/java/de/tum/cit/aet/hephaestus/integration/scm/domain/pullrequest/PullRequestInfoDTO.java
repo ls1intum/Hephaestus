@@ -22,17 +22,17 @@ public record PullRequestInfoDTO(
     @NonNull @Schema(description = "Whether the pull request is in draft mode") Boolean isDraft,
     @NonNull @Schema(description = "Whether the pull request has been merged") Boolean isMerged,
     @NonNull @Schema(description = "Number of comments on the pull request", example = "5") Integer commentsCount,
-    @Schema(description = "Author of the pull request") UserInfoDTO author,
+    @Nullable @Schema(description = "Author of the pull request") UserInfoDTO author,
     @Schema(description = "Labels applied to the pull request") List<LabelInfoDTO> labels,
     @Schema(description = "Users assigned to the pull request") List<UserInfoDTO> assignees,
-    @Schema(description = "Repository the pull request belongs to") RepositoryInfoDTO repository,
+    @Nullable @Schema(description = "Repository the pull request belongs to") RepositoryInfoDTO repository,
     @NonNull @Schema(description = "Number of lines added", example = "150") Integer additions,
     @NonNull @Schema(description = "Number of lines deleted", example = "50") Integer deletions,
-    @Schema(description = "Timestamp when the pull request was merged") Instant mergedAt,
-    @Schema(description = "Timestamp when the pull request was closed") Instant closedAt,
-    @NonNull @Schema(description = "URL to the pull request on the git provider") String htmlUrl,
-    @Schema(description = "Timestamp when the pull request was created") Instant createdAt,
-    @Schema(description = "Timestamp when the pull request was last updated") Instant updatedAt
+    @Nullable @Schema(description = "Timestamp when the pull request was merged") Instant mergedAt,
+    @Nullable @Schema(description = "Timestamp when the pull request was closed") Instant closedAt,
+    @Nullable @Schema(description = "URL to the pull request on the git provider") String htmlUrl,
+    @Nullable @Schema(description = "Timestamp when the pull request was created") Instant createdAt,
+    @Nullable @Schema(description = "Timestamp when the pull request was last updated") Instant updatedAt
 ) {
     @Nullable
     public static PullRequestInfoDTO fromPullRequest(@Nullable PullRequest pullRequest) {

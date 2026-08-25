@@ -23,4 +23,5 @@
     displayName = "Integration Framework",
     type = org.springframework.modulith.ApplicationModule.Type.OPEN
 )
+@org.jspecify.annotations.NullMarked
 package de.tum.cit.aet.hephaestus.integration;

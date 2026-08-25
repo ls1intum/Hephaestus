@@ -9,6 +9,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Object-mother for the owned JPA {@code @Entity} POJOs used across unit tests. Constructing the
@@ -43,7 +44,7 @@ public final class TestEntities {
     }
 
     /** A {@link Repository} with id, {@code nameWithOwner} and {@code defaultBranch} set. */
-    public static Repository repository(Long id, String nameWithOwner, String defaultBranch) {
+    public static Repository repository(Long id, String nameWithOwner, @Nullable String defaultBranch) {
         Repository repo = repository(id, nameWithOwner);
         if (defaultBranch != null) {
             repo.setDefaultBranch(defaultBranch);

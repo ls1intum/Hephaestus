@@ -6,6 +6,7 @@ import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -69,7 +70,7 @@ public class LlmConnectionService {
         return saved;
     }
 
-    private String connectionSlug(String requested, String displayName) {
+    private String connectionSlug(@Nullable String requested, String displayName) {
         return CatalogSlug.unique(requested, displayName, slug -> connectionRepository.findBySlug(slug).isPresent());
     }
 

@@ -22,6 +22,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -37,7 +38,18 @@ class DeliveryComposerTest extends BaseUnitTest {
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    private JsonNode buildEvidence(List<LocationSpec> locations, List<String> snippets) {
+    private static DeliveryContent content(@Nullable DeliveryContent content) {
+        assertThat(content).isNotNull();
+        return content;
+    }
+
+    private static String note(@Nullable DeliveryContent content) {
+        String note = content(content).mrNote();
+        assertThat(note).isNotNull();
+        return note;
+    }
+
+    private JsonNode buildEvidence(@Nullable List<LocationSpec> locations, @Nullable List<String> snippets) {
         ObjectNode evidence = objectMapper.createObjectNode();
         if (locations != null && !locations.isEmpty()) {
             ArrayNode citations = evidence.putArray("citations");
@@ -67,7 +79,7 @@ class DeliveryComposerTest extends BaseUnitTest {
         return evidence;
     }
 
-    private record LocationSpec(String path, int startLine, Integer endLine, String sourceKind) {
+    private record LocationSpec(String path, int startLine, @Nullable Integer endLine, String sourceKind) {
         LocationSpec(String path, int startLine) {
             this(path, startLine, null, "scm.pull-request.diff");
         }
@@ -93,9 +105,9 @@ class DeliveryComposerTest extends BaseUnitTest {
         String slug,
         String title,
         Severity severity,
-        List<LocationSpec> locations,
-        List<String> snippets,
-        String reasoning
+        @Nullable List<LocationSpec> locations,
+        @Nullable List<String> snippets,
+        @Nullable String reasoning
     ) {
         return new ValidatedObservation(
             slug,
@@ -195,7 +207,7 @@ class DeliveryComposerTest extends BaseUnitTest {
     }
 
     @Test
-    void compose_lead_isTheWholeOpeningAndNothingStandsInForItWhenAbsent() {
+    void shouldUseLeadAsWholeOpeningWhenPresent() {
         List<ValidatedObservation> observations = List.of(
             positiveObservation("scope-one-reviewable-change"),
             negativeObservation(
@@ -209,22 +221,12 @@ class DeliveryComposerTest extends BaseUnitTest {
         );
         String lead = "You kept this to one concern, but the description never says why it changed.";
 
-        String withLead = DeliveryComposer.compose(
-            observations,
-            ArtifactKinds.PULL_REQUEST,
-            Map.of(),
-            null,
-            List.of(),
-            lead
-        ).mrNote();
-        String withoutLead = DeliveryComposer.compose(
-            observations,
-            ArtifactKinds.PULL_REQUEST,
-            Map.of(),
-            null,
-            List.of(),
-            null
-        ).mrNote();
+        String withLead = note(
+            DeliveryComposer.compose(observations, ArtifactKinds.PULL_REQUEST, Map.of(), null, List.of(), lead)
+        );
+        String withoutLead = note(
+            DeliveryComposer.compose(observations, ArtifactKinds.PULL_REQUEST, Map.of(), null, List.of(), null)
+        );
 
         assertThat(withLead).isEqualTo(lead + "\n\n" + withoutLead);
         assertThat(withoutLead)
@@ -233,7 +235,7 @@ class DeliveryComposerTest extends BaseUnitTest {
     }
 
     @Test
-    void compose_thePracticesOwnWording_neverFollowsAFinding() {
+    void shouldNeverRenderPracticeCatalogueWording() {
         String why = "Code without a test is a promise nobody can check, and it is one careless refactor away.";
 
         DeliveryContent result = DeliveryComposer.compose(
@@ -272,7 +274,7 @@ class DeliveryComposerTest extends BaseUnitTest {
     }
 
     @Test
-    void compose_leadThatScrubsToNothing_opensNothingRatherThanABlankLine() {
+    void shouldOmitLeadWhenSanitizedEmpty() {
         List<ValidatedObservation> observations = List.of(
             negativeObservation(
                 "describe-what-and-why",
@@ -284,14 +286,16 @@ class DeliveryComposerTest extends BaseUnitTest {
             )
         );
 
-        String mrNote = DeliveryComposer.compose(
-            observations,
-            ArtifactKinds.PULL_REQUEST,
-            Map.of(),
-            null,
-            List.of(),
-            "NEGATIVE observation, MINOR severity."
-        ).mrNote();
+        String mrNote = note(
+            DeliveryComposer.compose(
+                observations,
+                ArtifactKinds.PULL_REQUEST,
+                Map.of(),
+                null,
+                List.of(),
+                "NEGATIVE observation, MINOR severity."
+            )
+        );
 
         assertThat(mrNote).startsWith("PR description lacks a rationale sentence");
     }
@@ -309,18 +313,13 @@ class DeliveryComposerTest extends BaseUnitTest {
     );
 
     private static String noteWithLead(List<ValidatedObservation> observations, String lead) {
-        return DeliveryComposer.compose(
-            observations,
-            ArtifactKinds.PULL_REQUEST,
-            Map.of(),
-            null,
-            List.of(),
-            lead
-        ).mrNote();
+        return note(
+            DeliveryComposer.compose(observations, ArtifactKinds.PULL_REQUEST, Map.of(), null, List.of(), lead)
+        );
     }
 
     @Test
-    void compose_leadOverBudget_dropsWholeSentencesRatherThanCuttingMidWord() {
+    void shouldKeepCompleteSentencesWhenLeadExceedsBudget() {
         String sentence = "This change moves the retry loop out of the poller and into its own class. ";
         String mrNote = noteWithLead(ONE_MINOR, sentence.repeat(6));
 
@@ -329,16 +328,16 @@ class DeliveryComposerTest extends BaseUnitTest {
     }
 
     @Test
-    void compose_aFindingWithItsOwnInlineComment_outranksALesserOneExpandedInTheNote() {
-        var onTheDiff = negativeObservation(
+    void shouldOrderCriticalFindingBeforeMinorFindingWhenBothAreInSummary() {
+        var critical = negativeObservation(
             "avoids-insecure-defaults-and-over-broad-permissions",
             "Token committed to the repo",
             Severity.CRITICAL,
-            List.of(new LocationSpec("application.yml", 14)),
+            List.of(),
             List.of("token: abc123"),
             "The token is written into checked-in config."
         );
-        var onTheArtifact = negativeObservation(
+        var minor = negativeObservation(
             "describe-what-and-why",
             "The description says what changed but not why",
             Severity.MINOR,
@@ -347,11 +346,9 @@ class DeliveryComposerTest extends BaseUnitTest {
             "The body lists files and no reason."
         );
 
-        String mrNote = DeliveryComposer.compose(
-            List.of(onTheArtifact, onTheDiff),
-            ArtifactKinds.PULL_REQUEST
-        ).mrNote();
+        String mrNote = note(DeliveryComposer.compose(List.of(minor, critical), ArtifactKinds.PULL_REQUEST));
 
+        assertThat(mrNote).contains("Token committed to the repo", "The description says what changed but not why");
         assertThat(mrNote.indexOf("Token committed to the repo"))
             .as("a reader who stops after the first block should have met the worst of it")
             .isLessThan(mrNote.indexOf("The description says what changed but not why"));
@@ -367,18 +364,21 @@ class DeliveryComposerTest extends BaseUnitTest {
             "Good split, and this is ready to merge.",
             "LGTM on the structure; one thing below.",
             "Solid change. I approve the new boundary.",
+            "This can merge.",
+            "- Retry handling",
+            "1. Retry handling",
             "# Retry handling",
             "| one | two |",
         }
     )
-    void compose_leadReachingBeyondASentence_isDroppedRatherThanRendered(String lead) {
+    void shouldDropLeadWhenItContainsMarkupLinkOrMergeVerdict(String lead) {
         assertThat(noteWithLead(ONE_MINOR, lead))
             .as("the opening carries no markup, no link and no verdict, so a lead with one opens nothing")
             .startsWith("PR description lacks a rationale sentence");
     }
 
     @Test
-    void compose_cleanChange_opensOnTheLeadToo() {
+    void shouldUseLeadForCleanChange() {
         ValidatedObservation strength = new ValidatedObservation(
             "error-state-handling",
             "Error state handling (positive)",
@@ -1060,6 +1060,7 @@ class DeliveryComposerTest extends BaseUnitTest {
         );
         var dc = DeliveryComposer.compose(observations, ArtifactKinds.PULL_REQUEST);
         assertThat(dc).isNotNull();
+        assertThat(dc.mrNote()).isNotNull();
         assertThat(dc.diffNotes()).hasSize(2);
         assertThat(dc.diffNotes())
             .extracting(PracticeDetectionResultParser.DiffNote::filePath)
@@ -1152,9 +1153,10 @@ class DeliveryComposerTest extends BaseUnitTest {
         DeliveryContent result = DeliveryComposer.compose(observations, ArtifactKinds.PULL_REQUEST);
 
         assertThat(result).isNotNull();
-        assertThat(result.mrNote().indexOf("3 more minor suggestions are not shown"))
+        String mrNote = note(result);
+        assertThat(mrNote.indexOf("3 more minor suggestions are not shown"))
             .as("the disclosure describes the list, so it follows it")
-            .isGreaterThan(result.mrNote().indexOf("Minor nudge 3"));
+            .isGreaterThan(mrNote.indexOf("Minor nudge 3"));
         assertThat(result.diffNotes()).hasSize(3);
     }
 
@@ -1396,8 +1398,8 @@ class DeliveryComposerTest extends BaseUnitTest {
             "Touches three concerns."
         );
 
-        String withoutMap = DeliveryComposer.compose(List.of(f), ArtifactKinds.PULL_REQUEST).mrNote();
-        String withEmptyMap = DeliveryComposer.compose(List.of(f), ArtifactKinds.PULL_REQUEST, Map.of()).mrNote();
+        String withoutMap = note(DeliveryComposer.compose(List.of(f), ArtifactKinds.PULL_REQUEST));
+        String withEmptyMap = note(DeliveryComposer.compose(List.of(f), ArtifactKinds.PULL_REQUEST, Map.of()));
 
         assertThat(withEmptyMap).isEqualTo(withoutMap);
         assertThat(withEmptyMap).doesNotContain("Why this matters");
@@ -1443,7 +1445,7 @@ class DeliveryComposerTest extends BaseUnitTest {
     void compose_allGoodPath_noPrincipleWhenNoneAuthored() {
         var observed = List.of(positiveWithReasoning("scope-one-reviewable-change", "The change stays focused."));
 
-        String note = DeliveryComposer.compose(observed, ArtifactKinds.PULL_REQUEST, Map.of()).mrNote();
+        String note = note(DeliveryComposer.compose(observed, ArtifactKinds.PULL_REQUEST, Map.of()));
 
         assertThat(note).contains("What's working well here");
         assertThat(note).doesNotContain("_Why this matters:_");
@@ -1618,7 +1620,7 @@ class DeliveryComposerTest extends BaseUnitTest {
             );
         }
 
-        List<WithheldObservation> withheld = DeliveryComposer.compose(sameLocus).withheld();
+        List<WithheldObservation> withheld = content(DeliveryComposer.compose(sameLocus)).withheld();
 
         assertThat(withheld).hasSize(1);
         assertThat(withheld.get(0).occurrenceKey()).startsWith("occ-").isNotEqualTo("shared-locus");

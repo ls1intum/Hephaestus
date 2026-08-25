@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.agent.catalog;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 /**
  * A workspace's own "bring your own" LLM connection — same shape as the instance connection
@@ -18,15 +19,15 @@ public record WorkspaceLlmConnectionDTO(
     @NonNull @Schema(description = "Wire protocol", example = "openai-completions") String apiProtocol,
     @NonNull @Schema(description = "Credential shape") LlmAuthMode authMode,
     @NonNull @Schema(description = "Whether an API key is stored") Boolean hasApiKey,
-    @Schema(description = "Last four characters of the stored API key, if any") String apiKeyLast4,
+    @Nullable @Schema(description = "Last four characters of the stored API key, if any") String apiKeyLast4,
     @NonNull @Schema(description = "Whether the connection is active") Boolean enabled,
     @NonNull @Schema(description = "Creation timestamp") Instant createdAt,
-    @Schema(description = "Last update timestamp") Instant updatedAt
+    @Nullable @Schema(description = "Last update timestamp") Instant updatedAt
 ) {
     public static WorkspaceLlmConnectionDTO from(WorkspaceLlmConnection connection) {
         String apiKey = connection.getApiKey();
         boolean hasKey = apiKey != null && !apiKey.isBlank();
-        String last4 = hasKey && apiKey.length() >= 4 ? apiKey.substring(apiKey.length() - 4) : null;
+        String last4 = apiKey != null && hasKey && apiKey.length() >= 4 ? apiKey.substring(apiKey.length() - 4) : null;
         return new WorkspaceLlmConnectionDTO(
             connection.getId(),
             connection.getSlug(),

@@ -79,7 +79,7 @@ class DiffNotePoster {
             try {
                 channel.clearStaleFeedback(target, HEPHAESTUS_MARKER);
             } catch (OutboundEgressSuppressedException e) {
-                throw new JobDeliverySuppressedException(e.getMessage(), e);
+                throw new JobDeliverySuppressedException(e.toString(), e);
             } catch (RuntimeException e) {
                 log.warn(
                     "Stale inline-note clear failed (best-effort), continuing: kind={}, jobId={}, error={}",
@@ -108,9 +108,9 @@ class DiffNotePoster {
                 result.suppressedRecurrenceKeys()
             );
         } catch (OutboundEgressSuppressedException e) {
-            throw new JobDeliverySuppressedException(e.getMessage(), e);
+            throw new JobDeliverySuppressedException(e.toString(), e);
         } catch (FeedbackDeliveryException e) {
-            throw new JobDeliveryException(e.getMessage(), e);
+            throw new JobDeliveryException(e.toString(), e);
         }
     }
 
@@ -122,9 +122,10 @@ class DiffNotePoster {
                 continue;
             }
             // A multi-line DiffAnchor stores the end first and optional range start second.
-            boolean isMultiLine = note.endLine() != null && note.endLine() > note.startLine();
+            Integer endLine = note.endLine();
+            boolean isMultiLine = endLine != null && endLine > note.startLine();
             FeedbackAnchor.DiffAnchor anchor = isMultiLine
-                ? new FeedbackAnchor.DiffAnchor(note.filePath(), note.endLine(), note.startLine())
+                ? new FeedbackAnchor.DiffAnchor(note.filePath(), Objects.requireNonNull(endLine), note.startLine())
                 : new FeedbackAnchor.DiffAnchor(note.filePath(), note.startLine(), null);
             observations.add(
                 new InlineFeedbackChannel.InlineFeedback(

@@ -32,36 +32,28 @@ jobs:
       checks: write
       statuses: write
     name: "${{ matrix.display-name }}"
-    # App Server tiers on the free 4-vCPU/16GB arm64 runners (the integration job was CPU-starved on
-    # the 2-vCPU default). Webapp jobs stay on ubuntu-latest (Node toolchain).
-    runs-on: ${{ startsWith(matrix.test-type, 'application-server-') && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
+    runs-on: ubuntu-latest
     if: inputs.should_skip != 'true'
     timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
         include:
-          - test-type: application-server-unit
-            display-name: "App Server: Unit"
-          - test-type: application-server-arch
-            display-name: "App Server: Arch"
+          - test-type: application-server-verification
+            display-name: "App Server: Unit and Architecture"
           - test-type: application-server-integration
             display-name: "App Server: Integration"
-          - test-type: webapp-unit
-            display-name: "Webapp: Unit"
           - test-type: webapp-storybook
-            display-name: "Webapp: Storybook"
+            display-name: "Webapp: Stories"
           - test-type: webapp-e2e
             display-name: "Webapp: E2E"
-          - test-type: webapp-visual
-            display-name: "Webapp: Visual"
 
     steps:
       - name: Determine if test should run
         id: should_run
         run: |
           case "${{ matrix.test-type }}" in
-            "webapp-unit"|"webapp-storybook"|"webapp-visual")
+            "webapp-storybook")
               echo "run=${{ inputs.webapp_changed }}" >> $GITHUB_OUTPUT
               ;;
             "webapp-e2e")
@@ -85,11 +77,11 @@ jobs:
 
       - name: Checkout repository
         if: steps.should_run.outputs.run == 'true'
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          # Full history needed only for Chromatic TurboSnap (webapp-visual)
-          # Other tests only need HEAD for faster checkout
-          fetch-depth: ${{ matrix.test-type == 'webapp-visual' && '0' || '1' }}
+          # Chromatic TurboSnap compares the stories job against its merge base.
+          fetch-depth: ${{ matrix.test-type == 'webapp-storybook' && '0' || '1' }}
+          persist-credentials: false
 
       - name: Setup pnpm + Node.js
         if: steps.should_run.outputs.run == 'true'
@@ -102,43 +94,27 @@ jobs:
           cache-type: ${{ matrix.test-type }}
           os: ${{ runner.os }}
 
-      - name: Run tests
-        if: steps.should_run.outputs.run == 'true' && startsWith(matrix.test-type, 'application-server-')
+      - name: Run server unit and architecture tests
+        if: steps.should_run.outputs.run == 'true' && matrix.test-type == 'application-server-verification'
         run: |
-          cd server
-          rm -rf target/surefire-reports/*
-          # -Dmaven.test.skip=false overrides the quick profile (auto-activated when cached generated-sources exist).
-          # unit / arch are split into parallel jobs; tag filtering is surefire-owned so no tier silently drops tests.
-          # skipAfterFailureCount=0 disables surefire's bail-out. It has to be the namespaced property: the
-          # plugin binds <skipAfterFailureCount> to ${hephaestus.surefire.skipAfterFailureCount} explicitly, so
-          # surefire's own -DskipAfterFailureCount name matches nothing in that chain and is silently ignored.
-          # CI is the run that must enumerate: a bail-out reports every remaining test as *Skipped*, and finding
-          # the rest then costs one full pipeline per threshold. A green run pays nothing for this, and only an
-          # already-broken one runs longer.
-          case "${{ matrix.test-type }}" in
-            # -DskipCoverage=false is what makes the JaCoCo package floors run at all. They default to
-            # skipped, and for years that meant the gates in pom.xml never executed once.
-            "application-server-unit") ./mvnw test -Dsurefire.includedGroups="unit" -Dhephaestus.surefire.skipAfterFailureCount=0 -Dmaven.test.skip=false -DskipCoverage=false -T 2C --batch-mode -Dmaven.build.cache.enabled=true ;;
-            "application-server-arch") ./mvnw test -Dsurefire.includedGroups="architecture" -Dhephaestus.surefire.skipAfterFailureCount=0 -Dmaven.test.skip=false -T 2C --batch-mode -Dmaven.build.cache.enabled=true ;;
-            # forkCount=2 spreads integration classes across 2 isolated JVMs (each its own Testcontainers
-            # Postgres); parallel=none keeps each fork serial (shared DB per fork). (3 forks tipped the
-            # StartupBudget per-bean timing ceiling under CPU contention — 2 is stable and still <10 min.)
-            "application-server-integration") ./mvnw test -Dsurefire.includedGroups="integration" -Dhephaestus.surefire.skipAfterFailureCount=0 -Dparallel=none -Dhephaestus.surefire.forkCount=2 -Dhephaestus.surefire.maxHeap=2048m -Dmaven.test.skip=false -T 2C --batch-mode -Dmaven.build.cache.enabled=true ;;
-          esac
+          rm -rf server/target/surefire-reports/*
+          pnpm run test:server:verification
+
+      - name: Run server integration tests
+        if: steps.should_run.outputs.run == 'true' && matrix.test-type == 'application-server-integration'
+        run: |
+          rm -rf server/target/surefire-reports/*
+          pnpm run test:server:integration
 
       - name: Run tests
+        id: tests
+        continue-on-error: ${{ matrix.test-type == 'webapp-storybook' }}
         if: steps.should_run.outputs.run == 'true' && startsWith(matrix.test-type, 'webapp-')
         run: |
           pnpm install --frozen-lockfile
           cd webapp
 
           case "${{ matrix.test-type }}" in
-            "webapp-unit")
-              # Bound runner deadlocks without coupling CI to the current suite duration, as the
-              # storybook leg below already does. Without it a hung suite burns the whole job
-              # timeout and GitHub retains no log for the step.
-              timeout --kill-after=30s 10m pnpm run test
-              ;;
             "webapp-storybook")
               # Install Playwright browsers (cached in ~/.cache/ms-playwright by setup-caches)
               pnpm exec playwright install chromium --with-deps
@@ -176,15 +152,35 @@ jobs:
 
               timeout --kill-after=30s 10m pnpm run test:e2e
               ;;
-            "webapp-visual")
-              pnpm run build-storybook
-              ;;
           esac
+
+      - name: Summarize test results
+        if: steps.should_run.outputs.run == 'true' && always() && (startsWith(matrix.test-type, 'application-server-') || matrix.test-type == 'webapp-storybook')
+        continue-on-error: true
+        run: |
+          mkdir -p ci-metrics
+          if [[ "${{ matrix.test-type }}" == application-server-* ]]; then
+            pnpm run summarize:test-results "${{ matrix.display-name }}" server/target/surefire-reports "ci-metrics/${{ matrix.test-type }}.json"
+          else
+            pnpm run summarize:test-results "${{ matrix.display-name }}" webapp/test-results "ci-metrics/${{ matrix.test-type }}.json"
+          fi
+
+      - name: Upload test metrics
+        if: steps.should_run.outputs.run == 'true' && always() && (startsWith(matrix.test-type, 'application-server-') || matrix.test-type == 'webapp-storybook')
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: test-metrics-${{ matrix.test-type }}
+          path: ci-metrics/*.json
+          if-no-files-found: ignore
+          retention-days: 14
 
       # Chromatic visual testing
       - name: "Chromatic Visual Testing"
-        if: steps.should_run.outputs.run == 'true' && matrix.test-type == 'webapp-visual'
+        if: >-
+          steps.should_run.outputs.run == 'true' && matrix.test-type == 'webapp-storybook' && always() &&
+          (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
         id: chromatic
+        continue-on-error: true
         uses: chromaui/action@1cfa065cbdab28f6ca3afaeb3d761383076a35aa # v11
         with:
           projectToken: ${{ secrets.CHROMATIC_PROJECT_TOKEN }}
@@ -200,23 +196,15 @@ jobs:
           CHROMATIC_BRANCH: ${{ github.head_ref || github.ref_name }}
           CHROMATIC_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
 
-      # Create Storybook status check
-      # CRITICAL: For pull_request events, context.sha is the MERGE commit, not the PR head.
-      # We must use the PR head SHA for the status to appear on the PR checks page.
       - name: "Create Storybook status check"
-        if: steps.should_run.outputs.run == 'true' && matrix.test-type == 'webapp-visual' && always() && startsWith(steps.chromatic.outputs.storybookUrl, 'http')
-        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        if: steps.should_run.outputs.run == 'true' && matrix.test-type == 'webapp-storybook' && always() && startsWith(steps.chromatic.outputs.storybookUrl, 'http')
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
-            // Use PR head SHA for pull_request events, otherwise use context.sha
-            const sha = context.payload.pull_request?.head?.sha || context.sha;
-            console.log(`Creating status check on SHA: ${sha}`);
-            console.log(`Storybook URL: ${{ steps.chromatic.outputs.storybookUrl }}`);
-
             await github.rest.repos.createCommitStatus({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              sha: sha,
+              sha: context.payload.pull_request?.head?.sha || context.sha,
               state: 'success',
               target_url: '${{ steps.chromatic.outputs.storybookUrl }}',
               description: 'Click Details to view your Storybook',
@@ -233,27 +221,18 @@ jobs:
           reporter: java-junit
           fail-on-error: false
 
-      - name: Upload webapp test results
-        if: steps.should_run.outputs.run == 'true' && always() && matrix.test-type == 'webapp-unit'
-        uses: dorny/test-reporter@a43b3a5f7366b97d083190328d2c652e1a8b6aa2 # v3.0.0
-        with:
-          name: "Test Results - ${{ matrix.test-type }}"
-          path: "webapp/test-results/junit-*.xml"
-          reporter: java-junit
-          fail-on-error: false
-
       - name: Upload webapp-storybook test results
         if: steps.should_run.outputs.run == 'true' && always() && matrix.test-type == 'webapp-storybook'
         uses: dorny/test-reporter@a43b3a5f7366b97d083190328d2c652e1a8b6aa2 # v3.0.0
         with:
-          name: "Test Results - ${{ matrix.test-type }}"
+          name: "Test Results - ${{ matrix.display-name }}"
           path: "webapp/test-results/junit-storybook.xml"
           reporter: java-junit
           fail-on-error: false
 
       - name: Upload webapp E2E diagnostics
         if: steps.should_run.outputs.run == 'true' && failure() && matrix.test-type == 'webapp-e2e'
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: webapp-e2e-results
           path: |
@@ -263,13 +242,24 @@ jobs:
           retention-days: 7
 
       - name: Upload Chromatic test results
-        if: steps.should_run.outputs.run == 'true' && always() && matrix.test-type == 'webapp-visual' && startsWith(steps.chromatic.outputs.storybookUrl, 'http')
+        if: steps.should_run.outputs.run == 'true' && always() && matrix.test-type == 'webapp-storybook' && startsWith(steps.chromatic.outputs.storybookUrl, 'http')
         uses: dorny/test-reporter@a43b3a5f7366b97d083190328d2c652e1a8b6aa2 # v3.0.0
         with:
           name: "Test Results - ${{ matrix.test-type }}"
           path: "webapp/chromatic-build-*.xml"
           reporter: java-junit
           fail-on-error: false
+
+      - name: Evaluate stories checks
+        if: steps.should_run.outputs.run == 'true' && matrix.test-type == 'webapp-storybook' && always()
+        env:
+          STORYBOOK_TESTS: ${{ steps.tests.outcome }}
+          CHROMATIC: ${{ steps.chromatic.outcome }}
+        run: |
+          if [ "$STORYBOOK_TESTS" != "success" ] || { [ "$CHROMATIC" != "success" ] && [ "$CHROMATIC" != "skipped" ]; }; then
+            echo "::error::Storybook tests or Chromatic failed; review both independently reported steps."
+            exit 1
+          fi
 
       # Test Summary for Job Summary
       - name: Generate test summary

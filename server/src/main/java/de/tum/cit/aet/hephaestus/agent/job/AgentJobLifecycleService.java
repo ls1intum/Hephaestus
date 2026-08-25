@@ -118,7 +118,10 @@ public class AgentJobLifecycleService {
         // Split deployment: ask the owning worker to stop its container over the WSS channel (ADR 0009).
         // No-op if that worker isn't connected here — the DB transition + backstops still finish the cancel.
         if (outcome.dispatchCancel()) {
-            workerJobCancelDispatcher.ifPresent(d -> d.dispatch(outcome.job().getWorkerId(), jobId, "user-cancel"));
+            String workerId = outcome.job().getWorkerId();
+            if (workerId != null) {
+                workerJobCancelDispatcher.ifPresent(d -> d.dispatch(workerId, jobId, "user-cancel"));
+            }
 
             // Monolith / co-located worker: stop the container in-process.
             if (sandboxManager != null) {

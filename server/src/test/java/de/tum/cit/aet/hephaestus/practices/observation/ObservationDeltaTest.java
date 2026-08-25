@@ -13,6 +13,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
@@ -174,7 +175,7 @@ class ObservationDeltaTest {
         assertThat(ObservationDelta.classify(List.of()).loci()).isEmpty();
     }
 
-    private static Locus locus(String key, UUID runId, Instant at, Assessment assessment, Severity severity) {
+    private static Locus locus(String key, UUID runId, Instant at, Assessment assessment, @Nullable Severity severity) {
         return new Locus(key, "ships-tests", ArtifactKinds.PULL_REQUEST, 22L, runId, at, assessment, severity);
     }
 

@@ -13,6 +13,7 @@ import java.util.Set;
 import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -66,7 +67,7 @@ class CatalogCriteriaSlugReferenceTest extends BaseUnitTest {
     }
 
     /** Returns the real slug that {@code token} is a strict segment-prefix of, or {@code null}. */
-    private static String realSlugTruncatedBy(String token, Set<String> realSlugs) {
+    private static @Nullable String realSlugTruncatedBy(String token, Set<String> realSlugs) {
         String prefix = token + "-";
         for (String slug : realSlugs) {
             if (slug.startsWith(prefix)) {

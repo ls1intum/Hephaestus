@@ -30,6 +30,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Entity representing a Git commit.
@@ -88,7 +89,7 @@ public class Commit {
      */
     @Column(columnDefinition = "TEXT")
     @ToString.Exclude
-    private String messageBody;
+    private @Nullable String messageBody;
 
     /**
      * The URL to view this commit on the Git provider's web interface.
@@ -281,7 +282,7 @@ public class Commit {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "author_id")
     @ToString.Exclude
-    private User author;
+    private @Nullable User author;
 
     /**
      * The user who committed the commit (may differ from author in cherry-picks, rebases, etc.).

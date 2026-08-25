@@ -31,6 +31,7 @@ import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Consumer;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -225,7 +226,7 @@ class DocumentReviewSubmitterTest extends BaseUnitTest {
         when(documentProjection.documentById(WORKSPACE_ID, DOCUMENT_ID)).thenReturn(Optional.of(document));
     }
 
-    private static ProjectedDocument document(Long createdByMemberId) {
+    private static ProjectedDocument document(@Nullable Long createdByMemberId) {
         return new ProjectedDocument(
             "engineering",
             "runbook",

@@ -5,6 +5,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.jspecify.annotations.Nullable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -37,7 +38,7 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, UUID> 
         @Param("workspaceId") Long workspaceId,
         @Param("userId") Long userId,
         @Param("threadId") UUID threadId,
-        @Param("excludedMessageId") UUID excludedMessageId
+        @Param("excludedMessageId") @Nullable UUID excludedMessageId
     );
 
     @Query(

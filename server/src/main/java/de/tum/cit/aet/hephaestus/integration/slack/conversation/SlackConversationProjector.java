@@ -8,6 +8,7 @@ import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackTs;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import org.jspecify.annotations.Nullable;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import tools.jackson.databind.ObjectMapper;
@@ -50,7 +51,7 @@ public class SlackConversationProjector implements ConversationThreadProjection 
     }
 
     /** A thread the audience participates in — the key pair used to fetch its messages. */
-    private record ThreadKey(String channelId, String channelName, String threadTs, long messageCount) {}
+    private record ThreadKey(String channelId, @Nullable String channelName, String threadTs, long messageCount) {}
 
     /**
      * Build the thread-grouped conversation payload for one audience within one workspace. Pure read; the caller
@@ -141,7 +142,7 @@ public class SlackConversationProjector implements ConversationThreadProjection 
     }
 
     @Override
-    public Instant sourceEffectiveAt(String sourceEventId) {
+    public @Nullable Instant sourceEffectiveAt(@Nullable String sourceEventId) {
         Long epochMicros = SlackTs.toEpochMicros(sourceEventId);
         return epochMicros == null
             ? null

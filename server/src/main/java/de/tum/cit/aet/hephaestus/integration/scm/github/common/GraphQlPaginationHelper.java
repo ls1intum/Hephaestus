@@ -284,17 +284,17 @@ public final class GraphQlPaginationHelper {
          */
         public static class Builder<T> {
 
-            private HttpGraphQlClient client;
-            private Long scopeId;
-            private String documentName;
-            private Map<String, Object> variables;
-            private Duration timeout;
-            private String connectionFieldPath;
-            private Class<T> connectionType;
-            private Function<T, GHPageInfo> pageInfoExtractor;
-            private PageProcessor<T> pageProcessor;
+            private @Nullable HttpGraphQlClient client;
+            private @Nullable Long scopeId;
+            private @Nullable String documentName;
+            private @Nullable Map<String, Object> variables;
+            private @Nullable Duration timeout;
+            private @Nullable String connectionFieldPath;
+            private @Nullable Class<T> connectionType;
+            private @Nullable Function<T, GHPageInfo> pageInfoExtractor;
+            private @Nullable PageProcessor<T> pageProcessor;
             private String contextDescription = "pagination";
-            private String initialCursor;
+            private @Nullable String initialCursor;
             private int maxPages = MAX_PAGINATION_PAGES;
 
             public Builder<T> client(HttpGraphQlClient client) {

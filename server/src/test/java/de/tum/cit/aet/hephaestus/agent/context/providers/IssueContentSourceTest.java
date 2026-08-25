@@ -33,6 +33,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -94,7 +95,7 @@ class IssueContentSourceTest extends BaseUnitTest {
         return l;
     }
 
-    private IssueComment comment(String authorLogin, String body, Instant createdAt) {
+    private IssueComment comment(@Nullable String authorLogin, String body, Instant createdAt) {
         IssueComment c = new IssueComment();
         c.setBody(body);
         if (authorLogin != null) {

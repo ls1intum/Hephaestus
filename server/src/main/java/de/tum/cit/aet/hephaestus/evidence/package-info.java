@@ -5,4 +5,5 @@
  * practice configuration, and persistence remain in their respective feature modules.
  */
 @org.springframework.modulith.ApplicationModule(displayName = "Evidence Contract", allowedDependencies = {})
+@org.jspecify.annotations.NullMarked
 package de.tum.cit.aet.hephaestus.evidence;

@@ -80,7 +80,9 @@ class AgentBindingServiceTest extends BaseUnitTest {
 
         assertThat(saved.getWorkspace()).isSameAs(w);
         assertThat(saved.getPurpose()).isEqualTo(AgentPurpose.PRACTICE_REVIEW);
-        assertThat(saved.getInstanceModel().getId()).isEqualTo(99L);
+        var instanceModel = saved.getInstanceModel();
+        assertThat(instanceModel).isNotNull();
+        assertThat(instanceModel.getId()).isEqualTo(99L);
         assertThat(saved.getWorkspaceModel()).isNull();
         assertThat(saved.getTimeoutSeconds()).isEqualTo(300);
         assertThat(saved.getMaxConcurrentJobs()).isEqualTo(2);

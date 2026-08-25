@@ -81,7 +81,7 @@ public interface SyncTargetProvider extends SyncTimestampProvider, BackfillState
         String slug,
         String displayName,
         String accountLogin,
-        Long installationId,
+        @org.jspecify.annotations.Nullable Long installationId,
         @org.jspecify.annotations.Nullable String serverUrl,
         List<SyncTarget> syncTargets,
         SyncContextProvider.SyncContext syncContext
@@ -119,10 +119,10 @@ public interface SyncTargetProvider extends SyncTimestampProvider, BackfillState
         Long scopeId,
         String displayName,
         String organizationLogin,
-        Long organizationId,
-        Instant issueTypesSyncedAt,
-        Instant issueDependenciesSyncedAt,
-        Instant subIssuesSyncedAt
+        @org.jspecify.annotations.Nullable Long organizationId,
+        @org.jspecify.annotations.Nullable Instant issueTypesSyncedAt,
+        @org.jspecify.annotations.Nullable Instant issueDependenciesSyncedAt,
+        @org.jspecify.annotations.Nullable Instant subIssuesSyncedAt
     ) {
         private static final long SECONDS_PER_MINUTE = 60L;
 
@@ -138,7 +138,7 @@ public interface SyncTargetProvider extends SyncTimestampProvider, BackfillState
             return needsSync(subIssuesSyncedAt, cooldownMinutes);
         }
 
-        private static boolean needsSync(Instant lastSyncedAt, int cooldownMinutes) {
+        private static boolean needsSync(@org.jspecify.annotations.Nullable Instant lastSyncedAt, int cooldownMinutes) {
             return (
                 lastSyncedAt == null ||
                 lastSyncedAt.isBefore(Instant.now().minusSeconds(cooldownMinutes * SECONDS_PER_MINUTE))
@@ -181,25 +181,25 @@ public interface SyncTargetProvider extends SyncTimestampProvider, BackfillState
     record SyncTarget(
         Long id,
         Long scopeId,
-        Long installationId,
-        String personalAccessToken,
+        @org.jspecify.annotations.Nullable Long installationId,
+        @org.jspecify.annotations.Nullable String personalAccessToken,
         AuthMode authMode,
         String repositoryNameWithOwner,
-        Instant lastLabelsSyncedAt,
-        Instant lastMilestonesSyncedAt,
-        Instant lastIssuesSyncedAt,
-        Instant lastPullRequestsSyncedAt,
-        Instant lastDiscussionsSyncedAt,
-        Instant lastCollaboratorsSyncedAt,
-        Instant lastFullSyncAt,
-        Integer issueBackfillHighWaterMark,
-        Integer issueBackfillCheckpoint,
-        Integer pullRequestBackfillHighWaterMark,
-        Integer pullRequestBackfillCheckpoint,
-        Instant backfillLastRunAt,
-        String issueSyncCursor,
-        String pullRequestSyncCursor,
-        String discussionSyncCursor,
+        @org.jspecify.annotations.Nullable Instant lastLabelsSyncedAt,
+        @org.jspecify.annotations.Nullable Instant lastMilestonesSyncedAt,
+        @org.jspecify.annotations.Nullable Instant lastIssuesSyncedAt,
+        @org.jspecify.annotations.Nullable Instant lastPullRequestsSyncedAt,
+        @org.jspecify.annotations.Nullable Instant lastDiscussionsSyncedAt,
+        @org.jspecify.annotations.Nullable Instant lastCollaboratorsSyncedAt,
+        @org.jspecify.annotations.Nullable Instant lastFullSyncAt,
+        @org.jspecify.annotations.Nullable Integer issueBackfillHighWaterMark,
+        @org.jspecify.annotations.Nullable Integer issueBackfillCheckpoint,
+        @org.jspecify.annotations.Nullable Integer pullRequestBackfillHighWaterMark,
+        @org.jspecify.annotations.Nullable Integer pullRequestBackfillCheckpoint,
+        @org.jspecify.annotations.Nullable Instant backfillLastRunAt,
+        @org.jspecify.annotations.Nullable String issueSyncCursor,
+        @org.jspecify.annotations.Nullable String pullRequestSyncCursor,
+        @org.jspecify.annotations.Nullable String discussionSyncCursor,
         @org.jspecify.annotations.Nullable Long nativeId
     ) {
         /** @return true if full sync has never run or is older than {@code staleThreshold} */
@@ -229,14 +229,15 @@ public interface SyncTargetProvider extends SyncTimestampProvider, BackfillState
         public boolean isIssueBackfillComplete() {
             return (
                 isIssueBackfillInitialized() &&
-                (issueBackfillHighWaterMark == 0 || (issueBackfillCheckpoint != null && issueBackfillCheckpoint <= 0))
+                (Integer.valueOf(0).equals(issueBackfillHighWaterMark) ||
+                    (issueBackfillCheckpoint != null && issueBackfillCheckpoint <= 0))
             );
         }
 
         public boolean isPullRequestBackfillComplete() {
             return (
                 isPullRequestBackfillInitialized() &&
-                (pullRequestBackfillHighWaterMark == 0 ||
+                (Integer.valueOf(0).equals(pullRequestBackfillHighWaterMark) ||
                     (pullRequestBackfillCheckpoint != null && pullRequestBackfillCheckpoint <= 0))
             );
         }
@@ -247,14 +248,14 @@ public interface SyncTargetProvider extends SyncTimestampProvider, BackfillState
 
         /** @return number of issues remaining to backfill */
         public int getIssueBackfillRemaining() {
-            if (!isIssueBackfillInitialized() || issueBackfillHighWaterMark == 0) return 0;
+            if (issueBackfillHighWaterMark == null || issueBackfillHighWaterMark == 0) return 0;
             if (issueBackfillCheckpoint == null) return issueBackfillHighWaterMark;
             return Math.max(0, issueBackfillCheckpoint);
         }
 
         /** @return number of pull requests remaining to backfill */
         public int getPullRequestBackfillRemaining() {
-            if (!isPullRequestBackfillInitialized() || pullRequestBackfillHighWaterMark == 0) return 0;
+            if (pullRequestBackfillHighWaterMark == null || pullRequestBackfillHighWaterMark == 0) return 0;
             if (pullRequestBackfillCheckpoint == null) return pullRequestBackfillHighWaterMark;
             return Math.max(0, pullRequestBackfillCheckpoint);
         }
@@ -270,7 +271,7 @@ public interface SyncTargetProvider extends SyncTimestampProvider, BackfillState
      * @param scopeId       unique scope identifier
      * @param usersSyncedAt last users sync timestamp
      */
-    record UserSyncState(Long scopeId, Instant usersSyncedAt) {
+    record UserSyncState(Long scopeId, @org.jspecify.annotations.Nullable Instant usersSyncedAt) {
         private static final long SECONDS_PER_MINUTE = 60L;
 
         public boolean needsSync(int cooldownMinutes) {
@@ -288,7 +289,11 @@ public interface SyncTargetProvider extends SyncTimestampProvider, BackfillState
      * @param teamsSyncedAt     last teams sync timestamp
      * @param organizationNames GitHub organizations to sync teams from
      */
-    record TeamSyncState(Long scopeId, Instant teamsSyncedAt, List<String> organizationNames) {
+    record TeamSyncState(
+        Long scopeId,
+        @org.jspecify.annotations.Nullable Instant teamsSyncedAt,
+        List<String> organizationNames
+    ) {
         private static final long SECONDS_PER_MINUTE = 60L;
 
         public boolean needsSync(int cooldownMinutes) {

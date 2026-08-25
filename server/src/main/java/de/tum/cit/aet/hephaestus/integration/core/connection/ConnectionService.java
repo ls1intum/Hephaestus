@@ -403,7 +403,7 @@ public class ConnectionService {
     public void provisionPatConnection(
         Workspace workspace,
         IntegrationKind kind,
-        String instanceKey,
+        @Nullable String instanceKey,
         ConnectionConfig config,
         String token,
         String correlationId

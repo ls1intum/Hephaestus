@@ -19,6 +19,7 @@ import io.nats.client.JetStreamApiException;
 import io.nats.client.JetStreamManagement;
 import io.nats.client.JetStreamOptions;
 import java.io.IOException;
+import java.time.Duration;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 
@@ -44,7 +45,14 @@ class WebhookProducerWiringTest extends BaseUnitTest {
         .withBean("natsConnection", Connection.class, WebhookProducerWiringTest::natsConnection)
         .withBean(MeterRegistry.class, SimpleMeterRegistry::new)
         .withBean(WebhookProperties.class, WebhookPropertiesFixture::properties)
-        .withBean(NatsConnectionProperties.class, () -> new NatsConnectionProperties(false, null, "hephaestus", null))
+        .withBean(NatsConnectionProperties.class, () ->
+            new NatsConnectionProperties(
+                false,
+                null,
+                "hephaestus",
+                new NatsConnectionProperties.Consumer(Duration.ofSeconds(60))
+            )
+        )
         .withUserConfiguration(WebhookConfiguration.class);
 
     @Test

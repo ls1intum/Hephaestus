@@ -12,17 +12,17 @@ import org.jspecify.annotations.Nullable;
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record GitHubIssueTypeDTO(
-    @JsonProperty("id") Long id,
-    @JsonProperty("node_id") String nodeId,
+    @JsonProperty("id") @Nullable Long id,
+    @JsonProperty("node_id") @Nullable String nodeId,
     @JsonProperty("name") String name,
-    @JsonProperty("description") String description,
-    @JsonProperty("color") String color,
+    @JsonProperty("description") @Nullable String description,
+    @JsonProperty("color") @Nullable String color,
     @JsonProperty("is_enabled") Boolean isEnabled
 ) {
     /**
      * Get the node ID, preferring nodeId for REST, id for GraphQL.
      */
-    public String getNodeId() {
+    public @Nullable String getNodeId() {
         // GraphQL returns 'id' as the node ID string
         // REST returns 'node_id' as the node ID string
         if (nodeId != null) {

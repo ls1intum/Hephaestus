@@ -7,6 +7,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Supplier;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
 
 /**
@@ -51,7 +52,7 @@ public class MentorTurnLock {
      * @return the entry whose {@link Entry#lock} is now held by the caller, or {@code null} if
      *         the lock was already held by someone else (we rolled the count back).
      */
-    private Entry acquire(ThreadKey key) {
+    private @Nullable Entry acquire(ThreadKey key) {
         Entry entry = locks.compute(key, (k, existing) -> {
             Entry e = existing != null ? existing : new Entry();
             e.holders.incrementAndGet();

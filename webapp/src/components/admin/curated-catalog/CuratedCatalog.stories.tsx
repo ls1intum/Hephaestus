@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { type ComponentProps, useState } from "react";
-import { expect, fn, screen, userEvent, within } from "storybook/test";
+import { expect, fn, screen, userEvent, waitFor, within } from "storybook/test";
 import type { CatalogEntryStatus, CuratedArea, CuratedPracticeSummary } from "@/api/types.gen";
 import { withStandardPage } from "@/stories/decorators";
 import { expectNoPageOverflow } from "@/test/reflow";
@@ -188,12 +188,12 @@ export const APracticeWhoseAreaIsGone: Story = {
 				name: "More actions for Outlived the area it was filed under",
 			}),
 		);
-		await expect(
-			await screen.findByRole("menuitem", {
-				name: "Move to Unassigned or an included group first",
-			}),
-		).toHaveAttribute("aria-disabled", "true");
+		const disabledMove = await screen.findByRole("menuitem", {
+			name: "Move to Unassigned or an included group first",
+		});
+		await expect(disabledMove).toHaveAttribute("aria-disabled", "true");
 		await userEvent.keyboard("{Escape}");
+		await waitFor(() => expect(disabledMove).not.toBeInTheDocument());
 		await userEvent.click(
 			canvas.getByRole("button", {
 				name: "More actions for Outlived the area it was filed under",

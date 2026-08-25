@@ -117,8 +117,7 @@ public class OutlineWebhookSignatureVerifier implements WebhookSignatureVerifier
         return new VerificationResult.Invalid("signature-mismatch");
     }
 
-    @Nullable
-    private static byte[] computeHmac(byte[] secret, String timestamp, byte[] body) {
+    private static byte@Nullable [] computeHmac(byte[] secret, String timestamp, byte[] body) {
         try {
             Mac mac = Mac.getInstance(HMAC_ALG);
             mac.init(new SecretKeySpec(secret, HMAC_ALG));

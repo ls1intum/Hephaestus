@@ -41,7 +41,7 @@ public class DockerHealthIndicator implements HealthIndicator {
         } catch (Exception e) {
             return Health.down()
                 .withDetail("dockerHost", properties.dockerHost())
-                .withDetail("error", e.getMessage())
+                .withDetail("error", e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage())
                 .build();
         }
     }

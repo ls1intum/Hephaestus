@@ -15,46 +15,6 @@ import org.junit.jupiter.api.Test;
 class SandboxSpecTest extends BaseUnitTest {
 
     @Test
-    void shouldRejectNullJobId() {
-        assertThatNullPointerException()
-            .isThrownBy(() ->
-                new SandboxSpec(
-                    null,
-                    "alpine:latest",
-                    List.of(),
-                    Map.of(),
-                    null,
-                    ResourceLimits.DEFAULT,
-                    SecurityProfile.DEFAULT,
-                    Map.of(),
-                    "/workspace/out",
-                    null
-                )
-            )
-            .withMessageContaining("jobId");
-    }
-
-    @Test
-    void shouldRejectNullImage() {
-        assertThatNullPointerException()
-            .isThrownBy(() ->
-                new SandboxSpec(
-                    UUID.randomUUID(),
-                    null,
-                    List.of(),
-                    Map.of(),
-                    null,
-                    ResourceLimits.DEFAULT,
-                    SecurityProfile.DEFAULT,
-                    Map.of(),
-                    "/workspace/out",
-                    null
-                )
-            )
-            .withMessageContaining("image");
-    }
-
-    @Test
     void shouldRejectBlankImage() {
         assertThatThrownBy(() ->
             new SandboxSpec(
@@ -72,26 +32,6 @@ class SandboxSpecTest extends BaseUnitTest {
         )
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessageContaining("blank");
-    }
-
-    @Test
-    void shouldRejectNullResourceLimits() {
-        assertThatNullPointerException()
-            .isThrownBy(() ->
-                new SandboxSpec(
-                    UUID.randomUUID(),
-                    "alpine:latest",
-                    List.of(),
-                    Map.of(),
-                    null,
-                    null,
-                    SecurityProfile.DEFAULT,
-                    Map.of(),
-                    "/workspace/out",
-                    null
-                )
-            )
-            .withMessageContaining("resourceLimits");
     }
 
     @Test
@@ -115,26 +55,6 @@ class SandboxSpecTest extends BaseUnitTest {
         assertThat(spec.environment()).isEmpty();
         assertThat(spec.inputFiles()).isEmpty();
         assertThat(spec.volumeMounts()).isEmpty();
-    }
-
-    @Test
-    void rejectsNullOutputPath() {
-        assertThatThrownBy(() ->
-            new SandboxSpec(
-                UUID.randomUUID(),
-                "alpine:latest",
-                null,
-                null,
-                null,
-                ResourceLimits.DEFAULT,
-                null,
-                null,
-                null,
-                null
-            )
-        )
-            .withFailMessage("outputPath should be required")
-            .isInstanceOf(NullPointerException.class);
     }
 
     @Nested

@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -46,6 +47,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 import org.springframework.graphql.client.HttpGraphQlClient;
+import org.springframework.transaction.TransactionStatus;
 import org.springframework.transaction.support.TransactionCallback;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -94,7 +96,7 @@ class GitHubHistoricalBackfillServiceTest extends BaseUnitTest {
     @Mock
     private HttpGraphQlClient client;
 
-    private GitHubHistoricalBackfillService service;
+    private GitHubHistoricalBackfillService service = mock(GitHubHistoricalBackfillService.class);
 
     private static final Long SCOPE_ID = 100L;
     private static final Long INSTALLATION_ID = 200L;
@@ -145,7 +147,7 @@ class GitHubHistoricalBackfillServiceTest extends BaseUnitTest {
             .when(transactionTemplate.execute(any()))
             .thenAnswer(invocation -> {
                 TransactionCallback<?> callback = invocation.getArgument(0);
-                return callback.doInTransaction(null);
+                return callback.doInTransaction(mock(TransactionStatus.class));
             });
     }
 

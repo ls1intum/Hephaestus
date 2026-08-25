@@ -25,6 +25,7 @@ import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
@@ -93,7 +94,7 @@ public class GitLabCommitSyncService {
      */
     public SyncResult syncCommitsForRepository(Long scopeId, Repository repository, @Nullable OffsetDateTime since) {
         String projectPath = repository.getNameWithOwner();
-        String safeProjectPath = sanitizeForLog(projectPath);
+        String safeProjectPath = Objects.requireNonNullElse(sanitizeForLog(projectPath), "<unknown>");
         String branch = repository.getDefaultBranch();
 
         if (branch == null || branch.isBlank()) {
@@ -101,7 +102,9 @@ public class GitLabCommitSyncService {
             return SyncResult.completed(0);
         }
 
-        Long providerId = repository.getProvider() != null ? repository.getProvider().getId() : null;
+        Long providerId = Objects.requireNonNull(
+            repository.getProvider() != null ? Objects.requireNonNull(repository.getProvider().getId()) : null
+        );
         String serverUrl = tokenService.resolveServerUrl(scopeId);
         String token = tokenService.getAccessToken(scopeId);
         long nativeId = repository.getNativeId();
@@ -210,7 +213,7 @@ public class GitLabCommitSyncService {
         // Upsert commit (passes null for stats — REST list endpoint doesn't provide them)
         commitRepository.upsertCommit(
             sha,
-            headline,
+            Objects.requireNonNullElse(headline, ""),
             body,
             webUrl,
             authoredAt,
@@ -254,7 +257,7 @@ public class GitLabCommitSyncService {
                 commitRepository
                     .findByShaAndRepositoryId(sha, repository.getId())
                     .map(c -> c.getId())
-                    .orElse(null),
+                    .orElseThrow(),
                 authorId,
                 CommitContributor.Role.AUTHOR.name(),
                 authorName,
@@ -269,7 +272,7 @@ public class GitLabCommitSyncService {
                 commitRepository
                     .findByShaAndRepositoryId(sha, repository.getId())
                     .map(c -> c.getId())
-                    .orElse(null),
+                    .orElseThrow(),
                 committerId,
                 CommitContributor.Role.COMMITTER.name(),
                 committerName,
@@ -288,7 +291,7 @@ public class GitLabCommitSyncService {
                         UUID.randomUUID(),
                         Instant.now(),
                         scopeId,
-                        RepositoryRef.from(repository),
+                        Objects.requireNonNull(RepositoryRef.from(repository)),
                         DataSource.REST_SYNC,
                         null,
                         UUID.randomUUID().toString(),

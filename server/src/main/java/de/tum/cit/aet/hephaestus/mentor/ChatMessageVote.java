@@ -12,6 +12,7 @@ import lombok.Setter;
 import lombok.ToString;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Represents a vote on a chat message.
@@ -53,7 +54,7 @@ public class ChatMessageVote {
     )
     @ToString.Exclude
     @JsonIgnore
-    private ChatMessage message;
+    private @Nullable ChatMessage message;
 
     /**
      * Boolean vote: true = upvote (helpful), false = downvote (not helpful)
@@ -64,11 +65,11 @@ public class ChatMessageVote {
 
     @CreationTimestamp
     @Column(nullable = false, updatable = false)
-    private Instant createdAt;
+    private @Nullable Instant createdAt;
 
     @UpdateTimestamp
     @Column(nullable = false)
-    private Instant updatedAt;
+    private @Nullable Instant updatedAt;
 
     /**
      * Constructor for new votes

@@ -53,6 +53,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.function.BooleanSupplier;
 import java.util.function.Supplier;
@@ -198,7 +199,7 @@ public class GithubDataSyncService {
     public boolean syncSyncTarget(SyncTarget syncTarget) {
         Long scopeId = syncTarget.scopeId();
         String nameWithOwner = syncTarget.repositoryNameWithOwner();
-        String safeNameWithOwner = sanitizeForLog(nameWithOwner);
+        String safeNameWithOwner = Objects.requireNonNullElse(sanitizeForLog(nameWithOwner), "null");
 
         if (!syncTargetProvider.isScopeActiveForSync(scopeId)) {
             log.debug("Skipped sync: reason=scopeNotActive, scopeId={}, repoName={}", scopeId, safeNameWithOwner);
@@ -212,7 +213,7 @@ public class GithubDataSyncService {
             );
 
         Repository repository = repositoryRepository
-            .findByNameWithOwnerAndProviderId(nameWithOwner, provider.getId())
+            .findByNameWithOwnerAndProviderId(nameWithOwner, Objects.requireNonNull(provider.getId()))
             .orElse(null);
         boolean repositoryCreatedDuringSync = false;
 
@@ -1194,7 +1195,7 @@ public class GithubDataSyncService {
                 repository.getId(),
                 repository.getNameWithOwner(),
                 syncTarget.scopeId(),
-                repository.getProvider().getId(),
+                Objects.requireNonNull(repository.getProvider().getId()),
                 repository
             );
         } catch (Exception e) {
@@ -1347,7 +1348,7 @@ public class GithubDataSyncService {
         // All retries exhausted — throw the last exception so the outer catch can classify it
         throw new SyncRetriesExhaustedException(
             "All " + TRANSIENT_RETRY_MAX_ATTEMPTS + " retries exhausted for " + description,
-            lastException
+            Objects.requireNonNull(lastException)
         );
     }
 

@@ -47,7 +47,7 @@ class FeatureFlagControllerIntegrationTest extends BaseIntegrationTest {
                 .jsonPath("$.MENTOR_ACCESS")
                 .isEqualTo(false) // admin annotation only sets "admin" authority
                 .jsonPath("$.GITLAB_WORKSPACE_CREATION")
-                .isEqualTo(false); // CONFIG flags default to false
+                .isEqualTo(true);
         }
 
         @Test

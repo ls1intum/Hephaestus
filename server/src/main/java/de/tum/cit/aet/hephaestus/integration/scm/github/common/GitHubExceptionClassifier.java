@@ -178,7 +178,7 @@ public class GitHubExceptionClassifier {
      * @param e the exception to classify
      * @return the error category
      */
-    public Category classify(Throwable e) {
+    public Category classify(@Nullable Throwable e) {
         return classifyWithDetails(e).category();
     }
 
@@ -189,7 +189,7 @@ public class GitHubExceptionClassifier {
      * @param e the exception to classify
      * @return classification result with category and additional details
      */
-    public ClassificationResult classifyWithDetails(Throwable e) {
+    public ClassificationResult classifyWithDetails(@Nullable Throwable e) {
         ClassificationResult result = doClassify(e);
         incrementCounter(result.category());
 
@@ -303,7 +303,7 @@ public class GitHubExceptionClassifier {
     /**
      * Internal classification logic without metric updates.
      */
-    private ClassificationResult doClassify(Throwable e) {
+    private ClassificationResult doClassify(@Nullable Throwable e) {
         if (e == null) {
             return ClassificationResult.of(Category.UNKNOWN, "Null exception");
         }

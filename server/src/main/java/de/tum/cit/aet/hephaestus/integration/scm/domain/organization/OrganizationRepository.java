@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.integration.scm.domain.organization;
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import java.util.Optional;
+import org.jspecify.annotations.Nullable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -58,7 +59,7 @@ public interface OrganizationRepository extends JpaRepository<Organization, Long
         @Param("providerId") Long providerId,
         @Param("login") String login,
         @Param("name") String name,
-        @Param("avatarUrl") String avatarUrl,
-        @Param("htmlUrl") String htmlUrl
+        @Param("avatarUrl") @Nullable String avatarUrl,
+        @Param("htmlUrl") @Nullable String htmlUrl
     );
 }

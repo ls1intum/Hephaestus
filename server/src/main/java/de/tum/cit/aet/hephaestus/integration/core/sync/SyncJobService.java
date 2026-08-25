@@ -163,13 +163,16 @@ public class SyncJobService implements SmartLifecycle {
             });
         } catch (DataIntegrityViolationException e) {
             // Re-read the partial-index race winner in a fresh transaction; the insert transaction aborted.
-            SyncJob raced = transactionTemplate.execute(status ->
-                syncJobRepository
-                    .findFirstByConnection_IdAndStatusInOrderByCreatedAtDesc(connectionId, SyncJobStatus.ACTIVE)
-                    .orElse(null)
-            );
-            if (raced != null) {
-                throw new SyncJobConflictException(raced, e);
+            Optional<SyncJob> raced = Optional.ofNullable(
+                transactionTemplate.execute(status ->
+                    syncJobRepository.findFirstByConnection_IdAndStatusInOrderByCreatedAtDesc(
+                        connectionId,
+                        SyncJobStatus.ACTIVE
+                    )
+                )
+            ).orElseGet(Optional::empty);
+            if (raced.isPresent()) {
+                throw new SyncJobConflictException(raced.get(), e);
             }
             throw e;
         }
@@ -301,14 +304,14 @@ public class SyncJobService implements SmartLifecycle {
      */
     public Optional<Long> requestCancelForTeardown(long connectionId) {
         reapAbandonedForConnection(connectionId);
-        return Optional.ofNullable(
+        Optional<Long> blockingJobId = Optional.ofNullable(
             transactionTemplate.execute(status ->
                 syncJobRepository
                     .findFirstByConnection_IdAndStatusInOrderByCreatedAtDesc(connectionId, SyncJobStatus.ACTIVE)
-                    .map(job -> {
+                    .flatMap(job -> {
                         if (syncJobRepository.markCancelRequested(job.getId(), SyncJobStatus.ACTIVE) == 0) {
                             // Completed between the read and the write — the connection is free after all.
-                            return null;
+                            return Optional.empty();
                         }
                         publish(
                             job.getWorkspace().getId(),
@@ -316,11 +319,11 @@ public class SyncJobService implements SmartLifecycle {
                             job.getKind(),
                             SyncStateChangedEvent.Scope.JOB
                         );
-                        return job.getId();
+                        return Optional.of(job.getId());
                     })
-                    .orElse(null)
             )
-        ).map(jobId -> {
+        ).orElseGet(Optional::empty);
+        return blockingJobId.map(jobId -> {
             notifyLocalRunner(jobId);
             return jobId;
         });

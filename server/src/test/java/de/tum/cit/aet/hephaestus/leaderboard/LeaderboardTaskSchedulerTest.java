@@ -5,6 +5,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.leaderboard.tasks.LeaguePointsUpdateTask;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
@@ -15,6 +16,7 @@ import java.util.Optional;
 import java.util.concurrent.ScheduledFuture;
 import net.javacrumbs.shedlock.core.LockProvider;
 import net.javacrumbs.shedlock.core.SimpleLock;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -52,7 +54,7 @@ class LeaderboardTaskSchedulerTest extends BaseUnitTest {
     @Mock
     private LeaderboardNotificationTask notificationTask;
 
-    private LeaderboardProperties properties;
+    private @Nullable LeaderboardProperties properties;
 
     @BeforeEach
     void setUp() {
@@ -79,7 +81,7 @@ class LeaderboardTaskSchedulerTest extends BaseUnitTest {
         );
         when(workspaceRepository.findById(7L)).thenReturn(Optional.of(workspace(7L)));
 
-        scheduler.onWorkspaceCreated(new WorkspaceCreatedEvent(7L, null));
+        scheduler.onWorkspaceCreated(new WorkspaceCreatedEvent(7L, IntegrationKind.GITHUB));
 
         ArgumentCaptor<Runnable> tick = ArgumentCaptor.forClass(Runnable.class);
         verify(taskScheduler).schedule(tick.capture(), any(Trigger.class));

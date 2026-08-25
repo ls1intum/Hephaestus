@@ -15,6 +15,7 @@ import java.time.Instant;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
@@ -97,7 +98,7 @@ public class GitLabIssueTypeSyncService {
             graphQlClientProvider.recordSuccess();
 
             @SuppressWarnings("unchecked")
-            List<Map<String, Object>> nodes = (List<Map<String, Object>>) (List<?>) response
+            List<Map<String, Object>> nodes = (List<Map<String, Object>>) (List<?>) Objects.requireNonNull(response)
                 .field("group.workItemTypes.nodes")
                 .toEntityList(Map.class);
 

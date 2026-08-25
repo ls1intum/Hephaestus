@@ -124,8 +124,10 @@ final class PracticeTraceDeriver {
         //    over anything re-derived from today's configuration.
         for (SignalOccurrence occurrence : matched) {
             ReviewOutcome review = occurrence.reviewId() == null ? null : reviews.get(occurrence.reviewId());
-            PracticeReadinessOutcome readiness =
-                review == null ? null : review.readinessByPracticeSlug().get(practice.slug());
+            if (review == null) {
+                continue;
+            }
+            PracticeReadinessOutcome readiness = review.readinessByPracticeSlug().get(practice.slug());
             if (readiness == null) {
                 continue;
             }

@@ -153,6 +153,8 @@ class ClasspathArtifactSourceCatalogRegistryTest {
         var decisions = ClasspathArtifactSourceCatalogRegistry.parseUseDecisions(root);
         var assessment = decisions.get("use-scm-pull-request-core-automated-review");
         var feedback = decisions.get("use-scm-pull-request-core-feedback-delivery");
+        org.junit.jupiter.api.Assertions.assertNotNull(assessment);
+        org.junit.jupiter.api.Assertions.assertNotNull(feedback);
 
         assertThat(
             assessment.permitsAt(Instant.parse("2026-08-03T12:00:00Z"), SourceUsePurpose.AUTOMATED_PRACTICE_REVIEW)
@@ -172,6 +174,7 @@ class ClasspathArtifactSourceCatalogRegistryTest {
             read(ClasspathArtifactSourceCatalogRegistry.USE_DECISIONS_RESOURCE)
         );
         var decision = decisions.get("use-docs-document-core-automated-review");
+        org.junit.jupiter.api.Assertions.assertNotNull(decision);
         Instant expiry = Instant.parse("2027-08-07T00:00:00Z");
 
         assertThat(decision.permitsAt(expiry.minusMillis(1), SourceUsePurpose.AUTOMATED_PRACTICE_REVIEW)).isTrue();
@@ -185,6 +188,7 @@ class ClasspathArtifactSourceCatalogRegistryTest {
             read(ClasspathArtifactSourceCatalogRegistry.USE_DECISIONS_RESOURCE)
         );
         var decision = decisions.get("use-docs-document-core-automated-review");
+        org.junit.jupiter.api.Assertions.assertNotNull(decision);
         Instant decided = Instant.parse("2026-08-07T00:00:00Z");
 
         assertThat(decision.permitsAt(decided, SourceUsePurpose.AUTOMATED_PRACTICE_REVIEW)).isTrue();

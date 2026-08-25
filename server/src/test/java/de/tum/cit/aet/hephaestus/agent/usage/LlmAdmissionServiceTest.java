@@ -27,6 +27,18 @@ import org.mockito.Mock;
 
 class LlmAdmissionServiceTest extends BaseUnitTest {
 
+    private static WorkspaceLlmModel workspaceModel(WorkspaceAgentBinding binding) {
+        WorkspaceLlmModel model = binding.getWorkspaceModel();
+        assertThat(model).isNotNull();
+        return model;
+    }
+
+    private static LlmModel instanceModel(WorkspaceAgentBinding binding) {
+        LlmModel model = binding.getInstanceModel();
+        assertThat(model).isNotNull();
+        return model;
+    }
+
     @Mock
     private LlmModelResolver resolver;
 
@@ -81,7 +93,7 @@ class LlmAdmissionServiceTest extends BaseUnitTest {
         when(bindingRepository.findByWorkspaceIdAndPurposeForUpdate(30L, AgentPurpose.PRACTICE_REVIEW)).thenReturn(
             Optional.of(binding)
         );
-        when(modelRepository.findByIdForUpdate(20L)).thenReturn(Optional.of(binding.getInstanceModel()));
+        when(modelRepository.findByIdForUpdate(20L)).thenReturn(Optional.of(instanceModel(binding)));
         ResolvedLlmModel resolved = new ResolvedLlmModel(
             "https://api.example/v1",
             "openai-responses",
@@ -124,7 +136,7 @@ class LlmAdmissionServiceTest extends BaseUnitTest {
         // The row lock the instance arm takes on llm_model is taken on workspace_llm_model here, and
         // it is scoped to the owning workspace: a model id alone must not be admissible cross-tenant.
         when(workspaceModelRepository.findByIdAndWorkspaceIdForUpdate(21L, 30L)).thenReturn(
-            Optional.of(binding.getWorkspaceModel())
+            Optional.of(workspaceModel(binding))
         );
         when(resolver.resolve(binding)).thenReturn(
             new ResolvedLlmModel("https://byo.example/v1", "openai-responses", "byo-model", null, null, false)
@@ -133,7 +145,7 @@ class LlmAdmissionServiceTest extends BaseUnitTest {
             new LlmModelResolver.ConnectionRef(FundingSource.WORKSPACE, 11L, 21L, 30L)
         );
         when(workspaceModelRepository.findByIdAndWorkspaceId(21L, 30L)).thenReturn(
-            Optional.of(binding.getWorkspaceModel())
+            Optional.of(workspaceModel(binding))
         );
 
         AdmittedLlmModel admitted = service.admit(binding);
@@ -155,12 +167,12 @@ class LlmAdmissionServiceTest extends BaseUnitTest {
     @Test
     void refusesToAdmitAModelWhosePriceIsUnknown() {
         WorkspaceAgentBinding binding = byoBinding();
-        binding.getWorkspaceModel().setPricingMode(PricingMode.UNPRICED);
+        workspaceModel(binding).setPricingMode(PricingMode.UNPRICED);
         when(bindingRepository.findByWorkspaceIdAndPurposeForUpdate(30L, AgentPurpose.PRACTICE_REVIEW)).thenReturn(
             Optional.of(binding)
         );
         when(workspaceModelRepository.findByIdAndWorkspaceIdForUpdate(21L, 30L)).thenReturn(
-            Optional.of(binding.getWorkspaceModel())
+            Optional.of(workspaceModel(binding))
         );
         when(resolver.resolve(binding)).thenReturn(
             new ResolvedLlmModel("https://byo.example/v1", "openai-responses", "byo-model", null, null, false)
@@ -169,7 +181,7 @@ class LlmAdmissionServiceTest extends BaseUnitTest {
             new LlmModelResolver.ConnectionRef(FundingSource.WORKSPACE, 11L, 21L, 30L)
         );
         when(workspaceModelRepository.findByIdAndWorkspaceId(21L, 30L)).thenReturn(
-            Optional.of(binding.getWorkspaceModel())
+            Optional.of(workspaceModel(binding))
         );
 
         assertThatThrownBy(() -> service.admit(binding))
@@ -183,7 +195,7 @@ class LlmAdmissionServiceTest extends BaseUnitTest {
         when(bindingRepository.findByWorkspaceIdAndPurposeForUpdate(30L, AgentPurpose.MENTOR)).thenReturn(
             Optional.of(binding)
         );
-        when(modelRepository.findByIdForUpdate(20L)).thenReturn(Optional.of(binding.getInstanceModel()));
+        when(modelRepository.findByIdForUpdate(20L)).thenReturn(Optional.of(instanceModel(binding)));
         when(resolver.resolve(binding)).thenThrow(new IllegalStateException("model revoked"));
 
         assertThatThrownBy(() -> service.admit(binding)).isInstanceOf(IllegalStateException.class);

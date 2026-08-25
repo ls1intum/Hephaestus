@@ -32,6 +32,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.annotation.Order;
@@ -262,7 +263,7 @@ public class ReviewHistoryContentSource implements EvidenceSource {
         long workspaceId,
         Long subjectUserId,
         Instant since,
-        @org.jspecify.annotations.Nullable UUID excludedJobId
+        @Nullable UUID excludedJobId
     ) {
         List<Observation> recent = observationRepository.findRecentByDeveloperAndWorkspace(
             subjectUserId,
@@ -284,7 +285,7 @@ public class ReviewHistoryContentSource implements EvidenceSource {
             .toList();
     }
 
-    private static @org.jspecify.annotations.Nullable UUID sourceJobExcludedFromHistory(AgentJob job) {
+    private static @Nullable UUID sourceJobExcludedFromHistory(AgentJob job) {
         String raw = job.getMetadata() == null ? "" : job.getMetadata().path("source_job_id").asString();
         if (raw.isBlank()) return null;
         try {
@@ -456,7 +457,7 @@ public class ReviewHistoryContentSource implements EvidenceSource {
      * otherwise — mirrors the resolution delivery performs, so history can't be staged for one person
      * while observations are filed against another.
      */
-    private Long resolveSubject(ContextRequest request, AgentJob job) {
+    private @Nullable Long resolveSubject(ContextRequest request, AgentJob job) {
         return switch (request) {
             case ContextRequest.PracticeReviewRequest ignored -> authorOfPullRequest(job);
             case ContextRequest.IssueReviewRequest ignored -> authorOfIssue(job);
@@ -466,7 +467,7 @@ public class ReviewHistoryContentSource implements EvidenceSource {
         };
     }
 
-    private Long authorOfPullRequest(AgentJob job) {
+    private @Nullable Long authorOfPullRequest(AgentJob job) {
         Long id = metadataLong(job, "pull_request_id");
         if (id == null) return null;
         return pullRequestRepository
@@ -476,7 +477,7 @@ public class ReviewHistoryContentSource implements EvidenceSource {
             .orElse(null);
     }
 
-    private Long authorOfIssue(AgentJob job) {
+    private @Nullable Long authorOfIssue(AgentJob job) {
         Long id = metadataLong(job, "issue_id");
         if (id == null) return null;
         return issueRepository
@@ -486,11 +487,11 @@ public class ReviewHistoryContentSource implements EvidenceSource {
             .orElse(null);
     }
 
-    private Long metadataSubject(AgentJob job) {
+    private @Nullable Long metadataSubject(AgentJob job) {
         return metadataLong(job, "about_user_id");
     }
 
-    private static Long metadataLong(AgentJob job, String field) {
+    private static @Nullable Long metadataLong(AgentJob job, String field) {
         var metadata = job.getMetadata();
         if (metadata == null || metadata.isNull()) return null;
         var node = metadata.get(field);
@@ -513,7 +514,7 @@ public class ReviewHistoryContentSource implements EvidenceSource {
         }
     }
 
-    private static AgentJob reviewJob(ContextRequest request) {
+    private static @Nullable AgentJob reviewJob(ContextRequest request) {
         return switch (request) {
             case ContextRequest.PracticeReviewRequest r -> r.job();
             case ContextRequest.IssueReviewRequest r -> r.job();

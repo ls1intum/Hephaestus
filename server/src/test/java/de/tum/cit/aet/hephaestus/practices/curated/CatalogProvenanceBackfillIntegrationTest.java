@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.practices.curated;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.practices.PracticeAutomatedReviewPolicy;
@@ -9,6 +10,7 @@ import de.tum.cit.aet.hephaestus.practices.PracticeEvidenceDefaults;
 import de.tum.cit.aet.hephaestus.workspace.AbstractWorkspaceIntegrationTest;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -222,8 +224,8 @@ class CatalogProvenanceBackfillIntegrationTest extends AbstractWorkspaceIntegrat
         Workspace workspace,
         String criteria,
         boolean provenancePending,
-        PracticeAutomatedReviewPolicy evidence,
-        String fingerprint
+        @Nullable PracticeAutomatedReviewPolicy evidence,
+        @Nullable String fingerprint
     ) {
         PracticeDefinition shipped = shipped();
         transactionOperations.executeWithoutResult(ignored -> {
@@ -320,7 +322,7 @@ class CatalogProvenanceBackfillIntegrationTest extends AbstractWorkspaceIntegrat
         return evidenceJson(definition.automatedReviewPolicy());
     }
 
-    private String evidenceJson(PracticeAutomatedReviewPolicy evidence) {
+    private String evidenceJson(@Nullable PracticeAutomatedReviewPolicy evidence) {
         return objectMapper.valueToTree(evidence).toString();
     }
 
@@ -332,11 +334,13 @@ class CatalogProvenanceBackfillIntegrationTest extends AbstractWorkspaceIntegrat
     }
 
     private String sourceFingerprint(Workspace workspace) {
-        return jdbcTemplate.queryForObject(
+        String fingerprint = jdbcTemplate.queryForObject(
             "SELECT source_curated_fingerprint FROM practice WHERE workspace_id = ?",
             String.class,
             workspace.getId()
         );
+        assertNotNull(fingerprint);
+        return fingerprint;
     }
 
     private long unfingerprintedRevisions() {
@@ -350,6 +354,8 @@ class CatalogProvenanceBackfillIntegrationTest extends AbstractWorkspaceIntegrat
     }
 
     private long count(String sql, Object... args) {
-        return jdbcTemplate.queryForObject(sql, Long.class, args);
+        Long count = jdbcTemplate.queryForObject(sql, Long.class, args);
+        assertNotNull(count);
+        return count;
     }
 }

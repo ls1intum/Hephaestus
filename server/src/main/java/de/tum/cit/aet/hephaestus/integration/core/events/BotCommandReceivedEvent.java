@@ -42,6 +42,6 @@ public record BotCommandReceivedEvent(
     String noteAuthor,
     long providerId,
     long authorNativeId,
-    Long commentId,
-    Long scopeId
+    @org.jspecify.annotations.Nullable Long commentId,
+    @org.jspecify.annotations.Nullable Long scopeId
 ) {}

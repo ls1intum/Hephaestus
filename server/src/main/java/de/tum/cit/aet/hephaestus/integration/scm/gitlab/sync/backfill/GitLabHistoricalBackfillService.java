@@ -197,8 +197,8 @@ public class GitLabHistoricalBackfillService {
         Long scopeId,
         Repository repo,
         SyncTarget target,
-        GitLabIssueSyncService issueSync,
-        GitLabMergeRequestSyncService mrSync,
+        @Nullable GitLabIssueSyncService issueSync,
+        @Nullable GitLabMergeRequestSyncService mrSync,
         int batchSize
     ) {
         String safeName = sanitizeForLog(repo.getNameWithOwner());
@@ -347,7 +347,7 @@ public class GitLabHistoricalBackfillService {
     /**
      * Resolves the GitLab provider ID by looking up the organization.
      */
-    private Long getGitLabProviderId(String accountLogin) {
+    private @Nullable Long getGitLabProviderId(String accountLogin) {
         return organizationRepository
             .findByLoginIgnoreCaseAndProvider_Type(accountLogin, IdentityProviderType.GITLAB)
             .map(org -> org.getProvider() != null ? org.getProvider().getId() : null)

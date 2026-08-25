@@ -10,6 +10,7 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 /**
  * A campaign as an admin sees it — before confirming, while it runs, and after it ends.
@@ -30,19 +31,23 @@ public record ReviewBackfillRunDTO(
     @NonNull
     DiscoveredVia discoveredVia,
     @Schema(description = "The schedule that opened this run; absent for a campaign an admin scoped by hand")
+    @Nullable
     UUID sweepScheduleId,
-    @Schema(description = "Set only while the run is PAUSED") ReviewBackfillPauseReason pauseReason,
+    @Schema(description = "Set only while the run is PAUSED") @Nullable ReviewBackfillPauseReason pauseReason,
     @NonNull Integer estimatedArtifacts,
     @Schema(description = "Forecast total spend in USD; absent when the workspace has no priced review history")
+    @Nullable
     BigDecimal estimatedCostUsd,
     @NonNull Integer submittedCount,
     @NonNull Integer passedCount,
     @NonNull Integer failedCount,
     @NonNull Long requestedByAccountId,
-    @Schema(description = "Who authorised the spend; absent until the run is confirmed") Long confirmedByAccountId,
+    @Schema(description = "Who authorised the spend; absent until the run is confirmed")
+    @Nullable
+    Long confirmedByAccountId,
     @NonNull Instant createdAt,
-    Instant startedAt,
-    Instant finishedAt
+    @Nullable Instant startedAt,
+    @Nullable Instant finishedAt
 ) {
     public static ReviewBackfillRunDTO from(ReviewBackfillRun run) {
         return new ReviewBackfillRunDTO(

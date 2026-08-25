@@ -11,6 +11,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubEventType;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.ProcessingContextFactory;
 import de.tum.cit.aet.hephaestus.integration.scm.github.issue.GitHubIssueProcessor;
 import de.tum.cit.aet.hephaestus.integration.scm.github.issuecomment.dto.GitHubIssueCommentEventDTO;
+import java.util.Objects;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -95,7 +96,7 @@ public class GitHubIssueCommentMessageHandler extends AbstractIntegrationMessage
 
         // Handle comment action
         if (event.actionType() == GitHubEventAction.IssueComment.DELETED) {
-            commentProcessor.delete(commentDto.id(), context);
+            commentProcessor.delete(Objects.requireNonNull(commentDto.id()), context);
         } else {
             // Use processWithParentCreation to handle the case where the parent
             // entity (Issue or PR) doesn't exist yet. This creates a minimal

@@ -132,6 +132,7 @@ class ActivityEventServiceIntegrationTest extends BaseIntegrationTest {
             ActivityEvent event = events.get(0);
             assertThat(event.getEventType()).isEqualTo(ActivityEventType.PULL_REQUEST_OPENED);
             assertThat(event.getOccurredAt()).isEqualTo(occurredAt);
+            org.junit.jupiter.api.Assertions.assertNotNull(event.getActor());
             assertThat(event.getActor().getId()).isEqualTo(testUser.getId());
             assertThat(event.getRepository().getId()).isEqualTo(testRepository.getId());
             assertThat(event.getWorkspace().getId()).isEqualTo(testWorkspace.getId());

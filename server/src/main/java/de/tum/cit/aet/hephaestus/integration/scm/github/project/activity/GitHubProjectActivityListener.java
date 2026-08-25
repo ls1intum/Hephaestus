@@ -13,6 +13,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.events.GitHubProjectEven
 import de.tum.cit.aet.hephaestus.integration.scm.github.project.Project;
 import de.tum.cit.aet.hephaestus.integration.scm.github.project.ProjectRepository;
 import java.time.Instant;
+import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.Nullable;
@@ -72,7 +73,7 @@ public class GitHubProjectActivityListener {
                     : Instant.now();
         safeRecord("project created", projectData.id(), () ->
             activityRecorder.record(
-                event.context().scopeId(),
+                Objects.requireNonNull(event.context().scopeId()),
                 ActivityEventType.PROJECT_CREATED,
                 occurredAt,
                 getActorOrNull(projectData.creatorId()),
@@ -96,7 +97,7 @@ public class GitHubProjectActivityListener {
         Long actorId = projectData.actorId() != null ? projectData.actorId() : projectData.creatorId();
         safeRecord("project updated", projectData.id(), () ->
             activityRecorder.record(
-                event.context().scopeId(),
+                Objects.requireNonNull(event.context().scopeId()),
                 ActivityEventType.PROJECT_UPDATED,
                 occurredAt,
                 getActorOrNull(actorId),
@@ -125,7 +126,7 @@ public class GitHubProjectActivityListener {
         Long actorId = projectData.actorId() != null ? projectData.actorId() : projectData.creatorId();
         safeRecord("project closed", projectData.id(), () ->
             activityRecorder.record(
-                event.context().scopeId(),
+                Objects.requireNonNull(event.context().scopeId()),
                 ActivityEventType.PROJECT_CLOSED,
                 occurredAt,
                 getActorOrNull(actorId),
@@ -149,7 +150,7 @@ public class GitHubProjectActivityListener {
         Long actorId = projectData.actorId() != null ? projectData.actorId() : projectData.creatorId();
         safeRecord("project reopened", projectData.id(), () ->
             activityRecorder.record(
-                event.context().scopeId(),
+                Objects.requireNonNull(event.context().scopeId()),
                 ActivityEventType.PROJECT_REOPENED,
                 occurredAt,
                 getActorOrNull(actorId),
@@ -169,10 +170,11 @@ public class GitHubProjectActivityListener {
         if (!hasValidScopeId("Project deleted", projectId, event.context().scopeId())) {
             return;
         }
+        Long scopeId = Objects.requireNonNull(event.context().scopeId());
         log.debug("Recording project deleted event: projectId={}", projectId);
         safeRecord("project deleted", projectId, () ->
             activityRecorder.recordDeleted(
-                event.context().scopeId(),
+                scopeId,
                 ActivityEventType.PROJECT_DELETED,
                 Instant.now(),
                 ActivityTargetType.PROJECT,
@@ -200,7 +202,7 @@ public class GitHubProjectActivityListener {
         User actor = getActorOrNull(itemData.actorId());
         safeRecord("project item created", itemData.id(), () ->
             activityRecorder.record(
-                event.context().scopeId(),
+                Objects.requireNonNull(event.context().scopeId()),
                 ActivityEventType.PROJECT_ITEM_CREATED,
                 occurredAt,
                 actor,
@@ -223,7 +225,7 @@ public class GitHubProjectActivityListener {
         Instant occurredAt = itemData.updatedAt() != null ? itemData.updatedAt() : Instant.now();
         safeRecord("project item updated", itemData.id(), () ->
             activityRecorder.record(
-                event.context().scopeId(),
+                Objects.requireNonNull(event.context().scopeId()),
                 ActivityEventType.PROJECT_ITEM_UPDATED,
                 occurredAt,
                 getActorOrNull(itemData.actorId()),
@@ -246,7 +248,7 @@ public class GitHubProjectActivityListener {
         Instant occurredAt = itemData.updatedAt() != null ? itemData.updatedAt() : Instant.now();
         safeRecord("project item archived", itemData.id(), () ->
             activityRecorder.record(
-                event.context().scopeId(),
+                Objects.requireNonNull(event.context().scopeId()),
                 ActivityEventType.PROJECT_ITEM_ARCHIVED,
                 occurredAt,
                 getActorOrNull(itemData.actorId()),
@@ -269,7 +271,7 @@ public class GitHubProjectActivityListener {
         Instant occurredAt = itemData.updatedAt() != null ? itemData.updatedAt() : Instant.now();
         safeRecord("project item restored", itemData.id(), () ->
             activityRecorder.record(
-                event.context().scopeId(),
+                Objects.requireNonNull(event.context().scopeId()),
                 ActivityEventType.PROJECT_ITEM_RESTORED,
                 occurredAt,
                 getActorOrNull(itemData.actorId()),
@@ -292,7 +294,7 @@ public class GitHubProjectActivityListener {
         log.debug("Recording project item deleted event: itemId={}", itemId);
         safeRecord("project item deleted", itemId, () ->
             activityRecorder.record(
-                event.context().scopeId(),
+                Objects.requireNonNull(event.context().scopeId()),
                 ActivityEventType.PROJECT_ITEM_DELETED,
                 Instant.now(),
                 null,
@@ -315,7 +317,7 @@ public class GitHubProjectActivityListener {
         Instant occurredAt = itemData.updatedAt() != null ? itemData.updatedAt() : Instant.now();
         safeRecord("project item converted", itemData.id(), () ->
             activityRecorder.record(
-                event.context().scopeId(),
+                Objects.requireNonNull(event.context().scopeId()),
                 ActivityEventType.PROJECT_ITEM_CONVERTED,
                 occurredAt,
                 getActorOrNull(itemData.actorId()),
@@ -338,7 +340,7 @@ public class GitHubProjectActivityListener {
         Instant occurredAt = itemData.updatedAt() != null ? itemData.updatedAt() : Instant.now();
         safeRecord("project item reordered", itemData.id(), () ->
             activityRecorder.record(
-                event.context().scopeId(),
+                Objects.requireNonNull(event.context().scopeId()),
                 ActivityEventType.PROJECT_ITEM_REORDERED,
                 occurredAt,
                 getActorOrNull(itemData.actorId()),
@@ -364,7 +366,7 @@ public class GitHubProjectActivityListener {
             data.createdAt() != null ? data.createdAt() : data.updatedAt() != null ? data.updatedAt() : Instant.now();
         safeRecord("project status update created", data.id(), () ->
             activityRecorder.record(
-                event.context().scopeId(),
+                Objects.requireNonNull(event.context().scopeId()),
                 ActivityEventType.PROJECT_STATUS_UPDATE_CREATED,
                 occurredAt,
                 getActorOrNull(data.creatorId()),
@@ -387,7 +389,7 @@ public class GitHubProjectActivityListener {
         Instant occurredAt = data.updatedAt() != null ? data.updatedAt() : Instant.now();
         safeRecord("project status update updated", data.id(), () ->
             activityRecorder.record(
-                event.context().scopeId(),
+                Objects.requireNonNull(event.context().scopeId()),
                 ActivityEventType.PROJECT_STATUS_UPDATE_UPDATED,
                 occurredAt,
                 getActorOrNull(data.creatorId()),
@@ -409,7 +411,7 @@ public class GitHubProjectActivityListener {
         }
         safeRecord("project status update deleted", id, () ->
             activityRecorder.record(
-                event.context().scopeId(),
+                Objects.requireNonNull(event.context().scopeId()),
                 ActivityEventType.PROJECT_STATUS_UPDATE_DELETED,
                 Instant.now(),
                 null,
@@ -431,7 +433,7 @@ public class GitHubProjectActivityListener {
         }
     }
 
-    private boolean hasValidScopeId(String eventName, Long entityId, Long scopeId) {
+    private boolean hasValidScopeId(String eventName, Long entityId, @Nullable Long scopeId) {
         if (scopeId == null) {
             log.warn("Skipped event due to null scopeId: eventType={}, entityId={}", eventName, entityId);
             return false;

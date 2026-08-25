@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.workspace;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import de.tum.cit.aet.hephaestus.activity.ActivityEventRepository;
 import de.tum.cit.aet.hephaestus.activity.ActivityEventType;
@@ -47,26 +48,22 @@ import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSource;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
+import de.tum.cit.aet.hephaestus.testconfig.SharedTestDoubles.LateFailingWorkspacePurgeContributor;
 import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
 import de.tum.cit.aet.hephaestus.testconfig.WithAdminUser;
 import de.tum.cit.aet.hephaestus.testconfig.WithMentorUser;
 import de.tum.cit.aet.hephaestus.workspace.dto.CreateWorkspaceRequestDTO;
 import de.tum.cit.aet.hephaestus.workspace.spi.WorkspacePurgeBlockedException;
-import de.tum.cit.aet.hephaestus.workspace.spi.WorkspacePurgeContributor;
 import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.TestConfiguration;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.reactive.server.WebTestClient;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -76,31 +73,10 @@ import org.springframework.transaction.support.TransactionTemplate;
  * Integration tests for workspace purge (deletion) covering data cleanup completeness,
  * idempotency, shared entity protection, credential clearing, and authorization.
  */
-@Import(WorkspacePurgeIntegrationTest.FailingContributorConfig.class)
 class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
-    private static final AtomicBoolean FAIL_LATE = new AtomicBoolean();
-
-    @TestConfiguration
-    static class FailingContributorConfig {
-
-        @Bean
-        WorkspacePurgeContributor lateFailingContributor() {
-            return new WorkspacePurgeContributor() {
-                @Override
-                public void deleteWorkspaceData(Long workspaceId) {
-                    if (FAIL_LATE.get()) {
-                        throw new IllegalStateException("late purge failure");
-                    }
-                }
-
-                @Override
-                public int getOrder() {
-                    return Integer.MAX_VALUE;
-                }
-            };
-        }
-    }
+    @Autowired
+    private LateFailingWorkspacePurgeContributor lateFailingContributor;
 
     @Autowired
     private WebTestClient webTestClient;
@@ -255,13 +231,13 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
         Long workspaceId = workspace.getId();
         assertThat(activityEventRepository.countByWorkspaceId(workspaceId)).isPositive();
 
-        FAIL_LATE.set(true);
+        lateFailingContributor.setFail(true);
         try {
             assertThatThrownBy(() -> workspaceLifecycleService.purgeWorkspace(workspace.getWorkspaceSlug()))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessage("late purge failure");
         } finally {
-            FAIL_LATE.set(false);
+            lateFailingContributor.setFail(false);
         }
 
         Workspace reloaded = workspaceRepository.findById(workspaceId).orElseThrow();
@@ -429,7 +405,9 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
         void purgePreservesOrganization() {
             Workspace workspace = createGitLabWorkspaceWithData("org-protect");
             Long workspaceId = workspace.getId();
-            Long orgId = workspace.getOrganization().getId();
+            Organization organization = workspace.getOrganization();
+            assertNotNull(organization);
+            Long orgId = organization.getId();
 
             workspaceLifecycleService.purgeWorkspace(workspace.getWorkspaceSlug());
 
@@ -521,63 +499,53 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
         }
     }
 
-    // Authorization
+    @Test
+    @WithAdminUser
+    void shouldAllowOwnerToPurgeWorkspace() {
+        Workspace workspace = createGitLabWorkspaceWithData("owner-purge");
 
-    @Nested
-    class Authorization {
+        webTestClient
+            .delete()
+            .uri("/workspaces/{workspaceSlug}", workspace.getWorkspaceSlug())
+            .headers(TestAuthUtils.withCurrentUser())
+            .exchange()
+            .expectStatus()
+            .isNoContent();
 
-        @Test
-        @WithAdminUser
-        void ownerCanPurge() {
-            Workspace workspace = createGitLabWorkspaceWithData("owner-purge");
-            // ensureOwnerMembership already called in createGitLabWorkspaceWithData
+        Workspace purged = workspaceRepository.findById(workspace.getId()).orElseThrow();
+        assertThat(purged.getStatus()).isEqualTo(Workspace.WorkspaceStatus.PURGED);
+    }
 
-            webTestClient
-                .delete()
-                .uri("/workspaces/{workspaceSlug}", workspace.getWorkspaceSlug())
-                .headers(TestAuthUtils.withCurrentUser())
-                .exchange()
-                .expectStatus()
-                .isNoContent();
+    @Test
+    @WithMentorUser
+    void shouldDenyPurgeWhenUserIsNotOwner() {
+        User owner = persistUser("non-owner-test-owner");
+        Workspace workspace = workspaceService.createWorkspace(
+            new CreateWorkspaceRequestDTO(
+                "non-owner-ws",
+                "Non-Owner Test",
+                "non-owner-group",
+                AccountType.ORG,
+                owner.getId(),
+                IntegrationKind.GITLAB,
+                "glpat-non-owner-token",
+                null
+            )
+        );
 
-            Workspace purged = workspaceRepository.findById(workspace.getId()).orElseThrow();
-            assertThat(purged.getStatus()).isEqualTo(Workspace.WorkspaceStatus.PURGED);
-        }
+        User mentorUser = persistUser("mentor");
+        ensureWorkspaceMembership(workspace, mentorUser, WorkspaceMembership.WorkspaceRole.MEMBER);
 
-        @Test
-        @WithMentorUser
-        void nonOwnerIsDeniedAccess() {
-            // Create workspace with a different owner — mentor user is NOT the owner
-            User owner = persistUser("non-owner-test-owner");
-            Workspace workspace = workspaceService.createWorkspace(
-                new CreateWorkspaceRequestDTO(
-                    "non-owner-ws",
-                    "Non-Owner Test",
-                    "non-owner-group",
-                    AccountType.ORG,
-                    owner.getId(),
-                    IntegrationKind.GITLAB,
-                    "glpat-non-owner-token",
-                    null
-                )
-            );
+        webTestClient
+            .delete()
+            .uri("/workspaces/{workspaceSlug}", workspace.getWorkspaceSlug())
+            .headers(TestAuthUtils.withCurrentUser())
+            .exchange()
+            .expectStatus()
+            .isForbidden();
 
-            // Mentor user has MEMBER role (not OWNER)
-            User mentorUser = persistUser("mentor");
-            ensureWorkspaceMembership(workspace, mentorUser, WorkspaceMembership.WorkspaceRole.MEMBER);
-
-            webTestClient
-                .delete()
-                .uri("/workspaces/{workspaceSlug}", workspace.getWorkspaceSlug())
-                .headers(TestAuthUtils.withCurrentUser())
-                .exchange()
-                .expectStatus()
-                .isForbidden();
-
-            // Workspace should still be ACTIVE (purge was denied)
-            Workspace unchanged = workspaceRepository.findById(workspace.getId()).orElseThrow();
-            assertThat(unchanged.getStatus()).isEqualTo(Workspace.WorkspaceStatus.ACTIVE);
-        }
+        Workspace unchanged = workspaceRepository.findById(workspace.getId()).orElseThrow();
+        assertThat(unchanged.getStatus()).isEqualTo(Workspace.WorkspaceStatus.ACTIVE);
     }
 
     // Slack purge + retention

@@ -13,6 +13,7 @@ import de.tum.cit.aet.hephaestus.practices.observation.ObservationTrendService;
 import de.tum.cit.aet.hephaestus.practices.observation.TrendDelta;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties;
 import java.util.List;
+import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -78,7 +79,7 @@ class FeedbackDeliveryService {
         }
 
         try {
-            doDeliverEligible(job, delivery, decision.artifact());
+            doDeliverEligible(job, delivery, Objects.requireNonNull(decision.artifact()));
         } catch (JobDeliverySuppressedException e) {
             log.info("Delivery suppressed at egress: jobId={}", job.getId());
             recordGateSuppressed(job, delivery, FeedbackSuppressionReason.INSTANCE_SILENCED);
@@ -257,6 +258,10 @@ class FeedbackDeliveryService {
             job.getId()
         );
         return diffResult;
+    }
+
+    ExistingDeliveryLookup findExistingSummary(AgentJob job) {
+        return commentPoster.findExistingSummaryComment(job);
     }
 
     private void recordUndelivered(AgentJob job, DeliveryContent delivery) {

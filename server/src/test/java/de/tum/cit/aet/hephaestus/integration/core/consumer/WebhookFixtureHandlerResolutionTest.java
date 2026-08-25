@@ -450,7 +450,9 @@ class WebhookFixtureHandlerResolutionTest extends BaseUnitTest {
         Object[] args = new Object[ctor.getParameterCount()];
         for (int i = 0; i < paramTypes.length; i++) {
             if (TransactionTemplate.class.equals(paramTypes[i])) {
-                args[i] = new TransactionTemplate();
+                args[i] = new TransactionTemplate(
+                    org.mockito.Mockito.mock(org.springframework.transaction.PlatformTransactionManager.class)
+                );
             }
         }
         return (IntegrationMessageHandler) ctor.newInstance(args);

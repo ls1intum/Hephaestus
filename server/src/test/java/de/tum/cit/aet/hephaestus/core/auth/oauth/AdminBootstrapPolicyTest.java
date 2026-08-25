@@ -7,6 +7,7 @@ import static org.mockito.Mockito.when;
 import de.tum.cit.aet.hephaestus.core.auth.AuthProperties;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.Arrays;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -16,7 +17,7 @@ import org.junit.jupiter.api.Test;
  */
 class AdminBootstrapPolicyTest extends BaseUnitTest {
 
-    private static AdminBootstrapPolicy policy(String... entries) {
+    private static AdminBootstrapPolicy policy(String @Nullable... entries) {
         AuthProperties props = mock(AuthProperties.class);
         when(props.bootstrapAdmins()).thenReturn(entries == null ? null : Arrays.asList(entries));
         return new AdminBootstrapPolicy(props);
