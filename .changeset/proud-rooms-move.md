@@ -1,4 +1,5 @@
 ---
+"hephaestus": patch
 ---
 
-No release note: this change only reduces repeated work in development and CI verification.
+Updates Spring Boot and the PostgreSQL driver to releases containing their latest security fixes.
