@@ -40,19 +40,6 @@ flowchart TD
 Staging tracks `main` HEAD and production tracks the last released tag, so the two are deliberately
 not the same commit.
 
-## ⚡ Pipeline Timeline
-
-| Stage                 | Duration                   | Notes                       |
-| --------------------- | -------------------------- | --------------------------- |
-| Quality gates         | ~3 min                     | Parallel with tests         |
-| Tests                 | ~3 min                     | Parallel with gates         |
-| Docker builds         | ~3 min (cached)            | Registry cache, ~7 min cold |
-| Release cut           | ~1 min                     | On Version PR merge: tag + GitHub Release |
-| Staging deploy        | ~2 min                     | Automatic                   |
-| **Your verification** | You decide                 | Check staging               |
-| Production deploy     | ~2 min                     | After approval              |
-| **Total**             | **~12 min + verification** | ~8 min with full cache hits |
-
 ## 🚀 Release Flow
 
 Every merge to `main` runs CI and updates the accumulating **Version PR** (changesets). Merging that PR
@@ -129,6 +116,7 @@ Coolify handles PR previews:
 | `ci-tests.yml`         | Called by cicd.yml    | Unit, integration, visual tests                    |
 | `ci-docker-build.yml`  | Called by cicd.yml    | Docker image builds per component                  |
 | `ci-security-scan.yml` | Called by cicd.yml    | Dependency scanning (Trivy), secret detection      |
+| `ci-profile.yml` | Weekly, manual | Profiles server integration tests and Spring contexts |
 | `verify-changesets.yml`| PRs                   | Fails shipped-code PRs that carry no changeset     |
 | `ci-compose-validate.yml` | PRs, push to main  | Renders the reference and self-host compose stacks so an interpolation or merge break is a red check, not a stranger's bad first boot |
 | `version-pr.yml`       | Push to main          | Maintains the accumulating Version PR (changesets) |
@@ -189,20 +177,9 @@ because they decide the verdict of the App Server leg's lint and format step: th
 project the type-aware rules resolve against, the `:agents` scripts that invoke them, and the binary
 versions. A gate whose own configuration can change without re-running it is not a gate.
 
-**Benefits:**
-
-- Webapp-only changes skip Java tests (~3 min saved)
-- Docs-only changes skip all CI jobs (~7 min saved)
-- CI config changes run everything (safety net)
-
 ### Docker Layer Caching
 
 Docker builds use **registry-based caching** to store intermediate layers in `ghcr.io`:
-
-| Component            | First Build | Cached Build | Cache Size |
-| -------------------- | ----------- | ------------ | ---------- |
-| Application Server   | ~7 min      | ~30 sec      | ~500 MB    |
-| Webapp               | ~5 min      | ~30 sec      | ~200 MB    |
 
 **How it works:**
 
@@ -231,6 +208,28 @@ therefore subject to the registry's anonymous rate limit.
 
 - Outdated PR runs cancelled automatically
 - Release runs never cancelled
+
+### Monitoring CI
+
+Use GitHub's organization-level [Actions metrics](https://docs.github.com/en/actions/concepts/metrics)
+for workflow and job run time, queue time, failure rate, and runner usage. Each `CI Status Gate` job
+also includes the current run's dependency-aware timeline and job summary.
+
+The weekly `CI profile` workflow covers the server-specific data GitHub does not provide: JFR,
+resource usage, JUnit results, and Spring context-cache metrics. It signals only after three
+consecutive regressions against five earlier default-branch profiles. Branch dispatches produce
+standalone diagnostic artifacts without changing or enforcing that baseline.
+
+`SpringTestContextArchitectureTest` separately enforces the reviewed Spring context keys. Run the
+profile options locally with:
+
+```bash
+mkdir -p ci-metrics
+/usr/bin/time -v -o ci-metrics/server-integration-resource.txt \
+  pnpm run test:server:integration \
+  -DargLine=-XX:StartFlightRecording=filename=target/integration-profile.jfr,settings=profile,dumponexit=true \
+  -Dlogging.level.org.springframework.test.context.cache=DEBUG
+```
 
 ## 🛠️ Running CI Locally
 
@@ -303,7 +302,7 @@ The CI Status Gate job generates a visual **Mermaid timeline** showing:
 
 - Job execution order and duration
 - Parallel job execution
-- Runner wait times
+- Job creation-to-start delay, including dependency waiting
 - Critical path identification
 
 This helps identify bottlenecks and optimization opportunities.
