@@ -578,7 +578,9 @@ public class FeedbackLedgerRecorder {
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void recordProposal(AgentJob job, @Nullable DeliveryContent delivery, List<ValidatedObservation> proposed) {
         final int position = 7_000;
-        if (delivery == null || delivery.mrNote() == null || delivery.mrNote().isBlank()) return;
+        if (delivery == null || delivery.mrNote() == null) return;
+        String body = PullRequestCommentPoster.sanitize(delivery.mrNote());
+        if (body.isBlank()) return;
         if (feedbackRepository.existsByAgentJobIdAndPosition(job.getId(), position)) return;
         Map<String, Observation> stored = observationRepository
             .findByAgentJobId(job.getId())
@@ -610,7 +612,7 @@ public class FeedbackLedgerRecorder {
                 .channel(FeedbackChannel.IN_CONTEXT)
                 .position(position)
                 .deliveryState(FeedbackDeliveryState.AWAITING_APPROVAL)
-                .body(delivery.mrNote())
+                .body(body)
                 .source(FeedbackSource.AGENT)
                 .createdAt(Instant.now())
                 .build()

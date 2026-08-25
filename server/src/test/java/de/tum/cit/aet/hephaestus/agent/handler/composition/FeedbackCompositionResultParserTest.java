@@ -415,6 +415,44 @@ class FeedbackCompositionResultParserTest extends BaseUnitTest {
         assertThat(parser.parse(raw("{ \"units\": [ 3, null, \"x\" ] }"))).isEmpty();
     }
 
+    @Test
+    void shouldReadTrimmedLeadWhenReviewComposedOne() {
+        JsonNode jobOutput = raw(
+            """
+            { "lead": "  You kept this to one concern; the description just never says why.  ",
+              "units": [] }
+            """
+        );
+
+        assertThat(parser.lead(jobOutput)).isEqualTo(
+            "You kept this to one concern; the description just never says why."
+        );
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = { "{ \"units\": [] }", "{ \"lead\": null }", "{ \"lead\": \"\" }", "{ \"lead\": \"   \" }" })
+    void shouldReturnNoLeadWhenTextIsBlankOrAbsent(String feedbackJson) {
+        assertThat(parser.lead(raw(feedbackJson))).isNull();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = { "{ \"lead\": 42 }", "{ \"lead\": true }", "{ \"lead\": [\"a\"] }", "{ \"lead\": {} }" })
+    void shouldReturnNoLeadWhenValueIsNotText(String feedbackJson) {
+        assertThat(parser.lead(raw(feedbackJson))).isNull();
+    }
+
+    @Test
+    void shouldReturnNoLeadWhenPayloadExceedsCeiling() {
+        assertThat(parser.lead(raw("{ \"lead\": \"" + "x".repeat(5_000) + "\" }")))
+            .as("the payload ceiling is a bound on what the envelope may carry, not a place to trim prose")
+            .isNull();
+    }
+
+    @Test
+    void shouldReturnNoLeadWhenJobOutputIsMissing() {
+        assertThat(parser.lead(null)).isNull();
+    }
+
     private JsonNode output(String unitJson, String preparedThreadKeysJson) {
         return outputOf(objectMapper.createArrayNode().add(objectMapper.readTree(unitJson)), preparedThreadKeysJson);
     }

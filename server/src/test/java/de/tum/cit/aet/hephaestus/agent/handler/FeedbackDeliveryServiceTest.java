@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -202,102 +203,6 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("re-review edits the prior summary in place instead of posting a new comment")
-        void editsPriorSummaryInPlace() {
-            AgentJob job = createJob();
-            stubOpenPr();
-            when(feedbackLedgerRecorder.priorLiveSummaryRef(eq(job))).thenReturn(Optional.of("IC_prior"));
-            when(commentPoster.updateFormattedBody(eq(job), eq("IC_prior"), any(String.class))).thenReturn(
-                new PullRequestCommentPoster.UpdateResult(PullRequestCommentPoster.UpdateResult.Kind.EDITED, "IC_prior")
-            );
-
-            service.deliverFeedback(
-                job,
-                new DeliveryContent("Re-reviewed: still fix the tests.", List.of(), List.of())
-            );
-
-            verify(commentPoster).updateFormattedBody(eq(job), eq("IC_prior"), any(String.class));
-            verify(commentPoster, never()).postFormattedBody(eq(job), any(String.class));
-            assertThat(job.getDeliveryCommentId()).isEqualTo("IC_prior");
-        }
-
-        @Test
-        @DisplayName("when the prior summary can't be edited (deleted by a human), falls back to a fresh post")
-        void fallsBackToNewPostWhenEditCannotLand() {
-            AgentJob job = createJob();
-            stubOpenPr();
-            when(feedbackLedgerRecorder.priorLiveSummaryRef(eq(job))).thenReturn(Optional.of("IC_prior"));
-            when(commentPoster.updateFormattedBody(eq(job), eq("IC_prior"), any(String.class))).thenReturn(
-                new PullRequestCommentPoster.UpdateResult(PullRequestCommentPoster.UpdateResult.Kind.GONE, null)
-            );
-            when(commentPoster.postFormattedBody(eq(job), any(String.class))).thenReturn("IC_new");
-
-            service.deliverFeedback(job, new DeliveryContent("Fresh summary.", List.of(), List.of()));
-
-            verify(commentPoster).updateFormattedBody(eq(job), eq("IC_prior"), any(String.class));
-            verify(commentPoster).postFormattedBody(eq(job), any(String.class));
-            assertThat(job.getDeliveryCommentId()).isEqualTo("IC_new");
-        }
-
-        @Test
-        @DisplayName("a TRANSIENT update error keeps the prior summary and does NOT post a duplicate (B4)")
-        void transientUpdateKeepsPriorSummaryNoFreshPost() {
-            AgentJob job = createJob();
-            stubOpenPr();
-            when(feedbackLedgerRecorder.priorLiveSummaryRef(eq(job))).thenReturn(Optional.of("IC_prior"));
-            when(commentPoster.updateFormattedBody(eq(job), eq("IC_prior"), any(String.class))).thenReturn(
-                new PullRequestCommentPoster.UpdateResult(PullRequestCommentPoster.UpdateResult.Kind.TRANSIENT, null)
-            );
-
-            service.deliverFeedback(job, new DeliveryContent("Re-reviewed.", List.of(), List.of()));
-
-            verify(commentPoster, never()).postFormattedBody(eq(job), any(String.class));
-            assertThat(job.getDeliveryCommentId()).isEqualTo("IC_prior");
-            verify(feedbackLedgerRecorder).record(
-                eq(job),
-                any(),
-                eq(ArtifactKinds.PULL_REQUEST),
-                eq(List.of()),
-                eq(false),
-                eq(false)
-            );
-        }
-
-        @Test
-        void transientSummaryWithInlineDeliveryRecordsInlineOnly() {
-            AgentJob job = createJob();
-            stubOpenPr();
-            when(feedbackLedgerRecorder.priorLiveSummaryRef(eq(job))).thenReturn(Optional.of("IC_prior"));
-            when(commentPoster.updateFormattedBody(eq(job), eq("IC_prior"), any(String.class))).thenReturn(
-                new PullRequestCommentPoster.UpdateResult(PullRequestCommentPoster.UpdateResult.Kind.TRANSIENT, null)
-            );
-            var note = new DiffNote("src/Foo.java", 10, null, "Fix this", "ck-foo");
-            var signal = new InlineFeedbackChannel.DeliveredSignal(
-                "ck-foo",
-                new FeedbackAnchor.DiffAnchor("src/Foo.java", 10, null),
-                InlineFeedbackChannel.Disposition.POSTED,
-                "note-1",
-                "disc-1"
-            );
-            when(diffNotePoster.reconcileInlineNotes(eq(job), any())).thenReturn(
-                new DiffNotePoster.DiffNoteResult(1, 0, List.of(signal))
-            );
-            DeliveryContent delivery = new DeliveryContent("Re-reviewed.", List.of(note), List.of());
-
-            service.deliverFeedback(job, delivery);
-
-            verify(commentPoster, never()).postFormattedBody(eq(job), any(String.class));
-            verify(feedbackLedgerRecorder).record(
-                eq(job),
-                eq(delivery),
-                eq(ArtifactKinds.PULL_REQUEST),
-                eq(List.of(signal)),
-                eq(false),
-                eq(true)
-            );
-        }
-
-        @Test
         void skipsWhenPrNotStubbed() {
             AgentJob job = createJob();
 
@@ -308,16 +213,12 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("with the progress-footer flag on, a meaningful re-review appends the footer and posts an A4 ping")
-        void appendsProgressFooterAndPingsOnMeaningfulReReview() {
+        @DisplayName("a meaningful re-review appends its progress footer to the new review comment")
+        void shouldAppendProgressFooterToNewCommentOnReReview() {
             var footerService = serviceWithProgressFooter();
             AgentJob job = createJob();
             stubOpenPr();
-            when(feedbackLedgerRecorder.priorLiveSummaryRef(eq(job))).thenReturn(Optional.of("IC_prior"));
-            when(commentPoster.updateFormattedBody(eq(job), eq("IC_prior"), any(String.class))).thenReturn(
-                new PullRequestCommentPoster.UpdateResult(PullRequestCommentPoster.UpdateResult.Kind.EDITED, "IC_prior")
-            );
-            when(commentPoster.postFormattedBody(eq(job), any(String.class))).thenReturn("IC_ping");
+            when(commentPoster.postFormattedBody(eq(job), any(String.class))).thenReturn("IC_new");
             when(
                 observationTrendService.computeForTarget(ArtifactKinds.PULL_REQUEST, PULL_REQUEST_ID, WORKSPACE_ID)
             ).thenReturn(Optional.of(resolvedTrend()));
@@ -325,11 +226,25 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             footerService.deliverFeedback(job, new DeliveryContent("Re-reviewed.", List.of(), List.of()));
 
             var body = ArgumentCaptor.forClass(String.class);
-            verify(commentPoster).updateFormattedBody(eq(job), eq("IC_prior"), body.capture());
+            verify(commentPoster).postFormattedBody(eq(job), body.capture());
             assertThat(body.getValue()).contains("Progress since your last review").contains("Resolved");
-            var ping = ArgumentCaptor.forClass(String.class);
-            verify(commentPoster).postFormattedBody(eq(job), ping.capture());
-            assertThat(ping.getValue()).contains("hephaestus:re-review-ping").contains("Re-reviewed");
+            verify(commentPoster, never()).updateFormattedBody(any(), any(), any());
+        }
+
+        @Test
+        void shouldPostSecondCommentWhenReviewRunsAgain() {
+            AgentJob job = createJob();
+            stubOpenPr();
+            when(commentPoster.postFormattedBody(eq(job), any(String.class))).thenReturn("IC_first", "IC_second");
+
+            service.deliverFeedback(job, new DeliveryContent("First look.", List.of(), List.of()));
+            service.deliverFeedback(job, new DeliveryContent("Second look.", List.of(), List.of()));
+
+            var bodies = ArgumentCaptor.forClass(String.class);
+            verify(commentPoster, times(2)).postFormattedBody(eq(job), bodies.capture());
+            assertThat(bodies.getAllValues().get(0)).contains("First look.");
+            assertThat(bodies.getAllValues().get(1)).contains("Second look.");
+            verify(commentPoster, never()).updateFormattedBody(any(), any(), any());
         }
 
         @Test
@@ -426,41 +341,6 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
                 FeedbackSuppressionReason.INSTANCE_SILENCED,
                 List.of()
             );
-        }
-
-        @Test
-        void shouldKeepPriorSummaryLiveWhenInlineDeliveryIsSuppressedAfterTransientEdit() {
-            AgentJob job = createJob();
-            stubOpenPr();
-            var delivery = new DeliveryContent(
-                "updated summary",
-                List.of(new DiffNote("src/Foo.java", 10, null, "inline", "key")),
-                List.of()
-            );
-            when(feedbackLedgerRecorder.priorLiveSummaryRef(job)).thenReturn(Optional.of("IC_prior"));
-            when(commentPoster.updateFormattedBody(eq(job), eq("IC_prior"), any(String.class))).thenReturn(
-                new PullRequestCommentPoster.UpdateResult(PullRequestCommentPoster.UpdateResult.Kind.TRANSIENT, null)
-            );
-            when(diffNotePoster.reconcileInlineNotes(eq(job), any())).thenThrow(
-                new JobDeliverySuppressedException("Silent Mode engaged", new IllegalStateException())
-            );
-
-            service.deliverFeedback(job, delivery);
-
-            verify(feedbackLedgerRecorder).recordSuppressedUnit(
-                job,
-                delivery,
-                FeedbackSuppressionReason.INSTANCE_SILENCED
-            );
-            verify(feedbackLedgerRecorder, never()).recordWithoutConversation(
-                any(),
-                any(),
-                any(),
-                any(),
-                anyBoolean(),
-                anyBoolean()
-            );
-            verify(feedbackLedgerRecorder, never()).recordSuppressedRemainder(any(), any(), any(), any());
         }
 
         @Test
@@ -914,92 +794,6 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
 
             verifyNoInteractions(commentPoster);
             verifyNoInteractions(pullRequestRepository);
-        }
-    }
-
-    @Nested
-    class SummaryDemotion {
-
-        private InlineFeedbackChannel.DeliveredSignal landedSignal(String findingFingerprint) {
-            return new InlineFeedbackChannel.DeliveredSignal(
-                findingFingerprint,
-                new FeedbackAnchor.DiffAnchor("src/Foo.java", 10, null),
-                InlineFeedbackChannel.Disposition.POSTED,
-                "note-1",
-                "thread-1"
-            );
-        }
-
-        @Test
-        @DisplayName("re-edits the summary in place with the demoted body once a keyed inline note lands")
-        void reEditsSummaryAfterInlineDelivery() {
-            AgentJob job = createJob();
-            stubOpenPr();
-            when(commentPoster.postFormattedBody(eq(job), any(String.class))).thenReturn("IC_summary");
-            when(diffNotePoster.reconcileInlineNotes(eq(job), any())).thenReturn(
-                new DiffNotePoster.DiffNoteResult(1, 0, List.of(landedSignal("corr-1")))
-            );
-            when(commentPoster.updateFormattedBody(eq(job), eq("IC_summary"), any(String.class))).thenReturn(
-                new PullRequestCommentPoster.UpdateResult(
-                    PullRequestCommentPoster.UpdateResult.Kind.EDITED,
-                    "IC_summary"
-                )
-            );
-
-            var delivery = new DeliveryContent(
-                "Full-line summary.",
-                List.of(new DiffNote("src/Foo.java", 10, null, "x")),
-                List.of()
-            );
-            service.deliverFeedback(job, delivery, deliveredKeys -> {
-                assertThat(deliveredKeys).containsExactly("corr-1");
-                return "Demoted summary body.";
-            });
-
-            ArgumentCaptor<String> body = ArgumentCaptor.forClass(String.class);
-            verify(commentPoster).updateFormattedBody(eq(job), eq("IC_summary"), body.capture());
-            assertThat(body.getValue()).contains("Demoted summary body.");
-        }
-
-        @Test
-        @DisplayName("no demotion edit when nothing landed inline — the full-line summary stays as posted")
-        void noReEditWhenNoInlineDelivered() {
-            AgentJob job = createJob();
-            stubOpenPr();
-            when(commentPoster.postFormattedBody(eq(job), any(String.class))).thenReturn("IC_summary");
-            boolean[] recomposed = { false };
-
-            service.deliverFeedback(job, new DeliveryContent("Full-line summary.", List.of(), List.of()), keys -> {
-                recomposed[0] = true;
-                return "should-not-be-used";
-            });
-
-            assertThat(recomposed[0]).isFalse();
-            verify(commentPoster, never()).updateFormattedBody(eq(job), any(String.class), any(String.class));
-        }
-
-        @Test
-        @DisplayName("a FAILED inline signal contributes no delivered key — its summary line is never demoted")
-        void failedSignalDoesNotDemote() {
-            AgentJob job = createJob();
-            stubOpenPr();
-            when(commentPoster.postFormattedBody(eq(job), any(String.class))).thenReturn("IC_summary");
-            var failed = new InlineFeedbackChannel.DeliveredSignal(
-                "corr-failed",
-                new FeedbackAnchor.DiffAnchor("src/Foo.java", 10, null),
-                InlineFeedbackChannel.Disposition.FAILED,
-                null,
-                null
-            );
-            when(diffNotePoster.reconcileInlineNotes(eq(job), any())).thenReturn(
-                new DiffNotePoster.DiffNoteResult(0, 1, List.of(failed))
-            );
-
-            service.deliverFeedback(job, new DeliveryContent("Full-line summary.", List.of(), List.of()), keys ->
-                "demoted"
-            );
-
-            verify(commentPoster, never()).updateFormattedBody(eq(job), any(String.class), any(String.class));
         }
     }
 

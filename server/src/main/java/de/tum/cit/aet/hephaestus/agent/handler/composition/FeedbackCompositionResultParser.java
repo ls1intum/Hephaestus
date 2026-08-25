@@ -30,6 +30,9 @@ public class FeedbackCompositionResultParser {
 
     private static final int MAX_PRACTICE_SLUG_LENGTH = 128;
 
+    /** A ceiling on the payload, not on the opening: the composer clamps the lead to its own budget. */
+    private static final int MAX_LEAD_LENGTH = 4_000;
+
     public List<ComposedFeedbackUnit> parse(@Nullable JsonNode jobOutput) {
         if (jobOutput == null || !jobOutput.isObject()) {
             return List.of();
@@ -270,6 +273,12 @@ public class FeedbackCompositionResultParser {
         );
     }
 
+    /** How the review opens, in the composer's words; null when it wrote none. */
+    @Nullable
+    public String lead(@Nullable JsonNode jobOutput) {
+        return jobOutput == null ? null : text(jobOutput.path("feedback"), "lead", MAX_LEAD_LENGTH);
+    }
+
     private static Map<String, StagedObservation> readObservations(@Nullable JsonNode node) {
         Map<String, StagedObservation> observations = new LinkedHashMap<>();
         if (node == null || !node.isArray()) {
@@ -336,7 +345,13 @@ public class FeedbackCompositionResultParser {
         if (situation == null || capability == null || evidenceSummary == null || inConversationSignal == null) {
             return null;
         }
-        return new ComposedFeedbackUnit.ConversationBrief(situation, capability, evidenceSummary, inConversationSignal);
+        return new ComposedFeedbackUnit.ConversationBrief(
+            situation,
+            capability,
+            evidenceSummary,
+            inConversationSignal,
+            note(notes, "alreadySaid", ComposedFeedbackUnit.MAX_AIM_LENGTH)
+        );
     }
 
     private static @Nullable String note(JsonNode notes, String field, int maxLength) {

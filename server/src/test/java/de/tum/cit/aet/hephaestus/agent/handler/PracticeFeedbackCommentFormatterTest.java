@@ -22,7 +22,12 @@ class PracticeFeedbackCommentFormatterTest extends BaseUnitTest {
         assertThat(result)
             .contains(PullRequestCommentPoster.summaryMarkerFor(job))
             .contains("Test body content")
-            .contains("<sub>Practice review &middot; model&lt;&amp;&gt; &middot; 1m 30s</sub>")
+            .contains(
+                "<sub>Practice review &middot; model&lt;&amp;&gt; &middot; AI-generated and can be inaccurate." +
+                    " React with 👍 or 👎 to give feedback.</sub>"
+            )
+            // Run duration is operator telemetry; the developer reading a review has no use for it.
+            .doesNotContain("1m 30s")
             .contains(
                 "[Manage comments and Slack reminders](https://hephaestus.example.com/settings#practice-feedback)"
             )

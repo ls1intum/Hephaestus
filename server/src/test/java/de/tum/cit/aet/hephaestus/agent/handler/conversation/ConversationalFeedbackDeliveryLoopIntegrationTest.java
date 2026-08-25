@@ -266,7 +266,8 @@ class ConversationalFeedbackDeliveryLoopIntegrationTest extends BaseIntegrationT
                 "The practice recurred.",
                 "Recognize the decision point.",
                 "The observations show the same pattern.",
-                "They can explain the decision in their own words."
+                "They can explain the decision in their own words.",
+                null
             ),
             null
         );

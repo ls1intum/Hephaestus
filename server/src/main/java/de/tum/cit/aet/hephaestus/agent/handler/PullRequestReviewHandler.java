@@ -337,16 +337,25 @@ public class PullRequestReviewHandler implements JobTypeHandler {
             .evaluate(job, loudEnough)
             .deliverable();
         List<ComposedFeedbackUnit> units = compositionResultParser.parse(job.getOutput(), FeedbackChannel.IN_CONTEXT);
+        String lead = compositionResultParser.lead(job.getOutput());
         Map<String, String> why = practiceCatalogInjector.whyBySlug(job.getWorkspace(), ArtifactKinds.PULL_REQUEST);
+        var content = DeliveryComposer.compose(deliverable, ArtifactKinds.PULL_REQUEST, why, unifiedDiff, units, lead);
+        // An approved proposal posts as its own comment, so only one of the two may open on the lead.
+        // The auto-posted note is composed first and takes it; the proposal takes it only when there is
+        // no such note, which is the all-approval workspace where the proposal is the only comment.
         feedbackService.recordProposal(
             job,
-            DeliveryComposer.compose(proposals, ArtifactKinds.PULL_REQUEST, why, unifiedDiff, units),
+            DeliveryComposer.compose(
+                proposals,
+                ArtifactKinds.PULL_REQUEST,
+                why,
+                unifiedDiff,
+                units,
+                content == null ? lead : null
+            ),
             proposals
         );
-        var content = DeliveryComposer.compose(deliverable, ArtifactKinds.PULL_REQUEST, why, unifiedDiff, units);
-        feedbackService.deliverFeedback(job, content, delivered ->
-            DeliveryComposer.recomposeMrNote(deliverable, ArtifactKinds.PULL_REQUEST, why, delivered, units)
-        );
+        feedbackService.deliverFeedback(job, content);
     }
 
     private PracticeDetectionResultParser.ValidatedObservation validated(Observation observation) {
@@ -545,10 +554,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
      */
     @Override
     public ExistingDeliveryLookup findExistingDelivery(AgentJob job) {
-        // Measurement has no provider-side delivery. Its durable effect is the persisted observation
-        // set plus the idempotent composition request, so an unrelated earlier review comment must
-        // never make recovery skip this handler.
-        return ExistingDeliveryLookup.absent();
+        return feedbackService.findExistingSummary(job);
     }
 
     private List<PracticeDetectionResultParser.ValidatedObservation> scanForSecrets(@Nullable String diff) {

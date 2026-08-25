@@ -89,6 +89,24 @@ class ApprovedFeedbackDeliveryListener {
             }
             return;
         }
+        String approvedBody = feedback.getBody();
+        String safeBody = PullRequestCommentPoster.sanitize(approvedBody);
+        if (safeBody.isBlank()) {
+            feedbackRepository.markApprovedSuppressed(
+                event.workspaceId(),
+                feedback.getId(),
+                FeedbackSuppressionReason.EMPTY_AFTER_SANITIZE.name()
+            );
+            return;
+        }
+        if (!safeBody.equals(approvedBody)) {
+            feedbackRepository.markApprovedSuppressed(
+                event.workspaceId(),
+                feedback.getId(),
+                FeedbackSuppressionReason.APPROVAL_STALE.name()
+            );
+            return;
+        }
         ExistingDeliveryLookup existing = commentPoster.findApprovedProposal(job, feedback.getId());
         if (existing.kind() == ExistingDeliveryLookup.Kind.UNKNOWN) {
             log.warn("Approved proposal deferred after inconclusive provider lookup: feedbackId={}", feedback.getId());

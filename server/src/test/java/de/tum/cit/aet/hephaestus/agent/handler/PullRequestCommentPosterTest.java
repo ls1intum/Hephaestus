@@ -59,6 +59,50 @@ class PullRequestCommentPosterTest extends BaseUnitTest {
         void shouldEscapeAtMentionsAfterPunctuation() {
             assertThat(PullRequestCommentPoster.sanitize("(@user123)")).contains("`@user123`");
             assertThat(PullRequestCommentPoster.sanitize("[@user123]")).contains("`@user123`");
+            // A provider links a mention after any non-word character, so the class cannot stop at brackets.
+            assertThat(PullRequestCommentPoster.sanitize("cc,@user123")).contains("`@user123`");
+            assertThat(PullRequestCommentPoster.sanitize("cc.@user123")).contains("`@user123`");
+            assertThat(PullRequestCommentPoster.sanitize("cc:@user123")).contains("`@user123`");
+            assertThat(PullRequestCommentPoster.sanitize("cc/@user123")).contains("`@user123`");
+        }
+
+        @Test
+        void shouldRemoveAnUnterminatedCommentOpener() {
+            String result = PullRequestCommentPoster.sanitize("Looks fine <!-- and the rest is hidden");
+
+            assertThat(result)
+                .as("an unterminated opener runs to end of document and hides everything below it")
+                .doesNotContain("<!--")
+                .contains("and the rest is hidden");
+        }
+
+        @Test
+        void shouldCloseAFenceTheBodyLeavesOpen() {
+            assertThat(PullRequestCommentPoster.sanitize("Body.\n```java\nint x = 1;")).endsWith("\n```");
+            assertThat(PullRequestCommentPoster.sanitize("Body.\n~~~\nint x = 1;")).endsWith("\n~~~");
+            assertThat(PullRequestCommentPoster.sanitize("Body.\n````\nint x = 1;\n```\nstill code")).endsWith(
+                "\n````"
+            );
+        }
+
+        @Test
+        void shouldLeaveABalancedBodyAlone() {
+            assertThat(PullRequestCommentPoster.sanitize("Body.\n```java\nint x = 1;\n```")).doesNotEndWith("```\n```");
+            assertThat(PullRequestCommentPoster.sanitize("Write ``` to open a block.")).isEqualTo(
+                "Write ``` to open a block."
+            );
+            assertThat(PullRequestCommentPoster.sanitize("Body.\n    ```\nindented, not a fence")).doesNotEndWith(
+                "\n```"
+            );
+        }
+
+        @Test
+        void shouldNotTreatAnInnerFenceWithAnInfoStringAsAClose() {
+            String result = PullRequestCommentPoster.sanitize("````\n```bash\npnpm run check\n```\n");
+
+            assertThat(result)
+                .as("the inner block is quoted content, so the outer one is still open")
+                .endsWith("\n````");
         }
 
         @Test
@@ -175,7 +219,19 @@ class PullRequestCommentPosterTest extends BaseUnitTest {
             String result = PullRequestCommentPoster.sanitize(longContent);
             assertThat(result).contains("[... truncated");
             assertThat(result).startsWith("x".repeat(100));
-            assertThat(result.length()).isLessThanOrEqualTo(PullRequestCommentPoster.MAX_BODY_LENGTH + 100);
+            assertThat(result).hasSizeLessThanOrEqualTo(PullRequestCommentPoster.MAX_BODY_LENGTH);
+        }
+
+        @Test
+        void shouldRemoveAnUnclosableFenceWithoutExceedingTheProviderLimit() {
+            String opener = "`".repeat(1_000);
+            String result = PullRequestCommentPoster.sanitize(
+                opener + " java\n" + "x".repeat(PullRequestCommentPoster.MAX_BODY_LENGTH)
+            );
+
+            assertThat(result).hasSizeLessThanOrEqualTo(PullRequestCommentPoster.MAX_BODY_LENGTH);
+            assertThat(result).doesNotStartWith(opener);
+            assertThat(result).endsWith("[... truncated — comment exceeded length limit]");
         }
 
         @Test
