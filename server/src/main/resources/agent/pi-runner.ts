@@ -22,6 +22,12 @@ import {
 } from "./pi-observation-normalize.ts";
 import { loadProviderConfig, registerHephaestusProvider } from "./pi-provider.ts";
 import {
+	buildReviewTree,
+	mapConcurrent,
+	missingPracticeSlugs,
+	resolveReviewConcurrency,
+} from "./pi-review-tree.ts";
+import {
 	ACTIONS,
 	CHANNELS,
 	type ComposedFeedbackEnvelope,
@@ -29,13 +35,6 @@ import {
 	type PreparedFeedbackTarget,
 	undeliverableUnits,
 } from "./pi-runner-composition.ts";
-import {
-	buildReviewTree,
-	mapConcurrent,
-	missingPracticeSlugs,
-	resolveReviewConcurrency,
-} from "./pi-review-tree.ts";
-import { forkPracticeSessions } from "./pi-session-tree.ts";
 import { deriveTimeouts, deriveTurnTiming } from "./pi-runner-timings.ts";
 import {
 	addAssistantUsage,
@@ -43,6 +42,7 @@ import {
 	newUsageLedger,
 	type UsageReport,
 } from "./pi-runner-usage.ts";
+import { forkPracticeSessions } from "./pi-session-tree.ts";
 
 // ── Reading what other processes wrote ───────────────────────────────────────
 // Everything this runner is handed — the task envelope, the manifest, the practice index, the

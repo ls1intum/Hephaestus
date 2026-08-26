@@ -4,9 +4,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+	type Channel,
 	type ComposedFeedbackEnvelope,
 	type ComposedFeedbackUnit,
-	type Channel,
 	undeliverableUnits,
 } from "../../../main/resources/agent/pi-runner-composition.ts";
 

@@ -3,8 +3,8 @@ import {
 	buildReviewTree,
 	mapConcurrent,
 	missingPracticeSlugs,
-	resolveReviewConcurrency,
 	type ReviewPractice,
+	resolveReviewConcurrency,
 } from "../../../main/resources/agent/pi-review-tree";
 
 const practices: ReviewPractice[] = [
