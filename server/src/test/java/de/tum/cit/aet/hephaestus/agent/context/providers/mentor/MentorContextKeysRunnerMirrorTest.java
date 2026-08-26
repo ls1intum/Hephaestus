@@ -70,7 +70,7 @@ class MentorContextKeysRunnerMirrorTest {
         String source = Files.readString(RUNNER, StandardCharsets.UTF_8);
 
         assertThat(source)
-            .contains("tools: [\"fetch_context\", \"link_observation\"]")
+            .contains("tools: [...MENTOR_TOOL_NAMES]")
             .contains("\"inputs/context/recent_authored_work.json\"")
             .doesNotContain("tools: [\"fetch_context\", \"link_observation\", \"read\", \"bash\", \"grep\"]");
     }

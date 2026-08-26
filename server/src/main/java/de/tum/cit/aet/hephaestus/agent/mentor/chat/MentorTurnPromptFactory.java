@@ -5,28 +5,6 @@ import de.tum.cit.aet.hephaestus.mentor.ThreadSurface;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
 
-/**
- * Owns runner-prompt assembly for one mentor turn — the single place that decorates the developer's
- * message with a per-surface style directive before it reaches the runner.
- *
- * <p><strong>Design.</strong> The directive text lives in a classpath resource
- * ({@code agent/mentor/prompts/slack-dm-turn.md}), loaded once via {@link
- * PiRuntimeFactory#loadClasspathResource} — the same mechanism that already externalises the mentor
- * SYSTEM prompt ({@code agent/mentor/system.md}, loaded by {@code MentorPiAdapter}). Multi-paragraph
- * prompt prose does not belong as a Java text block inline in a service class: it can't be reviewed,
- * diffed, or edited like prose, and it bloats the class with content that has nothing to do with turn
- * orchestration. Externalising it here mirrors the system-prompt precedent instead of inventing a new
- * pattern, and needs no template-engine dependency — the resource carries two plain
- * {@code {{PLACEHOLDER}}} markers, split out once at class-init into fixed prefix/middle/suffix
- * segments so a turn only ever concatenates strings (no repeated scanning of already-substituted,
- * developer-controlled text, which a naive {@code String#replace} chain could re-match).
- *
- * <p><strong>Contract.</strong> This only builds the transient string sent to the Pi runner for the
- * CURRENT turn. It never touches persistence: {@link MentorTurnRequest#userMessage()} is stored
- * verbatim by {@code MentorTurnPersistence} regardless of surface — only the runner-bound prompt is
- * decorated. The system prompt itself stays static per (shared) sandbox, so per-surface adaptation has
- * to ride the turn instead.
- */
 final class MentorTurnPromptFactory {
 
     private static final String SLACK_DM_TEMPLATE_RESOURCE = "mentor/prompts/slack-dm-turn.md";
@@ -63,11 +41,6 @@ final class MentorTurnPromptFactory {
 
     private MentorTurnPromptFactory() {}
 
-    /**
-     * The prompt actually sent to the runner for this turn. WEB gets the developer's message
-     * unchanged; {@link ThreadSurface#SLACK_DM} gets it wrapped in the Slack style directive plus the
-     * visible thread history (see class javadoc — the persisted message is untouched either way).
-     */
     static String forRunner(MentorTurnRequest request, Map<String, byte[]> contextInputs) {
         if (request.surface() != ThreadSurface.SLACK_DM) {
             return request.userMessage();
