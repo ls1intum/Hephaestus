@@ -1767,7 +1767,7 @@ async function main() {
 			const { session: observerSession } = await createAgentSession({
 				cwd: CWD,
 				agentDir: AGENT_DIR,
-				tools: ["read", "bash", "grep", "report_observation"],
+				tools: ["read", "grep", "report_observation"],
 				customTools: [scopedTool],
 				sessionManager: manager,
 				settingsManager,
