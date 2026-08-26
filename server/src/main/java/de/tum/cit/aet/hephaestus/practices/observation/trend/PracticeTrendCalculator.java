@@ -235,8 +235,18 @@ final class PracticeTrendCalculator {
         @Nullable Integer eligiblePractices,
         List<EvidenceOpportunity> trail
     ) {
-        Instant first = trail.stream().map(EvidenceOpportunity::occurredAt).min(Instant::compareTo).orElse(null);
-        Instant last = trail.stream().map(EvidenceOpportunity::occurredAt).max(Instant::compareTo).orElse(null);
+        // Provenance for what was COMPARED, so only opportunities that produced a verdict date it. The trail
+        // also carries the ones where the practice looked and found nothing to judge — they belong in it, and
+        // in the chart drawn from it, because "we saw this work item" is a fact worth showing. But letting one
+        // date the span would answer a question nobody asked: a stretch of work offering no opportunity would
+        // stretch "these N comparisons span X days" without adding a comparison.
+        List<Instant> dated = trail
+            .stream()
+            .filter(EvidenceOpportunity::applicable)
+            .map(EvidenceOpportunity::occurredAt)
+            .toList();
+        Instant first = dated.stream().min(Instant::compareTo).orElse(null);
+        Instant last = dated.stream().max(Instant::compareTo).orElse(null);
         Integer span =
             first == null || last == null
                 ? null
@@ -260,9 +270,26 @@ final class PracticeTrendCalculator {
         );
     }
 
+    /**
+     * Keeps the newest opportunities that still SAID something, plus whatever fell between them.
+     *
+     * <p>The cap bounds what a sparkline has to draw, so it counts the opportunities a reader can see a
+     * verdict in. Counting rows instead would let a stretch of work that offered this practice no opportunity
+     * push real evidence out of the window — and the standing reads its window off this same list, so that
+     * would quietly shrink the sample a standing rests on rather than merely shortening a chart.
+     */
     private static List<EvidenceOpportunity> cappedTrail(List<EvidenceOpportunity> trail, int bundleSize) {
         int cap = 2 * bundleSize + 4;
-        return trail.stream().skip(Math.max(0, trail.size() - cap)).toList();
+        int applicable = 0;
+        for (int index = trail.size() - 1; index >= 0; index--) {
+            if (trail.get(index).applicable()) {
+                applicable++;
+            }
+            if (applicable == cap) {
+                return trail.subList(index, trail.size());
+            }
+        }
+        return trail;
     }
 
     private static List<EvidenceOpportunity> areaTrail(Collection<PracticeTrend> trends, int bundleSize) {

@@ -81,6 +81,9 @@ public class ObservationHistoryContentSource implements ContentSource {
             developerId,
             workspaceId,
             since,
+            // Verdicts only: coaching on a run that declined to take a direction would invite the mentor to
+            // invent one. The totals still reach it through the presence-count summary.
+            true,
             PageRequest.of(0, MAX_RECENT_OBSERVATIONS)
         );
         List<PullRequestReview> reviews = queryRepository.findReviewsReceivedSince(

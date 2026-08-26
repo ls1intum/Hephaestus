@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.practices.observation;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -135,6 +136,7 @@ class PracticeReflectionVisibilityTest extends BaseUnitTest {
                 eq(USER_ID),
                 eq(WORKSPACE_ID),
                 any(Instant.class),
+                anyBoolean(),
                 any(Pageable.class)
             )
         ).thenReturn(List.of(observation));
@@ -159,6 +161,7 @@ class PracticeReflectionVisibilityTest extends BaseUnitTest {
                 eq(USER_ID),
                 eq(WORKSPACE_ID),
                 any(Instant.class),
+                anyBoolean(),
                 any(Pageable.class)
             )
         ).thenReturn(List.of(bad(practice, null), bad(practice, Severity.CRITICAL)));
@@ -213,6 +216,7 @@ class PracticeReflectionVisibilityTest extends BaseUnitTest {
                 eq(USER_ID),
                 eq(WORKSPACE_ID),
                 any(Instant.class),
+                anyBoolean(),
                 any(Pageable.class)
             )
         ).thenReturn(List.of(observations));

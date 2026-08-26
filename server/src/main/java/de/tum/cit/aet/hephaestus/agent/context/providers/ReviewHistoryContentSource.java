@@ -269,6 +269,9 @@ public class ReviewHistoryContentSource implements EvidenceSource {
             subjectUserId,
             workspaceId,
             since,
+            // Verdicts only: a run that produced none is nothing this context can quote, and it would spend
+            // the page budget burying the rows that can be.
+            true,
             PageRequest.of(0, MAX_OBSERVATIONS)
         );
         Set<UUID> visible = visibilityPolicy.permitsAll(

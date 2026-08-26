@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.practices.observation;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
@@ -178,6 +179,7 @@ class PracticeReflectionServiceTest extends BaseUnitTest {
                 eq(USER_ID),
                 eq(WORKSPACE_ID),
                 any(Instant.class),
+                anyBoolean(),
                 any(Pageable.class)
             )
         ).thenReturn(List.of(bad(practice, Severity.MAJOR, 41L), good(practice, 42L), good(practice, 43L)));
@@ -203,6 +205,7 @@ class PracticeReflectionServiceTest extends BaseUnitTest {
                 eq(USER_ID),
                 eq(WORKSPACE_ID),
                 any(Instant.class),
+                anyBoolean(),
                 any(Pageable.class)
             )
         ).thenReturn(List.of(bad(practice, Severity.MAJOR, 41L), good(practice, 42L)));
@@ -228,6 +231,7 @@ class PracticeReflectionServiceTest extends BaseUnitTest {
                 eq(USER_ID),
                 eq(WORKSPACE_ID),
                 any(Instant.class),
+                anyBoolean(),
                 any(Pageable.class)
             )
         ).thenReturn(
@@ -252,6 +256,7 @@ class PracticeReflectionServiceTest extends BaseUnitTest {
                 eq(USER_ID),
                 eq(WORKSPACE_ID),
                 any(Instant.class),
+                anyBoolean(),
                 any(Pageable.class)
             )
         ).thenReturn(
@@ -281,6 +286,7 @@ class PracticeReflectionServiceTest extends BaseUnitTest {
                 eq(USER_ID),
                 eq(WORKSPACE_ID),
                 any(Instant.class),
+                anyBoolean(),
                 any(Pageable.class)
             )
         ).thenReturn(
@@ -321,6 +327,7 @@ class PracticeReflectionServiceTest extends BaseUnitTest {
                 eq(USER_ID),
                 eq(WORKSPACE_ID),
                 any(Instant.class),
+                anyBoolean(),
                 any(Pageable.class)
             )
         ).thenReturn(List.of(bad(practice, null), bad(practice, Severity.CRITICAL)));
@@ -356,6 +363,7 @@ class PracticeReflectionServiceTest extends BaseUnitTest {
                 eq(USER_ID),
                 eq(WORKSPACE_ID),
                 any(Instant.class),
+                anyBoolean(),
                 any(Pageable.class)
             )
         ).thenReturn(List.of(minor, critical));
@@ -387,6 +395,7 @@ class PracticeReflectionServiceTest extends BaseUnitTest {
                 eq(USER_ID),
                 eq(WORKSPACE_ID),
                 any(Instant.class),
+                anyBoolean(),
                 any(Pageable.class)
             )
         ).thenReturn(List.of(locusA, locusB));

@@ -587,11 +587,18 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
      * needs {@code ORDER BY ... LIMIT 1} in a correlated subquery; the practice is loaded lazily per observation
      * rather than JOIN-fetched.
      *
-     * <p>Only a presence that {@link Presence#carriesValence() carries valence} is listed: {@code NOT_APPLICABLE}
-     * would bury the actionable {@code BAD}/{@code GOOD} rows within the page budget, and coaching on
-     * {@code INCONCLUSIVE} would invite the mentor to invent a direction the measurement declined to take. Both
-     * totals still reach the mentor via the presence-count summary; this list stays recency-ordered, not
-     * re-ordered by severity, to preserve its "what happened lately" purpose.
+     * <p>{@code verdictsOnly} decides whether a presence that does not {@link Presence#carriesValence() carry
+     * valence} is listed, because the two kinds of caller need opposite answers. The context providers pass
+     * {@code true}: {@code NOT_APPLICABLE} would bury the actionable {@code BAD}/{@code GOOD} rows within their
+     * page budget, and coaching on {@code INCONCLUSIVE} would invite the mentor to invent a direction the
+     * measurement declined to take — both totals still reach it via the presence-count summary. The reflection
+     * surface passes {@code false}: it does not render those rows either, but it must COUNT them, because "the
+     * practice ran and found nothing to judge" and "the practice was never looked at" are different answers and
+     * only the rows themselves can tell them apart. It filters them out one layer up, where the same pass that
+     * classifies every other row can also count these.
+     *
+     * <p>Either way the list stays recency-ordered, not re-ordered by severity, to preserve its "what happened
+     * lately" purpose.
      *
      * <p><strong>"Latest run" means the latest run that actually said something about THIS claim</strong> —
      * the subquery correlates on practice, subject, artifact and origin class together. Correlating on the
@@ -634,7 +641,7 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
                 AND target_artifact.id = f.artifact_id
           )
           AND f.observed_at >= :since
-          AND f.presence IN ('PRESENT', 'ABSENT')
+          AND (:verdictsOnly = FALSE OR f.presence IN ('PRESENT', 'ABSENT'))
           AND f.agent_job_id = (
               SELECT f2.agent_job_id FROM observation f2
               WHERE f2.practice_id = f.practice_id
@@ -651,63 +658,8 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
         @Param("aboutUserId") Long aboutUserId,
         @Param("workspaceId") Long workspaceId,
         @Param("since") Instant since,
+        @Param("verdictsOnly") boolean verdictsOnly,
         Pageable pageable
-    );
-
-    /**
-     * Per-practice count of the opportunities {@link #findRecentByDeveloperAndWorkspace} deliberately drops:
-     * the runs where a practice looked and produced no verdict.
-     *
-     * <p>The reflection surface must not list these — an inapplicable row is nothing a learner can act on, and
-     * the sibling query's javadoc explains why it filters them. But dropping them entirely made "no observation
-     * ever reached this area" and "the practices ran and your work offered no relevant opportunity" collapse
-     * into one indistinguishable empty state, which is the conflation
-     * {@code PracticeAreaStatusDTO.AreaStatus.NO_OPPORTUNITY} exists to remove. Counting them here keeps the
-     * cards clean while giving the area status the fact it needs.
-     *
-     * <p>Counts, not rows, because that is all the census consumes: an inapplicable opportunity is filtered out
-     * before bundling, so it can never reach a trend, and it carries nothing displayable.
-     *
-     * <p><b>Every predicate below mirrors {@link #findRecentByDeveloperAndWorkspace} except the presence
-     * filter, which is its exact complement.</b> The latest-run correlated subquery in particular must stay
-     * identical — a divergent copy would let the two queries disagree about which run is current and report a
-     * census for a run whose cards are not shown.
-     */
-    @Query(
-        value = """
-        SELECT p.slug AS practiceSlug, COUNT(f.id) AS count
-        FROM observation f
-        JOIN practice p ON p.id = f.practice_id
-        WHERE f.about_user_id = :aboutUserId
-          AND p.workspace_id = :workspaceId
-          AND NOT EXISTS (
-              SELECT 1
-              FROM issue target_artifact
-              JOIN workspace_team_repository_settings wtrs
-                ON wtrs.workspace_id = p.workspace_id
-               AND wtrs.repository_id = target_artifact.repository_id
-               AND wtrs.hidden_from_contributions = true
-              WHERE f.artifact_kind IN ('scm.pull_request', 'scm.issue')
-                AND target_artifact.id = f.artifact_id
-          )
-          AND f.observed_at >= :since
-          AND f.presence NOT IN ('PRESENT', 'ABSENT')
-          AND f.agent_job_id = (
-              SELECT f2.agent_job_id FROM observation f2
-              WHERE f2.practice_id = f.practice_id
-                AND f2.about_user_id = f.about_user_id
-                AND f2.artifact_kind = f.artifact_kind AND f2.artifact_id = f.artifact_id
-                AND (f2.origin = 'BACKFILL') = (f.origin = 'BACKFILL')
-              ORDER BY f2.observed_at DESC, f2.agent_job_id DESC LIMIT 1
-          )
-        GROUP BY p.slug
-        """,
-        nativeQuery = true
-    )
-    List<PracticeInapplicableCount> countInapplicableByDeveloperAndWorkspace(
-        @Param("aboutUserId") Long aboutUserId,
-        @Param("workspaceId") Long workspaceId,
-        @Param("since") Instant since
     );
 
     /**
@@ -884,12 +836,6 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
     /** Projection: presence → count. */
     interface PresenceCount {
         Presence getPresence();
-        Long getCount();
-    }
-
-    /** Projection: practice slug → how many of its latest-run observations produced no verdict. */
-    interface PracticeInapplicableCount {
-        String getPracticeSlug();
         Long getCount();
     }
 

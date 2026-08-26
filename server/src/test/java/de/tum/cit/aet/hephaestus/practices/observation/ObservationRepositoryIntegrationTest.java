@@ -541,6 +541,7 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
                 aboutUser.getId(),
                 workspace.getId(),
                 Instant.parse("2026-01-01T00:00:00Z"),
+                true,
                 PageRequest.of(0, 50)
             );
 
@@ -659,6 +660,7 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
                 aboutUser.getId(),
                 workspace.getId(),
                 Instant.parse("2026-01-01T00:00:00Z"),
+                true,
                 PageRequest.of(0, 10)
             );
             assertThat(recent).extracting(Observation::getPresence).containsExactly(Presence.PRESENT);
@@ -755,6 +757,7 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
                 aboutUser.getId(),
                 workspace.getId(),
                 since,
+                true,
                 PageRequest.of(0, 50)
             );
             assertThat(recent).extracting(Observation::getArtifactId).containsExactly(visiblePr.getId());
@@ -889,6 +892,7 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
                 aboutUser.getId(),
                 workspace.getId(),
                 Instant.parse("2026-01-01T00:00:00Z"),
+                true,
                 PageRequest.of(0, 50)
             );
 
@@ -912,6 +916,7 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
                 aboutUser.getId(),
                 workspace.getId(),
                 Instant.parse("2026-01-01T00:00:00Z"),
+                true,
                 PageRequest.of(0, 50)
             );
 
@@ -931,6 +936,7 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
                 aboutUser.getId(),
                 workspace.getId(),
                 Instant.parse("2026-01-01T00:00:00Z"),
+                true,
                 PageRequest.of(0, 50)
             );
 

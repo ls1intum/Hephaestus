@@ -11,7 +11,6 @@ import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeArea;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository.PracticeInapplicableCount;
 import de.tum.cit.aet.hephaestus.practices.observation.dto.ReflectionItemDTO;
 import de.tum.cit.aet.hephaestus.practices.observation.dto.ReflectionPracticeDTO;
 import de.tum.cit.aet.hephaestus.practices.observation.trend.PracticeTrend;
@@ -109,6 +108,12 @@ public class PracticeReflectionService {
             developerId,
             workspaceId,
             since,
+            // Verdictless rows included on purpose. This surface renders none of them, but it has to COUNT
+            // them: "the practice ran and found nothing to judge" and "the practice was never looked at" are
+            // different answers, and only the rows themselves tell them apart. Asking for them here is what
+            // lets one pass classify and count in the same place — the alternative was a second query whose
+            // predicates had to be kept identical to this one by hand.
+            false,
             Pageable.unpaged()
         );
         // An observation may cite a source the learner is not cleared to be shown. The policy answers that
@@ -145,7 +150,7 @@ public class PracticeReflectionService {
             .collect(
                 Collectors.toMap(
                     Map.Entry::getKey,
-                    entry -> entry.getValue().assessed(),
+                    entry -> entry.getValue().observed(),
                     (left, ignored) -> left,
                     LinkedHashMap::new
                 )
@@ -195,13 +200,11 @@ public class PracticeReflectionService {
                 )
             );
 
-        Map<String, Integer> inapplicableByPractice = inapplicableByPractice(developerId, workspaceId, since);
         List<ReflectionPracticeDTO> cards = cards(
             evidenceBySlug,
             eligiblePractices,
             trends,
             standingShareByPractice,
-            inapplicableByPractice,
             deliveredGuidance
         );
 
@@ -230,7 +233,6 @@ public class PracticeReflectionService {
         List<Practice> eligiblePractices,
         Map<String, PracticeTrend> trends,
         Map<String, Double> standingShareByPractice,
-        Map<String, Integer> inapplicableByPractice,
         Map<UUID, String> deliveredGuidance
     ) {
         Map<String, Practice> subjects = new LinkedHashMap<>();
@@ -245,7 +247,7 @@ public class PracticeReflectionService {
                 Double share = standingShareByPractice.get(entry.getKey());
                 return evidence != null && share != null
                     ? toCard(evidence, requireTrend(trends, entry.getKey()), deliveredGuidance, share)
-                    : silentCard(entry.getValue(), evidence, inapplicableByPractice.getOrDefault(entry.getKey(), 0));
+                    : silentCard(entry.getValue(), evidence);
             })
             .sorted(
                 Comparator.<ReflectionPracticeDTO>comparingInt(card -> standingRank(card.standing())).thenComparingInt(
@@ -266,12 +268,9 @@ public class PracticeReflectionService {
      *
      * <p>No trend either: a direction over evidence that produced no verdict would be a claim about nothing.
      */
-    private static ReflectionPracticeDTO silentCard(
-        Practice practice,
-        @Nullable PracticeEvidence evidence,
-        int notApplicable
-    ) {
-        boolean exercised = notApplicable > 0 || (evidence != null && evidence.suppressedStrengths() > 0);
+    private static ReflectionPracticeDTO silentCard(Practice practice, @Nullable PracticeEvidence evidence) {
+        boolean exercised =
+            evidence != null && (!evidence.withoutVerdict().isEmpty() || evidence.suppressedStrengths() > 0);
         PracticeArea area = practice.getArea();
         return new ReflectionPracticeDTO(
             practice.getSlug(),
@@ -376,11 +375,18 @@ public class PracticeReflectionService {
         Practice practice,
         List<Observation> problems,
         List<Observation> strengths,
-        int suppressedStrengths
+        int suppressedStrengths,
+        List<Observation> withoutVerdict
     ) {
         /**
-         * Splits one practice's group on {@link ObservationOutcome}, which is the only place the
-         * presence × assessment matrix is read.
+         * Sorts one practice's window into the buckets every downstream reader needs, reading
+         * {@link ObservationOutcome} exactly once per observation.
+         *
+         * <p>Grouping on the outcome rather than testing it per bucket is what makes the split visibly
+         * exhaustive: the five outcomes are the five keys, and every row lands under one of them. The earlier
+         * shape asked {@code isNegative} / {@code isPositive} / {@code isCoherentStrengthFor} in sequence, which
+         * evaluated the matrix two to four times per row and left "nothing falls through" as a claim in prose
+         * rather than something the code shows.
          *
          * <p>Every problem the practice raised is kept, worst severity first. Nothing is withheld: an earlier
          * revision suppressed single-artifact problems below a model-reported confidence floor, but that column
@@ -389,30 +395,42 @@ public class PracticeReflectionService {
          * artifact, so a locus is single-artifact by construction. Showing the record and letting the surface
          * say how often something was seen is the honest version of that intent.
          *
-         * <p>Positive evidence is partitioned rather than filtered, because a defect-detector practice's
-         * incoherent strengths are not noise to discard: they still prove the detector ran, which is what
-         * separates {@code NO_OPPORTUNITY} from {@code NOT_OBSERVED} for its area.
+         * <p>A defect-detector practice's {@code DEMONSTRATED_STRENGTH} rows are counted, not discarded: what
+         * would be demonstrated is the defect, so they are no strength to show — but they still prove the
+         * detector ran, which is what separates {@code NO_OPPORTUNITY} from {@code NOT_OBSERVED} for its area.
+         * The rule is applied once to the bucket here instead of once per row.
          */
         static PracticeEvidence classify(List<Observation> group) {
             Practice practice = group.get(0).getPractice();
-            boolean defectDetector = practice.isDefectDetector();
-            List<Observation> problems = group
+            Map<ObservationOutcome, List<Observation>> byOutcome = group
                 .stream()
-                .filter(observation -> ObservationOutcome.of(observation).isNegative())
-                .sorted(Comparator.comparingInt(PracticeReflectionService::severityOrdinal))
-                .toList();
-            Map<Boolean, List<Observation>> positives = group
-                .stream()
-                .filter(observation -> ObservationOutcome.of(observation).isPositive())
-                .collect(
-                    Collectors.partitioningBy(observation ->
-                        ObservationOutcome.of(observation).isCoherentStrengthFor(defectDetector)
-                    )
-                );
-            // partitioningBy always yields both keys, even when one side stays empty.
-            List<Observation> coherent = Objects.requireNonNull(positives.get(true));
-            List<Observation> incoherent = Objects.requireNonNull(positives.get(false));
-            return new PracticeEvidence(practice, problems, coherent, incoherent.size());
+                .collect(Collectors.groupingBy(ObservationOutcome::of));
+            List<Observation> demonstrated = bucket(byOutcome, ObservationOutcome.DEMONSTRATED_STRENGTH);
+            List<Observation> avoided = bucket(byOutcome, ObservationOutcome.SAFE_AVOIDANCE);
+            boolean detectorStrengthIsIncoherent = !ObservationOutcome.DEMONSTRATED_STRENGTH.isCoherentStrengthFor(
+                practice.isDefectDetector()
+            );
+            return new PracticeEvidence(
+                practice,
+                Stream.concat(
+                    bucket(byOutcome, ObservationOutcome.COMMISSION_PROBLEM).stream(),
+                    bucket(byOutcome, ObservationOutcome.OMISSION_GAP).stream()
+                )
+                    .sorted(Comparator.comparingInt(PracticeReflectionService::severityOrdinal))
+                    .toList(),
+                detectorStrengthIsIncoherent
+                    ? avoided
+                    : Stream.concat(demonstrated.stream(), avoided.stream()).toList(),
+                detectorStrengthIsIncoherent ? demonstrated.size() : 0,
+                bucket(byOutcome, ObservationOutcome.NOT_APPLICABLE)
+            );
+        }
+
+        private static List<Observation> bucket(
+            Map<ObservationOutcome, List<Observation>> byOutcome,
+            ObservationOutcome outcome
+        ) {
+            return byOutcome.getOrDefault(outcome, List.of());
         }
 
         String slug() {
@@ -420,32 +438,25 @@ public class PracticeReflectionService {
         }
 
         /**
-         * Everything that produced a verdict, which is exactly the trend's input. Observations that produced
-         * none are counted in the census instead: they are filtered out before bundling, so including them
-         * here could not move a trend, and they carry nothing a learner could read.
+         * Everything the practice's latest runs said, verdict or not — the trend's input.
+         *
+         * <p>The verdictless rows belong here even though they can never move a direction. The bundler drops an
+         * opportunity that produced no verdict at all, so including them changes no share and no posterior; what
+         * it does change is that a work item the practice looked at and could not judge is visible as an
+         * opportunity that yielded nothing, rather than as an absence indistinguishable from work that was never
+         * reviewed. That is the same distinction {@code NO_OPPORTUNITY} draws one level up.
          */
-        List<Observation> assessed() {
-            return Stream.concat(problems.stream(), strengths.stream()).toList();
+        List<Observation> observed() {
+            return Stream.concat(
+                Stream.concat(problems.stream(), strengths.stream()),
+                withoutVerdict.stream()
+            ).toList();
         }
 
         /** Whether this practice has anything to say to the learner at all. */
         boolean hasCard() {
             return !problems.isEmpty() || !strengths.isEmpty();
         }
-    }
-
-    private Map<String, Integer> inapplicableByPractice(Long developerId, Long workspaceId, Instant since) {
-        return observationRepository
-            .countInapplicableByDeveloperAndWorkspace(developerId, workspaceId, since)
-            .stream()
-            .collect(
-                Collectors.toMap(
-                    PracticeInapplicableCount::getPracticeSlug,
-                    count -> Math.toIntExact(count.getCount()),
-                    (left, ignored) -> left,
-                    LinkedHashMap::new
-                )
-            );
     }
 
     /**

@@ -83,6 +83,35 @@ class OpportunityBundlerTest {
         assertThat(result.opportunitiesUntilComparable(3)).isEqualTo(2);
     }
 
+    @Test
+    void shouldKeepAnOpportunityThatProducedNoVerdictOutOfTheBundles() {
+        // It stays in the trail: the practice looked at this work item, which is a different fact from never
+        // having reviewed it. But it carries no verdict, so it must not become a sample.
+        OpportunityBundler.Bundles result = bundle(
+            observation(1, UUID.randomUUID(), "2026-08-11T09:00:00Z", Assessment.GOOD),
+            inapplicable(2, UUID.randomUUID(), "2026-08-11T10:00:00Z"),
+            observation(3, UUID.randomUUID(), "2026-08-11T11:00:00Z", Assessment.BAD)
+        );
+
+        assertThat(result.trail()).hasSize(3);
+        assertThat(result.current()).hasSize(2);
+        assertThat(result.current()).noneMatch(opportunity -> opportunity.outcomes().notApplicable() > 0);
+    }
+
+    @Test
+    void shouldNotLetAVerdictlessRunSupersedeAnEarlierVerdictOnTheSameArtifact() {
+        // Same artifact, later run found nothing to judge. The latest run still wins — a re-review that says
+        // the practice no longer applies here must not leave the old problem standing.
+        OpportunityBundler.Bundles result = bundle(
+            observation(1, UUID.randomUUID(), "2026-08-10T09:00:00Z", Assessment.BAD),
+            inapplicable(1, UUID.randomUUID(), "2026-08-11T09:00:00Z")
+        );
+
+        assertThat(result.trail()).hasSize(1);
+        assertThat(result.trail().getFirst().applicable()).isFalse();
+        assertThat(result.current()).isEmpty();
+    }
+
     private static OpportunityBundler.Bundles bundle(Observation... observations) {
         return OpportunityBundler.bundle("testing", List.of(observations), Instant.parse("2026-05-01T00:00:00Z"), 4);
     }
@@ -95,6 +124,17 @@ class OpportunityBundlerTest {
             .artifactId(artifactId)
             .presence(Presence.PRESENT)
             .assessment(assessment)
+            .observedAt(Instant.parse(observedAt))
+            .build();
+    }
+
+    private static Observation inapplicable(long artifactId, UUID jobId, String observedAt) {
+        return Observation.builder()
+            .id(UUID.randomUUID())
+            .agentJobId(jobId)
+            .artifactKind(ArtifactKinds.PULL_REQUEST)
+            .artifactId(artifactId)
+            .presence(Presence.NOT_APPLICABLE)
             .observedAt(Instant.parse(observedAt))
             .build();
     }
