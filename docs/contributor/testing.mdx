@@ -16,13 +16,13 @@ Testing keeps regression risk low across services. The application server uses M
    # Unit tests only (fast)
    cd server && ./mvnw test
 
-   # Full suite including integration tests
+   # Unit and integration tests
    cd server && ./mvnw verify
    ```
 
-   Generated clients have their own module, so unchanged client inputs do not require regeneration
-   or recompilation when Maven finds a matching build-cache entry. Test selection never depends on
-   existing build output.
+   Generated clients have their own module, and the reactor restores their compiled artifact from
+   Maven Build Cache when its inputs are unchanged. After one reactor build, repeated application or
+   test edits can use the application-only recipes below without touching generated clients.
 
 3. Extend the correct base class:
 
@@ -30,7 +30,8 @@ Testing keeps regression risk low across services. The application server uses M
    feature-specific subclass.
 
 :::warning Naming matters
-Use `*Test.java` for unit tests and `*IntegrationTest.java` for integration tests. Maven's surefire and failsafe plugins use these patterns.
+Use `*Test.java` for unit tests and `*IntegrationTest.java` or `*LiquibaseTest.java` for integration
+tests. Maven's Surefire and Failsafe plugins use these patterns.
 :::
 
 ## Unit tests
@@ -44,21 +45,6 @@ Use `*Test.java` for unit tests and `*IntegrationTest.java` for integration test
 - Extend `BaseIntegrationTest` for cross-component behaviour.
 - Relies on a shared PostgreSQL Testcontainers instance (significantly faster than per-test containers).
 - Reads recorded webhook payloads from the fixture folder and deserialises them into the handler's event DTO.
-
-Example:
-
-```java
-class GitHubLabelMessageHandlerIntegrationTest extends BaseIntegrationTest {
-    @Test
-    @DisplayName("Should persist label from webhook")
-    void shouldPersistLabel() throws IOException {
-        var payload = objectMapper.readValue(
-            new ClassPathResource("github/label.created.json").getContentAsString(UTF_8),
-            GitHubLabelEventDTO.class);
-        // Test with real webhook data
-    }
-}
-```
 
 ## Controller integration tests
 
@@ -98,8 +84,6 @@ class FooControllerIntegrationTest extends AbstractWorkspaceIntegrationTest {
 }
 ```
 
-Documenting each new controller integration test in this format keeps future work predictable and minimises copy/paste.
-
 ## Cross-tenant isolation tests
 
 Tenancy bugs are silent data leaks: the endpoint answers `200` with plausible data, so nothing fails loudly. Every **new workspace-scoped read path** gets an isolation case in `CrossTenantIsolationIntegrationTest` (in `workspace/`), whose fixture and rationale are documented in its class Javadoc — two workspaces sharing an `account_login`, one overlapping member.
@@ -130,10 +114,14 @@ From `server/`:
 ```bash
 ./mvnw test                         # Unit tests
 ./mvnw test -Parchitecture-tests     # ArchUnit + Modulith verification
-./mvnw verify                       # Full suite + packaging
-./mvnw test -Dtest=SomeTest         # Single test class
-./mvnw test -Dtest=SomeTest#method  # Single test method
+./mvnw verify                       # Unit + integration tests and packaging
+./mvnw -f application/pom.xml test -Dtest=SomeTest         # Single test class
+./mvnw -f application/pom.xml test -Dtest=SomeTest#method  # Single test method
 ```
+
+Run a reactor command first after a fresh checkout or after changing a schema, generator, generated-client
+dependency, or `generated-clients/pom.xml`. The application-only commands then preserve Maven's
+incremental compilation; they fail immediately if the generated-client artifact has not been installed.
 
 The tag filter is a property, not the `-Dgroups` user property: surefire is configured with
 `<groups>${surefire.includedGroups}</groups>`, which an explicitly-configured plugin parameter wins

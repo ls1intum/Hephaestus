@@ -215,7 +215,7 @@ services:
   # matches and the domain is overwritten with an auto-generated host on every deploy.
   #
   # There is no server/Dockerfile — the image comes from Paketo buildpacks (spring-boot:build-image
-  # in server/pom.xml), which also supplies the /workspace/health-check binary. ci-docker-build.yml
+  # in server/application/pom.xml), which also supplies the /workspace/health-check binary. ci-docker-build.yml
   # publishes an immutable image for every code PR commit. Coolify injects that commit as
   # SOURCE_COMMIT, so previews cannot accidentally share or race on a mutable PR-wide image tag.
   #

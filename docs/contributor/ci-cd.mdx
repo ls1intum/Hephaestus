@@ -239,7 +239,8 @@ mkdir -p ci-metrics
 
 ## 🛠️ Running CI Locally
 
-Before pushing, run the same checks that CI runs:
+Before pushing, run the complete local quality gate. CI also runs builds and selected server test
+tiers that need more time or infrastructure.
 
 ### Full Local Check (Recommended)
 
@@ -247,6 +248,10 @@ Before pushing, run the same checks that CI runs:
 # Format and check all services
 pnpm run format && pnpm run check
 ```
+
+When relevant to the change, also run `pnpm run build:webapp`,
+`pnpm run test:server:verification`, and the Docker-backed server integration suite. The pull request
+workflow remains authoritative for its hosted jobs.
 
 ### Per-Service Commands
 

@@ -23,20 +23,25 @@ the Postgres container. For plain terminals: `pnpm dev:server` and `pnpm dev:web
 - **`BufferingApplicationStartup`** is wired in `Application.main()`. With `app.profiles=local`,
   `GET /actuator/startup` returns the timeline; `StartupBudgetIntegrationTest` catches per-step
   regressions in CI.
+
 ## Build traps
 
 Each of these can leave you with the wrong result.
 
 - **Use the reactor.** `server/generated-clients` owns every GraphQL and Outline generator and
   `server/application` consumes its JAR. From `server/`, `./mvnw test` runs the default unit suite;
-  use `-pl application -am` for a focused application lifecycle without bypassing its dependency.
+  use it after a fresh checkout or generated-client input change. For the repeated application-edit
+  loop, use `./mvnw -f application/pom.xml test` (and `-Dtest=ClassName` to focus a test) so Maven does
+  not restore the generated module and invalidate application incremental compilation.
 - **`-Dgroups=architecture` silently runs the unit suite instead.** `pom.xml` sets Surefire's `<groups>`
   to `${surefire.includedGroups}`, and a POM element beats the `-Dgroups` user property — so the flag is
   discarded and the default (`unit`) runs. The tag is selected by profile, never by `-Dgroups`:
-  `mvn test -Parchitecture-tests`. CI is unaffected; it passes `-Dsurefire.includedGroups`,
+  `./mvnw test -Parchitecture-tests`. CI is unaffected; it passes `-Dsurefire.includedGroups`,
   which is the property the POM actually reads.
 - **`clean` does not guarantee a cold build.** It removes workspace outputs, but Maven Build Cache can
-  restore them. Pass `-Dmaven.build.cache.enabled=false` when measuring a cold build.
+  restore them. The repository enables the cache for `generated-clients`; Maven logs `Found cached
+  build` on a hit. Pass `-Dmaven.build.cache.enabled=false` when measuring a cold build. Schema,
+  generator configuration, Java, dependency, and generated-client POM changes invalidate the entry.
 - **Do not run concurrent Maven processes in one checkout.** Both write the same module `target/`
   directories.
 - **`server/.env` leaks into Maven test JVMs.** A local `MANAGEMENT_PORT` collides across worktrees and
@@ -51,13 +56,13 @@ Each of these can leave you with the wrong result.
 spec if Maven does not produce a new one. Never stop another service to free a port; override:
 
 ```bash
-pnpm run generate:api:application-server:specs -Dopenapi.server.port=38111 -Dopenapi.jmx.port=9031
+MANAGEMENT_PORT=0 pnpm run generate:api:application-server:specs -- -Dopenapi.server.port=38111 -Dopenapi.jmx.port=9031
 pnpm run generate:api:application-server:client
 ```
 
 ## Boundaries
 
-**Always** — run `./mvnw test` before committing · tag every test (`@Tag("unit")`,
+**Always** — run the unit baseline and every affected tier before committing · tag every test (`@Tag("unit")`,
 `@Tag("integration")`, `@Tag("live")`) · declare a new endpoint's permission explicitly.
 
 **Ask first** — schema changes · security configuration · a new `pom.xml` dependency · workspace
@@ -82,17 +87,17 @@ nullness contract.
 
 | Tag | Runs | Command |
 |---|---|---|
-| `unit` | no Spring context | `mvn test` |
-| `architecture` | ArchUnit + Modulith verification | `mvn test -Parchitecture-tests` |
-| `integration` | full context + Testcontainers | `mvn verify` |
-| `live` | real GitHub API | `mvn test -Plive-tests` |
+| `unit` | no Spring context | `./mvnw test` |
+| `architecture` | ArchUnit + Modulith verification | `./mvnw test -Parchitecture-tests` |
+| `integration` | unit tests, then full context + Testcontainers | `./mvnw verify` |
+| `live` | real GitHub API | `./mvnw test -Plive-tests` |
 
 Live tests need GitHub App credentials in `application-live-local.yml` (gitignored); the Maven profile
 is the only guard.
 
 **An integration test's *filename* decides whether it ever runs.** Failsafe includes
 `**/*IntegrationTest.java` and `**/*LiquibaseTest.java` and nothing else, so a `@Tag("integration")`
-class named anything else is silently never executed by `mvn verify` — it fails no build and reports
+class named anything else is silently never executed by `./mvnw verify` — it fails no build and reports
 no skip.
 
 Name tests `should[ExpectedBehavior]When[Condition]`. Controller-level integration tests extend
@@ -115,7 +120,9 @@ or on "the only" result, and never write cleanup that another test depends on ha
   obsolete). Never delete one whose effect is not enforced elsewhere. Released changelogs are otherwise
   immutable and CI-enforced — root `AGENTS.md` § Database changes.
 - **The changelog is untested by the suite.** Tests run against `ddl-auto: create`, so a broken
-  changelog passes every tier. Validate with `mvn liquibase:update` against real Postgres.
+  changelog passes every tier. Use `pnpm run db:draft-changelog` to validate the migration history
+  against the repository-managed PostgreSQL container; discard the draft when no schema change is
+  intended.
 - **A native `@Query` may not contain an apostrophe inside a `--` comment.** Hibernate reads it as the
   start of a string literal and the whole `ApplicationContext` fails to build, naming something else.
   `NativeQueryCommentArchTest` enforces it, so the failure arrives as a named test rather than as a

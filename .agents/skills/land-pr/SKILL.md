@@ -46,8 +46,10 @@ pnpm run format
 pnpm run check
 ```
 
-`check` is the whole gate — every leg is listed under `check` in the root `package.json`, and every
-one of them also runs in CI. Formatting must never be the reason a remote build fails.
+`check` is the complete local quality gate — every leg is listed under `check` in the root
+`package.json`, and every one also runs in CI. CI additionally runs service tests, builds, images,
+security checks, and workflow-specific gates. Formatting must never be the reason a remote build
+fails.
 
 ## 4. Regenerate what your change invalidated
 

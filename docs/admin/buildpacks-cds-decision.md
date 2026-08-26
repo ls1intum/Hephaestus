@@ -29,7 +29,7 @@ AOT processing evaluates `@Conditional` at **build time**, baking the build-time
 
 ## Builder pinning
 
-`pom.xml` pins `builder-noble-java-tiny` + `ubuntu-noble-run-tiny` + the `health-checker` buildpack by
+`server/application/pom.xml` pins `builder-noble-java-tiny` + `ubuntu-noble-run-tiny` + the `health-checker` buildpack by
 sha256 digest. Refresh:
 
 ```shell
@@ -44,7 +44,7 @@ Bump as part of release cycles; the digest is the source of truth.
 
 On Docker Compose the container `HEALTHCHECK` is the only container-level health signal —
 `service_healthy` gating and the `docker compose ps` column both depend on it. `run-tiny` has no
-shell/wget and `builder-noble-java-tiny` bundles no probe, so `pom.xml` adds an explicit `<buildpacks>`
+shell/wget and `builder-noble-java-tiny` bundles no probe, so `server/application/pom.xml` adds an explicit `<buildpacks>`
 order. Specifying `<buildpacks>` **replaces** the builder's default order, so the `java` composite must
 be re-listed (`urn:cnb:builder:paketo-buildpacks/java`) before appending
 `docker://paketobuildpacks/health-checker`; `BP_HEALTH_CHECKER_ENABLED=true` opts it in. It contributes

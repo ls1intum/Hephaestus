@@ -79,8 +79,11 @@ These guidelines keep every service aligned. Keep changes focused. Mention any d
 
 - Configuration overrides stay in `application-*.yml`. Do not commit `application-local.yml`.
 - Share long-lived infrastructure in tests. Lean on Testcontainers and GitHub fixtures where possible.
-- After updating Liquibase migrations, regenerate the REST client with `pnpm run generate:api` and rerun `pnpm run db:generate-erd-docs`.
-- Run the modular test suites with `cd server && ./mvnw verify`. The reactor builds the generated-client dependency before the application, and ArchUnit checks enforce package boundaries.
+- After updating Liquibase migrations, run `pnpm run db:generate-erd-docs`. Regenerate OpenAPI and
+  the REST client only when the HTTP API contract changes.
+- Run architecture checks and the unit/integration lifecycle with
+  `cd server && ./mvnw test -Parchitecture-tests && ./mvnw verify`. The reactor builds the
+  generated-client dependency before the application.
 - Prefer integration tests that extend `BaseIntegrationTest`, or `AbstractWorkspaceIntegrationTest` for anything workspace-scoped, when you touch persistence logic. See [Testing](./testing.mdx).
 
 ## Webhook receiver (`server/.../integration/core/webhook/`)
@@ -98,14 +101,15 @@ These guidelines keep every service aligned. Keep changes focused. Mention any d
   container (`SPRING_PROFILES_ACTIVE=prod,webhook`) for restart independence — see ADR 0008.
 - Configuration is shared with auto-registration: `core.webhook.WebhookProperties` bound to
   `hephaestus.webhook.*`. The webhook packages carry per-package JaCoCo branch floors, declared in
-  `server/pom.xml`; read them there rather than from a copy.
+  `server/application/pom.xml`; read them there rather than from a copy.
 
 ## Docs site (`/docs`)
 
-- Docusaurus 3 powers the documentation. Install dependencies with `pnpm install` and run `pnpm run start` to preview.
+- Docusaurus 3 powers the documentation. Install dependencies with `pnpm install` and run
+  `pnpm run docs:dev` from the repository root to preview.
 - Keep front matter fields (`id`, `title`, `sidebar_position`) unique. Update `sidebars.*.ts` when adding new pages.
 - Use MDX components from `docs/src/components/**` to keep styling consistent.
-- Run `pnpm run build` before committing structural changes to confirm the static export succeeds.
+- Run `pnpm run docs:build` before committing structural changes to confirm the static export succeeds.
 
 ## Database and migrations
 

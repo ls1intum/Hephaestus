@@ -46,19 +46,19 @@ reflect the final state. Document any skipped gate in the PR description.
 | Command | Does |
 |---|---|
 | `pnpm run format` / `format:check` | Apply / verify formatting (Java + TypeScript) |
-| `pnpm run check` | The full gate — every leg it runs is listed as `check` in the root `package.json` |
+| `pnpm run check` | Static analysis, formatting checks, agent tests, and repository policy checks — every leg is listed in the root `package.json` |
 | `pnpm run test:webapp` | Vitest |
 | `pnpm run test:agents` | Agent runtime and precompute specs, on Bun |
 | `cd server && ./mvnw test` | Server unit tests — see `server/AGENTS.md` for all four tiers |
 
 Naming: `format` applies, `format:check` verifies read-only for CI, `lint` lints, `check` is the
-comprehensive verification. A `:webapp`, `:server` or `:agents` suffix scopes any of them; `:java`
+comprehensive local quality gate. A `:webapp`, `:server` or `:agents` suffix scopes any of them; `:java`
 scopes `format` and `lint` only — the Java leg of `check` is `check:server`.
 
-**Every leg of `check` also runs in CI**, so a green build and a green `check` agree. CI adds two
-gates `check` does not have — the Vite build and the `routeTree.gen.ts` comparison that only a build
-can make — and cannot run anything needing Docker or a live credential. Run `check` yourself before
-claiming it: it is the same command, and it fails faster than a workflow does.
+**Every leg of `check` also runs in CI.** CI additionally runs the Vite build and generated route-tree
+comparison, webapp tests, server test tiers, image and security checks, and other workflow-specific
+gates. It cannot run anything needing a live credential. Run `check` before pushing because it is the
+fastest complete local quality gate, then run the affected test or build commands above.
 
 ### Lint and format scopes
 

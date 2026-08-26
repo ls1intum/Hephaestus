@@ -19,7 +19,9 @@ Run the failing fixture test with the `-Dhephaestus.snapshot.regenerate=true` sy
 
 ```
 cd server
-./mvnw test -Dtest=TaskEnvelopeFixtureTest -Dhephaestus.snapshot.regenerate=true
+./mvnw -pl generated-clients -am install -DskipTests
+./mvnw -f application/pom.xml test -Dtest=TaskEnvelopeFixtureTest \
+  -Dhephaestus.snapshot.regenerate=true
 ```
 
 That mode overwrites the fixture on disk instead of asserting. Diff the result, commit if intended.

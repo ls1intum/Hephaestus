@@ -62,9 +62,8 @@ have their own `application-<name>.yml` under `server/application/src/main/resou
 the per-role and per-purpose overlays (`worker`, `webhook`, `e2e`, `cds-training`) documented where
 they are used.
 
-They are **not** Maven profiles — `cd server && ./mvnw -Plocal` warns that the profile does not exist and changes
-nothing. Maven passes the active Spring profile through the `app.profiles` property, so the override
-is `-Dapp.profiles=…` (this is what `pnpm dev:server:e2e` does).
+They are **not** Maven profiles. Maven passes the active Spring profile through the `app.profiles`
+property, so use `-Dapp.profiles=…` to override it; `pnpm dev:server:e2e` uses that interface.
 
 Create `application-local.yml` in `server/application/src/main/resources` to override defaults. This file is gitignored.
 
