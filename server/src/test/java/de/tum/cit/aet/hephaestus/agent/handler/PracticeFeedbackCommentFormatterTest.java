@@ -5,7 +5,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.config.ApplicationProperties;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
-import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.ObjectMapper;
@@ -24,16 +23,11 @@ class PracticeFeedbackCommentFormatterTest extends BaseUnitTest {
             .contains("Test body content")
             .contains(
                 "<sub>Practice review &middot; model&lt;&amp;&gt; &middot; AI-generated and can be inaccurate." +
-                    " React with 👍 or 👎 to give feedback.</sub>"
+                    " React with 👍 or 👎, or reply, to give feedback.</sub>"
             )
-            // Run duration is operator telemetry; the developer reading a review has no use for it.
-            .doesNotContain("1m 30s")
             .contains(
-                "[Manage comments and Slack reminders](https://hephaestus.example.com/settings#practice-feedback)"
-            )
-            // Every developer who receives feedback reads this footer, so the product name staying out of
-            // it is pinned rather than left to review.
-            .doesNotContain("Hephaestus Agent");
+                "[Why you're seeing this and how to stop it](https://hephaestus.example.com/settings#practice-feedback)"
+            );
     }
 
     @Test
@@ -43,16 +37,32 @@ class PracticeFeedbackCommentFormatterTest extends BaseUnitTest {
         String result = formatter.format("Body", job());
 
         assertThat(result).contains(
-            "[Manage comments and Slack reminders](https://hephaestus.example/app/settings#practice-feedback)"
+            "[Why you're seeing this and how to stop it](https://hephaestus.example/app/settings#practice-feedback)"
         );
     }
 
     @Test
-    void appendsDeliverySettingsLinkToSupplementalComment() {
-        String result = formatter("https://hephaestus.example").appendSettingsNotice("Inline feedback");
+    void appendsDisclosureAndSettingsLink() {
+        String result = formatter("https://hephaestus.example").appendDisclosure("Approved feedback", job());
+
+        assertThat(result)
+            .startsWith("Approved feedback\n\n")
+            .contains(
+                "<sub>Practice review &middot; model&lt;&amp;&gt; &middot; AI-generated and can be inaccurate." +
+                    " React with 👍 or 👎, or reply, to give feedback.</sub>"
+            )
+            .endsWith(
+                "<sub>[Why you're seeing this and how to stop it](https://hephaestus.example/settings#practice-feedback)</sub>\n"
+            );
+    }
+
+    @Test
+    void appendsFeedbackPromptToInlineComment() {
+        String result = formatter("https://hephaestus.example").appendInlineFeedbackPrompt("Inline feedback");
 
         assertThat(result).isEqualTo(
-            "Inline feedback\n\n<sub>[Manage comments and Slack reminders](https://hephaestus.example/settings#practice-feedback)</sub>\n"
+            "Inline feedback\n\n" +
+                "<sub>AI-generated &middot; React with 👍 or 👎, or reply, to give feedback.</sub>\n"
         );
     }
 
@@ -65,8 +75,6 @@ class PracticeFeedbackCommentFormatterTest extends BaseUnitTest {
     private static AgentJob job() {
         AgentJob job = new AgentJob();
         job.setId(UUID.randomUUID());
-        job.setStartedAt(Instant.parse("2024-01-01T00:00:00Z"));
-        job.setCompletedAt(Instant.parse("2024-01-01T00:01:30Z"));
         job.setConfigSnapshot(new ObjectMapper().createObjectNode().put("upstreamModelId", "model<&>"));
         return job;
     }

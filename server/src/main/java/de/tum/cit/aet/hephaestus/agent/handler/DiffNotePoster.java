@@ -57,23 +57,14 @@ class DiffNotePoster {
     }
 
     DiffNoteResult reconcileInlineNotes(AgentJob job, List<DiffNote> diffNotes) {
-        return reconcileInlineNotes(job, diffNotes, true);
+        return reconcileInlineNotes(job, diffNotes, null);
     }
 
     DiffNoteResult reconcileApprovedInlineNotes(AgentJob job, UUID feedbackId, List<DiffNote> diffNotes) {
-        return reconcileInlineNotes(job, diffNotes, false, feedbackId);
+        return reconcileInlineNotes(job, diffNotes, feedbackId);
     }
 
-    private DiffNoteResult reconcileInlineNotes(AgentJob job, List<DiffNote> diffNotes, boolean appendSettingsNotice) {
-        return reconcileInlineNotes(job, diffNotes, appendSettingsNotice, null);
-    }
-
-    private DiffNoteResult reconcileInlineNotes(
-        AgentJob job,
-        List<DiffNote> diffNotes,
-        boolean appendSettingsNotice,
-        @Nullable UUID packageId
-    ) {
+    private DiffNoteResult reconcileInlineNotes(AgentJob job, List<DiffNote> diffNotes, @Nullable UUID packageId) {
         IntegrationKind kind = Objects.requireNonNull(
             job.getIntegrationKind(),
             "AgentJob.integrationKind must not be null"
@@ -91,7 +82,6 @@ class DiffNotePoster {
 
         List<InlineFeedbackChannel.InlineFeedback> observations = mapObservations(
             diffNotes == null ? List.of() : diffNotes,
-            appendSettingsNotice,
             packageId
         );
 
@@ -140,7 +130,6 @@ class DiffNotePoster {
 
     private List<InlineFeedbackChannel.InlineFeedback> mapObservations(
         List<DiffNote> diffNotes,
-        boolean appendSettingsNotice,
         @Nullable UUID packageId
     ) {
         List<InlineFeedbackChannel.InlineFeedback> observations = new ArrayList<>(diffNotes.size());
@@ -159,7 +148,7 @@ class DiffNotePoster {
             observations.add(
                 new InlineFeedbackChannel.InlineFeedback(
                     anchor,
-                    appendSettingsNotice ? commentFormatter.appendSettingsNotice(sanitized) : sanitized,
+                    commentFormatter.appendInlineFeedbackPrompt(sanitized),
                     packageId == null ? HEPHAESTUS_MARKER : "<!-- hephaestus-approved-package:" + packageId + " -->",
                     packageId == null ? note.recurrenceKey() : "approved:" + packageId + ":" + index
                 )

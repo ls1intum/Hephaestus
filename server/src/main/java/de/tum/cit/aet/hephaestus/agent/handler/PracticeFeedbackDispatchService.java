@@ -46,6 +46,7 @@ class PracticeFeedbackDispatchService {
     private final FeedbackRepository feedbackRepository;
     private final DiffNotePoster diffNotePoster;
     private final FeedbackLedgerRecorder ledgerRecorder;
+    private final PracticeFeedbackCommentFormatter commentFormatter;
 
     PracticeFeedbackDispatchService(
         FeedbackDispatchRepository repository,
@@ -250,7 +251,13 @@ class PracticeFeedbackDispatchService {
                     repository.beginWrite(dispatch.getId(), dispatch.getWorkspaceId(), owner)
                 );
                 if (began == null || began != 1) return Result.inProgress();
-                summaryRef = java.util.Objects.requireNonNull(post(dispatch, job));
+                summaryRef = java.util.Objects.requireNonNull(
+                    commentPoster.postApprovedProposal(
+                        job,
+                        dispatch.approvedFeedbackId(),
+                        commentFormatter.appendDisclosure(dispatch.getBody(), job)
+                    )
+                );
             }
 
             ledgerRecorder.recordApprovedPlacements(feedback, summaryRef, java.util.List.of());

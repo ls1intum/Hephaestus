@@ -66,6 +66,9 @@ class PracticeFeedbackDispatchServiceTest extends BaseUnitTest {
     @Mock
     private FeedbackLedgerRecorder ledgerRecorder;
 
+    @Mock
+    private PracticeFeedbackCommentFormatter commentFormatter;
+
     private PracticeFeedbackDispatchService service;
     private AgentJob job;
     private FeedbackDispatch dispatch;
@@ -81,8 +84,12 @@ class PracticeFeedbackDispatchServiceTest extends BaseUnitTest {
             JsonMapper.builder().build(),
             feedbackRepository,
             diffNotePoster,
-            ledgerRecorder
+            ledgerRecorder,
+            commentFormatter
         );
+        lenient()
+            .when(commentFormatter.appendDisclosure(anyString(), any()))
+            .thenAnswer(call -> call.getArgument(0));
         lenient()
             .doAnswer(invocation -> {
                 @SuppressWarnings("unchecked")
@@ -342,6 +349,7 @@ class PracticeFeedbackDispatchServiceTest extends BaseUnitTest {
 
         assertThat(result.status()).isEqualTo(PracticeFeedbackDispatchService.Result.Status.SENT);
         verify(repository).claim(any(), any(), anyString(), any(), any(Integer.class));
+        verify(commentFormatter).appendDisclosure("approved body", job);
         verify(diffNotePoster).reconcileApprovedInlineNotes(
             job,
             feedback.getId(),
