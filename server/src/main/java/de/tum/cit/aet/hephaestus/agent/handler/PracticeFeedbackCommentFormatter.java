@@ -40,6 +40,16 @@ class PracticeFeedbackCommentFormatter {
         return sb.toString();
     }
 
+    String appendInlineDisclosure(String sanitizedBody) {
+        var sb = new StringBuilder(sanitizedBody.length() + 220);
+        sb.append(sanitizedBody).append("\n\n");
+        sb
+            .append("<sub>AI-generated &middot; [Why you're seeing this and how to stop it](")
+            .append(preferencesUrl)
+            .append(")</sub>\n");
+        return sb.toString();
+    }
+
     private void appendWhyAndSettingsLink(StringBuilder sb) {
         sb.append("<sub>[Why you're seeing this and how to stop it](").append(preferencesUrl).append(")</sub>\n");
     }

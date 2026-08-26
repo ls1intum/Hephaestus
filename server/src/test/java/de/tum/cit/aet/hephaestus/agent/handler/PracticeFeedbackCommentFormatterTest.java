@@ -42,11 +42,11 @@ class PracticeFeedbackCommentFormatterTest extends BaseUnitTest {
     }
 
     @Test
-    void appendsDisclosureAndSettingsLinkToInlineComment() {
-        String result = formatter("https://hephaestus.example").appendDisclosure("Inline feedback", job());
+    void appendsDisclosureAndSettingsLink() {
+        String result = formatter("https://hephaestus.example").appendDisclosure("Approved feedback", job());
 
         assertThat(result)
-            .startsWith("Inline feedback\n\n")
+            .startsWith("Approved feedback\n\n")
             .contains(
                 "<sub>Practice review &middot; model&lt;&amp;&gt; &middot; AI-generated and can be inaccurate." +
                     " React with 👍 or 👎, or reply, to give feedback.</sub>"
@@ -54,6 +54,18 @@ class PracticeFeedbackCommentFormatterTest extends BaseUnitTest {
             .endsWith(
                 "<sub>[Why you're seeing this and how to stop it](https://hephaestus.example/settings#practice-feedback)</sub>\n"
             );
+    }
+
+    @Test
+    void appendsCompactDisclosureToInlineComment() {
+        String result = formatter("https://hephaestus.example").appendInlineDisclosure("Inline feedback");
+
+        assertThat(result).isEqualTo(
+            "Inline feedback\n\n" +
+                "<sub>AI-generated &middot; " +
+                "[Why you're seeing this and how to stop it]" +
+                "(https://hephaestus.example/settings#practice-feedback)</sub>\n"
+        );
     }
 
     private static PracticeFeedbackCommentFormatter formatter(String webappUrl) {

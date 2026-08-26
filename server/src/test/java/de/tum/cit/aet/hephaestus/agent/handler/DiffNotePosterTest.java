@@ -101,7 +101,8 @@ class DiffNotePosterTest extends BaseUnitTest {
         assertThat(anchor.filePath()).isEqualTo("src/A.java");
         assertThat(anchor.newLineNumber()).isEqualTo(14);
         assertThat(f.body())
-            .contains("AI-generated and can be inaccurate")
+            .contains("<sub>AI-generated &middot; ")
+            .doesNotContain("React with")
             .contains(
                 "[Why you're seeing this and how to stop it](https://hephaestus.example/settings#practice-feedback)"
             );
