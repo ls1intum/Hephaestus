@@ -1,5 +1,7 @@
 package de.tum.cit.aet.hephaestus.practices.review;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
 import de.tum.cit.aet.hephaestus.testconfig.WithAdminUser;
@@ -10,6 +12,9 @@ import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembership.WorkspaceRole;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -111,6 +116,35 @@ class PracticeReviewSettingsControllerIntegrationTest extends AbstractWorkspaceI
         patch(workspace.getWorkspaceSlug(), null, Map.of("deliverToMerged", true))
             .expectStatus()
             .isEqualTo(HttpStatus.PRECONDITION_REQUIRED);
+    }
+
+    @Test
+    @WithAdminUser
+    void concurrentChangesFromOneVersionHaveExactlyOneWinner() throws Exception {
+        Workspace workspace = setupWorkspace("review-concurrent");
+        String slug = workspace.getWorkspaceSlug();
+        String etag = currentEtag(slug);
+        CountDownLatch start = new CountDownLatch(1);
+
+        try (var executor = Executors.newFixedThreadPool(2)) {
+            var first = executor.submit(() -> patchAfter(start, slug, etag, Map.of("cooldownMinutes", 10)));
+            var second = executor.submit(() -> patchAfter(start, slug, etag, Map.of("cooldownMinutes", 20)));
+            start.countDown();
+
+            assertThat(
+                List.of(first.get(10, TimeUnit.SECONDS), second.get(10, TimeUnit.SECONDS))
+            ).containsExactlyInAnyOrder(HttpStatus.OK, HttpStatus.PRECONDITION_FAILED);
+        }
+    }
+
+    private HttpStatus patchAfter(CountDownLatch start, String slug, String etag, Map<String, Object> body) {
+        try {
+            if (!start.await(10, TimeUnit.SECONDS)) throw new IllegalStateException("concurrent PATCHes did not start");
+            return HttpStatus.valueOf(patch(slug, etag, body).returnResult(Void.class).getStatus().value());
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException(exception);
+        }
     }
 
     private String currentEtag(String slug) {
