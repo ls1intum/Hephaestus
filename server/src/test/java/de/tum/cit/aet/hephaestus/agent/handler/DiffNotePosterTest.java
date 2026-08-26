@@ -27,11 +27,6 @@ import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
-/**
- * Unit tests for the inline diff-note poster (DiffNote → InlineFeedback mapping + channel dispatch). Couples to
- * A1: a repo-relative anchor path flows through unchanged, and the (startLine, endLine) → (newLineNumber,
- * startLine) anchor swap is verified.
- */
 class DiffNotePosterTest extends BaseUnitTest {
 
     private static List<InlineFeedback> posted(RecordingChannel channel) {
@@ -57,7 +52,6 @@ class DiffNotePosterTest extends BaseUnitTest {
         return new FeedbackTarget(new IntegrationRef(IntegrationKind.GITLAB, 1L, null), "group/project!42", null);
     }
 
-    /** A recording channel that captures the observations it was asked to post (and whether clear was invoked). */
     private static final class RecordingChannel implements InlineFeedbackChannel {
 
         @Nullable
@@ -97,7 +91,6 @@ class DiffNotePosterTest extends BaseUnitTest {
     void multiLineNote_swapsToEndLineAnchorWithRangeStart_andCarriesRecurrenceKey() {
         RecordingChannel channel = new RecordingChannel();
         DiffNotePoster poster = poster(channel);
-        // endLine > startLine ⇒ multi-line: the anchor's newLineNumber is the END line, startLine the range start.
         DiffNote multi = new DiffNote("src/A.java", 10, 14, "Fix this range", "ck-multi");
 
         poster.reconcileInlineNotes(gitlabJob(), List.of(multi));
@@ -106,11 +99,11 @@ class DiffNotePosterTest extends BaseUnitTest {
         InlineFeedback f = channel.posted.get(0);
         FeedbackAnchor.DiffAnchor anchor = (FeedbackAnchor.DiffAnchor) f.anchor();
         assertThat(anchor.filePath()).isEqualTo("src/A.java");
-        assertThat(anchor.newLineNumber()).isEqualTo(14); // end line
-        assertThat(f.body()).contains(
-            "[Manage comments and Slack reminders](https://hephaestus.example/settings#practice-feedback)"
-        );
-        assertThat(anchor.startLine()).isEqualTo(10); // range start
+        assertThat(anchor.newLineNumber()).isEqualTo(14);
+        assertThat(f.body())
+            .contains("<sub>AI-generated &middot; React with 👍 or 👎, or reply, to give feedback.</sub>")
+            .doesNotContain("Why you're seeing this");
+        assertThat(anchor.startLine()).isEqualTo(10);
         assertThat(f.recurrenceKey()).isEqualTo("ck-multi");
     }
 
@@ -131,14 +124,13 @@ class DiffNotePosterTest extends BaseUnitTest {
     void blankBodyNote_isSkipped_andClearsStaleWhenAllBlank() {
         RecordingChannel channel = new RecordingChannel();
         DiffNotePoster poster = poster(channel);
-        // A body that sanitizes to blank yields no observation → the all-empty path clears stale notes instead.
         DiffNote blank = new DiffNote("src/A.java", 10, null, "   ", "ck-blank");
 
         DiffNotePoster.DiffNoteResult result = poster.reconcileInlineNotes(gitlabJob(), List.of(blank));
 
         assertThat(result.posted()).isZero();
-        assertThat(channel.posted).isNull(); // postInlineFeedback never invoked
-        assertThat(channel.cleared).isTrue(); // stale-clear path taken
+        assertThat(channel.posted).isNull();
+        assertThat(channel.cleared).isTrue();
     }
 
     @Test
@@ -165,8 +157,6 @@ class DiffNotePosterTest extends BaseUnitTest {
 
     @Test
     void repoRelativeAnchorPath_flowsThroughUnchanged() {
-        // A1 coupling: the poster does not mutate the anchor path — the repo-relativisation must already have
-        // happened upstream in DeliveryComposer. A repo-relative path arrives and is posted verbatim.
         RecordingChannel channel = new RecordingChannel();
         DiffNotePoster poster = poster(channel);
         DiffNote note = new DiffNote("src/components/Button.tsx", 1, null, "Remove unused import", "ck-1");

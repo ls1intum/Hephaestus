@@ -32,6 +32,7 @@ class ApprovedFeedbackDeliveryListener {
     private final AgentJobRepository agentJobRepository;
     private final PracticeFeedbackDeliveryPolicy deliveryPolicy;
     private final PullRequestCommentPoster commentPoster;
+    private final PracticeFeedbackCommentFormatter commentFormatter;
     private final FeedbackApprovalEligibility approvalEligibility;
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
@@ -114,7 +115,11 @@ class ApprovedFeedbackDeliveryListener {
         }
         if (existing.kind() == ExistingDeliveryLookup.Kind.ABSENT) {
             try {
-                commentPoster.postApprovedProposal(job, feedback.getId(), feedback.getBody());
+                commentPoster.postApprovedProposal(
+                    job,
+                    feedback.getId(),
+                    commentFormatter.appendDisclosure(safeBody, job)
+                );
             } catch (JobDeliverySuppressedException exception) {
                 feedbackRepository.markApprovedSuppressed(
                     event.workspaceId(),

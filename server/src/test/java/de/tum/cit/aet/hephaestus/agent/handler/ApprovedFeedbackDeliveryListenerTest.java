@@ -7,6 +7,7 @@ import de.tum.cit.aet.hephaestus.agent.handler.spi.ExistingDeliveryLookup;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliverySuppressedException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
+import de.tum.cit.aet.hephaestus.config.ApplicationProperties;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
@@ -44,6 +45,7 @@ class ApprovedFeedbackDeliveryListenerTest {
             mock(AgentJobRepository.class),
             mock(PracticeFeedbackDeliveryPolicy.class),
             mock(PullRequestCommentPoster.class),
+            formatter(),
             eligibility
         ).deliver(new ApprovedFeedbackReadyEvent(7L, feedbackId));
 
@@ -73,6 +75,7 @@ class ApprovedFeedbackDeliveryListenerTest {
             jobRepository,
             policy,
             poster,
+            formatter(),
             eligible()
         ).deliver(new ApprovedFeedbackReadyEvent(7L, feedbackId));
 
@@ -99,7 +102,7 @@ class ApprovedFeedbackDeliveryListenerTest {
         when(poster.findApprovedProposal(job, feedbackId)).thenReturn(ExistingDeliveryLookup.absent());
         doThrow(new JobDeliverySuppressedException("silent", new RuntimeException("silent")))
             .when(poster)
-            .postApprovedProposal(job, feedbackId, "Exact proposal");
+            .postApprovedProposal(eq(job), eq(feedbackId), contains("AI-generated and can be inaccurate"));
 
         new ApprovedFeedbackDeliveryListener(
             feedbackRepository,
@@ -107,6 +110,7 @@ class ApprovedFeedbackDeliveryListenerTest {
             jobRepository,
             policy,
             poster,
+            formatter(),
             eligible()
         ).deliver(new ApprovedFeedbackReadyEvent(7L, feedbackId));
 
@@ -139,10 +143,11 @@ class ApprovedFeedbackDeliveryListenerTest {
             jobRepository,
             policy,
             poster,
+            formatter(),
             eligible()
         ).deliver(new ApprovedFeedbackReadyEvent(7L, feedbackId));
 
-        verify(poster).postApprovedProposal(job, feedbackId, "Exact proposal");
+        verify(poster).postApprovedProposal(eq(job), eq(feedbackId), contains("AI-generated and can be inaccurate"));
         verify(feedbackRepository).markApprovedDelivered(7L, feedbackId);
     }
 
@@ -171,6 +176,7 @@ class ApprovedFeedbackDeliveryListenerTest {
             jobRepository,
             policy,
             poster,
+            formatter(),
             eligible()
         ).deliver(new ApprovedFeedbackReadyEvent(7L, feedbackId));
 
@@ -204,6 +210,7 @@ class ApprovedFeedbackDeliveryListenerTest {
             jobRepository,
             policy,
             poster,
+            formatter(),
             eligible()
         ).deliver(new ApprovedFeedbackReadyEvent(7L, feedbackId));
 
@@ -237,6 +244,7 @@ class ApprovedFeedbackDeliveryListenerTest {
             jobRepository,
             policy,
             poster,
+            formatter(),
             eligible()
         ).deliver(new ApprovedFeedbackReadyEvent(7L, feedbackId));
 
@@ -268,6 +276,7 @@ class ApprovedFeedbackDeliveryListenerTest {
             jobRepository,
             policy,
             poster,
+            formatter(),
             eligible()
         ).deliver(new ApprovedFeedbackReadyEvent(7L, feedbackId));
 
@@ -302,6 +311,7 @@ class ApprovedFeedbackDeliveryListenerTest {
             jobRepository,
             policy,
             poster,
+            formatter(),
             eligible()
         ).deliver(new ApprovedFeedbackReadyEvent(7L, feedbackId));
 
@@ -311,6 +321,12 @@ class ApprovedFeedbackDeliveryListenerTest {
             FeedbackSuppressionReason.APPROVAL_STALE.name()
         );
         verifyNoInteractions(jobRepository, policy, poster);
+    }
+
+    private static PracticeFeedbackCommentFormatter formatter() {
+        return new PracticeFeedbackCommentFormatter(
+            new ApplicationProperties(null, new ApplicationProperties.Webapp("https://hephaestus.example"))
+        );
     }
 
     private static void approve(FeedbackApprovalRepository repository, Feedback feedback) {
