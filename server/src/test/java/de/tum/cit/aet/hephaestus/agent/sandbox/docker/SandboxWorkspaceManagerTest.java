@@ -57,19 +57,20 @@ class SandboxWorkspaceManagerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("emits work/ ancestor dirs as uid-1000 (writable) and leaves inputs/ to root auto-create")
-        void shouldMakeWorkRegionWritableButNotInputs() throws IOException {
-            // ADR 0020: read-only vs writable by LOCATION. The agent + precompute write under work/ as the
-            // container uid (1000); a root-owned work/ (Docker's default for auto-created intermediate dirs)
-            // would deny `mkdir -p work/precompute-out` and scratch writes. inputs/ must stay root (RO).
+        @DisplayName("applies workspace region permissions")
+        void shouldApplyDirectoryPermissions() throws IOException {
             Map<String, byte[]> files = new HashMap<>();
             files.put("inputs/context/diff.patch", "d".getBytes());
+            files.put(".pi/settings.json", "{}".getBytes());
+            files.put(".sessions/thread.jsonl", "{}".getBytes());
+            files.put("out/.gitkeep", new byte[0]);
             files.put("work/analysis/practices/.gitkeep", new byte[0]);
             files.put("work/precompute/practices/foo.ts", "x".getBytes());
 
-            // The archive stream is closed and its temp file deleted before injectFiles returns, so it
-            // must be drained inside the call — exactly as docker-java does in production.
             Map<String, Long> dirUid = new HashMap<>();
+            Map<String, Integer> dirMode = new HashMap<>();
+            Map<String, Long> fileUid = new HashMap<>();
+            Map<String, Integer> fileMode = new HashMap<>();
             doAnswer(invocation -> {
                 try (
                     var tis = new org.apache.commons.compress.archivers.tar.TarArchiveInputStream(
@@ -80,6 +81,10 @@ class SandboxWorkspaceManagerTest extends BaseUnitTest {
                     while ((e = tis.getNextEntry()) != null) {
                         if (e.isDirectory()) {
                             dirUid.put(e.getName(), e.getLongUserId());
+                            dirMode.put(e.getName(), e.getMode());
+                        } else {
+                            fileUid.put(e.getName(), e.getLongUserId());
+                            fileMode.put(e.getName(), e.getMode());
                         }
                     }
                 }
@@ -90,18 +95,35 @@ class SandboxWorkspaceManagerTest extends BaseUnitTest {
 
             manager.injectFiles(CONTAINER_ID, files);
 
-            // Every work/ ancestor is pre-created and owned by the container uid.
-            assertThat(dirUid).containsKeys(
-                "work/",
-                "work/analysis/",
-                "work/analysis/practices/",
-                "work/precompute/",
-                "work/precompute/practices/"
-            );
-            assertThat(dirUid.values()).allMatch(uid -> uid == 1000L);
-            // inputs/ dirs are deliberately NOT emitted — Docker auto-creates them as root, which IS the
-            // read-only guarantee (uid 1000 cannot create files in a root-owned directory).
-            assertThat(dirUid).doesNotContainKey("inputs/").doesNotContainKey("inputs/context/");
+            assertThat(dirUid)
+                .containsEntry(".pi/", 1000L)
+                .containsEntry(".sessions/", 1000L)
+                .containsEntry("out/", 1000L)
+                .containsEntry("inputs/", 0L)
+                .containsEntry("inputs/context/", 0L)
+                .containsEntry("work/", 1000L)
+                .containsEntry("work/analysis/", 1000L)
+                .containsEntry("work/analysis/practices/", 1000L)
+                .containsEntry("work/precompute/", 1000L)
+                .containsEntry("work/precompute/practices/", 1000L);
+            assertThat(dirMode)
+                .containsEntry(".pi/", 0755)
+                .containsEntry(".sessions/", 0755)
+                .containsEntry("out/", 0755)
+                .containsEntry("inputs/context/", 0555)
+                .containsEntry("work/analysis/", 0755);
+            assertThat(fileUid)
+                .containsEntry("inputs/context/diff.patch", 0L)
+                .containsEntry(".pi/settings.json", 1000L)
+                .containsEntry(".sessions/thread.jsonl", 1000L)
+                .containsEntry("out/.gitkeep", 1000L)
+                .containsEntry("work/analysis/practices/.gitkeep", 1000L);
+            assertThat(fileMode)
+                .containsEntry("inputs/context/diff.patch", 0444)
+                .containsEntry(".pi/settings.json", 0644)
+                .containsEntry(".sessions/thread.jsonl", 0644)
+                .containsEntry("out/.gitkeep", 0644)
+                .containsEntry("work/analysis/practices/.gitkeep", 0644);
         }
 
         @Test

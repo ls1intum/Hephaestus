@@ -403,18 +403,15 @@ public class SandboxWorkspaceManager {
             tar.setLongFileMode(TarArchiveOutputStream.LONGFILE_POSIX);
             tar.setBigNumberMode(TarArchiveOutputStream.BIGNUMBER_POSIX);
 
-            // Writable-region directories must be emitted explicitly as uid-1000 entries. Docker's tar
-            // extractor auto-creates intermediate dirs as root (uid 0), which is correct for the read-only
-            // inputs/ subtree but breaks work/ (ADR 0020): the precompute step does `mkdir -p work/
-            // precompute-out` and the agent uses work/ as scratch, both as uid 1000 — a root-owned work/
-            // would deny those writes. We therefore pre-create every work/* ancestor owned by 1000.
             Set<String> allPaths = new LinkedHashSet<>(files.keySet());
             allPaths.addAll(filesOnDisk.keySet());
-            for (String dir : writableAncestorDirs(allPaths)) {
+            for (String dir : ancestorDirs(allPaths)) {
                 TarArchiveEntry dirEntry = new TarArchiveEntry(dir + "/");
                 dirEntry.setModTime(System.currentTimeMillis());
-                dirEntry.setUserId(1000);
-                dirEntry.setGroupId(1000);
+                boolean writable = isWritableRegion(dir + "/");
+                dirEntry.setUserId(writable ? 1000 : 0);
+                dirEntry.setGroupId(writable ? 1000 : 0);
+                dirEntry.setMode(writable ? 0755 : 0555);
                 tar.putArchiveEntry(dirEntry);
                 tar.closeArchiveEntry();
             }
@@ -453,23 +450,25 @@ public class SandboxWorkspaceManager {
         TarArchiveEntry entry = new TarArchiveEntry(safePath);
         entry.setSize(size);
         entry.setModTime(System.currentTimeMillis());
-        entry.setUserId(1000);
-        entry.setGroupId(1000);
+        boolean writable = isWritableRegion(safePath);
+        entry.setUserId(writable ? 1000 : 0);
+        entry.setGroupId(writable ? 1000 : 0);
+        entry.setMode(writable ? 0644 : 0444);
         return entry;
     }
 
-    /**
-     * Every ancestor directory under the writable {@link SandboxLayout#WORK_PREFIX work/} region across
-     * all input keys, ordered parents-before-children (a {@link java.util.TreeSet} sorts a parent path
-     * ahead of its children because the parent is a string prefix). The read-only {@code inputs/} subtree
-     * is deliberately excluded — Docker auto-creates those as root, which is exactly the RO guarantee.
-     */
-    private static SortedSet<String> writableAncestorDirs(Set<String> keys) {
+    private static boolean isWritableRegion(String path) {
+        return (
+            path.startsWith(SandboxLayout.WORK_PREFIX) ||
+            path.startsWith(SandboxLayout.PI_AGENT_PREFIX) ||
+            path.startsWith(SandboxLayout.SESSIONS_DIR_PREFIX) ||
+            path.startsWith(SandboxLayout.OUTPUT_PREFIX)
+        );
+    }
+
+    private static SortedSet<String> ancestorDirs(Set<String> keys) {
         SortedSet<String> dirs = new TreeSet<>();
         for (String key : keys) {
-            if (!key.startsWith(SandboxLayout.WORK_PREFIX)) {
-                continue;
-            }
             for (int slash = key.indexOf('/'); slash >= 0; slash = key.indexOf('/', slash + 1)) {
                 dirs.add(key.substring(0, slash));
             }
