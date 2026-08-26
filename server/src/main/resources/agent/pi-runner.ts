@@ -165,6 +165,7 @@ function isAdmittedObservation(value: unknown): value is AdmittedObservation {
 
 // Overridable so a harness with no /workspace can drive the runner. Production never sets it.
 const WORKSPACE_ROOT = "/workspace";
+const EVIDENCE_TOOLS = ["read", "grep"] as const;
 const CWD = process.env.PI_RUNNER_CWD ?? WORKSPACE_ROOT;
 const OUTPUT = `${CWD}/out`;
 const RESULT_PATH = `${OUTPUT}/result.json`;
@@ -1699,7 +1700,7 @@ async function main() {
 				const { session: parentSession } = await createAgentSession({
 					cwd: CWD,
 					agentDir: AGENT_DIR,
-					tools: ["read", "bash", "grep"],
+					tools: [...EVIDENCE_TOOLS],
 					customTools: [],
 					sessionManager: manager,
 					settingsManager,
@@ -1762,7 +1763,7 @@ async function main() {
 			const { session: observerSession } = await createAgentSession({
 				cwd: CWD,
 				agentDir: AGENT_DIR,
-				tools: ["read", "grep", "report_observation"],
+				tools: [...EVIDENCE_TOOLS, "report_observation"],
 				customTools: [scopedTool],
 				sessionManager: manager,
 				settingsManager,
@@ -1876,7 +1877,7 @@ async function main() {
 			const { session: retrySession } = await createAgentSession({
 				cwd: CWD,
 				agentDir: AGENT_DIR,
-				tools: ["read", "grep", "report_observation"],
+				tools: [...EVIDENCE_TOOLS, "report_observation"],
 				customTools: [retryTool],
 				sessionManager: SessionManager.inMemory(),
 				settingsManager,
