@@ -23,7 +23,8 @@ export function PracticeFeedbackSection({
 					Practice feedback
 				</h2>
 				<p className="text-sm text-muted-foreground">
-					Control new comments on work you author and related Slack reminders.
+					Your workspace can deliver AI-generated practice feedback on work you author and send
+					related Slack reminders. You can turn these messages off below.
 				</p>
 			</div>
 
@@ -31,9 +32,9 @@ export function PracticeFeedbackSection({
 				<FieldContent>
 					<FieldLabel htmlFor="practice-feedback-delivery">Comments and Slack reminders</FieldLabel>
 					<FieldDescription>
-						When off, Hephaestus won't post new practice-feedback comments on issues, pull requests,
-						or merge requests you author or send related Slack reminders. Reviews still run,
-						observations remain stored, and workspace admins can still view them.
+						Turn this off to stop new comments on issues, pull requests, and merge requests you
+						author, and related Slack reminders. Reviews still run, and workspace admins can still
+						see the resulting observations.
 					</FieldDescription>
 				</FieldContent>
 				<Switch

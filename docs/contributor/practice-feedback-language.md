@@ -59,17 +59,9 @@ A column that counts per row is headed **Feedback** and the cell holds the numbe
 needs a singular subject, name what the feedback is *about* — "the feedback for this observation", not
 "the message for this observation".
 
-**Say what happens, not who does it.** On a practice surface, and in the footer of a delivered review
-comment, the subject is the operation and its results — *a practice review*, *a review*, *feedback*, *an
-observation* — not the application performing them. "What a review does on its own", not "What Hephaestus
-does on its own"; "Practice review", not "Hephaestus Agent". Two reasons, and both outlive the current copy:
-the product name adds a second voice to a screen that is already inside the product (and, on a provider, the
-bot account the comment is posted under has already attributed it), and reaching for a name for the doer is
-exactly what pulls a writer towards *agent*, the word this vocabulary bans. **Hephaestus** stays the right
-word where the application itself is the subject — installing it, linking an account to it, a release of it,
-and in the compound terms **Hephaestus default** and **No Hephaestus default** — and it is still the actor a
-contributor doc names when explaining what the system does. This rule is about the surfaces a developer or a
-workspace administrator reads.
+**Say what happens, not who does it.** On practice-review surfaces, use *practice review*, *review*,
+*feedback*, or *observation* as the subject. Use **Hephaestus** when the application itself is the subject,
+such as installation, account linking, or releases. Do not call the application or a review an *agent*.
 
 **All three channel names say where the feedback lands, and nothing else.** `IN_CONTEXT` lands on the work
 itself — a pull request summary or inline note, an issue comment. `IN_CHAT` lands in a turn of a

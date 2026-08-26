@@ -28,26 +28,22 @@ class PracticeFeedbackCommentFormatter {
         sb.append(sanitizedBody).append("\n\n");
         sb.append("---\n");
         appendMetadataFooter(sb, job);
-        appendDeliverySettingsLink(sb);
+        appendWhyAndSettingsLink(sb);
         return sb.toString();
     }
 
-    String appendSettingsNotice(String sanitizedBody) {
-        var sb = new StringBuilder(sanitizedBody.length() + 180);
+    String appendDisclosure(String sanitizedBody, AgentJob job) {
+        var sb = new StringBuilder(sanitizedBody.length() + 420);
         sb.append(sanitizedBody).append("\n\n");
-        appendDeliverySettingsLink(sb);
+        appendMetadataFooter(sb, job);
+        appendWhyAndSettingsLink(sb);
         return sb.toString();
     }
 
-    private void appendDeliverySettingsLink(StringBuilder sb) {
-        sb.append("<sub>[Manage comments and Slack reminders](").append(preferencesUrl).append(")</sub>\n");
+    private void appendWhyAndSettingsLink(StringBuilder sb) {
+        sb.append("<sub>[Why you're seeing this and how to stop it](").append(preferencesUrl).append(")</sub>\n");
     }
 
-    /**
-     * The footer names what produced the comment — a practice review — not who ran it. The bot account the
-     * comment is posted under already attributes the application on the provider, so repeating the product
-     * name here only adds a second voice; and "agent" is the word the practice vocabulary bans for it.
-     */
     private static void appendMetadataFooter(StringBuilder sb, AgentJob job) {
         sb.append("<sub>Practice review");
 
