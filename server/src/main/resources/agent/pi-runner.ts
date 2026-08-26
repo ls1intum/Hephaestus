@@ -1731,8 +1731,8 @@ async function main() {
 						),
 						parentDeadline.elapsed,
 					]);
-					const checkpointEntryId = manager.getLeafId();
-					const seedSessionFile = manager.getSessionFile();
+					const checkpointEntryId = parentSession.sessionManager.getLeafId();
+					const seedSessionFile = parentSession.sessionManager.getSessionFile();
 					if (!checkpointEntryId || !seedSessionFile)
 						throw new Error("reconnaissance produced no persistent checkpoint");
 					return forkPracticeSessions({
