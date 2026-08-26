@@ -97,8 +97,8 @@ Two consequences to plan for:
   deliberately not failed, because one of its provider objects may be live, and remains uncertain until
   provider lookup can confirm the outcome.
 
-Do not mutate dispatch rows manually. Their state, write fence, attempt count, next-attempt time and lease
-owner jointly prevent an uncertain provider outcome from becoming a duplicate write.
+Do not repair an `UNCERTAIN` dispatch by editing its row. Restore provider lookup instead; the state, write
+fence, retry count, and lease together prevent duplicate provider writes.
 
 ## Limits you should know about
 

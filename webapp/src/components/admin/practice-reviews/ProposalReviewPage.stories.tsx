@@ -62,7 +62,7 @@ export const Ready: Story = {
 				name: firstObservation.summary,
 			}),
 		).toBeVisible();
-		await userEvent.click(canvas.getByRole("button", { name: "Approve and send review" }));
+		await userEvent.click(canvas.getByRole("button", { name: "Approve for delivery" }));
 		await expect(args.onApprove).toHaveBeenCalledWith(feedback.id);
 		await expectNoPageOverflow();
 	},
@@ -72,7 +72,7 @@ export const PackageUnavailable: Story = {
 	args: { feedback: { ...feedback, proposedPlacements: [] } },
 	play: async ({ canvas }) => {
 		await expect(canvas.getByRole("alert")).toHaveTextContent("This review package is unavailable");
-		await expectGenuinelyDisabled(canvas.getByRole("button", { name: "Approve and send review" }));
+		await expectGenuinelyDisabled(canvas.getByRole("button", { name: "Approve for delivery" }));
 		await expect(canvas.getByRole("button", { name: "Reject feedback" })).toBeEnabled();
 	},
 };
@@ -81,7 +81,7 @@ export const NoObservations: Story = {
 	args: { feedback: { ...feedback, observations: [] } },
 	play: async ({ canvas }) => {
 		await expect(canvas.getByText("No observations are linked to this review")).toBeVisible();
-		await expect(canvas.getByRole("button", { name: "Approve and send review" })).toBeEnabled();
+		await expect(canvas.getByRole("button", { name: "Approve for delivery" })).toBeEnabled();
 	},
 };
 
@@ -106,7 +106,7 @@ export const RejectingWithContext: Story = {
 export const Deciding: Story = {
 	args: { isDeciding: true },
 	play: async ({ canvas }) => {
-		await expectGenuinelyDisabled(canvas.getByRole("button", { name: /Approve and send/ }));
+		await expectGenuinelyDisabled(canvas.getByRole("button", { name: "Approve for delivery" }));
 		await expectGenuinelyDisabled(canvas.getByRole("button", { name: "Reject feedback" }));
 	},
 };

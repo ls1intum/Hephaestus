@@ -45,8 +45,7 @@ export type WorkspaceTeamRepositorySettings = {
 };
 
 /**
- * The work a workspace reviews. Under a <code>SELECTED</code> mode an empty list admits nobody, never
- * everybody; a selected repository with no branches admits every branch of it.
+ * Selecting specific repositories or people with an empty selection admits nobody. A selected repository without branches admits all its branches.
  */
 export type WorkspaceReviewScope = {
     personMode: 'ALL_ELIGIBLE' | 'SELECTED';
@@ -3245,7 +3244,7 @@ export type PracticeReviewCoverageSummary = {
      */
     monitoredRepositories: number;
     /**
-     * Workspace-wide completed review jobs during the estimate window
+     * Workspace-wide practice-review jobs created during the estimate window
      */
     recentReviewVolume: number;
 };

@@ -96,7 +96,7 @@ export const Delivered: Story = {
 export const PartiallyDelivered: Story = {
 	args: { state: { status: "ready", feedback: partiallyDeliveredFeedback } },
 	play: async ({ canvas }) => {
-		await canvas.findByText("1 of 2 provider comments recorded");
+		await canvas.findByText("1 of 2 comments confirmed delivered");
 		canvas.getByText("Human decision");
 		canvas.getByText("Approved");
 		await expectNoPageOverflow();
@@ -111,7 +111,7 @@ export const Rejected: Story = {
 		await expect(within(audit).getByText("Rejected")).toBeVisible();
 		within(audit).getByText("Missing important context");
 		within(audit).getByText("The review did not account for the provider's retry contract.");
-		await expect(canvas.queryByText(/provider comments recorded/)).not.toBeInTheDocument();
+		await expect(canvas.queryByText(/comments confirmed delivered/)).not.toBeInTheDocument();
 	},
 };
 

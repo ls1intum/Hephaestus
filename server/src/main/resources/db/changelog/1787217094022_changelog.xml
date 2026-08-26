@@ -51,7 +51,7 @@
                AND (jsonb_array_length(COALESCE(practice_review_scope -> 'repositories', '[]'::jsonb)) > 0
                     OR jsonb_array_length(COALESCE(practice_review_scope -> 'targetBranches', '[]'::jsonb)) > 0);
 
-            -- One branch list covered the whole workspace, so every selected repository inherits it.
+            -- The source scope has one workspace-wide branch list; copy it to each selected repository.
             INSERT INTO practice_review_repository_target (workspace_id, repository_monitor_id, base_branches)
             SELECT w.id, r.id, COALESCE(w.practice_review_scope -> 'targetBranches', '[]'::jsonb)
               FROM workspace w
@@ -97,7 +97,7 @@
             <column name="practice_rollout_revision" type="BIGINT" defaultValueNumeric="0"><constraints nullable="false"/></column>
             <column name="practice_trigger_mode" type="VARCHAR(24)" defaultValue="MANUAL"><constraints nullable="false"/></column>
         </addColumn>
-        <!-- Existing active and completed work predates an operator-chosen rollout revision and must fail stale. -->
+        <!-- The -1 sentinel makes pre-migration review jobs fail the delivery-time rollout-revision check. -->
         <sql>UPDATE agent_job SET practice_rollout_revision = -1 WHERE status IN ('QUEUED', 'RUNNING', 'COMPLETED');</sql>
         <sql>ALTER TABLE agent_job ADD CONSTRAINT chk_agent_job_practice_trigger_mode CHECK (practice_trigger_mode IN ('AUTO', 'MANUAL'));</sql>
         <rollback>

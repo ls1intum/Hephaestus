@@ -7,12 +7,12 @@ export const APPROVAL_DECISION_DEFS = {
 		label: "Approved",
 		icon: CheckCircle2Icon,
 		badgeVariant: "success",
-		description: "An authorized workspace reviewer approved the exact package.",
+		description: "A workspace owner or admin approved the exact package.",
 	},
 	REJECTED: {
 		label: "Rejected",
 		icon: CircleXIcon,
 		badgeVariant: "destructive",
-		description: "An authorized workspace reviewer rejected the exact package.",
+		description: "A workspace owner or admin rejected the exact package.",
 	},
 } satisfies StatusDefs<NonNullable<FeedbackApproval["decision"]>>;

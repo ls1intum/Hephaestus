@@ -77,7 +77,7 @@ export const WITHHOLDING_REASON_DEFS: Record<WithholdingReason, string> = {
 	WORKSPACE_DISABLED: "Practice feedback is not enabled for this workspace.",
 	WORKSPACE_DELIVERY_PAUSED: "External practice feedback is paused for this workspace.",
 	STALE_ROLLOUT_REVISION:
-		"Review settings changed after this work was admitted, so its feedback cannot be released.",
+		"Review settings changed after this review started, so its feedback was not sent.",
 	OUTSIDE_CURRENT_COVERAGE:
 		"The author, repository, or base branch is no longer covered by practice review.",
 	APPROVAL_STALE:

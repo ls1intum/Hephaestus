@@ -35,10 +35,9 @@ export function DeliveryPolicyTrace({ evaluations }: DeliveryPolicyTraceProps) {
 
 	return (
 		<section className="min-w-0 rounded-lg border bg-card p-4 text-sm">
-			<h4 className="font-medium">Technical delivery policy trace</h4>
+			<h4 className="font-medium">Delivery policy trace</h4>
 			<p className="mt-1 text-xs text-muted-foreground">
-				Open an evaluation to inspect its ordered checks. After a denial, later checks are not
-				reached.
+				Checks run in order. After a denial, later checks are not reached.
 			</p>
 			<Accordion multiple className="mt-3">
 				{evaluations.map((evaluation, index) => {
@@ -66,9 +65,7 @@ export function DeliveryPolicyTrace({ evaluations }: DeliveryPolicyTraceProps) {
 							</AccordionTrigger>
 							<AccordionContent className="min-w-0 space-y-2 pb-4">
 								{evaluation.decisiveReason && (
-									<p className="text-xs">
-										Stopped here. {DELIVERY_REASON_SENTENCES[evaluation.decisiveReason]}
-									</p>
+									<p className="text-xs">{DELIVERY_REASON_SENTENCES[evaluation.decisiveReason]}</p>
 								)}
 								<p className="min-w-0 break-words text-xs text-muted-foreground">
 									{scopeSentence(evaluation.facts)}

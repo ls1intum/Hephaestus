@@ -200,8 +200,7 @@ class ProductionSchemaContractIntegrationTest {
     }
 
     @Test
-    @DisplayName("The coverage-mode columns refuse a mode the vocabulary does not have")
-    void coverageModeColumnsRefuseAnythingOutsideTheirVocabulary() {
+    void shouldRejectUnknownCoverageModes() {
         long workspaceId = insertWorkspace("coverage-mode-check");
 
         assertThatCode(() -> setCoverageMode(workspaceId, "practice_repository_coverage_mode", "SELECTED"))
@@ -233,8 +232,7 @@ class ProductionSchemaContractIntegrationTest {
 
     @ParameterizedTest
     @MethodSource("invalidBaseBranches")
-    @DisplayName("A covered repository's base branches must be short strings in an array")
-    void baseBranchesRefusesMalformedValues(String branches) {
+    void shouldRejectMalformedBaseBranches(String branches) {
         long workspaceId = insertWorkspace("base-branches-" + UUID.randomUUID());
         Long monitorId = jdbcTemplate.queryForObject(
             "INSERT INTO repository_to_monitor (workspace_id, name_with_owner) VALUES (?, ?) RETURNING id",
@@ -322,8 +320,7 @@ class ProductionSchemaContractIntegrationTest {
 
     @ParameterizedTest
     @MethodSource("invalidDispatchStates")
-    @DisplayName("Dispatch state fields cannot contradict one another")
-    void feedbackDispatchRefusesContradictoryState(String assignment, String constraint) {
+    void shouldRejectContradictoryDispatchState(String assignment, String constraint) {
         UUID dispatchId = insertDispatch("invalid-dispatch-" + UUID.randomUUID());
 
         assertThatThrownBy(() ->

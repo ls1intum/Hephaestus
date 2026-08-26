@@ -32,6 +32,7 @@ import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -355,19 +356,7 @@ class PracticeFeedbackDispatchServiceTest extends BaseUnitTest {
 
     @Test
     void oneDispatchLeaseOwnsTheExactApprovedPackage() {
-        Feedback feedback = Feedback.builder()
-            .id(UUID.randomUUID())
-            .workspaceId(7L)
-            .body("approved body")
-            .proposedPlacements(
-                new java.util.ArrayList<>(
-                    List.of(
-                        ProposedPlacement.summary("approved body"),
-                        ProposedPlacement.inline("exact inline", "src/Review.java", 12, null, "old-key")
-                    )
-                )
-            )
-            .build();
+        Feedback feedback = approvedFeedback();
         FeedbackDispatch approved = dispatch(FeedbackDispatchState.PENDING, feedback.getId());
         when(repository.findByDestinationKeyAndWorkspaceId("approved:" + feedback.getId(), 7L)).thenReturn(
             Optional.of(approved)
@@ -399,19 +388,7 @@ class PracticeFeedbackDispatchServiceTest extends BaseUnitTest {
 
     @Test
     void incompleteApprovedPackageReusesItsSummaryDuringRecovery() {
-        Feedback feedback = Feedback.builder()
-            .id(UUID.randomUUID())
-            .workspaceId(7L)
-            .body("approved body")
-            .proposedPlacements(
-                new java.util.ArrayList<>(
-                    List.of(
-                        ProposedPlacement.summary("approved body"),
-                        ProposedPlacement.inline("exact inline", "src/Review.java", 12, null, "old-key")
-                    )
-                )
-            )
-            .build();
+        Feedback feedback = approvedFeedback();
         FeedbackDispatch initial = approvedDispatch(FeedbackDispatchState.PENDING, feedback.getId(), false, null, 0);
         FeedbackDispatch recovering = approvedDispatch(
             FeedbackDispatchState.UNCERTAIN,
@@ -467,6 +444,22 @@ class PracticeFeedbackDispatchServiceTest extends BaseUnitTest {
 
     private FeedbackDispatch dispatch(FeedbackDispatchState state, UUID feedbackId) {
         return approvedDispatch(state, feedbackId, false, null, 0);
+    }
+
+    private static Feedback approvedFeedback() {
+        return Feedback.builder()
+            .id(UUID.randomUUID())
+            .workspaceId(7L)
+            .body("approved body")
+            .proposedPlacements(
+                new ArrayList<>(
+                    List.of(
+                        ProposedPlacement.summary("approved body"),
+                        ProposedPlacement.inline("exact inline", "src/Review.java", 12, null, "old-key")
+                    )
+                )
+            )
+            .build();
     }
 
     private FeedbackDispatch approvedDispatch(

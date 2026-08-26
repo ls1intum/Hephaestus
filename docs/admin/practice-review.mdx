@@ -23,7 +23,7 @@ Use this short path before tuning coverage, campaigns, or per-practice overrides
    If it does not, fix ingestion first; practice-review settings cannot make missing work appear.
 2. Under **AI models**, assign a ready model to practice reviews.
 3. On **Practices → Review → When and where**, turn on **Start practice reviews**, then turn on at least
-   one way in under **How reviews start** — **Reviews the work starts**, **Reviews somebody asks for**, or
+   one way in under **How reviews start** — **Start from work activity**, **Start requested reviews**, or
    both. The screen says *"Nothing can start a review"* when both are off.
 4. On **Practices → Review → How much**, set the **Workspace default** to **Review before sending** for the
    first test. Back on **When and where**, keep coverage at **All monitored repositories** and **All
@@ -106,12 +106,12 @@ All five spend from the workspace's AI budget.
 | ---------------------------------------------------------- | ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
 | Live event                                                 | Nobody — it is automatic, per the practices' occasions                                    | The per-workspace cooldown between reviews of the same work     |
 | `/hephaestus review` in a **GitLab merge request** comment | The work's author or assignees, or a workspace admin                                      | Per-person hourly allowance, **and** the same per-work cooldown |
-| **Review this now** on Review activity                     | The same people. Every member sees the button; anyone else is refused with a toast saying so | Per-person hourly allowance, **and** the same per-work cooldown |
+| **Review this now** on Review activity                     | The same people. Every member sees the button; unauthorized requests are refused            | Per-person hourly allowance, **and** the same per-work cooldown |
 | **Past work** campaign                                     | A workspace admin, and only after confirming a priced estimate                            | Bounded by the campaign's own scope                             |
 | **Keep checking new work** schedule                        | A workspace admin                                                                         | One campaign at a time per workspace                            |
 
-Two switches sit in front of the whole table. **Reviews the work starts** governs the first row;
-**Reviews somebody asks for** governs the other four together, so turning it off silently stops the button,
+Two switches sit in front of the whole table. **Start from work activity** governs the first row;
+**Start requested reviews** governs the other four together, so turning it off stops the button,
 the comment command, campaigns and schedules at once.
 
 Every door goes through coverage. Asking by hand does not widen it: a review requested on work whose author
@@ -150,15 +150,15 @@ Three independent controls answer different questions; confusing them is the mos
   does not blank the developer's own feedback pages here, which are not something leaving. Pausing is the
   immediate workspace brake. Feedback already approved but not sent when the pause takes effect is
   withheld permanently, just like automatic feedback, so resuming cannot release old work. Proposals that
-  have not been decided stay in the approval queue; after resume, an administrator may still inspect and
-  decide each one under the current policy.
+  have not been decided stay in the approval queue; after resume, a workspace owner or administrator may
+  still inspect and decide each one under the current policy.
 
-These settings advance the rollout revision and invalidate admitted, unsent work: changing coverage,
-**Post feedback after merge**, or the workspace default autonomy discards whatever was already reviewed
-and not yet sent — narrowing as much as widening, and that work is not reviewed again until it next
-changes. Changing the cooldown does not, and
-neither does an area or practice override, which is why demoting one practice back to **Review before
-sending** leaves existing proposals exactly where they were.
+Changing coverage, **Post feedback after merge**, or the workspace default autonomy invalidates admitted,
+unsent automatic feedback — narrowing as much as widening. That feedback does not re-enter delivery; a
+later review creates new feedback. Undecided proposals remain explicit workflow items and are checked
+against current policy if a workspace owner or administrator later approves them. Changing the cooldown
+does not advance the revision. Area and practice overrides are checked separately at delivery; they never
+promote an existing proposal to automatic delivery.
 
 ### Who counts as a person
 
@@ -278,23 +278,23 @@ upstream of practice review — check the integration's sync.
    enabled, the protocol is supported, and — for a shared instance model offered to *selected* workspaces
    rather than to all of them — this workspace still has a grant. Revoking a grant or disabling a
    connection stops every workspace bound to it, and the binding stays in place looking correct.
-3. **Is a budget exhausted?** Administration → **AI usage** names which purse paused the workspace and who
+3. **Is a budget exhausted?** Administration → **AI usage** names which budget stopped new reviews and who
    can lift it. `agent.queue.held` counts jobs parked on a cap; `agent.queue.depth` counts only what a
    worker could claim now, so alert on held rather than reading depth.
 4. **Is practice review, or the workspace, switched off?** The switch is **Start practice reviews** on
-   Administration → Practices → **Review → When and where** — *not* on the Workspace settings page. A paused
-   workspace runs nothing regardless of its AI configuration.
-5. **Can anything still start a review?** Same screen, **How reviews start**. With both **Reviews the work
-   starts** and **Reviews somebody asks for** off, the workspace is on and nothing reaches it; the screen
+   Administration → Practices → **Review → When and where** — *not* on the Workspace settings page. A
+   workspace paused from Workspace settings runs nothing regardless of its AI configuration.
+5. **Can anything still start a review?** Same screen, **How reviews start**. With both **Start from work
+   activity** and **Start requested reviews** off, the workspace is on and nothing reaches it; the screen
    says *"Nothing can start a review"*.
 6. **Is the work covered?** Same screen, **What gets reviewed**. Both counts have to be non-zero, and the
    author of the quiet work has to be one of the covered people. The trace prints one reason for the whole
    of coverage — *"The author, repository, or base branch is outside the workspace's review coverage"* — so
    check all three before changing a repository list. A separate reason, *"Hephaestus could not tell whose
    work this is"*, means the work had no identifiable author at all.
-7. **Is sending paused?** Same screen, **Sending feedback**. Reviews still run and **Review activity** still
-   fills up, so the symptom is specifically that nothing reaches anybody. Resuming does not release what was
-   withheld while it was paused.
+7. **Is sending paused?** Same screen, **Sending feedback**. Reviews and in-app feedback continue, but no
+   comments or mentor messages leave Hephaestus. Resuming does not release automatic feedback withheld by
+   the pause.
 8. **Is `AGENT_ENABLED=true` on every role that needs it?** It defaults to `false` and gates submission,
    execution *and* orphan recovery independently of the worker role. Set on the worker only, nothing is
    submitted; set on the server only, jobs queue and are never claimed. Confirm by presence, not value: if

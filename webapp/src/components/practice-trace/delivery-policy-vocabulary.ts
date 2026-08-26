@@ -38,25 +38,25 @@ export const DELIVERY_CHECK_STATUS_DEFS: StatusDefs<Status> = {
 		label: "Passed",
 		icon: CircleCheckIcon,
 		badgeVariant: "success",
-		description: "The check had no objection, so the run carried on to the next one.",
+		description: "The check allowed evaluation to continue.",
 	},
 	DENIED: {
 		label: "Denied",
 		icon: OctagonXIcon,
 		badgeVariant: "destructive",
-		description: "The check stopped the delivery. The reason above it says which rule it applied.",
+		description: "The check stopped delivery.",
 	},
 	NOT_APPLICABLE: {
 		label: "Not applicable",
 		icon: CircleSlashIcon,
 		badgeVariant: "outline",
-		description: "The check ran and had nothing to decide for this surface and stage.",
+		description: "The check did not apply to this surface or stage.",
 	},
 	NOT_REACHED: {
 		label: "Not reached",
 		icon: CircleDashedIcon,
 		badgeVariant: "secondary",
-		description: "An earlier check denied the delivery, so this one never ran at all.",
+		description: "An earlier denial stopped evaluation before this check.",
 	},
 };
 

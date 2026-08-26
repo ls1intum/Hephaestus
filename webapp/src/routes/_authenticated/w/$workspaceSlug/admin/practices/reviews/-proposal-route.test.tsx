@@ -61,7 +61,7 @@ describe("feedback proposal route", () => {
 		assert(firstObservation);
 		expect(screen.getByRole("link", { name: firstObservation.summary })).not.toBeNull();
 
-		await userEvent.click(screen.getByRole("button", { name: "Approve and send review" }));
+		await userEvent.click(screen.getByRole("button", { name: "Approve for delivery" }));
 		await screen.findByRole("heading", { name: /Feedback for/ }, ROUTE_RENDER_WAIT);
 		expect(requestBody).toStrictEqual({ decision: "APPROVED" });
 	});

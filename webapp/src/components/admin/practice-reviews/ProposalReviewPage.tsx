@@ -101,8 +101,8 @@ export function ProposalReviewPage({
 				title={`Feedback for ${subjectLabel(feedback.recipient)}`}
 				provenance={
 					<p className="max-w-2xl text-sm text-muted-foreground">
-						Review the complete package before anything is sent. One decision covers the summary and
-						every line comment below.
+						Approval authorizes the summary and every line comment below. Delivery checks still run
+						before anything is posted.
 					</p>
 				}
 			/>
@@ -151,8 +151,8 @@ export function ProposalReviewPage({
 				</div>
 				{packageUnavailable && (
 					<p role="alert" className="rounded-lg border border-destructive/40 p-3 text-sm">
-						This review package is unavailable. Reject it or wait for a replacement; it cannot be
-						sent safely.
+						This review package is unavailable, so it cannot be approved. Reject it or wait for a
+						replacement.
 					</p>
 				)}
 				{packageUnavailable ? null : <ReviewPackage feedback={feedback} defaultExpanded />}
@@ -232,7 +232,7 @@ export function ProposalReviewPage({
 			<footer className="sticky bottom-0 z-20 flex flex-col-reverse gap-2 border-t bg-background/95 py-3 backdrop-blur supports-[backdrop-filter]:bg-background/85 sm:flex-row sm:items-center sm:justify-end">
 				<RejectFeedbackPopover feedbackId={feedback.id} disabled={isDeciding} onReject={onReject} />
 				<Button disabled={isDeciding || packageUnavailable} onClick={() => onApprove(feedback.id)}>
-					{isDeciding ? <Spinner /> : <CheckIcon />} Approve and send review
+					{isDeciding ? <Spinner /> : <CheckIcon />} Approve for delivery
 				</Button>
 			</footer>
 		</article>
@@ -263,8 +263,7 @@ function RejectFeedbackPopover({
 				<PopoverHeader>
 					<PopoverTitle>Reject this feedback</PopoverTitle>
 					<PopoverDescription>
-						The category supports quality review. Add a note when the category alone would not
-						explain the problem.
+						Choose the reason. Add a note when the category is not enough.
 					</PopoverDescription>
 				</PopoverHeader>
 				<RadioGroup

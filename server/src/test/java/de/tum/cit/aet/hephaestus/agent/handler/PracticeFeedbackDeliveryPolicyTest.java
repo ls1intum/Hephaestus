@@ -118,12 +118,13 @@ class PracticeFeedbackDeliveryPolicyTest extends BaseUnitTest {
     }
 
     @Test
-    void pausingSendingLeavesTheDevelopersOwnPageReadable() {
+    void shouldStopConversationWithPauseReasonButKeepInAppReadableWhenSendingIsPaused() {
         AgentJob job = conversationJob();
         job.getWorkspace().getReviewSettings().setDeliveryStatus(PracticeDeliveryStatus.PAUSED);
         job.setPracticeRolloutRevision(job.getWorkspace().getReviewSettings().getRolloutRevision());
 
         assertThat(policy().allowsComposition(job, DeliveryPolicySurface.CONVERSATION)).isFalse();
+        assertThat(recordedRefusal()).isEqualTo(FeedbackSuppressionReason.WORKSPACE_DELIVERY_PAUSED);
         assertThat(policy().allowsComposition(job, DeliveryPolicySurface.IN_APP)).isTrue();
     }
 
@@ -134,16 +135,6 @@ class PracticeFeedbackDeliveryPolicyTest extends BaseUnitTest {
                 policy().allowsComposition(conversationJob(), DeliveryPolicySurface.ARTIFACT)
             )
         ).isInstanceOf(IllegalArgumentException.class);
-    }
-
-    @Test
-    void aPausedWorkspaceIsRefusedForThePauseAndNotForTheRevision() {
-        AgentJob job = conversationJob();
-        job.getWorkspace().getReviewSettings().setDeliveryStatus(PracticeDeliveryStatus.PAUSED);
-        job.setPracticeRolloutRevision(job.getWorkspace().getReviewSettings().getRolloutRevision());
-
-        assertThat(policy().allowsComposition(job, DeliveryPolicySurface.CONVERSATION)).isFalse();
-        assertThat(recordedRefusal()).isEqualTo(FeedbackSuppressionReason.WORKSPACE_DELIVERY_PAUSED);
     }
 
     @Test

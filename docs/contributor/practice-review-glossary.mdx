@@ -201,8 +201,9 @@ returns authoritative current and proposed repository/member counts plus whether
 The two autonomy `PATCH` endpoints take no `If-Match`.
 
 `deliveryStatus` is a separate workspace brake. `PAUSED` stops external practice feedback without stopping
-review or deleting coverage. Resuming is prospective: feedback admitted under an earlier rollout revision
-is not released. Instance Silent Mode remains the stronger instance-wide egress boundary.
+review or deleting coverage. Resuming does not release automatic feedback admitted under an earlier
+rollout revision. Undecided proposals remain explicit workflow items and are checked against current policy
+if later approved. Instance Silent Mode remains the stronger instance-wide egress boundary.
 
 Automatic admission records the current workspace `revision`. Any change to coverage, delivery status, the
 workspace default autonomy, or post-merge delivery advances it — narrowing as well as widening; the
@@ -242,9 +243,9 @@ two checks read the stage:
 - **At `COMPOSITION` the contributing practices are not yet known**, so `PRACTICE_AUTHORITY` is
   `NOT_APPLICABLE` on every lane. When the review has no artifact at all — a document or a conversation —
   coverage, recipient consent and artifact eligibility are `NOT_APPLICABLE` too, because there is no
-  repository, no author and no unsolicited destination to judge. That is not a bypass: Silent Mode,
-  workspace-enabled, the rollout fence and the workspace delivery pause are all decisive at composition,
-  so a paused or superseded workspace composes nothing.
+  repository, no author and no unsolicited destination to judge. Workspace-enabled and rollout-revision
+  checks still apply. External surfaces also apply Silent Mode and the delivery pause; `IN_APP` does not,
+  because it never leaves Hephaestus.
 
 The artifact lane is evaluated again at `AUTOMATIC`, at `APPROVED` when a person released it, and at `EGRESS`
 immediately before the provider call — by which point every fact is known. The `IN_APP` and `CONVERSATION`

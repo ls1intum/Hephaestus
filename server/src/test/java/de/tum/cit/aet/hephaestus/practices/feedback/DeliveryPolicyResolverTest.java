@@ -54,7 +54,7 @@ class DeliveryPolicyResolverTest extends BaseUnitTest {
     }
 
     @Test
-    void practiceAuthorityCannotBypassConsentOrArtifactState() {
+    void shouldKeepConsentAndArtifactStateAsIndependentVetoes() {
         DeliveryPolicyResolver.Facts optedOut = factsWith(
             FactAnswer.PASSES,
             FactAnswer.DENIES,

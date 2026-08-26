@@ -110,8 +110,8 @@ export const SelectedModelTurnedOff: Story = {
 export const SelectedPopulation: Story = {
 	args: { policy: { ...policy, settings: selectedSettings } },
 	play: async ({ canvas }) => {
-		await expect(canvas.getByText("1 of 3 monitored")).toBeVisible();
-		await expect(canvas.getByText("1 of 8 eligible")).toBeVisible();
+		await expect(canvas.getByText("1 of 3 monitored repositories")).toBeVisible();
+		await expect(canvas.getByText("1 of 8 eligible people")).toBeVisible();
 	},
 };
 
@@ -226,7 +226,7 @@ export const CumulativeWideningDraft: Story = {
 		await userEvent.click(canvas.getByRole("radio", { name: "All monitored repositories" }));
 		await userEvent.click(canvas.getByRole("radio", { name: "All eligible linked members" }));
 		await expect(args.coverage.preview).not.toHaveBeenCalled();
-		await expect(canvas.getByText("Changes are only a draft until you review them.")).toBeVisible();
+		await expect(canvas.getByText("You have unsaved coverage changes.")).toBeVisible();
 		await userEvent.click(canvas.getByRole("button", { name: "Review changes" }));
 		const dialog = within(await screen.findByRole("alertdialog"));
 		await expect(dialog.getByText(/Monitored repositories covered:/)).toHaveTextContent(
@@ -281,9 +281,7 @@ export const CoveragePreviewPending: Story = {
 	play: async ({ canvas }) => {
 		await userEvent.click(canvas.getByRole("radio", { name: "All monitored repositories" }));
 		await userEvent.click(canvas.getByRole("button", { name: "Review changes" }));
-		await expect(canvas.getByRole("status")).toHaveTextContent(
-			"Checking the impact of the complete draft…",
-		);
+		await expect(canvas.getByRole("status")).toHaveTextContent("Checking impact…");
 		await expect(canvas.getByRole("button", { name: "Checking impact…" })).toBeDisabled();
 	},
 };
@@ -329,7 +327,7 @@ export const CoverageSavePending: Story = {
 		await userEvent.click(canvas.getByRole("radio", { name: "Selected people" }));
 		await userEvent.click(canvas.getByRole("button", { name: "Review changes" }));
 		await expect(args.policy.onUpdate).toHaveBeenCalledTimes(1);
-		await expect(canvas.getByText("Saving the complete coverage…")).toBeVisible();
+		await expect(canvas.getByText("Saving coverage…")).toBeVisible();
 		await expect(canvas.getByRole("button", { name: "Saving…" })).toBeDisabled();
 	},
 };

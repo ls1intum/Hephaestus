@@ -170,10 +170,9 @@ export function PracticeReviewCoverageSettings({
 					What gets reviewed
 				</h2>
 				<p className="text-muted-foreground text-sm">
-					A review opens only for work that is in one of these repositories <strong>and</strong>{" "}
-					written by one of these linked people. Across this workspace, about{" "}
-					{settings.coverageSummary.recentReviewVolume} ran in the last{" "}
-					{settings.coverageSummary.estimateWindowDays} days.
+					A review starts only when both the repository and linked author are covered. About{" "}
+					{settings.coverageSummary.recentReviewVolume} review jobs entered the queue in this
+					workspace during the last {settings.coverageSummary.estimateWindowDays} days.
 				</p>
 			</div>
 			{conflicted ? (
@@ -181,8 +180,8 @@ export function PracticeReviewCoverageSettings({
 					<AlertCircle />
 					<AlertTitle>Coverage changed elsewhere</AlertTitle>
 					<AlertDescription>
-						Your draft is based on older coverage. Load the latest coverage before making this
-						change again.
+						Coverage changed after you started. Discard your draft and review the latest settings
+						before trying again.
 						<Button
 							variant="outline"
 							size="sm"
@@ -196,7 +195,7 @@ export function PracticeReviewCoverageSettings({
 								setWorkflow({ status: "editing" });
 							}}
 						>
-							Load latest coverage
+							Discard draft and load latest
 						</Button>
 					</AlertDescription>
 				</Alert>
@@ -208,7 +207,7 @@ export function PracticeReviewCoverageSettings({
 					label="Repositories"
 					covered={coveredRepositories}
 					total={settings.coverageSummary.monitoredRepositories}
-					noun="monitored"
+					noun="monitored repositories"
 				/>
 				<RadioGroup
 					aria-labelledby={`${repositoryScopeId}-label`}
@@ -289,11 +288,11 @@ export function PracticeReviewCoverageSettings({
 					label="People"
 					covered={coveredPeople}
 					total={settings.coverageSummary.eligiblePeople}
-					noun="eligible"
+					noun="eligible people"
 				/>
 				<FieldDescription>
-					Only linked human members who are eligible for practice reviews appear here. Missing or
-					unlinked authors are never included automatically.
+					Only eligible, linked human members can be selected. Missing or unlinked authors remain
+					outside coverage.
 				</FieldDescription>
 				<RadioGroup
 					aria-labelledby={`${personScopeId}-label`}
@@ -402,9 +401,9 @@ export function PracticeReviewCoverageSettings({
 					<AlertDialogHeader>
 						<AlertDialogTitle>Widen review coverage?</AlertDialogTitle>
 						<AlertDialogDescription>
-							More work becomes eligible for review. Feedback still follows each practice's
-							authority, the recipient's preference, and workspace delivery status. Earlier work is
-							not released or run again.
+							More work becomes eligible for review. This does not rerun earlier work or release
+							existing feedback. Practice authority, recipient preferences, and workspace delivery
+							still apply.
 						</AlertDialogDescription>
 					</AlertDialogHeader>
 					{workflow.status === "confirm" ? <CoverageImpact preview={workflow.preview} /> : null}
@@ -454,11 +453,11 @@ function CoverageWorkflowStatus({ workflow, dirty }: { workflow: Workflow; dirty
 	return (
 		<p role="status" className="max-w-md text-muted-foreground text-sm">
 			{workflow.status === "checking"
-				? "Checking the impact of the complete draft…"
+				? "Checking impact…"
 				: workflow.status === "saving"
-					? "Saving the complete coverage…"
+					? "Saving coverage…"
 					: dirty
-						? "Changes are only a draft until you review them."
+						? "You have unsaved coverage changes."
 						: "Coverage is up to date."}
 		</p>
 	);
@@ -479,9 +478,8 @@ function CoverageImpact({ preview }: { preview: PracticeReviewCoveragePreview })
 				<strong>{preview.proposed.coveredPeople}</strong> of {preview.proposed.eligiblePeople}
 			</p>
 			<p className="text-muted-foreground text-xs">
-				Workspace-wide context: {preview.proposed.recentReviewVolume} reviews ran in the last{" "}
-				{preview.proposed.estimateWindowDays} days across all review coverage, not just this
-				proposed population.
+				For scale, {preview.proposed.recentReviewVolume} review jobs entered this workspace's queue
+				during the last {preview.proposed.estimateWindowDays} days.
 			</p>
 		</div>
 	);
@@ -609,10 +607,10 @@ function BaseBranchEditor({
 	return (
 		<Field data-invalid={duplicate || undefined} className="border-t pt-3">
 			<FieldLabel htmlFor={id}>
-				Only these base branches<span className="sr-only"> for {nameWithOwner}</span>
+				Base branch limits<span className="sr-only"> for {nameWithOwner}</span>
 			</FieldLabel>
 			<FieldDescription id={descriptionId}>
-				Every base branch, unless you name some here. A name has to match the branch exactly.
+				Leave empty to cover every base branch. Otherwise enter exact branch names.
 			</FieldDescription>
 			<InputGroup data-invalid={duplicate || undefined}>
 				<InputGroupInput
@@ -621,7 +619,7 @@ function BaseBranchEditor({
 					value={draft}
 					autoComplete="off"
 					spellCheck={false}
-					placeholder="main…"
+					placeholder="main"
 					disabled={disabled}
 					aria-invalid={duplicate || undefined}
 					aria-describedby={duplicate ? `${descriptionId} ${errorId}` : descriptionId}

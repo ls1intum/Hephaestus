@@ -175,12 +175,13 @@ export function FeedbackDetailPage({
 				{packageSize > 0 && approval?.decision === "APPROVED" && (
 					<div className="rounded-lg border p-3">
 						<p className="text-sm font-medium">
-							{Math.min(deliveredPlacements, packageSize)} of {packageSize} provider comments
-							recorded
+							{Math.min(deliveredPlacements, packageSize)} of {packageSize} comments confirmed
+							delivered
 						</p>
 						{deliveryInProgress ? (
 							<p className="mt-1 text-sm text-muted-foreground">
-								This page updates while the remaining comments are reconciled safely.
+								Delivery is still in progress. This page updates as the remaining comments are
+								retried.
 							</p>
 						) : null}
 					</div>

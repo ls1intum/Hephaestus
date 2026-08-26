@@ -88,7 +88,7 @@ class PracticeFeedbackDispatchRepositoryIntegrationTest extends AbstractWorkspac
     }
 
     @Test
-    void shouldFenceTheOldOwnerAfterExpiredLeaseTakeover() {
+    void shouldFenceOldOwnerWhenExpiredLeaseIsTakenOver() {
         UUID dispatchId = insertDispatch(workspace.getId(), jobId, "lease-takeover");
         assertThat(claim(dispatchId, "first", Instant.now().plusSeconds(60))).isEqualTo(1);
         assertThat(claim(dispatchId, "second", Instant.now().plusSeconds(60))).isZero();
@@ -105,7 +105,7 @@ class PracticeFeedbackDispatchRepositoryIntegrationTest extends AbstractWorkspac
     }
 
     @Test
-    void shouldRejectAJobFromAnotherWorkspace() {
+    void shouldRejectJobWhenItBelongsToAnotherWorkspace() {
         User otherOwner = persistUser("other-dispatch-owner");
         Workspace other = createWorkspace("other-dispatch", "Other", "other-org", AccountType.ORG, otherOwner);
 
@@ -113,7 +113,7 @@ class PracticeFeedbackDispatchRepositoryIntegrationTest extends AbstractWorkspac
     }
 
     @Test
-    void shouldNeverReclaimTerminalFailure() {
+    void shouldNotReclaimTerminalFailure() {
         UUID dispatchId = insertDispatch(workspace.getId(), jobId, "terminal-failure");
         jdbcTemplate.update(
             "UPDATE feedback_dispatch SET state = 'FAILED', lease_expires_at = ? WHERE id = ?",
@@ -125,7 +125,7 @@ class PracticeFeedbackDispatchRepositoryIntegrationTest extends AbstractWorkspac
     }
 
     @Test
-    void shouldKeepReconcilingAnAmbiguousWriteAfterTheRetryBudget() {
+    void shouldKeepAmbiguousWriteRecoverableAfterRetryBudget() {
         UUID dispatchId = insertDispatch(workspace.getId(), jobId, "ambiguous-write");
         jdbcTemplate.update(
             "UPDATE feedback_dispatch SET state = 'UNCERTAIN', write_started = TRUE, attempt_count = 8 WHERE id = ?",
@@ -160,7 +160,7 @@ class PracticeFeedbackDispatchRepositoryIntegrationTest extends AbstractWorkspac
     }
 
     @Test
-    void shouldResetFailedAutomaticPackagesBeforeOrAfterAProviderWrite() {
+    void shouldResetFailedAutomaticPackagesBeforeOrAfterProviderWrite() {
         UUID safe = insertDispatch(workspace.getId(), jobId, "safe-retry");
         UUID ambiguous = insertDispatch(workspace.getId(), jobId, "ambiguous-retry");
         jdbcTemplate.update(

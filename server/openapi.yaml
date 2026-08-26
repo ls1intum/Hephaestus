@@ -11577,7 +11577,8 @@ components:
         recentReviewVolume:
           type: integer
           format: int32
-          description: Workspace-wide completed review jobs during the estimate window
+          description: Workspace-wide practice-review jobs created during the estimate
+            window
       required:
       - coveredPeople
       - coveredRepositories
@@ -15466,9 +15467,8 @@ components:
           description: "GitLab workspace provider config, null if not available"
     WorkspaceReviewScope:
       type: object
-      description: |-
-        The work a workspace reviews. Under a <code>SELECTED</code> mode an empty list admits nobody, never
-         everybody; a selected repository with no branches admits every branch of it.
+      description: Selecting specific repositories or people with an empty selection
+        admits nobody. A selected repository without branches admits all its branches.
       properties:
         personMode:
           type: string

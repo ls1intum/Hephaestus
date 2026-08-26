@@ -816,8 +816,7 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("repository-less work fails closed when the workspace selected specific repositories")
-        void selectedRepositoryScopeRefusesAKindWithoutARepository() {
+        void shouldRefuseRepositorylessKindWhenSpecificRepositoriesAreSelected() {
             Workspace workspace = createWorkspace();
             when(coverageService.assessRepositoryless(any(Workspace.class), any(ReviewSubject.class))).thenReturn(
                 new PracticeReviewCoverageService.CoverageAssessment(

@@ -72,7 +72,7 @@ function selectedSettings(overrides: Partial<Settings> = {}): Settings {
 }
 
 describe("PracticeReviewSettings", () => {
-	it("collects a complete draft before previewing or saving", async () => {
+	it("collects a cumulative draft before previewing or saving", async () => {
 		const preview = vi.fn(async () => ({
 			current: settings.coverageSummary,
 			proposed: settings.coverageSummary,
@@ -169,7 +169,7 @@ describe("PracticeReviewSettings", () => {
 				.getByRole("radio", { name: "All monitored repositories" })
 				.getAttribute("aria-checked"),
 		).toBe("true");
-		screen.getByText("Changes are only a draft until you review them.");
+		screen.getByText("You have unsaved coverage changes.");
 	});
 
 	it("does not save a dirty draft over coverage changed by another admin", async () => {

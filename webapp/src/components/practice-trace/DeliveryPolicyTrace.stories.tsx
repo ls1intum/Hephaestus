@@ -91,9 +91,7 @@ export const Denied: Story = {
 			canvas.getByText("Policy revision 4, evaluated as revision 5 · Resolver 1"),
 		).toBeVisible();
 		await expect(canvas.getByText("Stopped")).toBeVisible();
-		await expect(
-			canvas.getByText("Stopped here. The developer has opted out of AI feedback."),
-		).toBeVisible();
+		await expect(canvas.getByText("The developer has opted out of AI feedback.")).toBeVisible();
 		await expect(canvas.getByText("Denied")).toBeVisible();
 		await expect(canvas.getByText("Not reached")).toBeVisible();
 	},
@@ -105,7 +103,9 @@ export const Allowed: Story = {
 		await openEvaluation(canvas, /In-context feedback · Final delivery/);
 		await expect(await canvas.findByText("In-context feedback · Final delivery")).toBeVisible();
 		await expect(canvas.getByText("Allowed")).toBeVisible();
-		await expect(canvas.queryByText(/^Stopped here\./)).not.toBeInTheDocument();
+		await expect(
+			canvas.queryByText("The developer has opted out of AI feedback."),
+		).not.toBeInTheDocument();
 	},
 };
 
@@ -113,7 +113,7 @@ export const NoEvaluations: Story = {
 	args: { evaluations: [] },
 	play: async ({ canvas }) => {
 		await expect(
-			canvas.queryByRole("heading", { name: "Technical delivery policy trace" }),
+			canvas.queryByRole("heading", { name: "Delivery policy trace" }),
 		).not.toBeInTheDocument();
 	},
 };

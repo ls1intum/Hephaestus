@@ -7,10 +7,8 @@ import de.tum.cit.aet.hephaestus.core.auth.spi.AccountPreferencesQuery.Preferenc
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.Optional;
 import org.jspecify.annotations.Nullable;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-@DisplayName("Practice feedback delivery consent")
 class AccountPreferencesQueryTest extends BaseUnitTest {
 
     private static final long USER_ID = 11L;

@@ -6,10 +6,7 @@ import java.util.List;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
-/**
- * The work a workspace reviews. Under a {@code SELECTED} mode an empty list admits nobody, never
- * everybody; a selected repository with no branches admits every branch of it.
- */
+/** Selecting specific repositories or people with an empty selection admits nobody. A selected repository without branches admits all its branches. */
 public record WorkspaceReviewScope(
     @NonNull @NotNull ReviewRepositoryMode repositoryMode,
     @NonNull @NotNull ReviewPersonMode personMode,

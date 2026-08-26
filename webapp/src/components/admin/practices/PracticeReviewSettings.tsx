@@ -88,14 +88,9 @@ function ReviewStatusSection({
 
 	return (
 		<section className="space-y-4" aria-labelledby="review-status-heading">
-			<div className="space-y-1">
-				<h2 id="review-status-heading" className="font-semibold text-lg">
-					Practice reviews
-				</h2>
-				<p className="text-muted-foreground text-sm">
-					Whether new practice reviews can start in this workspace.
-				</p>
-			</div>
+			<h2 id="review-status-heading" className="font-semibold text-lg">
+				Practice reviews
+			</h2>
 			<Field orientation="horizontal">
 				<FieldContent>
 					<FieldLabel htmlFor="practice-reviews-enabled">Start practice reviews</FieldLabel>
@@ -190,7 +185,7 @@ function ReviewTimingSection({
 					How reviews start
 				</h2>
 				<p className="text-muted-foreground text-sm">
-					Two ways in: the work itself reaches a moment a practice watches for, or somebody asks.
+					Reviews start from activity on connected work or from a request.
 				</p>
 			</div>
 			{noWayIn ? (
@@ -204,10 +199,10 @@ function ReviewTimingSection({
 			) : null}
 			<Field orientation="horizontal">
 				<FieldContent>
-					<FieldLabel htmlFor="trigger-auto">Reviews the work starts</FieldLabel>
+					<FieldLabel htmlFor="trigger-auto">Start from work activity</FieldLabel>
 					<FieldDescription>
-						Connected work reaching one of the moments a practice watches for — opened, merged,
-						published — starts a review on its own.
+						A review starts when connected work reaches a practice trigger, such as opened, merged,
+						or published.
 					</FieldDescription>
 				</FieldContent>
 				<Switch
@@ -221,7 +216,7 @@ function ReviewTimingSection({
 			</Field>
 			<Field orientation="horizontal">
 				<FieldContent>
-					<FieldLabel htmlFor="trigger-manual">Reviews somebody asks for</FieldLabel>
+					<FieldLabel htmlFor="trigger-manual">Start requested reviews</FieldLabel>
 					<FieldDescription>
 						The <strong>Review this now</strong> button, a backfill of past work, a recurring check,
 						and <code>/hephaestus review</code> in a GitLab merge request comment. Turning this off
@@ -309,7 +304,7 @@ function FeedbackDeliverySection({ policy }: Pick<PracticeReviewSettingsProps, "
 					Sending feedback
 				</h2>
 				<p className="text-muted-foreground text-sm">
-					Whether finished feedback may leave Hephaestus and reach the people it is about.
+					Workspace-wide control for comments and mentor messages.
 				</p>
 			</div>
 			{paused ? (
@@ -317,11 +312,9 @@ function FeedbackDeliverySection({ policy }: Pick<PracticeReviewSettingsProps, "
 					<AlertCircle />
 					<AlertTitle>Sending is paused</AlertTitle>
 					<AlertDescription>
-						Reviews still run, and developers can still read their own feedback in Hephaestus.
-						Nothing reaches connected work or the mentor. Feedback that would have been sent
-						automatically is dropped rather than queued, so resuming never releases a backlog at
-						your developers; proposals waiting for approval stay in your queue, and you decide on
-						them once you resume.
+						Reviews and in-app feedback continue, but no comments or mentor messages leave
+						Hephaestus. Automatic feedback is not queued for later delivery. Pending approvals
+						remain in the review queue; a workspace owner or admin can decide them after resuming.
 					</AlertDescription>
 				</Alert>
 			) : null}
@@ -332,8 +325,7 @@ function FeedbackDeliverySection({ policy }: Pick<PracticeReviewSettingsProps, "
 						<StatusBadge def={WORKSPACE_DELIVERY_STATUS_DEFS[settings.deliveryStatus]} />
 					</div>
 					<FieldDescription>
-						Turning this off stops every comment and mentor message at once, without stopping the
-						reviews themselves. Coverage and practice settings are kept.
+						Pause all comments and mentor messages without stopping reviews or changing coverage.
 					</FieldDescription>
 				</FieldContent>
 				<Switch

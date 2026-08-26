@@ -12,7 +12,7 @@ public record PracticeReviewCoverageSummaryDTO(
     @NonNull
     Integer coveredPeople,
     @Schema(description = "Eligible linked human members in the workspace") @NonNull Integer eligiblePeople,
-    @Schema(description = "Workspace-wide completed review jobs during the estimate window")
+    @Schema(description = "Workspace-wide practice-review jobs created during the estimate window")
     @NonNull
     Integer recentReviewVolume,
     @Schema(description = "Number of days included in recentReviewVolume") @NonNull Integer estimateWindowDays
