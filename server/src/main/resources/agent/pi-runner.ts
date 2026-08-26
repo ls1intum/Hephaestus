@@ -29,7 +29,12 @@ import {
 	type PreparedFeedbackTarget,
 	undeliverableUnits,
 } from "./pi-runner-composition.ts";
-import { buildReviewTree, mapConcurrent, missingPracticeSlugs } from "./pi-review-tree.ts";
+import {
+	buildReviewTree,
+	mapConcurrent,
+	missingPracticeSlugs,
+	resolveReviewConcurrency,
+} from "./pi-review-tree.ts";
 import { forkPracticeSessions } from "./pi-session-tree.ts";
 import { deriveTimeouts, deriveTurnTiming } from "./pi-runner-timings.ts";
 import {
@@ -1667,10 +1672,7 @@ async function main() {
 	const groupCapacity = process.env.PI_PRACTICE_BATCH_SIZE
 		? Number(process.env.PI_PRACTICE_BATCH_SIZE)
 		: 6;
-	const concurrency = Number(process.env.PI_REVIEW_CONCURRENCY ?? 2);
-	if (!Number.isInteger(concurrency) || concurrency <= 0) {
-		throw new Error(`PI_REVIEW_CONCURRENCY must be a positive integer, got: ${concurrency}`);
-	}
+	const concurrency = resolveReviewConcurrency(process.env.PI_REVIEW_CONCURRENCY);
 	const tree = buildReviewTree(practiceIndex, groupCapacity);
 	const sessionDir = `${CWD}/.sessions`;
 	const reviewDeadline = startMs + INITIAL_TIMEOUT_MS;

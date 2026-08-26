@@ -229,7 +229,9 @@ function AgentPurposeCard({
 	const formRef = useRef<HTMLFormElement>(null);
 	const [selection, setSelection] = useState<ModelSelection | null>(bindingToSelection(binding));
 	const [enabled, setEnabled] = useState(binding?.enabled ?? true);
-	const [timeoutSeconds, setTimeoutSeconds] = useState(String(binding?.timeoutSeconds ?? 600));
+	const [timeoutSeconds, setTimeoutSeconds] = useState(
+		String(binding?.timeoutSeconds ?? MAX_TIMEOUT_SECONDS),
+	);
 	const [maxConcurrentJobs, setMaxConcurrentJobs] = useState(
 		String(binding?.maxConcurrentJobs ?? 3),
 	);

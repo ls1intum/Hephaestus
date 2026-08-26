@@ -45,6 +45,14 @@ const LANE_ORDER: readonly EvidenceLane[] = [
 	"unknown",
 ];
 
+export function resolveReviewConcurrency(value: string | undefined): number {
+	const concurrency = Number(value ?? 4);
+	if (!Number.isInteger(concurrency) || concurrency < 1 || concurrency > 8) {
+		throw new Error(`PI_REVIEW_CONCURRENCY must be an integer from 1 to 8, got: ${concurrency}`);
+	}
+	return concurrency;
+}
+
 function evidenceLane(sources: readonly string[]): EvidenceLane {
 	if (sources.some((source) => source.startsWith("chat."))) return "conversation";
 	if (sources.some((source) => source.startsWith("docs.") || source === "outline.documents"))

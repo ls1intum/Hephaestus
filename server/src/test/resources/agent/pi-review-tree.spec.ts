@@ -3,6 +3,7 @@ import {
 	buildReviewTree,
 	mapConcurrent,
 	missingPracticeSlugs,
+	resolveReviewConcurrency,
 	type ReviewPractice,
 } from "../../../main/resources/agent/pi-review-tree";
 
@@ -87,6 +88,15 @@ describe("buildReviewTree", () => {
 test("missingPracticeSlugs requires explicit coverage for every selected practice", () => {
 	expect(missingPracticeSlugs(["a", "b", "c"], ["c", "a"])).toEqual(["b"]);
 	expect(missingPracticeSlugs(["a", "b"], ["b", "a"])).toEqual([]);
+});
+
+test("review concurrency defaults to four and cannot overload the provider", () => {
+	expect(resolveReviewConcurrency(undefined)).toBe(4);
+	expect(resolveReviewConcurrency("1")).toBe(1);
+	expect(resolveReviewConcurrency("8")).toBe(8);
+	for (const invalid of ["0", "9", "2.5", "nope"]) {
+		expect(() => resolveReviewConcurrency(invalid)).toThrow("integer from 1 to 8");
+	}
 });
 
 test("mapConcurrent bounds active work and preserves input order", async () => {
