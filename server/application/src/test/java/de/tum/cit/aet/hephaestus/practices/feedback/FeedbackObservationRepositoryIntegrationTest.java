@@ -266,6 +266,7 @@ class FeedbackObservationRepositoryIntegrationTest extends BaseIntegrationTest {
                 id,
                 occurrenceKey,
                 agentJob.getId(),
+                agentJob.getWorkspace().getId(),
                 practice.getId(),
                 null,
                 "scm.pull_request",

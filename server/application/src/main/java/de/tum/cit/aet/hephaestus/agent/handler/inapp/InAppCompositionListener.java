@@ -148,7 +148,7 @@ public class InAppCompositionListener {
         // One recipient in practice — a review job files its observations against one person — but
         // read rather than assumed, so a kind that ever files against several does not silently
         // deliver all of their patterns to whoever happened to be first.
-        List<Long> recipients = observationRepository.findSubjectUserIdsByAgentJobId(agentJobId);
+        List<Long> recipients = observationRepository.findSubjectUserIdsByAgentJobId(agentJobId, workspaceId);
         // Every recipient's units share this job's id, and (agent_job_id, position) is unique, so each
         // recipient gets its own slice of the band. The query orders by user id, so a re-run assigns
         // the same slices and the idempotency guard still recognises what it already wrote.
@@ -205,7 +205,7 @@ public class InAppCompositionListener {
             InAppRoutingDecision decision = InAppFeedbackRouter.route(
                     message,
                     evidence,
-                    effectiveTier(evidence, workspaceDefault),
+                    effectiveTier(evidence, workspaceId, workspaceDefault),
                     subjectRole(evidence),
                     feedbackRepository
                             .lastInAppSurfacedAt(workspaceId, recipientUserId, message.practiceSlug())
@@ -251,7 +251,8 @@ public class InAppCompositionListener {
      * projection rather than by walking associations — the same reason {@code FeedbackChannelRouter}
      * projects it: the routing rule must not depend on whether the caller holds a session.
      */
-    private @Nullable PracticeAutonomy effectiveTier(List<Observation> evidence, PracticeAutonomy workspaceDefault) {
+    private @Nullable PracticeAutonomy effectiveTier(
+            List<Observation> evidence, Long workspaceId, PracticeAutonomy workspaceDefault) {
         List<UUID> ids = evidence.stream()
                 .map(Observation::getId)
                 .filter(Objects::nonNull)
@@ -259,7 +260,7 @@ public class InAppCompositionListener {
         if (ids.isEmpty()) {
             return null;
         }
-        return observationRepository.findPracticeAutonomyFor(ids).stream()
+        return observationRepository.findPracticeAutonomyFor(ids, workspaceId).stream()
                 .findFirst()
                 .map(row -> AutonomyResolver.resolvePractice(
                                 row.getPracticeAutonomy(), row.getGroupAutonomy(), workspaceDefault)

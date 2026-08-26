@@ -112,7 +112,7 @@ public class ConversationalDeliveryListener {
         if (sourceJob == null || !deliveryPolicy.allowsComposition(sourceJob, DeliveryPolicySurface.CONVERSATION)) {
             return 0;
         }
-        List<Observation> observations = observationRepository.findByAgentJobId(agentJobId);
+        List<Observation> observations = observationRepository.findByAgentJobId(agentJobId, workspaceId);
         if (observations.isEmpty()) {
             return 0;
         }

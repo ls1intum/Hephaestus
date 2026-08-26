@@ -120,7 +120,8 @@ class FeedbackLedgerRecorderTest extends BaseUnitTest {
         for (int i = 0; i < 5; i++) {
             observations.add(problem());
         }
-        when(observationRepository.findByAgentJobId(any())).thenReturn(observations);
+        when(observationRepository.findByAgentJobId(any(), org.mockito.ArgumentMatchers.anyLong()))
+                .thenReturn(observations);
         var delivery = new DeliveryContent(
                 "body",
                 List.of(),
@@ -153,7 +154,8 @@ class FeedbackLedgerRecorderTest extends BaseUnitTest {
         for (int i = 0; i < 5; i++) {
             observations.add(problem());
         }
-        when(observationRepository.findByAgentJobId(any())).thenReturn(observations);
+        when(observationRepository.findByAgentJobId(any(), org.mockito.ArgumentMatchers.anyLong()))
+                .thenReturn(observations);
 
         recorder()
                 .record(
@@ -177,7 +179,8 @@ class FeedbackLedgerRecorderTest extends BaseUnitTest {
         // null. The note and its DeliveredSignal share a findingFingerprint, so the signal's externalRef lands
         // on the saved FeedbackPlacement.
         var observation = problem();
-        when(observationRepository.findByAgentJobId(any())).thenReturn(List.of(observation));
+        when(observationRepository.findByAgentJobId(any(), org.mockito.ArgumentMatchers.anyLong()))
+                .thenReturn(List.of(observation));
 
         var note = new DiffNote("src/Foo.java", 10, null, "Fix this", "ck-foo-10");
         var signal = new InlineFeedbackChannel.DeliveredSignal(
@@ -208,7 +211,8 @@ class FeedbackLedgerRecorderTest extends BaseUnitTest {
     @Test
     void shouldNotCreatePlacementWhenInlineSignalFailed() {
         var observation = problem();
-        when(observationRepository.findByAgentJobId(any())).thenReturn(List.of(observation));
+        when(observationRepository.findByAgentJobId(any(), org.mockito.ArgumentMatchers.anyLong()))
+                .thenReturn(List.of(observation));
 
         var note = new DiffNote("src/Bar.java", 5, 8, "Range note");
         var signal = new InlineFeedbackChannel.DeliveredSignal(
@@ -239,7 +243,8 @@ class FeedbackLedgerRecorderTest extends BaseUnitTest {
             observations.add(problem());
         }
         UUID b2Id = observations.get(5).getId(); // also reported withheld by the composer
-        when(observationRepository.findByAgentJobId(any())).thenReturn(observations);
+        when(observationRepository.findByAgentJobId(any(), org.mockito.ArgumentMatchers.anyLong()))
+                .thenReturn(observations);
         var recorder = recorder();
         when(feedbackObservationRepository.findObservationIdsSuppressedForJob(any()))
                 .thenReturn(List.of(b2Id));
@@ -265,7 +270,8 @@ class FeedbackLedgerRecorderTest extends BaseUnitTest {
         var b2Suppressed = problem();
         UUID keptId = kept.getId();
         UUID b2Id = b2Suppressed.getId();
-        when(observationRepository.findByAgentJobId(any())).thenReturn(List.of(kept, b2Suppressed));
+        when(observationRepository.findByAgentJobId(any(), org.mockito.ArgumentMatchers.anyLong()))
+                .thenReturn(List.of(kept, b2Suppressed));
         var recorder = recorder();
         when(feedbackObservationRepository.findObservationIdsSuppressedForJob(any()))
                 .thenReturn(List.of(b2Id));
@@ -292,7 +298,8 @@ class FeedbackLedgerRecorderTest extends BaseUnitTest {
         for (int i = 0; i < 3; i++) {
             observations.add(problem());
         }
-        when(observationRepository.findByAgentJobId(any())).thenReturn(observations);
+        when(observationRepository.findByAgentJobId(any(), org.mockito.ArgumentMatchers.anyLong()))
+                .thenReturn(observations);
 
         recorder()
                 .record(
@@ -314,7 +321,8 @@ class FeedbackLedgerRecorderTest extends BaseUnitTest {
     @Test
     void reReview_proposal_carriesItsThreadAndRetiresTheUndecidedOneBeforeIt() {
         Observation observation = problem();
-        when(observationRepository.findByAgentJobId(any())).thenReturn(List.of(observation));
+        when(observationRepository.findByAgentJobId(any(), org.mockito.ArgumentMatchers.anyLong()))
+                .thenReturn(List.of(observation));
         when(feedbackRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         AgentJob job = job();
         when(commentFormatter.appendDisclosure("proposed body", job)).thenReturn("proposed body\n\nAI disclosure");
@@ -362,7 +370,8 @@ class FeedbackLedgerRecorderTest extends BaseUnitTest {
         // A prior live DELIVERED unit on this continuity line → the new row's replacesId points at it AND the
         // prior is flipped to SUPERSEDED via the native updateState, AFTER the new row lands (never zero live).
         var observation = problem();
-        when(observationRepository.findByAgentJobId(any())).thenReturn(List.of(observation));
+        when(observationRepository.findByAgentJobId(any(), org.mockito.ArgumentMatchers.anyLong()))
+                .thenReturn(List.of(observation));
         var recorder = recorder();
         UUID priorId = UUID.randomUUID();
         FeedbackPlacement priorSummary = mock(FeedbackPlacement.class);
@@ -396,7 +405,8 @@ class FeedbackLedgerRecorderTest extends BaseUnitTest {
         var problem = problem();
         var strength = strength();
         var na = notApplicable();
-        when(observationRepository.findByAgentJobId(any())).thenReturn(List.of(strength, problem, na));
+        when(observationRepository.findByAgentJobId(any(), org.mockito.ArgumentMatchers.anyLong()))
+                .thenReturn(List.of(strength, problem, na));
 
         recorder()
                 .record(
@@ -426,7 +436,8 @@ class FeedbackLedgerRecorderTest extends BaseUnitTest {
         // The recorder must write NO fresh DELIVERED unit and must NOT supersede the still-live prior — else the
         // mentor coaches against words the student never saw.
         var observation = problem();
-        when(observationRepository.findByAgentJobId(any())).thenReturn(List.of(observation));
+        when(observationRepository.findByAgentJobId(any(), org.mockito.ArgumentMatchers.anyLong()))
+                .thenReturn(List.of(observation));
         var recorder = recorder();
         recorder.record(
                 job(),
@@ -445,7 +456,8 @@ class FeedbackLedgerRecorderTest extends BaseUnitTest {
     @Test
     void inlineOnlyDeliveryRecordsInlinePlacementWithoutSupersedingSummary() {
         var observation = problem();
-        when(observationRepository.findByAgentJobId(any())).thenReturn(List.of(observation));
+        when(observationRepository.findByAgentJobId(any(), org.mockito.ArgumentMatchers.anyLong()))
+                .thenReturn(List.of(observation));
         var note = new DiffNote("src/Foo.java", 10, null, "Fix this", "ck-foo");
         var signal = new InlineFeedbackChannel.DeliveredSignal(
                 "ck-foo",
@@ -483,7 +495,8 @@ class FeedbackLedgerRecorderTest extends BaseUnitTest {
         // developer never saw in-context.
         Observation bad = problem();
         Observation good = strength();
-        when(observationRepository.findByAgentJobId(any())).thenReturn(List.of(bad, good));
+        when(observationRepository.findByAgentJobId(any(), org.mockito.ArgumentMatchers.anyLong()))
+                .thenReturn(List.of(bad, good));
 
         recorder().recordUndelivered(job(), new DeliveryContent("the advice that never landed", List.of(), List.of()));
 
@@ -537,7 +550,8 @@ class FeedbackLedgerRecorderTest extends BaseUnitTest {
     @Test
     void shouldRecordOneSuppressionWithoutConversationWhenUndeliveredDuringSilentMode() {
         Observation bad = problem();
-        when(observationRepository.findByAgentJobId(any())).thenReturn(List.of(bad));
+        when(observationRepository.findByAgentJobId(any(), org.mockito.ArgumentMatchers.anyLong()))
+                .thenReturn(List.of(bad));
         FeedbackLedgerRecorder recorder = recorder();
         when(egressGuard.deliveryAllowed(any())).thenReturn(false);
 
@@ -556,7 +570,8 @@ class FeedbackLedgerRecorderTest extends BaseUnitTest {
         // harmless (idempotent listener), but the FAILED row must NOT be persisted twice.
         FeedbackLedgerRecorder rec = recorder();
         Observation bad = problem();
-        when(observationRepository.findByAgentJobId(any())).thenReturn(List.of(bad));
+        when(observationRepository.findByAgentJobId(any(), org.mockito.ArgumentMatchers.anyLong()))
+                .thenReturn(List.of(bad));
         // Past the DELIVERED(0) guard (default false), but the FAILED(4000) unit already exists (retry).
         when(feedbackRepository.existsByAgentJobIdAndPosition(any(), eq(4000))).thenReturn(true);
 
@@ -586,7 +601,8 @@ class FeedbackLedgerRecorderTest extends BaseUnitTest {
         // reason — an evaluation treats "redundant with a delivered lesson" differently from "over the cap".
         var kept = problem();
         var deduped = problem();
-        when(observationRepository.findByAgentJobId(any())).thenReturn(List.of(kept, deduped));
+        when(observationRepository.findByAgentJobId(any(), org.mockito.ArgumentMatchers.anyLong()))
+                .thenReturn(List.of(kept, deduped));
         var delivery = new DeliveryContent(
                 "body",
                 List.of(),
@@ -609,7 +625,8 @@ class FeedbackLedgerRecorderTest extends BaseUnitTest {
         // and the loci must not be re-raised as a conversational signal in a mentor turn.
         Observation bad = problem();
         Observation good = strength();
-        when(observationRepository.findByAgentJobId(any())).thenReturn(List.of(bad, good));
+        when(observationRepository.findByAgentJobId(any(), org.mockito.ArgumentMatchers.anyLong()))
+                .thenReturn(List.of(bad, good));
 
         recorder()
                 .recordSuppressedUnit(
@@ -647,7 +664,8 @@ class FeedbackLedgerRecorderTest extends BaseUnitTest {
         FeedbackLedgerRecorder rec = recorder();
         FeedbackPlacement livePlacement = mock(FeedbackPlacement.class);
         when(livePlacement.getFeedbackId()).thenReturn(liveFeedbackId);
-        when(observationRepository.findByAgentJobId(any())).thenReturn(List.of(bad));
+        when(observationRepository.findByAgentJobId(any(), org.mockito.ArgumentMatchers.anyLong()))
+                .thenReturn(List.of(bad));
         when(feedbackPlacementRepository.findLatestDeliveredSummary(any())).thenReturn(Optional.of(livePlacement));
 
         rec.recordSuppressedUnit(
@@ -668,7 +686,8 @@ class FeedbackLedgerRecorderTest extends BaseUnitTest {
         Observation suppressed = problem();
         when(landed.getRecurrenceKey()).thenReturn("key-1");
         when(suppressed.getRecurrenceKey()).thenReturn("key-2");
-        when(observationRepository.findByAgentJobId(any())).thenReturn(List.of(landed, suppressed));
+        when(observationRepository.findByAgentJobId(any(), org.mockito.ArgumentMatchers.anyLong()))
+                .thenReturn(List.of(landed, suppressed));
         DeliveryContent delivery = new DeliveryContent(
                 "summary",
                 List.of(
@@ -707,7 +726,8 @@ class FeedbackLedgerRecorderTest extends BaseUnitTest {
     @Test
     void shouldNotPublishConversationAfterReleaseWhenCycleWasSuppressed() {
         Observation observation = problem();
-        when(observationRepository.findByAgentJobId(any())).thenReturn(List.of(observation));
+        when(observationRepository.findByAgentJobId(any(), org.mockito.ArgumentMatchers.anyLong()))
+                .thenReturn(List.of(observation));
 
         recorder()
                 .recordWithoutConversation(
@@ -726,7 +746,8 @@ class FeedbackLedgerRecorderTest extends BaseUnitTest {
         // A summary-less delivery (body sanitised to blank but inline notes landed): the DELIVERED unit must
         // not claim a SUMMARY posting that never happened.
         var observation = problem();
-        when(observationRepository.findByAgentJobId(any())).thenReturn(List.of(observation));
+        when(observationRepository.findByAgentJobId(any(), org.mockito.ArgumentMatchers.anyLong()))
+                .thenReturn(List.of(observation));
         AgentJob job = job(); // deliveryCommentId stays null
 
         recorder()
@@ -744,7 +765,8 @@ class FeedbackLedgerRecorderTest extends BaseUnitTest {
     @Test
     void shouldPersistTheDispatchSummaryReferenceInsteadOfMutableJobState() {
         var observation = problem();
-        when(observationRepository.findByAgentJobId(any())).thenReturn(List.of(observation));
+        when(observationRepository.findByAgentJobId(any(), org.mockito.ArgumentMatchers.anyLong()))
+                .thenReturn(List.of(observation));
         AgentJob job = job();
         job.setDeliveryCommentId("stale-job-ref");
 

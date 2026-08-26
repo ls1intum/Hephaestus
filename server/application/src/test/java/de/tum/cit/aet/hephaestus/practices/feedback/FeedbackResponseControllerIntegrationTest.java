@@ -100,6 +100,7 @@ class FeedbackResponseControllerIntegrationTest extends AbstractWorkspaceIntegra
                 .occurrenceKey("test-key-" + UUID.randomUUID())
                 .recurrenceKey(RECURRENCE_KEY)
                 .agentJobId(agentJob.getId())
+                .workspaceId(workspace.getId())
                 .practice(practice)
                 .artifactKind(ArtifactKinds.PULL_REQUEST)
                 .artifactId(42L)

@@ -195,6 +195,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
                         anyString(),
                         any(),
                         anyLong(),
+                        anyLong(),
                         any(), // practiceRevisionId
                         anyString(),
                         anyLong(),
@@ -472,6 +473,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
                             any(),
                             anyString(),
                             any(),
+                            anyLong(),
                             anyLong(),
                             any(),
                             anyString(),
@@ -873,6 +875,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
                             any(UUID.class),
                             eq("pr-description-quality:0:scm.pull_request:456:" + testJob.getId()),
                             eq(testJob.getId()),
+                            anyLong(),
                             eq(10L),
                             eq(11L),
                             eq("scm.pull_request"),
@@ -1129,6 +1132,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
                             anyString(),
                             any(),
                             anyLong(),
+                            anyLong(),
                             any(), // practiceRevisionId
                             anyString(),
                             anyLong(),
@@ -1179,6 +1183,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
                             anyString(),
                             any(),
                             anyLong(),
+                            anyLong(),
                             any(), // practiceRevisionId
                             anyString(),
                             anyLong(),
@@ -1214,6 +1219,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
                             any(),
                             keyCaptor.capture(),
                             any(),
+                            anyLong(),
                             anyLong(),
                             any(), // practiceRevisionId
                             anyString(),
@@ -1297,6 +1303,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
                             any(),
                             eq("pr-description-quality:0:scm.issue:999:" + testJob.getId()),
                             eq(testJob.getId()),
+                            anyLong(),
                             anyLong(),
                             eq(11L),
                             eq("scm.issue"),

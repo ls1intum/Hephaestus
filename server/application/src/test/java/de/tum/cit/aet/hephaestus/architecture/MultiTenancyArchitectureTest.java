@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.architecture;
 
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.*;
 import static de.tum.cit.aet.hephaestus.architecture.ArchitectureTestConstants.*;
+import static org.assertj.core.api.Assertions.assertThat;
 
 import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaMethod;
@@ -11,12 +12,15 @@ import com.tngtech.archunit.lang.ArchRule;
 import com.tngtech.archunit.lang.ConditionEvents;
 import com.tngtech.archunit.lang.SimpleConditionEvent;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
+import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
+import java.lang.reflect.Method;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.event.EventListener;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -105,6 +109,22 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
 
     @Nested
     class RepositoryWorkspaceFilteringTests {
+
+        @Test
+        void observationQueriesBindWorkspaceParameter() {
+            assertThat(ObservationRepository.class.isAnnotationPresent(WorkspaceAgnostic.class))
+                    .isFalse();
+            for (Method method : ObservationRepository.class.getDeclaredMethods()) {
+                Query query = method.getAnnotation(Query.class);
+                if (query == null) continue;
+                assertThat(method.getParameters())
+                        .as("%s must bind workspaceId", method.getName())
+                        .anyMatch(parameter -> {
+                            Param param = parameter.getAnnotation(Param.class);
+                            return param != null && param.value().equals("workspaceId");
+                        });
+            }
+        }
 
         @Test
         void queryMethodsIncludeWorkspaceFiltering() {

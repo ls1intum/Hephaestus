@@ -197,7 +197,8 @@ public class FeedbackLedgerRecorder {
         if (!summaryDelivered && !inlineDelivered) {
             return;
         }
-        List<Observation> observations = observationRepository.findByAgentJobId(job.getId());
+        List<Observation> observations = observationRepository.findByAgentJobId(
+                job.getId(), job.getWorkspace().getId());
         if (observations.isEmpty()) {
             return;
         }
@@ -416,7 +417,8 @@ public class FeedbackLedgerRecorder {
         if (feedbackRepository.existsByAgentJobIdAndPosition(job.getId(), GATE_SUPPRESSED_UNIT_ORDINAL)) {
             return; // already recorded (job retry)
         }
-        List<Observation> observations = observationRepository.findByAgentJobId(job.getId());
+        List<Observation> observations = observationRepository.findByAgentJobId(
+                job.getId(), job.getWorkspace().getId());
         if (observations.isEmpty()) {
             return;
         }
@@ -435,7 +437,8 @@ public class FeedbackLedgerRecorder {
         if (feedbackRepository.existsByAgentJobIdAndPosition(job.getId(), GATE_SUPPRESSED_UNIT_ORDINAL)) {
             return;
         }
-        List<Observation> observations = observationRepository.findByAgentJobId(job.getId());
+        List<Observation> observations = observationRepository.findByAgentJobId(
+                job.getId(), job.getWorkspace().getId());
         if (observations.isEmpty()) {
             return;
         }
@@ -532,10 +535,15 @@ public class FeedbackLedgerRecorder {
         if (body.isBlank()) return;
         String providerSummary = commentFormatter.appendDisclosure(body, job);
         if (feedbackRepository.existsByAgentJobIdAndPosition(job.getId(), position)) return;
-        Map<String, Observation> stored = observationRepository.findByAgentJobId(job.getId()).stream()
-                .filter(observation -> observation.getOccurrenceKey() != null)
-                .collect(java.util.stream.Collectors.toMap(
-                        Observation::getOccurrenceKey, observation -> observation, (first, duplicate) -> first));
+        Map<String, Observation> stored =
+                observationRepository
+                        .findByAgentJobId(job.getId(), job.getWorkspace().getId())
+                        .stream()
+                        .filter(observation -> observation.getOccurrenceKey() != null)
+                        .collect(java.util.stream.Collectors.toMap(
+                                Observation::getOccurrenceKey,
+                                observation -> observation,
+                                (first, duplicate) -> first));
         Observation first = proposed.stream()
                 .map(ValidatedObservation::occurrenceKey)
                 .map(stored::get)
@@ -666,7 +674,8 @@ public class FeedbackLedgerRecorder {
         if (feedbackRepository.existsByAgentJobIdAndPosition(job.getId(), UNDELIVERED_UNIT_ORDINAL)) {
             return; // already recorded (job retry)
         }
-        List<Observation> observations = observationRepository.findByAgentJobId(job.getId());
+        List<Observation> observations = observationRepository.findByAgentJobId(
+                job.getId(), job.getWorkspace().getId());
         if (observations.isEmpty()) {
             return;
         }

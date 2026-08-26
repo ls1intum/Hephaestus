@@ -78,7 +78,7 @@ class FeedbackResponseSuppressionFilterTest extends BaseUnitTest {
 
         assertThat(d.deliverable()).isEqualTo(in);
         assertThat(d.suppressedCount()).isZero();
-        verify(observationRepository, never()).findByAgentJobId(any());
+        verify(observationRepository, never()).findByAgentJobId(any(), org.mockito.ArgumentMatchers.anyLong());
     }
 
     @Test
@@ -111,7 +111,8 @@ class FeedbackResponseSuppressionFilterTest extends BaseUnitTest {
     @Test
     void unreactedLocus_isDelivered() {
         var pf = pf(CK);
-        when(observationRepository.findByAgentJobId(any())).thenReturn(List.of(pf));
+        when(observationRepository.findByAgentJobId(any(), org.mockito.ArgumentMatchers.anyLong()))
+                .thenReturn(List.of(pf));
         when(reactionRepository.findCurrentResolutionByRecurrenceKeys(any(), eq(CONTRIBUTOR), any()))
                 .thenReturn(List.of());
 
@@ -155,7 +156,8 @@ class FeedbackResponseSuppressionFilterTest extends BaseUnitTest {
                 null);
         var pf = pf(secretKey);
         var reaction = locus(secretKey, FeedbackResolution.DISPUTED);
-        when(observationRepository.findByAgentJobId(any())).thenReturn(List.of(pf));
+        when(observationRepository.findByAgentJobId(any(), org.mockito.ArgumentMatchers.anyLong()))
+                .thenReturn(List.of(pf));
         when(reactionRepository.findCurrentResolutionByRecurrenceKeys(any(), eq(CONTRIBUTOR), any()))
                 .thenReturn(List.of(reaction));
 
@@ -186,7 +188,8 @@ class FeedbackResponseSuppressionFilterTest extends BaseUnitTest {
         // A persisted observation may carry a null recurrence_key (a detector that emitted no locatable
         // observations). With no keys to bind, the native IN (:recurrenceKeys) query is skipped entirely.
         var pf = pf(null);
-        when(observationRepository.findByAgentJobId(any())).thenReturn(List.of(pf));
+        when(observationRepository.findByAgentJobId(any(), org.mockito.ArgumentMatchers.anyLong()))
+                .thenReturn(List.of(pf));
 
         var d = filter(true).evaluate(job(), List.of(vf(SLUG, Presence.ABSENT)));
 
@@ -200,7 +203,8 @@ class FeedbackResponseSuppressionFilterTest extends BaseUnitTest {
     private void stubPersistedAndReaction(FeedbackResolution action) {
         var pf = pf(CK);
         var reaction = reaction(action);
-        when(observationRepository.findByAgentJobId(any())).thenReturn(List.of(pf));
+        when(observationRepository.findByAgentJobId(any(), org.mockito.ArgumentMatchers.anyLong()))
+                .thenReturn(List.of(pf));
         when(reactionRepository.findCurrentResolutionByRecurrenceKeys(any(), eq(CONTRIBUTOR), any()))
                 .thenReturn(List.of(reaction));
     }
@@ -218,7 +222,8 @@ class FeedbackResponseSuppressionFilterTest extends BaseUnitTest {
         Observation second = pf(CK, "occ-second");
         List<Observation> persisted = List.of(first, second);
         var disputed = List.of(reaction(FeedbackResolution.DISPUTED));
-        when(observationRepository.findByAgentJobId(any())).thenReturn(persisted);
+        when(observationRepository.findByAgentJobId(any(), org.mockito.ArgumentMatchers.anyLong()))
+                .thenReturn(persisted);
         when(reactionRepository.findCurrentResolutionByRecurrenceKeys(any(), eq(CONTRIBUTOR), any()))
                 .thenReturn(disputed);
 

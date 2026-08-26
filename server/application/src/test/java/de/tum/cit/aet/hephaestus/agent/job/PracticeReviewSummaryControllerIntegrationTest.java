@@ -359,6 +359,7 @@ class PracticeReviewSummaryControllerIntegrationTest extends AbstractWorkspaceIn
                 id,
                 "summary-" + id,
                 job.getId(),
+                job.getWorkspace().getId(),
                 practice.getId(),
                 null,
                 ArtifactKinds.PULL_REQUEST.value(),

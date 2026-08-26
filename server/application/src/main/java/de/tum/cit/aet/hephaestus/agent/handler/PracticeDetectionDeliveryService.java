@@ -259,6 +259,7 @@ public class PracticeDetectionDeliveryService {
                     UUID.randomUUID(),
                     occurrenceKey,
                     job.getId(),
+                    job.getWorkspace().getId(),
                     practice.getId(),
                     practiceRevisionId,
                     artifactKind.value(),

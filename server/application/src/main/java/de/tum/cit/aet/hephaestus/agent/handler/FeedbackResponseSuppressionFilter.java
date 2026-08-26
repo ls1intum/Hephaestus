@@ -56,7 +56,8 @@ class FeedbackResponseSuppressionFilter {
         if (!reviewProperties.reactionSuppression()) {
             return new SuppressionDecision(scopedObservations, 0);
         }
-        List<Observation> persisted = observationRepository.findByAgentJobId(job.getId());
+        List<Observation> persisted = observationRepository.findByAgentJobId(
+                job.getId(), job.getWorkspace().getId());
         if (persisted.isEmpty()) {
             return new SuppressionDecision(scopedObservations, 0);
         }

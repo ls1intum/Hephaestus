@@ -736,6 +736,7 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
                     observationId,
                     "occ-" + observationId,
                     job.getId(),
+                    job.getWorkspace().getId(),
                     practice.getId(),
                     null,
                     ArtifactKinds.CONVERSATION_THREAD.value(),

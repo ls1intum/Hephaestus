@@ -126,6 +126,7 @@ class ObservationControllerIntegrationTest extends AbstractWorkspaceIntegrationT
                 id,
                 "key-" + id,
                 agentJob.getId(),
+                agentJob.getWorkspace().getId(),
                 practice.getId(),
                 practice.getCurrentRevision().getId(),
                 artifactKind,
@@ -675,6 +676,7 @@ class ObservationControllerIntegrationTest extends AbstractWorkspaceIntegrationT
                     otherFindingId,
                     "key-" + otherFindingId,
                     otherJob.getId(),
+                    otherJob.getWorkspace().getId(),
                     otherPractice.getId(),
                     null, // practiceRevisionId
                     "scm.pull_request",
@@ -929,6 +931,7 @@ class ObservationControllerIntegrationTest extends AbstractWorkspaceIntegrationT
                     findingId,
                     "key-" + findingId,
                     agentJob.getId(),
+                    agentJob.getWorkspace().getId(),
                     practiceA.getId(),
                     null, // practiceRevisionId
                     "scm.pull_request",
@@ -973,6 +976,7 @@ class ObservationControllerIntegrationTest extends AbstractWorkspaceIntegrationT
                     findingId,
                     "key-" + findingId,
                     agentJob.getId(),
+                    agentJob.getWorkspace().getId(),
                     practiceA.getId(),
                     null, // practiceRevisionId
                     "scm.pull_request",
@@ -1203,6 +1207,7 @@ class ObservationControllerIntegrationTest extends AbstractWorkspaceIntegrationT
                     ws2FindingId,
                     "key-" + ws2FindingId,
                     otherJob.getId(),
+                    otherJob.getWorkspace().getId(),
                     otherPractice.getId(),
                     null, // practiceRevisionId
                     "scm.pull_request",

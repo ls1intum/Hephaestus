@@ -20,6 +20,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeGroupRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
+import de.tum.cit.aet.hephaestus.practices.PracticeRevisionRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
@@ -27,6 +28,7 @@ import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.ObservationOrigin;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeGroup;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeRevision;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository.PresenceCount;
@@ -61,6 +63,9 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     private PracticeRepository practiceRepository;
+
+    @Autowired
+    private PracticeRevisionRepository practiceRevisionRepository;
 
     @Autowired
     private PracticeGroupRepository practiceGroupRepository;
@@ -108,6 +113,7 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
         practice.setCriteria("Test description");
         practice.setBindings(PracticeTestEvidence.bindings(ScmSignals.PULL_REQUEST_OPENED));
         practice = practiceRepository.save(practice);
+        practice = pinCurrentRevision(practice);
 
         agentJob = new AgentJob();
         agentJob.setWorkspace(workspace);
@@ -123,6 +129,12 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
         aboutUser = userRepository.save(aboutUser);
     }
 
+    private Practice pinCurrentRevision(Practice practice) {
+        PracticeRevision revision = practiceRevisionRepository.save(new PracticeRevision(practice, 1));
+        practice.setCurrentRevision(revision);
+        return practiceRepository.save(practice);
+    }
+
     @Nested
     class InsertIfAbsentTests {
 
@@ -133,6 +145,7 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
                     id,
                     "key-1",
                     agentJob.getId(),
+                    agentJob.getWorkspace().getId(),
                     practice.getId(),
                     null, // practiceRevisionId
                     "scm.pull_request",
@@ -170,6 +183,7 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
                     id1,
                     "dup-key",
                     agentJob.getId(),
+                    agentJob.getWorkspace().getId(),
                     practice.getId(),
                     null, // practiceRevisionId
                     "scm.pull_request",
@@ -189,6 +203,7 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
                     id2,
                     "dup-key",
                     agentJob.getId(),
+                    agentJob.getWorkspace().getId(),
                     practice.getId(),
                     null, // practiceRevisionId
                     "scm.pull_request",
@@ -218,6 +233,7 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
                     id,
                     "evidence-key",
                     agentJob.getId(),
+                    agentJob.getWorkspace().getId(),
                     practice.getId(),
                     null, // practiceRevisionId
                     "scm.pull_request",
@@ -254,6 +270,7 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
                     id,
                     "purge-key",
                     agentJob.getId(),
+                    agentJob.getWorkspace().getId(),
                     practice.getId(),
                     null, // practiceRevisionId
                     "scm.pull_request",
@@ -291,6 +308,7 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
             practiceB.setCriteria("Workspace B practice");
             practiceB.setBindings(PracticeTestEvidence.bindings(ScmSignals.PULL_REQUEST_OPENED));
             practiceB = practiceRepository.save(practiceB);
+            practiceB = pinCurrentRevision(practiceB);
 
             AgentJob agentJobB = new AgentJob();
             agentJobB.setWorkspace(workspaceB);
@@ -303,6 +321,7 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
                     UUID.randomUUID(),
                     "ws-a-key",
                     agentJob.getId(),
+                    agentJob.getWorkspace().getId(),
                     practice.getId(),
                     null, // practiceRevisionId
                     "scm.pull_request",
@@ -322,6 +341,7 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
                     UUID.randomUUID(),
                     "ws-b-key",
                     agentJobB.getId(),
+                    agentJobB.getWorkspace().getId(),
                     practiceB.getId(),
                     null, // practiceRevisionId
                     "scm.pull_request",
@@ -369,12 +389,14 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
             otherPractice.setCriteria("Other description");
             otherPractice.setBindings(PracticeTestEvidence.bindings(ScmSignals.PULL_REQUEST_OPENED));
             otherPractice = practiceRepository.save(otherPractice);
+            otherPractice = pinCurrentRevision(otherPractice);
 
             // Finding on the practice to be deleted
             observationRepository.insertIfAbsent(
                     UUID.randomUUID(),
                     "cascade-key-1",
                     agentJob.getId(),
+                    agentJob.getWorkspace().getId(),
                     practice.getId(),
                     null, // practiceRevisionId
                     "scm.pull_request",
@@ -394,6 +416,7 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
                     UUID.randomUUID(),
                     "cascade-key-2",
                     agentJob.getId(),
+                    agentJob.getWorkspace().getId(),
                     otherPractice.getId(),
                     null, // practiceRevisionId
                     "scm.pull_request",
@@ -444,6 +467,7 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
                     UUID.randomUUID(),
                     key,
                     jobId,
+                    workspace.getId(),
                     practice.getId(),
                     null,
                     "scm.pull_request",
@@ -545,6 +569,7 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
                     id,
                     "tt-roundtrip",
                     agentJob.getId(),
+                    agentJob.getWorkspace().getId(),
                     practice.getId(),
                     null, // practiceRevisionId
                     "scm.pull_request",
@@ -586,6 +611,7 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
                     UUID.randomUUID(),
                     key,
                     jobId,
+                    targetPractice.getWorkspace().getId(),
                     targetPractice.getId(),
                     null,
                     "scm.pull_request",
@@ -663,6 +689,7 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
             otherPractice.setCriteria("Other criteria");
             otherPractice.setBindings(PracticeTestEvidence.bindings(ScmSignals.PULL_REQUEST_OPENED));
             otherPractice = practiceRepository.save(otherPractice);
+            otherPractice = pinCurrentRevision(otherPractice);
 
             AgentJob otherJob = new AgentJob();
             otherJob.setWorkspace(otherWorkspace);
@@ -734,6 +761,7 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
                     UUID.randomUUID(),
                     key,
                     agentJob.getId(),
+                    agentJob.getWorkspace().getId(),
                     practice.getId(),
                     null,
                     "scm.pull_request",
@@ -814,6 +842,7 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
                     UUID.randomUUID(),
                     key,
                     jobId,
+                    workspace.getId(),
                     practice.getId(),
                     null,
                     "scm.pull_request",

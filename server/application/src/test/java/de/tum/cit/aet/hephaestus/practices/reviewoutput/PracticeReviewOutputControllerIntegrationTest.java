@@ -176,6 +176,7 @@ class PracticeReviewOutputControllerIntegrationTest extends AbstractWorkspaceInt
                 id,
                 "occurrence-" + id,
                 agentJob.getId(),
+                practice.getWorkspace().getId(),
                 practice.getId(),
                 null,
                 ArtifactKinds.PULL_REQUEST.value(),

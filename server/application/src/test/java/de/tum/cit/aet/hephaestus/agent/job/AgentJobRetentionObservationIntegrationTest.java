@@ -62,6 +62,7 @@ class AgentJobRetentionObservationIntegrationTest extends AbstractWorkspaceInteg
                 findingId,
                 "retention-" + findingId,
                 referenced.getId(),
+                referenced.getWorkspace().getId(),
                 practice.getId(),
                 null,
                 ArtifactKinds.PULL_REQUEST.value(),

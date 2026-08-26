@@ -13,6 +13,7 @@ import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
+import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -39,9 +40,13 @@ class ObservationAdmissionServiceTest extends BaseUnitTest {
         job.setId(UUID.randomUUID());
         job.setStatus(AgentJobStatus.RUNNING);
         job.setJobType(AgentJobType.PULL_REQUEST_REVIEW);
+        Workspace workspace = new Workspace();
+        workspace.setId(1L);
+        job.setWorkspace(workspace);
         job.setMetadata(mapper.createObjectNode());
         when(jobs.findByIdWithWorkspaceForUpdate(job.getId())).thenReturn(Optional.of(job));
-        when(observations.findByAgentJobId(job.getId())).thenReturn(List.of());
+        when(observations.findByAgentJobId(job.getId(), job.getWorkspace().getId()))
+                .thenReturn(List.of());
     }
 
     @Test
@@ -99,7 +104,8 @@ class ObservationAdmissionServiceTest extends BaseUnitTest {
         when(observation.getPresence()).thenReturn(Presence.PRESENT);
         when(observation.getEvidence()).thenReturn(evidence);
         when(observation.getEvidenceRationale()).thenReturn("The issue states why.");
-        when(observations.findByAgentJobId(job.getId())).thenReturn(List.of(observation));
+        when(observations.findByAgentJobId(job.getId(), job.getWorkspace().getId()))
+                .thenReturn(List.of(observation));
 
         ObjectNode response =
                 service.admit(job.getId(), mapper.createArrayNode().add("one"));

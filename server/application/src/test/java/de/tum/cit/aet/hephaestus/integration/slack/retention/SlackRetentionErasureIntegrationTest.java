@@ -263,6 +263,7 @@ class SlackRetentionErasureIntegrationTest extends BaseIntegrationTest {
                 observationId,
                 "occ-" + observationId,
                 job.getId(),
+                job.getWorkspace().getId(),
                 practice.getId(),
                 null,
                 artifactKind.value(),

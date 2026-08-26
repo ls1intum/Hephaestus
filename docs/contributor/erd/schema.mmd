@@ -790,6 +790,7 @@ erDiagram
         BIGINT practice_revision_id FK
         VARCHAR(8) assessment
         VARCHAR(16) origin "NOT NULL"
+        BIGINT workspace_id FK "NOT NULL"
     }
 
     Organization {
@@ -872,7 +873,7 @@ erDiagram
     }
 
     Practice {
-        BIGINT id PK
+        BIGINT id PK,UK
         BIGINT workspace_id FK,UK "NOT NULL"
         VARCHAR(64) slug UK "NOT NULL"
         VARCHAR(128) name "NOT NULL"
@@ -1580,6 +1581,7 @@ erDiagram
     User ||--o{ Milestone : created_by
     Practice ||--o{ Observation : has
     PracticeRevision ||--o{ Observation : has
+    Workspace ||--o{ Observation : has
     AgentJob ||--o{ Observation : has
     User ||--o{ Observation : has
     IdentityProvider ||--o{ Organization : references
