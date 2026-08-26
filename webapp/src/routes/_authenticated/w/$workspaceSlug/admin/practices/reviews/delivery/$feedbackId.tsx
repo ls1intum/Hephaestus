@@ -45,7 +45,7 @@ function FeedbackDetailRoute() {
 		onSuccess: async (_, variables) => {
 			toast.success(
 				variables.body.decision === "APPROVED"
-					? "Approval recorded. Sending the review…"
+					? "Review approved. Delivery is being checked."
 					: "Review rejected",
 			);
 			await Promise.all([

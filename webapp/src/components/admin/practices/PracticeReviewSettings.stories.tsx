@@ -351,8 +351,8 @@ export const SelectedEmptyMeansNobody: Story = {
 		},
 	},
 	play: async ({ canvas }) => {
-		await expect(canvas.getByText("Nothing is being reviewed")).toBeVisible();
-		await expect(canvas.getByText(/an empty list covers nobody/i)).toBeVisible();
+		await expect(canvas.getByText("No repositories are selected")).toBeVisible();
+		await expect(canvas.getByText("No people are selected")).toBeVisible();
 	},
 };
 
@@ -442,6 +442,10 @@ export const CoveragePreviewLoading: Story = {
 		await userEvent.click(canvas.getByRole("radio", { name: "All monitored repositories" }));
 
 		await expect(canvas.getByRole("radio", { name: "All monitored repositories" })).toBeChecked();
+		await expect(canvas.getByRole("radio", { name: "Selected repositories" })).toBeEnabled();
+		await expect(
+			canvas.getByRole("radio", { name: "Every member of this workspace" }),
+		).toBeEnabled();
 		await expect(canvas.getByRole("status")).toHaveTextContent("Checking the proposed coverage…");
 		await expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
 	},

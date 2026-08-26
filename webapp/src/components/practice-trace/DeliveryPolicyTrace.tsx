@@ -1,9 +1,10 @@
-import { ChevronDownIcon } from "lucide-react";
+import { CheckCircle2Icon, ChevronDownIcon, CircleStopIcon } from "lucide-react";
 import type {
 	DeliveryPolicyFactsSnapshot,
 	DeliveryPolicyTrace as DeliveryPolicyTraceData,
 } from "@/api/types.gen";
 import { StatusBadge } from "@/components/practice-vocabulary/StatusBadge";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
@@ -28,7 +29,7 @@ export function DeliveryPolicyTrace({ evaluations }: DeliveryPolicyTraceProps) {
 	if (evaluations.length === 0) return null;
 
 	return (
-		<Collapsible className="rounded-lg border bg-card p-4 text-sm">
+		<Collapsible className="min-w-0 rounded-lg border bg-card p-4 text-sm">
 			<CollapsibleTrigger
 				className="group/trace"
 				render={
@@ -51,16 +52,22 @@ export function DeliveryPolicyTrace({ evaluations }: DeliveryPolicyTraceProps) {
 							key={`${evaluation.reviewId}-${evaluation.evaluatedAt.toISOString()}-${index}`}
 							className="space-y-2 rounded-md border p-3"
 						>
-							<p className="font-medium">
-								{DELIVERY_SURFACE_LABELS[evaluation.surface]} ·{" "}
-								{DELIVERY_STAGE_LABELS[evaluation.stage]} · admitted revision{" "}
-								{evaluation.admittedRevision}
-								{evaluation.evaluatedRevision == null
-									? ""
-									: ` · evaluated revision ${evaluation.evaluatedRevision}`}
-							</p>
+							<div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
+								<p className="min-w-0 break-words font-medium">
+									{DELIVERY_SURFACE_LABELS[evaluation.surface]} ·{" "}
+									{DELIVERY_STAGE_LABELS[evaluation.stage]}
+								</p>
+								<Badge variant={evaluation.allowed ? "success" : "warning"}>
+									{evaluation.allowed ? (
+										<CheckCircle2Icon aria-hidden />
+									) : (
+										<CircleStopIcon aria-hidden />
+									)}
+									{evaluation.allowed ? "Allowed" : "Stopped"}
+								</Badge>
+							</div>
 							<p className="text-xs text-muted-foreground">
-								Resolver {evaluation.resolverVersion} · Evaluated{" "}
+								Evaluated{" "}
 								<time dateTime={evaluation.evaluatedAt.toISOString()}>
 									{evaluation.evaluatedAt.toLocaleString()}
 								</time>
@@ -70,8 +77,17 @@ export function DeliveryPolicyTrace({ evaluations }: DeliveryPolicyTraceProps) {
 									Stopped here. {DELIVERY_REASON_SENTENCES[evaluation.decisiveReason]}
 								</p>
 							)}
-							<p className="text-xs text-muted-foreground">{scopeSentence(evaluation.facts)}</p>
+							<p className="min-w-0 break-words text-xs text-muted-foreground">
+								{scopeSentence(evaluation.facts)}
+							</p>
 							<PolicyFacts facts={evaluation.facts} />
+							<p className="min-w-0 break-all text-xs text-muted-foreground">
+								Policy revision {evaluation.admittedRevision}
+								{evaluation.evaluatedRevision == null
+									? ""
+									: `, evaluated as revision ${evaluation.evaluatedRevision}`}
+								{" · "}Resolver {evaluation.resolverVersion}
+							</p>
 							<ul className="space-y-1">
 								{evaluation.checks.map((check) => (
 									<li key={check.check} className="flex items-center justify-between gap-3 text-xs">
@@ -114,11 +130,11 @@ function PolicyFacts({ facts }: { facts: DeliveryPolicyFactsSnapshot }) {
 	] as const;
 
 	return (
-		<dl className="grid grid-cols-[max-content_1fr] gap-x-3 gap-y-1 text-xs text-muted-foreground">
+		<dl className="grid min-w-0 grid-cols-[max-content_minmax(0,1fr)] gap-x-3 gap-y-1 text-xs text-muted-foreground">
 			{rows.map(([label, value]) => (
 				<div key={label} className="contents">
 					<dt className="font-medium text-foreground">{label}</dt>
-					<dd>{value}</dd>
+					<dd className="min-w-0 break-words">{value}</dd>
 				</div>
 			))}
 		</dl>

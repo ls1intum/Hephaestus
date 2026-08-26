@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { CheckIcon, CircleXIcon, Clock3Icon, FileCode2Icon } from "lucide-react";
+import { CheckIcon, CircleXIcon, Clock3Icon, FileCode2Icon, ScanSearchIcon } from "lucide-react";
 import { useId, useState } from "react";
 import type {
 	DecideFeedbackProposalRequest,
@@ -19,6 +19,13 @@ import {
 } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+	Empty,
+	EmptyDescription,
+	EmptyHeader,
+	EmptyMedia,
+	EmptyTitle,
+} from "@/components/ui/empty";
 import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
 import {
 	Popover,
@@ -211,52 +218,66 @@ export function ProposalReviewPage({
 						Open an observation to inspect its rationale, citations, and source passages.
 					</p>
 				</div>
-				<ReviewRowList label="Observations behind this feedback">
-					{feedback.observations.map((observation) => (
-						<ReviewRow
-							key={observation.observationId}
-							status={observationResult(observation)}
-							title={
-								<Link
-									to="/w/$workspaceSlug/admin/practices/reviews/observations/$observationId"
-									params={{ workspaceSlug, observationId: observation.observationId }}
-									search={(previous) => previous}
-								>
-									{observation.summary}
-								</Link>
-							}
-							meta={
-								<ReviewRowMeta
-									items={[
-										<ReviewPracticeLink
-											key="practice"
-											workspaceSlug={workspaceSlug}
-											practiceSlug={observation.practiceSlug}
-											practiceName={observation.practiceName}
-											area={observation.area}
-											practice={practices?.find(
-												(practice) => practice.slug === observation.practiceSlug,
-											)}
-										/>,
-										observation.role === "PRIMARY"
-											? "What this feedback is about"
-											: "Supporting this feedback",
-									]}
-								/>
-							}
-							chips={[
-								{
-									key: "result",
-									node: <ObservationResultBadge observation={observation} />,
-								},
-								{
-									key: "currentness",
-									node: <ClaimCurrentnessBadge currentness={observation.claimCurrentness} />,
-								},
-							]}
-						/>
-					))}
-				</ReviewRowList>
+				{feedback.observations.length === 0 ? (
+					<Empty className="border">
+						<EmptyHeader>
+							<EmptyMedia variant="icon">
+								<ScanSearchIcon />
+							</EmptyMedia>
+							<EmptyTitle>No observations are linked to this review</EmptyTitle>
+							<EmptyDescription>
+								The review package is still exact, but its supporting observations are unavailable.
+							</EmptyDescription>
+						</EmptyHeader>
+					</Empty>
+				) : (
+					<ReviewRowList label="Observations behind this feedback">
+						{feedback.observations.map((observation) => (
+							<ReviewRow
+								key={observation.observationId}
+								status={observationResult(observation)}
+								title={
+									<Link
+										to="/w/$workspaceSlug/admin/practices/reviews/observations/$observationId"
+										params={{ workspaceSlug, observationId: observation.observationId }}
+										search={(previous) => previous}
+									>
+										{observation.summary}
+									</Link>
+								}
+								meta={
+									<ReviewRowMeta
+										items={[
+											<ReviewPracticeLink
+												key="practice"
+												workspaceSlug={workspaceSlug}
+												practiceSlug={observation.practiceSlug}
+												practiceName={observation.practiceName}
+												area={observation.area}
+												practice={practices?.find(
+													(practice) => practice.slug === observation.practiceSlug,
+												)}
+											/>,
+											observation.role === "PRIMARY"
+												? "What this feedback is about"
+												: "Supporting this feedback",
+										]}
+									/>
+								}
+								chips={[
+									{
+										key: "result",
+										node: <ObservationResultBadge observation={observation} />,
+									},
+									{
+										key: "currentness",
+										node: <ClaimCurrentnessBadge currentness={observation.claimCurrentness} />,
+									},
+								]}
+							/>
+						))}
+					</ReviewRowList>
+				)}
 			</section>
 
 			<footer className="sticky bottom-0 z-20 flex flex-col-reverse gap-2 border-t bg-background/95 py-3 backdrop-blur supports-[backdrop-filter]:bg-background/85 sm:flex-row sm:items-center sm:justify-end">

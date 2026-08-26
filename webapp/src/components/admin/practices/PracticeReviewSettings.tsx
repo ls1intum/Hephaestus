@@ -418,9 +418,9 @@ function ReviewedWorkSection({
 		void previewScope(next);
 	};
 	const summary = settings.coverageSummary;
-	const coversNobody =
-		(scope.repositoryMode === "SELECTED" && scope.repositories.length === 0) ||
-		(scope.personMode === "SELECTED" && scope.personUserIds.length === 0);
+	const coversNoRepositories =
+		scope.repositoryMode === "SELECTED" && scope.repositories.length === 0;
+	const coversNoPeople = scope.personMode === "SELECTED" && scope.personUserIds.length === 0;
 	const monitoredListKnown = !coverage.repositories.isLoading && !coverage.repositories.isError;
 	const monitoredNames = new Set(coverage.repositories.options.map((option) => option.value));
 	const monitoredNow = (nameWithOwner: string) =>
@@ -435,8 +435,6 @@ function ReviewedWorkSection({
 		scope.personMode === "ALL_ELIGIBLE"
 			? summary.eligiblePeople
 			: scope.personUserIds.filter((id) => !eligibleListKnown || eligibleIds.has(id)).length;
-	const previewBusy = previewState.status === "pending";
-
 	return (
 		<section className="space-y-6" aria-labelledby="reviewed-work-heading">
 			<div className="space-y-1">
@@ -470,17 +468,6 @@ function ReviewedWorkSection({
 				</Alert>
 			) : null}
 
-			{coversNobody ? (
-				<Alert variant="warning" role="status">
-					<AlertCircle />
-					<AlertTitle>Nothing is being reviewed</AlertTitle>
-					<AlertDescription>
-						A selected list is empty, and an empty list covers nobody. Pick at least one repository
-						and one person, or go back to covering all of them.
-					</AlertDescription>
-				</Alert>
-			) : null}
-
 			<Field>
 				<CoverageLabel
 					id={`${repositoryScopeId}-label`}
@@ -492,7 +479,7 @@ function ReviewedWorkSection({
 				<RadioGroup
 					aria-labelledby={`${repositoryScopeId}-label`}
 					value={scope.repositoryMode}
-					disabled={policy.isSaving || previewBusy}
+					disabled={policy.isSaving}
 					onValueChange={(mode) => {
 						const next = { ...scope, repositoryMode: mode };
 						void previewScope(next);
@@ -523,13 +510,23 @@ function ReviewedWorkSection({
 							options={repositoryOptions}
 							selected={repositoryNames}
 							onChange={replaceRepositories}
-							disabled={policy.isSaving || previewBusy || coverage.repositories.isLoading}
+							disabled={policy.isSaving || coverage.repositories.isLoading}
 							emptyLabel={
 								coverage.repositories.isError
 									? "Repositories unavailable"
 									: "No monitored repositories"
 							}
 						/>
+						{coversNoRepositories ? (
+							<Alert variant="warning" role="status">
+								<AlertCircle />
+								<AlertTitle>No repositories are selected</AlertTitle>
+								<AlertDescription>
+									An empty selected list covers nobody. Choose a repository or cover all monitored
+									repositories.
+								</AlertDescription>
+							</Alert>
+						) : null}
 						{scope.repositories.length > 0 ? (
 							<ItemGroup>
 								{scope.repositories.map((repository) => (
@@ -538,7 +535,7 @@ function ReviewedWorkSection({
 										nameWithOwner={repository.nameWithOwner}
 										baseBranches={repository.baseBranches}
 										monitored={monitoredNow(repository.nameWithOwner)}
-										disabled={policy.isSaving || previewBusy}
+										disabled={policy.isSaving}
 										onChange={(baseBranches) => {
 											const next = {
 												...scope,
@@ -570,7 +567,7 @@ function ReviewedWorkSection({
 				<RadioGroup
 					aria-labelledby={`${personScopeId}-label`}
 					value={scope.personMode}
-					disabled={policy.isSaving || previewBusy}
+					disabled={policy.isSaving}
 					onValueChange={(mode) => {
 						const next = { ...scope, personMode: mode };
 						void previewScope(next);
@@ -601,9 +598,19 @@ function ReviewedWorkSection({
 							options={personOptions}
 							selected={scope.personUserIds}
 							onChange={(personUserIds) => void previewScope({ ...scope, personUserIds })}
-							disabled={policy.isSaving || previewBusy || coverage.people.isLoading}
+							disabled={policy.isSaving || coverage.people.isLoading}
 							emptyLabel={coverage.people.isError ? "Members unavailable" : "No workspace members"}
 						/>
+						{coversNoPeople ? (
+							<Alert variant="warning" role="status">
+								<AlertCircle />
+								<AlertTitle>No people are selected</AlertTitle>
+								<AlertDescription>
+									An empty selected list covers nobody. Choose a person or cover every workspace
+									member.
+								</AlertDescription>
+							</Alert>
+						) : null}
 						{scope.personUserIds.length > 0 ? (
 							<ul className="flex flex-wrap gap-2">
 								{scope.personUserIds.map((userId) => (
@@ -617,7 +624,7 @@ function ReviewedWorkSection({
 												personOptions.find((option) => option.value === userId)?.label ??
 												`member ${userId}`
 											} from covered people`}
-											disabled={policy.isSaving || previewBusy}
+											disabled={policy.isSaving}
 											onRemove={() =>
 												void previewScope({
 													...scope,
@@ -902,7 +909,6 @@ function BaseBranchEditor({
 						disabled={disabled || trimmed.length === 0 || duplicate}
 						onClick={add}
 					>
-						{/* The visible word opens the accessible name, so voice control can say it (WCAG 2.2 SC 2.5.3). */}
 						Add
 						<span className="sr-only"> to base branches for {nameWithOwner}</span>
 					</InputGroupButton>

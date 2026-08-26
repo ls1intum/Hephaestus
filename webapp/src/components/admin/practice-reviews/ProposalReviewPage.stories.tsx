@@ -77,6 +77,14 @@ export const PackageUnavailable: Story = {
 	},
 };
 
+export const NoObservations: Story = {
+	args: { feedback: { ...feedback, observations: [] } },
+	play: async ({ canvas }) => {
+		await expect(canvas.getByText("No observations are linked to this review")).toBeVisible();
+		await expect(canvas.getByRole("button", { name: "Approve and send review" })).toBeEnabled();
+	},
+};
+
 export const RejectingWithContext: Story = {
 	play: async ({ canvas, args }) => {
 		await userEvent.click(canvas.getByRole("button", { name: "Reject feedback" }));

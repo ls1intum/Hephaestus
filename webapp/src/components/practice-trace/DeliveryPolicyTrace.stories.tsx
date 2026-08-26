@@ -86,11 +86,11 @@ type Story = StoryObj<typeof meta>;
 export const Denied: Story = {
 	play: async ({ canvas }) => {
 		await openTrace(canvas);
+		await expect(await canvas.findByText("In-context feedback · Final delivery")).toBeVisible();
 		await expect(
-			await canvas.findByText(
-				"In-context feedback · Final delivery · admitted revision 4 · evaluated revision 5",
-			),
+			canvas.getByText("Policy revision 4, evaluated as revision 5 · Resolver 1"),
 		).toBeVisible();
+		await expect(canvas.getByText("Stopped")).toBeVisible();
 		await expect(
 			canvas.getByText("Stopped here. The developer has opted out of AI feedback."),
 		).toBeVisible();
@@ -103,11 +103,8 @@ export const Allowed: Story = {
 	args: { evaluations: [allowedEvaluation] },
 	play: async ({ canvas }) => {
 		await openTrace(canvas);
-		await expect(
-			await canvas.findByText(
-				"In-context feedback · Final delivery · admitted revision 4 · evaluated revision 4",
-			),
-		).toBeVisible();
+		await expect(await canvas.findByText("In-context feedback · Final delivery")).toBeVisible();
+		await expect(canvas.getByText("Allowed")).toBeVisible();
 		await expect(canvas.queryByText(/^Stopped here\./)).not.toBeInTheDocument();
 	},
 };
@@ -152,7 +149,8 @@ export const Reflow: Story = {
 				...openScopeEvaluation,
 				facts: {
 					...openScopeEvaluation.facts,
-					baseBranch: "release/2026.09-bounded-practice-review-rollout",
+					baseBranch:
+						"release202609boundedpracticereviewrolloutwithoutanybreakopportunitiesxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
 				},
 			},
 		],
