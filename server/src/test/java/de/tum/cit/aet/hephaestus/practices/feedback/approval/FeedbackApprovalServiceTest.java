@@ -3,6 +3,8 @@ package de.tum.cit.aet.hephaestus.practices.feedback.approval;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -189,14 +191,15 @@ class FeedbackApprovalServiceTest {
     }
 
     @Test
-    void shouldAllowRejectionWithoutCategory() {
-        when(feedbackRepository.decideProposal(7L, feedbackId, "DISCARDED")).thenReturn(1);
-        FeedbackApproval result = service.decide(
-            7L,
-            feedbackId,
-            42L,
-            new DecideFeedbackProposalRequestDTO(FeedbackApprovalDecision.REJECTED, null, null)
-        );
-        assertThat(result.getRejectionReason()).isNull();
+    void shouldRequireARejectionCategory() {
+        assertThatThrownBy(() ->
+            service.decide(
+                7L,
+                feedbackId,
+                42L,
+                new DecideFeedbackProposalRequestDTO(FeedbackApprovalDecision.REJECTED, null, null)
+            )
+        ).isInstanceOf(ResponseStatusException.class);
+        verify(feedbackRepository, never()).decideProposal(anyLong(), any(), anyString());
     }
 }

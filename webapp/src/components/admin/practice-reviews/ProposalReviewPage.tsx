@@ -1,15 +1,22 @@
 import { Link } from "@tanstack/react-router";
-import { CheckIcon, CircleXIcon, Clock3Icon } from "lucide-react";
-import { useState } from "react";
+import { CheckIcon, CircleXIcon, Clock3Icon, FileCode2Icon } from "lucide-react";
+import { useId, useState } from "react";
 import type {
 	DecideFeedbackProposalRequest,
 	GetPracticeReviewFeedbackResponse,
 	Practice,
 } from "@/api/types.gen";
+import { UNTRUSTED_MARKDOWN_PROSE, UntrustedMarkdown } from "@/components/common/UntrustedMarkdown";
 import { DELIVERY_PLACE_DEFS } from "@/components/practice-vocabulary/delivery-place-defs";
 import { observationResult } from "@/components/practice-vocabulary/observation-result";
 import { placementLabel } from "@/components/practice-vocabulary/placement-defs";
 import { StatusBadge } from "@/components/practice-vocabulary/StatusBadge";
+import {
+	Accordion,
+	AccordionContent,
+	AccordionItem,
+	AccordionTrigger,
+} from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
@@ -63,11 +70,16 @@ export function ProposalReviewPage({
 	onReject,
 }: ProposalReviewPageProps) {
 	const place = DELIVERY_PLACE_DEFS[feedback.channel];
+	const proposedPlacements = feedback.proposedPlacements;
+	const packageUnavailable = proposedPlacements.length === 0;
+	const summary = proposedPlacements.find((placement) => placement.type === "SUMMARY");
+	const inline = proposedPlacements.filter((placement) => placement.type === "INLINE");
+	const packageSummary = `${summary ? "1 summary" : "No summary"} and ${inline.length} ${
+		inline.length === 1 ? "line comment" : "line comments"
+	}`;
 	const placements = Array.from(
 		new Set(
-			feedback.placements.map((placement) =>
-				placementLabel(feedback.channel, placement.placementType),
-			),
+			proposedPlacements.map((placement) => placementLabel(feedback.channel, placement.type)),
 		),
 	);
 	const subjectDiffers = feedback.subject && feedback.subject.id !== feedback.recipient?.id;
@@ -100,9 +112,8 @@ export function ProposalReviewPage({
 				title={`Feedback for ${subjectLabel(feedback.recipient)}`}
 				provenance={
 					<p className="max-w-2xl text-sm text-muted-foreground">
-						Review the exact feedback, the work it addresses, and every observation behind it.
-						Approval sends only this feedback, and it arrives as one comment on the work — notes on
-						individual lines are posted only for feedback that sends automatically.
+						Review the complete package before anything is sent. One decision covers the summary and
+						every line comment below.
 					</p>
 				}
 			/>
@@ -135,13 +146,60 @@ export function ProposalReviewPage({
 						)}
 					</div>
 				</ReviewFact>
+				{feedback.reviewedRevision && (
+					<ReviewFact label="Reviewed revision">
+						<code className="break-all text-xs">{feedback.reviewedRevision}</code>
+					</ReviewFact>
+				)}
 			</ReviewFactGrid>
 
 			<section aria-labelledby="proposal-feedback-heading" className="space-y-3">
-				<h3 id="proposal-feedback-heading" className="text-lg font-semibold">
-					Feedback to send
-				</h3>
-				<FeedbackBody feedback={feedback} />
+				<div>
+					<h3 id="proposal-feedback-heading" className="text-lg font-semibold">
+						What will be sent
+					</h3>
+					<p className="text-sm text-muted-foreground">{packageSummary}</p>
+				</div>
+				{packageUnavailable && (
+					<p role="alert" className="rounded-lg border border-destructive/40 p-3 text-sm">
+						This review package is unavailable. Reject it or wait for a replacement; it cannot be
+						sent safely.
+					</p>
+				)}
+				{summary && <FeedbackBody feedback={{ ...feedback, body: summary.body }} />}
+				{inline.length > 0 && (
+					<Accordion
+						multiple
+						defaultValue={inline.map((_, index) => `inline-${index}`)}
+						className="rounded-xl border px-4"
+					>
+						{inline.map((placement, index) => (
+							<AccordionItem
+								key={`${placement.path}:${placement.startLine}:${index}`}
+								value={`inline-${index}`}
+							>
+								<AccordionTrigger className="gap-3 no-underline hover:no-underline">
+									<span className="flex min-w-0 items-start gap-2">
+										<FileCode2Icon className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+										<span className="min-w-0">
+											<span className="block break-all font-mono text-xs">{placement.path}</span>
+											<span className="block text-xs font-normal text-muted-foreground">
+												{placement.endLine && placement.endLine !== placement.startLine
+													? `Lines ${placement.startLine}–${placement.endLine}`
+													: `Line ${placement.startLine}`}
+											</span>
+										</span>
+									</span>
+								</AccordionTrigger>
+								<AccordionContent className="min-w-0 pb-4 pl-6">
+									<div className={`${UNTRUSTED_MARKDOWN_PROSE} min-w-0 break-words`}>
+										<UntrustedMarkdown>{placement.body}</UntrustedMarkdown>
+									</div>
+								</AccordionContent>
+							</AccordionItem>
+						))}
+					</Accordion>
+				)}
 			</section>
 
 			<section aria-labelledby="proposal-observations-heading" className="space-y-3">
@@ -203,8 +261,8 @@ export function ProposalReviewPage({
 
 			<footer className="sticky bottom-0 z-20 flex flex-col-reverse gap-2 border-t bg-background/95 py-3 backdrop-blur supports-[backdrop-filter]:bg-background/85 sm:flex-row sm:items-center sm:justify-end">
 				<RejectFeedbackPopover feedbackId={feedback.id} disabled={isDeciding} onReject={onReject} />
-				<Button disabled={isDeciding} onClick={() => onApprove(feedback.id)}>
-					{isDeciding ? <Spinner /> : <CheckIcon />} Approve and send
+				<Button disabled={isDeciding || packageUnavailable} onClick={() => onApprove(feedback.id)}>
+					{isDeciding ? <Spinner /> : <CheckIcon />} Approve and send review
 				</Button>
 			</footer>
 		</article>
@@ -223,6 +281,8 @@ function RejectFeedbackPopover({
 	const [open, setOpen] = useState(false);
 	const [reason, setReason] = useState<ProposalRejectionReason | "">("");
 	const [note, setNote] = useState("");
+	const rejectionId = useId();
+	const noteId = useId();
 	return (
 		<Popover open={open} onOpenChange={setOpen}>
 			<PopoverTrigger render={<Button variant="outline" disabled={disabled} />}>
@@ -246,18 +306,18 @@ function RejectFeedbackPopover({
 					{REJECTION_REASONS.map((option) => (
 						<label
 							key={option.value}
-							htmlFor={`rejection-${option.value}`}
+							htmlFor={`${rejectionId}-${option.value}`}
 							className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted has-data-checked:bg-muted"
 						>
-							<RadioGroupItem id={`rejection-${option.value}`} value={option.value} />
+							<RadioGroupItem id={`${rejectionId}-${option.value}`} value={option.value} />
 							<span>{option.label}</span>
 						</label>
 					))}
 				</RadioGroup>
 				<Field>
-					<FieldLabel htmlFor="rejection-note">Note</FieldLabel>
+					<FieldLabel htmlFor={noteId}>Note</FieldLabel>
 					<Textarea
-						id="rejection-note"
+						id={noteId}
 						value={note}
 						onChange={(event) => setNote(event.target.value)}
 						maxLength={500}
@@ -272,7 +332,8 @@ function RejectFeedbackPopover({
 					<Button
 						variant="destructive"
 						size="sm"
-						onClick={() => onReject(feedbackId, reason || undefined, note.trim() || undefined)}
+						disabled={disabled || !reason}
+						onClick={() => reason && onReject(feedbackId, reason, note.trim() || undefined)}
 					>
 						Reject feedback
 					</Button>

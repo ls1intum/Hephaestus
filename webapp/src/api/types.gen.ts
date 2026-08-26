@@ -56,7 +56,13 @@ export type WorkspaceReviewScope = {
 };
 
 export type ReviewRepositoryTarget = {
+    /**
+     * Exact pull-request base branches to cover; empty covers every base branch
+     */
     baseBranches: Array<string>;
+    /**
+     * Exact provider repository name, including its owner
+     */
     nameWithOwner: string;
 };
 
@@ -106,6 +112,10 @@ export type WorkspaceMembership = {
      * Timestamp when the membership was created
      */
     createdAt?: Date;
+    /**
+     * Whether this linked human member can be selected for practice-review coverage
+     */
+    eligibleForPracticeReview?: boolean;
     /**
      * Whether the member is hidden from the leaderboard
      */
@@ -1997,6 +2007,26 @@ export type ReviewRequestOutcome = {
     status: 'SUBMITTED' | 'REFUSED';
 };
 
+/**
+ * One exact provider message included in a review awaiting approval
+ */
+export type ReviewProposedPlacement = {
+    body: string;
+    /**
+     * Last 1-based line; null for a single-line comment or summary
+     */
+    endLine?: number;
+    /**
+     * Head-side file path; null for the summary
+     */
+    path?: string;
+    /**
+     * First 1-based line; null for the summary
+     */
+    startLine?: number;
+    type: 'SUMMARY' | 'INLINE' | 'CONVERSATION_TURN';
+};
+
 export type ReviewPracticeArea = {
     /**
      * Palette color key
@@ -2105,14 +2135,14 @@ export type ReviewBoundFeedback = {
      * When the message was placed; null if it was not delivered
      */
     deliveredAt?: Date;
-    deliveryState: 'AWAITING_APPROVAL' | 'PREPARED' | 'DELIVERED' | 'SUPERSEDED' | 'SUPPRESSED' | 'FAILED' | 'DISCARDED';
+    deliveryState: 'AWAITING_APPROVAL' | 'PREPARED' | 'PARTIALLY_DELIVERED' | 'DELIVERED' | 'SUPERSEDED' | 'SUPPRESSED' | 'FAILED' | 'DISCARDED';
     feedbackId: string;
     /**
      * Whether the observation led the feedback or reinforced it
      */
     role: 'PRIMARY' | 'SUPPORTING';
     /**
-     * Why the message was withheld; null unless the state is SUPPRESSED
+     * Why delivery stopped; set on withheld or terminally partial feedback
      */
     suppressionReason?: 'VOLUME_CAPPED' | 'COMPOSER_DEDUPED' | 'REACTED_DISPUTED' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'ARTIFACT_GONE' | 'ARTIFACT_CLOSED' | 'ARTIFACT_MERGED' | 'ARTIFACT_DRAFT' | 'RECIPIENT_OPTED_OUT' | 'EMPTY_AFTER_SANITIZE' | 'INSTANCE_SILENCED' | 'WORKSPACE_DISABLED' | 'WORKSPACE_DELIVERY_PAUSED' | 'STALE_ROLLOUT_REVISION' | 'OUTSIDE_CURRENT_COVERAGE' | 'APPROVAL_STALE' | 'APPROVAL_NO_LONGER_ELIGIBLE' | 'PRACTICE_REQUIRES_APPROVAL' | 'BACKFILL_QUIET';
 };
@@ -2259,7 +2289,7 @@ export type ReviewFeedbackDetail = {
      * When the feedback was placed; null if it was not delivered
      */
     deliveredAt?: Date;
-    deliveryState: 'AWAITING_APPROVAL' | 'PREPARED' | 'DELIVERED' | 'SUPERSEDED' | 'SUPPRESSED' | 'FAILED' | 'DISCARDED';
+    deliveryState: 'AWAITING_APPROVAL' | 'PREPARED' | 'PARTIALLY_DELIVERED' | 'DELIVERED' | 'SUPERSEDED' | 'SUPPRESSED' | 'FAILED' | 'DISCARDED';
     id: string;
     /**
      * Source observations in render order
@@ -2270,6 +2300,10 @@ export type ReviewFeedbackDetail = {
      */
     placements: Array<ReviewPlacement>;
     /**
+     * Exact ordered summary and inline messages covered by the approval decision
+     */
+    proposedPlacements: Array<ReviewProposedPlacement>;
+    /**
      * Who the feedback is addressed to; null when the identity is no longer resolvable
      */
     recipient?: ReviewSubject;
@@ -2278,11 +2312,15 @@ export type ReviewFeedbackDetail = {
      */
     replacesId?: string;
     /**
+     * Reviewed source revision for an immutable approval package
+     */
+    reviewedRevision?: string;
+    /**
      * Whose work the feedback addresses; may equal the recipient
      */
     subject?: ReviewSubject;
     /**
-     * Why the feedback was withheld; null unless the state is SUPPRESSED
+     * Why delivery stopped; set on withheld or terminally partial feedback
      */
     suppressionReason?: 'VOLUME_CAPPED' | 'COMPOSER_DEDUPED' | 'REACTED_DISPUTED' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'ARTIFACT_GONE' | 'ARTIFACT_CLOSED' | 'ARTIFACT_MERGED' | 'ARTIFACT_DRAFT' | 'RECIPIENT_OPTED_OUT' | 'EMPTY_AFTER_SANITIZE' | 'INSTANCE_SILENCED' | 'WORKSPACE_DISABLED' | 'WORKSPACE_DELIVERY_PAUSED' | 'STALE_ROLLOUT_REVISION' | 'OUTSIDE_CURRENT_COVERAGE' | 'APPROVAL_STALE' | 'APPROVAL_NO_LONGER_ELIGIBLE' | 'PRACTICE_REQUIRES_APPROVAL' | 'BACKFILL_QUIET';
     /**
@@ -2344,7 +2382,7 @@ export type ReviewFeedback = {
      * When the feedback was placed; null if it was not delivered
      */
     deliveredAt?: Date;
-    deliveryState: 'AWAITING_APPROVAL' | 'PREPARED' | 'DELIVERED' | 'SUPERSEDED' | 'SUPPRESSED' | 'FAILED' | 'DISCARDED';
+    deliveryState: 'AWAITING_APPROVAL' | 'PREPARED' | 'PARTIALLY_DELIVERED' | 'DELIVERED' | 'SUPERSEDED' | 'SUPPRESSED' | 'FAILED' | 'DISCARDED';
     id: string;
     /**
      * Number of observations used to compose the feedback
@@ -2363,7 +2401,7 @@ export type ReviewFeedback = {
      */
     subject?: ReviewSubject;
     /**
-     * Why the feedback was withheld; null unless the state is SUPPRESSED
+     * Why delivery stopped; set on withheld or terminally partial feedback
      */
     suppressionReason?: 'VOLUME_CAPPED' | 'COMPOSER_DEDUPED' | 'REACTED_DISPUTED' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'ARTIFACT_GONE' | 'ARTIFACT_CLOSED' | 'ARTIFACT_MERGED' | 'ARTIFACT_DRAFT' | 'RECIPIENT_OPTED_OUT' | 'EMPTY_AFTER_SANITIZE' | 'INSTANCE_SILENCED' | 'WORKSPACE_DISABLED' | 'WORKSPACE_DELIVERY_PAUSED' | 'STALE_ROLLOUT_REVISION' | 'OUTSIDE_CURRENT_COVERAGE' | 'APPROVAL_STALE' | 'APPROVAL_NO_LONGER_ELIGIBLE' | 'PRACTICE_REQUIRES_APPROVAL' | 'BACKFILL_QUIET';
 };
@@ -3129,17 +3167,44 @@ export type PracticeReviewSettings = {
 };
 
 export type PracticeReviewCoverageSummary = {
+    /**
+     * Eligible linked members admitted by the people coverage axis
+     */
     coveredPeople: number;
+    /**
+     * Monitored repositories admitted by the repository coverage axis
+     */
     coveredRepositories: number;
+    /**
+     * Eligible linked human members in the workspace
+     */
     eligiblePeople: number;
+    /**
+     * Number of days included in recentReviewVolume
+     */
     estimateWindowDays: number;
+    /**
+     * Repositories currently monitored by the workspace
+     */
     monitoredRepositories: number;
+    /**
+     * Workspace-wide completed review jobs during the estimate window
+     */
     recentReviewVolume: number;
 };
 
 export type PracticeReviewCoveragePreview = {
+    /**
+     * Effective coverage before the proposed change
+     */
     current: PracticeReviewCoverageSummary;
+    /**
+     * Effective coverage if the proposed change is applied
+     */
     proposed: PracticeReviewCoverageSummary;
+    /**
+     * Whether the proposal admits any repository, branch, or person excluded now
+     */
     widens: boolean;
 };
 
@@ -4618,9 +4683,6 @@ export type DeliveryPolicyTrace = {
     surface: 'ARTIFACT' | 'IN_APP' | 'CONVERSATION';
 };
 
-/**
- * The facts behind one delivery decision. Carries no feedback payload.
- */
 export type DeliveryPolicyFactsSnapshot = {
     artifactKind?: string;
     baseBranch?: string;
@@ -10094,7 +10156,7 @@ export type ListPracticeReviewFeedbackData = {
     query?: {
         page?: number;
         size?: number;
-        deliveryState?: Array<'AWAITING_APPROVAL' | 'PREPARED' | 'DELIVERED' | 'SUPERSEDED' | 'SUPPRESSED' | 'FAILED' | 'DISCARDED'>;
+        deliveryState?: Array<'AWAITING_APPROVAL' | 'PREPARED' | 'PARTIALLY_DELIVERED' | 'DELIVERED' | 'SUPERSEDED' | 'SUPPRESSED' | 'FAILED' | 'DISCARDED'>;
         suppressionReason?: Array<'VOLUME_CAPPED' | 'COMPOSER_DEDUPED' | 'REACTED_DISPUTED' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'ARTIFACT_GONE' | 'ARTIFACT_CLOSED' | 'ARTIFACT_MERGED' | 'ARTIFACT_DRAFT' | 'RECIPIENT_OPTED_OUT' | 'EMPTY_AFTER_SANITIZE' | 'INSTANCE_SILENCED' | 'WORKSPACE_DISABLED' | 'WORKSPACE_DELIVERY_PAUSED' | 'STALE_ROLLOUT_REVISION' | 'OUTSIDE_CURRENT_COVERAGE' | 'APPROVAL_STALE' | 'APPROVAL_NO_LONGER_ELIGIBLE' | 'PRACTICE_REQUIRES_APPROVAL' | 'BACKFILL_QUIET'>;
         channel?: Array<'IN_CONTEXT' | 'IN_CHAT' | 'IN_APP'>;
         agentJobId?: string;

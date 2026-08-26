@@ -19,12 +19,15 @@ import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSource;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
+import de.tum.cit.aet.hephaestus.practices.feedback.ProposedPlacement;
 import de.tum.cit.aet.hephaestus.practices.feedback.approval.ApprovedFeedbackReadyEvent;
 import de.tum.cit.aet.hephaestus.practices.feedback.approval.FeedbackApproval;
 import de.tum.cit.aet.hephaestus.practices.feedback.approval.FeedbackApprovalDigest;
 import de.tum.cit.aet.hephaestus.practices.feedback.approval.FeedbackApprovalEligibility;
 import de.tum.cit.aet.hephaestus.practices.feedback.approval.FeedbackApprovalRepository;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Tag;
@@ -81,11 +84,56 @@ class ApprovedFeedbackDeliveryListenerTest {
     }
 
     @Test
+    void sendsNothingWhenThePullRequestMovedAfterTheReviewedRevision() {
+        Fixture fixture = fixture();
+        PullRequest current = new PullRequest();
+        current.setHeadRefOid("new-head");
+        when(
+            fixture
+                .policy()
+                .evaluatePullRequest(fixture.job(), DeliveryPolicyStage.APPROVED, fixture.feedback().getId())
+        ).thenReturn(PracticeFeedbackDeliveryPolicy.Decision.allowed(current));
+        Feedback stale = Feedback.builder()
+            .id(fixture.feedback().getId())
+            .agentJobId(fixture.feedback().getAgentJobId())
+            .workspaceId(7L)
+            .artifactKind(ArtifactKinds.PULL_REQUEST)
+            .recipientUserId(8L)
+            .aboutUserId(8L)
+            .channel(FeedbackChannel.IN_CONTEXT)
+            .position(7_000)
+            .deliveryState(FeedbackDeliveryState.PREPARED)
+            .body("Exact proposal")
+            .reviewedRevision("old-head")
+            .source(FeedbackSource.AGENT)
+            .build();
+        when(fixture.feedbackRepository().findByIdAndWorkspaceId(stale.getId(), 7L)).thenReturn(Optional.of(stale));
+        when(fixture.approvalRepository().findByFeedbackIdAndWorkspaceId(stale.getId(), 7L)).thenReturn(
+            Optional.of(
+                FeedbackApproval.builder()
+                    .feedbackId(stale.getId())
+                    .workspaceId(7L)
+                    .contentDigest(FeedbackApprovalDigest.of(stale))
+                    .build()
+            )
+        );
+
+        fixture.listener().deliver(event(stale));
+
+        verify(fixture.feedbackRepository()).markApprovedSuppressed(
+            7L,
+            stale.getId(),
+            FeedbackSuppressionReason.APPROVAL_STALE.name()
+        );
+        verifyNoInteractions(fixture.dispatchService());
+    }
+
+    @Test
     void leavesProposalPreparedWhileDispatchIsUncertain() {
         Fixture fixture = fixture();
         allow(fixture);
         when(fixture.dispatchService().dispatchApproved(fixture.job(), fixture.feedback())).thenReturn(
-            PracticeFeedbackDispatchService.Result.uncertain()
+            PracticeFeedbackDispatchService.Result.uncertain(null)
         );
 
         fixture.listener().deliver(event(fixture.feedback()));
@@ -233,6 +281,8 @@ class ApprovedFeedbackDeliveryListenerTest {
             .position(7_000)
             .deliveryState(FeedbackDeliveryState.PREPARED)
             .body(body)
+            .proposedPlacements(new ArrayList<>(List.of(ProposedPlacement.summary(body))))
+            .proposedPracticeSlugs(new ArrayList<>())
             .source(FeedbackSource.AGENT)
             .build();
     }

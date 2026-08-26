@@ -3,7 +3,9 @@ package de.tum.cit.aet.hephaestus.agent.handler;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -65,6 +67,9 @@ class FeedbackLedgerRecorderTest extends BaseUnitTest {
     @Mock
     private OutboundEgressGuard egressGuard;
 
+    @Mock
+    private PracticeFeedbackCommentFormatter commentFormatter;
+
     private FeedbackLedgerRecorder recorder() {
         when(egressGuard.deliveryAllowed(any())).thenReturn(true);
         when(feedbackRepository.existsByAgentJobIdAndPosition(any(), anyInt())).thenReturn(false);
@@ -78,7 +83,44 @@ class FeedbackLedgerRecorderTest extends BaseUnitTest {
             feedbackObservationRepository,
             feedbackPlacementRepository,
             eventPublisher,
-            egressGuard
+            egressGuard,
+            commentFormatter
+        );
+    }
+
+    @Test
+    void recordsProviderHandlesForAnApprovedReviewPackage() {
+        Feedback feedback = Feedback.builder().id(UUID.randomUUID()).workspaceId(7L).build();
+        var signal = new InlineFeedbackChannel.DeliveredSignal(
+            "recurrence",
+            new FeedbackAnchor.DiffAnchor("src/Review.java", 12, 9),
+            InlineFeedbackChannel.Disposition.POSTED,
+            "inline-ref",
+            "thread-ref"
+        );
+
+        recorder().recordApprovedPlacements(feedback, "summary-ref", List.of(signal));
+
+        verify(feedbackPlacementRepository).insertProviderPlacementIfAbsent(
+            argThat(
+                placement ->
+                    placement.feedbackId().equals(feedback.getId()) &&
+                    placement.placementType().equals("SUMMARY") &&
+                    placement.postedCommentRef().equals("summary-ref")
+            )
+        );
+        verify(feedbackPlacementRepository).insertProviderPlacementIfAbsent(
+            argThat(
+                placement ->
+                    placement.feedbackId().equals(feedback.getId()) &&
+                    placement.placementType().equals("INLINE") &&
+                    "RANGE".equals(placement.anchorKind()) &&
+                    "src/Review.java".equals(placement.anchorPath()) &&
+                    Integer.valueOf(9).equals(placement.anchorStartLine()) &&
+                    Integer.valueOf(12).equals(placement.anchorEndLine()) &&
+                    "NEW".equals(placement.anchorSide()) &&
+                    placement.postedCommentRef().equals("inline-ref")
+            )
         );
     }
 
@@ -298,10 +340,19 @@ class FeedbackLedgerRecorderTest extends BaseUnitTest {
         Observation observation = problem();
         when(observationRepository.findByAgentJobId(any())).thenReturn(List.of(observation));
         when(feedbackRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(commentFormatter.appendSettingsNotice("inline body")).thenReturn("inline body\n\nsettings");
+        AgentJob job = job();
+        var metadata = tools.jackson.databind.json.JsonMapper.builder().build().createObjectNode();
+        metadata.put("commit_sha", "abc123");
+        job.setMetadata(metadata);
 
         recorder().recordProposal(
-            job(),
-            new DeliveryContent("proposed body", List.of(), List.of()),
+            job,
+            new DeliveryContent(
+                "proposed body",
+                List.of(new DiffNote("src/Example.java", 12, 14, "inline body", "rk")),
+                List.of()
+            ),
             List.of(
                 new PracticeDetectionResultParser.ValidatedObservation(
                     "practice",
@@ -319,6 +370,12 @@ class FeedbackLedgerRecorderTest extends BaseUnitTest {
         var saved = ArgumentCaptor.forClass(Feedback.class);
         verify(feedbackRepository).save(saved.capture());
         assertThat(saved.getValue().getThreadKey()).isNotBlank();
+        assertThat(saved.getValue().getReviewedRevision()).isEqualTo("abc123");
+        assertThat(saved.getValue().getProposedPracticeSlugs()).containsExactly("practice");
+        assertThat(saved.getValue().getProposedPlacements())
+            .extracting(placement -> placement.type().name())
+            .containsExactly("SUMMARY", "INLINE");
+        assertThat(saved.getValue().getProposedPlacements().get(1).body()).isEqualTo("inline body\n\nsettings");
         verify(feedbackRepository).supersedeUndecidedProposals(any(), eq(saved.getValue().getThreadKey()), any());
     }
 

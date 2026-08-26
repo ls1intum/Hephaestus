@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.workspace.settings;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -7,8 +8,15 @@ import java.util.List;
 import org.jspecify.annotations.NonNull;
 
 public record ReviewRepositoryTarget(
-    @NonNull @NotBlank @Size(max = 255) String nameWithOwner,
-    @NonNull @NotNull List<String> baseBranches
+    @Schema(description = "Exact provider repository name, including its owner")
+    @NonNull
+    @NotBlank
+    @Size(max = 255)
+    String nameWithOwner,
+    @Schema(description = "Exact pull-request base branches to cover; empty covers every base branch")
+    @NonNull
+    @NotNull
+    List<String> baseBranches
 ) {
     public ReviewRepositoryTarget {
         nameWithOwner = validValue(nameWithOwner, "repository name");

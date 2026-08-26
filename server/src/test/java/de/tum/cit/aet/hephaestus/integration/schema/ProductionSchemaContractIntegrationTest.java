@@ -31,6 +31,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.Stream;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -297,7 +298,83 @@ class ProductionSchemaContractIntegrationTest {
         ).isEqualTo(1);
     }
 
+    @ParameterizedTest
+    @MethodSource("invalidPracticeSlugs")
+    void feedbackDispatchRequiresAStringArrayOfPracticeSlugs(String practiceSlugs) {
+        UUID dispatchId = insertDispatch("invalid-practice-slugs-" + UUID.randomUUID());
+
+        assertThatThrownBy(() ->
+            jdbcTemplate.update(
+                "UPDATE feedback_dispatch SET practice_slugs = CAST(? AS jsonb) WHERE id = ?",
+                practiceSlugs,
+                dispatchId
+            )
+        ).isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @Test
+    void approvedDispatchRequiresFeedbackAndSummaryDispatchForbidsIt() {
+        DispatchOwner owner = insertDispatchOwner("dispatch-destination");
+        UUID feedbackId = insertFeedback(owner, "destination");
+        UUID summary = insertDispatch(owner, "summary-destination", "ARTIFACT_SUMMARY", null);
+
+        assertThatThrownBy(() ->
+            jdbcTemplate.update(
+                "UPDATE feedback_dispatch SET destination = 'APPROVED_REVIEW_PACKAGE' WHERE id = ?",
+                summary
+            )
+        ).isInstanceOf(DataIntegrityViolationException.class);
+        assertThatThrownBy(() ->
+            jdbcTemplate.update("UPDATE feedback_dispatch SET feedback_id = ? WHERE id = ?", feedbackId, summary)
+        ).isInstanceOf(DataIntegrityViolationException.class);
+
+        UUID approved = insertDispatch(owner, "valid-approved", "APPROVED_REVIEW_PACKAGE", feedbackId);
+        assertThat(
+            jdbcTemplate.queryForObject(
+                "SELECT destination FROM feedback_dispatch WHERE id = ?",
+                String.class,
+                approved
+            )
+        ).isEqualTo("APPROVED_REVIEW_PACKAGE");
+    }
+
+    @Test
+    void deletingAJobErasesItsPolicyEvaluationsAndDispatches() {
+        DispatchOwner owner = insertDispatchOwner("job-erasure");
+        UUID dispatchId = insertDispatch(owner, "job-erasure-dispatch", "ARTIFACT_SUMMARY", null);
+        UUID evaluationId = insertPolicyEvaluation(owner, null);
+
+        jdbcTemplate.update("DELETE FROM agent_job WHERE id = ?", owner.jobId());
+
+        assertThat(rowExists("feedback_dispatch", dispatchId)).isFalse();
+        assertThat(rowExists("delivery_policy_evaluation", evaluationId)).isFalse();
+    }
+
+    @Test
+    void deletingFeedbackErasesApprovedDispatchAndAnonymizesItsEvaluation() {
+        DispatchOwner owner = insertDispatchOwner("feedback-erasure");
+        UUID feedbackId = insertFeedback(owner, "erasure");
+        UUID dispatchId = insertDispatch(owner, "feedback-erasure-dispatch", "APPROVED_REVIEW_PACKAGE", feedbackId);
+        UUID evaluationId = insertPolicyEvaluation(owner, feedbackId);
+
+        jdbcTemplate.update("DELETE FROM feedback WHERE id = ?", feedbackId);
+
+        assertThat(rowExists("feedback_dispatch", dispatchId)).isFalse();
+        assertThat(
+            jdbcTemplate.queryForObject(
+                "SELECT feedback_id IS NULL FROM delivery_policy_evaluation WHERE id = ?",
+                Boolean.class,
+                evaluationId
+            )
+        ).isTrue();
+    }
+
     private UUID insertDispatch(String key) {
+        DispatchOwner owner = insertDispatchOwner(key);
+        return insertDispatch(owner, key, "ARTIFACT_SUMMARY", null);
+    }
+
+    private DispatchOwner insertDispatchOwner(String key) {
         long workspaceId = insertWorkspace(key);
         UUID jobId = UUID.randomUUID();
         jdbcTemplate.update(
@@ -308,18 +385,78 @@ class ProductionSchemaContractIntegrationTest {
             workspaceId,
             "token-" + jobId
         );
+        return new DispatchOwner(workspaceId, jobId);
+    }
+
+    private UUID insertDispatch(DispatchOwner owner, String key, String destination, @Nullable UUID feedbackId) {
         UUID dispatchId = UUID.randomUUID();
         jdbcTemplate.update(
-            "INSERT INTO feedback_dispatch (id, destination_key, workspace_id, agent_job_id, destination, state, " +
-                "body, practice_slugs, write_started, next_attempt_at, attempt_count, created_at, updated_at) " +
-                "VALUES (?, ?, ?, ?, 'ARTIFACT_SUMMARY', 'PENDING', 'body', '[]'::jsonb, false, now(), 0, now(), now())",
+            "INSERT INTO feedback_dispatch (id, destination_key, workspace_id, agent_job_id, feedback_id, " +
+                "destination, state, body, practice_slugs, write_started, next_attempt_at, attempt_count, " +
+                "created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, 'PENDING', 'body', '[]'::jsonb, false, now(), " +
+                "0, now(), now())",
             dispatchId,
             key,
-            workspaceId,
-            jobId
+            owner.workspaceId(),
+            owner.jobId(),
+            feedbackId,
+            destination
         );
         return dispatchId;
     }
+
+    private UUID insertFeedback(DispatchOwner owner, String key) {
+        Long providerId = jdbcTemplate.queryForObject(
+            "INSERT INTO identity_provider (type, server_url) VALUES ('GITHUB', ?) RETURNING id",
+            Long.class,
+            "https://provider.example/" + key
+        );
+        Long userId = jdbcTemplate.queryForObject(
+            "INSERT INTO \"user\" (native_id, provider_id, login, type) VALUES (1, ?, ?, 'USER') RETURNING id",
+            Long.class,
+            providerId,
+            "user-" + key
+        );
+        UUID feedbackId = UUID.randomUUID();
+        jdbcTemplate.update(
+            "INSERT INTO feedback (id, agent_job_id, workspace_id, recipient_user_id, about_user_id, channel, " +
+                "position, delivery_state, source, created_at) VALUES (?, ?, ?, ?, ?, 'IN_CONTEXT', 0, " +
+                "'AWAITING_APPROVAL', 'AGENT', now())",
+            feedbackId,
+            owner.jobId(),
+            owner.workspaceId(),
+            userId,
+            userId
+        );
+        return feedbackId;
+    }
+
+    private UUID insertPolicyEvaluation(DispatchOwner owner, @Nullable UUID feedbackId) {
+        UUID id = UUID.randomUUID();
+        jdbcTemplate.update(
+            "INSERT INTO delivery_policy_evaluation (id, workspace_id, agent_job_id, feedback_id, " +
+                "admitted_revision, evaluated_revision, resolver_version, surface, stage, allowed, checks, facts, " +
+                "evaluated_at) VALUES (?, ?, ?, ?, 0, 0, '1', 'ARTIFACT', 'EGRESS', true, '[]'::jsonb, " +
+                "'{}'::jsonb, now())",
+            id,
+            owner.workspaceId(),
+            owner.jobId(),
+            feedbackId
+        );
+        return id;
+    }
+
+    private boolean rowExists(String table, UUID id) {
+        return Boolean.TRUE.equals(
+            jdbcTemplate.queryForObject("SELECT EXISTS (SELECT 1 FROM " + table + " WHERE id = ?)", Boolean.class, id)
+        );
+    }
+
+    static Stream<String> invalidPracticeSlugs() {
+        return Stream.of("{}", "[1]", "[\"practice\", 2]");
+    }
+
+    private record DispatchOwner(long workspaceId, UUID jobId) {}
 
     static Stream<String> invalidBaseBranches() {
         return Stream.of("\"main\"", "[1]", "[\"\"]", "[\"   \"]", "[\"" + "x".repeat(256) + "\"]");

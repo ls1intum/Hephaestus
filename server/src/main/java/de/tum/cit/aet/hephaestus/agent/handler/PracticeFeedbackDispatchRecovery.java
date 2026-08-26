@@ -67,7 +67,7 @@ class PracticeFeedbackDispatchRecovery {
                     fail(dispatch, "Dispatch job no longer exists");
                     continue;
                 }
-                if (dispatch.getDestination() == FeedbackDispatchDestination.APPROVED_ARTIFACT_COMMENT) {
+                if (dispatch.getDestination() == FeedbackDispatchDestination.APPROVED_REVIEW_PACKAGE) {
                     var feedback = feedbackRepository
                         .findByIdAndWorkspaceId(dispatch.approvedFeedbackId(), dispatch.getWorkspaceId())
                         .orElse(null);
@@ -87,17 +87,31 @@ class PracticeFeedbackDispatchRecovery {
     }
 
     private void reconcileDomain(FeedbackDispatch dispatch, PracticeFeedbackDispatchService.Result result) {
-        if (dispatch.getDestination() == FeedbackDispatchDestination.APPROVED_ARTIFACT_COMMENT) {
+        if (dispatch.getDestination() == FeedbackDispatchDestination.APPROVED_REVIEW_PACKAGE) {
             if (result.status() == PracticeFeedbackDispatchService.Result.Status.SENT) {
                 feedbackRepository.markApprovedDelivered(dispatch.getWorkspaceId(), dispatch.approvedFeedbackId());
             } else if (result.status() == PracticeFeedbackDispatchService.Result.Status.SUPPRESSED) {
-                feedbackRepository.markApprovedSuppressed(
-                    dispatch.getWorkspaceId(),
-                    dispatch.approvedFeedbackId(),
-                    result.refusal().name()
-                );
+                if (result.externalRef() == null) {
+                    feedbackRepository.markApprovedSuppressed(
+                        dispatch.getWorkspaceId(),
+                        dispatch.approvedFeedbackId(),
+                        result.refusal().name()
+                    );
+                } else {
+                    feedbackRepository.markApprovedPartiallyDelivered(
+                        dispatch.getWorkspaceId(),
+                        dispatch.approvedFeedbackId(),
+                        result.refusal().name()
+                    );
+                }
             } else if (result.status() == PracticeFeedbackDispatchService.Result.Status.FAILED) {
                 feedbackRepository.markApprovedFailed(dispatch.getWorkspaceId(), dispatch.approvedFeedbackId());
+            } else if (result.externalRef() != null) {
+                feedbackRepository.markApprovedPartiallyDelivered(
+                    dispatch.getWorkspaceId(),
+                    dispatch.approvedFeedbackId(),
+                    null
+                );
             }
             return;
         }
@@ -125,7 +139,7 @@ class PracticeFeedbackDispatchRecovery {
 
     private void fail(FeedbackDispatch dispatch, String error) {
         dispatchService.fail(dispatch, error);
-        if (dispatch.getDestination() == FeedbackDispatchDestination.APPROVED_ARTIFACT_COMMENT) {
+        if (dispatch.getDestination() == FeedbackDispatchDestination.APPROVED_REVIEW_PACKAGE) {
             feedbackRepository.markApprovedFailed(dispatch.getWorkspaceId(), dispatch.approvedFeedbackId());
         } else {
             agentJobRepository.reconcileDispatchDeliveryStatus(

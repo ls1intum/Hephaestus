@@ -28,12 +28,14 @@ public class FeedbackApprovalEligibility {
         var practices = practiceRepository.findContributingPractices(workspaceId, feedbackId);
         if (practices.isEmpty()) return false;
         PracticeAutonomy workspaceDefault = defaultsProvider.forWorkspace(workspaceId).defaultAutonomy();
-        return practices
+        var authorities = practices
             .stream()
-            .allMatch(
-                practice ->
-                    AutonomyResolver.effectiveAutonomyOf(practice, workspaceDefault) == PracticeAutonomy.HUMAN_APPROVAL
-            );
+            .map(practice -> AutonomyResolver.effectiveAutonomyOf(practice, workspaceDefault))
+            .toList();
+        return (
+            authorities.stream().noneMatch(authority -> authority == PracticeAutonomy.OFF) &&
+            authorities.stream().anyMatch(authority -> authority == PracticeAutonomy.HUMAN_APPROVAL)
+        );
     }
 
     /**

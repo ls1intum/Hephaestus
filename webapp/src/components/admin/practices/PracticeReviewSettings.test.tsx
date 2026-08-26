@@ -192,14 +192,59 @@ describe("PracticeReviewSettings", () => {
 
 		fireEvent.click(screen.getByRole("radio", { name: "All monitored repositories" }));
 		view.unmount();
-		act(() => {
+		await act(async () => {
 			resolvePreview?.({
 				current: settings.coverageSummary,
 				proposed: settings.coverageSummary,
 				widens: false,
 			});
+			await Promise.resolve();
 		});
 
 		expect(onUpdate).not.toHaveBeenCalled();
+	});
+
+	it("keeps the accepted coverage visible while it is saving", async () => {
+		let finishSave: (() => void) | undefined;
+		const onUpdate = vi.fn(
+			() =>
+				new Promise<void>((resolve) => {
+					finishSave = resolve;
+				}),
+		);
+		await renderSettings({
+			policy: { settings, isSaving: false, onUpdate, onReset: vi.fn() },
+			coverage: {
+				preview: vi.fn(async () => ({
+					current: settings.coverageSummary,
+					proposed: { ...settings.coverageSummary, coveredRepositories: 0 },
+					widens: false,
+				})),
+				repositories: {
+					options: [{ value: "acme/widgets", label: "acme/widgets" }],
+					isLoading: false,
+					isError: false,
+					error: undefined,
+					onRetry: vi.fn(),
+				},
+				people: {
+					options: [{ value: 7, label: "Ada" }],
+					isLoading: false,
+					isError: false,
+					error: undefined,
+					onRetry: vi.fn(),
+				},
+			},
+		});
+
+		fireEvent.click(await screen.findByRole("radio", { name: "Selected repositories" }));
+		await act(() => Promise.resolve());
+
+		expect(
+			screen.getByRole("radio", { name: "Selected repositories" }).getAttribute("aria-checked"),
+		).toBe("true");
+		expect(onUpdate).toHaveBeenCalledOnce();
+
+		await act(async () => finishSave?.());
 	});
 });

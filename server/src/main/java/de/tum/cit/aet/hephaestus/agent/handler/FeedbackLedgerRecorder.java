@@ -15,10 +15,10 @@ import de.tum.cit.aet.hephaestus.practices.feedback.EvidenceRole;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservation;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackPlacement;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackPlacementRepository;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackPlacementRepository.ProviderPlacement;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSource;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
@@ -26,6 +26,7 @@ import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackThreadKey;
 import de.tum.cit.aet.hephaestus.practices.feedback.PlacementAnchorKind;
 import de.tum.cit.aet.hephaestus.practices.feedback.PlacementAnchorSide;
 import de.tum.cit.aet.hephaestus.practices.feedback.PlacementType;
+import de.tum.cit.aet.hephaestus.practices.feedback.ProposedPlacement;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
@@ -47,20 +48,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * Records the delivered-feedback LEDGER (ADR 0021): after the hardened delivery path posts the MR/issue
- * summary + inline notes, this persists ONE {@link Feedback} unit (surface IN_CONTEXT) describing what was
- * actually delivered, the {@link FeedbackObservation}s it fused,
- * and a {@link FeedbackPlacement} per posted comment (SUMMARY + one per inline note).
- *
- * <p><b>Non-regressing by construction.</b> This is a pure write-through side-effect invoked AFTER the
- * existing post, in its OWN {@link Propagation#REQUIRES_NEW} transaction, and callers wrap the call in a
- * try/catch that only logs — a ledger failure can therefore never roll back or alter the delivery the
- * student already received. Delete this recorder and delivery is byte-identical.
- *
- * <p>Idempotent: a job retry that re-delivers finds the unit already recorded ({@code (agent_job_id,
- * unit_ordinal)} guard) and does nothing.
- */
+/** Persists feedback units and their provider placement handles. */
 @Component
 public class FeedbackLedgerRecorder {
 
@@ -74,6 +62,46 @@ public class FeedbackLedgerRecorder {
      * write. Writers of a variable-length band must bound themselves by this.
      */
     public static final int UNIT_ORDINAL_BAND_WIDTH = 1000;
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void recordApprovedPlacements(
+        Feedback feedback,
+        @Nullable String summaryRef,
+        List<DeliveredSignal> inlineSignals
+    ) {
+        if (summaryRef != null) {
+            feedbackPlacementRepository.insertProviderPlacementIfAbsent(
+                new ProviderPlacement(
+                    UUID.randomUUID(),
+                    feedback.getId(),
+                    PlacementType.SUMMARY.name(),
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    summaryRef
+                )
+            );
+        }
+        for (DeliveredSignal signal : inlineSignals) {
+            if (signal.disposition() == Disposition.FAILED || signal.externalRef() == null) continue;
+            DiffAnchor anchor = (DiffAnchor) signal.anchor();
+            feedbackPlacementRepository.insertProviderPlacementIfAbsent(
+                new ProviderPlacement(
+                    UUID.randomUUID(),
+                    feedback.getId(),
+                    PlacementType.INLINE.name(),
+                    (anchor.startLine() != null ? PlacementAnchorKind.RANGE : PlacementAnchorKind.LINE).name(),
+                    anchor.filePath(),
+                    anchor.startLine() != null ? anchor.startLine() : anchor.newLineNumber(),
+                    anchor.newLineNumber(),
+                    PlacementAnchorSide.NEW.name(),
+                    signal.externalRef()
+                )
+            );
+        }
+    }
 
     /** Reaction-suppressed units start here so they never collide with the live IN_CONTEXT unit (ordinal 0). */
     private static final int SUPPRESSED_UNIT_ORDINAL_BASE = 1000;
@@ -113,12 +141,15 @@ public class FeedbackLedgerRecorder {
      */
     public static final int IN_APP_UNIT_ORDINAL_BASE = 7000;
 
+    private static final int APPROVAL_UNIT_ORDINAL = 8000;
+
     private final ObservationRepository observationRepository;
     private final FeedbackRepository feedbackRepository;
     private final FeedbackObservationRepository feedbackObservationRepository;
     private final FeedbackPlacementRepository feedbackPlacementRepository;
     private final ApplicationEventPublisher eventPublisher;
     private final OutboundEgressGuard egressGuard;
+    private final PracticeFeedbackCommentFormatter commentFormatter;
 
     FeedbackLedgerRecorder(
         ObservationRepository observationRepository,
@@ -126,7 +157,8 @@ public class FeedbackLedgerRecorder {
         FeedbackObservationRepository feedbackObservationRepository,
         FeedbackPlacementRepository feedbackPlacementRepository,
         ApplicationEventPublisher eventPublisher,
-        OutboundEgressGuard egressGuard
+        OutboundEgressGuard egressGuard,
+        PracticeFeedbackCommentFormatter commentFormatter
     ) {
         this.observationRepository = observationRepository;
         this.feedbackRepository = feedbackRepository;
@@ -134,6 +166,7 @@ public class FeedbackLedgerRecorder {
         this.feedbackPlacementRepository = feedbackPlacementRepository;
         this.eventPublisher = eventPublisher;
         this.egressGuard = egressGuard;
+        this.commentFormatter = commentFormatter;
     }
 
     /** Records a delivery whose summary landed. */
@@ -619,7 +652,7 @@ public class FeedbackLedgerRecorder {
     /** Stores the exact separately composed human-approval body before any provider side effect. */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void recordProposal(AgentJob job, @Nullable DeliveryContent delivery, List<ValidatedObservation> proposed) {
-        final int position = 7_000;
+        final int position = APPROVAL_UNIT_ORDINAL;
         if (delivery == null || delivery.mrNote() == null) return;
         String body = PullRequestCommentPoster.sanitize(delivery.mrNote());
         if (body.isBlank()) return;
@@ -655,6 +688,11 @@ public class FeedbackLedgerRecorder {
                 .position(position)
                 .deliveryState(FeedbackDeliveryState.AWAITING_APPROVAL)
                 .body(body)
+                .proposedPlacements(proposedPlacements(job, delivery, body))
+                .reviewedRevision(reviewedRevision(job))
+                .proposedPracticeSlugs(
+                    proposed.stream().map(ValidatedObservation::practiceSlug).distinct().sorted().toList()
+                )
                 .source(FeedbackSource.AGENT)
                 .threadKey(feedbackThreadKeyFor(first))
                 .createdAt(Instant.now())
@@ -677,6 +715,32 @@ public class FeedbackLedgerRecorder {
                 );
             }
         }
+    }
+
+    private List<ProposedPlacement> proposedPlacements(AgentJob job, DeliveryContent delivery, String summary) {
+        var placements = new java.util.ArrayList<ProposedPlacement>(delivery.diffNotes().size() + 1);
+        placements.add(ProposedPlacement.summary(summary));
+        for (DiffNote note : delivery.diffNotes()) {
+            String body = PullRequestCommentPoster.sanitize(note.body());
+            if (!body.isBlank()) {
+                placements.add(
+                    ProposedPlacement.inline(
+                        commentFormatter.appendSettingsNotice(body),
+                        note.filePath(),
+                        note.startLine(),
+                        note.endLine(),
+                        note.recurrenceKey()
+                    )
+                );
+            }
+        }
+        return List.copyOf(placements);
+    }
+
+    private static @Nullable String reviewedRevision(AgentJob job) {
+        if (job.getMetadata() == null) return null;
+        String revision = job.getMetadata().path("commit_sha").asString();
+        return revision == null || revision.isBlank() ? null : revision;
     }
 
     private void recordSuppressedAt(

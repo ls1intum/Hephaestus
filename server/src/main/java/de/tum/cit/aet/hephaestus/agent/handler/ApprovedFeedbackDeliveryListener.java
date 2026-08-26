@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.agent.handler;
 
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.practices.feedback.DeliveryPolicyStage;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState;
@@ -36,25 +37,21 @@ class ApprovedFeedbackDeliveryListener {
         Feedback feedback = feedbackRepository
             .findByIdAndWorkspaceId(event.feedbackId(), event.workspaceId())
             .orElse(null);
-        if (feedback == null || feedback.getDeliveryState() != FeedbackDeliveryState.PREPARED) return;
+        if (
+            feedback == null ||
+            (feedback.getDeliveryState() != FeedbackDeliveryState.PREPARED &&
+                feedback.getDeliveryState() != FeedbackDeliveryState.PARTIALLY_DELIVERED)
+        ) return;
         var approval = approvalRepository
             .findByFeedbackIdAndWorkspaceId(feedback.getId(), event.workspaceId())
             .orElse(null);
         if (approval == null || !approval.getContentDigest().equals(FeedbackApprovalDigest.of(feedback))) {
             log.error("Approved proposal content no longer matches its approval: feedbackId={}", feedback.getId());
-            feedbackRepository.markApprovedSuppressed(
-                event.workspaceId(),
-                feedback.getId(),
-                FeedbackSuppressionReason.APPROVAL_STALE.name()
-            );
+            stop(feedback, event.workspaceId(), FeedbackSuppressionReason.APPROVAL_STALE);
             return;
         }
         if (!approvalEligibility.isEligible(event.workspaceId(), feedback.getId())) {
-            feedbackRepository.markApprovedSuppressed(
-                event.workspaceId(),
-                feedback.getId(),
-                FeedbackSuppressionReason.APPROVAL_NO_LONGER_ELIGIBLE.name()
-            );
+            stop(feedback, event.workspaceId(), FeedbackSuppressionReason.APPROVAL_NO_LONGER_ELIGIBLE);
             return;
         }
         AgentJob job = agentJobRepository
@@ -77,43 +74,59 @@ class ApprovedFeedbackDeliveryListener {
         }
         if (!policy.allowed()) {
             if (policy.suppressionReason() != null) {
-                feedbackRepository.markApprovedSuppressed(
-                    event.workspaceId(),
-                    feedback.getId(),
-                    policy.suppressionReason().name()
-                );
+                stop(feedback, event.workspaceId(), policy.refusal());
             }
+            return;
+        }
+        if (
+            policy.target() instanceof PullRequest pullRequest &&
+            feedback.getReviewedRevision() != null &&
+            !feedback.getReviewedRevision().equals(pullRequest.getHeadRefOid())
+        ) {
+            stop(feedback, event.workspaceId(), FeedbackSuppressionReason.APPROVAL_STALE);
             return;
         }
         String approvedBody = feedback.getBody();
         String safeBody = PullRequestCommentPoster.sanitize(approvedBody);
         if (safeBody.isBlank()) {
-            feedbackRepository.markApprovedSuppressed(
-                event.workspaceId(),
-                feedback.getId(),
-                FeedbackSuppressionReason.EMPTY_AFTER_SANITIZE.name()
-            );
+            stop(feedback, event.workspaceId(), FeedbackSuppressionReason.EMPTY_AFTER_SANITIZE);
             return;
         }
         if (!safeBody.equals(approvedBody)) {
-            feedbackRepository.markApprovedSuppressed(
-                event.workspaceId(),
-                feedback.getId(),
-                FeedbackSuppressionReason.APPROVAL_STALE.name()
-            );
+            stop(feedback, event.workspaceId(), FeedbackSuppressionReason.APPROVAL_STALE);
             return;
         }
 
         PracticeFeedbackDispatchService.Result result = dispatchService.dispatchApproved(job, feedback);
         if (result.status() == PracticeFeedbackDispatchService.Result.Status.SUPPRESSED) {
             FeedbackSuppressionReason reason = result.refusal();
-            feedbackRepository.markApprovedSuppressed(event.workspaceId(), feedback.getId(), reason.name());
+            if (result.externalRef() == null) {
+                stop(feedback, event.workspaceId(), reason);
+            } else {
+                feedbackRepository.markApprovedPartiallyDelivered(event.workspaceId(), feedback.getId(), reason.name());
+            }
             return;
         }
-        if (result.status() != PracticeFeedbackDispatchService.Result.Status.SENT) {
+        if (result.status() == PracticeFeedbackDispatchService.Result.Status.SENT) {
+            feedbackRepository.markApprovedDelivered(event.workspaceId(), feedback.getId());
+            return;
+        }
+        if (result.status() == PracticeFeedbackDispatchService.Result.Status.FAILED) {
+            feedbackRepository.markApprovedFailed(event.workspaceId(), feedback.getId());
+            return;
+        }
+        if (result.externalRef() != null) {
+            feedbackRepository.markApprovedPartiallyDelivered(event.workspaceId(), feedback.getId(), null);
+        } else {
             log.warn("Approved proposal deferred for dispatch reconciliation: feedbackId={}", feedback.getId());
-            return;
         }
-        feedbackRepository.markApprovedDelivered(event.workspaceId(), feedback.getId());
+    }
+
+    private void stop(Feedback feedback, Long workspaceId, FeedbackSuppressionReason reason) {
+        if (feedback.getDeliveryState() == FeedbackDeliveryState.PARTIALLY_DELIVERED) {
+            feedbackRepository.markApprovedPartiallyDelivered(workspaceId, feedback.getId(), reason.name());
+        } else {
+            feedbackRepository.markApprovedSuppressed(workspaceId, feedback.getId(), reason.name());
+        }
     }
 }

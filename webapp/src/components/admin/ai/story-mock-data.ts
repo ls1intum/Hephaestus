@@ -52,9 +52,7 @@ export const mockPracticeReviewSettings: PracticeReviewSettings = {
 	deliverToMerged: false,
 	cooldownMinutesOverride: 30,
 	deliverToMergedOverride: undefined,
-	// Never chosen here, so it falls back to what a fresh workspace gets: the bottom of the
-	// practice → area → workspace chain speaks, and it speaks on the work itself.
-	defaultAutonomy: "AUTOMATIC",
+	defaultAutonomy: "HUMAN_APPROVAL",
 	defaultAutonomyOverride: undefined,
 };
 

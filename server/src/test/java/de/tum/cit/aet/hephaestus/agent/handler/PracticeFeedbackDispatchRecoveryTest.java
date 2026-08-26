@@ -51,7 +51,7 @@ class PracticeFeedbackDispatchRecoveryTest extends BaseUnitTest {
 
     @Test
     void exhaustedApprovedDispatchTerminalizesBothDispatchAndFeedback() {
-        FeedbackDispatch dispatch = dispatch(FeedbackDispatchDestination.APPROVED_ARTIFACT_COMMENT, UUID.randomUUID());
+        FeedbackDispatch dispatch = dispatch(FeedbackDispatchDestination.APPROVED_REVIEW_PACKAGE, UUID.randomUUID());
         when(dispatches.findExhausted(any(), anyInt(), any())).thenReturn(List.of(dispatch));
 
         recovery.recover();
@@ -63,7 +63,7 @@ class PracticeFeedbackDispatchRecoveryTest extends BaseUnitTest {
     @Test
     void recoveredApprovedDeliveryReconcilesTheFeedbackLifecycle() {
         UUID feedbackId = UUID.randomUUID();
-        FeedbackDispatch dispatch = dispatch(FeedbackDispatchDestination.APPROVED_ARTIFACT_COMMENT, feedbackId);
+        FeedbackDispatch dispatch = dispatch(FeedbackDispatchDestination.APPROVED_REVIEW_PACKAGE, feedbackId);
         AgentJob job = new AgentJob();
         var unit = mock(de.tum.cit.aet.hephaestus.practices.feedback.Feedback.class);
         when(unit.getBody()).thenReturn(dispatch.getBody());

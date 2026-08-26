@@ -102,6 +102,19 @@ public class GithubInlineFeedbackChannel implements InlineFeedbackChannel {
 
     @Override
     public InlineResult postInlineFeedback(SummaryChannel.FeedbackTarget target, List<InlineFeedback> feedbackItems) {
+        return postInlineFeedback(target, feedbackItems, false);
+    }
+
+    @Override
+    public InlineResult postImmutablePackage(SummaryChannel.FeedbackTarget target, List<InlineFeedback> feedbackItems) {
+        return postInlineFeedback(target, feedbackItems, true);
+    }
+
+    private InlineResult postInlineFeedback(
+        SummaryChannel.FeedbackTarget target,
+        List<InlineFeedback> feedbackItems,
+        boolean immutablePackage
+    ) {
         if (feedbackItems == null || feedbackItems.isEmpty()) {
             return InlineResult.counts(0, 0);
         }
@@ -120,7 +133,8 @@ public class GithubInlineFeedbackChannel implements InlineFeedbackChannel {
         // Index this reviewer's prior threads by correlation key so a finding that still holds is preserved
         // instead of re-posted (GitHub reviews are append-only — a duplicate cannot be edited away). Best-effort:
         // a failed read yields an empty index, degrading to a fresh post (still keyed) rather than blocking.
-        Map<String, PriorThread> priorByKey = indexPriorThreads(scopeId, pr);
+        String marker = immutablePackage ? feedbackItems.get(0).marker() : null;
+        Map<String, PriorThread> priorByKey = indexPriorThreads(scopeId, pr, marker, immutablePackage);
 
         // Partition feedbackItems: those whose key already has a live prior thread are preserved; the rest are posted.
         List<InlineFeedback> toPost = new ArrayList<>(feedbackItems.size());
@@ -189,7 +203,8 @@ public class GithubInlineFeedbackChannel implements InlineFeedbackChannel {
         List<String> postedKeys = new ArrayList<>(toPost.size());
         for (InlineFeedback finding : toPost) {
             FeedbackAnchor.DiffAnchor diff = (FeedbackAnchor.DiffAnchor) finding.anchor();
-            threads.add(buildThread(diff, appendCorrelationTag(finding.body(), finding.recurrenceKey())));
+            String body = immutablePackage ? appendMarker(finding.body(), finding.marker()) : finding.body();
+            threads.add(buildThread(diff, appendCorrelationTag(body, finding.recurrenceKey())));
             postedAnchors.add(diff);
             postedKeys.add(finding.recurrenceKey());
         }
@@ -291,7 +306,7 @@ public class GithubInlineFeedbackChannel implements InlineFeedbackChannel {
             return;
         }
         PrCoordinates pr = GithubSummaryChannel.parseSubjectExternalId(target.subjectExternalId());
-        Map<String, PriorThread> priorByKey = indexPriorThreads(scopeId, pr);
+        Map<String, PriorThread> priorByKey = indexPriorThreads(scopeId, pr, null, false);
         int minimized = minimizeVanishedThreads(scopeId, priorByKey.values(), Set.of());
         if (minimized > 0) {
             log.info("Minimized {} stale GitHub inline threads: workspaceId={}", minimized, scopeId);
@@ -357,12 +372,21 @@ public class GithubInlineFeedbackChannel implements InlineFeedbackChannel {
         return signals;
     }
 
+    private static String appendMarker(String body, String marker) {
+        return body.contains(marker) ? body : body + "\n\n" + marker;
+    }
+
     /**
      * Reads the PR's review threads (paginated) and indexes this reviewer's own prior threads by the correlation
      * key embedded in each thread's first comment. Best-effort: any failure yields an empty index so delivery
      * degrades to fresh keyed posts rather than blocking.
      */
-    private Map<String, PriorThread> indexPriorThreads(long scopeId, PrCoordinates pr) {
+    private Map<String, PriorThread> indexPriorThreads(
+        long scopeId,
+        PrCoordinates pr,
+        @Nullable String marker,
+        boolean failClosed
+    ) {
         Map<String, PriorThread> byKey = new LinkedHashMap<>();
         String after = null;
         try {
@@ -379,6 +403,15 @@ public class GithubInlineFeedbackChannel implements InlineFeedbackChannel {
                     .block(GRAPHQL_TIMEOUT);
 
                 if (response == null) {
+                    if (failClosed) {
+                        throw new FeedbackDeliveryException("GitHub review-thread lookup returned no response");
+                    }
+                    break;
+                }
+                if (response.getErrors() != null && !response.getErrors().isEmpty()) {
+                    if (failClosed) {
+                        throw new FeedbackDeliveryException("GitHub review-thread lookup returned errors");
+                    }
                     break;
                 }
                 gitHubProvider.trackRateLimit(scopeId, response);
@@ -388,7 +421,7 @@ public class GithubInlineFeedbackChannel implements InlineFeedbackChannel {
                     .getValue();
                 if (nodes != null) {
                     for (Map<String, Object> thread : nodes) {
-                        indexThread(thread, byKey);
+                        indexThread(thread, marker, byKey);
                     }
                 }
 
@@ -400,10 +433,16 @@ public class GithubInlineFeedbackChannel implements InlineFeedbackChannel {
                 }
                 after = response.field("repository.pullRequest.reviewThreads.pageInfo.endCursor").getValue();
                 if (after == null) {
+                    if (failClosed) {
+                        throw new FeedbackDeliveryException("GitHub review-thread pagination lost its cursor");
+                    }
                     break;
                 }
             }
         } catch (Exception e) {
+            if (failClosed) {
+                throw new FeedbackDeliveryException("GitHub review-thread lookup was inconclusive", e);
+            }
             log.debug("Failed to read PR review threads for correlation reconcile: workspaceId={}", scopeId, e);
         }
         return byKey;
@@ -411,7 +450,11 @@ public class GithubInlineFeedbackChannel implements InlineFeedbackChannel {
 
     /** Indexes one review thread under the correlation key parsed from its first comment, if it is one of ours. */
     @SuppressWarnings("unchecked")
-    private static void indexThread(Map<String, Object> thread, Map<String, PriorThread> byKey) {
+    private static void indexThread(
+        Map<String, Object> thread,
+        @Nullable String marker,
+        Map<String, PriorThread> byKey
+    ) {
         String threadId = (String) thread.get("id");
         if (threadId == null) {
             return;
@@ -427,7 +470,7 @@ public class GithubInlineFeedbackChannel implements InlineFeedbackChannel {
         Map<String, Object> firstComment = ((List<Map<String, Object>>) nodes).get(0);
         String body = (String) firstComment.get("body");
         String commentId = (String) firstComment.get("id");
-        if (body == null || commentId == null) {
+        if (body == null || commentId == null || (marker != null && !body.contains(marker))) {
             return;
         }
         String key = parseObservationFingerprint(body);

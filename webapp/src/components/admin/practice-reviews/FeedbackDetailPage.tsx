@@ -96,12 +96,17 @@ export function FeedbackDetailPage({
 		? reviewArtifactTypeSlug(feedback.artifact.type)
 		: undefined;
 	const anchoredPlacements = feedback.placements.filter((placement) => placement.anchorPath);
+	const packageSize = feedback.proposedPlacements.length;
+	const deliveredPlacements = feedback.placements.filter(
+		(placement) => placement.postedCommentRef,
+	).length;
+	const deliveryInProgress =
+		feedback.deliveryState === "PREPARED" ||
+		(feedback.deliveryState === "PARTIALLY_DELIVERED" && !feedback.suppressionReason);
 
 	return (
 		<article className="min-w-0 max-w-4xl space-y-8">
 			{breadcrumbs}
-			{/* No outcome chip in the header: the trace below states it, and the card around the text
-			    states it again for text that was not sent. */}
 			<ReviewDetailHeader
 				title={`Feedback for ${subjectLabel(feedback.recipient)}`}
 				provenance={
@@ -156,6 +161,19 @@ export function FeedbackDetailPage({
 					What became of it
 				</h3>
 				<DeliveryTrace feedback={feedback} />
+				{packageSize > 0 && (
+					<div className="rounded-lg border p-3">
+						<p className="text-sm font-medium">
+							{Math.min(deliveredPlacements, packageSize)} of {packageSize} approved comments
+							recorded at the provider
+						</p>
+						{deliveryInProgress ? (
+							<p className="mt-1 text-sm text-muted-foreground">
+								This page updates while the remaining comments are reconciled safely.
+							</p>
+						) : null}
+					</div>
+				)}
 				{anchoredPlacements.length > 0 && (
 					<div className="space-y-1 rounded-lg border p-3">
 						<p className="text-sm font-medium">Where it was anchored</p>

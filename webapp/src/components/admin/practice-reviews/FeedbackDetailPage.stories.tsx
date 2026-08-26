@@ -67,6 +67,32 @@ export const Delivered: Story = {
 	},
 };
 
+export const PartiallyDelivered: Story = {
+	args: {
+		feedback: {
+			...feedbackDetail("99999999-6666-6666-6666-666666666666"),
+			deliveryState: "PARTIALLY_DELIVERED",
+			deliveredAt: undefined,
+			placements: [
+				{ id: "summary-placement", placementType: "SUMMARY", postedCommentRef: "2481933" },
+			],
+			proposedPlacements: [
+				{ type: "SUMMARY", body: "Review summary" },
+				{
+					type: "INLINE",
+					body: "Use the established retry boundary here.",
+					path: "server/src/main/java/example/LongProviderBoundaryName.java",
+					startLine: 118,
+				},
+			],
+		},
+	},
+	play: async ({ canvas }) => {
+		await canvas.findByText("1 of 2 approved comments recorded at the provider");
+		await expectNoPageOverflow();
+	},
+};
+
 /**
  * A note of the length the composer really produces. Nothing on this page truncates it: the cut an
  * operator sees in the delivery list is a list preview and stops there.

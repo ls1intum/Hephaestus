@@ -21,7 +21,7 @@ export function mockReviewSettings(
 		etag: '"0"',
 		revision: 0,
 		cooldownMinutes: 30,
-		defaultAutonomy: "AUTOMATIC",
+		defaultAutonomy: "HUMAN_APPROVAL",
 		deliverToMerged: true,
 		deliveryStatus: "ACTIVE",
 		reviewScope: {

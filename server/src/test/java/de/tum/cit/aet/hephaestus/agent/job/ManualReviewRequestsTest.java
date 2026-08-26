@@ -1,6 +1,5 @@
 package de.tum.cit.aet.hephaestus.agent.job;
 
-import static de.tum.cit.aet.hephaestus.practices.review.GateDecisionTestFixtures.automaticDetection;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -213,6 +212,39 @@ class ManualReviewRequestsTest extends BaseUnitTest {
         verify(agentJobService, never()).submitWithOutcome(any(), any(), any(), any(), any(GateDecision.Detect.class));
     }
 
+    @Test
+    void anAdministratorCanRequestAnInternalReviewOutsideCoverage() {
+        GateDecision.Detect detection = new GateDecision.Detect(
+            workspace,
+            List.of(new Practice()),
+            workspace.getReviewSettings().getRolloutRevision(),
+            TriggerMode.MANUAL
+        );
+        when(gate.evaluate(any(), any(), any())).thenReturn(
+            new GateDecision.Skip("outside coverage", SignalStateReason.OUT_OF_REVIEW_SCOPE)
+        );
+        when(authority.isWorkspaceAdmin(WORKSPACE_ID, REQUESTER_ID)).thenReturn(true);
+        when(gate.evaluateAdministrative(any(), eq(ScmSignals.PULL_REQUEST_MANUAL_REVIEW))).thenReturn(detection);
+        givenSubmissionSucceeds();
+
+        ManualReviewOutcome outcome = requests.requestPullRequestReview(workspace, pullRequest(), requesters());
+
+        assertThat(outcome.status()).isEqualTo(ManualReviewOutcome.Status.SUBMITTED);
+        verify(agentJobService).submitWithOutcome(anyLong(), any(), any(), any(), eq(detection));
+    }
+
+    @Test
+    void anArtifactParticipantCannotBypassCoverage() {
+        when(gate.evaluate(any(), any(), any())).thenReturn(
+            new GateDecision.Skip("outside coverage", SignalStateReason.OUT_OF_REVIEW_SCOPE)
+        );
+
+        ManualReviewOutcome outcome = requests.requestPullRequestReview(workspace, pullRequest(), requesters());
+
+        assertThat(outcome.status()).isEqualTo(ManualReviewOutcome.Status.REFUSED);
+        verify(gate, never()).evaluateAdministrative(any(), any());
+    }
+
     /** A submission refusal — an exhausted budget, a cooldown — travels out with its own reason too. */
     @Test
     void aSubmissionRefusalKeepsTheReasonTheSubmissionStoppedOn() {
@@ -303,7 +335,14 @@ class ManualReviewRequestsTest extends BaseUnitTest {
     // Fixtures
 
     private void givenGateDetects() {
-        when(gate.evaluate(any(), any(), any())).thenReturn(automaticDetection(workspace, List.of(new Practice())));
+        when(gate.evaluate(any(), any(), any())).thenReturn(
+            new GateDecision.Detect(
+                workspace,
+                List.of(new Practice()),
+                workspace.getReviewSettings().getRolloutRevision(),
+                TriggerMode.MANUAL
+            )
+        );
     }
 
     private void givenSubmissionSucceeds() {

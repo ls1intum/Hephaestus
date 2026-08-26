@@ -116,6 +116,7 @@ public class ManualReviewRequests {
             pullRequest,
             new Asker(requester, identityIds(requesters)),
             signal -> gate.evaluate(pullRequest, signal, TriggerMode.MANUAL),
+            signal -> gate.evaluateAdministrative(pullRequest, signal),
             AgentJobType.PULL_REQUEST_REVIEW,
             () ->
                 new PullRequestReviewSubmissionRequest(
@@ -149,6 +150,7 @@ public class ManualReviewRequests {
             issue,
             new Asker(requester, identityIds(requesters)),
             signal -> gate.evaluateIssue(issue, signal, TriggerMode.MANUAL),
+            signal -> gate.evaluateIssueAdministrative(issue, signal),
             AgentJobType.ISSUE_REVIEW,
             () ->
                 new IssueReviewSubmissionRequest(
@@ -181,6 +183,7 @@ public class ManualReviewRequests {
         Issue artifact,
         Asker asker,
         Function<SignalName, GateDecision> evaluate,
+        Function<SignalName, GateDecision> evaluateAdministrative,
         AgentJobType jobType,
         Supplier<JobSubmissionRequest> submission
     ) {
@@ -214,6 +217,13 @@ public class ManualReviewRequests {
         );
 
         GateDecision decision = evaluate.apply(requestSignal);
+        if (
+            decision instanceof GateDecision.Skip skip &&
+            isCoverageRefusal(skip.resolvedSignalReason()) &&
+            authority.isWorkspaceAdmin(workspace.getId(), asker.standing().getId())
+        ) {
+            decision = evaluateAdministrative.apply(requestSignal);
+        }
         if (decision instanceof GateDecision.Skip skip) {
             log.info(
                 "Manual review request: gate declined, workspaceId={}, artifactId={}, reason={}",
@@ -249,5 +259,9 @@ public class ManualReviewRequests {
     /** Ids only: the limit counts rows, and a detached {@link User} is more than it needs to hold. */
     private static List<Long> identityIds(Collection<User> requesters) {
         return requesters.stream().map(User::getId).filter(Objects::nonNull).toList();
+    }
+
+    private static boolean isCoverageRefusal(SignalStateReason reason) {
+        return reason == SignalStateReason.OUT_OF_REVIEW_SCOPE || reason == SignalStateReason.SUBJECT_UNLINKED;
     }
 }

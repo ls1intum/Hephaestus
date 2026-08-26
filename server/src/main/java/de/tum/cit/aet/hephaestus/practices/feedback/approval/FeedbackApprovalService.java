@@ -110,6 +110,9 @@ public class FeedbackApprovalService {
     }
 
     private static void validate(DecideFeedbackProposalRequestDTO request) {
+        if (request.decision() == FeedbackApprovalDecision.REJECTED && request.rejectionReason() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "A rejection needs a reason");
+        }
         if (request.decision() == FeedbackApprovalDecision.APPROVED && request.rejectionReason() != null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "An approval cannot have a rejection reason");
         }

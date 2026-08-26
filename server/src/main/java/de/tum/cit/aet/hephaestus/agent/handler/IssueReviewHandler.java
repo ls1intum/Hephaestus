@@ -269,15 +269,22 @@ public class IssueReviewHandler implements JobTypeHandler {
         Map<String, String> why = practiceCatalogInjector.whyBySlug(job.getWorkspace(), ArtifactKinds.ISSUE);
         List<ComposedFeedbackUnit> units = compositionResultParser.parse(job.getOutput(), FeedbackChannel.IN_CONTEXT);
         String lead = compositionResultParser.lead(job.getOutput());
+        if (!proposals.isEmpty()) {
+            Set<String> included = java.util.stream.Stream.concat(proposals.stream(), loudEnough.stream())
+                .map(PracticeDetectionResultParser.ValidatedObservation::occurrenceKey)
+                .collect(java.util.stream.Collectors.toUnmodifiableSet());
+            List<PracticeDetectionResultParser.ValidatedObservation> reviewPackage = observations
+                .stream()
+                .filter(observation -> included.contains(observation.occurrenceKey()))
+                .toList();
+            feedbackLedgerRecorder.recordProposal(
+                job,
+                DeliveryComposer.compose(reviewPackage, ArtifactKinds.ISSUE, why, null, units, lead),
+                reviewPackage
+            );
+            return;
+        }
         var note = DeliveryComposer.compose(loudEnough, ArtifactKinds.ISSUE, why, null, units, lead);
-        // An approved proposal posts as its own comment, so only one of the two may open on the lead.
-        // The auto-posted note is composed first and takes it; the proposal takes it only when there is
-        // no such note, which is the all-approval workspace where the proposal is the only comment.
-        feedbackLedgerRecorder.recordProposal(
-            job,
-            DeliveryComposer.compose(proposals, ArtifactKinds.ISSUE, why, null, units, note == null ? lead : null),
-            proposals
-        );
         postIssueNote(
             job,
             note,

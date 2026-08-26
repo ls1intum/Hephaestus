@@ -78,7 +78,7 @@ export interface PracticeReviewSettingsProps {
 	policy: {
 		settings: PracticeReviewSettingsData;
 		isSaving: boolean;
-		onUpdate: (settings: UpdatePracticeReviewSettingsRequest, sourceEtag?: string) => void;
+		onUpdate: (settings: UpdatePracticeReviewSettingsRequest, sourceEtag?: string) => Promise<void>;
 		onReset: (field: PracticeReviewField) => void;
 	};
 	coverage: {
@@ -114,9 +114,7 @@ function ReviewStatusSection({
 	workspace,
 }: Pick<PracticeReviewSettingsProps, "workspaceSlug" | "model" | "workspace">) {
 	const modelRunnable = reviewModelRunnable(model);
-	// Loading and failed both count as not ready: the switch is closed against them, so the sentence
-	// explaining why it is closed has to cover them too.
-	const modelNotReady = model.isLoading || model.isError || !modelRunnable;
+	const modelUnavailable = model.isLoading || model.isError || !modelRunnable;
 
 	return (
 		<section className="space-y-4" aria-labelledby="review-status-heading">
@@ -132,7 +130,7 @@ function ReviewStatusSection({
 				<FieldContent>
 					<FieldLabel htmlFor="practice-reviews-enabled">Start practice reviews</FieldLabel>
 					<FieldDescription>
-						{!workspace.enabled && modelNotReady
+						{!workspace.enabled && modelUnavailable
 							? "This can be turned on once a review model is ready to run."
 							: "New work is reviewed while this is on. Switching it off stops new reviews; any already running may finish."}
 					</FieldDescription>
@@ -140,7 +138,7 @@ function ReviewStatusSection({
 				<Switch
 					id="practice-reviews-enabled"
 					checked={workspace.enabled}
-					disabled={workspace.isSaving || (!workspace.enabled && modelNotReady)}
+					disabled={workspace.isSaving || (!workspace.enabled && modelUnavailable)}
 					onCheckedChange={(checked) => workspace.onUpdate({ practicesEnabled: checked })}
 				/>
 			</Field>
@@ -149,11 +147,6 @@ function ReviewStatusSection({
 	);
 }
 
-/**
- * Only the states that need an action of their own. Whether the model is ready is already the page
- * banner's headline; repeating it here as a third widget said the same thing three times on one page,
- * so the healthy state is left as the one thing the banner cannot offer — the way to change it.
- */
 function ModelReadiness({
 	workspaceSlug,
 	model,
@@ -312,7 +305,7 @@ function CooldownField({
 				disabled={policy.isSaving}
 				onChange={(event) => setDraft(event.currentTarget.value)}
 				onBlur={() => {
-					if (!invalid && parsed !== value) policy.onUpdate({ cooldownMinutes: parsed });
+					if (!invalid && parsed !== value) void policy.onUpdate({ cooldownMinutes: parsed });
 				}}
 				className="max-w-32"
 			/>
@@ -341,11 +334,13 @@ function ReviewedWorkSection({
 	policy,
 	coverage,
 }: Pick<PracticeReviewSettingsProps, "policy" | "coverage">) {
+	const repositoryScopeId = useId();
+	const personScopeId = useId();
 	const settings = policy.settings;
-	const scope = settings.reviewScope;
 	type PreviewState =
 		| { status: "idle" }
 		| { status: "pending"; scope: WorkspaceReviewScope; sourceEtag: string }
+		| { status: "applying"; scope: WorkspaceReviewScope; sourceEtag: string }
 		| {
 				status: "ready";
 				scope: WorkspaceReviewScope;
@@ -362,6 +357,7 @@ function ReviewedWorkSection({
 		storedPreviewState.status === "idle" || storedPreviewState.sourceEtag === settings.etag
 			? storedPreviewState
 			: { status: "idle" };
+	const scope = previewState.status === "idle" ? settings.reviewScope : previewState.scope;
 	useEffect(
 		() => () => {
 			previewRequest.current += 1;
@@ -381,8 +377,13 @@ function ReviewedWorkSection({
 			.filter((id) => !coverage.people.options.some((option) => option.value === id))
 			.map((id) => ({ value: id, label: `Member ${id} (unavailable)` })),
 	];
-	const applyScope = (next: WorkspaceReviewScope, sourceEtag: string) =>
-		policy.onUpdate({ reviewScope: next }, sourceEtag);
+	const applyScope = async (next: WorkspaceReviewScope, sourceEtag: string) => {
+		setPreviewState({ status: "applying", scope: next, sourceEtag });
+		await Promise.resolve(policy.onUpdate({ reviewScope: next }, sourceEtag)).catch(
+			() => undefined,
+		);
+		setPreviewState({ status: "idle" });
+	};
 	const previewScope = async (next: WorkspaceReviewScope) => {
 		const request = ++previewRequest.current;
 		const sourceEtag = settings.etag;
@@ -392,8 +393,7 @@ function ReviewedWorkSection({
 			if (request !== previewRequest.current) return;
 			if (data.widens) setPreviewState({ status: "ready", scope: next, sourceEtag, data });
 			else {
-				setPreviewState({ status: "idle" });
-				applyScope(next, sourceEtag);
+				void applyScope(next, sourceEtag);
 			}
 		} catch {
 			if (request === previewRequest.current) {
@@ -450,9 +450,9 @@ function ReviewedWorkSection({
 				</p>
 			</div>
 			{previewState.status === "pending" ? (
-				<p role="status" className="text-muted-foreground text-sm">
+				<span role="status" className="sr-only">
 					Checking the proposed coverage…
-				</p>
+				</span>
 			) : previewState.status === "error" ? (
 				<Alert variant="warning">
 					<AlertCircle />
@@ -483,14 +483,14 @@ function ReviewedWorkSection({
 
 			<Field>
 				<CoverageLabel
-					id="repositories-covered-label"
+					id={`${repositoryScopeId}-label`}
 					label="Repositories"
 					covered={coveredRepositories}
 					total={summary.monitoredRepositories}
 					noun="monitored"
 				/>
 				<RadioGroup
-					aria-labelledby="repositories-covered-label"
+					aria-labelledby={`${repositoryScopeId}-label`}
 					value={scope.repositoryMode}
 					disabled={policy.isSaving || previewBusy}
 					onValueChange={(mode) => {
@@ -498,12 +498,12 @@ function ReviewedWorkSection({
 						void previewScope(next);
 					}}
 				>
-					<label className="flex items-center gap-2" htmlFor="repositories-all">
-						<RadioGroupItem id="repositories-all" value="ALL_MONITORED" />
+					<label className="flex items-center gap-2" htmlFor={`${repositoryScopeId}-all`}>
+						<RadioGroupItem id={`${repositoryScopeId}-all`} value="ALL_MONITORED" />
 						All monitored repositories
 					</label>
-					<label className="flex items-center gap-2" htmlFor="repositories-selected">
-						<RadioGroupItem id="repositories-selected" value="SELECTED" />
+					<label className="flex items-center gap-2" htmlFor={`${repositoryScopeId}-selected`}>
+						<RadioGroupItem id={`${repositoryScopeId}-selected`} value="SELECTED" />
 						Selected repositories
 					</label>
 				</RadioGroup>
@@ -560,7 +560,7 @@ function ReviewedWorkSection({
 
 			<Field>
 				<CoverageLabel
-					id="people-covered-label"
+					id={`${personScopeId}-label`}
 					label="People"
 					covered={coveredPeople}
 					total={summary.eligiblePeople}
@@ -568,7 +568,7 @@ function ReviewedWorkSection({
 				/>
 				<FieldDescription>Only workspace members can be selected.</FieldDescription>
 				<RadioGroup
-					aria-labelledby="people-covered-label"
+					aria-labelledby={`${personScopeId}-label`}
 					value={scope.personMode}
 					disabled={policy.isSaving || previewBusy}
 					onValueChange={(mode) => {
@@ -576,12 +576,12 @@ function ReviewedWorkSection({
 						void previewScope(next);
 					}}
 				>
-					<label className="flex items-center gap-2" htmlFor="people-all">
-						<RadioGroupItem id="people-all" value="ALL_ELIGIBLE" />
+					<label className="flex items-center gap-2" htmlFor={`${personScopeId}-all`}>
+						<RadioGroupItem id={`${personScopeId}-all`} value="ALL_ELIGIBLE" />
 						Every member of this workspace
 					</label>
-					<label className="flex items-center gap-2" htmlFor="people-selected">
-						<RadioGroupItem id="people-selected" value="SELECTED" />
+					<label className="flex items-center gap-2" htmlFor={`${personScopeId}-selected`}>
+						<RadioGroupItem id={`${personScopeId}-selected`} value="SELECTED" />
 						Selected people
 					</label>
 				</RadioGroup>
@@ -637,7 +637,7 @@ function ReviewedWorkSection({
 				open={previewState.status === "ready"}
 				onOpenChange={(open) => !open && cancelPreview()}
 			>
-				<AlertDialogContent>
+				<AlertDialogContent className="min-w-0">
 					<AlertDialogHeader>
 						<AlertDialogTitle>Widen review coverage?</AlertDialogTitle>
 						<AlertDialogDescription>
@@ -647,7 +647,7 @@ function ReviewedWorkSection({
 						</AlertDialogDescription>
 					</AlertDialogHeader>
 					{previewState.status === "ready" ? (
-						<div className="space-y-2 text-sm">
+						<div className="min-w-0 space-y-2 break-words text-sm">
 							<p>
 								Monitored repositories covered:{" "}
 								<strong>{previewState.data.current.coveredRepositories}</strong>
@@ -670,14 +670,13 @@ function ReviewedWorkSection({
 						</div>
 					) : null}
 					<AlertDialogFooter>
-						<AlertDialogCancel>Keep my chosen population</AlertDialogCancel>
+						<AlertDialogCancel>Keep current coverage</AlertDialogCancel>
 						<AlertDialogAction
 							disabled={previewState.status !== "ready"}
 							onClick={() => {
 								if (previewState.status === "ready") {
-									applyScope(previewState.scope, previewState.sourceEtag);
+									void applyScope(previewState.scope, previewState.sourceEtag);
 								}
-								setPreviewState({ status: "idle" });
 							}}
 						>
 							Apply wider coverage
@@ -731,9 +730,9 @@ function FeedbackDeliverySection({ policy }: Pick<PracticeReviewSettingsProps, "
 					id="policy-delivery-active"
 					checked={!paused}
 					disabled={policy.isSaving}
-					onCheckedChange={(checked) =>
-						policy.onUpdate({ deliveryStatus: checked ? "ACTIVE" : "PAUSED" })
-					}
+					onCheckedChange={(checked) => {
+						void policy.onUpdate({ deliveryStatus: checked ? "ACTIVE" : "PAUSED" });
+					}}
 				/>
 			</Field>
 			<Field orientation="horizontal">
@@ -754,7 +753,9 @@ function FeedbackDeliverySection({ policy }: Pick<PracticeReviewSettingsProps, "
 					id="policy-deliver-merged"
 					checked={settings.deliverToMerged}
 					disabled={policy.isSaving}
-					onCheckedChange={(checked) => policy.onUpdate({ deliverToMerged: checked })}
+					onCheckedChange={(checked) => {
+						void policy.onUpdate({ deliverToMerged: checked });
+					}}
 				/>
 			</Field>
 		</section>

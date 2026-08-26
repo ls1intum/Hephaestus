@@ -4,6 +4,7 @@ import de.tum.cit.aet.hephaestus.agent.handler.spi.ExistingDeliveryLookup;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliverySuppressedException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.practices.feedback.DeliveryPolicyStage;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDispatch;
@@ -12,7 +13,9 @@ import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDispatchDestination;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDispatchInsert;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDispatchRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDispatchState;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
+import de.tum.cit.aet.hephaestus.practices.feedback.PlacementType;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Duration;
 import java.time.Instant;
@@ -40,6 +43,9 @@ class PracticeFeedbackDispatchService {
     private final TransactionTemplate transactionTemplate;
     private final MeterRegistry meterRegistry;
     private final ObjectMapper objectMapper;
+    private final FeedbackRepository feedbackRepository;
+    private final DiffNotePoster diffNotePoster;
+    private final FeedbackLedgerRecorder ledgerRecorder;
 
     PracticeFeedbackDispatchService(
         FeedbackDispatchRepository repository,
@@ -47,7 +53,10 @@ class PracticeFeedbackDispatchService {
         PullRequestCommentPoster commentPoster,
         TransactionTemplate transactionTemplate,
         MeterRegistry meterRegistry,
-        ObjectMapper objectMapper
+        ObjectMapper objectMapper,
+        FeedbackRepository feedbackRepository,
+        DiffNotePoster diffNotePoster,
+        FeedbackLedgerRecorder ledgerRecorder
     ) {
         this.repository = repository;
         this.policy = policy;
@@ -55,6 +64,9 @@ class PracticeFeedbackDispatchService {
         this.transactionTemplate = transactionTemplate;
         this.meterRegistry = meterRegistry;
         this.objectMapper = objectMapper;
+        this.feedbackRepository = feedbackRepository;
+        this.diffNotePoster = diffNotePoster;
+        this.ledgerRecorder = ledgerRecorder;
     }
 
     Result dispatchAutomaticSummary(
@@ -83,10 +95,10 @@ class PracticeFeedbackDispatchService {
                 job,
                 feedback.getId(),
                 "approved:" + feedback.getId(),
-                FeedbackDispatchDestination.APPROVED_ARTIFACT_COMMENT,
+                FeedbackDispatchDestination.APPROVED_REVIEW_PACKAGE,
                 java.util.Objects.requireNonNull(feedback.getBody(), "an approved proposal always has a body"),
                 null,
-                Set.of()
+                Set.copyOf(feedback.getProposedPracticeSlugs())
             ),
             job
         );
@@ -156,10 +168,11 @@ class PracticeFeedbackDispatchService {
             return refuse(dispatch, owner, decision.refusal());
         }
 
-        ExistingDeliveryLookup existing = switch (dispatch.getDestination()) {
-            case ARTIFACT_SUMMARY -> commentPoster.findExistingSummaryComment(job);
-            case APPROVED_ARTIFACT_COMMENT -> commentPoster.findApprovedProposal(job, dispatch.approvedFeedbackId());
-        };
+        if (dispatch.getDestination() == FeedbackDispatchDestination.APPROVED_REVIEW_PACKAGE) {
+            return dispatchApprovedPackage(dispatch, job, owner, decision);
+        }
+
+        ExistingDeliveryLookup existing = commentPoster.findExistingSummaryComment(job);
         if (existing.kind() == ExistingDeliveryLookup.Kind.UNKNOWN) {
             return retry(dispatch, owner, "Provider lookup was inconclusive");
         }
@@ -199,6 +212,99 @@ class PracticeFeedbackDispatchService {
         }
     }
 
+    private Result dispatchApprovedPackage(
+        FeedbackDispatch dispatch,
+        AgentJob job,
+        String owner,
+        PracticeFeedbackDeliveryPolicy.Decision<?> initialDecision
+    ) {
+        Feedback feedback = feedbackRepository
+            .findByIdAndWorkspaceId(dispatch.approvedFeedbackId(), dispatch.getWorkspaceId())
+            .orElse(null);
+        if (feedback == null || feedback.getBody() == null || !feedback.getBody().equals(dispatch.getBody())) {
+            return retry(dispatch, owner, "Approved feedback is missing or no longer matches its immutable body");
+        }
+        if (!reviewedRevisionMatches(feedback, initialDecision)) {
+            return refuse(dispatch, owner, FeedbackSuppressionReason.APPROVAL_STALE);
+        }
+
+        try {
+            ExistingDeliveryLookup existing = commentPoster.findApprovedProposal(job, dispatch.approvedFeedbackId());
+            if (existing.kind() == ExistingDeliveryLookup.Kind.UNKNOWN) {
+                return retry(dispatch, owner, "Provider lookup was inconclusive");
+            }
+
+            String summaryRef;
+            if (existing.kind() == ExistingDeliveryLookup.Kind.FOUND) {
+                summaryRef = java.util.Objects.requireNonNull(existing.commentId());
+            } else {
+                PracticeFeedbackDeliveryPolicy.Decision<?> decision = evaluateAtEgress(dispatch, job);
+                if (!decision.allowed()) return refuse(dispatch, owner, decision.refusal());
+                if (!reviewedRevisionMatches(feedback, decision)) {
+                    return refuse(dispatch, owner, FeedbackSuppressionReason.APPROVAL_STALE);
+                }
+                if (dispatch.getWriteStarted()) {
+                    return retry(dispatch, owner, "A prior provider write has not been reconciled");
+                }
+                Integer began = transactionTemplate.execute(status ->
+                    repository.beginWrite(dispatch.getId(), dispatch.getWorkspaceId(), owner)
+                );
+                if (began == null || began != 1) return Result.inProgress();
+                summaryRef = java.util.Objects.requireNonNull(post(dispatch, job));
+            }
+
+            ledgerRecorder.recordApprovedPlacements(feedback, summaryRef, java.util.List.of());
+            var inlineNotes = feedback
+                .getProposedPlacements()
+                .stream()
+                .filter(placement -> placement.type() == PlacementType.INLINE)
+                .map(placement ->
+                    new PracticeDetectionResultParser.DiffNote(
+                        java.util.Objects.requireNonNull(placement.path()),
+                        java.util.Objects.requireNonNull(placement.startLine()),
+                        placement.endLine(),
+                        placement.body(),
+                        placement.recurrenceKey()
+                    )
+                )
+                .toList();
+            if (!inlineNotes.isEmpty()) {
+                PracticeFeedbackDeliveryPolicy.Decision<?> decision = evaluateAtEgress(dispatch, job);
+                if (!decision.allowed()) return refuse(dispatch, owner, decision.refusal(), summaryRef);
+                if (!reviewedRevisionMatches(feedback, decision)) {
+                    return refuse(dispatch, owner, FeedbackSuppressionReason.APPROVAL_STALE, summaryRef);
+                }
+                DiffNotePoster.DiffNoteResult inline = diffNotePoster.reconcileApprovedInlineNotes(
+                    job,
+                    feedback.getId(),
+                    inlineNotes
+                );
+                ledgerRecorder.recordApprovedPlacements(feedback, summaryRef, inline.signals());
+                if (inline.failed() > 0 || inline.suppressed()) {
+                    return retryPackage(dispatch, owner, "Approved review package remains incomplete", summaryRef);
+                }
+            }
+            return finish(dispatch, owner, FeedbackDispatchState.SENT, summaryRef, null, null, null)
+                ? Result.sent(summaryRef)
+                : Result.inProgress();
+        } catch (JobDeliverySuppressedException exception) {
+            return refuse(dispatch, owner, FeedbackSuppressionReason.INSTANCE_SILENCED);
+        } catch (RuntimeException exception) {
+            return retry(dispatch, owner, bounded(exception.getMessage()));
+        }
+    }
+
+    private static boolean reviewedRevisionMatches(
+        Feedback feedback,
+        PracticeFeedbackDeliveryPolicy.Decision<?> decision
+    ) {
+        if (feedback.getReviewedRevision() == null) return true;
+        return (
+            decision.target() instanceof PullRequest pullRequest &&
+            feedback.getReviewedRevision().equals(pullRequest.getHeadRefOid())
+        );
+    }
+
     private PracticeFeedbackDeliveryPolicy.Decision<?> evaluateAtEgress(FeedbackDispatch dispatch, AgentJob job) {
         Set<String> practiceSlugs = dispatch
             .getPracticeSlugs()
@@ -213,7 +319,7 @@ class PracticeFeedbackDispatchService {
     }
 
     private @Nullable String post(FeedbackDispatch dispatch, AgentJob job) {
-        if (dispatch.getDestination() == FeedbackDispatchDestination.APPROVED_ARTIFACT_COMMENT) {
+        if (dispatch.getDestination() == FeedbackDispatchDestination.APPROVED_REVIEW_PACKAGE) {
             if (job.getMetadata() != null && job.getMetadata().has("issue_number")) {
                 return commentPoster.postIssueApprovedProposal(job, dispatch.approvedFeedbackId(), dispatch.getBody());
             }
@@ -274,8 +380,17 @@ class PracticeFeedbackDispatchService {
     }
 
     private Result refuse(FeedbackDispatch dispatch, String owner, FeedbackSuppressionReason reason) {
-        return finish(dispatch, owner, FeedbackDispatchState.SUPPRESSED, null, null, reason, null)
-            ? Result.suppressed(reason)
+        return refuse(dispatch, owner, reason, null);
+    }
+
+    private Result refuse(
+        FeedbackDispatch dispatch,
+        String owner,
+        FeedbackSuppressionReason reason,
+        @Nullable String externalRef
+    ) {
+        return finish(dispatch, owner, FeedbackDispatchState.SUPPRESSED, externalRef, null, reason, null)
+            ? Result.suppressed(reason, externalRef)
             : Result.inProgress();
     }
 
@@ -285,6 +400,15 @@ class PracticeFeedbackDispatchService {
     }
 
     private Result retry(FeedbackDispatch dispatch, String owner, @Nullable String error) {
+        return retry(dispatch, owner, error, null);
+    }
+
+    private Result retry(
+        FeedbackDispatch dispatch,
+        String owner,
+        @Nullable String error,
+        @Nullable String externalRef
+    ) {
         int attempt = dispatch.getAttemptCount() + 1;
         if (attempt >= MAX_ATTEMPTS && !dispatch.getWriteStarted()) {
             return finish(dispatch, owner, FeedbackDispatchState.FAILED, null, error, null, null)
@@ -295,13 +419,23 @@ class PracticeFeedbackDispatchService {
                 dispatch,
                 owner,
                 FeedbackDispatchState.UNCERTAIN,
-                null,
+                externalRef,
                 error,
                 null,
                 Instant.now().plus(backoff(attempt))
             )
-            ? Result.uncertain()
+            ? Result.uncertain(externalRef)
             : Result.inProgress();
+    }
+
+    private Result retryPackage(FeedbackDispatch dispatch, String owner, String error, String externalRef) {
+        int attempt = dispatch.getAttemptCount() + 1;
+        if (attempt >= MAX_ATTEMPTS) {
+            return finish(dispatch, owner, FeedbackDispatchState.FAILED, externalRef, error, null, null)
+                ? Result.failed(externalRef)
+                : Result.inProgress();
+        }
+        return retry(dispatch, owner, error, externalRef);
     }
 
     static Duration backoff(int attempt) {
@@ -341,11 +475,19 @@ class PracticeFeedbackDispatchService {
         }
 
         static Result suppressed(@Nullable FeedbackSuppressionReason reason) {
-            return new Result(Status.SUPPRESSED, null, reason);
+            return suppressed(reason, null);
+        }
+
+        static Result suppressed(@Nullable FeedbackSuppressionReason reason, @Nullable String ref) {
+            return new Result(Status.SUPPRESSED, ref, reason);
+        }
+
+        static Result uncertain(@Nullable String ref) {
+            return new Result(Status.UNCERTAIN, ref, null);
         }
 
         static Result uncertain() {
-            return new Result(Status.UNCERTAIN, null, null);
+            return uncertain(null);
         }
 
         static Result inProgress() {
@@ -354,6 +496,10 @@ class PracticeFeedbackDispatchService {
 
         static Result failed() {
             return new Result(Status.FAILED, null, null);
+        }
+
+        static Result failed(@Nullable String ref) {
+            return new Result(Status.FAILED, ref, null);
         }
 
         enum Status {

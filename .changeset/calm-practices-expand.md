@@ -11,6 +11,11 @@ their own feedback in Hephaestus, and nothing reaches a pull request or the ment
 while paused is never released by resuming. Proposals that nobody has decided remain available for an
 administrator to approve or reject after sending resumes.
 
+When a review needs approval, the approval page now shows the exact summary and every inline comment
+as one package. One decision releases or rejects the whole review; automatically authorized findings
+in the same review wait for that decision instead of appearing early. After approval, the delivery
+page shows how many comments have reached the provider while safe retries finish the remainder.
+
 Every delivery decision now keeps its reasoning. On a piece of work under Review activity, a workspace
 administrator can see, for each attempt, which checks ran and in what order, which one stopped it, and
 the repository, branch, author and settings it was judged against — so "why did this go quiet?" is

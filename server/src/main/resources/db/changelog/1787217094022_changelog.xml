@@ -176,8 +176,8 @@
             ALTER TABLE feedback_dispatch ADD CONSTRAINT chk_feedback_dispatch_state
                 CHECK (state IN ('PENDING', 'CLAIMED', 'SENT', 'SUPPRESSED', 'UNCERTAIN', 'FAILED'));
             ALTER TABLE feedback_dispatch ADD CONSTRAINT chk_feedback_dispatch_destination
-                CHECK (destination IN ('ARTIFACT_SUMMARY', 'APPROVED_ARTIFACT_COMMENT')
-                    AND (destination = 'APPROVED_ARTIFACT_COMMENT') = (feedback_id IS NOT NULL));
+                CHECK (destination IN ('ARTIFACT_SUMMARY', 'APPROVED_REVIEW_PACKAGE')
+                    AND (destination = 'APPROVED_REVIEW_PACKAGE') = (feedback_id IS NOT NULL));
             ALTER TABLE feedback_dispatch ADD CONSTRAINT chk_feedback_dispatch_practice_slugs
                 CHECK (jsonb_typeof(practice_slugs) = 'array'
                     AND NOT jsonb_path_exists(practice_slugs, '$[*] ? (@.type() != "string")'));
@@ -213,6 +213,55 @@
                         'PRACTICE_REQUIRES_APPROVAL', 'BACKFILL_QUIET', 'WORKSPACE_DISABLED', 'APPROVAL_STALE',
                         'APPROVAL_NO_LONGER_ELIGIBLE'));
             ]]></sql>
+        </rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus" id="1787217094022-5">
+        <preConditions onFail="MARK_RAN" onFailMessage="Immutable review packages already exist">
+            <not><columnExists tableName="feedback" columnName="proposed_placements"/></not>
+        </preConditions>
+        <comment>Keep the exact summary, inline comments, and reviewed revision in one approval package.</comment>
+        <addColumn tableName="feedback">
+            <column name="proposed_placements" type="JSONB" defaultValue="[]"><constraints nullable="false"/></column>
+            <column name="reviewed_revision" type="VARCHAR(64)"/>
+            <column name="proposed_practice_slugs" type="JSONB" defaultValue="[]"><constraints nullable="false"/></column>
+        </addColumn>
+        <sql><![CDATA[
+            DELETE FROM feedback_placement duplicate
+             USING feedback_placement canonical
+             WHERE duplicate.feedback_id = canonical.feedback_id
+               AND duplicate.posted_comment_ref = canonical.posted_comment_ref
+               AND duplicate.posted_comment_ref IS NOT NULL
+               AND duplicate.id > canonical.id;
+        ]]></sql>
+        <addUniqueConstraint tableName="feedback_placement"
+            columnNames="feedback_id, posted_comment_ref"
+            constraintName="uk_feedback_placement_feedback_ref"/>
+        <sql><![CDATA[
+            ALTER TABLE feedback ADD CONSTRAINT chk_feedback_proposed_placements
+                CHECK (jsonb_typeof(proposed_placements) = 'array');
+            ALTER TABLE feedback ADD CONSTRAINT chk_feedback_proposed_practice_slugs
+                CHECK (jsonb_typeof(proposed_practice_slugs) = 'array'
+                    AND NOT jsonb_path_exists(proposed_practice_slugs, '$[*] ? (@.type() != "string")'));
+            ALTER TABLE feedback DROP CONSTRAINT chk_feedback_state;
+            ALTER TABLE feedback ADD CONSTRAINT chk_feedback_state
+                CHECK (delivery_state IN ('AWAITING_APPROVAL', 'PREPARED', 'PARTIALLY_DELIVERED', 'DELIVERED',
+                    'DISCARDED', 'SUPERSEDED', 'SUPPRESSED', 'FAILED'));
+        ]]></sql>
+        <rollback>
+            <dropUniqueConstraint tableName="feedback_placement"
+                constraintName="uk_feedback_placement_feedback_ref"/>
+            <sql><![CDATA[
+                UPDATE feedback SET delivery_state = 'FAILED', suppression_reason = NULL
+                 WHERE delivery_state = 'PARTIALLY_DELIVERED';
+                ALTER TABLE feedback DROP CONSTRAINT chk_feedback_state;
+                ALTER TABLE feedback ADD CONSTRAINT chk_feedback_state
+                    CHECK (delivery_state IN ('AWAITING_APPROVAL', 'PREPARED', 'DELIVERED', 'DISCARDED',
+                        'SUPERSEDED', 'SUPPRESSED', 'FAILED'));
+            ]]></sql>
+            <dropColumn tableName="feedback" columnName="reviewed_revision"/>
+            <dropColumn tableName="feedback" columnName="proposed_practice_slugs"/>
+            <dropColumn tableName="feedback" columnName="proposed_placements"/>
         </rollback>
     </changeSet>
 </databaseChangeLog>

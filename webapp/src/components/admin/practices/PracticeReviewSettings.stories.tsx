@@ -243,14 +243,17 @@ export const NarrowingToABaseBranch: Story = {
 			canvas.getByRole("button", { name: "Add to base branches for acme/widgets" }),
 		);
 
-		await expect(args.policy.onUpdate).toHaveBeenCalledWith({
-			reviewScope: {
-				repositoryMode: "SELECTED",
-				personMode: "ALL_ELIGIBLE",
-				repositories: [{ nameWithOwner: "acme/widgets", baseBranches: ["release/2026.1"] }],
-				personUserIds: [],
+		await expect(args.policy.onUpdate).toHaveBeenCalledWith(
+			{
+				reviewScope: {
+					repositoryMode: "SELECTED",
+					personMode: "ALL_ELIGIBLE",
+					repositories: [{ nameWithOwner: "acme/widgets", baseBranches: ["release/2026.1"] }],
+					personUserIds: [],
+				},
 			},
-		});
+			settings.etag,
+		);
 	},
 };
 
@@ -302,9 +305,8 @@ export const SelectedEmptyMeansNobody: Story = {
 		},
 	},
 	play: async ({ canvas }) => {
-		await expect(canvas.getByText("No repositories are covered.")).toBeVisible();
-		await expect(canvas.getByText("No people are covered.")).toBeVisible();
 		await expect(canvas.getByText("Nothing is being reviewed")).toBeVisible();
+		await expect(canvas.getByText(/an empty list covers nobody/i)).toBeVisible();
 	},
 };
 
@@ -322,6 +324,10 @@ export const SendingPaused: Story = {
 };
 
 export const WideningCoverageAsksFirst: Story = {
+	parameters: {
+		viewport: { defaultViewport: "reflow" },
+		chromatic: { viewports: [320, 1440] },
+	},
 	args: {
 		policy: {
 			...policy,
@@ -349,6 +355,7 @@ export const WideningCoverageAsksFirst: Story = {
 		await userEvent.click(canvas.getByRole("radio", { name: "All monitored repositories" }));
 
 		const dialog = within(await screen.findByRole("alertdialog"));
+		await expectNoPageOverflow();
 		await expect(dialog.getByText(/Monitored repositories covered:/)).toHaveTextContent(
 			"Monitored repositories covered: 1 → 3 of 3",
 		);
@@ -358,14 +365,17 @@ export const WideningCoverageAsksFirst: Story = {
 		await expect(args.coverage.preview).toHaveBeenCalled();
 
 		await userEvent.click(dialog.getByRole("button", { name: "Apply wider coverage" }));
-		await expect(args.policy.onUpdate).toHaveBeenCalledWith({
-			reviewScope: {
-				repositoryMode: "ALL_MONITORED",
-				personMode: "ALL_ELIGIBLE",
-				repositories: [{ nameWithOwner: "acme/widgets", baseBranches: [] }],
-				personUserIds: [],
+		await expect(args.policy.onUpdate).toHaveBeenCalledWith(
+			{
+				reviewScope: {
+					repositoryMode: "ALL_MONITORED",
+					personMode: "ALL_ELIGIBLE",
+					repositories: [{ nameWithOwner: "acme/widgets", baseBranches: [] }],
+					personUserIds: [],
+				},
 			},
-		});
+			settings.etag,
+		);
 	},
 };
 
@@ -385,9 +395,9 @@ export const CoveragePreviewLoading: Story = {
 	play: async ({ canvas }) => {
 		await userEvent.click(canvas.getByRole("radio", { name: "All monitored repositories" }));
 
-		const dialog = within(await screen.findByRole("alertdialog"));
-		await expectSettledVisible(dialog.getByText("Calculating the proposed coverage…"));
-		await expect(dialog.getByRole("button", { name: "Apply wider coverage" })).toBeDisabled();
+		await expect(canvas.getByRole("radio", { name: "All monitored repositories" })).toBeChecked();
+		await expect(canvas.getByRole("status")).toHaveTextContent("Checking the proposed coverage…");
+		await expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
 	},
 };
 
@@ -404,11 +414,10 @@ export const CoveragePreviewUnavailable: Story = {
 	play: async ({ args, canvas }) => {
 		await userEvent.click(canvas.getByRole("radio", { name: "All monitored repositories" }));
 
-		const dialog = within(await screen.findByRole("alertdialog"));
-		await expectSettledVisible(dialog.getByText("Couldn't estimate the new coverage"));
-		await expect(dialog.getByRole("button", { name: "Apply wider coverage" })).toBeDisabled();
+		await expectSettledVisible(canvas.getByText("Couldn't estimate the new coverage"));
+		await expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
 
-		await userEvent.click(dialog.getByRole("button", { name: "Retry" }));
+		await userEvent.click(canvas.getByRole("button", { name: "Retry" }));
 		await expect(args.coverage.preview).toHaveBeenCalledTimes(2);
 	},
 };

@@ -49,6 +49,32 @@ class WorkspaceReviewScopeTest extends BaseUnitTest {
     }
 
     @Test
+    void allRepositoriesCanBeCombinedWithSelectedPeople() {
+        WorkspaceReviewScope scope = new WorkspaceReviewScope(
+            ReviewRepositoryMode.ALL_MONITORED,
+            ReviewPersonMode.SELECTED,
+            List.of(),
+            List.of(7L)
+        );
+
+        assertThat(scope.admits("any/repository", "any-branch", 7L)).isTrue();
+        assertThat(scope.admits("any/repository", "any-branch", 8L)).isFalse();
+    }
+
+    @Test
+    void selectedRepositoriesCanBeCombinedWithAllEligiblePeople() {
+        WorkspaceReviewScope scope = new WorkspaceReviewScope(
+            ReviewRepositoryMode.SELECTED,
+            ReviewPersonMode.ALL_ELIGIBLE,
+            List.of(new ReviewRepositoryTarget("owner/repo", List.of())),
+            List.of()
+        );
+
+        assertThat(scope.admits("owner/repo", "any-branch", 7L)).isTrue();
+        assertThat(scope.admits("other/repo", "any-branch", 7L)).isFalse();
+    }
+
+    @Test
     void exactBaseBranchesAreScopedPerRepository() {
         WorkspaceReviewScope scope = selected(
             List.of(

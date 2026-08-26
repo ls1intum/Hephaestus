@@ -281,12 +281,16 @@ function WhenAndWhereSection({ workspaceSlug }: { workspaceSlug: string }) {
 					policy={{
 						settings: reviewSettingsQuery.data,
 						isSaving: updatePracticeReviewSettings.isPending,
-						onUpdate: (settings: UpdatePracticeReviewSettingsRequest, sourceEtag?: string) =>
-							updatePracticeReviewSettings.mutate({
+						onUpdate: async (
+							settings: UpdatePracticeReviewSettingsRequest,
+							sourceEtag?: string,
+						) => {
+							await updatePracticeReviewSettings.mutateAsync({
 								path: { workspaceSlug },
 								body: settings,
 								headers: sourceEtag ? { "If-Match": sourceEtag } : undefined,
-							}),
+							});
+						},
 						onReset: (field: PracticeReviewField) =>
 							updatePracticeReviewSettings.mutate({
 								path: { workspaceSlug },
@@ -308,7 +312,7 @@ function WhenAndWhereSection({ workspaceSlug }: { workspaceSlug: string }) {
 						},
 						people: {
 							options: (membersQuery.data ?? []).flatMap((member) =>
-								member.userId == null
+								member.userId == null || !member.eligibleForPracticeReview
 									? []
 									: [
 											{

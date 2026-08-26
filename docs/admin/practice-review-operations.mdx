@@ -93,8 +93,8 @@ Two consequences to plan for:
 - **Sustained `UNCERTAIN` means Hephaestus cannot prove whether the provider accepted the write**, not that
   feedback is queued. Fix provider connectivity or credentials so reconciliation can continue.
 - **A dispatch interrupted mid-write can outlive its retry budget without reaching `FAILED`.** It is
-  deliberately not failed, because the comment may be live, and it will log a warning until somebody
-  confirms the provider outcome.
+  deliberately not failed, because the comment may be live, and remains uncertain until provider lookup
+  can confirm the outcome.
 
 Do not mutate dispatch rows manually. Their state, write fence, attempt count, next-attempt time and lease
 owner jointly prevent an uncertain provider outcome from becoming a duplicate write.

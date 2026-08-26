@@ -69,7 +69,7 @@ public class ReviewRequestAuthority {
         return assignees != null && assignees.stream().anyMatch(a -> requesterId.equals(a.getId()));
     }
 
-    private boolean isWorkspaceAdmin(long workspaceId, Long requesterId) {
+    public boolean isWorkspaceAdmin(long workspaceId, Long requesterId) {
         return memberships
             .findByWorkspace_IdAndUser_Id(workspaceId, requesterId)
             .map(membership -> ADMIN_ROLES.contains(membership.getRole()))

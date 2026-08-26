@@ -2,13 +2,30 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn, screen, userEvent, within } from "storybook/test";
 import { expectNoPageOverflow } from "@/test/reflow";
 import { ProposalReviewPage } from "./ProposalReviewPage";
-import { longFeedbackDetail, workspacePractices } from "./story-mock-data";
+import { reviewFeedbackDetail, workspacePractices } from "./story-mock-data";
 
 const feedback = {
-	...longFeedbackDetail,
+	...reviewFeedbackDetail,
 	deliveryState: "AWAITING_APPROVAL" as const,
 	deliveredAt: undefined,
-	placements: [{ id: "proposal-summary", placementType: "SUMMARY" as const }],
+	placements: [],
+	proposedPlacements: [
+		{ type: "SUMMARY" as const, body: reviewFeedbackDetail.body ?? "Review summary" },
+		{
+			type: "INLINE" as const,
+			body: "Catch the expected transport error and let programming errors surface.",
+			path: "src/main/java/example/RetryService.java",
+			startLine: 48,
+		},
+		{
+			type: "INLINE" as const,
+			body: "Explain why this branch changes behavior.",
+			path: "src/main/java/example/ReviewHandler.java",
+			startLine: 91,
+			endLine: 94,
+		},
+	],
+	reviewedRevision: "27f4e88c9f5a",
 };
 
 const meta = {
@@ -34,14 +51,17 @@ type Story = StoryObj<typeof meta>;
 
 export const Ready: Story = {
 	play: async ({ canvas, args }) => {
+		const firstObservation = feedback.observations[0];
+		if (!firstObservation) throw new Error("The proposal story needs a supporting observation");
 		await expect(canvas.getByRole("heading", { name: /Feedback for/ })).toBeVisible();
-		await expect(canvas.getByText("As a summary comment on the work")).toBeVisible();
+		await expect(canvas.getByText("1 summary and 2 line comments")).toBeVisible();
+		await expect(canvas.getByText("src/main/java/example/RetryService.java")).toBeVisible();
 		await expect(
 			canvas.getByRole("link", {
-				name: "A cache miss and a permission failure come back as the same 404",
+				name: firstObservation.summary,
 			}),
 		).toBeVisible();
-		await userEvent.click(canvas.getByRole("button", { name: "Approve and send" }));
+		await userEvent.click(canvas.getByRole("button", { name: "Approve and send review" }));
 		await expect(args.onApprove).toHaveBeenCalledWith(feedback.id);
 		await expectNoPageOverflow();
 	},

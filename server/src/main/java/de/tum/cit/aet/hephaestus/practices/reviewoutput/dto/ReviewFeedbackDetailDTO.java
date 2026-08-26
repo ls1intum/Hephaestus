@@ -26,7 +26,7 @@ public record ReviewFeedbackDetailDTO(
     ReviewSubjectDTO subject,
     @NonNull FeedbackChannel channel,
     @NonNull FeedbackDeliveryState deliveryState,
-    @Schema(description = "Why the feedback was withheld; null unless the state is SUPPRESSED")
+    @Schema(description = "Why delivery stopped; set on withheld or terminally partial feedback")
     @Nullable
     FeedbackSuppressionReason suppressionReason,
     @Schema(description = "The feedback this one replaced; null on a first delivery") @Nullable UUID replacesId,
@@ -41,7 +41,13 @@ public record ReviewFeedbackDetailDTO(
     @Nullable
     String body,
     @NonNull @Schema(description = "Source observations in render order") List<ReviewBoundObservationDTO> observations,
-    @NonNull @Schema(description = "Recorded placements; empty when none") List<ReviewPlacementDTO> placements
+    @NonNull @Schema(description = "Recorded placements; empty when none") List<ReviewPlacementDTO> placements,
+    @Schema(description = "Reviewed source revision for an immutable approval package")
+    @Nullable
+    String reviewedRevision,
+    @NonNull
+    @Schema(description = "Exact ordered summary and inline messages covered by the approval decision")
+    List<ReviewProposedPlacementDTO> proposedPlacements
 ) {
     /**
      * @param bodyVisible whether this caller may read the composed text. A withheld body is rendered as
@@ -72,7 +78,11 @@ public record ReviewFeedbackDetailDTO(
             feedback.getDeliveredAt(),
             bodyVisible ? feedback.getBody() : null,
             observations,
-            placements
+            placements,
+            feedback.getReviewedRevision(),
+            bodyVisible
+                ? feedback.getProposedPlacements().stream().map(ReviewProposedPlacementDTO::from).toList()
+                : List.of()
         );
     }
 }

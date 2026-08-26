@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.integration.scm.gitlab.feedback;
 import static de.tum.cit.aet.hephaestus.integration.scm.GraphQlResponseStubValidator.Vendor.GITLAB;
 import static de.tum.cit.aet.hephaestus.integration.scm.GraphQlResponseStubValidator.assertVendorCouldReturn;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
@@ -16,6 +17,7 @@ import static org.mockito.Mockito.when;
 import de.tum.cit.aet.hephaestus.integration.core.egress.OutboundEgressGuard;
 import de.tum.cit.aet.hephaestus.integration.core.egress.OutboundEgressSuppressedException;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackAnchor.DiffAnchor;
+import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackDeliveryException;
 import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFeedbackChannel.DeliveredSignal;
 import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFeedbackChannel.Disposition;
 import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFeedbackChannel.InlineFeedback;
@@ -78,6 +80,26 @@ class GitlabInlineFeedbackChannelTest extends BaseUnitTest {
     @Test
     void emptyFindings() {
         assertThat(channel.postInlineFeedback(gitlabTarget(), List.of())).isEqualTo(InlineResult.counts(0, 0));
+    }
+
+    @Test
+    void immutablePackageDefersWhenPriorDiscussionsCannotBeRead() {
+        stubResolvedMr();
+        when(gitLabProvider.forScope(1L)).thenThrow(new RuntimeException("provider unavailable"));
+
+        assertThatThrownBy(() ->
+            channel.postImmutablePackage(
+                gitlabTarget(),
+                List.of(
+                    new InlineFeedback(
+                        new DiffAnchor("src/Foo.java", 10, null),
+                        "exact body",
+                        "<!-- package:1 -->",
+                        "approved:1:0"
+                    )
+                )
+            )
+        ).isInstanceOf(FeedbackDeliveryException.class);
     }
 
     @Test

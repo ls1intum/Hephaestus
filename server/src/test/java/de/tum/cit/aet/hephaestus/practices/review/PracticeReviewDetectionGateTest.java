@@ -29,6 +29,7 @@ import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceFeatures;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceResolver;
+import de.tum.cit.aet.hephaestus.workspace.settings.PracticeDeliveryStatus;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
@@ -606,6 +607,15 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
     class ReviewScopeTests {
 
         @Test
+        void pausedDeliveryDoesNotStopReviewCompute() {
+            PullRequest pr = createPullRequest();
+            Workspace workspace = setupThroughPracticeMatching(pr, createPractice(SIGNAL));
+            workspace.getReviewSettings().setDeliveryStatus(PracticeDeliveryStatus.PAUSED);
+
+            assertThat(gate.evaluate(pr, SIGNAL, TriggerMode.AUTO)).isInstanceOf(GateDecision.Detect.class);
+        }
+
+        @Test
         void admitsAPullRequestTargetingAScopedBranch() {
             PullRequest pr = createPullRequest();
             pr.setBaseRefName("main");
@@ -633,6 +643,18 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
             // Terminal, not pending: the branch the artifact targeted will not change, so re-offering it
             // would be the reaper re-deciding a decision that cannot come out differently.
             assertThat(skip.resolvedSignalReason().isRetryable()).isFalse();
+        }
+
+        @Test
+        void anAdministrativeEvaluationMayRunOutsideCoverage() {
+            PullRequest pr = createPullRequest();
+            pr.setBaseRefName("develop");
+            Workspace workspace = setupThroughPracticeMatching(pr, createPractice(SIGNAL));
+            when(coverageService.admits(workspace, "ls1intum/Hephaestus", "develop", pr.reviewSubject())).thenReturn(
+                false
+            );
+
+            assertThat(gate.evaluateAdministrative(pr, SIGNAL)).isInstanceOf(GateDecision.Detect.class);
         }
 
         /** Cheap enough to sit ahead of every query — no catalogue read happens for out-of-scope work. */

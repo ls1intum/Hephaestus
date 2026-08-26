@@ -56,7 +56,11 @@ public class PracticeReviewDetectionGate {
         @NonNull SignalName signal,
         @NonNull TriggerMode triggerMode
     ) {
-        return evaluateReviewable(pullRequest, pullRequest.isDraft(), signal, triggerMode);
+        return evaluateReviewable(pullRequest, pullRequest.isDraft(), signal, triggerMode, false);
+    }
+
+    public GateDecision evaluateAdministrative(PullRequest pullRequest, SignalName signal) {
+        return evaluateReviewable(pullRequest, pullRequest.isDraft(), signal, TriggerMode.MANUAL, true);
     }
 
     /**
@@ -68,7 +72,11 @@ public class PracticeReviewDetectionGate {
         @NonNull SignalName signal,
         @NonNull TriggerMode triggerMode
     ) {
-        return evaluateReviewable(issue, false, signal, triggerMode);
+        return evaluateReviewable(issue, false, signal, triggerMode, false);
+    }
+
+    public GateDecision evaluateIssueAdministrative(Issue issue, SignalName signal) {
+        return evaluateReviewable(issue, false, signal, TriggerMode.MANUAL, true);
     }
 
     /**
@@ -98,7 +106,8 @@ public class PracticeReviewDetectionGate {
         @NonNull Issue reviewable,
         boolean draft,
         @NonNull SignalName signal,
-        @NonNull TriggerMode triggerMode
+        @NonNull TriggerMode triggerMode,
+        boolean allowOutsideCoverage
     ) {
         // Workspace resolution first: per-workspace settings drive the checks below.
         String nameWithOwner =
@@ -116,6 +125,7 @@ public class PracticeReviewDetectionGate {
         GateDecision.@Nullable Skip scopeSkip = null;
         String targetBranch = reviewable instanceof PullRequest pr ? pr.getBaseRefName() : null;
         if (
+            !allowOutsideCoverage &&
             !(reviewable instanceof PullRequest
                 ? coverageService.admits(workspace, nameWithOwner, targetBranch, reviewable.reviewSubject())
                 : coverageService.admits(workspace, nameWithOwner, null, reviewable.reviewSubject(), false))

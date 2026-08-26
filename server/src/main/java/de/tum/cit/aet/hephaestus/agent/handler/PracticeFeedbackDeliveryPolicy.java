@@ -500,10 +500,16 @@ public class PracticeFeedbackDeliveryPolicy {
             )
             .sorted(java.util.Comparator.comparing(DeliveryPolicyFactsSnapshot.PracticeFact::slug))
             .toList();
-        boolean authorized =
-            !facts.isEmpty() &&
-            facts.size() == expected &&
-            facts.stream().allMatch(fact -> fact.autonomy() == requiredAutonomy(stage, feedbackId));
+        boolean approvedAttempt = isApprovedAttempt(stage, feedbackId);
+        boolean authorized = !facts.isEmpty() && facts.size() == expected;
+        if (approvedAttempt) {
+            authorized =
+                authorized &&
+                facts.stream().noneMatch(fact -> fact.autonomy() == PracticeAutonomy.OFF) &&
+                facts.stream().anyMatch(fact -> fact.autonomy() == PracticeAutonomy.HUMAN_APPROVAL);
+        } else {
+            authorized = authorized && facts.stream().allMatch(fact -> fact.autonomy() == PracticeAutonomy.AUTOMATIC);
+        }
         return new AutonomyAssessment(FactAnswer.of(authorized), facts);
     }
 

@@ -12,10 +12,17 @@ vi.setConfig({ testTimeout: 20_000 });
 const FEEDBACK_ID = reviewFeedbackDetail.id;
 
 function proposalWire(deliveryState: "AWAITING_APPROVAL" | "PREPARED") {
+	const body = "Please keep the cache scoped to one workspace so membership changes cannot leak.";
 	return {
 		...reviewFeedbackDetail,
 		deliveryState,
-		body: "Please keep the cache scoped to one workspace so membership changes cannot leak.",
+		body,
+		proposedPlacements:
+			reviewFeedbackDetail.proposedPlacements.length === 0
+				? [{ type: "SUMMARY" as const, body }]
+				: reviewFeedbackDetail.proposedPlacements.map((placement) =>
+						placement.type === "SUMMARY" ? { ...placement, body } : placement,
+					),
 		createdAt: reviewFeedbackDetail.createdAt.toISOString(),
 		observations: reviewFeedbackDetail.observations.map((observation) => ({
 			...observation,
@@ -26,8 +33,6 @@ function proposalWire(deliveryState: "AWAITING_APPROVAL" | "PREPARED") {
 
 describe("feedback proposal route", () => {
 	it("shows the exact proposal and sends an approval through the generated operation", async () => {
-		// The GET reports what the approval PUT left behind, so the page's own re-read is what has to
-		// show PREPARED.
 		let deliveryState: "AWAITING_APPROVAL" | "PREPARED" = "AWAITING_APPROVAL";
 		let requestBody: unknown;
 		server.use(
@@ -56,7 +61,7 @@ describe("feedback proposal route", () => {
 		assert(firstObservation);
 		expect(screen.getByRole("link", { name: firstObservation.summary })).not.toBeNull();
 
-		await userEvent.click(screen.getByRole("button", { name: "Approve and send" }));
+		await userEvent.click(screen.getByRole("button", { name: "Approve and send review" }));
 		await screen.findByRole("heading", { name: /Feedback for/ }, ROUTE_RENDER_WAIT);
 		expect(requestBody).toStrictEqual({ decision: "APPROVED" });
 	});

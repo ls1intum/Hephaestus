@@ -24,6 +24,7 @@ import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -118,6 +119,30 @@ class PracticeFeedbackDispatchRepositoryIntegrationTest extends AbstractWorkspac
         );
 
         assertThat(claim(dispatchId, "reconciler", Instant.now().plusSeconds(60))).isEqualTo(1);
+    }
+
+    @Test
+    void recoveryQueriesNeverExhaustAnAmbiguousWrite() {
+        UUID safeToFail = insertDispatch(workspace.getId(), jobId, "safe-to-fail");
+        UUID ambiguous = insertDispatch(workspace.getId(), jobId, "ambiguous-beyond-budget");
+        jdbcTemplate.update(
+            "UPDATE feedback_dispatch SET state = 'UNCERTAIN', attempt_count = 8 WHERE id = ?",
+            safeToFail
+        );
+        jdbcTemplate.update(
+            "UPDATE feedback_dispatch SET state = 'UNCERTAIN', write_started = TRUE, attempt_count = 8 WHERE id = ?",
+            ambiguous
+        );
+
+        Instant now = Instant.now().plusSeconds(1);
+        assertThat(dispatchRepository.findRecoverable(now, 8, PageRequest.of(0, 10)))
+            .extracting(dispatch -> dispatch.getId())
+            .contains(ambiguous)
+            .doesNotContain(safeToFail);
+        assertThat(dispatchRepository.findExhausted(now, 8, PageRequest.of(0, 10)))
+            .extracting(dispatch -> dispatch.getId())
+            .contains(safeToFail)
+            .doesNotContain(ambiguous);
     }
 
     @Test

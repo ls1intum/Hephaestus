@@ -38,6 +38,46 @@ export function usePracticeReviewSettingsMutation(
 			if (previous && !variables.headers?.["If-Match"]) {
 				variables.headers = { "If-Match": previous.etag };
 			}
+			if (previous) {
+				const patch = variables.body;
+				const reset = patch.reset;
+				queryClient.setQueryData<PracticeReviewSettings>(settingsQueryKey, {
+					...previous,
+					...(reset?.includes("REVIEW_SCOPE")
+						? {
+								reviewScope: {
+									repositoryMode: "ALL_MONITORED" as const,
+									personMode: "ALL_ELIGIBLE" as const,
+									repositories: [],
+									personUserIds: [],
+								},
+							}
+						: {}),
+					...(reset?.includes("DEFAULT_AUTONOMY") ? { defaultAutonomyOverride: undefined } : {}),
+					...(reset?.includes("DELIVER_TO_MERGED") ? { deliverToMergedOverride: undefined } : {}),
+					...(reset?.includes("COOLDOWN_MINUTES") ? { cooldownMinutesOverride: undefined } : {}),
+					...(patch.reviewScope ? { reviewScope: patch.reviewScope } : {}),
+					...(patch.deliveryStatus ? { deliveryStatus: patch.deliveryStatus } : {}),
+					...(patch.defaultAutonomy
+						? {
+								defaultAutonomy: patch.defaultAutonomy,
+								defaultAutonomyOverride: patch.defaultAutonomy,
+							}
+						: {}),
+					...(patch.deliverToMerged === undefined
+						? {}
+						: {
+								deliverToMerged: patch.deliverToMerged,
+								deliverToMergedOverride: patch.deliverToMerged,
+							}),
+					...(patch.cooldownMinutes === undefined
+						? {}
+						: {
+								cooldownMinutes: patch.cooldownMinutes,
+								cooldownMinutesOverride: patch.cooldownMinutes,
+							}),
+				});
+			}
 			return { previous };
 		},
 		onSuccess: (updated) => {

@@ -23,6 +23,7 @@ import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.testconfig.TestEntities;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import java.util.List;
+import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -65,6 +66,8 @@ class DiffNotePosterTest extends BaseUnitTest {
 
         boolean cleared;
 
+        boolean immutable;
+
         @Nullable
         RuntimeException clearThrows;
 
@@ -77,6 +80,12 @@ class DiffNotePosterTest extends BaseUnitTest {
         public InlineResult postInlineFeedback(FeedbackTarget target, List<InlineFeedback> observations) {
             this.posted = observations;
             return new InlineResult(observations.size(), 0, List.of());
+        }
+
+        @Override
+        public InlineResult postImmutablePackage(FeedbackTarget target, List<InlineFeedback> observations) {
+            this.immutable = true;
+            return postInlineFeedback(target, observations);
         }
 
         @Override
@@ -125,6 +134,24 @@ class DiffNotePosterTest extends BaseUnitTest {
         FeedbackAnchor.DiffAnchor anchor = (FeedbackAnchor.DiffAnchor) posted(channel).get(0).anchor();
         assertThat(anchor.newLineNumber()).isEqualTo(10);
         assertThat(anchor.startLine()).isNull();
+    }
+
+    @Test
+    void approvedPackageUsesItsOwnImmutableProviderIdentity() {
+        RecordingChannel channel = new RecordingChannel();
+        UUID feedbackId = UUID.randomUUID();
+
+        poster(channel).reconcileApprovedInlineNotes(
+            gitlabJob(),
+            feedbackId,
+            List.of(new DiffNote("src/A.java", 10, null, "Exact body", "cross-review-key"))
+        );
+
+        InlineFeedback delivered = posted(channel).get(0);
+        assertThat(channel.immutable).isTrue();
+        assertThat(delivered.body()).isEqualTo("Exact body");
+        assertThat(delivered.marker()).isEqualTo("<!-- hephaestus-approved-package:" + feedbackId + " -->");
+        assertThat(delivered.recurrenceKey()).isEqualTo("approved:" + feedbackId + ":0");
     }
 
     @Test

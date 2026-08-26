@@ -8,6 +8,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -506,7 +507,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
         }
 
         @Test
-        void shouldUseLeadOnlyForAutoPostedNoteWhenProposalAlsoExists() {
+        void shouldHoldAutomaticFeedbackInsideTheReviewPackageWhenAnyPracticeNeedsApproval() {
             String lead = "The retry path is covered now, but the description never says why it changed.";
             ObjectNode metadata = sampleJobMetadata();
             metadata.put(ObservationAdmissionService.DIGEST_METADATA_KEY, "digest-1");
@@ -539,18 +540,10 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
             handler.deliver(job);
 
             var proposal = org.mockito.ArgumentCaptor.forClass(PracticeDetectionResultParser.DeliveryContent.class);
-            var summary = org.mockito.ArgumentCaptor.forClass(PracticeDetectionResultParser.DeliveryContent.class);
             verify(feedbackService).recordProposal(org.mockito.ArgumentMatchers.eq(job), proposal.capture(), any());
-            verify(feedbackService).deliverFeedback(
-                org.mockito.ArgumentMatchers.eq(job),
-                summary.capture(),
-                org.mockito.ArgumentMatchers.eq(java.util.Set.of("describe-what-and-why"))
-            );
+            verify(feedbackService, never()).deliverFeedback(any(), any(), any());
 
-            assertThat(summary.getValue().mrNote()).startsWith(lead);
-            assertThat(proposal.getValue().mrNote())
-                .as("two comments on one change must not open on the same sentence")
-                .doesNotContain(lead);
+            assertThat(proposal.getValue().mrNote()).startsWith(lead);
         }
 
         @Test

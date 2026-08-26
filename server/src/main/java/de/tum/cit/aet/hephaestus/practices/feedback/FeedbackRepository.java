@@ -50,11 +50,24 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Transactional
     @Query(
-        value = "UPDATE feedback SET delivery_state = 'DELIVERED', delivered_at = CURRENT_TIMESTAMP " +
-            "WHERE id = :id AND workspace_id = :workspaceId AND delivery_state = 'PREPARED'",
+        value = "UPDATE feedback SET delivery_state = 'DELIVERED', delivered_at = CURRENT_TIMESTAMP, suppression_reason = NULL " +
+            "WHERE id = :id AND workspace_id = :workspaceId AND delivery_state IN ('PREPARED', 'PARTIALLY_DELIVERED')",
         nativeQuery = true
     )
     int markApprovedDelivered(@Param("workspaceId") Long workspaceId, @Param("id") UUID id);
+
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Transactional
+    @Query(
+        value = "UPDATE feedback SET delivery_state = 'PARTIALLY_DELIVERED', suppression_reason = :reason " +
+            "WHERE id = :id AND workspace_id = :workspaceId AND delivery_state IN ('PREPARED', 'PARTIALLY_DELIVERED')",
+        nativeQuery = true
+    )
+    int markApprovedPartiallyDelivered(
+        @Param("workspaceId") Long workspaceId,
+        @Param("id") UUID id,
+        @Param("reason") @Nullable String reason
+    );
 
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Transactional
@@ -73,7 +86,7 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
     @Transactional
     @Query(
         value = "UPDATE feedback SET delivery_state = 'FAILED', suppression_reason = NULL " +
-            "WHERE id = :id AND workspace_id = :workspaceId AND delivery_state = 'PREPARED'",
+            "WHERE id = :id AND workspace_id = :workspaceId AND delivery_state IN ('PREPARED', 'PARTIALLY_DELIVERED')",
         nativeQuery = true
     )
     int markApprovedFailed(@Param("workspaceId") Long workspaceId, @Param("id") UUID id);
@@ -87,10 +100,12 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
     @Query(
         value = """
         SELECT f.agent_job_id AS "jobId",
-               COUNT(*) FILTER (WHERE f.delivery_state = 'PREPARED') AS "prepared",
+               COUNT(*) FILTER (WHERE f.delivery_state = 'PREPARED' OR
+                   (f.delivery_state = 'PARTIALLY_DELIVERED' AND f.suppression_reason IS NULL)) AS "prepared",
                COUNT(*) FILTER (WHERE f.delivery_state = 'DELIVERED') AS "delivered",
                COUNT(*) FILTER (WHERE f.delivery_state = 'SUPERSEDED') AS "superseded",
-               COUNT(*) FILTER (WHERE f.delivery_state = 'SUPPRESSED') AS "suppressed",
+               COUNT(*) FILTER (WHERE f.delivery_state = 'SUPPRESSED' OR
+                   (f.delivery_state = 'PARTIALLY_DELIVERED' AND f.suppression_reason IS NOT NULL)) AS "suppressed",
                COUNT(*) FILTER (WHERE f.delivery_state = 'FAILED') AS "failed"
         FROM feedback f
         WHERE f.workspace_id = :workspaceId
@@ -247,11 +262,7 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
     )
     int markSuperseded(@Param("workspaceId") Long workspaceId, @Param("id") UUID id);
 
-    /**
-     * Retires proposals on this thread that nobody decided, so a re-reviewed artifact offers one current
-     * decision rather than one per run. Scoped to {@code AWAITING_APPROVAL}: a decided proposal is a
-     * record of what a person chose and is never rewritten.
-     */
+    /** Retires undecided predecessors; decided proposals are immutable. */
     @Modifying(flushAutomatically = true)
     @Transactional
     @Query(

@@ -2,7 +2,7 @@ package de.tum.cit.aet.hephaestus.practices.feedback;
 
 /**
  * The withholding-rationale axis of a {@link Feedback} unit: why it was withheld instead of delivered. Set iff the
- * unit's {@link FeedbackDeliveryState} is {@code SUPPRESSED}; NULL otherwise. Constrained at the DB by
+ * unit is withheld or terminally partially delivered; NULL otherwise. Constrained at the DB by
  * {@code chk_feedback_suppression_reason}.
  */
 public enum FeedbackSuppressionReason {

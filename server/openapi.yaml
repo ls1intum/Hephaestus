@@ -5333,6 +5333,7 @@ paths:
             enum:
             - AWAITING_APPROVAL
             - PREPARED
+            - PARTIALLY_DELIVERED
             - DELIVERED
             - SUPERSEDED
             - SUPPRESSED
@@ -9416,7 +9417,6 @@ components:
       - decision
     DeliveryPolicyFactsSnapshot:
       type: object
-      description: The facts behind one delivery decision. Carries no feedback payload.
       properties:
         artifactKind:
           type: string
@@ -11544,10 +11544,14 @@ components:
       properties:
         current:
           $ref: "#/components/schemas/PracticeReviewCoverageSummary"
+          description: Effective coverage before the proposed change
         proposed:
           $ref: "#/components/schemas/PracticeReviewCoverageSummary"
+          description: Effective coverage if the proposed change is applied
         widens:
           type: boolean
+          description: "Whether the proposal admits any repository, branch, or person\
+            \ excluded now"
       required:
       - current
       - proposed
@@ -11558,21 +11562,28 @@ components:
         coveredPeople:
           type: integer
           format: int32
+          description: Eligible linked members admitted by the people coverage axis
         coveredRepositories:
           type: integer
           format: int32
+          description: Monitored repositories admitted by the repository coverage
+            axis
         eligiblePeople:
           type: integer
           format: int32
+          description: Eligible linked human members in the workspace
         estimateWindowDays:
           type: integer
           format: int32
+          description: Number of days included in recentReviewVolume
         monitoredRepositories:
           type: integer
           format: int32
+          description: Repositories currently monitored by the workspace
         recentReviewVolume:
           type: integer
           format: int32
+          description: Workspace-wide completed review jobs during the estimate window
       required:
       - coveredPeople
       - coveredRepositories
@@ -12745,6 +12756,7 @@ components:
           enum:
           - AWAITING_APPROVAL
           - PREPARED
+          - PARTIALLY_DELIVERED
           - DELIVERED
           - SUPERSEDED
           - SUPPRESSED
@@ -12761,7 +12773,8 @@ components:
           - SUPPORTING
         suppressionReason:
           type: string
-          description: Why the message was withheld; null unless the state is SUPPRESSED
+          description: Why delivery stopped; set on withheld or terminally partial
+            feedback
           enum:
           - VOLUME_CAPPED
           - COMPOSER_DEDUPED
@@ -12891,6 +12904,7 @@ components:
           enum:
           - AWAITING_APPROVAL
           - PREPARED
+          - PARTIALLY_DELIVERED
           - DELIVERED
           - SUPERSEDED
           - SUPPRESSED
@@ -12916,7 +12930,8 @@ components:
           description: Whose work the feedback addresses; may equal the recipient
         suppressionReason:
           type: string
-          description: Why the feedback was withheld; null unless the state is SUPPRESSED
+          description: Why delivery stopped; set on withheld or terminally partial
+            feedback
           enum:
           - VOLUME_CAPPED
           - COMPOSER_DEDUPED
@@ -13004,6 +13019,7 @@ components:
           enum:
           - AWAITING_APPROVAL
           - PREPARED
+          - PARTIALLY_DELIVERED
           - DELIVERED
           - SUPERSEDED
           - SUPPRESSED
@@ -13022,6 +13038,12 @@ components:
           description: Recorded placements; empty when none
           items:
             $ref: "#/components/schemas/ReviewPlacement"
+        proposedPlacements:
+          type: array
+          description: Exact ordered summary and inline messages covered by the approval
+            decision
+          items:
+            $ref: "#/components/schemas/ReviewProposedPlacement"
         recipient:
           $ref: "#/components/schemas/ReviewSubject"
           description: Who the feedback is addressed to; null when the identity is
@@ -13030,12 +13052,16 @@ components:
           type: string
           format: uuid
           description: The feedback this one replaced; null on a first delivery
+        reviewedRevision:
+          type: string
+          description: Reviewed source revision for an immutable approval package
         subject:
           $ref: "#/components/schemas/ReviewSubject"
           description: Whose work the feedback addresses; may equal the recipient
         suppressionReason:
           type: string
-          description: Why the feedback was withheld; null unless the state is SUPPRESSED
+          description: Why delivery stopped; set on withheld or terminally partial
+            feedback
           enum:
           - VOLUME_CAPPED
           - COMPOSER_DEDUPED
@@ -13068,6 +13094,7 @@ components:
       - id
       - observations
       - placements
+      - proposedPlacements
     ReviewFeedbackDisposition:
       type: object
       description: Counts of feedback by delivery state
@@ -13355,15 +13382,46 @@ components:
       required:
       - name
       - slug
+    ReviewProposedPlacement:
+      type: object
+      description: One exact provider message included in a review awaiting approval
+      properties:
+        body:
+          type: string
+        endLine:
+          type: integer
+          format: int32
+          description: Last 1-based line; null for a single-line comment or summary
+        path:
+          type: string
+          description: Head-side file path; null for the summary
+        startLine:
+          type: integer
+          format: int32
+          description: First 1-based line; null for the summary
+        type:
+          type: string
+          enum:
+          - SUMMARY
+          - INLINE
+          - CONVERSATION_TURN
+      required:
+      - body
+      - type
     ReviewRepositoryTarget:
       type: object
       properties:
         baseBranches:
           type: array
+          description: Exact pull-request base branches to cover; empty covers every
+            base branch
           items:
             type: string
         nameWithOwner:
           type: string
+          description: "Exact provider repository name, including its owner"
+          maxLength: 255
+          minLength: 0
       required:
       - baseBranches
       - nameWithOwner
@@ -15353,6 +15411,10 @@ components:
           type: string
           format: date-time
           description: Timestamp when the membership was created
+        eligibleForPracticeReview:
+          type: boolean
+          description: Whether this linked human member can be selected for practice-review
+            coverage
         hidden:
           type: boolean
           description: Whether the member is hidden from the leaderboard

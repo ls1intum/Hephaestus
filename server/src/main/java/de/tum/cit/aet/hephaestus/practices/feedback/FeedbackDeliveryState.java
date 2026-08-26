@@ -11,6 +11,8 @@ public enum FeedbackDeliveryState {
      * had it yet.
      */
     PREPARED,
+    /** A provider received part of an approved package, while one or more placements remain unsent. */
+    PARTIALLY_DELIVERED,
     /**
      * Received by the developer. On the two lanes we do not own this is inferred from a successful post;
      * on IN_APP it is observed, at the moment they open it.

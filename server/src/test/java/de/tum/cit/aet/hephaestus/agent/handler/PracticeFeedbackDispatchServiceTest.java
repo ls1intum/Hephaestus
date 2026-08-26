@@ -14,12 +14,17 @@ import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.handler.spi.ExistingDeliveryLookup;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
+import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackAnchor;
+import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFeedbackChannel;
+import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDispatch;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDispatchCompletion;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDispatchDestination;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDispatchRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDispatchState;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
+import de.tum.cit.aet.hephaestus.practices.feedback.ProposedPlacement;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
@@ -52,6 +57,15 @@ class PracticeFeedbackDispatchServiceTest extends BaseUnitTest {
     @Mock
     private TransactionTemplate transactions;
 
+    @Mock
+    private FeedbackRepository feedbackRepository;
+
+    @Mock
+    private DiffNotePoster diffNotePoster;
+
+    @Mock
+    private FeedbackLedgerRecorder ledgerRecorder;
+
     private PracticeFeedbackDispatchService service;
     private AgentJob job;
     private FeedbackDispatch dispatch;
@@ -64,7 +78,10 @@ class PracticeFeedbackDispatchServiceTest extends BaseUnitTest {
             poster,
             transactions,
             new SimpleMeterRegistry(),
-            JsonMapper.builder().build()
+            JsonMapper.builder().build(),
+            feedbackRepository,
+            diffNotePoster,
+            ledgerRecorder
         );
         lenient()
             .doAnswer(invocation -> {
@@ -264,7 +281,7 @@ class PracticeFeedbackDispatchServiceTest extends BaseUnitTest {
             .build();
         FeedbackDispatch approved = dispatch(
             FeedbackDispatchState.PENDING,
-            FeedbackDispatchDestination.APPROVED_ARTIFACT_COMMENT,
+            FeedbackDispatchDestination.APPROVED_REVIEW_PACKAGE,
             feedback.getId()
         );
         when(repository.findByDestinationKeyAndWorkspaceId("approved:" + feedback.getId(), 7L)).thenReturn(
@@ -284,6 +301,55 @@ class PracticeFeedbackDispatchServiceTest extends BaseUnitTest {
         verify(poster, never()).postApprovedProposal(any(), any(), any());
     }
 
+    @Test
+    void oneDispatchLeaseOwnsTheExactApprovedPackage() {
+        Feedback feedback = Feedback.builder()
+            .id(UUID.randomUUID())
+            .workspaceId(7L)
+            .body("approved body")
+            .proposedPlacements(
+                new java.util.ArrayList<>(
+                    List.of(
+                        ProposedPlacement.summary("approved body"),
+                        ProposedPlacement.inline("exact inline", "src/Review.java", 12, null, "old-key")
+                    )
+                )
+            )
+            .build();
+        FeedbackDispatch approved = dispatch(
+            FeedbackDispatchState.PENDING,
+            FeedbackDispatchDestination.APPROVED_REVIEW_PACKAGE,
+            feedback.getId()
+        );
+        when(repository.findByDestinationKeyAndWorkspaceId("approved:" + feedback.getId(), 7L)).thenReturn(
+            Optional.of(approved)
+        );
+        when(feedbackRepository.findByIdAndWorkspaceId(feedback.getId(), 7L)).thenReturn(Optional.of(feedback));
+        when(poster.findApprovedProposal(job, feedback.getId())).thenReturn(ExistingDeliveryLookup.absent());
+        when(poster.postApprovedProposal(job, feedback.getId(), "approved body")).thenReturn("summary-ref");
+        var signal = new InlineFeedbackChannel.DeliveredSignal(
+            "approved:" + feedback.getId() + ":0",
+            new FeedbackAnchor.DiffAnchor("src/Review.java", 12, null),
+            InlineFeedbackChannel.Disposition.POSTED,
+            "inline-ref",
+            "thread-ref"
+        );
+        when(diffNotePoster.reconcileApprovedInlineNotes(any(), any(), any())).thenReturn(
+            new DiffNotePoster.DiffNoteResult(1, 0, List.of(signal))
+        );
+
+        var result = service.dispatchApproved(job, feedback);
+
+        assertThat(result.status()).isEqualTo(PracticeFeedbackDispatchService.Result.Status.SENT);
+        verify(repository).claim(any(), any(), anyString(), any(), any(Integer.class));
+        verify(diffNotePoster).reconcileApprovedInlineNotes(
+            job,
+            feedback.getId(),
+            List.of(new PracticeDetectionResultParser.DiffNote("src/Review.java", 12, null, "exact inline", "old-key"))
+        );
+        verify(ledgerRecorder).recordApprovedPlacements(feedback, "summary-ref", List.of(signal));
+    }
+
     private FeedbackDispatch dispatch(
         FeedbackDispatchState state,
         FeedbackDispatchDestination destination,
@@ -298,7 +364,7 @@ class PracticeFeedbackDispatchServiceTest extends BaseUnitTest {
             feedbackId,
             destination,
             state,
-            base.getBody(),
+            "approved body",
             null,
             base.getPracticeSlugs(),
             false,

@@ -7,6 +7,7 @@ import de.tum.cit.aet.hephaestus.integration.core.egress.OutboundEgressGateway;
 import de.tum.cit.aet.hephaestus.integration.core.egress.OutboundEgressGuard;
 import de.tum.cit.aet.hephaestus.integration.core.egress.OutboundEgressSuppressedException;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackAnchor;
+import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackDeliveryException;
 import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFeedbackChannel;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SummaryChannel;
@@ -119,6 +120,19 @@ public class GitlabInlineFeedbackChannel implements InlineFeedbackChannel {
 
     @Override
     public InlineResult postInlineFeedback(SummaryChannel.FeedbackTarget target, List<InlineFeedback> feedbackItems) {
+        return postInlineFeedback(target, feedbackItems, false);
+    }
+
+    @Override
+    public InlineResult postImmutablePackage(SummaryChannel.FeedbackTarget target, List<InlineFeedback> feedbackItems) {
+        return postInlineFeedback(target, feedbackItems, true);
+    }
+
+    private InlineResult postInlineFeedback(
+        SummaryChannel.FeedbackTarget target,
+        List<InlineFeedback> feedbackItems,
+        boolean failClosedLookup
+    ) {
         if (feedbackItems == null || feedbackItems.isEmpty()) {
             return InlineResult.counts(0, 0);
         }
@@ -147,7 +161,13 @@ public class GitlabInlineFeedbackChannel implements InlineFeedbackChannel {
         // instead of being cleared-then-reposted. Best-effort: a failed read yields an empty index, degrading to
         // fresh keyed posts (no edit, no delete) rather than blocking delivery.
         String marker = feedbackItems.get(0).marker();
-        Map<String, PriorThread> priorByKey = indexPriorThreads(scopeId, mr.projectPath(), mr.iid(), marker);
+        Map<String, PriorThread> priorByKey = indexPriorThreads(
+            scopeId,
+            mr.projectPath(),
+            mr.iid(),
+            marker,
+            failClosedLookup
+        );
 
         int posted = 0;
         int failed = 0;
@@ -361,18 +381,27 @@ public class GitlabInlineFeedbackChannel implements InlineFeedbackChannel {
      * non-system note WITHOUT the marker, a human (or another tool) joined it and the thread is flagged as
      * human-replied. Best-effort: any failure yields an empty index so delivery degrades to fresh keyed posts.
      */
-    private Map<String, PriorThread> indexPriorThreads(long scopeId, String projectPath, int mrIid, String marker) {
+    private Map<String, PriorThread> indexPriorThreads(
+        long scopeId,
+        String projectPath,
+        int mrIid,
+        String marker,
+        boolean failClosed
+    ) {
         Map<String, PriorThread> byKey = new LinkedHashMap<>();
         if (marker == null || marker.isBlank()) {
             return byKey;
         }
         try {
-            for (Map<String, Object> discussion : fetchAllDiscussions(scopeId, projectPath, mrIid)) {
+            for (Map<String, Object> discussion : fetchAllDiscussions(scopeId, projectPath, mrIid, failClosed)) {
                 indexDiscussion(discussion, marker, byKey);
             }
         } catch (OutboundEgressSuppressedException e) {
             throw e;
         } catch (Exception e) {
+            if (failClosed) {
+                throw new FeedbackDeliveryException("GitLab discussion lookup was inconclusive", e);
+            }
             log.debug("Failed to read MR discussions for correlation reconcile: workspaceId={}", scopeId, e);
         }
         return byKey;
@@ -384,7 +413,12 @@ public class GitlabInlineFeedbackChannel implements InlineFeedbackChannel {
      * threads, and a single-page read would leave prior bot threads on page 2+ neither editable nor reapable.
      * Bounded by {@link #MAX_DISCUSSION_PAGES}. Best-effort: a failed page returns what was accumulated so far.
      */
-    private List<Map<String, Object>> fetchAllDiscussions(long scopeId, String projectPath, int mrIid) {
+    private List<Map<String, Object>> fetchAllDiscussions(
+        long scopeId,
+        String projectPath,
+        int mrIid,
+        boolean failClosed
+    ) {
         List<Map<String, Object>> all = new ArrayList<>();
         String cursor = null;
         int page = 0;
@@ -400,6 +434,7 @@ public class GitlabInlineFeedbackChannel implements InlineFeedbackChannel {
                 .block(GRAPHQL_TIMEOUT);
 
             if (response == null) {
+                if (failClosed) throw new FeedbackDeliveryException("GitLab discussion lookup returned no response");
                 break;
             }
             List<Map<String, Object>> nodes = Objects.requireNonNull(response)
@@ -412,7 +447,15 @@ public class GitlabInlineFeedbackChannel implements InlineFeedbackChannel {
                 .field("project.mergeRequest.discussions.pageInfo")
                 .toEntity(GitLabPageInfo.class);
             page++;
-            if (pageInfo == null || !pageInfo.hasNextPage() || pageInfo.endCursor() == null) {
+            if (pageInfo == null) {
+                if (failClosed) throw new FeedbackDeliveryException("GitLab discussion pagination was incomplete");
+                break;
+            }
+            if (!pageInfo.hasNextPage()) {
+                break;
+            }
+            if (pageInfo.endCursor() == null) {
+                if (failClosed) throw new FeedbackDeliveryException("GitLab discussion pagination lost its cursor");
                 break;
             }
             cursor = pageInfo.endCursor();
@@ -545,7 +588,7 @@ public class GitlabInlineFeedbackChannel implements InlineFeedbackChannel {
             return;
         }
         try {
-            List<Map<String, Object>> discussions = fetchAllDiscussions(scopeId, projectPath, mrIid);
+            List<Map<String, Object>> discussions = fetchAllDiscussions(scopeId, projectPath, mrIid, false);
             if (discussions.isEmpty()) {
                 return;
             }

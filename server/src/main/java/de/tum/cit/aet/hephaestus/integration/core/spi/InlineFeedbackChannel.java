@@ -14,6 +14,10 @@ public interface InlineFeedbackChannel {
 
     InlineResult postInlineFeedback(SummaryChannel.FeedbackTarget target, List<InlineFeedback> feedback);
 
+    default InlineResult postImmutablePackage(SummaryChannel.FeedbackTarget target, List<InlineFeedback> feedback) {
+        return postInlineFeedback(target, feedback);
+    }
+
     /**
      * Removes this run's previously posted inline feedback (matched by {@code marker}) without posting new
      * ones — the clear half of clear-then-post, callable on a zero-note re-run so stale notes from an earlier

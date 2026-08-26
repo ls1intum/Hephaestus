@@ -12,12 +12,15 @@ import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import jakarta.validation.constraints.NotNull;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.Immutable;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import org.jspecify.annotations.Nullable;
 
 @Entity
@@ -85,13 +88,26 @@ public class Feedback {
     @Column(name = "delivery_state", nullable = false, length = 32)
     private FeedbackDeliveryState deliveryState;
 
-    /** Why a unit was withheld. Set iff {@link #deliveryState} is {@code SUPPRESSED}; NULL otherwise. */
+    /** Why delivery stopped. Set on withheld or terminally partial feedback. */
     @Enumerated(EnumType.STRING)
     @Column(name = "suppression_reason", length = 32)
     private @Nullable FeedbackSuppressionReason suppressionReason;
 
     @Column(name = "body", columnDefinition = "TEXT")
     private @Nullable String body;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "proposed_placements", nullable = false, columnDefinition = "jsonb")
+    @Builder.Default
+    private List<ProposedPlacement> proposedPlacements = List.of();
+
+    @Column(name = "reviewed_revision", length = 64)
+    private @Nullable String reviewedRevision;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "proposed_practice_slugs", nullable = false, columnDefinition = "jsonb")
+    @Builder.Default
+    private List<String> proposedPracticeSlugs = List.of();
 
     @NotNull
     @Enumerated(EnumType.STRING)
