@@ -28,8 +28,8 @@ import {
 	type ComposedFeedbackUnit,
 	undeliverableUnits,
 } from "./pi-runner-composition.ts";
-import { buildPracticeFanout } from "./pi-runner-fanout.ts";
-import { deriveTimeouts } from "./pi-runner-timings.ts";
+import { buildPracticeFanout, DEFAULT_PRACTICE_BATCH_SIZE } from "./pi-runner-fanout.ts";
+import { deriveTimeouts, deriveTurnTiming } from "./pi-runner-timings.ts";
 import {
 	addAssistantUsage,
 	extractUsageFromSession,
@@ -181,7 +181,6 @@ if (!AGENT_DIR) {
 const {
 	initialMs: INITIAL_TIMEOUT_MS,
 	retryMs: RETRY_TIMEOUT_MS,
-	softNudgeMs: SOFT_TIMEOUT_MS,
 	compositionMs: COMPOSITION_TIMEOUT_MS,
 } = deriveTimeouts(AGENT_BUDGET_MS, existsSync(`${CWD}/inputs/feedback-composition.json`));
 
@@ -1594,10 +1593,43 @@ let softTimeoutFired = false;
 let hardAborted = false;
 let retryAborted = false;
 
+function scheduleTurnTimers(
+	session: AgentSession,
+	turnNumber: number,
+	turnCount: number,
+	softNudgeMs: number,
+	hardLimitMs: number,
+) {
+	const state = { softTimedOut: false, hardTimedOut: false };
+	const softTimer = setTimeout(() => {
+		state.softTimedOut = true;
+		console.error(
+			`[pi-runner] turn ${turnNumber}/${turnCount} fair share nearly spent — nudging agent to report`,
+		);
+		const remainingTurns = turnCount - turnNumber;
+		const steerMessage =
+			`This turn is using its fair share of the review budget; ${remainingTurns} focused turn(s) still need time. ` +
+			`Stop exploring and persist an observation for every practice in this turn now, one report_observation call per practice. ${PERSIST_DISCIPLINE}`;
+		session
+			.steer(steerMessage)
+			.catch((err) => console.error(`[pi-runner] steer failed: ${errorText(err)}`));
+	}, softNudgeMs);
+	const hardTimer = setTimeout(() => {
+		state.hardTimedOut = true;
+		console.error(
+			`[pi-runner] turn ${turnNumber}/${turnCount} exhausted its fair share — aborting this turn`,
+		);
+		session
+			.abort()
+			.catch((err) => console.error(`[pi-runner] turn abort failed: ${errorText(err)}`));
+	}, hardLimitMs);
+	return { softTimer, hardTimer, state };
+}
+
 async function main() {
 	console.error(`[pi-runner] Embedded SDK mode`);
 	console.error(
-		`[pi-runner] Budget: total=${AGENT_BUDGET_MS}ms, initial=${INITIAL_TIMEOUT_MS}ms (soft=${SOFT_TIMEOUT_MS}ms), retry=${RETRY_TIMEOUT_MS}ms`,
+		`[pi-runner] Budget: total=${AGENT_BUDGET_MS}ms, initial=${INITIAL_TIMEOUT_MS}ms, retry=${RETRY_TIMEOUT_MS}ms`,
 	);
 
 	// Pi filters custom tools through this allowlist; omit filesystem mutation tools.
@@ -1689,18 +1721,6 @@ async function main() {
 
 	let prevUsage = null;
 
-	const softTimer = setTimeout(() => {
-		softTimeoutFired = true;
-		console.error(`[pi-runner] Soft timeout fired — nudging agent to persist review state`);
-		const steerMessage =
-			`Stop analyzing and persist output now. ` +
-			`Use report_observation immediately for any observation you already have, ` +
-			`one observation per call. ${PERSIST_DISCIPLINE}`;
-		session
-			.steer(steerMessage)
-			.catch((err) => console.error(`[pi-runner] steer failed: ${errorText(err)}`));
-	}, SOFT_TIMEOUT_MS);
-
 	const hardTimer = setTimeout(() => {
 		hardAborted = true;
 		console.error(`[pi-runner] Hard timeout — aborting agent`);
@@ -1737,12 +1757,13 @@ async function main() {
 	const allSlugs = loadPracticeSlugs();
 	const batchSize = process.env.PI_PRACTICE_BATCH_SIZE
 		? Number(process.env.PI_PRACTICE_BATCH_SIZE)
-		: 6;
+		: DEFAULT_PRACTICE_BATCH_SIZE;
 	const { areaCount, batches } = buildPracticeFanout(practiceIndex, batchSize);
 	console.error(
 		`[pi-runner] Fan-out: ${allSlugs.length} practices in ${areaCount} areas -> ${batches.length} focused turn(s)`,
 	);
 
+	let previousTurnFailed = false;
 	try {
 		for (const [bi, batch] of batches.entries()) {
 			if (hardAborted) {
@@ -1756,53 +1777,44 @@ async function main() {
 			const [onlySlug] = batch;
 			const readHint = `Read inputs/practices/${batch.length === 1 && onlySlug !== undefined ? `${onlySlug}.md` : "<slug>.md for each"}`;
 			const batchPrompt =
-				bi === 0
+				bi === 0 || previousTurnFailed
 					? `${prompt}\n\n## Scope for this turn\n${readHint} and evaluate ONLY these practices, persisting each with report_observation (one call per observation): ${batch.join(", ")}.`
 					: `Continue the SAME review. Using the diff and context you ALREADY read (do NOT re-read the diff), ${readHint} and evaluate ONLY these practices, persisting each with report_observation (one call per observation): ${batch.join(", ")}.`;
+			const elapsedMs = Date.now() - startMs;
+			const remainingMs = Math.max(0, INITIAL_TIMEOUT_MS - elapsedMs);
+			const turnTiming = deriveTurnTiming(remainingMs, batches.length - bi);
+			console.error(
+				`[pi-runner] turn ${bi + 1}/${batches.length} budget: fairShare=${turnTiming.fairShareMs}ms, remaining=${remainingMs}ms`,
+			);
+			const {
+				softTimer: turnSoftTimer,
+				hardTimer: turnHardTimer,
+				state: turnTimerState,
+			} = scheduleTurnTimers(
+				session,
+				bi + 1,
+				batches.length,
+				turnTiming.softNudgeMs,
+				turnTiming.fairShareMs,
+			);
 			try {
 				await session.prompt(batchPrompt);
+				previousTurnFailed = turnTimerState.hardTimedOut;
 				console.error(
 					`[pi-runner] turn ${bi + 1}/${batches.length} complete (slugs=${batch.length})`,
 				);
 			} catch (err) {
-				// A hard abort during this turn is what the check at the top of the next one is for.
+				previousTurnFailed = true;
 				console.error(
 					`[pi-runner] turn ${bi + 1}/${batches.length} prompt error: ${errorText(err)}`,
 				);
-			}
-		}
-
-		if (!hardAborted && allSlugs.length > 0) {
-			const covered = new Set(reviewState.observations.map((f) => f.practiceSlug).filter(Boolean));
-			const missing = allSlugs.filter((s) => !covered.has(s));
-			if (missing.length > 0) {
-				console.error(
-					`[pi-runner] Coverage gate: ${missing.length} unreported -> ${missing.join(", ")}`,
-				);
-				const gatePrompt =
-					`Coverage check. You have NOT yet reported an observation for these practices: ${missing.join(", ")}. ` +
-					`Read inputs/practices/<slug>.md for each and evaluate it against the SAME diff/context you already read ` +
-					`(do NOT re-read the diff). Persist an observation for EVERY one with report_observation, one call per observation ` +
-					`— choose a BEHAVIOR_* outcome when evidence settles the claim. Use NO_REVIEW_OCCASION only when a prerequisite situation explicitly named by the practice did not occur; target-behaviour absence is BEHAVIOR_ABSENT_*, never a decline. Use INSUFFICIENT_EVIDENCE only when the available evidence was read but does not settle the claim. Fill exactly the evidence branch the tool schema requires.`;
-				try {
-					await session.prompt(gatePrompt);
-				} catch (err) {
-					console.error(`[pi-runner] coverage-gate prompt error: ${errorText(err)}`);
-				}
-				const stillMissing = allSlugs.filter(
-					(s) => !new Set(reviewState.observations.map((f) => f.practiceSlug)).has(s),
-				);
-				console.error(
-					`[pi-runner] Coverage gate done: ${allSlugs.length - stillMissing.length}/${allSlugs.length} practices covered`,
-				);
-			} else {
-				console.error(
-					`[pi-runner] Coverage gate: all ${allSlugs.length} practices already reported`,
-				);
+			} finally {
+				softTimeoutFired ||= turnTimerState.softTimedOut;
+				clearTimeout(turnSoftTimer);
+				clearTimeout(turnHardTimer);
 			}
 		}
 	} finally {
-		clearTimeout(softTimer);
 		clearTimeout(hardTimer);
 	}
 

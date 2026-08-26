@@ -1,6 +1,21 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildPracticeFanout } from "../../../main/resources/agent/pi-runner-fanout.ts";
+import {
+	buildPracticeFanout,
+	DEFAULT_PRACTICE_BATCH_SIZE,
+} from "../../../main/resources/agent/pi-runner-fanout.ts";
+
+void test("reviews one practice per accountable turn by default", () => {
+	const fanout = buildPracticeFanout(
+		[
+			{ slug: "a", area: "security" },
+			{ slug: "b", area: "security" },
+		],
+		DEFAULT_PRACTICE_BATCH_SIZE,
+	);
+
+	assert.deepEqual(fanout.batches, [["a"], ["b"]]);
+});
 
 void test("keeps related practices together and splits only at the configured bound", () => {
 	const fanout = buildPracticeFanout(

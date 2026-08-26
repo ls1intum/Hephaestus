@@ -8,6 +8,8 @@ export interface PracticeFanout {
 	batches: string[][];
 }
 
+export const DEFAULT_PRACTICE_BATCH_SIZE = 1;
+
 export function buildPracticeFanout(
 	practices: readonly FanoutPractice[],
 	batchSize: number,
