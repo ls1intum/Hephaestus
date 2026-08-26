@@ -11,6 +11,16 @@ import {
 	AccordionItem,
 	AccordionTrigger,
 } from "@/components/ui/accordion";
+import {
+	AlertDialog,
+	AlertDialogAction,
+	AlertDialogCancel,
+	AlertDialogContent,
+	AlertDialogDescription,
+	AlertDialogFooter,
+	AlertDialogHeader,
+	AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ButtonGroup } from "@/components/ui/button-group";
@@ -103,6 +113,7 @@ export function PracticeAutonomyPage({
 }: PracticeAutonomyPageProps) {
 	const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
 	const [openAreas, setOpenAreas] = useState<string[]>([]);
+	const [automaticPromotion, setAutomaticPromotion] = useState<string[] | null>(null);
 
 	const groups = groupPracticesByArea(rollup, practices, { overridesOnly });
 	const overrides = countOverrides(rollup);
@@ -128,6 +139,40 @@ export function PracticeAutonomyPage({
 
 	return (
 		<div className="space-y-6">
+			<AlertDialog
+				open={automaticPromotion !== null}
+				onOpenChange={(open) => !open && setAutomaticPromotion(null)}
+			>
+				<AlertDialogContent>
+					<AlertDialogHeader>
+						<AlertDialogTitle>Send feedback automatically?</AlertDialogTitle>
+						<AlertDialogDescription>
+							Set {automaticPromotion?.length ?? 0} selected{" "}
+							{automaticPromotion?.length === 1 ? "practice" : "practices"} to Send automatically.
+							Their eligible feedback will no longer wait for approval. Current coverage includes{" "}
+							{settings.coverageSummary.coveredRepositories} of{" "}
+							{settings.coverageSummary.monitoredRepositories} monitored repositories and{" "}
+							{settings.coverageSummary.coveredPeople} of {settings.coverageSummary.eligiblePeople}{" "}
+							eligible people. {settings.coverageSummary.recentReviewVolume} review jobs entered
+							this workspace's queue during the last {settings.coverageSummary.estimateWindowDays}{" "}
+							days.
+						</AlertDialogDescription>
+					</AlertDialogHeader>
+					<AlertDialogFooter>
+						<AlertDialogCancel>Keep current settings</AlertDialogCancel>
+						<AlertDialogAction
+							onClick={() => {
+								if (automaticPromotion !== null) {
+									onBulkSetAutonomy(automaticPromotion, "AUTOMATIC");
+								}
+								setAutomaticPromotion(null);
+							}}
+						>
+							Send automatically
+						</AlertDialogAction>
+					</AlertDialogFooter>
+				</AlertDialogContent>
+			</AlertDialog>
 			<WorkspaceDecisionCard
 				settings={settings}
 				saving={pending.workspace}
@@ -142,7 +187,13 @@ export function PracticeAutonomyPage({
 				<BulkActionBar
 					count={actionable.length}
 					bulk={pending.bulk}
-					onSet={(autonomy) => onBulkSetAutonomy(actionable, autonomy)}
+					onSet={(autonomy) => {
+						if (autonomy === "AUTOMATIC") {
+							setAutomaticPromotion(actionable);
+							return;
+						}
+						onBulkSetAutonomy(actionable, autonomy);
+					}}
 					onClear={() => setSelected(new Set())}
 				/>
 			</div>
