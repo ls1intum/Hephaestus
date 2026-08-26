@@ -28,7 +28,8 @@ import {
 	type ComposedFeedbackUnit,
 	undeliverableUnits,
 } from "./pi-runner-composition.ts";
-import { buildPracticeFanout, DEFAULT_PRACTICE_BATCH_SIZE } from "./pi-runner-fanout.ts";
+import { buildReviewTree, mapConcurrent } from "./pi-review-tree.ts";
+import { forkPracticeSessions } from "./pi-session-tree.ts";
 import { deriveTimeouts, deriveTurnTiming } from "./pi-runner-timings.ts";
 import {
 	addAssistantUsage,
@@ -42,13 +43,6 @@ import {
 // composition request, the staged history, the admission response — is JSON written by another process.
 // None of it is typed by having been parsed, so each reader below states the shape it needs and checks
 // for it, and the checks are the only reason the shapes are true.
-
-/**
- * The SDK's own session state, reached through the one entry point this repo depends on: the message
- * and event types live in @earendil-works/pi-agent-core and /pi-ai, which pi-coding-agent depends on but
- * does not re-export and pnpm's strict layout does not put on our resolution path.
- */
-type SessionState = AgentSession["state"];
 
 /** JSON.parse with the return type it actually has. */
 function parseJson(text: string): unknown {
@@ -88,6 +82,7 @@ function listOrEmpty<T>(items: T[] | undefined): T[] {
 interface PracticeIndexEntry {
 	slug: string;
 	area?: string;
+	readsSources: string[];
 	exhaustiveSources: string[];
 }
 
@@ -248,6 +243,9 @@ function readPracticeIndex(): PracticeIndexEntry[] {
 			slug: practice.slug,
 			// A blank area is no area: the fan-out groups a practice without one under its own slug.
 			area: typeof practice.area === "string" && practice.area !== "" ? practice.area : undefined,
+			readsSources: jsonArray(practice.readsSources).filter(
+				(kind): kind is string => typeof kind === "string",
+			),
 			exhaustiveSources: jsonArray(practice.exhaustiveSources).filter(
 				(kind): kind is string => typeof kind === "string",
 			),
@@ -647,45 +645,57 @@ interface ReportObservationDetails {
 	measurementClosed?: boolean;
 }
 
-const reportObservationTool = defineTool({
-	name: "report_observation",
-	label: "Report Observation",
-	description:
-		"Persist exactly one structured observation immediately so it survives retries and timeouts. Call this as soon as one observation is ready. Do not wait to batch observations.",
-	parameters: {
-		type: "object",
-		additionalProperties: false,
-		required: ["observation"],
-		properties: {
-			observation: observationSchema,
+function buildReportObservationTool(allowedPracticeSlug?: string) {
+	return defineTool({
+		name: "report_observation",
+		label: "Report Observation",
+		description:
+			"Persist exactly one structured observation immediately so it survives retries and timeouts. Call this as soon as one observation is ready. Do not wait to batch observations.",
+		parameters: {
+			type: "object",
+			additionalProperties: false,
+			required: ["observation"],
+			properties: {
+				observation: observationSchema,
+			},
 		},
-	},
-	// Nothing here waits on anything, and Pi awaits what this returns inside its own try/catch — so a
-	// validation throw out of appendObservations still reaches the model as this call's failure.
-	execute: (_toolCallId, params): Promise<AgentToolResult<ReportObservationDetails>> => {
-		if (measurementClosed) {
+		execute: (_toolCallId, params): Promise<AgentToolResult<ReportObservationDetails>> => {
+			if (measurementClosed) {
+				return Promise.resolve({
+					content: [
+						{
+							type: "text",
+							text: "Measurement is closed; this turn may only compose feedback.",
+						},
+					],
+					details: { inserted: 0, measurementClosed: true },
+				});
+			}
+			const normalized = normalizeObservation(params.observation);
+			if (allowedPracticeSlug && normalized.practiceSlug !== allowedPracticeSlug) {
+				return Promise.resolve({
+					content: [
+						{
+							type: "text",
+							text: `This observer is scoped to '${allowedPracticeSlug}', not '${normalized.practiceSlug}'.`,
+						},
+					],
+					details: { inserted: 0 },
+				});
+			}
+			const { inserted, duplicates, negatives } = appendObservations([normalized]);
 			return Promise.resolve({
 				content: [
-					{ type: "text", text: "Measurement is closed; this turn may only compose feedback." },
+					{
+						type: "text",
+						text: `Stored ${inserted} observation${duplicates > 0 ? ` (${duplicates} duplicate skipped)` : ""}. Negative observations in this call: ${negatives}.`,
+					},
 				],
-				details: { inserted: 0, measurementClosed: true },
+				details: { inserted, duplicates, totalObservations: reviewState.observations.length },
 			});
-		}
-		// Counted off the normalised observation. It used to be read from `params.observation.assessment`,
-		// a field the tool schema does not have and `additionalProperties: false` forbids, so the model
-		// was told "Negative observations in this call: 0" however bad the finding it had just filed.
-		const { inserted, duplicates, negatives } = appendObservations([params.observation]);
-		return Promise.resolve({
-			content: [
-				{
-					type: "text",
-					text: `Stored ${inserted} observation${duplicates > 0 ? ` (${duplicates} duplicate skipped)` : ""}. Negative observations in this call: ${negatives}.`,
-				},
-			],
-			details: { inserted, duplicates, totalObservations: reviewState.observations.length },
-		});
-	},
-});
+		},
+	});
+}
 
 function accumulateUsage(prev: UsageReport | null, curr: UsageReport): void {
 	usageTotals.model = curr.model ?? usageTotals.model;
@@ -701,89 +711,6 @@ function accumulateUsage(prev: UsageReport | null, curr: UsageReport): void {
 	usageTotals.totalCalls += Math.max(0, curr.totalCalls - (prev?.totalCalls ?? 0));
 }
 
-function extractLastAssistantText(sessionState: {
-	messages?: SessionState["messages"];
-}): string | null {
-	const messages = listOrEmpty(sessionState.messages);
-	for (let i = messages.length - 1; i >= 0; i--) {
-		const msg = messages[i];
-		if (msg?.role !== "assistant") continue;
-		const text = listOrEmpty(msg.content)
-			.map((part) =>
-				part.type === "text" ? part.text : part.type === "thinking" ? part.thinking : "",
-			)
-			.join("")
-			.trim();
-		if (!text || text.length < 20) continue;
-		if (text.includes("{") && text.includes("}")) return text;
-	}
-	return null;
-}
-
-// Keep the recovery scan bounded consistently with PracticeDetectionResultParser.
-const MAX_RESCUE_TEXT_LENGTH = 1_000_000;
-
-function tryParseJsonFromText(text: string | null): ObservationsPayload | null {
-	if (!text) return null;
-	if (text.length > MAX_RESCUE_TEXT_LENGTH) return null;
-	try {
-		const parsed = parseJson(text);
-		if (isValidObservationsPayload(parsed)) return parsed;
-	} catch {
-		// The whole text is rarely bare JSON; the fenced and braced passes below are the real attempts.
-	}
-	// matchAll rather than a hand-driven exec loop: the fenced body is the only group, so destructuring
-	// it names what each iteration is about and keeps the regex's lastIndex out of the loop condition.
-	for (const [, fencedBody = ""] of text.matchAll(/```(?:json)?\s*\n?([\s\S]*?)\n?\s*```/g)) {
-		try {
-			const parsed = parseJson(fencedBody.trim());
-			if (isValidObservationsPayload(parsed)) return parsed;
-		} catch {
-			// A fence that is not JSON: try the next one.
-		}
-	}
-	const observationsMatch = text.match(/\{\s*"observations"/);
-	if (!observationsMatch || observationsMatch.index === undefined) return null;
-	const braceStart = observationsMatch.index;
-	// Bounded: each attempt re-parses a longer slice, so an unclosed brace is quadratic without a cap.
-	let attempts = 0;
-	for (
-		let end = text.indexOf("}", braceStart);
-		end >= 0 && attempts < 256;
-		end = text.indexOf("}", end + 1)
-	) {
-		attempts++;
-		try {
-			const candidate = text.slice(braceStart, end + 1);
-			const parsed = parseJson(candidate);
-			if (isValidObservationsPayload(parsed)) return parsed;
-		} catch {
-			// This brace does not close the object: widen to the next candidate.
-		}
-	}
-	return null;
-}
-
-function tryRescueFromTextResponse(sessionState: SessionState): boolean {
-	const text = extractLastAssistantText(sessionState);
-	if (!text) return false;
-	try {
-		writeFileSync(`${OUTPUT}/last-assistant-text.txt`, text);
-	} catch {
-		// The dump is a diagnostic; failing to write it must not fail the rescue.
-	}
-	const payload = tryParseJsonFromText(text);
-	if (!payload) {
-		console.error(
-			`[pi-runner] Text rescue: found text (${text.length} chars) but no valid JSON. First 200: ${text.slice(0, 200)}`,
-		);
-		return false;
-	}
-	console.error(`[pi-runner] Text rescue: extracted ${payload.observations.length} observations`);
-	writeFileSync(RESULT_PATH, JSON.stringify(payload, null, 2));
-	return checkResultFile();
-}
-
 function loadPracticeSlugs(): string[] {
 	return practiceIndex.map((practice) => practice.slug).filter(Boolean);
 }
@@ -794,17 +721,6 @@ const PERSIST_DISCIPLINE =
 	`Only keep GOOD observations that add real review value. ` +
 	`Do not add derivative low-signal observations when a stronger observation already covers the problem. ` +
 	`Use tools only from this point onward. Do not write planning prose or plain-text commentary.`;
-
-function buildRetryScaffold(slugs: readonly string[]): string {
-	if (!slugs.length) return "";
-	return (
-		`\n\nThe practice slugs you must cover: ${slugs.join(", ")}. ` +
-		`Persist every justified observation with report_observation, one observation per call. ` +
-		`There is no target count and no quota. ` +
-		`Only report GOOD observations that add real review value. ` +
-		`Do not emit derivative low-signal observations when a stronger root-cause observation already covers the problem.`
-	);
-}
 
 const ENVELOPE_MISMATCH_EXIT = 42;
 const SUPPORTED_SCHEMA_VERSION = 1;
@@ -1350,7 +1266,8 @@ function buildFeedbackTool(
 			if (seen.has(key)) {
 				return refuse(`Already have a ${unit.channel} unit for ${unit.practiceSlug}; skipped.`);
 			}
-			if (usedPerChannel[unit.channel] >= bounds.maxUnits) {
+			const delivers = unit.action !== "WITHHOLD";
+			if (delivers && usedPerChannel[unit.channel] >= bounds.maxUnits) {
 				return refuse(`${unit.channel} cap of ${bounds.maxUnits} reached; skipped.`);
 			}
 			const rejection = validateUnit(unit, observationsById, preparedThreadKeys, placementKinds);
@@ -1358,7 +1275,7 @@ function buildFeedbackTool(
 				return refuse(rejection);
 			}
 			seen.add(key);
-			usedPerChannel[unit.channel]++;
+			if (delivers) usedPerChannel[unit.channel]++;
 			composedFeedback.units.push(unit);
 			persistComposedFeedback();
 			return Promise.resolve({
@@ -1634,7 +1551,6 @@ async function main() {
 
 	// Pi filters custom tools through this allowlist; omit filesystem mutation tools.
 	const settingsManager = SettingsManager.create(CWD, AGENT_DIR);
-	const sessionManager = SessionManager.inMemory();
 	const modelRuntime = await ModelRuntime.create({
 		authPath: `${AGENT_DIR}/auth.json`,
 		modelsPath: `${AGENT_DIR}/models.json`,
@@ -1663,32 +1579,26 @@ async function main() {
 				stagedPreparedThreadKeys(),
 			)
 		: null;
-	const { session, extensionsResult } = await createAgentSession({
-		cwd: CWD,
-		agentDir: AGENT_DIR,
-		tools: [
-			"read",
-			"bash",
-			"grep",
-			"report_observation",
-			...(feedbackTool ? ["report_feedback", "report_summary"] : []),
-		],
-		customTools: [
-			reportObservationTool,
-			...(feedbackTool ? [feedbackTool, buildSummaryTool()] : []),
-		],
-		sessionManager,
-		settingsManager,
-		modelRuntime,
-		model,
-	});
-	// Fail closed: Pi otherwise silently falls back to a built-in provider.
-	for (const ext of extensionsResult.extensions) {
-		console.error(`[pi-runner] extension loaded: ${ext.path}`);
-	}
-	for (const err of extensionsResult.errors) {
-		console.error(`[pi-runner] extension error: ${err.path}: ${err.error}`);
-	}
+	const events: { type: string; timestamp: number }[] = [];
+	const streamUsage = newUsageLedger();
+	const subscribeSession = (trackedSession: AgentSession, label: string) =>
+		trackedSession.subscribe((event: AgentSessionEvent) => {
+			if (event.type === "tool_execution_start") {
+				console.error(`[pi-runner] ${label} tool: ${event.toolName}`);
+			}
+			if (event.type === "message_end" && event.message.role === "assistant") {
+				addAssistantUsage(streamUsage, event.message);
+				const stopReason = event.message.stopReason;
+				const types = listOrEmpty(event.message.content).map((c) => c.type);
+				const toolCalls = types.filter((t) => t === "toolCall").length;
+				const errMsg = event.message.errorMessage;
+				console.error(
+					`[pi-runner] ${label} assistant msg: stopReason=${stopReason}, toolCalls=${toolCalls}, ` +
+						`types=[${types.join(",")}]${errMsg ? `, errorMessage=${redact(errMsg)}` : ""}`,
+				);
+			}
+			events.push({ type: `${label}:${event.type}`, timestamp: Date.now() });
+		});
 
 	async function completeWithAdmittedComposition() {
 		measurementClosed = true;
@@ -1697,129 +1607,205 @@ async function main() {
 		const result: Record<string, unknown> = isRecord(parsed) ? parsed : {};
 		result.admissionDigest = admissionDigest;
 		writeFileSync(RESULT_PATH, JSON.stringify(result));
-		if (!compositionRequest || admittedObservations.length === 0) return;
+		if (!compositionRequest || !feedbackTool || admittedObservations.length === 0) return;
+		const { session: composerSession, extensionsResult: composerExtensions } =
+			await createAgentSession({
+				cwd: CWD,
+				agentDir: AGENT_DIR,
+				tools: ["read", "grep", "report_feedback", "report_summary"],
+				customTools: [feedbackTool, buildSummaryTool()],
+				sessionManager: SessionManager.inMemory(),
+				settingsManager,
+				modelRuntime,
+				model,
+			});
+		for (const error of composerExtensions.errors) {
+			console.error(`[pi-runner] composer extension error: ${error.path}: ${error.error}`);
+		}
+		const unsubscribeComposer = subscribeSession(composerSession, "composer");
 		const instructions = readFileSync(COMPOSER_PROMPT_PATH, "utf8");
 		const compositionTimer = setTimeout(() => {
 			console.error(
 				`[pi-runner] Composition timeout — preserving observations and composed units so far`,
 			);
-			session
+			composerSession
 				.abort()
 				.catch((error) =>
 					console.error(`[pi-runner] composition abort failed: ${errorText(error)}`),
 				);
 		}, COMPOSITION_TIMEOUT_MS);
 		try {
-			await session.prompt(
+			await composerSession.prompt(
 				`${instructions}\n\n${buildCompositionTurn(compositionRequest, admittedObservations)}`,
 			);
 		} finally {
 			clearTimeout(compositionTimer);
+			unsubscribeComposer();
 		}
 		persistComposedFeedback();
+		const combinedUsage = extractUsageFromSession(composerSession.state, streamUsage);
+		accumulateUsage(prevUsage, combinedUsage);
+		prevUsage = combinedUsage;
+		persistUsage();
 	}
 
-	let prevUsage = null;
+	let prevUsage: UsageReport | null = null;
+	const activeSessions = new Set<AgentSession>();
 
 	const hardTimer = setTimeout(() => {
 		hardAborted = true;
-		console.error(`[pi-runner] Hard timeout — aborting agent`);
-		session.abort().catch((err) => console.error(`[pi-runner] abort failed: ${errorText(err)}`));
+		console.error(`[pi-runner] Hard timeout — aborting ${activeSessions.size} active session(s)`);
+		for (const activeSession of activeSessions) {
+			activeSession
+				.abort()
+				.catch((err) => console.error(`[pi-runner] abort failed: ${errorText(err)}`));
+		}
 	}, INITIAL_TIMEOUT_MS);
-
-	const events: { type: string; timestamp: number }[] = [];
-	const streamUsage = newUsageLedger();
-	const unsubscribe = session.subscribe((event: AgentSessionEvent) => {
-		if (event.type === "tool_execution_start") {
-			console.error(`[pi-runner] tool: ${event.toolName}`);
-		}
-		if (event.type === "message_end" && event.message.role === "assistant") {
-			// Compaction removes messages but does not undo their token usage.
-			addAssistantUsage(streamUsage, event.message);
-			const stopReason = event.message.stopReason;
-			const types = listOrEmpty(event.message.content).map((c) => c.type);
-			// "toolCall" is what an assistant content part is called. This counted "tool_use" and
-			// "tool_call" — neither of which the union contains — so every turn the model spent entirely
-			// on tools was logged as having made none, which is the opposite of what this line is read for.
-			const toolCalls = types.filter((t) => t === "toolCall").length;
-			const errMsg = event.message.errorMessage;
-			console.error(
-				`[pi-runner] assistant msg: stopReason=${stopReason}, toolCalls=${toolCalls}, ` +
-					`types=[${types.join(",")}]${errMsg ? `, errorMessage=${redact(errMsg)}` : ""}`,
-			);
-		}
-		events.push({ type: event.type, timestamp: Date.now() });
-	});
 
 	console.error(`[pi-runner] Starting initial analysis`);
 	const startMs = Date.now();
 
 	const allSlugs = loadPracticeSlugs();
-	const batchSize = process.env.PI_PRACTICE_BATCH_SIZE
+	const groupCapacity = process.env.PI_PRACTICE_BATCH_SIZE
 		? Number(process.env.PI_PRACTICE_BATCH_SIZE)
-		: DEFAULT_PRACTICE_BATCH_SIZE;
-	const { areaCount, batches } = buildPracticeFanout(practiceIndex, batchSize);
+		: 6;
+	const concurrency = Number(process.env.PI_REVIEW_CONCURRENCY ?? 2);
+	if (!Number.isInteger(concurrency) || concurrency <= 0) {
+		throw new Error(`PI_REVIEW_CONCURRENCY must be a positive integer, got: ${concurrency}`);
+	}
+	const tree = buildReviewTree(practiceIndex, groupCapacity);
+	const sessionDir = `${CWD}/.sessions`;
+	const reviewDeadline = startMs + INITIAL_TIMEOUT_MS;
 	console.error(
-		`[pi-runner] Fan-out: ${allSlugs.length} practices in ${areaCount} areas -> ${batches.length} focused turn(s)`,
+		`[pi-runner] Review tree: ${tree.practiceCount} practices, ${tree.groups.length} reconnaissance parent(s), concurrency=${concurrency}`,
 	);
 
-	let previousTurnFailed = false;
+	interface ObserverTask {
+		practiceSlug: string;
+		groupId: string;
+		sessionFile?: string;
+	}
+
 	try {
-		for (const [bi, batch] of batches.entries()) {
-			if (hardAborted) {
-				console.error(
-					`[pi-runner] Hard abort fired — stopping turn loop at ${bi}/${batches.length}`,
+		const groupedTasks = await mapConcurrent(
+			tree.groups,
+			concurrency,
+			async (group): Promise<ObserverTask[]> => {
+				if (hardAborted) return [];
+				const manager = SessionManager.create(CWD, sessionDir);
+				const { session: parentSession } = await createAgentSession({
+					cwd: CWD,
+					agentDir: AGENT_DIR,
+					tools: ["read", "bash", "grep"],
+					customTools: [],
+					sessionManager: manager,
+					settingsManager,
+					modelRuntime,
+					model,
+				});
+				const unsubscribeParent = subscribeSession(parentSession, `recon:${group.id}`);
+				activeSessions.add(parentSession);
+				const remainingMs = Math.max(1, reviewDeadline - Date.now());
+				const parentBudgetMs = Math.min(
+					180_000,
+					Math.max(
+						45_000,
+						Math.floor((remainingMs * concurrency) / (tree.groups.length + allSlugs.length)),
+					),
 				);
-				break;
-			}
-			// Bound rather than indexed: a template literal renders an absent slug as "undefined.md"
-			// without complaint, which is the one place the compiler cannot see this class of hole.
-			const [onlySlug] = batch;
-			const readHint = `Read inputs/practices/${batch.length === 1 && onlySlug !== undefined ? `${onlySlug}.md` : "<slug>.md for each"}`;
-			const batchPrompt =
-				bi === 0 || previousTurnFailed
-					? `${prompt}\n\n## Scope for this turn\n${readHint} and evaluate ONLY these practices, persisting each with report_observation (one call per observation): ${batch.join(", ")}.`
-					: `Continue the SAME review. Using the diff and context you ALREADY read (do NOT re-read the diff), ${readHint} and evaluate ONLY these practices, persisting each with report_observation (one call per observation): ${batch.join(", ")}.`;
-			const elapsedMs = Date.now() - startMs;
-			const remainingMs = Math.max(0, INITIAL_TIMEOUT_MS - elapsedMs);
-			const turnTiming = deriveTurnTiming(remainingMs, batches.length - bi);
-			console.error(
-				`[pi-runner] turn ${bi + 1}/${batches.length} budget: fairShare=${turnTiming.fairShareMs}ms, remaining=${remainingMs}ms`,
+				const parentTimer = setTimeout(() => {
+					parentSession
+						.abort()
+						.catch((error) => console.error(`[pi-runner] recon abort failed: ${errorText(error)}`));
+				}, parentBudgetMs);
+				try {
+					await parentSession.prompt(
+						`Build shared reconnaissance for the '${group.id}' observation group. ` +
+							`The child observers will evaluate these practices later: ${group.practiceSlugs.join(", ")}. ` +
+							`Read only the evidence needed to understand their shared context, starting with these source kinds: ${group.evidenceSources.join(", ") || "the staged manifest"}. ` +
+							`Map relevant files, hunks, symbols, metadata, tests, and uncertainties with exact paths and lines. ` +
+							`Do not assess a practice, recommend feedback, or claim GOOD/BAD. End with a compact factual evidence map for child sessions.`,
+					);
+					const checkpointEntryId = manager.getLeafId();
+					const seedSessionFile = manager.getSessionFile();
+					if (!checkpointEntryId || !seedSessionFile)
+						throw new Error("reconnaissance produced no persistent checkpoint");
+					return forkPracticeSessions({
+						seedSessionFile,
+						checkpointEntryId,
+						practiceSlugs: group.practiceSlugs,
+						sessionDir,
+					}).map((fork) => ({ ...fork, groupId: group.id }));
+				} catch (error) {
+					console.error(`[pi-runner] reconnaissance ${group.id} failed: ${errorText(error)}`);
+					return group.practiceSlugs.map((practiceSlug) => ({ practiceSlug, groupId: group.id }));
+				} finally {
+					clearTimeout(parentTimer);
+					activeSessions.delete(parentSession);
+					unsubscribeParent();
+				}
+			},
+		);
+		const observerTasks = groupedTasks.flat();
+		let remainingObservers = observerTasks.length;
+		await mapConcurrent(observerTasks, concurrency, async (task, index) => {
+			if (hardAborted) return;
+			const manager = task.sessionFile
+				? SessionManager.open(task.sessionFile, sessionDir)
+				: SessionManager.inMemory();
+			const scopedTool = buildReportObservationTool(task.practiceSlug);
+			const { session: observerSession } = await createAgentSession({
+				cwd: CWD,
+				agentDir: AGENT_DIR,
+				tools: ["read", "bash", "grep", "report_observation"],
+				customTools: [scopedTool],
+				sessionManager: manager,
+				settingsManager,
+				modelRuntime,
+				model,
+			});
+			const unsubscribeObserver = subscribeSession(
+				observerSession,
+				`observer:${task.practiceSlug}`,
 			);
-			const {
-				softTimer: turnSoftTimer,
-				hardTimer: turnHardTimer,
-				state: turnTimerState,
-			} = scheduleTurnTimers(
-				session,
-				bi + 1,
-				batches.length,
-				turnTiming.softNudgeMs,
-				turnTiming.fairShareMs,
+			activeSessions.add(observerSession);
+			const remainingMs = Math.max(1, reviewDeadline - Date.now());
+			const activeSlots = Math.min(concurrency, remainingObservers);
+			const leafBudgetMs = Math.max(
+				1,
+				Math.min(360_000, Math.floor((remainingMs * activeSlots) / remainingObservers)),
+			);
+			const timing = deriveTurnTiming(leafBudgetMs, 1);
+			const timers = scheduleTurnTimers(
+				observerSession,
+				index + 1,
+				observerTasks.length,
+				timing.softNudgeMs,
+				timing.fairShareMs,
 			);
 			try {
-				await session.prompt(batchPrompt);
-				previousTurnFailed = turnTimerState.hardTimedOut;
-				console.error(
-					`[pi-runner] turn ${bi + 1}/${batches.length} complete (slugs=${batch.length})`,
+				await observerSession.prompt(
+					`${prompt}\n\n## Practice branch\nContinue from the shared '${task.groupId}' reconnaissance above. ` +
+						`Read inputs/practices/${task.practiceSlug}.md and evaluate ONLY '${task.practiceSlug}'. ` +
+						`Persist the result with report_observation before doing anything else outside this scope.`,
 				);
-			} catch (err) {
-				previousTurnFailed = true;
-				console.error(
-					`[pi-runner] turn ${bi + 1}/${batches.length} prompt error: ${errorText(err)}`,
-				);
+			} catch (error) {
+				console.error(`[pi-runner] observer ${task.practiceSlug} failed: ${errorText(error)}`);
 			} finally {
-				softTimeoutFired ||= turnTimerState.softTimedOut;
-				clearTimeout(turnSoftTimer);
-				clearTimeout(turnHardTimer);
+				softTimeoutFired ||= timers.state.softTimedOut;
+				clearTimeout(timers.softTimer);
+				clearTimeout(timers.hardTimer);
+				activeSessions.delete(observerSession);
+				unsubscribeObserver();
+				remainingObservers--;
 			}
-		}
+		});
 	} finally {
 		clearTimeout(hardTimer);
 	}
 
 	const initialDurationMs = Date.now() - startMs;
-	const initialUsage = extractUsageFromSession(session.state, streamUsage);
+	const initialUsage = extractUsageFromSession({}, streamUsage);
 	accumulateUsage(null, initialUsage);
 	prevUsage = initialUsage;
 
@@ -1841,97 +1827,86 @@ async function main() {
 	);
 
 	const resultFileSource = resolveResultFile();
+	const coveredAfterInitial = new Set(reviewState.observations.map((item) => item.practiceSlug));
+	const missingAfterInitial = allSlugs.filter((slug) => !coveredAfterInitial.has(slug));
 
-	if (resultFileSource === "agent") {
+	if (resultFileSource === "agent" && missingAfterInitial.length === 0) {
 		console.error(`[pi-runner] SUCCESS: result.json valid after initial run`);
 		await completeWithAdmittedComposition();
-		unsubscribe();
 		process.exit(0);
 	}
-	if (resultFileSource === "tool-state") {
+	if (resultFileSource === "tool-state" && missingAfterInitial.length === 0) {
 		console.error(
 			`[pi-runner] SUCCESS: composed result.json from persisted tool state after initial run`,
 		);
 		await completeWithAdmittedComposition();
-		unsubscribe();
 		process.exit(0);
 	}
 
-	const lastMsgs = listOrEmpty(session.state.messages)
-		.filter((m) => m.role === "assistant")
-		.slice(-2);
-	for (const m of lastMsgs) {
-		const parts = listOrEmpty(m.content);
-		const types = parts.map((c) => c.type);
-		const textLen = parts.reduce(
-			(total, part) => total + (part.type === "text" ? part.text.length : 0),
-			0,
-		);
-		console.error(
-			`[pi-runner] assistant msg: stopReason=${m.stopReason}, contentTypes=[${types.join(",")}], textLen=${textLen}`,
-		);
-	}
-
-	const agentText = extractLastAssistantText(session.state);
-	if (agentText) {
-		console.error(
-			`[pi-runner] Agent produced text (${agentText.length} chars) but did not persist complete review output`,
-		);
-		if (tryRescueFromTextResponse(session.state)) {
-			console.error(`[pi-runner] SUCCESS: rescued valid JSON from agent text`);
-			await completeWithAdmittedComposition();
-			unsubscribe();
-			process.exit(0);
-		}
-	}
-
-	console.error(`[pi-runner] Re-prompting agent to persist remaining review output`);
-
-	const slugs = loadPracticeSlugs();
-	const scaffold = buildRetryScaffold(slugs);
-	console.error(`[pi-runner] Loaded ${slugs.length} practice slugs for retry scaffold`);
+	console.error(
+		`[pi-runner] Retrying ${missingAfterInitial.length} missing practice observer(s): ${missingAfterInitial.join(", ")}`,
+	);
 
 	const retryTimer = setTimeout(() => {
 		retryAborted = true;
 		console.error(`[pi-runner] Retry hard timeout — aborting`);
-		session
-			.abort()
-			.catch((err) => console.error(`[pi-runner] retry abort failed: ${errorText(err)}`));
+		for (const activeSession of activeSessions) {
+			activeSession
+				.abort()
+				.catch((err) => console.error(`[pi-runner] retry abort failed: ${errorText(err)}`));
+		}
 	}, RETRY_TIMEOUT_MS);
 
 	const retryStartMs = Date.now();
 
-	let retryPrompt: string;
-	if (softTimeoutFired || hardAborted) {
-		retryPrompt =
-			`You ran out of time before finalizing the review. ` +
-			`Do NOT restart analysis from scratch. Do NOT read more files. ` +
-			`Persist every remaining justified observation with report_observation immediately, ` +
-			`one observation per call. ${PERSIST_DISCIPLINE} ${scaffold}`;
-	} else if (agentText) {
-		retryPrompt =
-			`You completed analysis but did not persist the final review output. ` +
-			`Do NOT read any more files. Persist the remaining observations with report_observation NOW, ` +
-			`one observation per call. ${PERSIST_DISCIPLINE} ${scaffold}`;
-	} else {
-		retryPrompt =
-			`You did not persist the review output. The review will fail unless you persist it NOW. ` +
-			`Use your analysis from above. Do NOT read more files. Persist observations with ` +
-			`report_observation immediately, one observation per call. ${PERSIST_DISCIPLINE} ${scaffold}`;
-	}
-
 	try {
-		try {
-			await session.prompt(retryPrompt);
-		} catch (err) {
-			console.error(`[pi-runner] Retry error: ${errorText(err)}`);
-		}
+		let retriesRemaining = missingAfterInitial.length;
+		await mapConcurrent(missingAfterInitial, concurrency, async (practiceSlug) => {
+			if (retryAborted) return;
+			const retryTool = buildReportObservationTool(practiceSlug);
+			const { session: retrySession } = await createAgentSession({
+				cwd: CWD,
+				agentDir: AGENT_DIR,
+				tools: ["read", "grep", "report_observation"],
+				customTools: [retryTool],
+				sessionManager: SessionManager.inMemory(),
+				settingsManager,
+				modelRuntime,
+				model,
+			});
+			const unsubscribeRetry = subscribeSession(retrySession, `retry:${practiceSlug}`);
+			activeSessions.add(retrySession);
+			const activeSlots = Math.min(concurrency, retriesRemaining);
+			const retryBudgetMs = Math.max(
+				1,
+				Math.floor((RETRY_TIMEOUT_MS * activeSlots) / retriesRemaining),
+			);
+			const timer = setTimeout(() => {
+				retrySession
+					.abort()
+					.catch((error) => console.error(`[pi-runner] retry abort failed: ${errorText(error)}`));
+			}, retryBudgetMs);
+			try {
+				await retrySession.prompt(
+					`${prompt}\n\n## Recovery practice branch\nThe earlier observer did not persist '${practiceSlug}'. ` +
+						`Read inputs/practices/${practiceSlug}.md and the staged evidence needed to evaluate ONLY this practice. ` +
+						`Persist exactly one justified outcome with report_observation. ${PERSIST_DISCIPLINE}`,
+				);
+			} catch (error) {
+				console.error(`[pi-runner] retry ${practiceSlug} failed: ${errorText(error)}`);
+			} finally {
+				clearTimeout(timer);
+				activeSessions.delete(retrySession);
+				unsubscribeRetry();
+				retriesRemaining--;
+			}
+		});
 	} finally {
 		clearTimeout(retryTimer);
 	}
 
 	const retryDurationMs = Date.now() - retryStartMs;
-	const retryUsage = extractUsageFromSession(session.state, streamUsage);
+	const retryUsage = extractUsageFromSession({}, streamUsage);
 	accumulateUsage(prevUsage, retryUsage);
 	prevUsage = retryUsage;
 
@@ -1954,7 +1929,6 @@ async function main() {
 	if (checkResultFile()) {
 		console.error(`[pi-runner] SUCCESS: result.json valid after retry`);
 		await completeWithAdmittedComposition();
-		unsubscribe();
 		process.exit(0);
 	}
 
@@ -1965,14 +1939,6 @@ async function main() {
 			`[pi-runner] SUCCESS: composed result.json from persisted tool state after retry`,
 		);
 		await completeWithAdmittedComposition();
-		unsubscribe();
-		process.exit(0);
-	}
-
-	if (tryRescueFromTextResponse(session.state)) {
-		console.error(`[pi-runner] SUCCESS: rescued valid JSON from text`);
-		await completeWithAdmittedComposition();
-		unsubscribe();
 		process.exit(0);
 	}
 

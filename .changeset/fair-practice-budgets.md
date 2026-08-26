@@ -2,4 +2,4 @@
 "hephaestus": patch
 ---
 
-Practice reviews now keep slow practices from consuming the time reserved for the rest of the review.
+Practice reviews now investigate shared context once, evaluate practices in isolated parallel sessions, and compose feedback in a fresh focused session.
