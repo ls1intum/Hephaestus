@@ -1672,8 +1672,11 @@ async function main() {
 	const groupCapacity = process.env.PI_PRACTICE_BATCH_SIZE
 		? Number(process.env.PI_PRACTICE_BATCH_SIZE)
 		: 6;
-	const concurrency = resolveReviewConcurrency(process.env.PI_REVIEW_CONCURRENCY);
 	const tree = buildReviewTree(practiceIndex, groupCapacity);
+	const concurrency = resolveReviewConcurrency(
+		process.env.PI_REVIEW_CONCURRENCY,
+		tree.practiceCount,
+	);
 	const sessionDir = `${CWD}/.sessions`;
 	const reviewDeadline = startMs + INITIAL_TIMEOUT_MS;
 	console.error(

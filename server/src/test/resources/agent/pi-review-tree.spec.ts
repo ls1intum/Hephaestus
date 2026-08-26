@@ -90,13 +90,17 @@ test("missingPracticeSlugs requires explicit coverage for every selected practic
 	expect(missingPracticeSlugs(["a", "b"], ["b", "a"])).toEqual([]);
 });
 
-test("review concurrency defaults to four and cannot overload the provider", () => {
-	expect(resolveReviewConcurrency(undefined)).toBe(4);
-	expect(resolveReviewConcurrency("1")).toBe(1);
-	expect(resolveReviewConcurrency("8")).toBe(8);
+test("review concurrency scales with the catalogue without overloading the provider", () => {
+	expect(resolveReviewConcurrency(undefined, 1)).toBe(1);
+	expect(resolveReviewConcurrency(undefined, 16)).toBe(4);
+	expect(resolveReviewConcurrency(undefined, 27)).toBe(7);
+	expect(resolveReviewConcurrency(undefined, 100)).toBe(8);
+	expect(resolveReviewConcurrency("1", 27)).toBe(1);
+	expect(resolveReviewConcurrency("8", 1)).toBe(8);
 	for (const invalid of ["0", "9", "2.5", "nope"]) {
-		expect(() => resolveReviewConcurrency(invalid)).toThrow("integer from 1 to 8");
+		expect(() => resolveReviewConcurrency(invalid, 27)).toThrow("integer from 1 to 8");
 	}
+	expect(() => resolveReviewConcurrency(undefined, -1)).toThrow("non-negative integer");
 });
 
 test("mapConcurrent bounds active work and preserves input order", async () => {
