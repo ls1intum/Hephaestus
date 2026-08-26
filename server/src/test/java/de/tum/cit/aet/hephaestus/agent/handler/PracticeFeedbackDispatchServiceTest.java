@@ -224,7 +224,6 @@ class PracticeFeedbackDispatchServiceTest extends BaseUnitTest {
         verify(poster, never()).postFormattedBody(any(), any());
     }
 
-    /** A terminal row answers with the reason it stored, so nobody downstream has to invent one. */
     @Test
     void anAlreadySuppressedDispatchReportsTheReasonItStored() {
         dispatch = dispatch(FeedbackDispatchState.SUPPRESSED, FeedbackSuppressionReason.OUTSIDE_CURRENT_COVERAGE);

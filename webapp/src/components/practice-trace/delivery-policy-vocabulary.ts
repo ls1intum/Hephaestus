@@ -15,6 +15,11 @@ type Reason = NonNullable<DeliveryPolicyTrace["decisiveReason"]>;
 type RepositoryMode = NonNullable<DeliveryPolicyFactsSnapshot["repositoryMode"]>;
 type PersonMode = NonNullable<DeliveryPolicyFactsSnapshot["personMode"]>;
 type Subject = NonNullable<DeliveryPolicyFactsSnapshot["subject"]>;
+type DeliveryStatus = NonNullable<DeliveryPolicyFactsSnapshot["deliveryStatus"]>;
+type TriggerMode = NonNullable<DeliveryPolicyFactsSnapshot["triggerMode"]>;
+type Autonomy = NonNullable<
+	NonNullable<DeliveryPolicyFactsSnapshot["contributingPractices"]>[number]["autonomy"]
+>;
 
 export const DELIVERY_CHECK_LABELS = {
 	INSTANCE_SILENT_MODE: "Instance Silent Mode",
@@ -83,5 +88,21 @@ export const DELIVERY_SUBJECT_LABELS = {
 	NON_HUMAN: "author is a bot",
 	UNLINKED: "author is not a workspace member",
 } satisfies Record<Subject, string>;
+
+export const DELIVERY_STATUS_LABELS = {
+	ACTIVE: "sending active",
+	PAUSED: "sending paused",
+} satisfies Record<DeliveryStatus, string>;
+
+export const DELIVERY_TRIGGER_LABELS = {
+	AUTO: "started automatically",
+	MANUAL: "requested by a person",
+} satisfies Record<TriggerMode, string>;
+
+export const DELIVERY_AUTONOMY_LABELS = {
+	OFF: "off",
+	HUMAN_APPROVAL: "review before sending",
+	AUTOMATIC: "send automatically",
+} satisfies Record<Autonomy, string>;
 
 export const DELIVERY_REASON_SENTENCES = WITHHOLDING_REASON_DEFS satisfies Record<Reason, string>;

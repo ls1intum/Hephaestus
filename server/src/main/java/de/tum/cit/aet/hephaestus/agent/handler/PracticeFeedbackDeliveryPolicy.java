@@ -150,8 +150,6 @@ public class PracticeFeedbackDeliveryPolicy {
         Issue issue = integralId(metadata, "issue_id")
             .flatMap(issueRepository::findByIdWithAuthorAndRepository)
             .orElse(null);
-        // One refined reference rather than a boolean: everything downstream needs the artifact itself,
-        // and a repository can be absent even when the issue is not.
         Issue target =
             workspace != null &&
             isEligibleTarget(issue, metadata, "issue_number", workspaceId) &&
@@ -584,12 +582,10 @@ public class PracticeFeedbackDeliveryPolicy {
             return new Decision<>(artifact, null);
         }
 
-        /** The work this is about. An allowed decision always carries it. */
         T target() {
             return java.util.Objects.requireNonNull(artifact, "an allowed decision always carries its artifact");
         }
 
-        /** The check that stopped this. A suppressed decision always names one. */
         FeedbackSuppressionReason refusal() {
             return java.util.Objects.requireNonNull(suppressionReason, "a suppressed decision always names its reason");
         }

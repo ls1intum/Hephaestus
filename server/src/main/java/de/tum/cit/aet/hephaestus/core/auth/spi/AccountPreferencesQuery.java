@@ -7,10 +7,6 @@ public interface AccountPreferencesQuery {
 
     Optional<PreferencesView> preferencesForUserId(long userId);
 
-    /**
-     * A row exists only once someone opens their account settings, so its absence is not a choice — it
-     * resolves to the same default a freshly created row carries.
-     */
     default boolean practiceFeedbackDeliveryEnabled(long userId) {
         return preferencesForUserId(userId)
             .map(PreferencesView::practiceFeedbackDeliveryEnabled)

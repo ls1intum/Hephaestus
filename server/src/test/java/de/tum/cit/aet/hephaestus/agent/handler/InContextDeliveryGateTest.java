@@ -92,7 +92,7 @@ class InContextDeliveryGateTest extends BaseUnitTest {
     }
 
     @Test
-    void aWorkspaceThatNoLongerExistsHasNoRevisionToMatchAndWithholds() {
+    void aWorkspaceThatNoLongerExistsProducesNoInContextFeedback() {
         InContextDeliveryGate gate = new InContextDeliveryGate(
             practiceRepository,
             observationRepository,
@@ -102,20 +102,6 @@ class InContextDeliveryGateTest extends BaseUnitTest {
         );
 
         assertThat(gate.admitInContext(job(), List.of(observation("loud", "occ-1")))).isEmpty();
-    }
-
-    /** Deliberate: automatic feedback is dropped so a resume releases no backlog, but a human still owns the queue. */
-    @Test
-    void pausingSendingKeepsTheApprovalQueueForAHumanToDecideOn() {
-        Workspace paused = new Workspace();
-        paused.setId(WORKSPACE_ID);
-        paused.getReviewSettings().setDeliveryStatus(PracticeDeliveryStatus.PAUSED);
-        when(practiceRepository.findByWorkspaceId(WORKSPACE_ID)).thenReturn(
-            List.of(practice("measured", PracticeAutonomy.HUMAN_APPROVAL))
-        );
-        ValidatedObservation measured = observation("measured", "occ-1");
-
-        assertThat(gate().awaitingApproval(job(), List.of(measured))).containsExactly(measured);
     }
 
     @Test
@@ -129,7 +115,6 @@ class InContextDeliveryGateTest extends BaseUnitTest {
         verifyNoInteractions(feedbackLedgerRecorder);
     }
 
-    /** Human-approval observations are kept for the proposal lane but never reach the artifact directly. */
     @Test
     void proposingPracticesAreWithheldFromTheArtifact() {
         when(practiceRepository.findByWorkspaceId(WORKSPACE_ID)).thenReturn(

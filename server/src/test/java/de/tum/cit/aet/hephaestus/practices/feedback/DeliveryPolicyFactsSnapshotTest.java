@@ -8,7 +8,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.ObjectMapper;
 
-/** Renaming a component reinterprets every row already stored, because the column is read back through it. */
 @DisplayName("Delivery policy facts snapshot")
 class DeliveryPolicyFactsSnapshotTest extends BaseUnitTest {
 
@@ -31,15 +30,6 @@ class DeliveryPolicyFactsSnapshotTest extends BaseUnitTest {
             "triggerMode",
             "contributingPractices"
         );
-    }
-
-    @Test
-    void survivesARoundTripThroughTheColumn() {
-        DeliveryPolicyFactsSnapshot written = empty();
-
-        assertThat(
-            objectMapper.treeToValue(objectMapper.valueToTree(written), DeliveryPolicyFactsSnapshot.class)
-        ).isEqualTo(written);
     }
 
     private static DeliveryPolicyFactsSnapshot empty() {

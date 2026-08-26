@@ -74,30 +74,13 @@ monitored repositories take pull requests from outside the organization.
 
 **After**: coverage has two dimensions — repositories and people — and both must admit the work. The
 people dimension is workspace membership: work whose author is not a member is not reviewed and no
-feedback is prepared about it, and the same holds when the work has no identifiable author or the author
-is a bot. This is deliberate. Feedback nobody will read still costs a model run, and preparing it widens
-the privacy radius to a person the workspace never enrolled.
+feedback is prepared about it. Work with no identifiable author also remains outside coverage.
 
 **Migration**: nothing to change before upgrading.
 
-Afterwards, open **Practices → Review → When and where** and read the two counts under **What gets
-reviewed**: **People** is how many members are in scope, **Repositories** how many monitored repositories
-are. Existing members need no action.
-
-If **People** is lower than the set of contributors you expect to be reviewed, the difference is people
-who are not members. Signing in to Hephaestus does not make somebody a member, and the **Members** screen
-has no *Add member* button — add them to the connected GitHub organization or GitLab group and the next
-roster sync will pick them up. [Who counts as a
-person](https://ls1intum.github.io/Hephaestus/admin/practice-review#who-counts-as-a-person) has the full
-rule.
-
-Narrowing further is optional: switch either dimension to **Selected** and name the repositories, base
-branches and people yourself. An empty selection covers nobody, never everybody, and the screen warns you
-when a selected list is empty.
-
-One thing to know before you start tuning: every change to coverage discards whatever has been reviewed
-but not yet sent. It does not go back and review work that was already refused either. Get the population
-right in as few edits as you can.
+**Operator action after upgrading**: open **Practices → Review → When and where** and confirm the
+**People** and **Repositories** counts. Existing members need no action. If expected contributors are
+missing, follow [Who counts as a person](https://ls1intum.github.io/Hephaestus/admin/practice-review#who-counts-as-a-person).
 
 ### v0.74.0
 

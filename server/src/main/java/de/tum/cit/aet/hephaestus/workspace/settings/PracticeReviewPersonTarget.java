@@ -13,7 +13,6 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.jspecify.annotations.Nullable;
 
-/** One workspace member whose work is reviewed. Deleting their membership deletes this with it. */
 @Entity
 @Table(name = "practice_review_person_target")
 @IdClass(PracticeReviewPersonTarget.Key.class)

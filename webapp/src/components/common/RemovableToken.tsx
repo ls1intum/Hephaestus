@@ -5,7 +5,6 @@ import { cn } from "@/lib/utils";
 
 export interface RemovableTokenProps {
 	label: string;
-	/** Has to name the value too: a row of these is otherwise a row of identically named buttons. */
 	removeLabel: string;
 	onRemove: () => void;
 	disabled?: boolean;

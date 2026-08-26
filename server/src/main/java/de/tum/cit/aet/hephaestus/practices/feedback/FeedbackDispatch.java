@@ -101,7 +101,6 @@ public class FeedbackDispatch {
     @Column(name = "attempt_count", nullable = false)
     private Integer attemptCount;
 
-    /** Why a policy check refused this row. Never a transport error — {@link #lastError} owns those. */
     @Column(name = "suppression_reason", length = 48)
     private @Nullable String suppressionReason;
 

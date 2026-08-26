@@ -145,7 +145,6 @@ public class PracticeReviewCoverageService {
             boolean afterRepository = proposed.repositoryMode() == ReviewRepositoryMode.ALL_MONITORED || after != null;
             if (afterRepository && !beforeRepository) return true;
             if (!afterRepository || !beforeRepository) continue;
-            // An empty list is how "every branch" is spelled, which is also what an all-monitored mode means.
             List<String> beforeBranches =
                 current.repositoryMode() == ReviewRepositoryMode.ALL_MONITORED || before == null
                     ? List.of()

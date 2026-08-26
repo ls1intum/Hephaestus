@@ -106,7 +106,6 @@ public final class DeliveryPolicyResolver {
         @Nullable FeedbackSuppressionReason suppressionReason,
         List<CheckResult> checks
     ) {
-        /** The check that stopped this. A denial always names one, so callers need not re-prove it. */
         public FeedbackSuppressionReason refusal() {
             return java.util.Objects.requireNonNull(suppressionReason, "a denied result always names its reason");
         }

@@ -521,7 +521,6 @@ public class FeedbackLedgerRecorder {
         );
     }
 
-    /** Records a provider write recovered after the run ended in the same ledger as normal delivery. */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void recordRecoveredSummary(AgentJob job, String externalRef, String body) {
         if (feedbackRepository.existsByAgentJobIdAndPosition(job.getId(), IN_CONTEXT_UNIT_ORDINAL)) {
@@ -574,7 +573,6 @@ public class FeedbackLedgerRecorder {
         );
     }
 
-    /** The current provider comment for an issue review; pull-request re-reviews always post a new summary. */
     @Transactional(propagation = Propagation.REQUIRES_NEW, readOnly = true)
     public Optional<String> priorLiveIssueSummaryRef(AgentJob job) {
         List<Observation> observations = observationRepository.findByAgentJobId(job.getId());
@@ -662,8 +660,6 @@ public class FeedbackLedgerRecorder {
                 .createdAt(Instant.now())
                 .build()
         );
-        // A re-review proposes again about the same work. Without this the queue offers one decision per
-        // run, and approving an older one posts a review of a diff that has moved on.
         feedbackRepository.supersedeUndecidedProposals(
             job.getWorkspace().getId(),
             feedbackThreadKeyFor(first),

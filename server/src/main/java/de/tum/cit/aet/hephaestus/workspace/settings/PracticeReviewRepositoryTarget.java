@@ -16,7 +16,6 @@ import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 import org.jspecify.annotations.Nullable;
 
-/** One monitored repository a workspace reviews, and the base branches of it that are in scope. */
 @Entity
 @Table(name = "practice_review_repository_target")
 @IdClass(PracticeReviewRepositoryTarget.Key.class)
@@ -33,7 +32,6 @@ public class PracticeReviewRepositoryTarget {
     @Column(name = "repository_monitor_id", nullable = false)
     private Long repositoryMonitorId;
 
-    /** Empty admits every branch, which is what naming none of them means. */
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "base_branches", nullable = false, columnDefinition = "jsonb")
     private List<String> baseBranches = List.of();

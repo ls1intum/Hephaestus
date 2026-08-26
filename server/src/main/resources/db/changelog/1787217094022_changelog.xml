@@ -27,8 +27,6 @@
             <column name="repository_monitor_id" type="BIGINT"><constraints nullable="false"/></column>
             <column name="base_branches" type="JSONB" defaultValue="[]"><constraints nullable="false"/></column>
         </createTable>
-        <!-- Hibernate sorts an @IdClass alphabetically and the schema gate diffs against that, so the key
-             cannot lead with the tenant; the index is what serves the workspace lookups instead. -->
         <addPrimaryKey tableName="practice_review_repository_target" columnNames="repository_monitor_id,workspace_id" constraintName="pk_practice_review_repository_target"/>
         <createIndex tableName="practice_review_repository_target" indexName="idx_practice_review_repository_target_workspace"><column name="workspace_id"/></createIndex>
         <addUniqueConstraint tableName="repository_to_monitor" columnNames="workspace_id,id" constraintName="uk_repository_to_monitor_workspace_id"/>
@@ -99,10 +97,7 @@
             <column name="practice_rollout_revision" type="BIGINT" defaultValueNumeric="0"><constraints nullable="false"/></column>
             <column name="practice_trigger_mode" type="VARCHAR(24)" defaultValue="MANUAL"><constraints nullable="false"/></column>
         </addColumn>
-        <!-- A job admitted before rollout provenance existed carries no revision anybody chose. -1 is below
-             every revision a workspace can hold (the column starts at 0 and only ever increments), so the
-             delivery fence refuses it as stale. A COMPLETED job is included because approval and dispatch
-             recovery both re-evaluate the fence long after the run itself finished. -->
+        <!-- Existing active and completed work predates an operator-chosen rollout revision and must fail stale. -->
         <sql>UPDATE agent_job SET practice_rollout_revision = -1 WHERE status IN ('QUEUED', 'RUNNING', 'COMPLETED');</sql>
         <sql>ALTER TABLE agent_job ADD CONSTRAINT chk_agent_job_practice_trigger_mode CHECK (practice_trigger_mode IN ('AUTO', 'MANUAL'));</sql>
         <rollback>

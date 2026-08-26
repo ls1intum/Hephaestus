@@ -9,7 +9,6 @@ import de.tum.cit.aet.hephaestus.workspace.settings.ReviewRepositoryMode;
 import java.util.List;
 import org.jspecify.annotations.Nullable;
 
-/** The facts behind one delivery decision. Carries no feedback payload. */
 public record DeliveryPolicyFactsSnapshot(
     @Nullable String artifactKind,
     @Nullable String repository,

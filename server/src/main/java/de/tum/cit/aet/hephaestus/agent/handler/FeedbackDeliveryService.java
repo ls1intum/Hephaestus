@@ -200,9 +200,6 @@ class FeedbackDeliveryService {
             recordSuppressedRemainder(job, delivery, inlineResult.suppressedRecurrenceKeys());
         }
         if (inlineResult.failed() > 0) {
-            // Raised last, so the ledger and both dispatches are already durable and a retry re-runs the
-            // inline reconcile alone. The reconcile is keyed by recurrence, so re-running it posts nothing
-            // twice — but nothing else retries it, and a note dropped in silence never arrives at all.
             throw new JobDeliveryException(
                 "Inline notes were not fully delivered: failed=" + inlineResult.failed() + ", jobId=" + job.getId()
             );

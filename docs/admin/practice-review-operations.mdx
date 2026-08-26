@@ -80,22 +80,21 @@ Metric names in the instrumented code are the source of truth for dashboards and
 
 **Retention.** Terminal job payloads are stripped before their rows are deleted, so row retention shorter
 than payload retention is incoherent — the application refuses to start rather than accept it. Treat the
-fabric root as sensitive storage. Nothing else needs a retention setting of its own: delivery-policy
-evaluations and dispatch intents are deleted with their owning job or workspace, and selected coverage
-targets with their workspace membership or monitored repository.
+fabric root as sensitive storage. Delivery-policy evaluations and dispatch intents follow their owning
+job or workspace; selected coverage targets follow their workspace membership or monitored repository.
 
 **Dispatch recovery.** A dispatch whose provider outcome is unknown is never re-posted on a guess. Before
 writing, the dispatcher looks for a deterministic marker on the provider: if the comment is already there
 it is recorded as sent, and only a definitive not-found lets a first write proceed. An interrupted write
-therefore stalls in `UNCERTAIN` rather than duplicating, and reconciles or gives up on its own.
+therefore stalls in `UNCERTAIN` rather than risking a duplicate.
 
 Two consequences to plan for:
 
-- **Sustained `UNCERTAIN` means the provider is not answering the lookup**, not that feedback is queued.
-  Fix provider connectivity or credentials; nothing in Hephaestus will clear it.
+- **Sustained `UNCERTAIN` means Hephaestus cannot prove whether the provider accepted the write**, not that
+  feedback is queued. Fix provider connectivity or credentials so reconciliation can continue.
 - **A dispatch interrupted mid-write can outlive its retry budget without reaching `FAILED`.** It is
   deliberately not failed, because the comment may be live, and it will log a warning until somebody
-  confirms on the provider which it is. Treat a row warning on repeat as an operator task, not a bug.
+  confirms the provider outcome.
 
 Do not mutate dispatch rows manually. Their state, write fence, attempt count, next-attempt time and lease
 owner jointly prevent an uncertain provider outcome from becoming a duplicate write.
@@ -122,7 +121,7 @@ behaviors matter independently of their exact defaults:
   everything, and neither is a substitute for the other when you are diagnosing missing context.
 - **No screen edits what the model is told.** What Hephaestus observes is shaped by each practice's
   criteria; the wording it then chooses is shaped by a prompt that ships with the release. Changing the
-  latter is a code change, so a complaint about tone is an issue to file, not a setting to find.
+  latter is a code change.
 
 ## Rollback
 

@@ -10,15 +10,19 @@ import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-/** Every feedback lane asks this one question, so two lanes cannot answer an absent row differently. */
 @DisplayName("Practice feedback delivery consent")
 class AccountPreferencesQueryTest extends BaseUnitTest {
 
     private static final long USER_ID = 11L;
 
     @Test
-    void anAuthorWhoNeverOpenedTheirSettingsIsNotTreatedAsHavingDeclined() {
-        assertThat(preferences(null).practiceFeedbackDeliveryEnabled(USER_ID)).isTrue();
+    void anAbsentRowUsesTheSameDeliveryDefaultAsANewRow() {
+        boolean defaultWithoutRow = preferences(null).practiceFeedbackDeliveryEnabled(USER_ID);
+
+        assertThat(defaultWithoutRow)
+            .isTrue()
+            .isEqualTo(new UserPreferences().isPracticeFeedbackDeliveryEnabled())
+            .isEqualTo(PreferencesView.PRACTICE_FEEDBACK_DELIVERY_ENABLED_BY_DEFAULT);
     }
 
     @Test
@@ -29,13 +33,6 @@ class AccountPreferencesQueryTest extends BaseUnitTest {
     @Test
     void anExplicitOptInIsHonoured() {
         assertThat(preferences(true).practiceFeedbackDeliveryEnabled(USER_ID)).isTrue();
-    }
-
-    @Test
-    void theAbsentRowResolvesToWhatACreatedRowWouldCarry() {
-        assertThat(new UserPreferences().isPracticeFeedbackDeliveryEnabled()).isEqualTo(
-            PreferencesView.PRACTICE_FEEDBACK_DELIVERY_ENABLED_BY_DEFAULT
-        );
     }
 
     private static AccountPreferencesQuery preferences(@Nullable Boolean stored) {

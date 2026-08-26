@@ -328,12 +328,10 @@ class PracticeFeedbackDispatchService {
     }
 
     record Result(Status status, @Nullable String externalRef, @Nullable FeedbackSuppressionReason suppressionReason) {
-        /** The check that stopped this. A refusal always names one. */
         FeedbackSuppressionReason refusal() {
             return java.util.Objects.requireNonNull(suppressionReason, "a refused dispatch always names its reason");
         }
 
-        /** The provider id this landed on. A sent dispatch always has one. */
         String sentRef() {
             return java.util.Objects.requireNonNull(externalRef, "a sent dispatch always has a provider id");
         }

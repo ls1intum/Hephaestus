@@ -7,14 +7,17 @@ import { StatusBadge } from "@/components/practice-vocabulary/StatusBadge";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
+	DELIVERY_AUTONOMY_LABELS,
 	DELIVERY_CHECK_LABELS,
 	DELIVERY_CHECK_STATUS_DEFS,
 	DELIVERY_PERSON_MODE_LABELS,
 	DELIVERY_REASON_SENTENCES,
 	DELIVERY_REPOSITORY_MODE_LABELS,
 	DELIVERY_STAGE_LABELS,
+	DELIVERY_STATUS_LABELS,
 	DELIVERY_SUBJECT_LABELS,
 	DELIVERY_SURFACE_LABELS,
+	DELIVERY_TRIGGER_LABELS,
 } from "./delivery-policy-vocabulary";
 
 export interface DeliveryPolicyTraceProps {
@@ -68,9 +71,7 @@ export function DeliveryPolicyTrace({ evaluations }: DeliveryPolicyTraceProps) {
 								</p>
 							)}
 							<p className="text-xs text-muted-foreground">{scopeSentence(evaluation.facts)}</p>
-							<p className="text-xs text-muted-foreground">
-								{policyFactsSentence(evaluation.facts)}
-							</p>
+							<PolicyFacts facts={evaluation.facts} />
 							<ul className="space-y-1">
 								{evaluation.checks.map((check) => (
 									<li key={check.check} className="flex items-center justify-between gap-3 text-xs">
@@ -87,15 +88,41 @@ export function DeliveryPolicyTrace({ evaluations }: DeliveryPolicyTraceProps) {
 	);
 }
 
-function policyFactsSentence(facts: DeliveryPolicyFactsSnapshot): string {
+function PolicyFacts({ facts }: { facts: DeliveryPolicyFactsSnapshot }) {
 	const applicable = (value: boolean | undefined) =>
 		value == null ? "not applicable" : value ? "yes" : "no";
-	const listedPractices = facts.contributingPractices
-		?.map((practice) => `${practice.slug ?? "unknown"}: ${practice.autonomy ?? "unknown"}`)
-		.join(", ");
-	const practices =
-		listedPractices == null || listedPractices.length === 0 ? "none" : listedPractices;
-	return `Policy: delivery ${facts.deliveryStatus ?? "not applicable"} · trigger ${facts.triggerMode ?? "not applicable"} · recipient consent ${applicable(facts.recipientConsent)} · repository matched ${applicable(facts.repositoryMatched)} · branch matched ${applicable(facts.branchMatched)} · person matched ${applicable(facts.personMatched)} · practices ${practices}`;
+	const practices = facts.contributingPractices?.map((practice) => {
+		const autonomy = practice.autonomy
+			? DELIVERY_AUTONOMY_LABELS[practice.autonomy]
+			: "not recorded";
+		return `${practice.slug ?? "unnamed practice"}: ${autonomy}`;
+	});
+	const rows = [
+		[
+			"Workspace delivery",
+			facts.deliveryStatus ? DELIVERY_STATUS_LABELS[facts.deliveryStatus] : "not recorded",
+		],
+		["Started", facts.triggerMode ? DELIVERY_TRIGGER_LABELS[facts.triggerMode] : "not recorded"],
+		["Recipient consent", applicable(facts.recipientConsent)],
+		["Repository matched", applicable(facts.repositoryMatched)],
+		["Branch matched", applicable(facts.branchMatched)],
+		["Person matched", applicable(facts.personMatched)],
+		[
+			"Contributing practices",
+			practices == null ? "not recorded" : practices.length === 0 ? "none" : practices.join(", "),
+		],
+	] as const;
+
+	return (
+		<dl className="grid grid-cols-[max-content_1fr] gap-x-3 gap-y-1 text-xs text-muted-foreground">
+			{rows.map(([label, value]) => (
+				<div key={label} className="contents">
+					<dt className="font-medium text-foreground">{label}</dt>
+					<dd>{value}</dd>
+				</div>
+			))}
+		</dl>
+	);
 }
 
 function scopeSentence(facts: DeliveryPolicyFactsSnapshot): string {

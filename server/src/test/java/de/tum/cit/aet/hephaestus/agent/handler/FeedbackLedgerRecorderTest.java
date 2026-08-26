@@ -293,10 +293,6 @@ class FeedbackLedgerRecorderTest extends BaseUnitTest {
             });
     }
 
-    /**
-     * A re-review proposes again about the same work. The queue has to offer one current decision, or an
-     * approver can send a review of a diff that has moved on.
-     */
     @Test
     void reReview_proposal_carriesItsThreadAndRetiresTheUndecidedOneBeforeIt() {
         Observation observation = problem();

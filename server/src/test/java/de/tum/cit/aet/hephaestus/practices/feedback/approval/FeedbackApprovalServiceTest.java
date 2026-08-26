@@ -102,7 +102,6 @@ class FeedbackApprovalServiceTest {
         verify(feedbackRepository, never()).decideProposal(any(), any(), any());
     }
 
-    /** Rejecting sends nothing, so a brake has no opinion about it. */
     @Test
     void shouldStillAllowRejectionWhileSendingIsPaused() {
         lenient().when(eligibility.brakeOnDelivery(7L)).thenReturn(FeedbackSuppressionReason.WORKSPACE_DELIVERY_PAUSED);

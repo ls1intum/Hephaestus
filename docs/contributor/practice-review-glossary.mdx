@@ -89,9 +89,6 @@ signal. `ObservationOrigin` is the population any resulting observation belongs 
 | A confirmed campaign over past work             | `BACKFILL`                    | Backfill of past work      | `BACKFILL`         | yes                                  |
 | A recurring sweep schedule                      | `SWEEP`                       | Found by a recurring check | `LIVE`             | yes                                  |
 
-Four consequences follow from the table rather than from any enum, so state them rather than letting a
-reader infer them:
-
 - **The comment command and the button are indistinguishable afterwards.** Both record `MANUAL`; nothing
   downstream can tell them apart. (A third path, the dev trigger, records `MANUAL` too.)
 - **`SYNC` is a dead end for connected project work** — the SCM listeners return before submitting, leaving
@@ -169,7 +166,7 @@ that admits review. Missing autonomy resolution fails closed for external delive
 
 ## Review coverage and delivery status
 
-`WorkspaceReviewScope` defines the workspace population that automatic review may admit. It has two
+`WorkspaceReviewScope` defines the workspace population that practice review may admit. It has two
 independent modes:
 
 | Axis       | Broad mode      | Narrow mode                                                              | Selected-empty means |
@@ -249,8 +246,7 @@ two checks read the stage:
   workspace-enabled, the rollout fence and the workspace delivery pause are all decisive at composition,
   so a paused or superseded workspace composes nothing.
 
-Which lanes get a second evaluation is not symmetric, and it is worth knowing before reading a trace. The
-artifact lane is evaluated again at `AUTOMATIC`, at `APPROVED` when a person released it, and at `EGRESS`
+The artifact lane is evaluated again at `AUTOMATIC`, at `APPROVED` when a person released it, and at `EGRESS`
 immediately before the provider call — by which point every fact is known. The `IN_APP` and `CONVERSATION`
 surfaces are evaluated exactly once, at `COMPOSITION`; from there each lane's own router applies the
 origin-and-autonomy predicate and its per-lane rules, and those refusals are recorded as routing decisions

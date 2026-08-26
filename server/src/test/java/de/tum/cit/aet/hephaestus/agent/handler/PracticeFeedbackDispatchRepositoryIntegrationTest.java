@@ -175,7 +175,6 @@ class PracticeFeedbackDispatchRepositoryIntegrationTest extends AbstractWorkspac
         );
     }
 
-    /** Null is the tenancy refusal, not a failure to reach the database. */
     private @Nullable UUID tryInsertDispatch(long workspaceId, UUID owningJobId, String key) {
         UUID id = UUID.randomUUID();
         Integer inserted = transactions.execute(status ->

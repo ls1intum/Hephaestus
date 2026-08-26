@@ -124,9 +124,9 @@ nothing to point at and ask about — and there is no comment command on GitHub 
 The workspace steps are the five above, and they are not enough on their own. The deployment must enable
 the agent runtime on both the submitting server and the claiming worker, and enable repository checkout
 wherever evidence capture runs; until it does, every workspace on the instance is quiet however it is
-configured. There is no instance-wide switch for practice review beyond those two — a workspace's own
-**Start practice reviews** is the only other one. Variables, Compose forwarding, storage requirements,
-queue metrics, retention, and fixed limits are in
+configured. Workspace coverage is not configured by an instance population flag; instance Silent Mode
+is the separate emergency brake for external delivery. Variables, Compose forwarding, storage
+requirements, queue metrics, retention, and fixed limits are in
 [Practice review operations](./practice-review-operations.mdx).
 
 Draft eligibility is the one thing you will look for on the workspace screens and not find: it belongs to
@@ -146,44 +146,38 @@ Three independent controls answer different questions; confusing them is the mos
   warns you when one is. The people side is workspace membership — see
   [Who counts as a person](#who-counts-as-a-person).
 - **Send feedback**, under **Sending feedback**, controls whether feedback may leave Hephaestus. It stops
-  pull-request comments and the mentor; it does not stop measurement, does not discard configuration, and
+  comments on connected work and the mentor; it does not stop measurement, does not discard configuration, and
   does not blank the developer's own feedback pages here, which are not something leaving. Pausing is the
   immediate workspace brake. Feedback already approved but not sent when the pause takes effect is
   withheld permanently, just like automatic feedback, so resuming cannot release old work. Proposals that
   have not been decided stay in the approval queue; after resume, an administrator may still inspect and
   decide each one under the current policy.
 
-The rest are prospective, and the price is worth knowing before you touch them: changing coverage,
+These settings advance the rollout revision and invalidate admitted, unsent work: changing coverage,
 **Post feedback after merge**, or the workspace default autonomy discards whatever was already reviewed
 and not yet sent — narrowing as much as widening, and that work is not reviewed again until it next
 changes. Changing the cooldown does not, and
-neither does a group or practice override, which is why demoting one practice back to **Review before
+neither does an area or practice override, which is why demoting one practice back to **Review before
 sending** leaves existing proposals exactly where they were.
 
 ### Who counts as a person
 
 The people side of coverage is **workspace membership**, and the count beside **People** on the review
-screen is how many members are in scope. A member is somebody with a row on the **Members** screen, and
-rows arrive in exactly three ways: the connected GitHub organization or GitLab group roster sync, the team
-sync (which is what catches a GitLab user who is only in a subgroup and so never appears in the
-organization roster), and workspace creation, which enrols the owner and any provisioned administrators.
+screen is how many members are in scope. A covered person must appear on the **Members** screen. Manage a
+missing person in the connected organization, group, or team roster and let membership sync pick them up;
+signing in to Hephaestus alone does not create workspace membership.
 
-Signing in to Hephaestus is not one of them, and the **Members** screen has no *Add member* button. To
-cover somebody who is missing, add them to the connected organization or group and let the next sync pick
-them up.
-
-This is the change most likely to surprise you: an outside contributor who opens a pull request but is not
-in the organization roster is not a covered person, so their work is not reviewed and no feedback is
-prepared about them. The same is true when the work has no identifiable author, or the author is a bot.
+An outside contributor who is not a workspace member is not covered, so their work is not reviewed and no
+feedback is prepared about them. The same is true when the work has no identifiable author, or the author is a bot.
 Read the **People** count before concluding that reviews are broken — if it is lower than your
 contributor list, the difference is the people who are not members.
 
 ### You set this once, not a hundred times
 
-**Autonomy** is answered once for the **workspace**, and every group and every practice follows that
-answer until you say otherwise. A group can override the workspace, and a practice can override its group:
+**Autonomy** is answered once for the **workspace**, and every area and every practice follows that
+answer until you say otherwise. An area can override the workspace, and a practice can override its area:
 
-> practice → its group → the workspace
+> practice → its area → the workspace
 
 Anything you have not decided shows as **inherited**, with the level it came from, and can be reset back to
 inheriting at any time. Start with the one workspace answer, then override the handful of groups where it
@@ -192,7 +186,7 @@ row is a setting nobody applies. Coverage does not work this way and is not inhe
 the whole workspace, on **When and where**.
 
 **Review → How much** shows, above the list, how many practices sit at each setting — once for the
-workspace and again on each group. Read that line before changing anything; it is the fastest way to see
+workspace and again on each area. Read that line before changing anything; it is the fastest way to see
 whether an override somebody made long ago is still doing what you think. **Set by hand** filters the list
 down to the overrides.
 
@@ -315,8 +309,3 @@ upstream of practice review — check the integration's sync.
 The per-workspace review list under Administration → **Practices → Practice reviews** shows each review's
 status, the model it ran on, and its error message — the fastest way to tell "never submitted" from
 "submitted and failed".
-
-## Operational reference
-
-For deployment variables, the workspace setting map, queue metrics, retention, and non-configurable limits,
-see [Practice review operations](./practice-review-operations.mdx).

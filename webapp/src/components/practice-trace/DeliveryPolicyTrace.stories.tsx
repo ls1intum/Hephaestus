@@ -112,7 +112,7 @@ export const Allowed: Story = {
 	},
 };
 
-export const OpenScope: Story = {
+export const BroadCoverage: Story = {
 	args: { evaluations: [openScopeEvaluation] },
 	play: async ({ canvas }) => {
 		await openTrace(canvas);
@@ -125,7 +125,7 @@ export const OpenScope: Story = {
 	},
 };
 
-export const NoScopeRecorded: Story = {
+export const NoCoverageRecorded: Story = {
 	args: { evaluations: [conversationEvaluation] },
 	play: async ({ canvas }) => {
 		await openTrace(canvas);

@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { AlertCircle, ChevronDownIcon, FolderGitIcon, UsersIcon } from "lucide-react";
+import { AlertCircle, ChevronDownIcon } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 import type {
 	AgentBinding,
@@ -26,13 +26,6 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import {
-	Empty,
-	EmptyDescription,
-	EmptyHeader,
-	EmptyMedia,
-	EmptyTitle,
-} from "@/components/ui/empty";
 import {
 	Field,
 	FieldContent,
@@ -452,8 +445,8 @@ function ReviewedWorkSection({
 				</h2>
 				<p className="text-muted-foreground text-sm">
 					A review opens only for work that is in one of these repositories <strong>and</strong>{" "}
-					written by one of these people. About {summary.recentReviewVolume} ran in the last{" "}
-					{summary.estimateWindowDays} days.
+					written by one of these people. Across this workspace, about {summary.recentReviewVolume}
+					ran in the last {summary.estimateWindowDays} days.
 				</p>
 			</div>
 			{previewState.status === "pending" ? (
@@ -537,19 +530,7 @@ function ReviewedWorkSection({
 									: "No monitored repositories"
 							}
 						/>
-						{scope.repositories.length === 0 ? (
-							<Empty className="border py-6">
-								<EmptyHeader>
-									<EmptyMedia variant="icon">
-										<FolderGitIcon />
-									</EmptyMedia>
-									<EmptyTitle>No repositories are covered.</EmptyTitle>
-									<EmptyDescription>
-										Pick the repositories this workspace should review.
-									</EmptyDescription>
-								</EmptyHeader>
-							</Empty>
-						) : (
+						{scope.repositories.length > 0 ? (
 							<ItemGroup>
 								{scope.repositories.map((repository) => (
 									<RepositoryScopeRow
@@ -572,7 +553,7 @@ function ReviewedWorkSection({
 									/>
 								))}
 							</ItemGroup>
-						)}
+						) : null}
 					</div>
 				) : null}
 			</Field>
@@ -585,10 +566,7 @@ function ReviewedWorkSection({
 					total={summary.eligiblePeople}
 					noun="members"
 				/>
-				<FieldDescription>
-					Only members of this workspace are reviewed. Membership follows the connected organization
-					or group and the team graph; signing in to Hephaestus does not by itself grant it.
-				</FieldDescription>
+				<FieldDescription>Only workspace members can be selected.</FieldDescription>
 				<RadioGroup
 					aria-labelledby="people-covered-label"
 					value={scope.personMode}
@@ -626,17 +604,7 @@ function ReviewedWorkSection({
 							disabled={policy.isSaving || previewBusy || coverage.people.isLoading}
 							emptyLabel={coverage.people.isError ? "Members unavailable" : "No workspace members"}
 						/>
-						{scope.personUserIds.length === 0 ? (
-							<Empty className="border py-6">
-								<EmptyHeader>
-									<EmptyMedia variant="icon">
-										<UsersIcon />
-									</EmptyMedia>
-									<EmptyTitle>No people are covered.</EmptyTitle>
-									<EmptyDescription>Pick whose work this workspace should review.</EmptyDescription>
-								</EmptyHeader>
-							</Empty>
-						) : (
+						{scope.personUserIds.length > 0 ? (
 							<ul className="flex flex-wrap gap-2">
 								{scope.personUserIds.map((userId) => (
 									<li key={userId}>
@@ -660,7 +628,7 @@ function ReviewedWorkSection({
 									</li>
 								))}
 							</ul>
-						)}
+						) : null}
 					</div>
 				) : null}
 			</Field>
@@ -741,7 +709,7 @@ function FeedbackDeliverySection({ policy }: Pick<PracticeReviewSettingsProps, "
 					<AlertTitle>Sending is paused</AlertTitle>
 					<AlertDescription>
 						Reviews still run, and developers can still read their own feedback in Hephaestus.
-						Nothing reaches a pull request or the mentor. Feedback that would have been sent
+						Nothing reaches connected work or the mentor. Feedback that would have been sent
 						automatically is dropped rather than queued, so resuming never releases a backlog at
 						your developers; proposals waiting for approval stay in your queue, and you decide on
 						them once you resume.

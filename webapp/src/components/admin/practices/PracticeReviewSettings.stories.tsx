@@ -128,10 +128,6 @@ export const ModelReadinessUnavailable: Story = {
 	args: { model: { ...model, binding: undefined, isError: true } },
 };
 
-/**
- * Reviews on with both doors shut is the one state the page banner cannot see — it reads the switch
- * and the model, not the triggers — so it is said beside the switches that cause it.
- */
 export const TriggersOff: Story = {
 	args: {
 		workspace: { ...workspace, autoTriggerEnabled: false, manualTriggerEnabled: false },
@@ -213,7 +209,7 @@ export const PilotPopulation: Story = {
  * Adding one entry has to send the *whole* narrowed scope, not just the branch that was typed:
  * patching one list would silently drop the other and widen reviews to every repository.
  */
-export const AddingATargetBranch: Story = {
+export const NarrowingToABaseBranch: Story = {
 	args: {
 		policy: {
 			...policy,
@@ -247,7 +243,6 @@ export const AddingATargetBranch: Story = {
 			canvas.getByRole("button", { name: "Add to base branches for acme/widgets" }),
 		);
 
-		// Trimmed on the way out: a name with a stray space matches no branch the gate ever sees.
 		await expect(args.policy.onUpdate).toHaveBeenCalledWith({
 			reviewScope: {
 				repositoryMode: "SELECTED",
@@ -326,7 +321,7 @@ export const SendingPaused: Story = {
 	},
 };
 
-export const OpeningToEveryoneAsksFirst: Story = {
+export const WideningCoverageAsksFirst: Story = {
 	args: {
 		policy: {
 			...policy,
@@ -376,7 +371,7 @@ export const OpeningToEveryoneAsksFirst: Story = {
 
 export const CoveragePreviewLoading: Story = {
 	args: {
-		...OpeningToEveryoneAsksFirst.args,
+		...WideningCoverageAsksFirst.args,
 		coverage: {
 			...coverage,
 			preview: fn(
@@ -398,7 +393,7 @@ export const CoveragePreviewLoading: Story = {
 
 export const CoveragePreviewUnavailable: Story = {
 	args: {
-		...OpeningToEveryoneAsksFirst.args,
+		...WideningCoverageAsksFirst.args,
 		coverage: {
 			...coverage,
 			preview: fn(async () => {
@@ -423,7 +418,6 @@ export const ChangingTheTimeBetweenReviews: Story = {
 	play: async ({ args, canvas }) => {
 		const cooldown = canvas.getByRole("spinbutton", { name: "Time between reviews (minutes)" });
 
-		// Passing through the field is not an edit.
 		await userEvent.click(cooldown);
 		await userEvent.tab();
 		await expect(args.policy.onUpdate).not.toHaveBeenCalled();
