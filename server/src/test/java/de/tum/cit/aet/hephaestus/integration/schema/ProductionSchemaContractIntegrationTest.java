@@ -29,6 +29,7 @@ import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
+import java.util.UUID;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
@@ -252,6 +253,72 @@ class ProductionSchemaContractIntegrationTest {
         )
             .as("an axis that is not an array cannot be read as the list it claims to be")
             .isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @ParameterizedTest
+    @MethodSource("invalidDispatchStates")
+    @DisplayName("Dispatch state fields cannot contradict one another")
+    void feedbackDispatchRefusesContradictoryState(String assignment) {
+        UUID dispatchId = insertDispatch("invalid-dispatch-" + UUID.randomUUID());
+
+        assertThatThrownBy(() ->
+            jdbcTemplate.update("UPDATE feedback_dispatch SET " + assignment + " WHERE id = ?", dispatchId)
+        ).isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    static Stream<String> invalidDispatchStates() {
+        return Stream.of(
+            "state = 'CLAIMED'",
+            "lease_owner = 'worker', lease_expires_at = now()",
+            "state = 'SENT'",
+            "delivered_external_ref = 'provider-1'",
+            "state = 'SUPPRESSED'",
+            "suppression_reason = 'WORKSPACE_DELIVERY_PAUSED'"
+        );
+    }
+
+    @Test
+    void feedbackDispatchAcceptsCompleteTerminalStates() {
+        UUID sent = insertDispatch("valid-sent");
+        UUID suppressed = insertDispatch("valid-suppressed");
+
+        assertThat(
+            jdbcTemplate.update(
+                "UPDATE feedback_dispatch SET state = 'SENT', delivered_external_ref = 'provider-1' WHERE id = ?",
+                sent
+            )
+        ).isEqualTo(1);
+        assertThat(
+            jdbcTemplate.update(
+                "UPDATE feedback_dispatch SET state = 'SUPPRESSED', suppression_reason = " +
+                    "'WORKSPACE_DELIVERY_PAUSED' WHERE id = ?",
+                suppressed
+            )
+        ).isEqualTo(1);
+    }
+
+    private UUID insertDispatch(String key) {
+        long workspaceId = insertWorkspace(key);
+        UUID jobId = UUID.randomUUID();
+        jdbcTemplate.update(
+            "INSERT INTO agent_job (id, workspace_id, job_type, status, config_snapshot, job_token, retry_count, " +
+                "created_at, available_at, delivery_attempts, practice_rollout_revision, practice_trigger_mode) " +
+                "VALUES (?, ?, 'PULL_REQUEST_REVIEW', 'COMPLETED', '{}'::jsonb, ?, 0, now(), now(), 0, 0, 'AUTO')",
+            jobId,
+            workspaceId,
+            "token-" + jobId
+        );
+        UUID dispatchId = UUID.randomUUID();
+        jdbcTemplate.update(
+            "INSERT INTO feedback_dispatch (id, destination_key, workspace_id, agent_job_id, destination, state, " +
+                "body, practice_slugs, write_started, next_attempt_at, attempt_count, created_at, updated_at) " +
+                "VALUES (?, ?, ?, ?, 'ARTIFACT_SUMMARY', 'PENDING', 'body', '[]'::jsonb, false, now(), 0, now(), now())",
+            dispatchId,
+            key,
+            workspaceId,
+            jobId
+        );
+        return dispatchId;
     }
 
     static Stream<String> invalidBaseBranches() {
