@@ -340,7 +340,7 @@ class FeedbackLedgerRecorderTest extends BaseUnitTest {
         Observation observation = problem();
         when(observationRepository.findByAgentJobId(any())).thenReturn(List.of(observation));
         when(feedbackRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
-        when(commentFormatter.appendSettingsNotice("inline body")).thenReturn("inline body\n\nsettings");
+        when(commentFormatter.appendInlineFeedbackPrompt("inline body")).thenReturn("inline body\n\nAI disclosure");
         AgentJob job = job();
         var metadata = tools.jackson.databind.json.JsonMapper.builder().build().createObjectNode();
         metadata.put("commit_sha", "abc123");
@@ -375,7 +375,7 @@ class FeedbackLedgerRecorderTest extends BaseUnitTest {
         assertThat(saved.getValue().getProposedPlacements())
             .extracting(placement -> placement.type().name())
             .containsExactly("SUMMARY", "INLINE");
-        assertThat(saved.getValue().getProposedPlacements().get(1).body()).isEqualTo("inline body\n\nsettings");
+        assertThat(saved.getValue().getProposedPlacements().get(1).body()).isEqualTo("inline body\n\nAI disclosure");
         verify(feedbackRepository).supersedeUndecidedProposals(any(), eq(saved.getValue().getThreadKey()), any());
     }
 

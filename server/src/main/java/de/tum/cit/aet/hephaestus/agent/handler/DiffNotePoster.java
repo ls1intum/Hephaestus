@@ -148,7 +148,7 @@ class DiffNotePoster {
             observations.add(
                 new InlineFeedbackChannel.InlineFeedback(
                     anchor,
-                    commentFormatter.appendInlineFeedbackPrompt(sanitized),
+                    packageId == null ? commentFormatter.appendInlineFeedbackPrompt(sanitized) : sanitized,
                     packageId == null ? HEPHAESTUS_MARKER : "<!-- hephaestus-approved-package:" + packageId + " -->",
                     packageId == null ? note.recurrenceKey() : "approved:" + packageId + ":" + index
                 )

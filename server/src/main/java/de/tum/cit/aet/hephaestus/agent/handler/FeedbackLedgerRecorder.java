@@ -725,7 +725,7 @@ public class FeedbackLedgerRecorder {
             if (!body.isBlank()) {
                 placements.add(
                     ProposedPlacement.inline(
-                        commentFormatter.appendSettingsNotice(body),
+                        commentFormatter.appendInlineFeedbackPrompt(body),
                         note.filePath(),
                         note.startLine(),
                         note.endLine(),
