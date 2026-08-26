@@ -57,7 +57,8 @@ class PracticeFeedbackDispatchService {
         ObjectMapper objectMapper,
         FeedbackRepository feedbackRepository,
         DiffNotePoster diffNotePoster,
-        FeedbackLedgerRecorder ledgerRecorder
+        FeedbackLedgerRecorder ledgerRecorder,
+        PracticeFeedbackCommentFormatter commentFormatter
     ) {
         this.repository = repository;
         this.policy = policy;
@@ -68,6 +69,7 @@ class PracticeFeedbackDispatchService {
         this.feedbackRepository = feedbackRepository;
         this.diffNotePoster = diffNotePoster;
         this.ledgerRecorder = ledgerRecorder;
+        this.commentFormatter = commentFormatter;
     }
 
     Result dispatchAutomaticSummary(
