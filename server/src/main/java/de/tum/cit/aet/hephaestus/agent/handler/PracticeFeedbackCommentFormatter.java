@@ -40,13 +40,10 @@ class PracticeFeedbackCommentFormatter {
         return sb.toString();
     }
 
-    String appendInlineDisclosure(String sanitizedBody) {
-        var sb = new StringBuilder(sanitizedBody.length() + 220);
+    String appendInlineFeedbackPrompt(String sanitizedBody) {
+        var sb = new StringBuilder(sanitizedBody.length() + 120);
         sb.append(sanitizedBody).append("\n\n");
-        sb
-            .append("<sub>AI-generated &middot; [Why you're seeing this and how to stop it](")
-            .append(preferencesUrl)
-            .append(")</sub>\n");
+        sb.append("<sub>React with 👍 or 👎, or reply, to give feedback.</sub>\n");
         return sb.toString();
     }
 

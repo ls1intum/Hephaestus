@@ -57,14 +57,11 @@ class PracticeFeedbackCommentFormatterTest extends BaseUnitTest {
     }
 
     @Test
-    void appendsCompactDisclosureToInlineComment() {
-        String result = formatter("https://hephaestus.example").appendInlineDisclosure("Inline feedback");
+    void appendsFeedbackPromptToInlineComment() {
+        String result = formatter("https://hephaestus.example").appendInlineFeedbackPrompt("Inline feedback");
 
         assertThat(result).isEqualTo(
-            "Inline feedback\n\n" +
-                "<sub>AI-generated &middot; " +
-                "[Why you're seeing this and how to stop it]" +
-                "(https://hephaestus.example/settings#practice-feedback)</sub>\n"
+            "Inline feedback\n\n<sub>React with 👍 or 👎, or reply, to give feedback.</sub>\n"
         );
     }
 

@@ -130,7 +130,7 @@ class DiffNotePoster {
             observations.add(
                 new InlineFeedbackChannel.InlineFeedback(
                     anchor,
-                    commentFormatter.appendInlineDisclosure(sanitized),
+                    commentFormatter.appendInlineFeedbackPrompt(sanitized),
                     HEPHAESTUS_MARKER,
                     note.recurrenceKey()
                 )
