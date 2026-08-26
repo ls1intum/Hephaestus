@@ -58,8 +58,7 @@ import tools.jackson.databind.node.ObjectNode;
 class PracticeRunnerLiveLlmTest {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
-    /** Must equal {@code ARG PI_VERSION} in docker/agents/pi/Dockerfile. */
-    private static final String PI_SDK_VERSION = "0.74.1";
+    private static final String PI_SDK_VERSION = "0.84.3";
 
     private static final Path SDK_DIR = Path.of("target", "pi-sdk").toAbsolutePath();
     private static final Path RUNNER = Path.of("src", "main", "resources", "agent", "pi-runner.ts").toAbsolutePath();

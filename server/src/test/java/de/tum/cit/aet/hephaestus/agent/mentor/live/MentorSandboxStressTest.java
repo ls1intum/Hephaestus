@@ -41,7 +41,7 @@ import tools.jackson.databind.node.ObjectNode;
  *   <li><b>Cold-start</b> wall-clock (spawn → {@code runner_ready} → {@code hello.result})</li>
  *   <li><b>Per-runner RSS</b> sampled every 250 ms from {@code /proc/$pid/status} for the
  *       runner's lifetime — captures peak + steady-state.</li>
- *   <li><b>Turn latency</b> (prompt → {@code agent_end}) against the live LLM.</li>
+ *   <li><b>Turn latency</b> (prompt → settled terminal event) against the live LLM.</li>
  * </ul>
  *
  * <p>This deliberately bypasses Docker (Path C of the stress plan). The runner footprint
@@ -58,7 +58,7 @@ import tools.jackson.databind.node.ObjectNode;
 class MentorSandboxStressTest {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
-    private static final String PI_SDK_VERSION = "0.74.1";
+    private static final String PI_SDK_VERSION = "0.84.3";
     private static final Path SDK_DIR = Path.of("target", "pi-sdk").toAbsolutePath();
     private static final Path RUNNER = Path.of(
         "src",
@@ -67,7 +67,7 @@ class MentorSandboxStressTest {
         "agent",
         "pi-mentor-runner.ts"
     ).toAbsolutePath();
-    /** Per-session deadline: cold-start + handshake + prompt + agent_end against live LLM. */
+    /** Per-session deadline: cold-start + handshake + prompt + settlement against live LLM. */
     private static final Duration SESSION_BUDGET = Duration.ofSeconds(120);
 
     private final List<Path> stagedWorkspaces = new CopyOnWriteArrayList<>();
@@ -104,7 +104,7 @@ class MentorSandboxStressTest {
     /**
      * Per-user multi-session scenario. Spawns N runners (one per simulated user) and inside each
      * opens K mentor threads, then drives a serial K-turn round-robin: prompt thread 0 → wait for
-     * agent_end → prompt thread 1 → … This is the production scenario for a power user with
+     * settlement → prompt thread 1 → … This is the production scenario for a power user with
      * multiple mentor conversations open — sessions multiplex through one
      * {@code AgentSessionRuntime} via {@code switchSession}, not separate containers.
      *
@@ -321,7 +321,6 @@ class MentorSandboxStressTest {
             driver.openThread(threadId, Duration.ofSeconds(30));
             session.openThreadNanos = System.nanoTime();
 
-            // Listen for agent_end (turn complete signal) for this thread.
             CompletableFuture<Void> turnComplete = new CompletableFuture<>();
             sandbox.subscribe(frame -> {
                 if (!"event".equals(frame.path("method").asString())) return;
@@ -390,7 +389,6 @@ class MentorSandboxStressTest {
             // (RSS_after_K_opens - baseline) / (K-1), avoiding the apples-vs-oranges error of
             // using the first /proc sample (before Pi SDK was loaded at all).
 
-            // Subscribe once for all per-thread agent_end signals.
             var turnCompletes = new ConcurrentHashMap<UUID, CompletableFuture<Void>>();
             sandbox.subscribe(frame -> {
                 if (!"event".equals(frame.path("method").asString())) return;

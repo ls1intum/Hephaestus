@@ -327,6 +327,43 @@ void test("second concurrent prompt returns -32001 turn_already_in_flight", asyn
 	}
 });
 
+void test("forwards only the final attempt after Pi settles", async () => {
+	const runner = spawnRunner({ MENTOR_RUNNER_STUB_RETRY_DELAY_MS: "150" });
+	const threadId = "55555555-5555-5555-5555-555555555555";
+	try {
+		await readReady(runner.reader);
+		runner.send({ jsonrpc: "2.0", id: "o", method: "open_thread", params: { threadId } });
+		await readResult(runner.reader, "o");
+		runner.send({
+			jsonrpc: "2.0",
+			id: "p",
+			method: "prompt",
+			params: { threadId, text: "retry once" },
+		});
+		await readResult(runner.reader, "p");
+		await readUntil(runner.reader, (frame) => eventType(frame) === "message_update");
+
+		await assert.rejects(runner.reader.next(50), /timeout/, "attempt-level agent_end leaked");
+		const terminal = await readUntil(runner.reader, (frame) => eventType(frame) === "agent_end");
+		assert.equal(eventThreadId(terminal), threadId);
+		assert.ok(isEventNotification(terminal));
+		const event = terminal.params.event;
+		assert.equal(event.type, "agent_end");
+		assert.equal(event.willRetry, false);
+		assert.equal(event.messages.length, 1);
+		const message = event.messages[0];
+		assert.equal(message?.role, "assistant");
+		assert.deepEqual(message.content, [{ type: "text", text: "stub: retry once" }]);
+		await assert.rejects(
+			runner.reader.next(50),
+			/timeout/,
+			"turn emitted more than one terminal event",
+		);
+	} finally {
+		await shutdown(runner);
+	}
+});
+
 void test("batch JSON-RPC request is rejected with -32600 (not silently dropped)", async () => {
 	// JSON-RPC 2.0 §6 permits top-level arrays as batches. Neither end emits batches today;
 	// the runner rejects them loudly so a future Java caller that bundles requests doesn't
@@ -352,33 +389,7 @@ void test("batch JSON-RPC request is rejected with -32600 (not silently dropped)
 });
 
 void test("watchdog cross-thread rebind: no event leakage from concurrently-bound thread", async () => {
-	// Scenario: thread A is mid-prompt (watchdog armed) when ANOTHER thread B opens, which
-	// — via the regular bindThread teardown — flips activeThreadId from A to B and replaces
-	// A's subscription with B's. When A's watchdog later fires (a few ms after), runtime is
-	// bound to B but the rebind needs to install a fresh A subscription AND remove B's
-	// (otherwise the next event broadcast hits both subscribers and emits threadId=B frames
-	// through forwardEvent(state_B, …)).
-	//
-	// The stub's switchSession is a no-op and shares one subscribers Set across sessions, so
-	// a missing cross-thread teardown leaves B_callback in the broadcast list. We force the
-	// window by:
-	//   1. open A — A is active, no watchdog yet
-	//   2. prompt A with a 200 ms slow stub → arms A's watchdog (80 ms budget+grace)
-	//   3. open B — bindThread B fires inside the watchdog window, BEFORE A's watchdog ticks.
-	//      Now activeThreadId=B, A_callback gone, B_callback added. A's ThreadState still
-	//      lives in the `threads` Map; its watchdog timer is still armed.
-	//   4. A's watchdog fires at ~80 ms (post-open-B). With the fix, the rebind sees
-	//      activeThreadId=B ≠ state.threadId=A, tears down B_callback, switches session,
-	//      adds newA_callback, sets activeThreadId=A. Without the fix, B_callback stays and
-	//      activeThreadId remains stale at B.
-	//   5. The first prompt's residue (text_delta at ~100 ms, natural agent_end at ~200 ms)
-	//      broadcasts through whatever subscribers remain. With the fix only newA_callback
-	//      receives them → threadId=A only. Without the fix, B_callback also fires →
-	//      threadId=B leak.
-	//
-	// The legitimate pre-rebind events (the initial agent_start at t=0 fires only through
-	// A_callback because B isn't open yet) are NOT a leak; we demarcate the "leak window"
-	// as everything AFTER the turn_watchdog_fired event.
+	// Switching to B while A times out must not leave B subscribed after A is rebound.
 	const threadA = "33333333-3333-3333-3333-333333333333";
 	const threadB = "44444444-4444-4444-4444-444444444444";
 	const runner = spawnRunner({
@@ -389,12 +400,9 @@ void test("watchdog cross-thread rebind: no event leakage from concurrently-boun
 	try {
 		await readReady(runner.reader);
 
-		// 1. open A — activeThreadId becomes A; subscribers = {A_callback}
 		runner.send({ jsonrpc: "2.0", id: "oA", method: "open_thread", params: { threadId: threadA } });
 		await readResult(runner.reader, "oA");
 
-		// 2. prompt A — arms watchdog A (80 ms). Stub broadcasts agent_start NOW; A_callback
-		//    is the only subscriber so we observe threadId=A only (legitimate).
 		runner.send({
 			jsonrpc: "2.0",
 			id: "pA1",
@@ -405,14 +413,9 @@ void test("watchdog cross-thread rebind: no event leakage from concurrently-boun
 		assert.ok("accepted" in ack, "prompt A must be accepted");
 		assert.equal(ack.accepted, true);
 
-		// 3. open B — bindThread B tears down A_callback, adds B_callback, activeThreadId=B.
-		//    Must arrive BEFORE the watchdog ticks (80 ms after pA1 was accepted). The stub
-		//    is fast — open_thread is a sync handler, so this races in well under 80 ms.
 		runner.send({ jsonrpc: "2.0", id: "oB", method: "open_thread", params: { threadId: threadB } });
 		await readResult(runner.reader, "oB");
 
-		// 4 + 5. Collect every event frame until the stub's residue setTimeout chain drains,
-		// classified by whether it arrived before or after the turn_watchdog_fired marker.
 		const events: MentorEventNotification[] = [];
 		let watchdogSeenAtIndex = -1;
 		const start = Date.now();

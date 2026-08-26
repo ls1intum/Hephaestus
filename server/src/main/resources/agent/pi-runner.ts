@@ -3,10 +3,9 @@ import {
 	type AgentSession,
 	type AgentSessionEvent,
 	type AgentToolResult,
-	AuthStorage,
 	createAgentSession,
 	defineTool,
-	ModelRegistry,
+	ModelRuntime,
 	SessionManager,
 	SettingsManager,
 } from "@earendil-works/pi-coding-agent";
@@ -1624,25 +1623,24 @@ async function main() {
 	// Pi filters custom tools through this allowlist; omit filesystem mutation tools.
 	const settingsManager = SettingsManager.create(CWD, AGENT_DIR);
 	const sessionManager = SessionManager.inMemory();
-	const authStorage = AuthStorage.create();
-	const modelRegistry = ModelRegistry.create(authStorage);
+	const modelRuntime = await ModelRuntime.create({
+		authPath: `${AGENT_DIR}/auth.json`,
+		modelsPath: `${AGENT_DIR}/models.json`,
+		allowModelNetwork: false,
+	});
 
-	// Pi 0.74.x bug: createAgentSession.findInitialModel runs before the extension runner drains
-	// pending registrations into the model registry. Register the hephaestus provider directly
-	// here so the session resolves a real model on first prompt. Config (protocol/model/capability)
-	// comes from the server-written pi-provider.json; baseUrl/token come from the sandbox env
-	// (shared with pi-mentor-runner.ts via pi-provider.ts).
 	const providerConfig = loadProviderConfig(CWD);
-	const registered = registerHephaestusProvider(modelRegistry, providerConfig);
-	if (registered && providerConfig) {
-		console.error(
-			`[pi-runner] registered hephaestus provider: apiProtocol=${providerConfig.apiProtocol} model=${providerConfig.modelId}`,
-		);
-	} else {
-		console.error(
-			`[pi-runner] hephaestus provider NOT registered — missing pi-provider.json or proxy env vars`,
+	const registered = registerHephaestusProvider(modelRuntime, providerConfig);
+	if (!registered || !providerConfig?.modelId) {
+		throw new Error(
+			"Hephaestus provider is not configured — pi-provider.json and proxy credentials are required",
 		);
 	}
+	const model = modelRuntime.getModel("hephaestus", providerConfig.modelId);
+	if (!model) throw new Error(`Hephaestus model was not registered: ${providerConfig.modelId}`);
+	console.error(
+		`[pi-runner] registered hephaestus provider: apiProtocol=${providerConfig.apiProtocol} model=${providerConfig.modelId}`,
+	);
 
 	const compositionRequest = loadCompositionRequest();
 	const feedbackTool = compositionRequest
@@ -1669,8 +1667,8 @@ async function main() {
 		],
 		sessionManager,
 		settingsManager,
-		authStorage,
-		modelRegistry,
+		modelRuntime,
+		model,
 	});
 	// Fail closed: Pi otherwise silently falls back to a built-in provider.
 	for (const ext of extensionsResult.extensions) {

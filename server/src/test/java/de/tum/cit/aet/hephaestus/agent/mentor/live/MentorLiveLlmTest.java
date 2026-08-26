@@ -48,8 +48,7 @@ import tools.jackson.databind.node.ObjectNode;
  *   <li>Ensures the Pi SDK is installed under {@code target/pi-sdk/node_modules} (idempotent;
  *       the install marker survives across test runs and parallel JVMs use a directory lock).</li>
  *   <li>Spawns {@code pi-mentor-runner.ts} directly with {@code bun} — no Docker — and points
- *       it at a real OpenAI-compatible endpoint via {@code OPENAI_BASE_URL} +
- *       {@code OPENAI_API_KEY}.</li>
+ *       it at a real OpenAI-compatible endpoint through the production provider contract.</li>
  *   <li>Drives the JSON-RPC protocol the same way {@code MentorRunnerClient} drives it in prod
  *       (hello → open_thread → prompt) and translates every emitted event through the real
  *       {@link PiEventToUiChunkTranslator} so the test exercises the production stream-merge logic.</li>
@@ -58,8 +57,8 @@ import tools.jackson.databind.node.ObjectNode;
  * <p>To exercise the production routing end-to-end, this test uses the real
  * {@link PiRuntimeFactory} to mint the settings.json (defaultProvider=hephaestus) — the same
  * bytes the production agent container would see. The hephaestus custom provider is registered
- * directly on the ModelRegistry by {@code pi-mentor-runner.ts} before {@code createAgentSession},
- * driven by the {@code PI_HEPHAESTUS_*} env vars seeded from {@link LiveLlmCredentials}. If a
+ * directly on the ModelRuntime by {@code pi-mentor-runner.ts} before {@code createAgentSession},
+ * driven by the provider file and proxy env vars seeded from {@link LiveLlmCredentials}. If a
  * future refactor regresses the production path, this live test fails — no test-only extension
  * masks the bug.
  */
@@ -68,8 +67,7 @@ import tools.jackson.databind.node.ObjectNode;
 class MentorLiveLlmTest {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
-    /** Must equal {@code ARG PI_VERSION} in docker/agents/pi/Dockerfile. */
-    private static final String PI_SDK_VERSION = "0.74.1";
+    private static final String PI_SDK_VERSION = "0.84.3";
 
     private static final Duration TURN_TIMEOUT = Duration.ofSeconds(90);
 
@@ -178,8 +176,6 @@ class MentorLiveLlmTest {
             if (!isThreadEvent(frame, threadId)) return;
             JsonNode event = frame.path("params").path("event");
             chunks.addAll(translator.translate(event, state));
-            // Pi's terminal event for a turn is `agent_end`; the translator turns it into a
-            // Finish chunk. We signal completion off that, not by polling.
             if ("agent_end".equals(event.path("type").asString())) {
                 translationDone.complete(null);
             }
@@ -233,7 +229,7 @@ class MentorLiveLlmTest {
         // Persistence snapshot
         // partsSnapshot is what lands in chat_message.parts JSONB — a single text part once the
         // turn closes. The text part is only populated on the block-close the translator emits at
-        // agent_end, so the snapshot may not yet carry it; assert parts is well-formed JSON and,
+        // settlement, so the snapshot may not yet carry it; assert parts is well-formed JSON and,
         // when present, that the buffered text matches.
         var partsSnapshot = state.partsSnapshot();
         assertThat(partsSnapshot.isArray()).isTrue();
@@ -361,7 +357,7 @@ class MentorLiveLlmTest {
             threadId,
             "Remember: my favorite framework is Spring Boot. Reply with exactly: noted."
         );
-        assertThat(bytesA).as("runner emitted session_persisted before agent_end").isNotNull();
+        assertThat(bytesA).as("runner emitted session_persisted before the terminal wire event").isNotNull();
 
         respawnWithSession(creds, threadId, bytesA);
         String followUp = runTurnAndCollect(

@@ -13,6 +13,7 @@ RUN apt-get update -qq && apt-get install -y --no-install-recommends git finduti
 # Bun: installed before the SDK because it *is* the package manager for the layer below.
 # The sha256 pins below are per-version: a bump that does not refresh them fails the build.
 # ci-quality-gates.yml greps this exact `ARG BUN_VERSION=` line to pin the CI toolchain.
+# Renovate cannot update the two release-asset hashes; refresh them from SHASUMS256.txt on bumps.
 # renovate: datasource=github-releases depName=oven-sh/bun extractVersion=^bun-v(?<version>.*)$
 ARG BUN_VERSION=1.4.0
 RUN arch="${TARGETARCH:-$(dpkg --print-architecture)}" && \
@@ -35,19 +36,14 @@ RUN groupadd --gid 1000 agent && \
     useradd --uid 1000 --gid 1000 --home-dir /home/agent --create-home --shell /bin/bash agent
 
 # renovate: datasource=npm depName=@earendil-works/pi-coding-agent
-ARG PI_VERSION=0.74.1
+ARG PI_VERSION=0.84.3
 # Install the Pi SDK into a deterministic, hash-free path at /opt/pi-sdk/node_modules.
 # `bun install` against a hand-written package.json (not `bun add`) keeps the resolved version
 # exactly ${PI_VERSION} and the layer reproducible. The runner imports by bare specifier, which
 # resolves through the symlink PiRuntimeFactory plants at /<workspace>/node_modules → here.
 #
 # Bun blocks lifecycle scripts by default and no `trustedDependencies` is declared.
-# Three dependencies ship one: @google/genai (preinstall `echo`), protobufjs (postinstall that
-# only ever writes a version-scheme warning to stderr) and koffi (install script that fetches a
-# prebuilt only when the tarball lacks one — it never does; koffi vendors every triplet).
-# Verified by diffing an npm-with-scripts tree against a bun-scripts-blocked tree on the same
-# arch: all three packages came out byte-identical. Running them would also be impossible here,
-# since every one of them shells out to `node`.
+# Lifecycle scripts stay disabled; the image build verifies the installed SDK before publishing.
 RUN mkdir -p /opt/pi-sdk && cd /opt/pi-sdk && \
     printf '{"name":"hephaestus-pi-sdk","private":true,"dependencies":{"@earendil-works/pi-coding-agent":"%s"}}\n' \
         "${PI_VERSION}" > package.json && \
@@ -55,14 +51,6 @@ RUN mkdir -p /opt/pi-sdk && cd /opt/pi-sdk && \
     rm -rf /tmp/bun-cache && \
     test -d /opt/pi-sdk/node_modules/@earendil-works/pi-coding-agent \
       || (echo "Pi SDK not found at /opt/pi-sdk/node_modules" >&2; exit 1) && \
-    arch="${TARGETARCH:-$(dpkg --print-architecture)}" && \
-    case "${arch}" in \
-        amd64|x86_64) koffi_triplet="linux_x64" ;; \
-        arm64|aarch64) koffi_triplet="linux_arm64" ;; \
-        *) echo "Unsupported TARGETARCH/architecture: ${arch}" >&2; exit 1 ;; \
-    esac && \
-    test -f "/opt/pi-sdk/node_modules/koffi/build/koffi/${koffi_triplet}/koffi.node" \
-      || (echo "koffi prebuilt missing for ${koffi_triplet}: its blocked install script mattered after all" >&2; exit 1) && \
     chown -R 1000:1000 /opt/pi-sdk && \
     mkdir -p /workspace && chown 1000:1000 /workspace
 
