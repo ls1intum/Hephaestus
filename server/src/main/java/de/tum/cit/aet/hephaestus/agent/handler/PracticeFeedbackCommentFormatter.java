@@ -51,7 +51,9 @@ class PracticeFeedbackCommentFormatter {
         if (modelName != null && !modelName.isBlank()) {
             sb.append(" &middot; ").append(HtmlUtils.htmlEscape(modelName));
         }
-        sb.append(" &middot; AI-generated and can be inaccurate. React with 👍 or 👎 to give feedback.</sub>\n");
+        sb.append(
+            " &middot; AI-generated and can be inaccurate. React with 👍 or 👎, or reply, to give feedback.</sub>\n"
+        );
     }
 
     @Nullable

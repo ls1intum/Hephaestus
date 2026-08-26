@@ -23,7 +23,7 @@ class PracticeFeedbackCommentFormatterTest extends BaseUnitTest {
             .contains("Test body content")
             .contains(
                 "<sub>Practice review &middot; model&lt;&amp;&gt; &middot; AI-generated and can be inaccurate." +
-                    " React with 👍 or 👎 to give feedback.</sub>"
+                    " React with 👍 or 👎, or reply, to give feedback.</sub>"
             )
             .contains(
                 "[Why you're seeing this and how to stop it](https://hephaestus.example.com/settings#practice-feedback)"
@@ -49,7 +49,7 @@ class PracticeFeedbackCommentFormatterTest extends BaseUnitTest {
             .startsWith("Inline feedback\n\n")
             .contains(
                 "<sub>Practice review &middot; model&lt;&amp;&gt; &middot; AI-generated and can be inaccurate." +
-                    " React with 👍 or 👎 to give feedback.</sub>"
+                    " React with 👍 or 👎, or reply, to give feedback.</sub>"
             )
             .endsWith(
                 "<sub>[Why you're seeing this and how to stop it](https://hephaestus.example/settings#practice-feedback)</sub>\n"
