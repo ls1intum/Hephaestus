@@ -24,6 +24,7 @@ import {
 	JSONRPC_VERSION,
 	type JsonRpcErrorResponse,
 	type JsonRpcSuccessResponse,
+	MENTOR_TOOL_NAMES,
 	type MentorEventNotification,
 	type MentorOutboundFrame,
 	type MentorRequest,
@@ -33,6 +34,10 @@ const RUNNER = path.resolve(
 	import.meta.dirname,
 	"../../../main/resources/agent/pi-mentor-runner.ts",
 );
+
+void test("mentor exposes only read and inline-rendering tools", () => {
+	assert.deepEqual(MENTOR_TOOL_NAMES, ["fetch_context", "link_observation"]);
+});
 
 // Production runner targets /workspace/.sessions, which is unwritable in CI / local node test
 // runs. Spawn each runner with an isolated tmpdir to keep the smoke tests hermetic.

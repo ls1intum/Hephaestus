@@ -30,6 +30,7 @@ import {
 	JSONRPC_VERSION,
 	type JsonRpcId,
 	MENTOR_PROTOCOL_VERSION,
+	MENTOR_TOOL_NAMES,
 	type MentorErrorCode,
 	type MentorMethod,
 	type MentorOutboundFrame,
@@ -404,7 +405,7 @@ async function createPiRuntime(sdk: PiSdk, agentDir: string): Promise<MentorRunt
 			sessionManager,
 			sessionStartEvent,
 			customTools: [fetchContextTool, linkObservationTool],
-			tools: ["fetch_context", "link_observation"],
+			tools: [...MENTOR_TOOL_NAMES],
 		});
 		return { ...result, services, diagnostics: services.diagnostics };
 	};

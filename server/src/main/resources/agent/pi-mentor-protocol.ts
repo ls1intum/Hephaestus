@@ -20,6 +20,8 @@ export const JSONRPC_VERSION = "2.0";
  */
 export const MENTOR_PROTOCOL_VERSION = 1;
 
+export const MENTOR_TOOL_NAMES = ["fetch_context", "link_observation"] as const;
+
 /**
  * JSON-RPC 2.0 §4 restricts an id to String, Number or Null. Java always sends a Number (an
  * `AtomicLong` counter) and the runner echoes back whatever it received; the runner's own
