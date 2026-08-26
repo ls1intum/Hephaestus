@@ -98,6 +98,14 @@ class PracticeFeedbackDispatchRecoveryTest extends BaseUnitTest {
     }
 
     private static FeedbackDispatch dispatch(FeedbackDispatchDestination destination, @Nullable UUID feedbackId) {
+        return dispatch(destination, feedbackId, false);
+    }
+
+    private static FeedbackDispatch dispatch(
+        FeedbackDispatchDestination destination,
+        @Nullable UUID feedbackId,
+        boolean writeStarted
+    ) {
         UUID id = UUID.randomUUID();
         return new FeedbackDispatch(
             id,
@@ -110,7 +118,7 @@ class PracticeFeedbackDispatchRecoveryTest extends BaseUnitTest {
             "body",
             null,
             JsonMapper.builder().build().valueToTree(List.of("practice")),
-            false,
+            writeStarted,
             null,
             null,
             null,

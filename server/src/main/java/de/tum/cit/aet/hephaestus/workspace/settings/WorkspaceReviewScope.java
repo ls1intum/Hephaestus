@@ -1,5 +1,7 @@
 package de.tum.cit.aet.hephaestus.workspace.settings;
 
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotNull;
 import java.util.List;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
@@ -9,10 +11,10 @@ import org.jspecify.annotations.Nullable;
  * everybody; a selected repository with no branches admits every branch of it.
  */
 public record WorkspaceReviewScope(
-    @NonNull ReviewRepositoryMode repositoryMode,
-    @NonNull ReviewPersonMode personMode,
-    @NonNull List<ReviewRepositoryTarget> repositories,
-    @NonNull List<Long> personUserIds
+    @NonNull @NotNull ReviewRepositoryMode repositoryMode,
+    @NonNull @NotNull ReviewPersonMode personMode,
+    @NonNull @NotNull @Valid List<ReviewRepositoryTarget> repositories,
+    @NonNull @NotNull List<Long> personUserIds
 ) {
     public static final WorkspaceReviewScope ALL = new WorkspaceReviewScope(
         ReviewRepositoryMode.ALL_MONITORED,
@@ -22,16 +24,18 @@ public record WorkspaceReviewScope(
     );
 
     public WorkspaceReviewScope {
-        repositoryMode = repositoryMode == null ? ReviewRepositoryMode.ALL_MONITORED : repositoryMode;
-        personMode = personMode == null ? ReviewPersonMode.ALL_ELIGIBLE : personMode;
-        repositories =
-            repositories == null
-                ? List.of()
-                : repositories.stream().filter(java.util.Objects::nonNull).distinct().toList();
-        personUserIds =
-            personUserIds == null
-                ? List.of()
-                : personUserIds.stream().filter(java.util.Objects::nonNull).distinct().toList();
+        java.util.Objects.requireNonNull(repositoryMode, "repositoryMode");
+        java.util.Objects.requireNonNull(personMode, "personMode");
+        repositories = List.copyOf(java.util.Objects.requireNonNull(repositories, "repositories"));
+        long repositoryNames = repositories.stream().map(ReviewRepositoryTarget::nameWithOwner).distinct().count();
+        if (repositoryNames != repositories.size()) {
+            throw new IllegalArgumentException("A repository may appear only once in review coverage");
+        }
+        personUserIds = java.util.Objects.requireNonNull(personUserIds, "personUserIds")
+            .stream()
+            .distinct()
+            .sorted()
+            .toList();
     }
 
     public boolean admitsRepository(@Nullable String nameWithOwner, @Nullable String baseBranch) {

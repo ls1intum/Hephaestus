@@ -5,6 +5,7 @@ import de.tum.cit.aet.hephaestus.workspace.settings.PracticeDeliveryStatus;
 import de.tum.cit.aet.hephaestus.workspace.settings.PracticeReviewField;
 import de.tum.cit.aet.hephaestus.workspace.settings.WorkspaceReviewScope;
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import java.util.Set;
@@ -23,6 +24,7 @@ public record UpdatePracticeReviewSettingsRequestDTO(
     @Nullable
     Integer cooldownMinutes,
     @Schema(description = "Replaces repository and person coverage wholesale. Null leaves it unchanged.")
+    @Valid
     @Nullable
     WorkspaceReviewScope reviewScope,
     @Schema(description = "Pause or activate external feedback. Resume never releases work from an older revision.")

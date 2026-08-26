@@ -36,7 +36,8 @@
         <addForeignKeyConstraint baseTableName="practice_review_repository_target" baseColumnNames="workspace_id,repository_monitor_id" referencedTableName="repository_to_monitor" referencedColumnNames="workspace_id,id" constraintName="sfk_practice_review_repository_target_monitor" onDelete="CASCADE"/>
         <sql splitStatements="true" endDelimiter=";"><![CDATA[
             ALTER TABLE practice_review_repository_target ADD CONSTRAINT chk_practice_review_repository_target_branches
-                CHECK (jsonb_typeof(base_branches) = 'array');
+                CHECK (jsonb_typeof(base_branches) = 'array'
+                    AND NOT jsonb_path_exists(base_branches, '$[*] ? (@.type() != "string" || @ like_regex "^\\s*$" || @ like_regex "^.{255}.")'));
         ]]></sql>
         <createTable tableName="practice_review_person_target">
             <column name="workspace_id" type="BIGINT"><constraints nullable="false"/></column>
@@ -178,9 +179,19 @@
         <addForeignKeyConstraint baseTableName="feedback_dispatch" baseColumnNames="workspace_id,feedback_id" referencedTableName="feedback" referencedColumnNames="workspace_id,id" constraintName="sfk_feedback_dispatch_feedback" onDelete="CASCADE"/>
         <sql splitStatements="true" endDelimiter=";"><![CDATA[
             ALTER TABLE feedback_dispatch ADD CONSTRAINT chk_feedback_dispatch_state
-                CHECK (state IN ('PENDING', 'CLAIMED', 'SENT', 'HELD', 'SUPPRESSED', 'UNCERTAIN', 'FAILED'));
+                CHECK (state IN ('PENDING', 'CLAIMED', 'SENT', 'SUPPRESSED', 'UNCERTAIN', 'FAILED'));
             ALTER TABLE feedback_dispatch ADD CONSTRAINT chk_feedback_dispatch_destination
-                CHECK (destination IN ('ARTIFACT_SUMMARY', 'APPROVED_ARTIFACT_COMMENT'));
+                CHECK (destination IN ('ARTIFACT_SUMMARY', 'APPROVED_ARTIFACT_COMMENT')
+                    AND (destination = 'APPROVED_ARTIFACT_COMMENT') = (feedback_id IS NOT NULL));
+            ALTER TABLE feedback_dispatch ADD CONSTRAINT chk_feedback_dispatch_practice_slugs
+                CHECK (jsonb_typeof(practice_slugs) = 'array'
+                    AND NOT jsonb_path_exists(practice_slugs, '$[*] ? (@.type() != "string")'));
+            ALTER TABLE feedback_dispatch ADD CONSTRAINT chk_feedback_dispatch_lease
+                CHECK ((state = 'CLAIMED') = (lease_owner IS NOT NULL AND lease_expires_at IS NOT NULL));
+            ALTER TABLE feedback_dispatch ADD CONSTRAINT chk_feedback_dispatch_delivery
+                CHECK ((state = 'SENT') = (delivered_external_ref IS NOT NULL));
+            ALTER TABLE feedback_dispatch ADD CONSTRAINT chk_feedback_dispatch_suppression
+                CHECK ((state = 'SUPPRESSED') = (suppression_reason IS NOT NULL));
             ALTER TABLE feedback DROP CONSTRAINT chk_feedback_suppression_reason;
             ALTER TABLE feedback ADD CONSTRAINT chk_feedback_suppression_reason
                 CHECK (suppression_reason IS NULL OR suppression_reason IN (

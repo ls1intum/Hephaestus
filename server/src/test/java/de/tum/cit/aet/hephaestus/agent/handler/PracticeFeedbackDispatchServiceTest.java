@@ -206,7 +206,7 @@ class PracticeFeedbackDispatchServiceTest extends BaseUnitTest {
 
     @Test
     void recoveredWriteThatIsNotYetVisibleIsNeverPostedAgain() {
-        dispatch = dispatch(FeedbackDispatchState.UNCERTAIN, true);
+        dispatch = dispatch(FeedbackDispatchState.UNCERTAIN, true, PracticeFeedbackDispatchService.MAX_ATTEMPTS);
         when(repository.findByDestinationKeyAndWorkspaceId("summary:" + job.getId(), 7L)).thenReturn(
             Optional.of(dispatch)
         );
@@ -239,10 +239,6 @@ class PracticeFeedbackDispatchServiceTest extends BaseUnitTest {
         verify(repository, never()).claim(any(), any(), anyString(), any(), any(Integer.class));
     }
 
-    /**
-     * Automatic feedback is dropped by a pause rather than parked, which is what "resuming releases no
-     * backlog" means. The row records the pause as a policy outcome, never as a transport error.
-     */
     @Test
     void aPauseDropsAutomaticFeedbackTerminally() {
         when(policy.evaluatePullRequest(any(), any(), any(), any())).thenReturn(
@@ -261,12 +257,8 @@ class PracticeFeedbackDispatchServiceTest extends BaseUnitTest {
         verify(poster, never()).postFormattedBody(any(), any());
     }
 
-    /**
-     * A human already decided this one, so a brake the operator can lift parks it instead of spending it —
-     * and parking must not consume a delivery attempt, which is transport currency.
-     */
     @Test
-    void aPauseParksAnApprovedProposalForRecheck() {
+    void aPauseSuppressesAnApprovedProposalTerminally() {
         var feedback = de.tum.cit.aet.hephaestus.practices.feedback.Feedback.builder()
             .id(UUID.randomUUID())
             .body("approved body")
@@ -285,10 +277,10 @@ class PracticeFeedbackDispatchServiceTest extends BaseUnitTest {
 
         var result = service.dispatchApproved(job, feedback);
 
-        assertThat(result.status()).isEqualTo(PracticeFeedbackDispatchService.Result.Status.HELD);
+        assertThat(result.status()).isEqualTo(PracticeFeedbackDispatchService.Result.Status.SUPPRESSED);
         var completion = ArgumentCaptor.forClass(FeedbackDispatchCompletion.class);
         verify(repository).finish(completion.capture());
-        assertThat(completion.getValue().state()).isEqualTo(FeedbackDispatchState.HELD.name());
+        assertThat(completion.getValue().state()).isEqualTo(FeedbackDispatchState.SUPPRESSED.name());
         assertThat(completion.getValue().suppressionReason()).isEqualTo("WORKSPACE_DELIVERY_PAUSED");
         verify(poster, never()).postApprovedProposal(any(), any(), any());
     }
@@ -354,6 +346,10 @@ class PracticeFeedbackDispatchServiceTest extends BaseUnitTest {
     }
 
     private FeedbackDispatch dispatch(FeedbackDispatchState state, boolean writeStarted) {
+        return dispatch(state, writeStarted, 0);
+    }
+
+    private FeedbackDispatch dispatch(FeedbackDispatchState state, boolean writeStarted, int attemptCount) {
         return new FeedbackDispatch(
             UUID.randomUUID(),
             "summary:" + job.getId(),
@@ -370,7 +366,7 @@ class PracticeFeedbackDispatchServiceTest extends BaseUnitTest {
             null,
             null,
             Instant.now(),
-            0,
+            attemptCount,
             null,
             null,
             Instant.now(),

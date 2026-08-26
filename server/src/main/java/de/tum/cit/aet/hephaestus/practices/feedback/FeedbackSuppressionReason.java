@@ -48,14 +48,5 @@ public enum FeedbackSuppressionReason {
      * a trend claim, and {@link de.tum.cit.aet.hephaestus.practices.model.ObservationOrigin} calls a
      * backfilled population "sound as a snapshot, unusable as a trend against LIVE rows".
      */
-    BACKFILL_QUIET;
-
-    /**
-     * Whether an operator can lift this refusal by changing a setting. Only these park an approved dispatch
-     * for re-evaluation; every other reason is a fact about the work or a decision somebody made, and
-     * re-checking it later would only reach the same answer.
-     */
-    public boolean operatorRevisable() {
-        return this == WORKSPACE_DELIVERY_PAUSED || this == INSTANCE_SILENCED;
-    }
+    BACKFILL_QUIET,
 }

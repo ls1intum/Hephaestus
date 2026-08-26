@@ -334,9 +334,9 @@ invariant that matters — at most one live `PREPARED` per thread — is held by
 Supersession only ever claims `PREPARED` feedback. Say **superseded** for feedback that was prepared but
 replaced before anybody read it, and **continued** for newer feedback written beside feedback that was
 already read: nothing received is ever un-said, and the newer row still records what it follows through
-`replaces_id`. The in-context channel is the one place a `DELIVERED` message is retired, and that is not
-an exception — the provider comment is edited in place, so the old text stops being visible and the
-ledger has to say so.
+`replaces_id`. Issue reviews may edit the prior issue comment in place, so their ledger entry is retired
+when that visible text is replaced. Pull request reviews do not: every new review posts a new summary,
+while a retry of the same review reconciles its existing comment by marker.
 
 ### How a locus moved
 

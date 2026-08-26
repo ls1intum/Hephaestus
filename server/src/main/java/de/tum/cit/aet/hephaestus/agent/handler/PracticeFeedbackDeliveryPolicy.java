@@ -455,7 +455,7 @@ public class PracticeFeedbackDeliveryPolicy {
             artifactKind,
             repository,
             baseBranch,
-            coverage == null ? null : subjectStatus(coverage.subjectStatus()),
+            coverage == null ? null : coverage.subjectStatus(),
             coverage == null ? null : coverage.repositoryMode(),
             coverage == null ? null : coverage.personMode(),
             coverage == null ? null : coverage.repositoryMatched(),
@@ -532,12 +532,6 @@ public class PracticeFeedbackDeliveryPolicy {
      */
     private static boolean egressBrakesApply(DeliveryPolicySurface surface) {
         return surface != DeliveryPolicySurface.IN_APP;
-    }
-
-    private static DeliveryPolicyFactsSnapshot.SubjectStatus subjectStatus(
-        PracticeReviewCoverageService.SubjectStatus status
-    ) {
-        return DeliveryPolicyFactsSnapshot.SubjectStatus.valueOf(status.name());
     }
 
     private void record(

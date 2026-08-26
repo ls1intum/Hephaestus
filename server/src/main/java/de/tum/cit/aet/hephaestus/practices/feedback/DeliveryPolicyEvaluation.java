@@ -18,6 +18,7 @@ import lombok.NoArgsConstructor;
 import org.hibernate.annotations.Immutable;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
+import org.jspecify.annotations.Nullable;
 import tools.jackson.databind.JsonNode;
 
 @Entity
@@ -49,14 +50,14 @@ public class DeliveryPolicyEvaluation {
     private UUID agentJobId;
 
     @Column(name = "feedback_id", columnDefinition = "UUID")
-    private UUID feedbackId;
+    private @Nullable UUID feedbackId;
 
     @NotNull
     @Column(name = "admitted_revision", nullable = false)
     private Long admittedRevision;
 
     @Column(name = "evaluated_revision")
-    private Long evaluatedRevision;
+    private @Nullable Long evaluatedRevision;
 
     @NotNull
     @Column(name = "resolver_version", nullable = false, length = 16)
@@ -78,7 +79,7 @@ public class DeliveryPolicyEvaluation {
 
     @Enumerated(EnumType.STRING)
     @Column(name = "decisive_reason", length = 48)
-    private FeedbackSuppressionReason decisiveReason;
+    private @Nullable FeedbackSuppressionReason decisiveReason;
 
     @NotNull
     @JdbcTypeCode(SqlTypes.JSON)

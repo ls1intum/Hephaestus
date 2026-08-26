@@ -129,6 +129,9 @@ public class PracticeReviewSettingsService {
     }
 
     private int recentVolume(Workspace workspace) {
-        return volumeQuery.countSince(workspace.getId(), Instant.now().minus(30, ChronoUnit.DAYS));
+        return volumeQuery.countSince(
+            workspace.getId(),
+            Instant.now().minus(PracticeReviewCoverageService.ESTIMATE_WINDOW_DAYS, ChronoUnit.DAYS)
+        );
     }
 }

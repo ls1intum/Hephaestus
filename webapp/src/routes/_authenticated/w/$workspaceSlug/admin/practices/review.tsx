@@ -281,8 +281,12 @@ function WhenAndWhereSection({ workspaceSlug }: { workspaceSlug: string }) {
 					policy={{
 						settings: reviewSettingsQuery.data,
 						isSaving: updatePracticeReviewSettings.isPending,
-						onUpdate: (settings: UpdatePracticeReviewSettingsRequest) =>
-							updatePracticeReviewSettings.mutate({ path: { workspaceSlug }, body: settings }),
+						onUpdate: (settings: UpdatePracticeReviewSettingsRequest, sourceEtag?: string) =>
+							updatePracticeReviewSettings.mutate({
+								path: { workspaceSlug },
+								body: settings,
+								headers: sourceEtag ? { "If-Match": sourceEtag } : undefined,
+							}),
 						onReset: (field: PracticeReviewField) =>
 							updatePracticeReviewSettings.mutate({
 								path: { workspaceSlug },
@@ -290,15 +294,8 @@ function WhenAndWhereSection({ workspaceSlug }: { workspaceSlug: string }) {
 							}),
 					}}
 					coverage={{
-						preview: {
-							data: coveragePreview.data,
-							isPending: coveragePreview.isPending,
-							isError: coveragePreview.isError,
-							onPreview: (scope) => {
-								coveragePreview.reset();
-								coveragePreview.mutate({ path: { workspaceSlug }, body: scope });
-							},
-						},
+						preview: (scope) =>
+							coveragePreview.mutateAsync({ path: { workspaceSlug }, body: scope }),
 						repositories: {
 							options: (repositoriesQuery.data ?? []).map((repository) => ({
 								value: repository,
@@ -306,6 +303,8 @@ function WhenAndWhereSection({ workspaceSlug }: { workspaceSlug: string }) {
 							})),
 							isLoading: repositoriesQuery.isLoading,
 							isError: repositoriesQuery.isError,
+							error: repositoriesQuery.error,
+							onRetry: () => void repositoriesQuery.refetch(),
 						},
 						people: {
 							options: (membersQuery.data ?? []).flatMap((member) =>
@@ -324,6 +323,8 @@ function WhenAndWhereSection({ workspaceSlug }: { workspaceSlug: string }) {
 							),
 							isLoading: membersQuery.isLoading,
 							isError: membersQuery.isError,
+							error: membersQuery.error,
+							onRetry: () => void membersQuery.refetch(),
 						},
 					}}
 				/>

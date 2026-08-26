@@ -35,7 +35,9 @@ export function usePracticeReviewSettingsMutation(
 		onMutate: async (variables) => {
 			await queryClient.cancelQueries({ queryKey: settingsQueryKey });
 			const previous = queryClient.getQueryData<PracticeReviewSettings>(settingsQueryKey);
-			if (previous) variables.headers = { "If-Match": previous.etag };
+			if (previous && !variables.headers?.["If-Match"]) {
+				variables.headers = { "If-Match": previous.etag };
+			}
 			return { previous };
 		},
 		onSuccess: (updated) => {

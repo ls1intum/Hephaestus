@@ -84,6 +84,22 @@ class PracticeReviewSettingsControllerIntegrationTest extends AbstractWorkspaceI
 
     @Test
     @WithAdminUser
+    void malformedCoverageCannotDefaultToEveryone() {
+        Workspace workspace = setupWorkspace("review-malformed-scope");
+
+        webTestClient
+            .post()
+            .uri("/workspaces/{slug}/practices/review-settings/coverage-preview", workspace.getWorkspaceSlug())
+            .headers(TestAuthUtils.withCurrentUser())
+            .contentType(MediaType.APPLICATION_JSON)
+            .bodyValue(Map.of("personMode", "SELECTED", "repositories", List.of(), "personUserIds", List.of()))
+            .exchange()
+            .expectStatus()
+            .isBadRequest();
+    }
+
+    @Test
+    @WithAdminUser
     void overridesAndResetsPracticeReviewPolicy() {
         Workspace workspace = setupWorkspace("ai-reset");
         String slug = workspace.getWorkspaceSlug();

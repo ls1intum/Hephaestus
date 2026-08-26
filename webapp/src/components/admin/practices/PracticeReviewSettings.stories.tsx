@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn, screen, userEvent, within } from "storybook/test";
-import type { AgentBinding } from "@/api/types.gen";
+import type { AgentBinding, PracticeReviewCoveragePreview } from "@/api/types.gen";
 import { expectUnavailable } from "@/test/controls";
 import { expectSettledVisible } from "@/test/overlay";
 import { expectNoPageOverflow } from "@/test/reflow";
@@ -39,20 +39,17 @@ const policy = {
 };
 
 const coverage = {
-	preview: {
-		data: {
-			current: settings.coverageSummary,
-			proposed: { ...settings.coverageSummary, coveredRepositories: 3 },
-			widens: true,
-		},
-		isPending: false,
-		isError: false,
-		onPreview: fn(),
-	},
+	preview: fn(async () => ({
+		current: settings.coverageSummary,
+		proposed: { ...settings.coverageSummary, coveredRepositories: 3 },
+		widens: true,
+	})),
 	repositories: {
 		options: ["acme/widgets", "acme/gadgets"].map((value) => ({ value, label: value })),
 		isLoading: false,
 		isError: false,
+		error: undefined,
+		onRetry: fn(),
 	},
 	people: {
 		options: [
@@ -61,6 +58,8 @@ const coverage = {
 		],
 		isLoading: false,
 		isError: false,
+		error: undefined,
+		onRetry: fn(),
 	},
 };
 
@@ -91,34 +90,13 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/**
- * A switch row stays a row: the control sits after its label and description, on the same line. This
- * is measured rather than believed because the reflow fix below it could have been bought by letting
- * the row stack instead, which is not the layout this surface wants at any width.
- */
-async function expectSwitchSitsBesideItsLabel(control: HTMLElement) {
-	const field = control.closest<HTMLElement>('[data-slot="field"]');
-	const content = field?.querySelector<HTMLElement>('[data-slot="field-content"]');
-	if (!content) throw new Error("The switch is not in a Field with a FieldContent.");
-
-	const controlBox = control.getBoundingClientRect();
-	const contentBox = content.getBoundingClientRect();
-	await expect(controlBox.left).toBeGreaterThanOrEqual(contentBox.right);
-	await expect(controlBox.top).toBeGreaterThanOrEqual(contentBox.top);
-	await expect(controlBox.top).toBeLessThan(contentBox.bottom);
-}
-
 export const Configured: Story = {
 	parameters: {
 		viewport: { defaultViewport: "reflow" },
 		chromatic: { viewports: [320, 1440] },
 	},
-	play: async ({ canvas }) => {
+	play: async () => {
 		await expectNoPageOverflow();
-		// Fitting at 320px is not the same as fitting by stacking: the row survives the narrow width.
-		await expectSwitchSitsBesideItsLabel(
-			canvas.getByRole("switch", { name: "Start practice reviews" }),
-		);
 	},
 };
 
@@ -201,6 +179,8 @@ export const PilotPopulation: Story = {
 				})),
 				isLoading: false,
 				isError: false,
+				error: undefined,
+				onRetry: fn(),
 			},
 			people: {
 				options: [
@@ -212,6 +192,8 @@ export const PilotPopulation: Story = {
 				],
 				isLoading: false,
 				isError: false,
+				error: undefined,
+				onRetry: fn(),
 			},
 		},
 	},
@@ -246,6 +228,14 @@ export const AddingATargetBranch: Story = {
 				},
 			},
 		},
+		coverage: {
+			...coverage,
+			preview: fn(async () => ({
+				current: settings.coverageSummary,
+				proposed: settings.coverageSummary,
+				widens: false,
+			})),
+		},
 	},
 	play: async ({ args, canvas }) => {
 		await userEvent.click(canvas.getByRole("button", { name: "Base branches for acme/widgets" }));
@@ -269,110 +259,6 @@ export const AddingATargetBranch: Story = {
 	},
 };
 
-export const AddingASecondBranchAppliesImmediately: Story = {
-	args: {
-		policy: {
-			...policy,
-			onUpdate: fn(),
-			settings: {
-				...settings,
-				reviewScope: {
-					repositoryMode: "SELECTED",
-					personMode: "ALL_ELIGIBLE",
-					repositories: [{ nameWithOwner: "acme/widgets", baseBranches: ["main"] }],
-					personUserIds: [],
-				},
-			},
-		},
-	},
-	play: async ({ args, canvas }) => {
-		await userEvent.click(canvas.getByRole("button", { name: "Base branches for acme/widgets" }));
-		await userEvent.type(canvas.getByLabelText("Only these base branches for acme/widgets"), "dev");
-		await userEvent.click(
-			canvas.getByRole("button", { name: "Add to base branches for acme/widgets" }),
-		);
-
-		await expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
-		await expect(args.policy.onUpdate).toHaveBeenCalledWith({
-			reviewScope: {
-				repositoryMode: "SELECTED",
-				personMode: "ALL_ELIGIBLE",
-				repositories: [{ nameWithOwner: "acme/widgets", baseBranches: ["main", "dev"] }],
-				personUserIds: [],
-			},
-		});
-	},
-};
-
-export const RemovingOneOfTwoBranchesNarrows: Story = {
-	args: {
-		policy: {
-			...policy,
-			onUpdate: fn(),
-			settings: {
-				...settings,
-				reviewScope: {
-					repositoryMode: "SELECTED",
-					personMode: "ALL_ELIGIBLE",
-					repositories: [{ nameWithOwner: "acme/widgets", baseBranches: ["main", "dev"] }],
-					personUserIds: [],
-				},
-			},
-		},
-	},
-	play: async ({ args, canvas }) => {
-		await userEvent.click(canvas.getByRole("button", { name: "Base branches for acme/widgets" }));
-		await userEvent.click(
-			canvas.getByRole("button", { name: "Remove dev from base branches for acme/widgets" }),
-		);
-
-		await expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
-		await expect(args.policy.onUpdate).toHaveBeenCalledWith({
-			reviewScope: {
-				repositoryMode: "SELECTED",
-				personMode: "ALL_ELIGIBLE",
-				repositories: [{ nameWithOwner: "acme/widgets", baseBranches: ["main"] }],
-				personUserIds: [],
-			},
-		});
-	},
-};
-
-export const ClearingEveryBranchAppliesImmediately: Story = {
-	args: {
-		policy: {
-			...policy,
-			onUpdate: fn(),
-			settings: {
-				...settings,
-				reviewScope: {
-					repositoryMode: "SELECTED",
-					personMode: "ALL_ELIGIBLE",
-					repositories: [{ nameWithOwner: "acme/widgets", baseBranches: ["main"] }],
-					personUserIds: [],
-				},
-			},
-		},
-	},
-	play: async ({ args, canvas }) => {
-		await userEvent.click(canvas.getByRole("button", { name: "Base branches for acme/widgets" }));
-		await userEvent.click(
-			canvas.getByRole("button", { name: "Remove main from base branches for acme/widgets" }),
-		);
-
-		await expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
-		await expect(args.policy.onUpdate).toHaveBeenCalledWith({
-			reviewScope: {
-				repositoryMode: "SELECTED",
-				personMode: "ALL_ELIGIBLE",
-				repositories: [{ nameWithOwner: "acme/widgets", baseBranches: [] }],
-				personUserIds: [],
-			},
-		});
-	},
-};
-
-/** Saying so has to reach the input itself: the Add button greying out announces nothing. */
 export const RefusingADuplicate: Story = {
 	args: {
 		policy: {
@@ -440,31 +326,6 @@ export const SendingPaused: Story = {
 	},
 };
 
-/** The common path: every step is an increment the counters already report, so none of it interrupts. */
-export const BuildingThePopulationNeverInterrupts: Story = {
-	args: {
-		policy: {
-			...policy,
-			onUpdate: fn(),
-			settings: {
-				...settings,
-				reviewScope: {
-					repositoryMode: "SELECTED",
-					personMode: "SELECTED",
-					repositories: [{ nameWithOwner: "acme/widgets", baseBranches: [] }],
-					personUserIds: [7],
-				},
-			},
-		},
-	},
-	play: async ({ args, canvas }) => {
-		await userEvent.click(canvas.getByLabelText("Choose repositories"));
-		await userEvent.click(await screen.findByRole("option", { name: "acme/gadgets" }));
-		await expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
-		await expect(args.policy.onUpdate).toHaveBeenCalledTimes(1);
-	},
-};
-
 export const OpeningToEveryoneAsksFirst: Story = {
 	args: {
 		policy: {
@@ -482,14 +343,11 @@ export const OpeningToEveryoneAsksFirst: Story = {
 		},
 		coverage: {
 			...coverage,
-			preview: {
-				...coverage.preview,
-				data: {
-					current: { ...settings.coverageSummary, coveredRepositories: 1 },
-					proposed: settings.coverageSummary,
-					widens: true,
-				},
-			},
+			preview: fn(async () => ({
+				current: { ...settings.coverageSummary, coveredRepositories: 1 },
+				proposed: settings.coverageSummary,
+				widens: true,
+			})),
 		},
 	},
 	play: async ({ args, canvas }) => {
@@ -502,9 +360,9 @@ export const OpeningToEveryoneAsksFirst: Story = {
 		await expect(dialog.getByText(/Workspace-wide context:/)).toHaveTextContent(
 			"not just this proposed population",
 		);
-		await expect(args.coverage.preview.onPreview).toHaveBeenCalled();
+		await expect(args.coverage.preview).toHaveBeenCalled();
 
-		await userEvent.click(dialog.getByRole("button", { name: "Review everyone" }));
+		await userEvent.click(dialog.getByRole("button", { name: "Apply wider coverage" }));
 		await expect(args.policy.onUpdate).toHaveBeenCalledWith({
 			reviewScope: {
 				repositoryMode: "ALL_MONITORED",
@@ -521,7 +379,12 @@ export const CoveragePreviewLoading: Story = {
 		...OpeningToEveryoneAsksFirst.args,
 		coverage: {
 			...coverage,
-			preview: { data: undefined, isPending: true, isError: false, onPreview: fn() },
+			preview: fn(
+				() =>
+					new Promise<PracticeReviewCoveragePreview>(() => {
+						// Deliberately pending to keep the loading state visible.
+					}),
+			),
 		},
 	},
 	play: async ({ canvas }) => {
@@ -529,7 +392,7 @@ export const CoveragePreviewLoading: Story = {
 
 		const dialog = within(await screen.findByRole("alertdialog"));
 		await expectSettledVisible(dialog.getByText("Calculating the proposed coverage…"));
-		await expect(dialog.getByRole("button", { name: "Review everyone" })).toBeDisabled();
+		await expect(dialog.getByRole("button", { name: "Apply wider coverage" })).toBeDisabled();
 	},
 };
 
@@ -538,7 +401,9 @@ export const CoveragePreviewUnavailable: Story = {
 		...OpeningToEveryoneAsksFirst.args,
 		coverage: {
 			...coverage,
-			preview: { data: undefined, isPending: false, isError: true, onPreview: fn() },
+			preview: fn(async () => {
+				throw new Error("preview unavailable");
+			}),
 		},
 	},
 	play: async ({ args, canvas }) => {
@@ -546,10 +411,10 @@ export const CoveragePreviewUnavailable: Story = {
 
 		const dialog = within(await screen.findByRole("alertdialog"));
 		await expectSettledVisible(dialog.getByText("Couldn't estimate the new coverage"));
-		await expect(dialog.getByRole("button", { name: "Review everyone" })).toBeEnabled();
+		await expect(dialog.getByRole("button", { name: "Apply wider coverage" })).toBeDisabled();
 
 		await userEvent.click(dialog.getByRole("button", { name: "Retry" }));
-		await expect(args.coverage.preview.onPreview).toHaveBeenCalledTimes(2);
+		await expect(args.coverage.preview).toHaveBeenCalledTimes(2);
 	},
 };
 

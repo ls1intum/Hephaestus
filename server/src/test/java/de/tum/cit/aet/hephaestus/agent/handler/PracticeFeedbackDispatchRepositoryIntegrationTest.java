@@ -109,6 +109,45 @@ class PracticeFeedbackDispatchRepositoryIntegrationTest extends AbstractWorkspac
         assertThat(claim(dispatchId, "late-redelivery", Instant.now().plusSeconds(60))).isZero();
     }
 
+    @Test
+    void shouldKeepReconcilingAnAmbiguousWriteAfterTheRetryBudget() {
+        UUID dispatchId = insertDispatch(workspace.getId(), jobId, "ambiguous-write");
+        jdbcTemplate.update(
+            "UPDATE feedback_dispatch SET state = 'UNCERTAIN', write_started = TRUE, attempt_count = 8 WHERE id = ?",
+            dispatchId
+        );
+
+        assertThat(claim(dispatchId, "reconciler", Instant.now().plusSeconds(60))).isEqualTo(1);
+    }
+
+    @Test
+    void shouldResetOnlyFailuresKnownToPrecedeTheProviderWrite() {
+        UUID safe = insertDispatch(workspace.getId(), jobId, "safe-retry");
+        UUID ambiguous = insertDispatch(workspace.getId(), jobId, "ambiguous-retry");
+        jdbcTemplate.update(
+            "UPDATE feedback_dispatch SET state = 'FAILED', attempt_count = 8, last_error = 'failed' WHERE id = ?",
+            safe
+        );
+        jdbcTemplate.update(
+            "UPDATE feedback_dispatch SET state = 'FAILED', write_started = TRUE, attempt_count = 8 WHERE id = ?",
+            ambiguous
+        );
+
+        Integer reset = transactions.execute(status ->
+            dispatchRepository.resetFailedBeforeWrite(jobId, workspace.getId())
+        );
+        assertThat(reset).isEqualTo(1);
+        assertThat(
+            jdbcTemplate.queryForObject("SELECT state FROM feedback_dispatch WHERE id = ?", String.class, safe)
+        ).isEqualTo("PENDING");
+        assertThat(
+            jdbcTemplate.queryForObject("SELECT attempt_count FROM feedback_dispatch WHERE id = ?", Integer.class, safe)
+        ).isZero();
+        assertThat(
+            jdbcTemplate.queryForObject("SELECT state FROM feedback_dispatch WHERE id = ?", String.class, ambiguous)
+        ).isEqualTo("FAILED");
+    }
+
     private int claimAfter(CountDownLatch start, UUID dispatchId, String owner) {
         try {
             assertThat(start.await(10, TimeUnit.SECONDS)).isTrue();

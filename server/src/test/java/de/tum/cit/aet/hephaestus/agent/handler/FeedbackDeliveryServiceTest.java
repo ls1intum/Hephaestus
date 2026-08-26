@@ -39,6 +39,7 @@ import de.tum.cit.aet.hephaestus.practices.model.Severity;
 import de.tum.cit.aet.hephaestus.practices.observation.TrendDelta;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewCoverageService;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties;
+import de.tum.cit.aet.hephaestus.practices.review.ReviewSubjectStatus;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitorRepository;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
@@ -158,7 +159,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
                 new PracticeReviewCoverageService.CoverageAssessment(
                     de.tum.cit.aet.hephaestus.workspace.settings.ReviewRepositoryMode.ALL_MONITORED,
                     de.tum.cit.aet.hephaestus.workspace.settings.ReviewPersonMode.ALL_ELIGIBLE,
-                    PracticeReviewCoverageService.SubjectStatus.RESOLVED_LINKED_HUMAN,
+                    ReviewSubjectStatus.RESOLVED_LINKED_HUMAN,
                     true,
                     true,
                     true,

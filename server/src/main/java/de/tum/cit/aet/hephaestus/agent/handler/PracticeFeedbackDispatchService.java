@@ -31,8 +31,6 @@ class PracticeFeedbackDispatchService {
     static final Duration LEASE = Duration.ofMinutes(5);
     static final int MAX_ATTEMPTS = 8;
 
-    /** How long a parked row waits before the operator's setting is read again. */
-    private static final Duration HELD_RECHECK = Duration.ofHours(1);
     private static final Duration BASE_BACKOFF = Duration.ofSeconds(15);
     private static final Duration MAX_BACKOFF = Duration.ofMinutes(15);
 
@@ -134,9 +132,6 @@ class PracticeFeedbackDispatchService {
         }
         if (dispatch.getState() == FeedbackDispatchState.SUPPRESSED) {
             return Result.suppressed(storedReason(dispatch));
-        }
-        if (dispatch.getState() == FeedbackDispatchState.HELD && dispatch.getNextAttemptAt().isAfter(Instant.now())) {
-            return Result.held(storedReason(dispatch));
         }
         if (dispatch.getState() == FeedbackDispatchState.FAILED) {
             return Result.failed();
@@ -278,21 +273,9 @@ class PracticeFeedbackDispatchService {
         return true;
     }
 
-    /**
-     * Parks the row when an operator could lift the refusal, drops it when nobody will revisit it. Automatic
-     * feedback never parks: a pause drops it, which is what resuming without a backlog means.
-     */
     private Result refuse(FeedbackDispatch dispatch, String owner, FeedbackSuppressionReason reason) {
-        boolean park =
-            dispatch.getDestination() == FeedbackDispatchDestination.APPROVED_ARTIFACT_COMMENT &&
-            reason.operatorRevisable();
-        if (!park) {
-            return finish(dispatch, owner, FeedbackDispatchState.SUPPRESSED, null, null, reason, null)
-                ? Result.suppressed(reason)
-                : Result.inProgress();
-        }
-        return finish(dispatch, owner, FeedbackDispatchState.HELD, null, null, reason, Instant.now().plus(HELD_RECHECK))
-            ? Result.held(reason)
+        return finish(dispatch, owner, FeedbackDispatchState.SUPPRESSED, null, null, reason, null)
+            ? Result.suppressed(reason)
             : Result.inProgress();
     }
 
@@ -303,7 +286,7 @@ class PracticeFeedbackDispatchService {
 
     private Result retry(FeedbackDispatch dispatch, String owner, @Nullable String error) {
         int attempt = dispatch.getAttemptCount() + 1;
-        if (attempt >= MAX_ATTEMPTS) {
+        if (attempt >= MAX_ATTEMPTS && !dispatch.getWriteStarted()) {
             return finish(dispatch, owner, FeedbackDispatchState.FAILED, null, error, null, null)
                 ? Result.failed()
                 : Result.inProgress();
@@ -363,10 +346,6 @@ class PracticeFeedbackDispatchService {
             return new Result(Status.SUPPRESSED, null, reason);
         }
 
-        static Result held(@Nullable FeedbackSuppressionReason reason) {
-            return new Result(Status.HELD, null, reason);
-        }
-
         static Result uncertain() {
             return new Result(Status.UNCERTAIN, null, null);
         }
@@ -381,7 +360,6 @@ class PracticeFeedbackDispatchService {
 
         enum Status {
             SENT,
-            HELD,
             SUPPRESSED,
             UNCERTAIN,
             IN_PROGRESS,

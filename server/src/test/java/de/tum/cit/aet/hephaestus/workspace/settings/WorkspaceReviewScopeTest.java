@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.workspace.settings;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.Arrays;
@@ -77,22 +78,61 @@ class WorkspaceReviewScopeTest extends BaseUnitTest {
     }
 
     @Test
-    void repositoryTargetsNormalizeBranchesAndCollections() {
+    void repositoryTargetsCanonicalizeBranchesAndPeople() {
         ReviewRepositoryTarget target = new ReviewRepositoryTarget(
             " owner/repo ",
-            Arrays.asList(" main ", "", "main", null, "develop")
+            Arrays.asList(" main ", "main", "develop")
         );
         WorkspaceReviewScope scope = new WorkspaceReviewScope(
             ReviewRepositoryMode.SELECTED,
             ReviewPersonMode.SELECTED,
-            List.of(target, target),
-            Arrays.asList(7L, 7L, null)
+            List.of(target),
+            Arrays.asList(7L, 7L)
         );
 
-        assertThat(scope.repositories()).containsExactly(
-            new ReviewRepositoryTarget("owner/repo", List.of("main", "develop"))
-        );
+        assertThat(scope.repositories()).containsExactly(target);
+        assertThat(target.baseBranches()).containsExactly("develop", "main");
         assertThat(scope.personUserIds()).containsExactly(7L);
+    }
+
+    @Test
+    void missingPolicyAxesAreRejectedInsteadOfWidened() {
+        assertThatThrownBy(() ->
+            MAPPER.readValue(
+                """
+                {"personMode":"SELECTED","repositories":[],"personUserIds":[]}
+                """,
+                WorkspaceReviewScope.class
+            )
+        ).hasRootCauseMessage("repositoryMode");
+        assertThatThrownBy(() ->
+            MAPPER.readValue("{\"nameWithOwner\":\"owner/repo\"}", ReviewRepositoryTarget.class)
+        ).hasRootCauseMessage("baseBranches");
+    }
+
+    @Test
+    void duplicateRepositoryTargetsAreRejectedInsteadOfSilentlyOverwriting() {
+        ReviewRepositoryTarget first = new ReviewRepositoryTarget("owner/repo", List.of("main"));
+        ReviewRepositoryTarget second = new ReviewRepositoryTarget("owner/repo", List.of("develop"));
+
+        assertThatThrownBy(() ->
+            new WorkspaceReviewScope(
+                ReviewRepositoryMode.SELECTED,
+                ReviewPersonMode.SELECTED,
+                List.of(first, second),
+                List.of(7L)
+            )
+        ).isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void malformedRepositoryTargetsAreRejectedAtTheDomainBoundary() {
+        assertThatThrownBy(() -> new ReviewRepositoryTarget(" ", List.of())).isInstanceOf(
+            IllegalArgumentException.class
+        );
+        assertThatThrownBy(() -> new ReviewRepositoryTarget("owner/repo", List.of("x".repeat(256)))).isInstanceOf(
+            IllegalArgumentException.class
+        );
     }
 
     @Test

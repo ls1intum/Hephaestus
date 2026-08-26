@@ -521,12 +521,7 @@ public class FeedbackLedgerRecorder {
         );
     }
 
-    /**
-     * Records a summary the recovery sweep delivered after the run itself had ended. The normal write happens
-     * inside delivery, which a crash between the provider write and the acknowledgement skips entirely — and
-     * {@link #priorLiveSummaryRef} reads this placement, so without it the next re-review finds no prior
-     * summary and posts a second one beside the recovered comment.
-     */
+    /** Records a provider write recovered after the run ended in the same ledger as normal delivery. */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void recordRecoveredSummary(AgentJob job, String externalRef, String body) {
         if (feedbackRepository.existsByAgentJobIdAndPosition(job.getId(), IN_CONTEXT_UNIT_ORDINAL)) {
@@ -579,20 +574,9 @@ public class FeedbackLedgerRecorder {
         );
     }
 
-    /**
-     * The external comment id of the CURRENT live in-context summary for this job's continuity line, if any —
-     * the comment a re-review edits in place rather than posting anew. That is the shipped provider UX, not
-     * what ADR 0021 asks for — the ADR says delivered feedback is never rewritten and a new unit supersedes
-     * the one it replaces, which is what the ledger below already does. Derived from
-     * the job's own observations so this read key is computed identically to the write key in {@link #record},
-     * with no reliance on PR↔observation id coupling. Empty when this is the first delivery on the line, the prior
-     * unit is already superseded/failed, or it had no recoverable SUMMARY placement (e.g. the post had failed).
-     *
-     * <p>Best-effort and side-effect free: runs in its own read-only transaction; callers treat any failure as
-     * "no prior summary" and post fresh.
-     */
+    /** The current provider comment for an issue review; pull-request re-reviews always post a new summary. */
     @Transactional(propagation = Propagation.REQUIRES_NEW, readOnly = true)
-    public Optional<String> priorLiveSummaryRef(AgentJob job) {
+    public Optional<String> priorLiveIssueSummaryRef(AgentJob job) {
         List<Observation> observations = observationRepository.findByAgentJobId(job.getId());
         if (observations.isEmpty()) {
             return Optional.empty();

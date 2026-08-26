@@ -350,7 +350,7 @@ public class IssueReviewHandler implements JobTypeHandler {
             PracticeFeedbackDispatchService.Result result = dispatchService.dispatchAutomaticSummary(
                 job,
                 formatted,
-                feedbackLedgerRecorder.priorLiveSummaryRef(job).orElse(null),
+                feedbackLedgerRecorder.priorLiveIssueSummaryRef(job).orElse(null),
                 contributingPracticeSlugs
             );
             if (result.status() == PracticeFeedbackDispatchService.Result.Status.SUPPRESSED) {

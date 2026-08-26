@@ -23,6 +23,7 @@ import de.tum.cit.aet.hephaestus.agent.usage.LlmPriceSnapshot;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageRecorder;
 import de.tum.cit.aet.hephaestus.agent.usage.PricingState;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDispatchRepository;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import java.util.Optional;
@@ -58,6 +59,9 @@ class AgentJobLifecycleServiceTest extends BaseUnitTest {
     @Mock
     private LlmUsageRecorder usageRecorder;
 
+    @Mock
+    private FeedbackDispatchRepository feedbackDispatchRepository;
+
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     private AgentJobLifecycleService service;
@@ -74,7 +78,8 @@ class AgentJobLifecycleServiceTest extends BaseUnitTest {
             sandboxManager,
             Optional.empty(),
             usageRecorder,
-            objectMapper
+            objectMapper,
+            feedbackDispatchRepository
         );
 
         workspace = new Workspace();
@@ -408,6 +413,7 @@ class AgentJobLifecycleServiceTest extends BaseUnitTest {
 
             AgentJob result = service.retryDelivery(WORKSPACE_ID, jobId);
 
+            verify(feedbackDispatchRepository).resetFailedBeforeWrite(jobId, WORKSPACE_ID);
             verify(handler).deliver(completedJob);
             verify(agentJobRepository).updateDeliveryStatus(
                 eq(jobId),

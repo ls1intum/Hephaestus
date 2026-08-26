@@ -192,6 +192,9 @@ class ProductionSchemaContractIntegrationTest {
         assertColumnExists("identity_provider", "type");
         assertIndexExists("idx_slack_thread_participants");
         assertIndexExists("idx_slack_message_ingest");
+        assertConstraintExists("chk_feedback_dispatch_lease");
+        assertConstraintExists("chk_feedback_dispatch_delivery");
+        assertConstraintExists("chk_feedback_dispatch_suppression");
     }
 
     /**
@@ -234,20 +237,25 @@ class ProductionSchemaContractIntegrationTest {
             .isEqualTo("SELECTED");
     }
 
-    @Test
-    @DisplayName("A covered repository's base branches must be an array, not a bare value")
-    void baseBranchesRefusesAnythingThatIsNotAnArray() {
+    @ParameterizedTest
+    @MethodSource("invalidBaseBranches")
+    @DisplayName("A covered repository's base branches must be short strings in an array")
+    void baseBranchesRefusesMalformedValues(String branches) {
         assertThatThrownBy(() ->
             jdbcTemplate.update(
                 "INSERT INTO practice_review_repository_target (workspace_id, repository_monitor_id, base_branches) " +
                     "VALUES (?, ?, CAST(? AS jsonb))",
                 insertWorkspace("base-branches-check"),
                 1L,
-                "\"main\""
+                branches
             )
         )
             .as("an axis that is not an array cannot be read as the list it claims to be")
             .isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    static Stream<String> invalidBaseBranches() {
+        return Stream.of("\"main\"", "[1]", "[\"\"]", "[\"   \"]", "[\"" + "x".repeat(256) + "\"]");
     }
 
     /** A workspace row with only the columns the schema demands; every setting below is left at its default. */
@@ -274,6 +282,15 @@ class ProductionSchemaContractIntegrationTest {
             indexName
         );
         assertThat(count).as("Liquibase-built schema must contain index %s", indexName).isNotNull().isEqualTo(1);
+    }
+
+    private void assertConstraintExists(String constraintName) {
+        Integer count = jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM pg_constraint WHERE conname = ?",
+            Integer.class,
+            constraintName
+        );
+        assertThat(count).isEqualTo(1);
     }
 
     private void assertColumnExists(String table, String column) {

@@ -456,7 +456,7 @@ class FeedbackLedgerRecorderTest extends BaseUnitTest {
     }
 
     @Test
-    void priorLiveSummaryRefUsesLatestDeliveredSummaryPlacement() {
+    void priorLiveIssueSummaryRefUsesLatestDeliveredSummaryPlacement() {
         Observation observation = problem();
         when(observationRepository.findByAgentJobId(any())).thenReturn(List.of(observation));
         FeedbackLedgerRecorder recorder = recorder();
@@ -464,7 +464,7 @@ class FeedbackLedgerRecorderTest extends BaseUnitTest {
         when(summary.getPostedCommentRef()).thenReturn("summary-1");
         when(feedbackPlacementRepository.findLatestDeliveredSummary(any())).thenReturn(Optional.of(summary));
 
-        Optional<String> result = recorder.priorLiveSummaryRef(job());
+        Optional<String> result = recorder.priorLiveIssueSummaryRef(job());
 
         assertThat(result).contains("summary-1");
     }

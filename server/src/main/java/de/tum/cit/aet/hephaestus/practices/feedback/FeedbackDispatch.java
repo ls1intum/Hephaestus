@@ -53,7 +53,6 @@ public class FeedbackDispatch {
     @Column(name = "feedback_id", columnDefinition = "UUID")
     private @Nullable UUID feedbackId;
 
-    /** The feedback this carries. Only an approved-comment dispatch has one; a summary or ping has none. */
     public UUID approvedFeedbackId() {
         return java.util.Objects.requireNonNull(feedbackId, "an approved dispatch always names its feedback");
     }

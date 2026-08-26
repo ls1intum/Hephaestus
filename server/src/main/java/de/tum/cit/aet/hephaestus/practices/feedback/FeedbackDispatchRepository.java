@@ -43,11 +43,11 @@ public interface FeedbackDispatchRepository extends JpaRepository<FeedbackDispat
         value = """
         UPDATE feedback_dispatch
            SET state = 'CLAIMED', lease_owner = :owner, lease_expires_at = :leaseUntil,
-               attempt_count = attempt_count + CASE WHEN state = 'HELD' THEN 0 ELSE 1 END,
+               attempt_count = attempt_count + 1,
                updated_at = CURRENT_TIMESTAMP
          WHERE id = :id AND workspace_id = :workspaceId
-           AND (state = 'HELD' OR attempt_count < :maxAttempts)
-           AND (state IN ('PENDING', 'UNCERTAIN', 'HELD')
+           AND (attempt_count < :maxAttempts OR write_started = TRUE)
+           AND (state IN ('PENDING', 'UNCERTAIN')
                 OR (state = 'CLAIMED' AND lease_expires_at < CURRENT_TIMESTAMP))
            AND next_attempt_at <= CURRENT_TIMESTAMP
         """,
@@ -86,36 +86,15 @@ public interface FeedbackDispatchRepository extends JpaRepository<FeedbackDispat
     )
     int finish(@Param("completion") FeedbackDispatchCompletion completion);
 
-    /** Parked rows whose refusal nobody lifted. Re-checking them forever would only grow the audit. */
-    @Query(
-        """
-        SELECT d FROM FeedbackDispatch d
-        WHERE d.state = de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDispatchState.HELD
-          AND d.createdAt < :cutoff
-        """
-    )
-    List<FeedbackDispatch> findHeldSince(@Param("cutoff") Instant cutoff);
-
-    @Modifying(clearAutomatically = true, flushAutomatically = true)
-    @Query(
-        value = """
-        UPDATE feedback_dispatch SET state = 'SUPPRESSED', updated_at = CURRENT_TIMESTAMP
-         WHERE id = :id AND workspace_id = :workspaceId AND state = 'HELD'
-        """,
-        nativeQuery = true
-    )
-    int giveUpOnHeld(@Param("id") UUID id, @Param("workspaceId") Long workspaceId);
-
     @Query(
         """
         SELECT d FROM FeedbackDispatch d
         WHERE d.nextAttemptAt <= :now
-          AND ((d.attemptCount < :maxAttempts
-                AND (d.state IN (de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDispatchState.PENDING,
-                                 de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDispatchState.UNCERTAIN)
-                     OR (d.state = de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDispatchState.CLAIMED
-                         AND d.leaseExpiresAt < :now)))
-            OR d.state = de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDispatchState.HELD)
+          AND (d.attemptCount < :maxAttempts OR d.writeStarted = true)
+          AND (d.state IN (de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDispatchState.PENDING,
+                           de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDispatchState.UNCERTAIN)
+               OR (d.state = de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDispatchState.CLAIMED
+                   AND d.leaseExpiresAt < :now))
         ORDER BY d.updatedAt ASC
         """
     )
@@ -129,6 +108,7 @@ public interface FeedbackDispatchRepository extends JpaRepository<FeedbackDispat
         """
         SELECT d FROM FeedbackDispatch d
         WHERE d.attemptCount >= :maxAttempts
+          AND d.writeStarted = false
           AND (d.state IN (de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDispatchState.PENDING,
                            de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDispatchState.UNCERTAIN)
             OR (d.state = de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDispatchState.CLAIMED
@@ -154,4 +134,18 @@ public interface FeedbackDispatchRepository extends JpaRepository<FeedbackDispat
         nativeQuery = true
     )
     int fail(@Param("id") UUID id, @Param("workspaceId") Long workspaceId, @Param("error") @Nullable String error);
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query(
+        value = """
+        UPDATE feedback_dispatch
+           SET state = 'PENDING', attempt_count = 0, next_attempt_at = CURRENT_TIMESTAMP,
+               lease_owner = NULL, lease_expires_at = NULL, last_error = NULL,
+               updated_at = CURRENT_TIMESTAMP
+         WHERE agent_job_id = :jobId AND workspace_id = :workspaceId
+           AND state = 'FAILED' AND write_started = FALSE
+        """,
+        nativeQuery = true
+    )
+    int resetFailedBeforeWrite(@Param("jobId") UUID jobId, @Param("workspaceId") Long workspaceId);
 }

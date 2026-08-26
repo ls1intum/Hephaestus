@@ -14,7 +14,6 @@ import de.tum.cit.aet.hephaestus.workspace.settings.ReviewPersonMode;
 import de.tum.cit.aet.hephaestus.workspace.settings.ReviewRepositoryMode;
 import de.tum.cit.aet.hephaestus.workspace.settings.ReviewRepositoryTarget;
 import de.tum.cit.aet.hephaestus.workspace.settings.WorkspaceReviewScope;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -28,6 +27,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 public class PracticeReviewCoverageService {
+
+    static final int ESTIMATE_WINDOW_DAYS = 30;
 
     private final RepositoryToMonitorRepository monitorRepository;
     private final WorkspaceMembershipRepository membershipRepository;
@@ -108,7 +109,7 @@ public class PracticeReviewCoverageService {
             coveredPeople,
             eligible,
             recentReviewVolume,
-            30
+            ESTIMATE_WINDOW_DAYS
         );
     }
 
@@ -222,15 +223,15 @@ public class PracticeReviewCoverageService {
         boolean branchRestrictionsApply
     ) {
         WorkspaceReviewScope scope = readScope(workspace);
-        SubjectStatus subjectStatus;
+        ReviewSubjectStatus subjectStatus;
         if (subject == null || subject.actorId() == null) {
-            subjectStatus = SubjectStatus.MISSING;
+            subjectStatus = ReviewSubjectStatus.MISSING;
         } else if (!subject.human()) {
-            subjectStatus = SubjectStatus.NON_HUMAN;
+            subjectStatus = ReviewSubjectStatus.NON_HUMAN;
         } else if (membershipRepository.findByWorkspace_IdAndUser_Id(workspace.getId(), subject.actorId()).isEmpty()) {
-            subjectStatus = SubjectStatus.UNLINKED;
+            subjectStatus = ReviewSubjectStatus.UNLINKED;
         } else {
-            subjectStatus = SubjectStatus.RESOLVED_LINKED_HUMAN;
+            subjectStatus = ReviewSubjectStatus.RESOLVED_LINKED_HUMAN;
         }
 
         ReviewRepositoryTarget selectedRepository = scope
@@ -249,7 +250,7 @@ public class PracticeReviewCoverageService {
                 selectedRepository.baseBranches().isEmpty() ||
                 (baseBranch != null && selectedRepository.baseBranches().contains(baseBranch)));
         boolean personMatched =
-            subjectStatus == SubjectStatus.RESOLVED_LINKED_HUMAN &&
+            subjectStatus == ReviewSubjectStatus.RESOLVED_LINKED_HUMAN &&
             subject != null &&
             scope.admitsPerson(subject.actorId());
         return new CoverageAssessment(
@@ -263,17 +264,10 @@ public class PracticeReviewCoverageService {
         );
     }
 
-    public enum SubjectStatus {
-        RESOLVED_LINKED_HUMAN,
-        MISSING,
-        NON_HUMAN,
-        UNLINKED,
-    }
-
     public record CoverageAssessment(
         ReviewRepositoryMode repositoryMode,
         ReviewPersonMode personMode,
-        SubjectStatus subjectStatus,
+        ReviewSubjectStatus subjectStatus,
         boolean repositoryMatched,
         boolean branchMatched,
         boolean personMatched,
@@ -283,46 +277,21 @@ public class PracticeReviewCoverageService {
     @Transactional
     public void replace(Workspace workspace, WorkspaceReviewScope requested) {
         long workspaceId = workspace.getId();
+        validate(workspaceId, requested);
         Map<String, RepositoryToMonitor> monitorsByName = monitorRepository
             .findByWorkspaceId(workspaceId)
             .stream()
             .collect(Collectors.toMap(RepositoryToMonitor::getNameWithOwner, Function.identity()));
-        Map<Long, WorkspaceMembership> eligibleById = eligibleMemberships(workspaceId)
-            .stream()
-            .collect(Collectors.toMap(WorkspaceMembership::getUserId, Function.identity()));
-
-        LinkedHashMap<String, ReviewRepositoryTarget> requestedRepositories = new LinkedHashMap<>();
-        for (ReviewRepositoryTarget selection : requested.repositories()) {
-            if (selection.nameWithOwner().isBlank()) {
-                throw new InvalidReviewCoverageException("A selected repository name must not be blank");
-            }
-            if (!monitorsByName.containsKey(selection.nameWithOwner())) {
-                throw new InvalidReviewCoverageException(
-                    "Repository is not monitored by this workspace: " + selection.nameWithOwner()
-                );
-            }
-            requestedRepositories.put(selection.nameWithOwner(), selection);
-        }
         Set<Long> requestedPeople = Set.copyOf(requested.personUserIds());
-        if (!eligibleById.keySet().containsAll(requestedPeople)) {
-            throw new InvalidReviewCoverageException(
-                "Every selected person must be an eligible linked workspace member"
-            );
-        }
 
         repositoryTargetRepository.deleteByWorkspaceId(workspaceId);
         personTargetRepository.deleteByWorkspaceId(workspaceId);
 
         if (requested.repositoryMode() == ReviewRepositoryMode.SELECTED) {
-            for (ReviewRepositoryTarget selection : requestedRepositories.values()) {
-                for (String branchName : selection.baseBranches()) {
-                    if (branchName.length() > 255) {
-                        throw new InvalidReviewCoverageException("A base branch must not exceed 255 characters");
-                    }
-                }
+            for (ReviewRepositoryTarget selection : requested.repositories()) {
                 RepositoryToMonitor monitor = java.util.Objects.requireNonNull(
                     monitorsByName.get(selection.nameWithOwner()),
-                    "validate() refuses a selection this workspace does not monitor"
+                    "validated repository"
                 );
                 repositoryTargetRepository.save(
                     new PracticeReviewRepositoryTarget(workspaceId, monitor.getId(), selection.baseBranches())

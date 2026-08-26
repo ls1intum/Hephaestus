@@ -56,12 +56,21 @@ export function DeliveryPolicyTrace({ evaluations }: DeliveryPolicyTraceProps) {
 									? ""
 									: ` · evaluated revision ${evaluation.evaluatedRevision}`}
 							</p>
+							<p className="text-xs text-muted-foreground">
+								Resolver {evaluation.resolverVersion} · Evaluated{" "}
+								<time dateTime={evaluation.evaluatedAt.toISOString()}>
+									{evaluation.evaluatedAt.toLocaleString()}
+								</time>
+							</p>
 							{evaluation.decisiveReason && (
 								<p className="text-xs">
 									Stopped here. {DELIVERY_REASON_SENTENCES[evaluation.decisiveReason]}
 								</p>
 							)}
 							<p className="text-xs text-muted-foreground">{scopeSentence(evaluation.facts)}</p>
+							<p className="text-xs text-muted-foreground">
+								{policyFactsSentence(evaluation.facts)}
+							</p>
 							<ul className="space-y-1">
 								{evaluation.checks.map((check) => (
 									<li key={check.check} className="flex items-center justify-between gap-3 text-xs">
@@ -76,6 +85,17 @@ export function DeliveryPolicyTrace({ evaluations }: DeliveryPolicyTraceProps) {
 			</CollapsibleContent>
 		</Collapsible>
 	);
+}
+
+function policyFactsSentence(facts: DeliveryPolicyFactsSnapshot): string {
+	const applicable = (value: boolean | undefined) =>
+		value == null ? "not applicable" : value ? "yes" : "no";
+	const listedPractices = facts.contributingPractices
+		?.map((practice) => `${practice.slug ?? "unknown"}: ${practice.autonomy ?? "unknown"}`)
+		.join(", ");
+	const practices =
+		listedPractices == null || listedPractices.length === 0 ? "none" : listedPractices;
+	return `Policy: delivery ${facts.deliveryStatus ?? "not applicable"} · trigger ${facts.triggerMode ?? "not applicable"} · recipient consent ${applicable(facts.recipientConsent)} · repository matched ${applicable(facts.repositoryMatched)} · branch matched ${applicable(facts.branchMatched)} · person matched ${applicable(facts.personMatched)} · practices ${practices}`;
 }
 
 function scopeSentence(facts: DeliveryPolicyFactsSnapshot): string {

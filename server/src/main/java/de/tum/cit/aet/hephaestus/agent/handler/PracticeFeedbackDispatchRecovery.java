@@ -32,9 +32,6 @@ class PracticeFeedbackDispatchRecovery {
     private final PracticeFeedbackDispatchService dispatchService;
     private final FeedbackLedgerRecorder feedbackLedgerRecorder;
 
-    /** How long an approved proposal waits for an operator to lift the brake before it is dropped. */
-    private static final java.time.Duration HELD_TTL = java.time.Duration.ofDays(30);
-
     @Scheduled(fixedDelayString = "PT30S", initialDelayString = "PT30S")
     @SchedulerLock(name = "practice-feedback-dispatch-recovery", lockAtMostFor = "PT15M", lockAtLeastFor = "PT5S")
     void recover() {
@@ -44,18 +41,13 @@ class PracticeFeedbackDispatchRecovery {
             PageRequest.of(0, BATCH_SIZE)
         )) {
             try {
-                failUnlessProviderWriteMayHaveLanded(exhausted, "Dispatch retry limit exhausted");
+                fail(exhausted, "Dispatch retry limit exhausted");
             } catch (RuntimeException exception) {
                 log.warn(
                     "Exhausted practice feedback dispatch could not be failed: dispatchId={}",
                     exhausted.getId(),
                     exception
                 );
-            }
-        }
-        for (var stale : dispatchRepository.findHeldSince(Instant.now().minus(HELD_TTL))) {
-            if (dispatchRepository.giveUpOnHeld(stale.getId(), stale.getWorkspaceId()) == 1) {
-                projectGiveUp(stale);
             }
         }
         for (var candidate : dispatchRepository.findRecoverable(
@@ -72,7 +64,7 @@ class PracticeFeedbackDispatchRecovery {
                     .findByIdAndWorkspaceId(dispatch.getAgentJobId(), dispatch.getWorkspaceId())
                     .orElse(null);
                 if (job == null) {
-                    failUnlessProviderWriteMayHaveLanded(dispatch, "Dispatch job no longer exists");
+                    fail(dispatch, "Dispatch job no longer exists");
                     continue;
                 }
                 if (dispatch.getDestination() == FeedbackDispatchDestination.APPROVED_ARTIFACT_COMMENT) {
@@ -82,10 +74,7 @@ class PracticeFeedbackDispatchRecovery {
                     if (
                         feedback == null || feedback.getBody() == null || !feedback.getBody().equals(dispatch.getBody())
                     ) {
-                        failUnlessProviderWriteMayHaveLanded(
-                            dispatch,
-                            "Approved feedback is missing or no longer matches its immutable body"
-                        );
+                        fail(dispatch, "Approved feedback is missing or no longer matches its immutable body");
                         continue;
                     }
                 }
@@ -94,25 +83,6 @@ class PracticeFeedbackDispatchRecovery {
             } catch (RuntimeException exception) {
                 log.warn("Practice feedback dispatch recovery deferred: dispatchId={}", candidate.getId(), exception);
             }
-        }
-    }
-
-    private void projectGiveUp(FeedbackDispatch dispatch) {
-        log.info(
-            "Held dispatch dropped after {}: dispatchId={}, reason={}",
-            HELD_TTL,
-            dispatch.getId(),
-            dispatch.getSuppressionReason()
-        );
-        if (dispatch.getDestination() == FeedbackDispatchDestination.APPROVED_ARTIFACT_COMMENT) {
-            feedbackRepository.markApprovedSuppressed(
-                dispatch.getWorkspaceId(),
-                dispatch.approvedFeedbackId(),
-                java.util.Objects.requireNonNull(
-                    dispatch.getSuppressionReason(),
-                    "a held dispatch always carries the refusal that parked it"
-                )
-            );
         }
     }
 
@@ -153,15 +123,7 @@ class PracticeFeedbackDispatchRecovery {
         }
     }
 
-    private void failUnlessProviderWriteMayHaveLanded(FeedbackDispatch dispatch, String error) {
-        if (Boolean.TRUE.equals(dispatch.getWriteStarted())) {
-            log.warn(
-                "Dispatch not failed because its provider write may already be live; leaving it to keep retrying: dispatchId={}, error={}",
-                dispatch.getId(),
-                error
-            );
-            return;
-        }
+    private void fail(FeedbackDispatch dispatch, String error) {
         dispatchService.fail(dispatch, error);
         if (dispatch.getDestination() == FeedbackDispatchDestination.APPROVED_ARTIFACT_COMMENT) {
             feedbackRepository.markApprovedFailed(dispatch.getWorkspaceId(), dispatch.approvedFeedbackId());

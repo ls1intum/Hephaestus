@@ -51,7 +51,6 @@ class PracticeReviewCoverageServiceTest extends BaseUnitTest {
     @Test
     void selectedRepositoryFromAnotherTenantIsRejected() {
         when(monitors.findByWorkspaceId(1L)).thenReturn(List.of(monitor(11L, "owner/local")));
-        when(memberships.findAllWithUserByWorkspaceId(1L)).thenReturn(List.of());
         WorkspaceReviewScope crossTenant = new WorkspaceReviewScope(
             ReviewRepositoryMode.SELECTED,
             ReviewPersonMode.ALL_ELIGIBLE,

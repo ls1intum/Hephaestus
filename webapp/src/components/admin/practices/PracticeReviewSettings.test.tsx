@@ -1,4 +1,4 @@
-import { fireEvent, screen } from "@testing-library/react";
+import { act, fireEvent, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type {
 	AgentBinding,
@@ -44,25 +44,24 @@ function renderSettings(props: Partial<React.ComponentProps<typeof PracticeRevie
 				onReset: vi.fn(),
 			}}
 			coverage={{
-				preview: {
-					data: {
-						current: settings.coverageSummary,
-						proposed: settings.coverageSummary,
-						widens: true,
-					},
-					isPending: false,
-					isError: false,
-					onPreview: vi.fn(),
-				},
+				preview: vi.fn(async () => ({
+					current: settings.coverageSummary,
+					proposed: settings.coverageSummary,
+					widens: true,
+				})),
 				repositories: {
 					options: [{ value: "acme/widgets", label: "acme/widgets" }],
 					isLoading: false,
 					isError: false,
+					error: undefined,
+					onRetry: vi.fn(),
 				},
 				people: {
 					options: [{ value: 7, label: "Ada" }],
 					isLoading: false,
 					isError: false,
+					error: undefined,
+					onRetry: vi.fn(),
 				},
 			}}
 			{...props}
@@ -149,5 +148,58 @@ describe("PracticeReviewSettings", () => {
 
 		fireEvent.click(start);
 		expect(onUpdate).toHaveBeenCalledWith({ practicesEnabled: true });
+	});
+
+	it("does not apply a coverage preview after the page closes", async () => {
+		let resolvePreview:
+			| ((value: {
+					current: typeof settings.coverageSummary;
+					proposed: typeof settings.coverageSummary;
+					widens: boolean;
+			  }) => void)
+			| undefined;
+		const preview = vi.fn(
+			() =>
+				new Promise<{
+					current: typeof settings.coverageSummary;
+					proposed: typeof settings.coverageSummary;
+					widens: boolean;
+				}>((resolve) => {
+					resolvePreview = resolve;
+				}),
+		);
+		const onUpdate = vi.fn();
+		const view = await renderSettings({
+			policy: { settings, isSaving: false, onUpdate, onReset: vi.fn() },
+			coverage: {
+				preview,
+				repositories: {
+					options: [{ value: "acme/widgets", label: "acme/widgets" }],
+					isLoading: false,
+					isError: false,
+					error: undefined,
+					onRetry: vi.fn(),
+				},
+				people: {
+					options: [{ value: 7, label: "Ada" }],
+					isLoading: false,
+					isError: false,
+					error: undefined,
+					onRetry: vi.fn(),
+				},
+			},
+		});
+
+		fireEvent.click(screen.getByRole("radio", { name: "All monitored repositories" }));
+		view.unmount();
+		act(() => {
+			resolvePreview?.({
+				current: settings.coverageSummary,
+				proposed: settings.coverageSummary,
+				widens: false,
+			});
+		});
+
+		expect(onUpdate).not.toHaveBeenCalled();
 	});
 });
