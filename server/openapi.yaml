@@ -5334,6 +5334,7 @@ paths:
             - AWAITING_APPROVAL
             - PREPARED
             - PARTIALLY_DELIVERED
+            - PARTIALLY_FAILED
             - DELIVERED
             - SUPERSEDED
             - SUPPRESSED
@@ -7743,12 +7744,6 @@ components:
         container:
           type: string
           description: "Repository, collection or channel it sits in"
-        deliveryPolicy:
-          type: array
-          description: Immutable ordered policy evaluations; intended for progressive
-            technical disclosure
-          items:
-            $ref: "#/components/schemas/DeliveryPolicyTrace"
         number:
           type: integer
           format: int32
@@ -7776,7 +7771,6 @@ components:
       required:
       - artifactId
       - artifactKind
-      - deliveryPolicy
       - practices
       - signals
       - title
@@ -12757,6 +12751,7 @@ components:
           - AWAITING_APPROVAL
           - PREPARED
           - PARTIALLY_DELIVERED
+          - PARTIALLY_FAILED
           - DELIVERED
           - SUPERSEDED
           - SUPPRESSED
@@ -12905,6 +12900,7 @@ components:
           - AWAITING_APPROVAL
           - PREPARED
           - PARTIALLY_DELIVERED
+          - PARTIALLY_FAILED
           - DELIVERED
           - SUPERSEDED
           - SUPPRESSED
@@ -12993,6 +12989,10 @@ components:
         agentJobId:
           type: string
           format: uuid
+        approval:
+          $ref: "#/components/schemas/FeedbackApproval"
+          description: "Immutable human decision for this proposal, when one has been\
+            \ made"
         artifact:
           $ref: "#/components/schemas/ReviewArtifact"
           description: Work item the feedback targets; null when it is unanchored
@@ -13000,7 +13000,7 @@ components:
           type: string
           description: "Stored composed body; null when none was produced, and always\
             \ null on the IN_APP and IN_CHAT channels — neither the developer's practice\
-            \ pages nor the mentor's queued move is readable by an operator"
+            \ pages nor the mentor's prepared context is readable by an operator"
         channel:
           type: string
           enum:
@@ -13014,12 +13014,18 @@ components:
           type: string
           format: date-time
           description: When the feedback was placed; null if it was not delivered
+        deliveryPolicy:
+          type: array
+          description: Ordered delivery-policy evaluations for this feedback's review
+          items:
+            $ref: "#/components/schemas/DeliveryPolicyTrace"
         deliveryState:
           type: string
           enum:
           - AWAITING_APPROVAL
           - PREPARED
           - PARTIALLY_DELIVERED
+          - PARTIALLY_FAILED
           - DELIVERED
           - SUPERSEDED
           - SUPPRESSED
@@ -13090,6 +13096,7 @@ components:
       - agentJobId
       - channel
       - createdAt
+      - deliveryPolicy
       - deliveryState
       - id
       - observations

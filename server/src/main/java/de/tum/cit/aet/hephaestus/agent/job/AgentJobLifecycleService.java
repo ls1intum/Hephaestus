@@ -73,7 +73,7 @@ public class AgentJobLifecycleService {
                 Set.of(DeliveryStatus.FAILED)
             );
             if (transitioned == 1) {
-                feedbackDispatchRepository.resetFailedBeforeWrite(jobId, workspaceId);
+                feedbackDispatchRepository.resetFailedAutomaticPackage(jobId, workspaceId);
             }
             return transitioned;
         });
@@ -254,7 +254,7 @@ public class AgentJobLifecycleService {
             return false;
         }
 
-        if (existing.kind() == ExistingDeliveryLookup.Kind.FOUND) {
+        if (existing.kind() == ExistingDeliveryLookup.Kind.FOUND && !handler.reconcilesMoreThanOneProviderObject()) {
             String existingCommentId = existing.commentId();
             boolean won = fencedDeliveryWrite(
                 job.getId(),
@@ -272,7 +272,6 @@ public class AgentJobLifecycleService {
             return won;
         }
 
-        // ABSENT — confirmed safe to post.
         try {
             handler.deliver(job);
             boolean won = fencedDeliveryWrite(

@@ -23,6 +23,10 @@ import de.tum.cit.aet.hephaestus.practices.feedback.DeliveryPolicyEvaluationReco
 import de.tum.cit.aet.hephaestus.practices.feedback.DeliveryPolicyStage;
 import de.tum.cit.aet.hephaestus.practices.feedback.DeliveryPolicySurface;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
+import de.tum.cit.aet.hephaestus.practices.feedback.approval.FeedbackApproval;
+import de.tum.cit.aet.hephaestus.practices.feedback.approval.FeedbackApprovalDecision;
+import de.tum.cit.aet.hephaestus.practices.feedback.approval.FeedbackApprovalRepository;
+import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewCoverageService;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties;
@@ -75,19 +79,8 @@ class PracticeFeedbackDeliveryPolicyTest extends BaseUnitTest {
     @Mock
     private PracticeRepository practiceRepository;
 
-    @Test
-    void approvedFeedbackKeepsHumanAuthorizationAtPhysicalEgress() {
-        assertThat(
-            PracticeFeedbackDeliveryPolicy.requiredAutonomy(DeliveryPolicyStage.EGRESS, UUID.randomUUID())
-        ).isEqualTo(PracticeAutonomy.HUMAN_APPROVAL);
-    }
-
-    @Test
-    void automaticFeedbackRequiresAutomaticAuthorityAtPhysicalEgress() {
-        assertThat(PracticeFeedbackDeliveryPolicy.requiredAutonomy(DeliveryPolicyStage.EGRESS, null)).isEqualTo(
-            PracticeAutonomy.AUTOMATIC
-        );
-    }
+    @Mock
+    private FeedbackApprovalRepository approvalRepository;
 
     @Test
     void compositionIsAllowedBeforeAnyPracticeSetIsKnown() {
@@ -95,6 +88,24 @@ class PracticeFeedbackDeliveryPolicyTest extends BaseUnitTest {
 
         assertThat(policy().allowsComposition(job, DeliveryPolicySurface.IN_APP)).isTrue();
         assertThat(policy().allowsComposition(job, DeliveryPolicySurface.CONVERSATION)).isTrue();
+    }
+
+    @Test
+    void repositorylessCompositionStillRequiresCurrentCoverageAndConsent() {
+        AgentJob job = conversationJob();
+        when(coverageService.assessRepositoryless(any(), any())).thenReturn(coverage(false));
+
+        assertThat(policy().allowsComposition(job, DeliveryPolicySurface.CONVERSATION)).isFalse();
+        assertThat(recordedRefusal()).isEqualTo(FeedbackSuppressionReason.OUTSIDE_CURRENT_COVERAGE);
+    }
+
+    @Test
+    void repositorylessCompositionHonorsTheRecipientsCurrentPreference() {
+        AgentJob job = conversationJob();
+        when(accountPreferencesQuery.practiceFeedbackDeliveryEnabled(AUTHOR_ID)).thenReturn(false);
+
+        assertThat(policy().allowsComposition(job, DeliveryPolicySurface.CONVERSATION)).isFalse();
+        assertThat(recordedRefusal()).isEqualTo(FeedbackSuppressionReason.RECIPIENT_OPTED_OUT);
     }
 
     @Test
@@ -142,6 +153,93 @@ class PracticeFeedbackDeliveryPolicyTest extends BaseUnitTest {
         job.setPracticeRolloutRevision(job.getWorkspace().getReviewSettings().getRolloutRevision() - 1);
 
         assertThat(policy().allowsComposition(job, DeliveryPolicySurface.CONVERSATION)).isFalse();
+        assertThat(recordedRefusal()).isEqualTo(FeedbackSuppressionReason.STALE_ROLLOUT_REVISION);
+    }
+
+    @Test
+    void explicitApprovalMayReleaseAnOlderProposalAfterResume() {
+        AgentJob job = pullRequestJob();
+        job.setPracticeRolloutRevision(job.getWorkspace().getReviewSettings().getRolloutRevision() - 1);
+        PullRequest pullRequest = openPullRequest();
+        stubPullRequestEvaluation(pullRequest, coverage(true));
+        when(accountPreferencesQuery.practiceFeedbackDeliveryEnabled(AUTHOR_ID)).thenReturn(true);
+        UUID feedbackId = UUID.randomUUID();
+        Practice practice = new Practice();
+        practice.setSlug("review-quality");
+        practice.setAutonomy(PracticeAutonomy.HUMAN_APPROVAL);
+        when(
+            practiceRepository.findByWorkspaceIdAndSlugIn(WORKSPACE_ID, java.util.Set.of("review-quality"))
+        ).thenReturn(java.util.List.of(practice));
+        when(approvalRepository.findByFeedbackIdAndWorkspaceId(feedbackId, WORKSPACE_ID)).thenReturn(
+            Optional.of(
+                FeedbackApproval.builder()
+                    .feedbackId(feedbackId)
+                    .workspaceId(WORKSPACE_ID)
+                    .decision(FeedbackApprovalDecision.APPROVED)
+                    .build()
+            )
+        );
+
+        var decision = policy().evaluatePullRequest(
+            job,
+            DeliveryPolicyStage.EGRESS,
+            feedbackId,
+            java.util.Set.of("review-quality")
+        );
+
+        assertThat(decision.allowed()).isTrue();
+        assertThat(recordedEvaluation().result().checks()).anySatisfy(check -> {
+            assertThat(check.check().name()).isEqualTo("ROLLOUT_REVISION");
+            assertThat(check.status().name()).isEqualTo("NOT_APPLICABLE");
+        });
+    }
+
+    @Test
+    void repositorylessFeedbackIdentityDoesNotGrantHumanApproval() {
+        AgentJob job = conversationJob();
+        UUID feedbackId = UUID.randomUUID();
+        Practice practice = new Practice();
+        practice.setSlug("review-quality");
+        practice.setAutonomy(PracticeAutonomy.HUMAN_APPROVAL);
+        when(
+            practiceRepository.findByWorkspaceIdAndSlugIn(WORKSPACE_ID, java.util.Set.of("review-quality"))
+        ).thenReturn(java.util.List.of(practice));
+
+        var decision = policy().evaluateRepositoryless(
+            job,
+            DeliveryPolicyStage.EGRESS,
+            feedbackId,
+            DeliveryPolicySurface.CONVERSATION,
+            AUTHOR_ID,
+            java.util.Set.of("review-quality")
+        );
+
+        assertThat(decision.allowed()).isFalse();
+        assertThat(recordedRefusal()).isEqualTo(FeedbackSuppressionReason.PRACTICE_REQUIRES_APPROVAL);
+    }
+
+    @Test
+    void staleAutomaticRepositorylessFeedbackIsNotReleasedAsAnApproval() {
+        AgentJob job = conversationJob();
+        job.setPracticeRolloutRevision(job.getPracticeRolloutRevision() - 1);
+        UUID feedbackId = UUID.randomUUID();
+        Practice practice = new Practice();
+        practice.setSlug("review-quality");
+        practice.setAutonomy(PracticeAutonomy.AUTOMATIC);
+        when(
+            practiceRepository.findByWorkspaceIdAndSlugIn(WORKSPACE_ID, java.util.Set.of("review-quality"))
+        ).thenReturn(java.util.List.of(practice));
+
+        var decision = policy().evaluateRepositoryless(
+            job,
+            DeliveryPolicyStage.EGRESS,
+            feedbackId,
+            DeliveryPolicySurface.CONVERSATION,
+            AUTHOR_ID,
+            java.util.Set.of("review-quality")
+        );
+
+        assertThat(decision.allowed()).isFalse();
         assertThat(recordedRefusal()).isEqualTo(FeedbackSuppressionReason.STALE_ROLLOUT_REVISION);
     }
 
@@ -203,6 +301,12 @@ class PracticeFeedbackDeliveryPolicyTest extends BaseUnitTest {
         job.setId(UUID.randomUUID());
         job.setWorkspace(workspace);
         job.setArtifactKind(ArtifactKind.of("chat.conversation_thread"));
+        job.setPracticeRolloutRevision(workspace.getReviewSettings().getRolloutRevision());
+        var metadata = tools.jackson.databind.json.JsonMapper.builder().build().createObjectNode();
+        metadata.put("about_user_id", AUTHOR_ID);
+        job.setMetadata(metadata);
+        lenient().when(coverageService.assessRepositoryless(any(), any())).thenReturn(coverage(true));
+        lenient().when(accountPreferencesQuery.practiceFeedbackDeliveryEnabled(AUTHOR_ID)).thenReturn(true);
         return job;
     }
 
@@ -271,7 +375,8 @@ class PracticeFeedbackDeliveryPolicyTest extends BaseUnitTest {
             silentModeQuery,
             coverageService,
             evaluationRecorder,
-            practiceRepository
+            practiceRepository,
+            approvalRepository
         );
     }
 }

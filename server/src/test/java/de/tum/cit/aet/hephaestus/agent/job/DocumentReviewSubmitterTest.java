@@ -21,6 +21,7 @@ import de.tum.cit.aet.hephaestus.integration.core.signal.SignalName;
 import de.tum.cit.aet.hephaestus.integration.core.signal.SignalRecorder;
 import de.tum.cit.aet.hephaestus.integration.core.signal.SignalRevision;
 import de.tum.cit.aet.hephaestus.integration.core.signal.SignalStateReason;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ReviewSubject;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.ObservationOrigin;
 import de.tum.cit.aet.hephaestus.practices.review.GateDecision;
@@ -115,7 +116,7 @@ class DocumentReviewSubmitterTest extends BaseUnitTest {
     void submitsADocumentReview() {
         givenWorkspace();
         givenDocument(document(42L));
-        when(gate.evaluateSignal(workspace, PUBLISHED, TriggerMode.AUTO)).thenReturn(
+        when(gate.evaluateSignal(workspace, PUBLISHED, TriggerMode.AUTO, new ReviewSubject(42L, true))).thenReturn(
             automaticDetection(workspace, List.of())
         );
 
@@ -145,7 +146,7 @@ class DocumentReviewSubmitterTest extends BaseUnitTest {
     void resubmitCarriesTheLedgersDiscoveryMode() {
         givenWorkspace();
         givenDocument(document(42L));
-        when(gate.evaluateSignal(workspace, PUBLISHED, TriggerMode.AUTO)).thenReturn(
+        when(gate.evaluateSignal(workspace, PUBLISHED, TriggerMode.AUTO, new ReviewSubject(42L, true))).thenReturn(
             automaticDetection(workspace, List.of())
         );
         ArtifactSignal signal = new ArtifactSignal();
@@ -211,7 +212,7 @@ class DocumentReviewSubmitterTest extends BaseUnitTest {
     void recordsTheGatesReason() {
         givenWorkspace();
         givenDocument(document(42L));
-        when(gate.evaluateSignal(workspace, PUBLISHED, TriggerMode.AUTO)).thenReturn(
+        when(gate.evaluateSignal(workspace, PUBLISHED, TriggerMode.AUTO, new ReviewSubject(42L, true))).thenReturn(
             new GateDecision.Skip("every practice bound to this signal is off", SignalStateReason.PRACTICE_AUTONOMY_OFF)
         );
 

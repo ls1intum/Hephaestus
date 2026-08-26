@@ -36,7 +36,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -168,27 +167,16 @@ public class FeedbackLedgerRecorder {
         this.commentFormatter = commentFormatter;
     }
 
-    /** Records a delivery whose summary landed. */
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void record(
-        AgentJob job,
-        DeliveryContent delivery,
-        ArtifactKind artifact,
-        List<DeliveredSignal> inlineSignals
-    ) {
-        record(job, delivery, artifact, inlineSignals, true, !inlineSignals.isEmpty(), true);
-    }
-
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void record(
         AgentJob job,
         DeliveryContent delivery,
         ArtifactKind artifact,
         List<DeliveredSignal> inlineSignals,
-        boolean summaryDelivered,
+        @Nullable String summaryExternalRef,
         boolean inlineDelivered
     ) {
-        record(job, delivery, artifact, inlineSignals, summaryDelivered, inlineDelivered, true);
+        record(job, delivery, artifact, inlineSignals, summaryExternalRef, inlineDelivered, true);
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -197,10 +185,10 @@ public class FeedbackLedgerRecorder {
         DeliveryContent delivery,
         ArtifactKind artifact,
         List<DeliveredSignal> inlineSignals,
-        boolean summaryDelivered,
+        @Nullable String summaryExternalRef,
         boolean inlineDelivered
     ) {
-        record(job, delivery, artifact, inlineSignals, summaryDelivered, inlineDelivered, false);
+        record(job, delivery, artifact, inlineSignals, summaryExternalRef, inlineDelivered, false);
     }
 
     private void record(
@@ -208,10 +196,11 @@ public class FeedbackLedgerRecorder {
         DeliveryContent delivery,
         ArtifactKind artifact,
         List<DeliveredSignal> inlineSignals,
-        boolean summaryDelivered,
+        @Nullable String summaryExternalRef,
         boolean inlineDelivered,
         boolean conversationalDeliveryEligible
     ) {
+        boolean summaryDelivered = summaryExternalRef != null;
         if (conversationalDeliveryEligible) {
             publishFeedbackLaneTrigger(job);
         }
@@ -319,12 +308,12 @@ public class FeedbackLedgerRecorder {
             feedbackObservationRepository.insertIfAbsent(feedback.getId(), f.getId(), role.name(), ordinal++);
         }
 
-        if (summaryDelivered && job.getDeliveryCommentId() != null) {
+        if (summaryExternalRef != null) {
             feedbackPlacementRepository.save(
                 FeedbackPlacement.builder()
                     .feedback(feedback)
                     .placementType(PlacementType.SUMMARY)
-                    .postedCommentRef(job.getDeliveryCommentId())
+                    .postedCommentRef(summaryExternalRef)
                     .createdAt(now)
                     .build()
             );
@@ -553,71 +542,6 @@ public class FeedbackLedgerRecorder {
         );
     }
 
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void recordRecoveredSummary(AgentJob job, String externalRef, String body) {
-        if (feedbackRepository.existsByAgentJobIdAndPosition(job.getId(), IN_CONTEXT_UNIT_ORDINAL)) {
-            return;
-        }
-        List<Observation> observations = observationRepository.findByAgentJobId(job.getId());
-        if (observations.isEmpty()) {
-            return;
-        }
-        Observation any = observations.get(0);
-        String feedbackThreadKey = feedbackThreadKeyFor(any);
-        Instant now = Instant.now();
-        Feedback feedback = feedbackRepository.save(
-            Feedback.builder()
-                .agentJobId(job.getId())
-                .workspaceId(job.getWorkspace().getId())
-                .artifactKind(any.getArtifactKind())
-                .artifactId(any.getArtifactId())
-                .recipientUserId(any.getAboutUserId())
-                .aboutUserId(any.getAboutUserId())
-                .channel(FeedbackChannel.IN_CONTEXT)
-                .position(IN_CONTEXT_UNIT_ORDINAL)
-                .deliveryState(FeedbackDeliveryState.DELIVERED)
-                .body(body)
-                .source(FeedbackSource.AGENT)
-                .threadKey(feedbackThreadKey)
-                .replacesId(
-                    feedbackPlacementRepository
-                        .findLatestDeliveredSummary(feedbackThreadKey)
-                        .map(FeedbackPlacement::getFeedbackId)
-                        .orElse(null)
-                )
-                .createdAt(now)
-                .deliveredAt(now)
-                .build()
-        );
-        feedbackPlacementRepository.save(
-            FeedbackPlacement.builder()
-                .feedback(feedback)
-                .placementType(PlacementType.SUMMARY)
-                .postedCommentRef(externalRef)
-                .createdAt(now)
-                .build()
-        );
-        log.info(
-            "Recovered summary recorded in the ledger: jobId={}, feedbackId={}, commentRef={}",
-            job.getId(),
-            feedback.getId(),
-            externalRef
-        );
-    }
-
-    @Transactional(propagation = Propagation.REQUIRES_NEW, readOnly = true)
-    public Optional<String> priorLiveIssueSummaryRef(AgentJob job) {
-        List<Observation> observations = observationRepository.findByAgentJobId(job.getId());
-        if (observations.isEmpty()) {
-            return Optional.empty();
-        }
-        String feedbackThreadKey = feedbackThreadKeyFor(observations.get(0));
-        return feedbackPlacementRepository
-            .findLatestDeliveredSummary(feedbackThreadKey)
-            .map(FeedbackPlacement::getPostedCommentRef)
-            .filter(ref -> !ref.isBlank());
-    }
-
     /**
      * Record a SUPPRESSED ledger unit for a locus withheld by reaction-aware suppression (ADR 0021) — the
      * student already DISPUTED / marked NOT_APPLICABLE / DISMISSED this concern, so it was NOT re-delivered.
@@ -655,6 +579,7 @@ public class FeedbackLedgerRecorder {
         if (delivery == null || delivery.mrNote() == null) return;
         String body = PullRequestCommentPoster.sanitize(delivery.mrNote());
         if (body.isBlank()) return;
+        String providerSummary = commentFormatter.appendDisclosure(body, job);
         if (feedbackRepository.existsByAgentJobIdAndPosition(job.getId(), position)) return;
         Map<String, Observation> stored = observationRepository
             .findByAgentJobId(job.getId())
@@ -686,8 +611,8 @@ public class FeedbackLedgerRecorder {
                 .channel(FeedbackChannel.IN_CONTEXT)
                 .position(position)
                 .deliveryState(FeedbackDeliveryState.AWAITING_APPROVAL)
-                .body(body)
-                .proposedPlacements(proposedPlacements(job, delivery, body))
+                .body(providerSummary)
+                .proposedPlacements(proposedPlacements(delivery, providerSummary))
                 .reviewedRevision(reviewedRevision(job))
                 .proposedPracticeSlugs(
                     proposed.stream().map(ValidatedObservation::practiceSlug).distinct().sorted().toList()
@@ -716,7 +641,7 @@ public class FeedbackLedgerRecorder {
         }
     }
 
-    private List<ProposedPlacement> proposedPlacements(AgentJob job, DeliveryContent delivery, String summary) {
+    private List<ProposedPlacement> proposedPlacements(DeliveryContent delivery, String summary) {
         var placements = new java.util.ArrayList<ProposedPlacement>(delivery.diffNotes().size() + 1);
         placements.add(ProposedPlacement.summary(summary));
         for (DiffNote note : delivery.diffNotes()) {

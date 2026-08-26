@@ -8,8 +8,15 @@ import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobStatus;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
+import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDispatchCompletion;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDispatchInsert;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDispatchRepository;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDispatchState;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSource;
 import de.tum.cit.aet.hephaestus.workspace.AbstractWorkspaceIntegrationTest;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
@@ -37,6 +44,9 @@ class PracticeFeedbackDispatchRepositoryIntegrationTest extends AbstractWorkspac
     private AgentJobRepository jobRepository;
 
     @Autowired
+    private FeedbackRepository feedbackRepository;
+
+    @Autowired
     private TransactionTemplate transactions;
 
     @Autowired
@@ -44,10 +54,12 @@ class PracticeFeedbackDispatchRepositoryIntegrationTest extends AbstractWorkspac
 
     private Workspace workspace;
     private UUID jobId;
+    private Long ownerId;
 
     @BeforeEach
     void seedDispatchOwner() {
         User owner = persistUser("dispatch-owner");
+        ownerId = owner.getId();
         workspace = createWorkspace("dispatch", "Dispatch", "dispatch-org", AccountType.ORG, owner);
         AgentJob job = new AgentJob();
         job.setWorkspace(workspace);
@@ -61,10 +73,12 @@ class PracticeFeedbackDispatchRepositoryIntegrationTest extends AbstractWorkspac
     @Test
     void shouldAllowExactlyOneConcurrentClaim() throws Exception {
         UUID dispatchId = insertDispatch(workspace.getId(), jobId, "claim-race");
+        CountDownLatch ready = new CountDownLatch(2);
         CountDownLatch start = new CountDownLatch(1);
         try (var executor = Executors.newFixedThreadPool(2)) {
-            var first = executor.submit(() -> claimAfter(start, dispatchId, "first"));
-            var second = executor.submit(() -> claimAfter(start, dispatchId, "second"));
+            var first = executor.submit(() -> claimAfter(ready, start, dispatchId, "first"));
+            var second = executor.submit(() -> claimAfter(ready, start, dispatchId, "second"));
+            assertThat(ready.await(10, TimeUnit.SECONDS)).isTrue();
             start.countDown();
 
             assertThat(
@@ -146,7 +160,7 @@ class PracticeFeedbackDispatchRepositoryIntegrationTest extends AbstractWorkspac
     }
 
     @Test
-    void shouldResetOnlyFailuresKnownToPrecedeTheProviderWrite() {
+    void shouldResetFailedAutomaticPackagesBeforeOrAfterAProviderWrite() {
         UUID safe = insertDispatch(workspace.getId(), jobId, "safe-retry");
         UUID ambiguous = insertDispatch(workspace.getId(), jobId, "ambiguous-retry");
         jdbcTemplate.update(
@@ -159,9 +173,9 @@ class PracticeFeedbackDispatchRepositoryIntegrationTest extends AbstractWorkspac
         );
 
         Integer reset = transactions.execute(status ->
-            dispatchRepository.resetFailedBeforeWrite(jobId, workspace.getId())
+            dispatchRepository.resetFailedAutomaticPackage(jobId, workspace.getId())
         );
-        assertThat(reset).isEqualTo(1);
+        assertThat(reset).isEqualTo(2);
         assertThat(
             jdbcTemplate.queryForObject("SELECT state FROM feedback_dispatch WHERE id = ?", String.class, safe)
         ).isEqualTo("PENDING");
@@ -170,11 +184,70 @@ class PracticeFeedbackDispatchRepositoryIntegrationTest extends AbstractWorkspac
         ).isZero();
         assertThat(
             jdbcTemplate.queryForObject("SELECT state FROM feedback_dispatch WHERE id = ?", String.class, ambiguous)
-        ).isEqualTo("FAILED");
+        ).isEqualTo("PENDING");
     }
 
-    private int claimAfter(CountDownLatch start, UUID dispatchId, String owner) {
+    @Test
+    void approvedPackageKeepsTheSummaryReferenceWhileInlineDeliveryIsUncertain() {
+        Feedback feedback = feedbackRepository.saveAndFlush(
+            Feedback.builder()
+                .agentJobId(jobId)
+                .workspaceId(workspace.getId())
+                .recipientUserId(ownerId)
+                .aboutUserId(ownerId)
+                .channel(FeedbackChannel.IN_CONTEXT)
+                .position(8000)
+                .deliveryState(FeedbackDeliveryState.PREPARED)
+                .body("approved body")
+                .source(FeedbackSource.AGENT)
+                .build()
+        );
+        UUID dispatchId = UUID.randomUUID();
+        transactions.executeWithoutResult(status ->
+            dispatchRepository.insertIfAbsent(
+                new FeedbackDispatchInsert(
+                    dispatchId,
+                    "approved:" + feedback.getId(),
+                    workspace.getId(),
+                    jobId,
+                    feedback.getId(),
+                    "APPROVED_REVIEW_PACKAGE",
+                    "approved body",
+                    "[]",
+                    "{\"mrNote\":\"approved body\",\"diffNotes\":[],\"withheld\":[]}"
+                )
+            )
+        );
+        assertThat(claim(dispatchId, "package-worker", Instant.now().plusSeconds(60))).isEqualTo(1);
+
+        Integer finished = transactions.execute(status ->
+            dispatchRepository.finish(
+                new FeedbackDispatchCompletion(
+                    dispatchId,
+                    workspace.getId(),
+                    "package-worker",
+                    FeedbackDispatchState.UNCERTAIN.name(),
+                    "summary-42",
+                    "inline delivery incomplete",
+                    null,
+                    "[]",
+                    Instant.now()
+                )
+            )
+        );
+
+        assertThat(finished).isEqualTo(1);
+        assertThat(dispatchRepository.findByIdAndWorkspaceId(dispatchId, workspace.getId())).hasValueSatisfying(
+            dispatch -> {
+                assertThat(dispatch.getState()).isEqualTo(FeedbackDispatchState.UNCERTAIN);
+                assertThat(dispatch.getDeliveredExternalRef()).isEqualTo("summary-42");
+            }
+        );
+    }
+
+    private int claimAfter(CountDownLatch ready, CountDownLatch start, UUID dispatchId, String owner) {
         try {
+            ready.countDown();
             assertThat(start.await(10, TimeUnit.SECONDS)).isTrue();
             return claim(dispatchId, owner, Instant.now().plusSeconds(60));
         } catch (InterruptedException exception) {
@@ -210,10 +283,10 @@ class PracticeFeedbackDispatchRepositoryIntegrationTest extends AbstractWorkspac
                     workspaceId,
                     owningJobId,
                     null,
-                    "ARTIFACT_SUMMARY",
+                    "AUTOMATIC_REVIEW_PACKAGE",
                     "body",
-                    null,
-                    "[]"
+                    "[]",
+                    "{\"mrNote\":\"body\",\"diffNotes\":[],\"withheld\":[]}"
                 )
             )
         );

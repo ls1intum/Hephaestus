@@ -2,6 +2,8 @@ package de.tum.cit.aet.hephaestus.practices.reviewoutput;
 
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
+import de.tum.cit.aet.hephaestus.practices.feedback.DeliveryPolicyEvaluationRepository;
+import de.tum.cit.aet.hephaestus.practices.feedback.DeliveryPolicySurface;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository;
@@ -9,12 +11,15 @@ import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackPlacementRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackQueryFilter;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository.OperatorFeedbackRow;
+import de.tum.cit.aet.hephaestus.practices.feedback.approval.FeedbackApprovalRepository;
+import de.tum.cit.aet.hephaestus.practices.feedback.approval.dto.FeedbackApprovalDTO;
 import de.tum.cit.aet.hephaestus.practices.reviewoutput.ReviewArtifactResolver.ArtifactRef;
 import de.tum.cit.aet.hephaestus.practices.reviewoutput.dto.ReviewBoundObservationDTO;
 import de.tum.cit.aet.hephaestus.practices.reviewoutput.dto.ReviewFeedbackDTO;
 import de.tum.cit.aet.hephaestus.practices.reviewoutput.dto.ReviewFeedbackDetailDTO;
 import de.tum.cit.aet.hephaestus.practices.reviewoutput.dto.ReviewPlacementDTO;
 import de.tum.cit.aet.hephaestus.practices.reviewoutput.dto.ReviewSubjectDTO;
+import de.tum.cit.aet.hephaestus.practices.trace.dto.DeliveryPolicyTraceDTO;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -24,6 +29,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import tools.jackson.databind.ObjectMapper;
 
 @Service
 @RequiredArgsConstructor
@@ -34,6 +40,9 @@ class ReviewFeedbackQueryService {
     private final FeedbackPlacementRepository feedbackPlacementRepository;
     private final ReviewSubjectResolver subjectResolver;
     private final ReviewArtifactResolver artifactResolver;
+    private final FeedbackApprovalRepository approvalRepository;
+    private final DeliveryPolicyEvaluationRepository policyEvaluations;
+    private final ObjectMapper objectMapper;
 
     @Transactional(readOnly = true)
     public Page<ReviewFeedbackDTO> list(Long workspaceId, FeedbackQueryFilter filter, Pageable pageable) {
@@ -94,6 +103,26 @@ class ReviewFeedbackQueryService {
                 : new ArtifactRef(feedback.getAgentJobId(), feedback.getArtifactKind(), feedback.getArtifactId());
         var artifact =
             artifactKey == null ? null : artifactResolver.resolve(workspaceId, List.of(artifactKey)).get(artifactKey);
+        var evaluations = policyEvaluations.findByWorkspaceIdAndFeedbackIdOrderByEvaluatedAtAsc(
+            workspaceId,
+            feedbackId
+        );
+        if (evaluations.isEmpty()) {
+            evaluations =
+                policyEvaluations.findByWorkspaceIdAndAgentJobIdAndFeedbackIdIsNullAndSurfaceOrderByEvaluatedAtAsc(
+                    workspaceId,
+                    feedback.getAgentJobId(),
+                    surfaceFor(feedback.getChannel())
+                );
+        }
+        List<DeliveryPolicyTraceDTO> deliveryPolicy = evaluations
+            .stream()
+            .map(evaluation -> DeliveryPolicyTraceDTO.from(evaluation, objectMapper))
+            .toList();
+        FeedbackApprovalDTO approval = approvalRepository
+            .findByFeedbackIdAndWorkspaceId(feedbackId, workspaceId)
+            .map(FeedbackApprovalDTO::from)
+            .orElse(null);
         return ReviewFeedbackDetailDTO.from(
             feedback,
             artifact,
@@ -101,27 +130,20 @@ class ReviewFeedbackQueryService {
             subjects.get(feedback.getAboutUserId()),
             observations,
             placements,
+            approval,
+            deliveryPolicy,
             bodyVisibleToOperator(feedback)
         );
     }
 
-    /**
-     * Whether an operator may read this unit's composed text.
-     *
-     * <p>No on the two private lanes, and only on those. A {@link FeedbackChannel#IN_APP} body is the
-     * developer's private view — the one place the system writes about a named person where the person is
-     * the sole audience, and in the course deployment a workspace admin is their instructor. A
-     * {@link FeedbackChannel#IN_CHAT} body is the composer's coaching move for the mentor, and its
-     * evidence part is the same kind of thing: a pattern claim about a named person, drawn across their
-     * work, written to be shown to them alone and only once they have answered for themselves. It used to
-     * be safe to return because it was always NULL; now that a move is stored on it, returning it would
-     * hand the instructor the plan without the conversation that makes it a coaching move rather than a
-     * verdict.
-     *
-     * <p>Everything else about the unit still shows: that it exists, its state, why it was withheld, who it
-     * was for, how many observations fed it. See {@code FeedbackRepository#findForWorkspace}, which
-     * withholds the same bodies from the list projection in SQL.
-     */
+    private static DeliveryPolicySurface surfaceFor(FeedbackChannel channel) {
+        return switch (channel) {
+            case IN_CONTEXT -> DeliveryPolicySurface.ARTIFACT;
+            case IN_APP -> DeliveryPolicySurface.IN_APP;
+            case IN_CHAT -> DeliveryPolicySurface.CONVERSATION;
+        };
+    }
+
     private static boolean bodyVisibleToOperator(Feedback feedback) {
         return (feedback.getChannel() != FeedbackChannel.IN_APP && feedback.getChannel() != FeedbackChannel.IN_CHAT);
     }

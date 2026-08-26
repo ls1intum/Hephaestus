@@ -26,9 +26,9 @@ Use this short path before tuning coverage, campaigns, or per-practice overrides
    one way in under **How reviews start** — **Reviews the work starts**, **Reviews somebody asks for**, or
    both. The screen says *"Nothing can start a review"* when both are off.
 4. On **Practices → Review → How much**, set the **Workspace default** to **Review before sending** for the
-   first test. Back on **When and where**, keep coverage at **All monitored repositories** and **Every
-   member of this workspace**, and leave **Send feedback** on.
-5. Open a small pull or merge request whose author is a workspace member, then follow it in **Review
+   first test. Back on **When and where**, keep coverage at **All monitored repositories** and **All
+   eligible linked members**, and leave **Send feedback** on.
+5. Open a small pull or merge request whose author is an eligible linked member, then follow it in **Review
    activity**. The trace distinguishes ingestion, admission, observation, composition, withholding, and
    delivery; do not use the presence of a provider comment as the success test.
 
@@ -143,7 +143,7 @@ Three independent controls answer different questions; confusing them is the mos
   an existing proposal.
 - **Coverage**, under **What gets reviewed**, is one workspace-wide intersection: all or selected monitored
   repositories × all or selected people. A selected list left empty covers nobody, which is why the screen
-  warns you when one is. The people side is workspace membership — see
+  warns you when one is. The people side is linked human workspace membership — see
   [Who counts as a person](#who-counts-as-a-person).
 - **Send feedback**, under **Sending feedback**, controls whether feedback may leave Hephaestus. It stops
   comments on connected work and the mentor; it does not stop measurement, does not discard configuration, and
@@ -162,10 +162,10 @@ sending** leaves existing proposals exactly where they were.
 
 ### Who counts as a person
 
-The people side of coverage is **workspace membership**, and the count beside **People** on the review
-screen is how many members are in scope. A covered person must appear on the **Members** screen. Manage a
-missing person in the connected organization, group, or team roster and let membership sync pick them up;
-signing in to Hephaestus alone does not create workspace membership.
+The people side of coverage contains linked human workspace members, and the count beside **People** on
+the review screen is how many are in scope. A covered person must appear as eligible on the **Members**
+screen. Manage a missing person in the connected organization, group, or team roster and let membership
+sync pick them up; signing in to Hephaestus alone does not create workspace membership.
 
 An outside contributor who is not a workspace member is not covered, so their work is not reviewed and no
 feedback is prepared about them. The same is true when the work has no identifiable author, or the author is a bot.

@@ -76,7 +76,7 @@ public class PracticeReviewSettingsService {
         settings.applyDefaultAutonomy(req.defaultAutonomy() == null ? null : req.defaultAutonomy().name());
         var afterScope = coverageService.scope(workspace);
         PracticeReviewSnapshot after = PracticeReviewSnapshot.of(settings, afterScope);
-        if (!before.samePolicyAs(after)) {
+        if (!before.sameRolloutPolicyAs(after)) {
             settings.incrementRolloutRevision();
             after = PracticeReviewSnapshot.of(settings, afterScope);
         }

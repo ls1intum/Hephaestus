@@ -91,6 +91,15 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
     )
     int markApprovedFailed(@Param("workspaceId") Long workspaceId, @Param("id") UUID id);
 
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Transactional
+    @Query(
+        value = "UPDATE feedback SET delivery_state = 'PARTIALLY_FAILED', suppression_reason = NULL " +
+            "WHERE id = :id AND workspace_id = :workspaceId AND delivery_state IN ('PREPARED', 'PARTIALLY_DELIVERED')",
+        nativeQuery = true
+    )
+    int markApprovedPartiallyFailed(@Param("workspaceId") Long workspaceId, @Param("id") UUID id);
+
     /** Idempotency guard for the ledger recorder: has this job already recorded this unit? */
     boolean existsByAgentJobIdAndPosition(UUID agentJobId, Integer position);
 
@@ -106,7 +115,7 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
                COUNT(*) FILTER (WHERE f.delivery_state = 'SUPERSEDED') AS "superseded",
                COUNT(*) FILTER (WHERE f.delivery_state = 'SUPPRESSED' OR
                    (f.delivery_state = 'PARTIALLY_DELIVERED' AND f.suppression_reason IS NOT NULL)) AS "suppressed",
-               COUNT(*) FILTER (WHERE f.delivery_state = 'FAILED') AS "failed"
+               COUNT(*) FILTER (WHERE f.delivery_state IN ('FAILED', 'PARTIALLY_FAILED')) AS "failed"
         FROM feedback f
         WHERE f.workspace_id = :workspaceId
           AND f.agent_job_id IN :jobIds
@@ -471,6 +480,19 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
         nativeQuery = true
     )
     int markConversationSuppressedBySilentMode(@Param("id") UUID id);
+
+    @Modifying
+    @Transactional
+    @Query(
+        value = "UPDATE feedback SET delivery_state = 'SUPPRESSED', suppression_reason = :reason " +
+            "WHERE id = :id AND workspace_id = :workspaceId AND delivery_state = 'PREPARED'",
+        nativeQuery = true
+    )
+    int markPreparedSuppressed(
+        @Param("id") UUID id,
+        @Param("workspaceId") Long workspaceId,
+        @Param("reason") String reason
+    );
 
     /**
      * Newest PREPARED conversational units for a developer (as recipient) — the mentor's queue. The body on

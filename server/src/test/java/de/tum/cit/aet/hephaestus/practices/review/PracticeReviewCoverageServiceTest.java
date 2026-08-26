@@ -12,7 +12,9 @@ import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitorRepository;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembership;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembershipRepository;
+import de.tum.cit.aet.hephaestus.workspace.settings.PracticeReviewPersonTarget;
 import de.tum.cit.aet.hephaestus.workspace.settings.PracticeReviewPersonTargetRepository;
+import de.tum.cit.aet.hephaestus.workspace.settings.PracticeReviewRepositoryTarget;
 import de.tum.cit.aet.hephaestus.workspace.settings.PracticeReviewRepositoryTargetRepository;
 import de.tum.cit.aet.hephaestus.workspace.settings.ReviewPersonMode;
 import de.tum.cit.aet.hephaestus.workspace.settings.ReviewRepositoryMode;
@@ -88,6 +90,72 @@ class PracticeReviewCoverageServiceTest extends BaseUnitTest {
         assertThat(service.admits(workspace, "owner/repo", "main", null)).isFalse();
         assertThat(service.admits(workspace, "owner/repo", "main", bot)).isFalse();
         assertThat(service.admits(workspace, "owner/repo", "main", human)).isFalse();
+    }
+
+    @Test
+    void repositorylessWorkRequiresAllRepositoriesAndASelectedLinkedPerson() {
+        workspace.getReviewSettings().applyRollout(ReviewRepositoryMode.ALL_MONITORED, ReviewPersonMode.SELECTED, null);
+        when(people.findByWorkspaceId(1L)).thenReturn(List.of(new PracticeReviewPersonTarget(1L, 7L)));
+        when(memberships.findByWorkspace_IdAndUser_Id(1L, 7L)).thenReturn(Optional.of(membership(7L, User.Type.USER)));
+
+        var assessment = service.assessRepositoryless(workspace, new ReviewSubject(7L, true));
+
+        assertThat(assessment.admitted()).isTrue();
+        assertThat(assessment.repositoryMatched()).isTrue();
+        assertThat(assessment.personMatched()).isTrue();
+    }
+
+    @Test
+    void selectedRepositoriesFailClosedForRepositorylessWork() {
+        workspace.getReviewSettings().applyRollout(ReviewRepositoryMode.SELECTED, ReviewPersonMode.ALL_ELIGIBLE, null);
+        when(memberships.findByWorkspace_IdAndUser_Id(1L, 7L)).thenReturn(Optional.of(membership(7L, User.Type.USER)));
+
+        var assessment = service.assessRepositoryless(workspace, new ReviewSubject(7L, true));
+
+        assertThat(assessment.admitted()).isFalse();
+        assertThat(assessment.repositoryMatched()).isFalse();
+        assertThat(assessment.personMatched()).isTrue();
+    }
+
+    @Test
+    void previewDistinguishesWideningFromNarrowingAcrossBothAxes() {
+        workspace.getReviewSettings().applyRollout(ReviewRepositoryMode.SELECTED, ReviewPersonMode.SELECTED, null);
+        when(monitors.findByWorkspaceId(1L)).thenReturn(
+            List.of(monitor(11L, "owner/first"), monitor(12L, "owner/second"))
+        );
+        when(memberships.findAllWithUserByWorkspaceId(1L)).thenReturn(
+            List.of(membership(7L, User.Type.USER), membership(8L, User.Type.USER))
+        );
+        when(repositoryTargets.findByWorkspaceId(1L)).thenReturn(
+            List.of(new PracticeReviewRepositoryTarget(1L, 11L, List.of("main")))
+        );
+        when(people.findByWorkspaceId(1L)).thenReturn(List.of(new PracticeReviewPersonTarget(1L, 7L)));
+
+        var addRepository = scope(
+            List.of(
+                new ReviewRepositoryTarget("owner/first", List.of("main")),
+                new ReviewRepositoryTarget("owner/second", List.of())
+            ),
+            List.of(7L)
+        );
+        var addBranch = scope(
+            List.of(new ReviewRepositoryTarget("owner/first", List.of("main", "develop"))),
+            List.of(7L)
+        );
+        var addPerson = scope(List.of(new ReviewRepositoryTarget("owner/first", List.of("main"))), List.of(7L, 8L));
+        var narrow = scope(List.of(), List.of());
+
+        assertThat(service.preview(workspace, addRepository, 12).widens()).isTrue();
+        assertThat(service.preview(workspace, addBranch, 12).widens()).isTrue();
+        assertThat(service.preview(workspace, addPerson, 12).widens()).isTrue();
+        var narrowed = service.preview(workspace, narrow, 12);
+        assertThat(narrowed.widens()).isFalse();
+        assertThat(narrowed.proposed().coveredRepositories()).isZero();
+        assertThat(narrowed.proposed().coveredPeople()).isZero();
+    }
+
+    private static WorkspaceReviewScope scope(List<ReviewRepositoryTarget> repositories, List<Long> people) {
+        return new WorkspaceReviewScope(ReviewRepositoryMode.SELECTED, ReviewPersonMode.SELECTED, repositories, people);
     }
 
     private static RepositoryToMonitor monitor(long id, String name) {

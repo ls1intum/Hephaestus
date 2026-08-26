@@ -89,12 +89,7 @@ class DiffNotePoster {
             } catch (OutboundEgressSuppressedException e) {
                 throw new JobDeliverySuppressedException(e.toString(), e);
             } catch (RuntimeException e) {
-                log.warn(
-                    "Stale inline-note clear failed (best-effort), continuing: kind={}, jobId={}, error={}",
-                    kind,
-                    job.getId(),
-                    e.getMessage()
-                );
+                throw new JobDeliveryException(e.toString(), e);
             }
             return new DiffNoteResult(0, 0, List.of());
         }
@@ -136,12 +131,11 @@ class DiffNotePoster {
             if (sanitized.isBlank()) {
                 continue;
             }
-            // A multi-line DiffAnchor stores the end first and optional range start second.
             Integer endLine = note.endLine();
             boolean isMultiLine = endLine != null && endLine > note.startLine();
             FeedbackAnchor.DiffAnchor anchor = isMultiLine
-                ? new FeedbackAnchor.DiffAnchor(note.filePath(), Objects.requireNonNull(endLine), note.startLine())
-                : new FeedbackAnchor.DiffAnchor(note.filePath(), note.startLine(), null);
+                ? FeedbackAnchor.DiffAnchor.range(note.filePath(), note.startLine(), Objects.requireNonNull(endLine))
+                : FeedbackAnchor.DiffAnchor.singleLine(note.filePath(), note.startLine());
             observations.add(
                 new InlineFeedbackChannel.InlineFeedback(
                     anchor,

@@ -2135,7 +2135,7 @@ export type ReviewBoundFeedback = {
      * When the message was placed; null if it was not delivered
      */
     deliveredAt?: Date;
-    deliveryState: 'AWAITING_APPROVAL' | 'PREPARED' | 'PARTIALLY_DELIVERED' | 'DELIVERED' | 'SUPERSEDED' | 'SUPPRESSED' | 'FAILED' | 'DISCARDED';
+    deliveryState: 'AWAITING_APPROVAL' | 'PREPARED' | 'PARTIALLY_DELIVERED' | 'PARTIALLY_FAILED' | 'DELIVERED' | 'SUPERSEDED' | 'SUPPRESSED' | 'FAILED' | 'DISCARDED';
     feedbackId: string;
     /**
      * Whether the observation led the feedback or reinforced it
@@ -2276,11 +2276,15 @@ export type ReviewFeedbackDisposition = {
 export type ReviewFeedbackDetail = {
     agentJobId: string;
     /**
+     * Immutable human decision for this proposal, when one has been made
+     */
+    approval?: FeedbackApproval;
+    /**
      * Work item the feedback targets; null when it is unanchored
      */
     artifact?: ReviewArtifact;
     /**
-     * Stored composed body; null when none was produced, and always null on the IN_APP and IN_CHAT channels — neither the developer's practice pages nor the mentor's queued move is readable by an operator
+     * Stored composed body; null when none was produced, and always null on the IN_APP and IN_CHAT channels — neither the developer's practice pages nor the mentor's prepared context is readable by an operator
      */
     body?: string;
     channel: 'IN_CONTEXT' | 'IN_CHAT' | 'IN_APP';
@@ -2289,7 +2293,11 @@ export type ReviewFeedbackDetail = {
      * When the feedback was placed; null if it was not delivered
      */
     deliveredAt?: Date;
-    deliveryState: 'AWAITING_APPROVAL' | 'PREPARED' | 'PARTIALLY_DELIVERED' | 'DELIVERED' | 'SUPERSEDED' | 'SUPPRESSED' | 'FAILED' | 'DISCARDED';
+    /**
+     * Ordered delivery-policy evaluations for this feedback's review
+     */
+    deliveryPolicy: Array<DeliveryPolicyTrace>;
+    deliveryState: 'AWAITING_APPROVAL' | 'PREPARED' | 'PARTIALLY_DELIVERED' | 'PARTIALLY_FAILED' | 'DELIVERED' | 'SUPERSEDED' | 'SUPPRESSED' | 'FAILED' | 'DISCARDED';
     id: string;
     /**
      * Source observations in render order
@@ -2365,6 +2373,55 @@ export type ReviewBoundObservation = {
     summary: string;
 };
 
+export type PracticeFact = {
+    autonomy?: 'OFF' | 'HUMAN_APPROVAL' | 'AUTOMATIC';
+    slug?: string;
+};
+
+export type DeliveryPolicyFactsSnapshot = {
+    artifactKind?: string;
+    baseBranch?: string;
+    branchMatched?: boolean;
+    contributingPractices?: Array<PracticeFact>;
+    deliveryStatus?: 'ACTIVE' | 'PAUSED';
+    personMatched?: boolean;
+    personMode?: 'ALL_ELIGIBLE' | 'SELECTED';
+    recipientConsent?: boolean;
+    repository?: string;
+    repositoryMatched?: boolean;
+    repositoryMode?: 'ALL_MONITORED' | 'SELECTED';
+    subject?: 'RESOLVED_LINKED_HUMAN' | 'MISSING' | 'NON_HUMAN' | 'UNLINKED';
+    triggerMode?: 'AUTO' | 'MANUAL';
+};
+
+export type DeliveryPolicyTraceCheck = {
+    check: 'INSTANCE_SILENT_MODE' | 'WORKSPACE_ENABLED' | 'ROLLOUT_REVISION' | 'WORKSPACE_DELIVERY' | 'CURRENT_COVERAGE' | 'PRACTICE_AUTHORITY' | 'RECIPIENT_CONSENT' | 'ARTIFACT_ELIGIBILITY';
+    status: 'PASSED' | 'DENIED' | 'NOT_APPLICABLE' | 'NOT_REACHED';
+};
+
+export type DeliveryPolicyTrace = {
+    admittedRevision: number;
+    allowed: boolean;
+    checks: Array<DeliveryPolicyTraceCheck>;
+    decisiveReason?: 'VOLUME_CAPPED' | 'COMPOSER_DEDUPED' | 'REACTED_DISPUTED' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'ARTIFACT_GONE' | 'ARTIFACT_CLOSED' | 'ARTIFACT_MERGED' | 'ARTIFACT_DRAFT' | 'RECIPIENT_OPTED_OUT' | 'EMPTY_AFTER_SANITIZE' | 'INSTANCE_SILENCED' | 'WORKSPACE_DISABLED' | 'WORKSPACE_DELIVERY_PAUSED' | 'STALE_ROLLOUT_REVISION' | 'OUTSIDE_CURRENT_COVERAGE' | 'APPROVAL_STALE' | 'APPROVAL_NO_LONGER_ELIGIBLE' | 'PRACTICE_REQUIRES_APPROVAL' | 'BACKFILL_QUIET';
+    evaluatedAt: Date;
+    evaluatedRevision?: number;
+    facts: DeliveryPolicyFactsSnapshot;
+    resolverVersion: string;
+    reviewId: string;
+    stage: 'COMPOSITION' | 'AUTOMATIC' | 'APPROVED' | 'EGRESS';
+    surface: 'ARTIFACT' | 'IN_APP' | 'CONVERSATION';
+};
+
+export type FeedbackApproval = {
+    actorAccountId?: number;
+    decidedAt?: Date;
+    decision?: 'APPROVED' | 'REJECTED';
+    feedbackId?: string;
+    rejectionNote?: string;
+    rejectionReason?: 'INCORRECT' | 'MISSING_CONTEXT' | 'UNHELPFUL' | 'DUPLICATE' | 'INAPPROPRIATE_PLACEMENT' | 'OTHER';
+};
+
 export type ReviewFeedback = {
     agentJobId: string;
     /**
@@ -2382,7 +2439,7 @@ export type ReviewFeedback = {
      * When the feedback was placed; null if it was not delivered
      */
     deliveredAt?: Date;
-    deliveryState: 'AWAITING_APPROVAL' | 'PREPARED' | 'PARTIALLY_DELIVERED' | 'DELIVERED' | 'SUPERSEDED' | 'SUPPRESSED' | 'FAILED' | 'DISCARDED';
+    deliveryState: 'AWAITING_APPROVAL' | 'PREPARED' | 'PARTIALLY_DELIVERED' | 'PARTIALLY_FAILED' | 'DELIVERED' | 'SUPERSEDED' | 'SUPPRESSED' | 'FAILED' | 'DISCARDED';
     id: string;
     /**
      * Number of observations used to compose the feedback
@@ -3206,11 +3263,6 @@ export type PracticeReviewCoveragePreview = {
      * Whether the proposal admits any repository, branch, or person excluded now
      */
     widens: boolean;
-};
-
-export type PracticeFact = {
-    autonomy?: 'OFF' | 'HUMAN_APPROVAL' | 'AUTOMATIC';
-    slug?: string;
 };
 
 /**
@@ -4584,15 +4636,6 @@ export type GitLabGroup = {
     webUrl?: string;
 };
 
-export type FeedbackApproval = {
-    actorAccountId?: number;
-    decidedAt?: Date;
-    decision?: 'APPROVED' | 'REJECTED';
-    feedbackId?: string;
-    rejectionNote?: string;
-    rejectionReason?: 'INCORRECT' | 'MISSING_CONTEXT' | 'UNHELPFUL' | 'DUPLICATE' | 'INAPPROPRIATE_PLACEMENT' | 'OTHER';
-};
-
 /**
  * Feature flags evaluated for the current user
  */
@@ -4662,41 +4705,6 @@ export type DeveloperPracticeSummary = {
      * Total number of observations
      */
     totalObservations: number;
-};
-
-export type DeliveryPolicyTraceCheck = {
-    check: 'INSTANCE_SILENT_MODE' | 'WORKSPACE_ENABLED' | 'ROLLOUT_REVISION' | 'WORKSPACE_DELIVERY' | 'CURRENT_COVERAGE' | 'PRACTICE_AUTHORITY' | 'RECIPIENT_CONSENT' | 'ARTIFACT_ELIGIBILITY';
-    status: 'PASSED' | 'DENIED' | 'NOT_APPLICABLE' | 'NOT_REACHED';
-};
-
-export type DeliveryPolicyTrace = {
-    admittedRevision: number;
-    allowed: boolean;
-    checks: Array<DeliveryPolicyTraceCheck>;
-    decisiveReason?: 'VOLUME_CAPPED' | 'COMPOSER_DEDUPED' | 'REACTED_DISPUTED' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'ARTIFACT_GONE' | 'ARTIFACT_CLOSED' | 'ARTIFACT_MERGED' | 'ARTIFACT_DRAFT' | 'RECIPIENT_OPTED_OUT' | 'EMPTY_AFTER_SANITIZE' | 'INSTANCE_SILENCED' | 'WORKSPACE_DISABLED' | 'WORKSPACE_DELIVERY_PAUSED' | 'STALE_ROLLOUT_REVISION' | 'OUTSIDE_CURRENT_COVERAGE' | 'APPROVAL_STALE' | 'APPROVAL_NO_LONGER_ELIGIBLE' | 'PRACTICE_REQUIRES_APPROVAL' | 'BACKFILL_QUIET';
-    evaluatedAt: Date;
-    evaluatedRevision?: number;
-    facts: DeliveryPolicyFactsSnapshot;
-    resolverVersion: string;
-    reviewId: string;
-    stage: 'COMPOSITION' | 'AUTOMATIC' | 'APPROVED' | 'EGRESS';
-    surface: 'ARTIFACT' | 'IN_APP' | 'CONVERSATION';
-};
-
-export type DeliveryPolicyFactsSnapshot = {
-    artifactKind?: string;
-    baseBranch?: string;
-    branchMatched?: boolean;
-    contributingPractices?: Array<PracticeFact>;
-    deliveryStatus?: 'ACTIVE' | 'PAUSED';
-    personMatched?: boolean;
-    personMode?: 'ALL_ELIGIBLE' | 'SELECTED';
-    recipientConsent?: boolean;
-    repository?: string;
-    repositoryMatched?: boolean;
-    repositoryMode?: 'ALL_MONITORED' | 'SELECTED';
-    subject?: 'RESOLVED_LINKED_HUMAN' | 'MISSING' | 'NON_HUMAN' | 'UNLINKED';
-    triggerMode?: 'AUTO' | 'MANUAL';
 };
 
 export type DecideFeedbackProposalRequest = {
@@ -5625,10 +5633,6 @@ export type ArtifactTrace = {
      * Repository, collection or channel it sits in
      */
     container?: string;
-    /**
-     * Immutable ordered policy evaluations; intended for progressive technical disclosure
-     */
-    deliveryPolicy: Array<DeliveryPolicyTrace>;
     /**
      * The number the provider shows, for kinds that have one
      */
@@ -10156,7 +10160,7 @@ export type ListPracticeReviewFeedbackData = {
     query?: {
         page?: number;
         size?: number;
-        deliveryState?: Array<'AWAITING_APPROVAL' | 'PREPARED' | 'PARTIALLY_DELIVERED' | 'DELIVERED' | 'SUPERSEDED' | 'SUPPRESSED' | 'FAILED' | 'DISCARDED'>;
+        deliveryState?: Array<'AWAITING_APPROVAL' | 'PREPARED' | 'PARTIALLY_DELIVERED' | 'PARTIALLY_FAILED' | 'DELIVERED' | 'SUPERSEDED' | 'SUPPRESSED' | 'FAILED' | 'DISCARDED'>;
         suppressionReason?: Array<'VOLUME_CAPPED' | 'COMPOSER_DEDUPED' | 'REACTED_DISPUTED' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'ARTIFACT_GONE' | 'ARTIFACT_CLOSED' | 'ARTIFACT_MERGED' | 'ARTIFACT_DRAFT' | 'RECIPIENT_OPTED_OUT' | 'EMPTY_AFTER_SANITIZE' | 'INSTANCE_SILENCED' | 'WORKSPACE_DISABLED' | 'WORKSPACE_DELIVERY_PAUSED' | 'STALE_ROLLOUT_REVISION' | 'OUTSIDE_CURRENT_COVERAGE' | 'APPROVAL_STALE' | 'APPROVAL_NO_LONGER_ELIGIBLE' | 'PRACTICE_REQUIRES_APPROVAL' | 'BACKFILL_QUIET'>;
         channel?: Array<'IN_CONTEXT' | 'IN_CHAT' | 'IN_APP'>;
         agentJobId?: string;

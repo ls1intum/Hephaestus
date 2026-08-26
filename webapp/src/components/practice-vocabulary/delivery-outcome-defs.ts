@@ -56,6 +56,13 @@ export const DELIVERY_STATE_DEFS: StatusDefs<DeliveryState> = {
 		description:
 			"Some approved comments reached the provider. The remaining comments are retrying or were withheld for the reason shown.",
 	},
+	PARTIALLY_FAILED: {
+		label: "Partially delivered · retries exhausted",
+		icon: CircleAlertIcon,
+		badgeVariant: "destructive",
+		description:
+			"Some approved comments reached the provider, but the remaining comments could not be delivered after bounded retries.",
+	},
 	SUPERSEDED: {
 		label: "Replaced by newer",
 		icon: HistoryIcon,

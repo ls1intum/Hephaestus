@@ -214,6 +214,26 @@ public class PracticeReviewCoverageService {
         return readAssessment(workspace, repositoryNameWithOwner, baseBranch, subject, branchRestrictionsApply);
     }
 
+    @Transactional(readOnly = true)
+    public CoverageAssessment assessRepositoryless(Workspace workspace, @Nullable ReviewSubject subject) {
+        WorkspaceReviewScope scope = readScope(workspace);
+        ReviewSubjectStatus subjectStatus = subjectStatus(workspace, subject);
+        boolean repositoryMatched = scope.repositoryMode() == ReviewRepositoryMode.ALL_MONITORED;
+        boolean personMatched =
+            subjectStatus == ReviewSubjectStatus.RESOLVED_LINKED_HUMAN &&
+            subject != null &&
+            scope.admitsPerson(subject.actorId());
+        return new CoverageAssessment(
+            scope.repositoryMode(),
+            scope.personMode(),
+            subjectStatus,
+            repositoryMatched,
+            repositoryMatched,
+            personMatched,
+            repositoryMatched && personMatched
+        );
+    }
+
     private CoverageAssessment readAssessment(
         Workspace workspace,
         @Nullable String repositoryNameWithOwner,
@@ -222,16 +242,7 @@ public class PracticeReviewCoverageService {
         boolean branchRestrictionsApply
     ) {
         WorkspaceReviewScope scope = readScope(workspace);
-        ReviewSubjectStatus subjectStatus;
-        if (subject == null || subject.actorId() == null) {
-            subjectStatus = ReviewSubjectStatus.MISSING;
-        } else if (!subject.human()) {
-            subjectStatus = ReviewSubjectStatus.NON_HUMAN;
-        } else if (membershipRepository.findByWorkspace_IdAndUser_Id(workspace.getId(), subject.actorId()).isEmpty()) {
-            subjectStatus = ReviewSubjectStatus.UNLINKED;
-        } else {
-            subjectStatus = ReviewSubjectStatus.RESOLVED_LINKED_HUMAN;
-        }
+        ReviewSubjectStatus subjectStatus = subjectStatus(workspace, subject);
 
         ReviewRepositoryTarget selectedRepository = scope
             .repositories()
@@ -261,6 +272,14 @@ public class PracticeReviewCoverageService {
             personMatched,
             repositoryMatched && branchMatched && personMatched
         );
+    }
+
+    private ReviewSubjectStatus subjectStatus(Workspace workspace, @Nullable ReviewSubject subject) {
+        if (subject == null || subject.actorId() == null) return ReviewSubjectStatus.MISSING;
+        if (!subject.human()) return ReviewSubjectStatus.NON_HUMAN;
+        return membershipRepository.findByWorkspace_IdAndUser_Id(workspace.getId(), subject.actorId()).isPresent()
+            ? ReviewSubjectStatus.RESOLVED_LINKED_HUMAN
+            : ReviewSubjectStatus.UNLINKED;
     }
 
     public record CoverageAssessment(

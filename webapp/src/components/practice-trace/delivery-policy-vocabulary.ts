@@ -6,6 +6,7 @@ import type {
 } from "@/api/types.gen";
 import type { StatusDefs } from "@/components/practice-vocabulary/status-def";
 import { WITHHOLDING_REASON_DEFS } from "@/components/practice-vocabulary/withholding-defs";
+import { WORKSPACE_DELIVERY_STATUS_DEFS } from "@/components/practice-vocabulary/workspace-delivery-status-defs";
 
 type Check = DeliveryPolicyTraceCheck["check"];
 type Status = DeliveryPolicyTraceCheck["status"];
@@ -90,8 +91,8 @@ export const DELIVERY_SUBJECT_LABELS = {
 } satisfies Record<Subject, string>;
 
 export const DELIVERY_STATUS_LABELS = {
-	ACTIVE: "sending active",
-	PAUSED: "sending paused",
+	ACTIVE: WORKSPACE_DELIVERY_STATUS_DEFS.ACTIVE.label,
+	PAUSED: WORKSPACE_DELIVERY_STATUS_DEFS.PAUSED.label,
 } satisfies Record<DeliveryStatus, string>;
 
 export const DELIVERY_TRIGGER_LABELS = {

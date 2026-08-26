@@ -83,12 +83,12 @@ class GitlabInlineFeedbackChannelTest extends BaseUnitTest {
     }
 
     @Test
-    void immutablePackageDefersWhenPriorDiscussionsCannotBeRead() {
+    void automaticPackageDefersWhenPriorDiscussionsCannotBeRead() {
         stubResolvedMr();
         when(gitLabProvider.forScope(1L)).thenThrow(new RuntimeException("provider unavailable"));
 
         assertThatThrownBy(() ->
-            channel.postImmutablePackage(
+            channel.postInlineFeedback(
                 gitlabTarget(),
                 List.of(
                     new InlineFeedback(
@@ -100,6 +100,15 @@ class GitlabInlineFeedbackChannelTest extends BaseUnitTest {
                 )
             )
         ).isInstanceOf(FeedbackDeliveryException.class);
+    }
+
+    @Test
+    void clearStaleDefersWhenRateLimitIsCritical() {
+        when(gitLabProvider.isRateLimitCritical(1L)).thenReturn(true);
+
+        assertThatThrownBy(() -> channel.clearStaleFeedback(gitlabTarget(), MARKER)).isInstanceOf(
+            FeedbackDeliveryException.class
+        );
     }
 
     @Test

@@ -14,7 +14,6 @@ import de.tum.cit.aet.hephaestus.agent.handler.composition.FeedbackCompositionIn
 import de.tum.cit.aet.hephaestus.agent.handler.composition.FeedbackCompositionResultParser;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.ExistingDeliveryLookup;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException;
-import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliverySuppressedException;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobPreparationException;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobSubmission;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobSubmissionRequest;
@@ -29,6 +28,7 @@ import de.tum.cit.aet.hephaestus.integration.core.signal.SignalName;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.practices.feedback.DeliveryPolicyStage;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDispatchState;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
@@ -68,8 +68,10 @@ public class IssueReviewHandler implements JobTypeHandler {
     private final FeedbackLedgerRecorder feedbackLedgerRecorder;
     private final PracticeFeedbackDeliveryPolicy deliveryPolicy;
     private final PracticeFeedbackCommentFormatter commentFormatter;
+    private final ReactionSuppressionFilter reactionSuppressionFilter;
     private final ObservationRepository observationRepository;
     private final PracticeFeedbackDispatchService dispatchService;
+    private final FeedbackDeliveryService feedbackDeliveryService;
 
     IssueReviewHandler(
         JsonMapper objectMapper,
@@ -84,8 +86,10 @@ public class IssueReviewHandler implements JobTypeHandler {
         FeedbackLedgerRecorder feedbackLedgerRecorder,
         PracticeFeedbackDeliveryPolicy deliveryPolicy,
         PracticeFeedbackCommentFormatter commentFormatter,
+        ReactionSuppressionFilter reactionSuppressionFilter,
         ObservationRepository observationRepository,
-        PracticeFeedbackDispatchService dispatchService
+        PracticeFeedbackDispatchService dispatchService,
+        FeedbackDeliveryService feedbackDeliveryService
     ) {
         this.objectMapper = objectMapper;
         this.workspaceContextBuilder = workspaceContextBuilder;
@@ -99,8 +103,10 @@ public class IssueReviewHandler implements JobTypeHandler {
         this.feedbackLedgerRecorder = feedbackLedgerRecorder;
         this.deliveryPolicy = deliveryPolicy;
         this.commentFormatter = commentFormatter;
+        this.reactionSuppressionFilter = reactionSuppressionFilter;
         this.observationRepository = observationRepository;
         this.dispatchService = dispatchService;
+        this.feedbackDeliveryService = feedbackDeliveryService;
     }
 
     @Override
@@ -252,19 +258,23 @@ public class IssueReviewHandler implements JobTypeHandler {
 
     @Override
     public void deliver(AgentJob job) {
+        if (feedbackDeliveryService.recoverAutomaticPackageIfPresent(job)) return;
         ObservationAdmissionService.requireMatchingCompositionDigest(job);
         List<PracticeDetectionResultParser.ValidatedObservation> observations = observationRepository
             .findByAgentJobId(job.getId())
             .stream()
             .map(this::validated)
             .toList();
+        List<PracticeDetectionResultParser.ValidatedObservation> eligible = reactionSuppressionFilter
+            .evaluate(job, observations)
+            .deliverable();
         List<PracticeDetectionResultParser.ValidatedObservation> loudEnough = inContextDeliveryGate.admitInContext(
             job,
-            observations
+            eligible
         );
         List<PracticeDetectionResultParser.ValidatedObservation> proposals = inContextDeliveryGate.awaitingApproval(
             job,
-            observations
+            eligible
         );
         Map<String, String> why = practiceCatalogInjector.whyBySlug(job.getWorkspace(), ArtifactKinds.ISSUE);
         List<ComposedFeedbackUnit> units = compositionResultParser.parse(job.getOutput(), FeedbackChannel.IN_CONTEXT);
@@ -352,30 +362,33 @@ public class IssueReviewHandler implements JobTypeHandler {
             recordSuppressed(job, delivery, FeedbackSuppressionReason.EMPTY_AFTER_SANITIZE);
             return;
         }
-        try {
-            String formatted = commentFormatter.format(sanitized, job);
-            PracticeFeedbackDispatchService.Result result = dispatchService.dispatchAutomaticSummary(
-                job,
-                formatted,
-                feedbackLedgerRecorder.priorLiveIssueSummaryRef(job).orElse(null),
-                contributingPracticeSlugs
-            );
-            if (result.status() == PracticeFeedbackDispatchService.Result.Status.SUPPRESSED) {
-                recordSuppressed(job, delivery, result.refusal());
-                return;
-            }
-            if (result.status() != PracticeFeedbackDispatchService.Result.Status.SENT || result.externalRef() == null) {
-                feedbackLedgerRecorder.recordUndelivered(job, delivery);
-                throw new JobDeliveryException(
-                    "Issue summary dispatch is awaiting reconciliation: jobId=" + job.getId()
-                );
-            }
-            String commentId = result.externalRef();
-            job.setDeliveryCommentId(commentId);
-            feedbackLedgerRecorder.record(job, delivery, ArtifactKinds.ISSUE, List.of());
-        } catch (JobDeliverySuppressedException e) {
-            recordSuppressed(job, delivery, FeedbackSuppressionReason.INSTANCE_SILENCED);
+        String formatted = commentFormatter.format(sanitized, job);
+        var providerPackage = new PracticeDetectionResultParser.DeliveryContent(
+            formatted,
+            delivery.diffNotes(),
+            delivery.withheld()
+        );
+        PracticeFeedbackDispatchService.Result result = dispatchService.dispatchAutomaticPackage(
+            job,
+            providerPackage,
+            contributingPracticeSlugs
+        );
+        var dispatch = dispatchService.automaticPackage(job);
+        if (
+            dispatch.getState() == FeedbackDispatchState.SENT ||
+            dispatch.getState() == FeedbackDispatchState.SUPPRESSED ||
+            dispatch.getState() == FeedbackDispatchState.FAILED
+        ) {
+            feedbackDeliveryService.projectAutomaticPackage(job, dispatch);
         }
+        if (result.status() == PracticeFeedbackDispatchService.Result.Status.SENT) {
+            job.setDeliveryCommentId(result.externalRef());
+            return;
+        }
+        if (result.status() == PracticeFeedbackDispatchService.Result.Status.SUPPRESSED) return;
+        throw new JobDeliveryException(
+            "Issue review package dispatch is awaiting reconciliation: jobId=" + job.getId()
+        );
     }
 
     private void recordSuppressed(

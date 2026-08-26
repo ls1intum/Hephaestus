@@ -4,7 +4,6 @@ import type { GetArtifactTraceResponse, ReviewRequestOutcome } from "@/api/types
 import { MissingRecordEmpty } from "@/components/common/MissingRecordEmpty";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { Skeleton } from "@/components/ui/skeleton";
-import { DeliveryPolicyTrace } from "./DeliveryPolicyTrace";
 import { TraceHeader } from "./TraceHeader";
 import { TracePracticeList } from "./TracePracticeList";
 import { TraceRefusalAlert } from "./TraceRefusalAlert";
@@ -116,10 +115,6 @@ export function TracePage({
 				signals={trace.signals}
 				artifactKind={trace.artifactKind}
 			/>
-
-			{/* A relevance filter, never an authorization boundary: the endpoint serves this trace to
-			    every member. */}
-			{canAdminister && <DeliveryPolicyTrace evaluations={trace.deliveryPolicy} />}
 
 			<p className="flex items-center gap-1.5 text-xs text-muted-foreground">
 				<RadarIcon className="size-3.5 shrink-0" aria-hidden />

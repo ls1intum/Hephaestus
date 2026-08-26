@@ -11,6 +11,6 @@ public record FeedbackDispatchInsert(
     @Nullable UUID feedbackId,
     String destination,
     String body,
-    @Nullable String targetExternalRef,
-    String practiceSlugs
+    String practiceSlugs,
+    String packageContent
 ) {}

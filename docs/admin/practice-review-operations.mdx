@@ -83,18 +83,19 @@ than payload retention is incoherent — the application refuses to start rather
 fabric root as sensitive storage. Delivery-policy evaluations and dispatch intents follow their owning
 job or workspace; selected coverage targets follow their workspace membership or monitored repository.
 
-**Dispatch recovery.** A dispatch whose provider outcome is unknown is never re-posted on a guess. Before
-writing, the dispatcher looks for a deterministic marker on the provider: if the comment is already there
-it is recorded as sent, and only a definitive not-found lets a first write proceed. An interrupted write
-therefore stalls in `UNCERTAIN` rather than risking a duplicate.
+**Dispatch recovery.** One dispatch owns the exact summary and inline comments in a review. Before each
+provider create, it reconciles the stable marker or recurrence key already stored with the provider. A
+found placement is preserved, a definitive not-found permits the first write, and an inconclusive lookup
+leaves the package `UNCERTAIN` rather than risking a duplicate. The dispatch becomes `SENT` only after the
+whole package converges.
 
 Two consequences to plan for:
 
 - **Sustained `UNCERTAIN` means Hephaestus cannot prove whether the provider accepted the write**, not that
   feedback is queued. Fix provider connectivity or credentials so reconciliation can continue.
 - **A dispatch interrupted mid-write can outlive its retry budget without reaching `FAILED`.** It is
-  deliberately not failed, because the comment may be live, and remains uncertain until provider lookup
-  can confirm the outcome.
+  deliberately not failed, because one of its provider objects may be live, and remains uncertain until
+  provider lookup can confirm the outcome.
 
 Do not mutate dispatch rows manually. Their state, write fence, attempt count, next-attempt time and lease
 owner jointly prevent an uncertain provider outcome from becoming a duplicate write.

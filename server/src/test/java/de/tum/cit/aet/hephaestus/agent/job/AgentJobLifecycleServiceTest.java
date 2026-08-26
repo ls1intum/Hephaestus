@@ -413,7 +413,7 @@ class AgentJobLifecycleServiceTest extends BaseUnitTest {
 
             AgentJob result = service.retryDelivery(WORKSPACE_ID, jobId);
 
-            verify(feedbackDispatchRepository).resetFailedBeforeWrite(jobId, WORKSPACE_ID);
+            verify(feedbackDispatchRepository).resetFailedAutomaticPackage(jobId, WORKSPACE_ID);
             verify(handler).deliver(completedJob);
             verify(agentJobRepository).updateDeliveryStatus(
                 eq(jobId),
@@ -495,6 +495,28 @@ class AgentJobLifecycleServiceTest extends BaseUnitTest {
                 java.util.Set.of(DeliveryStatus.PENDING),
                 CLAIMED_ATTEMPTS
             );
+        }
+
+        @Test
+        void existingSummaryStillReconcilesTheRestOfAProviderPackage() {
+            when(handler.findExistingDelivery(completedJob)).thenReturn(
+                ExistingDeliveryLookup.found("existing-comment-id")
+            );
+            when(handler.reconcilesMoreThanOneProviderObject()).thenReturn(true);
+            when(
+                agentJobRepository.transitionDeliveryStatusFenced(
+                    eq(jobId),
+                    eq(DeliveryStatus.DELIVERED),
+                    any(),
+                    any(),
+                    eq(CLAIMED_ATTEMPTS)
+                )
+            ).thenReturn(1);
+
+            boolean result = service.recoverStuckDelivery(completedJob, CLAIMED_ATTEMPTS);
+
+            assertThat(result).isTrue();
+            verify(handler).deliver(completedJob);
         }
 
         @Test

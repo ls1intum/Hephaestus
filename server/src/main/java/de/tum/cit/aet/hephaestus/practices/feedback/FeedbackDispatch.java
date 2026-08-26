@@ -71,13 +71,24 @@ public class FeedbackDispatch {
     @Column(name = "body", nullable = false, columnDefinition = "TEXT")
     private String body;
 
-    @Column(name = "target_external_ref", length = 255)
-    private @Nullable String targetExternalRef;
-
     @NotNull
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "practice_slugs", nullable = false, columnDefinition = "jsonb")
     private JsonNode practiceSlugs;
+
+    @NotNull
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "package_content", nullable = false, columnDefinition = "jsonb")
+    private JsonNode packageContent;
+
+    public JsonNode packageContent() {
+        return packageContent;
+    }
+
+    @NotNull
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "delivered_placements", nullable = false, columnDefinition = "jsonb")
+    private JsonNode deliveredPlacements;
 
     @NotNull
     @ColumnDefault("false")
@@ -106,6 +117,15 @@ public class FeedbackDispatch {
 
     @Column(name = "last_error", length = 512)
     private @Nullable String lastError;
+
+    @Column(name = "projected_at")
+    private @Nullable Instant projectedAt;
+
+    @Column(name = "projection_owner", length = 64)
+    private @Nullable String projectionOwner;
+
+    @Column(name = "projection_expires_at")
+    private @Nullable Instant projectionExpiresAt;
 
     @NotNull
     @Column(name = "created_at", nullable = false)

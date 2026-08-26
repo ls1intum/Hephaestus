@@ -1,57 +1,30 @@
 import { Link } from "@tanstack/react-router";
-import { AlertCircle, ChevronDownIcon } from "lucide-react";
-import { useEffect, useId, useRef, useState } from "react";
+import { AlertCircle } from "lucide-react";
+import { useState } from "react";
 import type {
 	AgentBinding,
-	PracticeReviewCoveragePreview,
 	PracticeReviewSettings as PracticeReviewSettingsData,
 	UpdatePracticeReviewSettingsRequest,
 	UpdateWorkspaceFeaturesRequest,
-	WorkspaceReviewScope,
 } from "@/api/types.gen";
-import { FacetMultiSelect, type FacetSource } from "@/components/common/FacetMultiSelect";
-import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
-import { RemovableToken } from "@/components/common/RemovableToken";
+import { StatusBadge } from "@/components/practice-vocabulary/StatusBadge";
+import { WORKSPACE_DELIVERY_STATUS_DEFS } from "@/components/practice-vocabulary/workspace-delivery-status-defs";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import {
-	AlertDialog,
-	AlertDialogAction,
-	AlertDialogCancel,
-	AlertDialogContent,
-	AlertDialogDescription,
-	AlertDialogFooter,
-	AlertDialogHeader,
-	AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
 	Field,
 	FieldContent,
 	FieldDescription,
 	FieldError,
 	FieldLabel,
-	FieldTitle,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import {
-	InputGroup,
-	InputGroupAddon,
-	InputGroupButton,
-	InputGroupInput,
-} from "@/components/ui/input-group";
-import {
-	Item,
-	ItemActions,
-	ItemContent,
-	ItemDescription,
-	ItemGroup,
-	ItemTitle,
-} from "@/components/ui/item";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
+import {
+	PracticeReviewCoverageSettings,
+	type PracticeReviewCoverageSettingsProps,
+} from "./PracticeReviewCoverageSettings";
 import { reviewModelRunnable } from "./review/review-readiness";
 
 export type PracticeReviewField = NonNullable<UpdatePracticeReviewSettingsRequest["reset"]>[number];
@@ -62,12 +35,10 @@ export type PracticeReviewWorkspaceUpdate = Pick<
 
 export interface PracticeReviewSettingsProps {
 	workspaceSlug: string;
-	model: {
-		binding?: AgentBinding;
-		isLoading: boolean;
-		isError: boolean;
-		onRetry: () => void;
-	};
+	model:
+		| { status: "loading" }
+		| { status: "error"; onRetry: () => void }
+		| { status: "ready"; binding?: AgentBinding };
 	workspace: {
 		enabled: boolean;
 		autoTriggerEnabled: boolean;
@@ -81,14 +52,7 @@ export interface PracticeReviewSettingsProps {
 		onUpdate: (settings: UpdatePracticeReviewSettingsRequest, sourceEtag?: string) => Promise<void>;
 		onReset: (field: PracticeReviewField) => void;
 	};
-	coverage: {
-		preview: (scope: WorkspaceReviewScope) => Promise<PracticeReviewCoveragePreview>;
-		repositories: FacetSource & { error: unknown; onRetry: () => void };
-		people: FacetSource<{ value: number; label: string; description?: string }> & {
-			error: unknown;
-			onRetry: () => void;
-		};
-	};
+	coverage: Pick<PracticeReviewCoverageSettingsProps, "preview" | "repositories" | "people">;
 }
 
 export function PracticeReviewSettings({
@@ -102,7 +66,13 @@ export function PracticeReviewSettings({
 		<div className="space-y-8">
 			<ReviewStatusSection workspaceSlug={workspaceSlug} model={model} workspace={workspace} />
 			<ReviewTimingSection workspace={workspace} policy={policy} />
-			<ReviewedWorkSection policy={policy} coverage={coverage} />
+			<PracticeReviewCoverageSettings
+				settings={policy.settings}
+				preview={coverage.preview}
+				onSave={(scope, sourceEtag) => policy.onUpdate({ reviewScope: scope }, sourceEtag)}
+				repositories={coverage.repositories}
+				people={coverage.people}
+			/>
 			<FeedbackDeliverySection policy={policy} />
 		</div>
 	);
@@ -114,7 +84,7 @@ function ReviewStatusSection({
 	workspace,
 }: Pick<PracticeReviewSettingsProps, "workspaceSlug" | "model" | "workspace">) {
 	const modelRunnable = reviewModelRunnable(model);
-	const modelUnavailable = model.isLoading || model.isError || !modelRunnable;
+	const modelUnavailable = model.status !== "ready" || !modelRunnable;
 
 	return (
 		<section className="space-y-4" aria-labelledby="review-status-heading">
@@ -152,11 +122,11 @@ function ModelReadiness({
 	model,
 	runnable,
 }: Pick<PracticeReviewSettingsProps, "workspaceSlug" | "model"> & { runnable: boolean }) {
-	if (model.isLoading) {
+	if (model.status === "loading") {
 		return null;
 	}
 
-	if (model.isError) {
+	if (model.status === "error") {
 		return (
 			<Alert variant="warning" role="status">
 				<AlertCircle />
@@ -295,7 +265,9 @@ function CooldownField({
 			<FieldLabel htmlFor="policy-cooldown">Time between reviews (minutes)</FieldLabel>
 			<Input
 				id="policy-cooldown"
+				name="practice-review-cooldown"
 				type="number"
+				autoComplete="off"
 				min={0}
 				max={1440}
 				step={1}
@@ -323,375 +295,6 @@ function CooldownField({
 				policy={policy}
 			/>
 		</Field>
-	);
-}
-
-/**
- * Matches are exact: a wildcard language here would be a promise the gate cannot keep, since it
- * holds the pull request row and not the diff.
- */
-function ReviewedWorkSection({
-	policy,
-	coverage,
-}: Pick<PracticeReviewSettingsProps, "policy" | "coverage">) {
-	const repositoryScopeId = useId();
-	const personScopeId = useId();
-	const settings = policy.settings;
-	type PreviewState =
-		| { status: "idle" }
-		| { status: "pending"; scope: WorkspaceReviewScope; sourceEtag: string }
-		| { status: "applying"; scope: WorkspaceReviewScope; sourceEtag: string }
-		| {
-				status: "ready";
-				scope: WorkspaceReviewScope;
-				sourceEtag: string;
-				data: PracticeReviewCoveragePreview;
-		  }
-		| { status: "error"; scope: WorkspaceReviewScope; sourceEtag: string };
-	const [storedPreviewState, setPreviewState] = useState<PreviewState>({ status: "idle" });
-	const previewRequest = useRef(0);
-	useEffect(() => {
-		previewRequest.current += 1;
-	}, [settings.etag]);
-	const previewState: PreviewState =
-		storedPreviewState.status === "idle" || storedPreviewState.sourceEtag === settings.etag
-			? storedPreviewState
-			: { status: "idle" };
-	const scope = previewState.status === "idle" ? settings.reviewScope : previewState.scope;
-	useEffect(
-		() => () => {
-			previewRequest.current += 1;
-		},
-		[],
-	);
-	const repositoryNames = scope.repositories.map((repository) => repository.nameWithOwner);
-	const repositoryOptions = [
-		...coverage.repositories.options,
-		...repositoryNames
-			.filter((name) => !coverage.repositories.options.some((option) => option.value === name))
-			.map((name) => ({ value: name, label: `${name} (unavailable)` })),
-	];
-	const personOptions = [
-		...coverage.people.options,
-		...scope.personUserIds
-			.filter((id) => !coverage.people.options.some((option) => option.value === id))
-			.map((id) => ({ value: id, label: `Member ${id} (unavailable)` })),
-	];
-	const applyScope = async (next: WorkspaceReviewScope, sourceEtag: string) => {
-		setPreviewState({ status: "applying", scope: next, sourceEtag });
-		await Promise.resolve(policy.onUpdate({ reviewScope: next }, sourceEtag)).catch(
-			() => undefined,
-		);
-		setPreviewState({ status: "idle" });
-	};
-	const previewScope = async (next: WorkspaceReviewScope) => {
-		const request = ++previewRequest.current;
-		const sourceEtag = settings.etag;
-		setPreviewState({ status: "pending", scope: next, sourceEtag });
-		try {
-			const data = await coverage.preview(next);
-			if (request !== previewRequest.current) return;
-			if (data.widens) setPreviewState({ status: "ready", scope: next, sourceEtag, data });
-			else {
-				void applyScope(next, sourceEtag);
-			}
-		} catch {
-			if (request === previewRequest.current) {
-				setPreviewState({ status: "error", scope: next, sourceEtag });
-			}
-		}
-	};
-	const cancelPreview = () => {
-		previewRequest.current += 1;
-		setPreviewState({ status: "idle" });
-	};
-	const replaceRepositories = (names: string[]) => {
-		const byName = new Map(
-			scope.repositories.map((repository) => [repository.nameWithOwner, repository]),
-		);
-		const next = {
-			...scope,
-			repositories: names.map(
-				(name) => byName.get(name) ?? { nameWithOwner: name, baseBranches: [] },
-			),
-		};
-		void previewScope(next);
-	};
-	const summary = settings.coverageSummary;
-	const coversNoRepositories =
-		scope.repositoryMode === "SELECTED" && scope.repositories.length === 0;
-	const coversNoPeople = scope.personMode === "SELECTED" && scope.personUserIds.length === 0;
-	const monitoredListKnown = !coverage.repositories.isLoading && !coverage.repositories.isError;
-	const monitoredNames = new Set(coverage.repositories.options.map((option) => option.value));
-	const monitoredNow = (nameWithOwner: string) =>
-		!monitoredListKnown || monitoredNames.has(nameWithOwner);
-	const coveredRepositories =
-		scope.repositoryMode === "ALL_MONITORED"
-			? summary.monitoredRepositories
-			: scope.repositories.filter((repository) => monitoredNow(repository.nameWithOwner)).length;
-	const eligibleListKnown = !coverage.people.isLoading && !coverage.people.isError;
-	const eligibleIds = new Set(coverage.people.options.map((option) => option.value));
-	const coveredPeople =
-		scope.personMode === "ALL_ELIGIBLE"
-			? summary.eligiblePeople
-			: scope.personUserIds.filter((id) => !eligibleListKnown || eligibleIds.has(id)).length;
-	return (
-		<section className="space-y-6" aria-labelledby="reviewed-work-heading">
-			<div className="space-y-1">
-				<h2 id="reviewed-work-heading" className="font-semibold text-lg">
-					What gets reviewed
-				</h2>
-				<p className="text-muted-foreground text-sm">
-					A review opens only for work that is in one of these repositories <strong>and</strong>{" "}
-					written by one of these people. Across this workspace, about {summary.recentReviewVolume}
-					ran in the last {summary.estimateWindowDays} days.
-				</p>
-			</div>
-			{previewState.status === "pending" ? (
-				<span role="status" className="sr-only">
-					Checking the proposed coverage…
-				</span>
-			) : previewState.status === "error" ? (
-				<Alert variant="warning">
-					<AlertCircle />
-					<AlertTitle>Couldn't estimate the new coverage</AlertTitle>
-					<AlertDescription>
-						Your settings have not changed.
-						<Button
-							variant="outline"
-							size="sm"
-							onClick={() => void previewScope(previewState.scope)}
-						>
-							Retry
-						</Button>
-					</AlertDescription>
-				</Alert>
-			) : null}
-
-			<Field>
-				<CoverageLabel
-					id={`${repositoryScopeId}-label`}
-					label="Repositories"
-					covered={coveredRepositories}
-					total={summary.monitoredRepositories}
-					noun="monitored"
-				/>
-				<RadioGroup
-					aria-labelledby={`${repositoryScopeId}-label`}
-					value={scope.repositoryMode}
-					disabled={policy.isSaving}
-					onValueChange={(mode) => {
-						const next = { ...scope, repositoryMode: mode };
-						void previewScope(next);
-					}}
-				>
-					<label className="flex items-center gap-2" htmlFor={`${repositoryScopeId}-all`}>
-						<RadioGroupItem id={`${repositoryScopeId}-all`} value="ALL_MONITORED" />
-						All monitored repositories
-					</label>
-					<label className="flex items-center gap-2" htmlFor={`${repositoryScopeId}-selected`}>
-						<RadioGroupItem id={`${repositoryScopeId}-selected`} value="SELECTED" />
-						Selected repositories
-					</label>
-				</RadioGroup>
-				{scope.repositoryMode === "SELECTED" ? (
-					<div className="space-y-3">
-						{coverage.repositories.isError ? (
-							<QueryErrorAlert
-								error={coverage.repositories.error}
-								title="Couldn't load repositories"
-								onRetry={coverage.repositories.onRetry}
-							/>
-						) : null}
-						<FacetMultiSelect
-							id="covered-repositories"
-							title="Choose repositories"
-							variant="field"
-							options={repositoryOptions}
-							selected={repositoryNames}
-							onChange={replaceRepositories}
-							disabled={policy.isSaving || coverage.repositories.isLoading}
-							emptyLabel={
-								coverage.repositories.isError
-									? "Repositories unavailable"
-									: "No monitored repositories"
-							}
-						/>
-						{coversNoRepositories ? (
-							<Alert variant="warning" role="status">
-								<AlertCircle />
-								<AlertTitle>No repositories are selected</AlertTitle>
-								<AlertDescription>
-									An empty selected list covers nobody. Choose a repository or cover all monitored
-									repositories.
-								</AlertDescription>
-							</Alert>
-						) : null}
-						{scope.repositories.length > 0 ? (
-							<ItemGroup>
-								{scope.repositories.map((repository) => (
-									<RepositoryScopeRow
-										key={repository.nameWithOwner}
-										nameWithOwner={repository.nameWithOwner}
-										baseBranches={repository.baseBranches}
-										monitored={monitoredNow(repository.nameWithOwner)}
-										disabled={policy.isSaving}
-										onChange={(baseBranches) => {
-											const next = {
-												...scope,
-												repositories: scope.repositories.map((entry) =>
-													entry.nameWithOwner === repository.nameWithOwner
-														? { ...entry, baseBranches }
-														: entry,
-												),
-											};
-											void previewScope(next);
-										}}
-									/>
-								))}
-							</ItemGroup>
-						) : null}
-					</div>
-				) : null}
-			</Field>
-
-			<Field>
-				<CoverageLabel
-					id={`${personScopeId}-label`}
-					label="People"
-					covered={coveredPeople}
-					total={summary.eligiblePeople}
-					noun="members"
-				/>
-				<FieldDescription>Only workspace members can be selected.</FieldDescription>
-				<RadioGroup
-					aria-labelledby={`${personScopeId}-label`}
-					value={scope.personMode}
-					disabled={policy.isSaving}
-					onValueChange={(mode) => {
-						const next = { ...scope, personMode: mode };
-						void previewScope(next);
-					}}
-				>
-					<label className="flex items-center gap-2" htmlFor={`${personScopeId}-all`}>
-						<RadioGroupItem id={`${personScopeId}-all`} value="ALL_ELIGIBLE" />
-						Every member of this workspace
-					</label>
-					<label className="flex items-center gap-2" htmlFor={`${personScopeId}-selected`}>
-						<RadioGroupItem id={`${personScopeId}-selected`} value="SELECTED" />
-						Selected people
-					</label>
-				</RadioGroup>
-				{scope.personMode === "SELECTED" ? (
-					<div className="space-y-3">
-						{coverage.people.isError ? (
-							<QueryErrorAlert
-								error={coverage.people.error}
-								title="Couldn't load members"
-								onRetry={coverage.people.onRetry}
-							/>
-						) : null}
-						<FacetMultiSelect
-							id="covered-people"
-							title="Choose people"
-							variant="field"
-							options={personOptions}
-							selected={scope.personUserIds}
-							onChange={(personUserIds) => void previewScope({ ...scope, personUserIds })}
-							disabled={policy.isSaving || coverage.people.isLoading}
-							emptyLabel={coverage.people.isError ? "Members unavailable" : "No workspace members"}
-						/>
-						{coversNoPeople ? (
-							<Alert variant="warning" role="status">
-								<AlertCircle />
-								<AlertTitle>No people are selected</AlertTitle>
-								<AlertDescription>
-									An empty selected list covers nobody. Choose a person or cover every workspace
-									member.
-								</AlertDescription>
-							</Alert>
-						) : null}
-						{scope.personUserIds.length > 0 ? (
-							<ul className="flex flex-wrap gap-2">
-								{scope.personUserIds.map((userId) => (
-									<li key={userId}>
-										<RemovableToken
-											label={
-												personOptions.find((option) => option.value === userId)?.label ??
-												`Member ${userId}`
-											}
-											removeLabel={`Remove ${
-												personOptions.find((option) => option.value === userId)?.label ??
-												`member ${userId}`
-											} from covered people`}
-											disabled={policy.isSaving}
-											onRemove={() =>
-												void previewScope({
-													...scope,
-													personUserIds: scope.personUserIds.filter((id) => id !== userId),
-												})
-											}
-										/>
-									</li>
-								))}
-							</ul>
-						) : null}
-					</div>
-				) : null}
-			</Field>
-
-			<AlertDialog
-				open={previewState.status === "ready"}
-				onOpenChange={(open) => !open && cancelPreview()}
-			>
-				<AlertDialogContent className="min-w-0">
-					<AlertDialogHeader>
-						<AlertDialogTitle>Widen review coverage?</AlertDialogTitle>
-						<AlertDialogDescription>
-							More work becomes eligible for review. Feedback still follows each practice's
-							authority, the recipient's preference, and the workspace delivery status. Earlier work
-							is not released or run again.
-						</AlertDialogDescription>
-					</AlertDialogHeader>
-					{previewState.status === "ready" ? (
-						<div className="min-w-0 space-y-2 break-words text-sm">
-							<p>
-								Monitored repositories covered:{" "}
-								<strong>{previewState.data.current.coveredRepositories}</strong>
-								{" → "}
-								<strong>{previewState.data.proposed.coveredRepositories}</strong> of{" "}
-								{previewState.data.proposed.monitoredRepositories}
-							</p>
-							<p>
-								Workspace members covered:{" "}
-								<strong>{previewState.data.current.coveredPeople}</strong>
-								{" → "}
-								<strong>{previewState.data.proposed.coveredPeople}</strong> of{" "}
-								{previewState.data.proposed.eligiblePeople}
-							</p>
-							<p className="text-muted-foreground text-xs">
-								Workspace-wide context: {previewState.data.proposed.recentReviewVolume} reviews ran
-								in the last {previewState.data.proposed.estimateWindowDays} days across all review
-								coverage, not just this proposed population.
-							</p>
-						</div>
-					) : null}
-					<AlertDialogFooter>
-						<AlertDialogCancel>Keep current coverage</AlertDialogCancel>
-						<AlertDialogAction
-							disabled={previewState.status !== "ready"}
-							onClick={() => {
-								if (previewState.status === "ready") {
-									void applyScope(previewState.scope, previewState.sourceEtag);
-								}
-							}}
-						>
-							Apply wider coverage
-						</AlertDialogAction>
-					</AlertDialogFooter>
-				</AlertDialogContent>
-			</AlertDialog>
-		</section>
 	);
 }
 
@@ -724,10 +327,10 @@ function FeedbackDeliverySection({ policy }: Pick<PracticeReviewSettingsProps, "
 			) : null}
 			<Field orientation="horizontal">
 				<FieldContent>
-					<FieldLabel htmlFor="policy-delivery-active">
-						Send feedback
-						<Badge variant={paused ? "warning" : "success"}>{paused ? "Paused" : "Active"}</Badge>
-					</FieldLabel>
+					<div className="flex flex-wrap items-center gap-2">
+						<FieldLabel htmlFor="policy-delivery-active">Send feedback</FieldLabel>
+						<StatusBadge def={WORKSPACE_DELIVERY_STATUS_DEFS[settings.deliveryStatus]} />
+					</div>
 					<FieldDescription>
 						Turning this off stops every comment and mentor message at once, without stopping the
 						reviews themselves. Coverage and practice settings are kept.
@@ -766,171 +369,6 @@ function FeedbackDeliverySection({ policy }: Pick<PracticeReviewSettingsProps, "
 				/>
 			</Field>
 		</section>
-	);
-}
-
-function CoverageLabel({
-	id,
-	label,
-	covered,
-	total,
-	noun,
-}: {
-	id: string;
-	label: string;
-	covered: number;
-	total: number;
-	noun: string;
-}) {
-	return (
-		<div className="flex items-baseline justify-between gap-3">
-			<FieldTitle id={id}>{label}</FieldTitle>
-			<span className="text-muted-foreground text-sm">
-				{covered} of {total} {noun}
-			</span>
-		</div>
-	);
-}
-
-function RepositoryScopeRow({
-	nameWithOwner,
-	baseBranches,
-	monitored,
-	disabled,
-	onChange,
-}: {
-	nameWithOwner: string;
-	baseBranches: string[];
-	monitored: boolean;
-	disabled: boolean;
-	onChange: (next: string[]) => void;
-}) {
-	const editorId = useId();
-
-	return (
-		<Collapsible>
-			<Item variant="outline" size="sm" role="listitem" className="flex-wrap">
-				<ItemContent>
-					<ItemTitle className="min-w-0 gap-2">
-						<span className="truncate font-mono" title={nameWithOwner}>
-							{nameWithOwner}
-						</span>
-						{monitored ? null : <Badge variant="warning">Not monitored</Badge>}
-					</ItemTitle>
-					<ItemDescription>
-						{monitored
-							? baseBranches.length === 0
-								? "Every base branch"
-								: `Only ${baseBranches.join(", ")}`
-							: "This workspace no longer syncs this repository, so nothing in it is reviewed."}
-					</ItemDescription>
-				</ItemContent>
-				<ItemActions>
-					<CollapsibleTrigger
-						render={
-							<Button variant="outline" size="sm" disabled={disabled} className="group/branches">
-								Base branches
-								<span className="sr-only"> for {nameWithOwner}</span>
-								<ChevronDownIcon
-									aria-hidden
-									className="transition-transform group-aria-expanded/branches:rotate-180"
-								/>
-							</Button>
-						}
-					/>
-				</ItemActions>
-				<CollapsibleContent className="w-full">
-					<BaseBranchEditor
-						id={editorId}
-						nameWithOwner={nameWithOwner}
-						values={baseBranches}
-						disabled={disabled}
-						onChange={onChange}
-					/>
-				</CollapsibleContent>
-			</Item>
-		</Collapsible>
-	);
-}
-
-function BaseBranchEditor({
-	id,
-	nameWithOwner,
-	values,
-	disabled,
-	onChange,
-}: {
-	id: string;
-	nameWithOwner: string;
-	values: string[];
-	disabled: boolean;
-	onChange: (next: string[]) => void;
-}) {
-	const [draft, setDraft] = useState("");
-	const trimmed = draft.trim();
-	const duplicate = trimmed.length > 0 && values.includes(trimmed);
-	const descriptionId = `${id}-description`;
-	const errorId = `${id}-error`;
-
-	const add = () => {
-		if (trimmed.length === 0 || duplicate) return;
-		onChange([...values, trimmed]);
-		setDraft("");
-	};
-
-	return (
-		<Field data-invalid={duplicate || undefined} className="border-t pt-3">
-			<FieldLabel htmlFor={id}>
-				Only these base branches
-				<span className="sr-only"> for {nameWithOwner}</span>
-			</FieldLabel>
-			<FieldDescription id={descriptionId}>
-				Every base branch, unless you name some here. A name has to match the branch exactly.
-			</FieldDescription>
-			<InputGroup data-invalid={duplicate || undefined}>
-				<InputGroupInput
-					id={id}
-					value={draft}
-					placeholder="main"
-					disabled={disabled}
-					aria-invalid={duplicate || undefined}
-					aria-describedby={duplicate ? `${descriptionId} ${errorId}` : descriptionId}
-					onChange={(event) => setDraft(event.target.value)}
-					onKeyDown={(event) => {
-						if (event.key === "Enter") {
-							event.preventDefault();
-							add();
-						}
-					}}
-				/>
-				<InputGroupAddon align="inline-end">
-					<InputGroupButton
-						variant="outline"
-						disabled={disabled || trimmed.length === 0 || duplicate}
-						onClick={add}
-					>
-						Add
-						<span className="sr-only"> to base branches for {nameWithOwner}</span>
-					</InputGroupButton>
-				</InputGroupAddon>
-			</InputGroup>
-			{duplicate ? <FieldError id={errorId}>{trimmed} is already listed.</FieldError> : null}
-			{values.length > 0 ? (
-				<ul className="flex flex-wrap gap-2">
-					{values.map((value) => (
-						<li key={value}>
-							<RemovableToken
-								label={value}
-								className="font-mono"
-								removeLabel={`Remove ${value} from base branches for ${nameWithOwner}`}
-								disabled={disabled}
-								onRemove={() => onChange(values.filter((entry) => entry !== value))}
-							/>
-						</li>
-					))}
-				</ul>
-			) : null}
-		</Field>
 	);
 }
 

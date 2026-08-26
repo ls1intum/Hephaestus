@@ -8,6 +8,8 @@ import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeArea;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
+import de.tum.cit.aet.hephaestus.practices.review.WorkspaceReviewDefaults;
+import de.tum.cit.aet.hephaestus.practices.review.autonomy.AutonomyResolver;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
@@ -203,14 +205,20 @@ public class PracticeAreaService {
      */
     @Transactional
     public PracticeArea setAutonomy(WorkspaceContext ctx, String slug, @Nullable PracticeAutonomy autonomy) {
-        lockWorkspace(ctx);
+        Workspace workspace = lockWorkspace(ctx);
         PracticeArea area = loadArea(ctx, slug);
         if (area.getAutonomy() == autonomy) {
             return area;
         }
+        List<Practice> practices = practiceRepository.findByWorkspaceIdAndAreaIdOrderByDisplayOrderAscNameAsc(
+            ctx.id(),
+            area.getId()
+        );
+        Map<Long, PracticeAutonomy> effectiveBefore = effectiveAutonomies(practices, workspace);
         PracticeAreaSnapshot before = PracticeAreaSnapshot.of(area);
         area.setAutonomy(autonomy);
         area = practiceAreaRepository.save(area);
+        bumpRolloutRevisionIfChanged(workspace, effectiveBefore, practices);
         configAudit.record(
             ConfigAuditEntry.updated(
                 ConfigAuditEntityType.PRACTICE_AREA,
@@ -302,13 +310,14 @@ public class PracticeAreaService {
     }
 
     private void removeArea(WorkspaceContext ctx, String slug, boolean deletePractices) {
-        lockWorkspace(ctx);
+        Workspace workspace = lockWorkspace(ctx);
         PracticeArea area = loadArea(ctx, slug);
         PracticeAreaSnapshot areaBefore = PracticeAreaSnapshot.of(area);
         List<Practice> practices = practiceRepository.findByWorkspaceIdAndAreaIdOrderByDisplayOrderAscNameAsc(
             ctx.id(),
             area.getId()
         );
+        Map<Long, PracticeAutonomy> effectiveBefore = effectiveAutonomies(practices, workspace);
         int nextOrder = deletePractices ? 0 : practiceRepository.findMaxDisplayOrder(ctx.id(), null) + 1;
         for (Practice practice : practices) {
             PracticeDefinitionSnapshot before = PracticeDefinitionSnapshot.of(
@@ -334,6 +343,11 @@ public class PracticeAreaService {
             recordPlacementChange(ctx, practice, before, revisionNumber);
         }
         practiceAreaRepository.delete(area);
+        if (deletePractices && !practices.isEmpty()) {
+            workspace.getReviewSettings().incrementRolloutRevision();
+        } else if (!deletePractices) {
+            bumpRolloutRevisionIfChanged(workspace, effectiveBefore, practices);
+        }
         configAudit.record(
             ConfigAuditEntry.deleted(ConfigAuditEntityType.PRACTICE_AREA, area.getId(), ctx.id(), areaBefore)
         );
@@ -347,7 +361,7 @@ public class PracticeAreaService {
 
     @Transactional
     public Practice bindPractice(WorkspaceContext ctx, String practiceSlug, @Nullable String areaSlug) {
-        lockWorkspace(ctx);
+        Workspace workspace = lockWorkspace(ctx);
         Practice practice = practiceRepository
             .findByWorkspaceIdAndSlug(ctx.id(), practiceSlug)
             .orElseThrow(() -> new EntityNotFoundException("Practice", practiceSlug));
@@ -356,10 +370,14 @@ public class PracticeAreaService {
             practice,
             practiceRevisionService.currentRevisionNumber(practice)
         );
+        PracticeAutonomy effectiveBefore = effectiveAutonomy(practice, workspace);
         if (!applyBinding(ctx, practice, areaSlug)) {
             return practice;
         }
         practice = practiceRepository.save(practice);
+        if (effectiveBefore != effectiveAutonomy(practice, workspace)) {
+            workspace.getReviewSettings().incrementRolloutRevision();
+        }
         int revisionNumber = practiceRevisionService.append(practice).getRevisionNumber();
         recordPlacementChange(ctx, practice, before, revisionNumber);
         return practice;
@@ -390,6 +408,29 @@ public class PracticeAreaService {
         return workspaceRepository
             .findByIdForUpdate(ctx.id())
             .orElseThrow(() -> new EntityNotFoundException("Workspace", ctx.slug()));
+    }
+
+    private static Map<Long, PracticeAutonomy> effectiveAutonomies(List<Practice> practices, Workspace workspace) {
+        return practices
+            .stream()
+            .collect(Collectors.toMap(Practice::getId, practice -> effectiveAutonomy(practice, workspace)));
+    }
+
+    private static PracticeAutonomy effectiveAutonomy(Practice practice, Workspace workspace) {
+        return AutonomyResolver.effectiveAutonomyOf(practice, WorkspaceReviewDefaults.of(workspace).defaultAutonomy());
+    }
+
+    private static void bumpRolloutRevisionIfChanged(
+        Workspace workspace,
+        Map<Long, PracticeAutonomy> before,
+        List<Practice> practices
+    ) {
+        boolean changed = practices
+            .stream()
+            .anyMatch(practice -> before.get(practice.getId()) != effectiveAutonomy(practice, workspace));
+        if (changed) {
+            workspace.getReviewSettings().incrementRolloutRevision();
+        }
     }
 
     private void recordPlacementChange(

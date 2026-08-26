@@ -89,6 +89,12 @@ class IssueReviewHandlerTest extends BaseUnitTest {
     @Mock
     private WorkspaceRepository workspaceRepository;
 
+    @Mock
+    private ReactionSuppressionFilter reactionSuppressionFilter;
+
+    @Mock
+    private PracticeFeedbackDispatchService dispatchService;
+
     private IssueReviewHandler handler;
 
     private boolean silentModeEngaged;
@@ -108,8 +114,6 @@ class IssueReviewHandlerTest extends BaseUnitTest {
             new PracticeDetectionResultParser(objectMapper),
             new de.tum.cit.aet.hephaestus.agent.handler.composition.FeedbackCompositionResultParser(),
             deliveryService,
-            // Real gate over the same mocked catalogue: with no practice rows, every slug is unknown and
-            // therefore admitted, so these tests exercise delivery rather than the autonomy.
             InContextDeliveryGateFixtures.gate(
                 practiceRepository,
                 org.mockito.Mockito.mock(de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository.class),
@@ -119,9 +123,14 @@ class IssueReviewHandlerTest extends BaseUnitTest {
             feedbackLedgerRecorder,
             mock(PracticeFeedbackDeliveryPolicy.class),
             mock(PracticeFeedbackCommentFormatter.class),
+            reactionSuppressionFilter,
             mock(de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository.class),
-            mock(PracticeFeedbackDispatchService.class)
+            dispatchService,
+            mock(FeedbackDeliveryService.class)
         );
+        lenient()
+            .when(reactionSuppressionFilter.evaluate(any(), any()))
+            .thenAnswer(invocation -> new ReactionSuppressionFilter.ReactionDecision(invocation.getArgument(1), 0));
         lenient()
             .when(repositoryToMonitorRepository.existsByWorkspaceIdAndNameWithOwner(1L, "owner/repo"))
             .thenReturn(true);

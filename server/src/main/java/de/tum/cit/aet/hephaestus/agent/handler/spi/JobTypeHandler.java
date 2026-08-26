@@ -70,4 +70,8 @@ public interface JobTypeHandler {
     default ExistingDeliveryLookup findExistingDelivery(AgentJob job) {
         return ExistingDeliveryLookup.unknown();
     }
+
+    default boolean reconcilesMoreThanOneProviderObject() {
+        return false;
+    }
 }

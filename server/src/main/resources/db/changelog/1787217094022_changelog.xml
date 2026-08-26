@@ -156,8 +156,9 @@
             <column name="destination" type="VARCHAR(40)"><constraints nullable="false"/></column>
             <column name="state" type="VARCHAR(16)"><constraints nullable="false"/></column>
             <column name="body" type="TEXT"><constraints nullable="false"/></column>
-            <column name="target_external_ref" type="VARCHAR(255)"/>
             <column name="practice_slugs" type="JSONB"><constraints nullable="false"/></column>
+            <column name="package_content" type="JSONB"><constraints nullable="false"/></column>
+            <column name="delivered_placements" type="JSONB"><constraints nullable="false"/></column>
             <column name="write_started" type="BOOLEAN" defaultValueBoolean="false"><constraints nullable="false"/></column>
             <column name="delivered_external_ref" type="VARCHAR(255)"/>
             <column name="lease_owner" type="VARCHAR(64)"/>
@@ -166,6 +167,9 @@
             <column name="attempt_count" type="INTEGER"><constraints nullable="false"/></column>
             <column name="suppression_reason" type="VARCHAR(48)"/>
             <column name="last_error" type="VARCHAR(512)"/>
+            <column name="projected_at" type="TIMESTAMP WITH TIME ZONE"/>
+            <column name="projection_owner" type="VARCHAR(64)"/>
+            <column name="projection_expires_at" type="TIMESTAMP WITH TIME ZONE"/>
             <column name="created_at" type="TIMESTAMP WITH TIME ZONE"><constraints nullable="false"/></column>
             <column name="updated_at" type="TIMESTAMP WITH TIME ZONE"><constraints nullable="false"/></column>
         </createTable>
@@ -176,17 +180,23 @@
             ALTER TABLE feedback_dispatch ADD CONSTRAINT chk_feedback_dispatch_state
                 CHECK (state IN ('PENDING', 'CLAIMED', 'SENT', 'SUPPRESSED', 'UNCERTAIN', 'FAILED'));
             ALTER TABLE feedback_dispatch ADD CONSTRAINT chk_feedback_dispatch_destination
-                CHECK (destination IN ('ARTIFACT_SUMMARY', 'APPROVED_REVIEW_PACKAGE')
+                CHECK (destination IN ('AUTOMATIC_REVIEW_PACKAGE', 'APPROVED_REVIEW_PACKAGE')
                     AND (destination = 'APPROVED_REVIEW_PACKAGE') = (feedback_id IS NOT NULL));
             ALTER TABLE feedback_dispatch ADD CONSTRAINT chk_feedback_dispatch_practice_slugs
                 CHECK (jsonb_typeof(practice_slugs) = 'array'
                     AND NOT jsonb_path_exists(practice_slugs, '$[*] ? (@.type() != "string")'));
+            ALTER TABLE feedback_dispatch ADD CONSTRAINT chk_feedback_dispatch_package
+                CHECK (jsonb_typeof(package_content) = 'object'
+                    AND jsonb_typeof(delivered_placements) = 'array');
             ALTER TABLE feedback_dispatch ADD CONSTRAINT chk_feedback_dispatch_lease
                 CHECK ((state = 'CLAIMED') = (lease_owner IS NOT NULL AND lease_expires_at IS NOT NULL));
             ALTER TABLE feedback_dispatch ADD CONSTRAINT chk_feedback_dispatch_delivery
-                CHECK ((state = 'SENT') = (delivered_external_ref IS NOT NULL));
+                CHECK (state <> 'SENT' OR delivered_external_ref IS NOT NULL
+                    OR jsonb_array_length(delivered_placements) > 0 OR body = '');
             ALTER TABLE feedback_dispatch ADD CONSTRAINT chk_feedback_dispatch_suppression
                 CHECK ((state = 'SUPPRESSED') = (suppression_reason IS NOT NULL));
+            ALTER TABLE feedback_dispatch ADD CONSTRAINT chk_feedback_dispatch_projection
+                CHECK ((projection_owner IS NULL) = (projection_expires_at IS NULL));
             ALTER TABLE feedback DROP CONSTRAINT chk_feedback_suppression_reason;
             ALTER TABLE feedback ADD CONSTRAINT chk_feedback_suppression_reason
                 CHECK (suppression_reason IS NULL OR suppression_reason IN (
@@ -199,6 +209,10 @@
         ]]></sql>
         <createIndex tableName="feedback_dispatch" indexName="idx_feedback_dispatch_recovery"><column name="state"/><column name="lease_expires_at"/><column name="updated_at"/></createIndex>
         <createIndex tableName="feedback_dispatch" indexName="idx_feedback_dispatch_workspace"><column name="workspace_id"/><column name="created_at" descending="true"/></createIndex>
+        <sql><![CDATA[
+            CREATE INDEX idx_feedback_dispatch_projection ON feedback_dispatch (updated_at)
+             WHERE projected_at IS NULL AND state IN ('SENT', 'SUPPRESSED', 'FAILED');
+        ]]></sql>
         <rollback>
             <dropTable tableName="feedback_dispatch"/>
             <sql splitStatements="true" endDelimiter=";"><![CDATA[
@@ -245,7 +259,7 @@
                     AND NOT jsonb_path_exists(proposed_practice_slugs, '$[*] ? (@.type() != "string")'));
             ALTER TABLE feedback DROP CONSTRAINT chk_feedback_state;
             ALTER TABLE feedback ADD CONSTRAINT chk_feedback_state
-                CHECK (delivery_state IN ('AWAITING_APPROVAL', 'PREPARED', 'PARTIALLY_DELIVERED', 'DELIVERED',
+                CHECK (delivery_state IN ('AWAITING_APPROVAL', 'PREPARED', 'PARTIALLY_DELIVERED', 'PARTIALLY_FAILED', 'DELIVERED',
                     'DISCARDED', 'SUPERSEDED', 'SUPPRESSED', 'FAILED'));
         ]]></sql>
         <rollback>
@@ -253,7 +267,7 @@
                 constraintName="uk_feedback_placement_feedback_ref"/>
             <sql><![CDATA[
                 UPDATE feedback SET delivery_state = 'FAILED', suppression_reason = NULL
-                 WHERE delivery_state = 'PARTIALLY_DELIVERED';
+                 WHERE delivery_state IN ('PARTIALLY_DELIVERED', 'PARTIALLY_FAILED');
                 ALTER TABLE feedback DROP CONSTRAINT chk_feedback_state;
                 ALTER TABLE feedback ADD CONSTRAINT chk_feedback_state
                     CHECK (delivery_state IN ('AWAITING_APPROVAL', 'PREPARED', 'DELIVERED', 'DISCARDED',

@@ -1,22 +1,12 @@
 import { Link } from "@tanstack/react-router";
-import { CheckIcon, CircleXIcon, Clock3Icon, FileCode2Icon, ScanSearchIcon } from "lucide-react";
+import { CheckIcon, CircleXIcon, ScanSearchIcon } from "lucide-react";
 import { useId, useState } from "react";
-import type {
-	DecideFeedbackProposalRequest,
-	GetPracticeReviewFeedbackResponse,
-	Practice,
-} from "@/api/types.gen";
-import { UNTRUSTED_MARKDOWN_PROSE, UntrustedMarkdown } from "@/components/common/UntrustedMarkdown";
+import type { GetPracticeReviewFeedbackResponse, Practice } from "@/api/types.gen";
+import { DELIVERY_STATE_DEFS } from "@/components/practice-vocabulary/delivery-outcome-defs";
 import { DELIVERY_PLACE_DEFS } from "@/components/practice-vocabulary/delivery-place-defs";
 import { observationResult } from "@/components/practice-vocabulary/observation-result";
 import { placementLabel } from "@/components/practice-vocabulary/placement-defs";
 import { StatusBadge } from "@/components/practice-vocabulary/StatusBadge";
-import {
-	Accordion,
-	AccordionContent,
-	AccordionItem,
-	AccordionTrigger,
-} from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -38,17 +28,21 @@ import {
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
-import { FeedbackBody } from "./FeedbackBody";
+import {
+	PROPOSAL_REJECTION_REASONS,
+	type ProposalRejectionReason,
+} from "./proposal-rejection-vocabulary";
 import { ReviewArtifactLink } from "./ReviewArtifact";
 import { ClaimCurrentnessBadge, ObservationResultBadge } from "./ReviewBadges";
 import { ReviewBreadcrumbs } from "./ReviewBreadcrumbs";
 import { ReviewDetailHeader, ReviewFact, ReviewFactGrid } from "./ReviewDetailHeader";
+import { ReviewPackage } from "./ReviewPackage";
 import { ReviewPerson } from "./ReviewPerson";
 import { ReviewPracticeLink } from "./ReviewPracticeLink";
 import { ReviewRow, ReviewRowList, ReviewRowMeta } from "./ReviewRow";
 import { subjectLabel } from "./review-format";
 
-export type ProposalRejectionReason = NonNullable<DecideFeedbackProposalRequest["rejectionReason"]>;
+export type { ProposalRejectionReason } from "./proposal-rejection-vocabulary";
 
 export interface ProposalReviewPageProps {
 	workspaceSlug: string;
@@ -58,15 +52,6 @@ export interface ProposalReviewPageProps {
 	onApprove: (feedbackId: string) => void;
 	onReject: (feedbackId: string, reason?: ProposalRejectionReason, note?: string) => void;
 }
-
-const REJECTION_REASONS: Array<{ value: ProposalRejectionReason; label: string }> = [
-	{ value: "INCORRECT", label: "Incorrect" },
-	{ value: "MISSING_CONTEXT", label: "Missing important context" },
-	{ value: "UNHELPFUL", label: "Not useful to the recipient" },
-	{ value: "DUPLICATE", label: "Already covered elsewhere" },
-	{ value: "INAPPROPRIATE_PLACEMENT", label: "Wrong delivery place" },
-	{ value: "OTHER", label: "Something else" },
-];
 
 export function ProposalReviewPage({
 	workspaceSlug,
@@ -109,10 +94,7 @@ export function ProposalReviewPage({
 			<ReviewDetailHeader
 				chips={
 					<>
-						<Badge variant="warning">
-							<Clock3Icon />
-							Awaiting approval
-						</Badge>
+						<StatusBadge def={DELIVERY_STATE_DEFS[feedback.deliveryState]} />
 						<StatusBadge def={place} />
 					</>
 				}
@@ -173,40 +155,7 @@ export function ProposalReviewPage({
 						sent safely.
 					</p>
 				)}
-				{summary && <FeedbackBody feedback={{ ...feedback, body: summary.body }} />}
-				{inline.length > 0 && (
-					<Accordion
-						multiple
-						defaultValue={inline.map((_, index) => `inline-${index}`)}
-						className="rounded-xl border px-4"
-					>
-						{inline.map((placement, index) => (
-							<AccordionItem
-								key={`${placement.path}:${placement.startLine}:${index}`}
-								value={`inline-${index}`}
-							>
-								<AccordionTrigger className="gap-3 no-underline hover:no-underline">
-									<span className="flex min-w-0 items-start gap-2">
-										<FileCode2Icon className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-										<span className="min-w-0">
-											<span className="block break-all font-mono text-xs">{placement.path}</span>
-											<span className="block text-xs font-normal text-muted-foreground">
-												{placement.endLine && placement.endLine !== placement.startLine
-													? `Lines ${placement.startLine}–${placement.endLine}`
-													: `Line ${placement.startLine}`}
-											</span>
-										</span>
-									</span>
-								</AccordionTrigger>
-								<AccordionContent className="min-w-0 pb-4 pl-6">
-									<div className={`${UNTRUSTED_MARKDOWN_PROSE} min-w-0 break-words`}>
-										<UntrustedMarkdown>{placement.body}</UntrustedMarkdown>
-									</div>
-								</AccordionContent>
-							</AccordionItem>
-						))}
-					</Accordion>
-				)}
+				{packageUnavailable ? null : <ReviewPackage feedback={feedback} defaultExpanded />}
 			</section>
 
 			<section aria-labelledby="proposal-observations-heading" className="space-y-3">
@@ -324,7 +273,7 @@ function RejectFeedbackPopover({
 					aria-label="Rejection category"
 					className="gap-1"
 				>
-					{REJECTION_REASONS.map((option) => (
+					{PROPOSAL_REJECTION_REASONS.map((option) => (
 						<label
 							key={option.value}
 							htmlFor={`${rejectionId}-${option.value}`}
@@ -339,10 +288,12 @@ function RejectFeedbackPopover({
 					<FieldLabel htmlFor={noteId}>Note</FieldLabel>
 					<Textarea
 						id={noteId}
+						name="feedback-rejection-note"
+						autoComplete="off"
 						value={note}
 						onChange={(event) => setNote(event.target.value)}
 						maxLength={500}
-						placeholder="What should be corrected or reconsidered?"
+						placeholder="What should be corrected or reconsidered…"
 					/>
 					<FieldDescription>Optional · {note.length}/500</FieldDescription>
 				</Field>

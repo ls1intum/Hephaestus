@@ -20,8 +20,13 @@ import de.tum.cit.aet.hephaestus.integration.core.signal.SignalKey;
 import de.tum.cit.aet.hephaestus.integration.core.signal.SignalRecorder;
 import de.tum.cit.aet.hephaestus.integration.core.signal.SignalState;
 import de.tum.cit.aet.hephaestus.integration.core.signal.SignalStateReason;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ReviewSubject;
+import de.tum.cit.aet.hephaestus.practices.review.GateDecision;
+import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewDetectionGate;
+import de.tum.cit.aet.hephaestus.practices.review.TriggerMode;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
+import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Consumer;
@@ -33,7 +38,6 @@ import org.mockito.Mock;
 import org.springframework.transaction.TransactionStatus;
 import org.springframework.transaction.support.TransactionTemplate;
 
-/** One settled thread, several recipients, one ledger row. */
 @Tag("unit")
 @DisplayName("A settled conversation thread's review")
 class ConversationReviewSubmitterTest extends BaseUnitTest {
@@ -53,31 +57,40 @@ class ConversationReviewSubmitterTest extends BaseUnitTest {
     @Mock
     private TransactionTemplate transactionTemplate;
 
+    @Mock
+    private WorkspaceRepository workspaceRepository;
+
+    @Mock
+    private PracticeReviewDetectionGate detectionGate;
+
     private ConversationReviewSubmitter submitter;
 
     @BeforeEach
-    @SuppressWarnings("unchecked")
     void setUp() {
         submitter = new ConversationReviewSubmitter(
             candidateSource,
             agentJobService,
             signalRecorder,
-            transactionTemplate
+            transactionTemplate,
+            workspaceRepository,
+            detectionGate
         );
         lenient()
             .doAnswer(invocation -> {
-                ((Consumer<TransactionStatus>) invocation.getArgument(0)).accept(mock(TransactionStatus.class));
+                Consumer<TransactionStatus> callback = invocation.getArgument(0);
+                callback.accept(mock(TransactionStatus.class));
                 return null;
             })
             .when(transactionTemplate)
             .executeWithoutResult(any());
+        Workspace workspace = new Workspace();
+        workspace.setId(WORKSPACE_ID);
+        lenient().when(workspaceRepository.findById(WORKSPACE_ID)).thenReturn(Optional.of(workspace));
+        lenient()
+            .when(detectionGate.evaluateSignal(eq(workspace), any(), eq(TriggerMode.AUTO), any(ReviewSubject.class)))
+            .thenReturn(new GateDecision.Detect(workspace, java.util.List.of(), 0, TriggerMode.AUTO));
     }
 
-    /**
-     * The fan-out is a delivery decision, not three occasions. Settling per participant would leave the
-     * row pointing at whichever submission happened to be last, and would put the participant count into
-     * every "how many occasions did this instance see" answer.
-     */
     @Test
     void threeParticipantsAreThreeJobsAndStillOneSettledOccurrence() {
         givenSubmissionSucceeds();
@@ -89,16 +102,16 @@ class ConversationReviewSubmitterTest extends BaseUnitTest {
             eq(WORKSPACE_ID),
             eq(AgentJobType.CONVERSATION_REVIEW),
             any(),
-            eq(null)
+            eq(null),
+            any(GateDecision.Detect.class)
         );
         verify(signalRecorder).markTriggered(eq(key()), any());
         verify(signalRecorder, never()).markRefused(any(), any());
     }
 
-    /** A refused occurrence gets its reason on the row, which is what the reaper later reads. */
     @Test
     void anOccurrenceNothingRanForIsRefusedWithTheReasonThatStoppedIt() {
-        when(agentJobService.submitWithOutcome(anyLong(), any(), any(), any())).thenReturn(
+        when(agentJobService.submitWithOutcome(anyLong(), any(), any(), any(), any())).thenReturn(
             SubmissionOutcome.refused(SignalStateReason.BUDGET_EXHAUSTED)
         );
 
@@ -108,16 +121,11 @@ class ConversationReviewSubmitterTest extends BaseUnitTest {
         verify(signalRecorder).markRefused(key(), SignalStateReason.BUDGET_EXHAUSTED);
     }
 
-    /**
-     * A partial fan-out counts as triggered. A review did run on this occurrence, and saying otherwise
-     * would hand the reaper a row to re-offer — which would re-review the participants who already got
-     * one.
-     */
     @Test
     void aPartialFanOutStillCountsAsAnOccurrenceThatWasReviewed() {
         AgentJob job = new AgentJob();
         job.setId(UUID.randomUUID());
-        when(agentJobService.submitWithOutcome(anyLong(), any(), any(), any())).thenReturn(
+        when(agentJobService.submitWithOutcome(anyLong(), any(), any(), any(), any())).thenReturn(
             SubmissionOutcome.refused(SignalStateReason.SUBJECT_UNLINKED),
             SubmissionOutcome.of(job)
         );
@@ -127,7 +135,6 @@ class ConversationReviewSubmitterTest extends BaseUnitTest {
         verify(signalRecorder, never()).markRefused(any(), any());
     }
 
-    /** Nobody to file findings against is retryable: they can link their account afterwards. */
     @Test
     void aThreadWithNoResolvableParticipantIsHeldOpenRatherThanRetired() {
         assertThat(submitter.submitAndSettle(candidate(), key())).isZero();
@@ -135,11 +142,18 @@ class ConversationReviewSubmitterTest extends BaseUnitTest {
         verify(signalRecorder).markRefused(key(), SignalStateReason.SUBJECT_UNLINKED);
     }
 
-    /**
-     * The reaper's path re-reads the thread instead of rebuilding it from the ledger row, so consent is
-     * re-checked. A signal refused for an exhausted budget can be re-offered days later, and by then the
-     * channel may have been withdrawn — reviewing it would read a conversation nobody agreed to.
-     */
+    @Test
+    void aParticipantOutsideReviewCoverageDoesNotStartCompute() {
+        when(detectionGate.evaluateSignal(any(), any(), any(), any())).thenReturn(
+            new GateDecision.Skip("outside review coverage", SignalStateReason.OUT_OF_REVIEW_SCOPE)
+        );
+
+        assertThat(submitter.submitAndSettle(candidate(11L), key())).isZero();
+
+        verify(agentJobService, never()).submitWithOutcome(anyLong(), any(), any(), any(), any());
+        verify(signalRecorder).markRefused(key(), SignalStateReason.OUT_OF_REVIEW_SCOPE);
+    }
+
     @Test
     void aReOfferedSignalWhoseChannelLostConsentIsRetiredRatherThanReviewed() {
         when(candidateSource.candidateById(WORKSPACE_ID, THREAD_ID)).thenReturn(Optional.empty());
@@ -147,7 +161,7 @@ class ConversationReviewSubmitterTest extends BaseUnitTest {
         submitter.resubmit(pendingSignal());
 
         verify(signalRecorder).markRefused(key(), SignalStateReason.ARTIFACT_GONE);
-        verify(agentJobService, never()).submitWithOutcome(anyLong(), any(), any(), any());
+        verify(agentJobService, never()).submitWithOutcome(anyLong(), any(), any(), any(), any());
     }
 
     @Test
@@ -157,7 +171,13 @@ class ConversationReviewSubmitterTest extends BaseUnitTest {
 
         submitter.resubmit(pendingSignal());
 
-        verify(agentJobService).submitWithOutcome(eq(WORKSPACE_ID), any(), any(), eq(null));
+        verify(agentJobService).submitWithOutcome(
+            eq(WORKSPACE_ID),
+            any(),
+            any(),
+            eq(null),
+            any(GateDecision.Detect.class)
+        );
         verify(signalRecorder).markTriggered(eq(key()), any());
     }
 
@@ -169,7 +189,7 @@ class ConversationReviewSubmitterTest extends BaseUnitTest {
     // Fixtures
 
     private void givenSubmissionSucceeds() {
-        when(agentJobService.submitWithOutcome(anyLong(), any(), any(), any())).thenAnswer(invocation -> {
+        when(agentJobService.submitWithOutcome(anyLong(), any(), any(), any(), any())).thenAnswer(invocation -> {
             AgentJob job = new AgentJob();
             job.setId(UUID.randomUUID());
             return SubmissionOutcome.of(job);

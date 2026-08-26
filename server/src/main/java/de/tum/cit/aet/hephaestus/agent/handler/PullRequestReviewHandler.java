@@ -313,6 +313,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
 
     @Override
     public void deliver(AgentJob job) {
+        if (feedbackService.recoverAutomaticPackageIfPresent(job)) return;
         ObservationAdmissionService.requireMatchingCompositionDigest(job);
         deliverAdmitted(job);
     }
@@ -325,17 +326,18 @@ public class PullRequestReviewHandler implements JobTypeHandler {
             .toList();
         if (scopedObservations.isEmpty()) throw new JobDeliveryException("Admitted observation set is empty");
         String unifiedDiff = capturedDiff(job);
+        List<PracticeDetectionResultParser.ValidatedObservation> eligible = reactionSuppressionFilter
+            .evaluate(job, scopedObservations)
+            .deliverable();
         List<PracticeDetectionResultParser.ValidatedObservation> proposals = inContextDeliveryGate.awaitingApproval(
             job,
-            scopedObservations
+            eligible
         );
         List<PracticeDetectionResultParser.ValidatedObservation> loudEnough = inContextDeliveryGate.admitInContext(
             job,
-            scopedObservations
+            eligible
         );
-        List<PracticeDetectionResultParser.ValidatedObservation> deliverable = reactionSuppressionFilter
-            .evaluate(job, loudEnough)
-            .deliverable();
+        List<PracticeDetectionResultParser.ValidatedObservation> deliverable = loudEnough;
         List<ComposedFeedbackUnit> units = compositionResultParser.parse(job.getOutput(), FeedbackChannel.IN_CONTEXT);
         String lead = compositionResultParser.lead(job.getOutput());
         Map<String, String> why = practiceCatalogInjector.whyBySlug(job.getWorkspace(), ArtifactKinds.PULL_REQUEST);
@@ -527,8 +529,6 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         );
         List<PracticeDetectionResultParser.ValidatedObservation> deliverable = reactions.deliverable();
         if (deliverable.isEmpty() && !scopedObservations.isEmpty()) {
-            // A SUCCESS (the student told us to stop nagging), not a delivery failure: the SUPPRESSED
-            // ledger rows are written, and the prior edit-in-place summary stays as-is.
             log.info(
                 "All {} observations suppressed by prior reactions: jobId={}",
                 scopedObservations.size(),
@@ -552,13 +552,14 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         }
     }
 
-    /**
-     * Guards only the summary comment. Inline diff notes are reconciled on every delivery attempt, so a
-     * recovery retry that falls through to {@link #deliver} cannot duplicate them.
-     */
     @Override
     public ExistingDeliveryLookup findExistingDelivery(AgentJob job) {
         return feedbackService.findExistingSummary(job);
+    }
+
+    @Override
+    public boolean reconcilesMoreThanOneProviderObject() {
+        return true;
     }
 
     private List<PracticeDetectionResultParser.ValidatedObservation> scanForSecrets(@Nullable String diff) {

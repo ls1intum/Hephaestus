@@ -20,6 +20,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeArea;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeRevision;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
@@ -55,6 +56,8 @@ class PracticeAreaServiceTest extends BaseUnitTest {
     @InjectMocks
     private PracticeAreaService service;
 
+    private Workspace workspace;
+
     private static final WorkspaceContext CTX = new WorkspaceContext(
         1L,
         "acme",
@@ -68,7 +71,9 @@ class PracticeAreaServiceTest extends BaseUnitTest {
 
     @BeforeEach
     void mockWorkspaceLock() {
-        lenient().when(workspaceRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(new Workspace()));
+        workspace = new Workspace();
+        workspace.setId(1L);
+        lenient().when(workspaceRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(workspace));
         PracticeRevision revision = mock(PracticeRevision.class);
         lenient().when(revision.getRevisionNumber()).thenReturn(1);
         lenient().when(practiceRevisionService.append(any())).thenReturn(revision);
@@ -195,6 +200,48 @@ class PracticeAreaServiceTest extends BaseUnitTest {
 
         verify(practiceRevisionService).append(first);
         verify(practiceRevisionService).append(second);
+    }
+
+    @Test
+    void changingInheritedAuthorityBumpsTheRolloutRevisionOnce() {
+        PracticeArea area = area("g");
+        area.setId(7L);
+        area.setAutonomy(PracticeAutonomy.HUMAN_APPROVAL);
+        Practice first = practice("first");
+        first.setId(1L);
+        first.setArea(area);
+        Practice second = practice("second");
+        second.setId(2L);
+        second.setArea(area);
+        when(practiceAreaRepository.findByWorkspaceIdAndSlug(1L, "g")).thenReturn(Optional.of(area));
+        when(practiceAreaRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(practiceRepository.findByWorkspaceIdAndAreaIdOrderByDisplayOrderAscNameAsc(1L, 7L)).thenReturn(
+            List.of(first, second)
+        );
+
+        service.setAutonomy(CTX, "g", PracticeAutonomy.AUTOMATIC);
+
+        assertThat(workspace.getReviewSettings().getRolloutRevision()).isEqualTo(1);
+    }
+
+    @Test
+    void changingAnAreaDoesNotBumpWhenPracticesOverrideIt() {
+        PracticeArea area = area("g");
+        area.setId(7L);
+        area.setAutonomy(PracticeAutonomy.HUMAN_APPROVAL);
+        Practice practice = practice("p");
+        practice.setId(1L);
+        practice.setArea(area);
+        practice.setAutonomy(PracticeAutonomy.AUTOMATIC);
+        when(practiceAreaRepository.findByWorkspaceIdAndSlug(1L, "g")).thenReturn(Optional.of(area));
+        when(practiceAreaRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(practiceRepository.findByWorkspaceIdAndAreaIdOrderByDisplayOrderAscNameAsc(1L, 7L)).thenReturn(
+            List.of(practice)
+        );
+
+        service.setAutonomy(CTX, "g", PracticeAutonomy.OFF);
+
+        assertThat(workspace.getReviewSettings().getRolloutRevision()).isZero();
     }
 
     @Test

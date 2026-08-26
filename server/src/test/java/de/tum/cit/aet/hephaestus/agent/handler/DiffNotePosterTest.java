@@ -1,7 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.handler;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -10,6 +9,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.DiffNote;
+import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.config.ApplicationProperties;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackAnchor;
@@ -161,12 +161,14 @@ class DiffNotePosterTest extends BaseUnitTest {
     }
 
     @Test
-    void noFindings_swallowsClearFailure_bestEffort() {
+    void shouldFailThePackageWhenEmptyReconciliationCannotClearStaleFeedback() {
         RecordingChannel channel = new RecordingChannel();
         channel.clearThrows = new RuntimeException("gitlab down");
         DiffNotePoster poster = poster(channel);
 
-        assertThatCode(() -> poster.reconcileInlineNotes(gitlabJob(), List.of())).doesNotThrowAnyException();
+        assertThatThrownBy(() -> poster.reconcileInlineNotes(gitlabJob(), List.of())).isInstanceOf(
+            JobDeliveryException.class
+        );
         assertThat(channel.cleared).isTrue();
     }
 

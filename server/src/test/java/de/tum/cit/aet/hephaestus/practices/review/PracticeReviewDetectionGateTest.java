@@ -93,6 +93,17 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
                 org.mockito.ArgumentMatchers.anyBoolean()
             )
         ).thenReturn(true);
+        when(coverageService.assessRepositoryless(any(Workspace.class), any(ReviewSubject.class))).thenReturn(
+            new PracticeReviewCoverageService.CoverageAssessment(
+                de.tum.cit.aet.hephaestus.workspace.settings.ReviewRepositoryMode.ALL_MONITORED,
+                de.tum.cit.aet.hephaestus.workspace.settings.ReviewPersonMode.ALL_ELIGIBLE,
+                ReviewSubjectStatus.RESOLVED_LINKED_HUMAN,
+                true,
+                true,
+                true,
+                true
+            )
+        );
     }
 
     // Helpers
@@ -733,7 +744,12 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
                 List.of(createPractice(DOCUMENT_PUBLISHED))
             );
 
-            GateDecision decision = gate.evaluateSignal(workspace, DOCUMENT_PUBLISHED, TriggerMode.AUTO);
+            GateDecision decision = gate.evaluateSignal(
+                workspace,
+                DOCUMENT_PUBLISHED,
+                TriggerMode.AUTO,
+                new ReviewSubject(7L, true)
+            );
 
             assertThat(decision).isInstanceOf(GateDecision.Detect.class);
             assertThat(((GateDecision.Detect) decision).matchedPractices()).hasSize(1);
@@ -748,7 +764,12 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
             silenced.setAutonomy(PracticeAutonomy.OFF);
             when(practiceRepository.findByWorkspaceId(WORKSPACE_ID)).thenReturn(List.of(silenced));
 
-            GateDecision silencedDecision = gate.evaluateSignal(workspace, DOCUMENT_PUBLISHED, TriggerMode.AUTO);
+            GateDecision silencedDecision = gate.evaluateSignal(
+                workspace,
+                DOCUMENT_PUBLISHED,
+                TriggerMode.AUTO,
+                new ReviewSubject(7L, true)
+            );
 
             assertThat(silencedDecision).isInstanceOf(GateDecision.Skip.class);
             assertThat(((GateDecision.Skip) silencedDecision).resolvedSignalReason()).isEqualTo(
@@ -756,7 +777,12 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
             );
 
             when(practiceRepository.findByWorkspaceId(WORKSPACE_ID)).thenReturn(List.of());
-            GateDecision absentDecision = gate.evaluateSignal(workspace, DOCUMENT_PUBLISHED, TriggerMode.AUTO);
+            GateDecision absentDecision = gate.evaluateSignal(
+                workspace,
+                DOCUMENT_PUBLISHED,
+                TriggerMode.AUTO,
+                new ReviewSubject(7L, true)
+            );
 
             assertThat(((GateDecision.Skip) absentDecision).resolvedSignalReason()).isEqualTo(
                 SignalStateReason.GATE_SKIPPED
@@ -768,7 +794,12 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
             Workspace workspace = createWorkspace();
             workspace.getFeatures().setPracticesEnabled(false);
 
-            GateDecision decision = gate.evaluateSignal(workspace, DOCUMENT_PUBLISHED, TriggerMode.AUTO);
+            GateDecision decision = gate.evaluateSignal(
+                workspace,
+                DOCUMENT_PUBLISHED,
+                TriggerMode.AUTO,
+                new ReviewSubject(7L, true)
+            );
 
             assertThat(decision).isInstanceOf(GateDecision.Skip.class);
             verifyNoInteractions(practiceRepository);
@@ -779,25 +810,36 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
             Workspace workspace = createWorkspace();
             workspace.getFeatures().setPracticeReviewAutoTriggerEnabled(false);
 
-            assertThat(gate.evaluateSignal(workspace, DOCUMENT_PUBLISHED, TriggerMode.AUTO)).isInstanceOf(
-                GateDecision.Skip.class
-            );
+            assertThat(
+                gate.evaluateSignal(workspace, DOCUMENT_PUBLISHED, TriggerMode.AUTO, new ReviewSubject(7L, true))
+            ).isInstanceOf(GateDecision.Skip.class);
         }
 
         @Test
-        @DisplayName("a repository-scoped workspace does not silence work that has no repository")
-        void reviewScopeDoesNotApplyToAKindWithoutARepository() {
-            // The scope names branches and repositories. A document has neither, so ANDing it on would
-            // silence every document in any workspace that had ever narrowed its SCM review scope — a
-            // refusal about one domain leaking into another.
+        @DisplayName("repository-less work fails closed when the workspace selected specific repositories")
+        void selectedRepositoryScopeRefusesAKindWithoutARepository() {
             Workspace workspace = createWorkspace();
-            when(practiceDetectionReadiness.hasRunnableAgent(WORKSPACE_ID)).thenReturn(true);
-            when(practiceRepository.findByWorkspaceId(WORKSPACE_ID)).thenReturn(
-                List.of(createPractice(DOCUMENT_PUBLISHED))
+            when(coverageService.assessRepositoryless(any(Workspace.class), any(ReviewSubject.class))).thenReturn(
+                new PracticeReviewCoverageService.CoverageAssessment(
+                    de.tum.cit.aet.hephaestus.workspace.settings.ReviewRepositoryMode.SELECTED,
+                    de.tum.cit.aet.hephaestus.workspace.settings.ReviewPersonMode.ALL_ELIGIBLE,
+                    ReviewSubjectStatus.RESOLVED_LINKED_HUMAN,
+                    false,
+                    false,
+                    true,
+                    false
+                )
             );
 
-            assertThat(gate.evaluateSignal(workspace, DOCUMENT_PUBLISHED, TriggerMode.AUTO)).isInstanceOf(
-                GateDecision.Detect.class
+            GateDecision decision = gate.evaluateSignal(
+                workspace,
+                DOCUMENT_PUBLISHED,
+                TriggerMode.AUTO,
+                new ReviewSubject(7L, true)
+            );
+
+            assertThat(((GateDecision.Skip) decision).resolvedSignalReason()).isEqualTo(
+                SignalStateReason.OUT_OF_REVIEW_SCOPE
             );
         }
     }

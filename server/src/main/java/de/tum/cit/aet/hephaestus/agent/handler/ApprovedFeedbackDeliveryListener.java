@@ -31,6 +31,7 @@ class ApprovedFeedbackDeliveryListener {
     private final PracticeFeedbackDeliveryPolicy deliveryPolicy;
     private final PracticeFeedbackDispatchService dispatchService;
     private final FeedbackApprovalEligibility approvalEligibility;
+    private final FeedbackLedgerRecorder feedbackLedgerRecorder;
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void deliver(ApprovedFeedbackReadyEvent event) {
@@ -61,9 +62,19 @@ class ApprovedFeedbackDeliveryListener {
 
         PracticeFeedbackDeliveryPolicy.Decision<?> policy;
         if (ArtifactKinds.ISSUE.equals(feedback.getArtifactKind())) {
-            policy = deliveryPolicy.evaluateIssue(job, DeliveryPolicyStage.APPROVED, feedback.getId());
+            policy = deliveryPolicy.evaluateIssue(
+                job,
+                DeliveryPolicyStage.APPROVED,
+                feedback.getId(),
+                feedback.getProposedPracticeSlugs()
+            );
         } else if (ArtifactKinds.PULL_REQUEST.equals(feedback.getArtifactKind())) {
-            policy = deliveryPolicy.evaluatePullRequest(job, DeliveryPolicyStage.APPROVED, feedback.getId());
+            policy = deliveryPolicy.evaluatePullRequest(
+                job,
+                DeliveryPolicyStage.APPROVED,
+                feedback.getId(),
+                feedback.getProposedPracticeSlugs()
+            );
         } else {
             log.error(
                 "Approved proposal has no supported artifact kind: feedbackId={}, artifactKind={}",
@@ -100,19 +111,48 @@ class ApprovedFeedbackDeliveryListener {
         PracticeFeedbackDispatchService.Result result = dispatchService.dispatchApproved(job, feedback);
         if (result.status() == PracticeFeedbackDispatchService.Result.Status.SUPPRESSED) {
             FeedbackSuppressionReason reason = result.refusal();
-            if (result.externalRef() == null) {
-                stop(feedback, event.workspaceId(), reason);
-            } else {
-                feedbackRepository.markApprovedPartiallyDelivered(event.workspaceId(), feedback.getId(), reason.name());
-            }
+            dispatchService.projectApproved(feedback, () -> {
+                feedbackLedgerRecorder.recordApprovedPlacements(
+                    feedback,
+                    result.externalRef(),
+                    result.deliveredSignals()
+                );
+                if (result.externalRef() == null) {
+                    stop(feedback, event.workspaceId(), reason);
+                } else {
+                    feedbackRepository.markApprovedPartiallyDelivered(
+                        event.workspaceId(),
+                        feedback.getId(),
+                        reason.name()
+                    );
+                }
+            });
             return;
         }
         if (result.status() == PracticeFeedbackDispatchService.Result.Status.SENT) {
-            feedbackRepository.markApprovedDelivered(event.workspaceId(), feedback.getId());
+            dispatchService.projectApproved(feedback, () -> {
+                feedbackLedgerRecorder.recordApprovedPlacements(
+                    feedback,
+                    result.externalRef(),
+                    result.deliveredSignals()
+                );
+                feedbackRepository.markApprovedDelivered(event.workspaceId(), feedback.getId());
+            });
             return;
         }
         if (result.status() == PracticeFeedbackDispatchService.Result.Status.FAILED) {
-            feedbackRepository.markApprovedFailed(event.workspaceId(), feedback.getId());
+            dispatchService.projectApproved(feedback, () -> {
+                feedbackLedgerRecorder.recordApprovedPlacements(
+                    feedback,
+                    result.externalRef(),
+                    result.deliveredSignals()
+                );
+                if (result.externalRef() == null) {
+                    feedbackRepository.markApprovedFailed(event.workspaceId(), feedback.getId());
+                } else {
+                    feedbackRepository.markApprovedPartiallyFailed(event.workspaceId(), feedback.getId());
+                }
+            });
             return;
         }
         if (result.externalRef() != null) {

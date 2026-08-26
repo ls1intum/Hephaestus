@@ -268,6 +268,7 @@ public class PracticeService {
             );
         }
         int revisionNumber = practiceRevisionService.append(practice).getRevisionNumber();
+        workspace.getReviewSettings().incrementRolloutRevision();
         configAudit.record(
             ConfigAuditEntry.created(
                 ConfigAuditEntityType.PRACTICE_DEFINITION,
@@ -299,13 +300,14 @@ public class PracticeService {
 
     @Transactional
     public Practice updatePractice(WorkspaceContext ctx, String slug, UpdatePracticeRequestDTO request) {
-        lockWorkspace(ctx);
+        Workspace workspace = lockWorkspace(ctx);
         Practice practice = practiceRepository
             .findByWorkspaceIdAndSlug(ctx.id(), slug)
             .orElseThrow(() -> new EntityNotFoundException("Practice", slug));
         Integer revisionNumber = currentRevisionNumber(practice);
         PracticeDefinitionSnapshot before = PracticeDefinitionSnapshot.of(practice, revisionNumber);
         PracticeDefinition beforeDefinition = PracticeDefinition.from(practice);
+        PracticeAutonomy effectiveAutonomyBefore = effectiveAutonomy(practice, ctx.id());
 
         Set<ClearablePracticeField> fieldsToClear = request.clear() == null ? Set.of() : request.clear();
         List<PracticeBinding> bindings = request.bindings() == null ? beforeDefinition.bindings() : request.bindings();
@@ -386,6 +388,9 @@ public class PracticeService {
                 )
             );
         }
+        if (effectiveAutonomyBefore != effectiveAutonomy(practice, ctx.id())) {
+            workspace.getReviewSettings().incrementRolloutRevision();
+        }
         log.info("Updated practice '{}' (slug={}) in workspace {}", practice.getName(), slug, ctx.slug());
         return practice;
     }
@@ -399,7 +404,7 @@ public class PracticeService {
      */
     @Transactional
     public Practice setAutonomy(WorkspaceContext ctx, String slug, @Nullable PracticeAutonomy autonomy) {
-        lockWorkspace(ctx);
+        Workspace workspace = lockWorkspace(ctx);
         Practice practice = practiceRepository
             .findByWorkspaceIdAndSlug(ctx.id(), slug)
             .orElseThrow(() -> new EntityNotFoundException("Practice", slug));
@@ -408,6 +413,7 @@ public class PracticeService {
         if (before == autonomy) {
             return practice;
         }
+        PracticeAutonomy effectiveBefore = effectiveAutonomy(practice, ctx.id());
         // Every autonomy above OFF starts a review, so every autonomy above OFF needs a policy that can run one.
         // Asked of the autonomy that would be IN FORCE, not of the one being written: "inherit" is a request
         // for whatever the area says, and if that admits a review the practice still cannot run it.
@@ -427,6 +433,9 @@ public class PracticeService {
 
         practice.setAutonomy(autonomy);
         practice = practiceRepository.save(practice);
+        if (effectiveBefore != effectiveAutonomy(practice, ctx.id())) {
+            workspace.getReviewSettings().incrementRolloutRevision();
+        }
         configAudit.record(
             ConfigAuditEntry.updated(
                 ConfigAuditEntityType.PRACTICE_USAGE,
@@ -446,9 +455,16 @@ public class PracticeService {
         return practice;
     }
 
+    private PracticeAutonomy effectiveAutonomy(Practice practice, Long workspaceId) {
+        return AutonomyResolver.effectiveAutonomyOf(
+            practice,
+            workspaceDefaults.forWorkspace(workspaceId).defaultAutonomy()
+        );
+    }
+
     @Transactional
     public void deletePractice(WorkspaceContext ctx, String slug) {
-        lockWorkspace(ctx);
+        Workspace workspace = lockWorkspace(ctx);
         Practice practice = practiceRepository
             .findByWorkspaceIdAndSlug(ctx.id(), slug)
             .orElseThrow(() -> new EntityNotFoundException("Practice", slug));
@@ -456,6 +472,7 @@ public class PracticeService {
         Long practiceId = practice.getId();
         PracticeDefinitionSnapshot before = PracticeDefinitionSnapshot.of(practice, currentRevisionNumber(practice));
         practiceRepository.delete(practice);
+        workspace.getReviewSettings().incrementRolloutRevision();
         configAudit.record(
             ConfigAuditEntry.deleted(ConfigAuditEntityType.PRACTICE_DEFINITION, practiceId, ctx.id(), before)
         );

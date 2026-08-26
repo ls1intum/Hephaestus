@@ -11,6 +11,7 @@ import de.tum.cit.aet.hephaestus.integration.core.signal.PendingSignalResubmitte
 import de.tum.cit.aet.hephaestus.integration.core.signal.SignalKey;
 import de.tum.cit.aet.hephaestus.integration.core.signal.SignalRecorder;
 import de.tum.cit.aet.hephaestus.integration.core.signal.SignalStateReason;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ReviewSubject;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.review.GateDecision;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewDetectionGate;
@@ -23,15 +24,6 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
 
-/**
- * Turns a recorded {@code docs.document} signal into a review, and settles the ledger row either way.
- *
- * <p>The live path ({@link DocumentReviewTrigger}) and the reaper path ({@link PendingSignalResubmitter})
- * share this class so a resubmitted signal reaches the same decision as the first attempt.
- *
- * <p>The observation is attributed to the document's author ({@code DocumentArtifactDescriptor}'s sole
- * {@code AUTHOR} role), never to whoever last edited it — even on an update signal.
- */
 @Component
 @ConditionalOnProperty(prefix = "hephaestus.agent", name = "enabled", havingValue = "true")
 public class DocumentReviewSubmitter implements DocumentReviewTrigger, PendingSignalResubmitter {
@@ -73,21 +65,12 @@ public class DocumentReviewSubmitter implements DocumentReviewTrigger, PendingSi
 
     @Override
     public void resubmit(ArtifactSignal signal) {
-        // Reuse the ledger row's own discovery mode; deriving it from the retry would file a campaign's
-        // tail as LIVE.
         submit(signal.key(), signal.getDiscoveredVia());
     }
 
-    /**
-     * Deliberately not transactional: {@link AgentJobService#submit} opens its own transaction and takes a
-     * pessimistic lock on the workspace, which must not be widened to a caller's unit of work. Every
-     * refusal below therefore goes through {@link #refuse} rather than the recorder directly, since
-     * {@code markRefused} is {@code Propagation.MANDATORY} and neither entry point holds a transaction.
-     */
     private void submit(SignalKey key, DiscoveredVia discoveredVia) {
         Workspace workspace = workspaceRepository.findById(key.workspaceId()).orElse(null);
         if (workspace == null) {
-            // FK ties the ledger row to the workspace: null here means it was deleted after recording.
             refuse(key, SignalStateReason.ARTIFACT_GONE);
             return;
         }
@@ -104,8 +87,6 @@ public class DocumentReviewSubmitter implements DocumentReviewTrigger, PendingSi
 
         Long aboutUserId = document.createdByMemberId();
         if (aboutUserId == null || aboutUserId <= 0) {
-            // Retryable on purpose: the author linking their account later makes every passed-over
-            // document of theirs reviewable, with no upstream event to re-announce it.
             log.debug(
                 "Document signal has no linked author to attribute to: documentId={}, subject={}",
                 key.artifactId(),
@@ -115,7 +96,14 @@ public class DocumentReviewSubmitter implements DocumentReviewTrigger, PendingSi
             return;
         }
 
-        switch (practiceReviewDetectionGate.evaluateSignal(workspace, key.signalName(), TriggerMode.AUTO)) {
+        switch (
+            practiceReviewDetectionGate.evaluateSignal(
+                workspace,
+                key.signalName(),
+                TriggerMode.AUTO,
+                new ReviewSubject(aboutUserId, true)
+            )
+        ) {
             case GateDecision.Skip skip -> {
                 log.debug(
                     "Document signal skipped by practice gate: documentId={}, reason={}",
@@ -142,10 +130,6 @@ public class DocumentReviewSubmitter implements DocumentReviewTrigger, PendingSi
         }
     }
 
-    /**
-     * Not annotated {@code @Transactional}: this method is private, so self-invocation would bypass the
-     * proxy and {@code markRefused} would still throw.
-     */
     private void refuse(SignalKey key, SignalStateReason reason) {
         transactionTemplate.executeWithoutResult(status -> signalRecorder.markRefused(key, reason));
     }

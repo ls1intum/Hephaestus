@@ -12,10 +12,7 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-@WorkspaceAgnostic(
-    "Every caller-facing method is keyed by workspace_id; findRecoverable and findExhausted are the " +
-        "fleet-wide recovery sweep and are deliberately cross-tenant"
-)
+@WorkspaceAgnostic("Tenant-scoped writes carry workspace_id; the recovery queries deliberately scan the fleet")
 public interface FeedbackDispatchRepository extends JpaRepository<FeedbackDispatch, UUID> {
     Optional<FeedbackDispatch> findByDestinationKeyAndWorkspaceId(String destinationKey, Long workspaceId);
 
@@ -26,10 +23,13 @@ public interface FeedbackDispatchRepository extends JpaRepository<FeedbackDispat
         value = """
         INSERT INTO feedback_dispatch (
             id, destination_key, workspace_id, agent_job_id, feedback_id, destination, state, body,
-            target_external_ref, practice_slugs, write_started, next_attempt_at, attempt_count, created_at, updated_at
+            practice_slugs, package_content, delivered_placements,
+            write_started, next_attempt_at, attempt_count, created_at, updated_at
         ) SELECT
             :#{#command.id()}, :#{#command.destinationKey()}, :#{#command.workspaceId()}, :#{#command.agentJobId()}, :#{#command.feedbackId()}, :#{#command.destination()}, 'PENDING', :#{#command.body()},
-            :#{#command.targetExternalRef()}, CAST(:#{#command.practiceSlugs()} AS jsonb), FALSE, CURRENT_TIMESTAMP, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+            CAST(:#{#command.practiceSlugs()} AS jsonb),
+            CAST(:#{#command.packageContent()} AS jsonb), '[]'::jsonb,
+            FALSE, CURRENT_TIMESTAMP, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
           FROM agent_job j
          WHERE j.id = :#{#command.agentJobId()} AND j.workspace_id = :#{#command.workspaceId()}
         ON CONFLICT (destination_key) DO NOTHING
@@ -79,6 +79,7 @@ public interface FeedbackDispatchRepository extends JpaRepository<FeedbackDispat
         UPDATE feedback_dispatch SET state = :#{#completion.state()}, delivered_external_ref = :#{#completion.externalRef()},
                lease_owner = NULL, lease_expires_at = NULL, next_attempt_at = :#{#completion.nextAttemptAt()},
                last_error = :#{#completion.error()}, suppression_reason = :#{#completion.suppressionReason()},
+               delivered_placements = CAST(:#{#completion.deliveredPlacements()} AS jsonb),
                updated_at = CURRENT_TIMESTAMP
          WHERE id = :#{#completion.id()} AND workspace_id = :#{#completion.workspaceId()} AND state = 'CLAIMED' AND lease_owner = :#{#completion.owner()}
         """,
@@ -122,6 +123,79 @@ public interface FeedbackDispatchRepository extends JpaRepository<FeedbackDispat
         Pageable pageable
     );
 
+    @Query(
+        """
+        SELECT d FROM FeedbackDispatch d
+        WHERE d.projectedAt IS NULL
+          AND (d.projectionOwner IS NULL OR d.projectionExpiresAt < :now)
+          AND d.state IN (de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDispatchState.SENT,
+                          de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDispatchState.SUPPRESSED,
+                          de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDispatchState.FAILED)
+        ORDER BY d.updatedAt ASC
+        """
+    )
+    List<FeedbackDispatch> findUnprojectedTerminal(@Param("now") Instant now, Pageable pageable);
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query(
+        value = """
+        UPDATE feedback_dispatch
+           SET projection_owner = :owner, projection_expires_at = :leaseUntil, updated_at = CURRENT_TIMESTAMP
+         WHERE id = :id AND workspace_id = :workspaceId AND projected_at IS NULL
+           AND state IN ('SENT', 'SUPPRESSED', 'FAILED')
+           AND (projection_owner IS NULL OR projection_expires_at < CURRENT_TIMESTAMP)
+        """,
+        nativeQuery = true
+    )
+    int claimProjection(
+        @Param("id") UUID id,
+        @Param("workspaceId") Long workspaceId,
+        @Param("owner") String owner,
+        @Param("leaseUntil") Instant leaseUntil
+    );
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query(
+        value = """
+        UPDATE feedback_dispatch
+           SET projection_owner = :owner, projection_expires_at = :leaseUntil, updated_at = CURRENT_TIMESTAMP
+         WHERE destination_key = :destinationKey AND workspace_id = :workspaceId AND projected_at IS NULL
+           AND state IN ('SENT', 'SUPPRESSED', 'FAILED')
+           AND (projection_owner IS NULL OR projection_expires_at < CURRENT_TIMESTAMP)
+        """,
+        nativeQuery = true
+    )
+    int claimProjectionByKey(
+        @Param("destinationKey") String destinationKey,
+        @Param("workspaceId") Long workspaceId,
+        @Param("owner") String owner,
+        @Param("leaseUntil") Instant leaseUntil
+    );
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query(
+        value = "UPDATE feedback_dispatch SET projected_at = CURRENT_TIMESTAMP, projection_owner = NULL, " +
+            "projection_expires_at = NULL, updated_at = CURRENT_TIMESTAMP " +
+            "WHERE id = :id AND workspace_id = :workspaceId AND projected_at IS NULL " +
+            "AND projection_owner = :owner AND state IN ('SENT', 'SUPPRESSED', 'FAILED')",
+        nativeQuery = true
+    )
+    int markProjected(@Param("id") UUID id, @Param("workspaceId") Long workspaceId, @Param("owner") String owner);
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query(
+        value = "UPDATE feedback_dispatch SET projected_at = CURRENT_TIMESTAMP, projection_owner = NULL, " +
+            "projection_expires_at = NULL, updated_at = CURRENT_TIMESTAMP " +
+            "WHERE destination_key = :destinationKey AND workspace_id = :workspaceId AND projected_at IS NULL " +
+            "AND projection_owner = :owner AND state IN ('SENT', 'SUPPRESSED', 'FAILED')",
+        nativeQuery = true
+    )
+    int markProjectedByKey(
+        @Param("destinationKey") String destinationKey,
+        @Param("workspaceId") Long workspaceId,
+        @Param("owner") String owner
+    );
+
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query(
         value = """
@@ -141,11 +215,12 @@ public interface FeedbackDispatchRepository extends JpaRepository<FeedbackDispat
         UPDATE feedback_dispatch
            SET state = 'PENDING', attempt_count = 0, next_attempt_at = CURRENT_TIMESTAMP,
                lease_owner = NULL, lease_expires_at = NULL, last_error = NULL,
+               projected_at = NULL, projection_owner = NULL, projection_expires_at = NULL,
                updated_at = CURRENT_TIMESTAMP
          WHERE agent_job_id = :jobId AND workspace_id = :workspaceId
-           AND state = 'FAILED' AND write_started = FALSE
+           AND destination = 'AUTOMATIC_REVIEW_PACKAGE' AND state = 'FAILED'
         """,
         nativeQuery = true
     )
-    int resetFailedBeforeWrite(@Param("jobId") UUID jobId, @Param("workspaceId") Long workspaceId);
+    int resetFailedAutomaticPackage(@Param("jobId") UUID jobId, @Param("workspaceId") Long workspaceId);
 }

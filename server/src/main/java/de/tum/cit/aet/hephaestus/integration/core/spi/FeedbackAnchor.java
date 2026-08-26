@@ -17,6 +17,15 @@ public sealed interface FeedbackAnchor permits FeedbackAnchor.DiffAnchor {
         public DiffAnchor(String filePath, int newLineNumber, @Nullable Integer startLine) {
             this(filePath, newLineNumber, startLine, DiffSide.RIGHT);
         }
+
+        public static DiffAnchor singleLine(String filePath, int line) {
+            return new DiffAnchor(filePath, line, null);
+        }
+
+        public static DiffAnchor range(String filePath, int startLine, int endLine) {
+            if (endLine < startLine) throw new IllegalArgumentException("endLine must not precede startLine");
+            return new DiffAnchor(filePath, endLine, startLine);
+        }
     }
 
     enum DiffSide {

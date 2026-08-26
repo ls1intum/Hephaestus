@@ -34,7 +34,10 @@ import {
 } from "@/components/admin/practices/PracticeSkeletons";
 import { PracticeAutonomyPage } from "@/components/admin/practices/practice-autonomy/PracticeAutonomyPage";
 import { ReviewPage } from "@/components/admin/practices/review/ReviewPage";
-import type { ReviewRunningState } from "@/components/admin/practices/review/review-readiness";
+import type {
+	ReviewModelState,
+	ReviewRunningState,
+} from "@/components/admin/practices/review/review-readiness";
 import {
 	DEFAULT_REVIEW_SECTION,
 	reviewSearchSchema,
@@ -48,6 +51,7 @@ import { useSweepScheduleMutations } from "@/hooks/use-sweep-schedule-mutations"
 import { useUpdateWorkspaceFeatures } from "@/hooks/use-update-workspace-features";
 import { workspaceAdminHead } from "@/lib/page-title";
 import { problemDetailOf } from "@/lib/problem-detail";
+import { useSearchState } from "@/lib/search-params";
 
 export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/practices/review")({
 	head: workspaceAdminHead("Review"),
@@ -55,37 +59,31 @@ export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/pra
 	component: ReviewRoute,
 });
 
-/**
- * The container for the whole review surface. Each tab's data is fetched by its own section function
- * below, and those functions are handed to the page as *elements*: creating an element runs nothing,
- * and Base UI mounts only the open panel, so opening the page costs one workspace read and one
- * agent-binding read — never all three sections' queries.
- */
 function ReviewRoute() {
 	const { workspaceSlug } = Route.useParams();
 	const { section, overrides } = Route.useSearch();
 	const navigate = useNavigate({ from: Route.fullPath });
+	const setSearch = useSearchState();
 
-	// Read by the banner above the tabs, so they are the only two requests every visit pays for.
-	// Both are shared with the sections on the same keys, so a section's toggle corrects the banner
-	// without either of them asking again.
 	const workspaceQuery = useQuery({ ...getWorkspaceOptions({ path: { workspaceSlug } }) });
 	const bindingsQuery = useQuery({ ...listAgentsOptions({ path: { workspaceSlug } }) });
+	const reviewModel: ReviewModelState = bindingsQuery.isPending
+		? { status: "loading" }
+		: bindingsQuery.isError
+			? { status: "error" }
+			: {
+					status: "ready",
+					binding: bindingsQuery.data.find((agent) => agent.purpose === "PRACTICE_REVIEW"),
+				};
 
 	const running: ReviewRunningState | undefined = workspaceQuery.data && {
 		enabled: workspaceQuery.data.practicesEnabled,
-		model: {
-			binding: bindingsQuery.data?.find((agent) => agent.purpose === "PRACTICE_REVIEW"),
-			isLoading: bindingsQuery.isLoading,
-			isError: bindingsQuery.isError,
-		},
+		model: reviewModel,
 	};
 
 	return (
 		<ReviewPage
 			section={section ?? DEFAULT_REVIEW_SECTION}
-			// The default section is left out of the URL rather than written into it, so the sidebar's
-			// link and a tab click on the first section produce the same address.
 			onSectionChange={(next) =>
 				void navigate({
 					search: (previous) => ({
@@ -101,9 +99,10 @@ function ReviewRoute() {
 						workspaceSlug={workspaceSlug}
 						overridesOnly={overrides === true}
 						onOverridesOnlyChange={(next) =>
-							void navigate({
-								search: (previous) => ({ ...previous, overrides: next ? true : undefined }),
-							})
+							void setSearch((previous) => ({
+								...previous,
+								overrides: next ? true : undefined,
+							}))
 						}
 					/>
 				),
@@ -116,7 +115,6 @@ function ReviewRoute() {
 
 interface HowMuchSectionProps {
 	workspaceSlug: string;
-	/** The "only what was set by hand" filter, which lives in the URL so it can be linked to. */
 	overridesOnly: boolean;
 	onOverridesOnlyChange: (next: boolean) => void;
 }
@@ -213,6 +211,14 @@ function WhenAndWhereSection({ workspaceSlug }: { workspaceSlug: string }) {
 		...getPracticeReviewSettingsOptions({ path: { workspaceSlug } }),
 	});
 	const bindingsQuery = useQuery({ ...listAgentsOptions({ path: { workspaceSlug } }) });
+	const settingsReviewModel: ReviewModelState = bindingsQuery.isPending
+		? { status: "loading" }
+		: bindingsQuery.isError
+			? { status: "error" }
+			: {
+					status: "ready",
+					binding: bindingsQuery.data.find((agent) => agent.purpose === "PRACTICE_REVIEW"),
+				};
 	const workspaceQuery = useQuery({ ...getWorkspaceOptions({ path: { workspaceSlug } }) });
 	const schedulesQuery = useQuery(listSweepSchedulesOptions({ path: { workspaceSlug } }));
 	const repositoriesQuery = useQuery(getRepositoriesToMonitorOptions({ path: { workspaceSlug } }));
@@ -229,14 +235,9 @@ function WhenAndWhereSection({ workspaceSlug }: { workspaceSlug: string }) {
 	});
 	const schedules = useSweepScheduleMutations(workspaceSlug);
 
-	// The bindings query is deliberately not part of this gate: its state is passed into the form,
-	// which offers the way to change the model, so blocking on it would hide every working setting
-	// behind one slow request.
 	const isLoading = reviewSettingsQuery.isPending || workspaceQuery.isPending;
 	const error = reviewSettingsQuery.error ?? workspaceQuery.error;
 
-	// `space-y-8`: the schedule reads as one more section of the settings above it, so it sits at the
-	// same rhythm as the sections inside them rather than looking like a separate panel.
 	return (
 		<div className="max-w-3xl space-y-8">
 			{environment.deployment.environment === "preview" && (
@@ -264,12 +265,11 @@ function WhenAndWhereSection({ workspaceSlug }: { workspaceSlug: string }) {
 			) : (
 				<PracticeReviewSettings
 					workspaceSlug={workspaceSlug}
-					model={{
-						binding: bindingsQuery.data?.find((binding) => binding.purpose === "PRACTICE_REVIEW"),
-						isLoading: bindingsQuery.isLoading,
-						isError: bindingsQuery.isError,
-						onRetry: () => void bindingsQuery.refetch(),
-					}}
+					model={
+						settingsReviewModel.status === "error"
+							? { ...settingsReviewModel, onRetry: () => void bindingsQuery.refetch() }
+							: settingsReviewModel
+					}
 					workspace={{
 						enabled: workspaceQuery.data.practicesEnabled,
 						autoTriggerEnabled: workspaceQuery.data.practiceReviewAutoTriggerEnabled,
@@ -300,42 +300,49 @@ function WhenAndWhereSection({ workspaceSlug }: { workspaceSlug: string }) {
 					coverage={{
 						preview: (scope) =>
 							coveragePreview.mutateAsync({ path: { workspaceSlug }, body: scope }),
-						repositories: {
-							options: (repositoriesQuery.data ?? []).map((repository) => ({
-								value: repository,
-								label: repository,
-							})),
-							isLoading: repositoriesQuery.isLoading,
-							isError: repositoriesQuery.isError,
-							error: repositoriesQuery.error,
-							onRetry: () => void repositoriesQuery.refetch(),
-						},
-						people: {
-							options: (membersQuery.data ?? []).flatMap((member) =>
-								member.userId == null || !member.eligibleForPracticeReview
-									? []
-									: [
-											{
-												value: member.userId,
-												label:
-													[member.userName, member.userLogin].find(
-														(name) => name != null && name.trim() !== "",
-													) ?? `Member ${member.userId}`,
-												description: member.userLogin ? `@${member.userLogin}` : undefined,
-											},
-										],
-							),
-							isLoading: membersQuery.isLoading,
-							isError: membersQuery.isError,
-							error: membersQuery.error,
-							onRetry: () => void membersQuery.refetch(),
-						},
+						repositories: repositoriesQuery.isPending
+							? { status: "loading" }
+							: repositoriesQuery.isError
+								? {
+										status: "error",
+										error: repositoriesQuery.error,
+										onRetry: () => void repositoriesQuery.refetch(),
+									}
+								: {
+										status: "ready",
+										options: repositoriesQuery.data.map((repository) => ({
+											value: repository,
+											label: repository,
+										})),
+									},
+						people: membersQuery.isPending
+							? { status: "loading" }
+							: membersQuery.isError
+								? {
+										status: "error",
+										error: membersQuery.error,
+										onRetry: () => void membersQuery.refetch(),
+									}
+								: {
+										status: "ready",
+										options: membersQuery.data.flatMap((member) =>
+											member.userId == null || !member.eligibleForPracticeReview
+												? []
+												: [
+														{
+															value: member.userId,
+															label:
+																[member.userName, member.userLogin].find(
+																	(name) => name != null && name.trim() !== "",
+																) ?? `Member ${member.userId}`,
+															description: member.userLogin ? `@${member.userLogin}` : undefined,
+														},
+													],
+										),
+									},
 					}}
 				/>
 			)}
-			{/* Outside the gate above, and deliberately: the recurring check is a separate resource with
-			    its own request and its own error handling, and it is a standing authorisation to spend —
-			    so a failed review-settings load must not be what stops an admin pausing a runaway one. */}
 			<PracticeReviewSweepSchedule
 				schedules={schedulesQuery.data ?? []}
 				isLoading={schedulesQuery.isLoading}
@@ -350,7 +357,6 @@ function WhenAndWhereSection({ workspaceSlug }: { workspaceSlug: string }) {
 	);
 }
 
-/** A backfill can run for hours, so the list re-reads itself while one is under way. */
 const ACTIVE_BACKFILL_POLL_MS = 15_000;
 
 function PastWorkSection({ workspaceSlug }: { workspaceSlug: string }) {

@@ -88,10 +88,17 @@ function FeedbackDetailRoute() {
 		<FeedbackDetailPage
 			workspaceSlug={workspaceSlug}
 			search={search}
-			feedback={feedback}
-			isLoading={feedbackQueryResult.isLoading}
-			error={feedbackQueryResult.isError ? feedbackQueryResult.error : undefined}
-			onRetry={() => void feedbackQueryResult.refetch()}
+			state={
+				feedbackQueryResult.isPending
+					? { status: "loading" }
+					: feedbackQueryResult.isError || !feedback
+						? {
+								status: "error",
+								error: feedbackQueryResult.error,
+								onRetry: () => void feedbackQueryResult.refetch(),
+							}
+						: { status: "ready", feedback }
+			}
 			practices={practicesQuery.data}
 		/>
 	);

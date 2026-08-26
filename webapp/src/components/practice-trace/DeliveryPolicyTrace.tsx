@@ -1,12 +1,17 @@
-import { CheckCircle2Icon, ChevronDownIcon, CircleStopIcon } from "lucide-react";
+import { CheckCircle2Icon, CircleStopIcon } from "lucide-react";
 import type {
 	DeliveryPolicyFactsSnapshot,
 	DeliveryPolicyTrace as DeliveryPolicyTraceData,
 } from "@/api/types.gen";
+import { RelativeTime } from "@/components/common/RelativeTime";
 import { StatusBadge } from "@/components/practice-vocabulary/StatusBadge";
+import {
+	Accordion,
+	AccordionContent,
+	AccordionItem,
+	AccordionTrigger,
+} from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
 	DELIVERY_AUTONOMY_LABELS,
 	DELIVERY_CHECK_LABELS,
@@ -29,34 +34,27 @@ export function DeliveryPolicyTrace({ evaluations }: DeliveryPolicyTraceProps) {
 	if (evaluations.length === 0) return null;
 
 	return (
-		<Collapsible className="min-w-0 rounded-lg border bg-card p-4 text-sm">
-			<CollapsibleTrigger
-				className="group/trace"
-				render={
-					<Button variant="ghost" size="sm" className="-ml-2">
-						Technical delivery policy trace
-						<ChevronDownIcon
-							className="transition-transform group-aria-expanded/trace:rotate-180"
-							aria-hidden
-						/>
-					</Button>
-				}
-			/>
-			<CollapsibleContent>
-				<p className="mt-2 text-xs text-muted-foreground">
-					Checks run in order. After a denial, later checks are not reached.
-				</p>
-				<ol className="mt-4 space-y-4">
-					{evaluations.map((evaluation, index) => (
-						<li
-							key={`${evaluation.reviewId}-${evaluation.evaluatedAt.toISOString()}-${index}`}
-							className="space-y-2 rounded-md border p-3"
-						>
-							<div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
-								<p className="min-w-0 break-words font-medium">
-									{DELIVERY_SURFACE_LABELS[evaluation.surface]} ·{" "}
-									{DELIVERY_STAGE_LABELS[evaluation.stage]}
-								</p>
+		<section className="min-w-0 rounded-lg border bg-card p-4 text-sm">
+			<h4 className="font-medium">Technical delivery policy trace</h4>
+			<p className="mt-1 text-xs text-muted-foreground">
+				Open an evaluation to inspect its ordered checks. After a denial, later checks are not
+				reached.
+			</p>
+			<Accordion multiple className="mt-3">
+				{evaluations.map((evaluation, index) => {
+					const value = `${evaluation.reviewId}-${evaluation.evaluatedAt.toISOString()}-${index}`;
+					return (
+						<AccordionItem key={value} value={value}>
+							<AccordionTrigger className="gap-3 no-underline hover:no-underline">
+								<span className="min-w-0 flex-1">
+									<span className="block break-words">
+										{DELIVERY_SURFACE_LABELS[evaluation.surface]} ·{" "}
+										{DELIVERY_STAGE_LABELS[evaluation.stage]}
+									</span>
+									<span className="block font-normal text-muted-foreground text-xs">
+										<RelativeTime value={evaluation.evaluatedAt} tooltip={false} />
+									</span>
+								</span>
 								<Badge variant={evaluation.allowed ? "success" : "warning"}>
 									{evaluation.allowed ? (
 										<CheckCircle2Icon aria-hidden />
@@ -65,42 +63,41 @@ export function DeliveryPolicyTrace({ evaluations }: DeliveryPolicyTraceProps) {
 									)}
 									{evaluation.allowed ? "Allowed" : "Stopped"}
 								</Badge>
-							</div>
-							<p className="text-xs text-muted-foreground">
-								Evaluated{" "}
-								<time dateTime={evaluation.evaluatedAt.toISOString()}>
-									{evaluation.evaluatedAt.toLocaleString()}
-								</time>
-							</p>
-							{evaluation.decisiveReason && (
-								<p className="text-xs">
-									Stopped here. {DELIVERY_REASON_SENTENCES[evaluation.decisiveReason]}
+							</AccordionTrigger>
+							<AccordionContent className="min-w-0 space-y-2 pb-4">
+								{evaluation.decisiveReason && (
+									<p className="text-xs">
+										Stopped here. {DELIVERY_REASON_SENTENCES[evaluation.decisiveReason]}
+									</p>
+								)}
+								<p className="min-w-0 break-words text-xs text-muted-foreground">
+									{scopeSentence(evaluation.facts)}
 								</p>
-							)}
-							<p className="min-w-0 break-words text-xs text-muted-foreground">
-								{scopeSentence(evaluation.facts)}
-							</p>
-							<PolicyFacts facts={evaluation.facts} />
-							<p className="min-w-0 break-all text-xs text-muted-foreground">
-								Policy revision {evaluation.admittedRevision}
-								{evaluation.evaluatedRevision == null
-									? ""
-									: `, evaluated as revision ${evaluation.evaluatedRevision}`}
-								{" · "}Resolver {evaluation.resolverVersion}
-							</p>
-							<ul className="space-y-1">
-								{evaluation.checks.map((check) => (
-									<li key={check.check} className="flex items-center justify-between gap-3 text-xs">
-										<span className="min-w-0">{DELIVERY_CHECK_LABELS[check.check]}</span>
-										<StatusBadge def={DELIVERY_CHECK_STATUS_DEFS[check.status]} />
-									</li>
-								))}
-							</ul>
-						</li>
-					))}
-				</ol>
-			</CollapsibleContent>
-		</Collapsible>
+								<PolicyFacts facts={evaluation.facts} />
+								<p className="min-w-0 break-all text-xs text-muted-foreground">
+									Policy revision {evaluation.admittedRevision}
+									{evaluation.evaluatedRevision == null
+										? ""
+										: `, evaluated as revision ${evaluation.evaluatedRevision}`}
+									{" · "}Resolver {evaluation.resolverVersion}
+								</p>
+								<ul className="space-y-1">
+									{evaluation.checks.map((check) => (
+										<li
+											key={check.check}
+											className="flex items-center justify-between gap-3 text-xs"
+										>
+											<span className="min-w-0">{DELIVERY_CHECK_LABELS[check.check]}</span>
+											<StatusBadge def={DELIVERY_CHECK_STATUS_DEFS[check.status]} />
+										</li>
+									))}
+								</ul>
+							</AccordionContent>
+						</AccordionItem>
+					);
+				})}
+			</Accordion>
+		</section>
 	);
 }
 

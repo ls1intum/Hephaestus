@@ -11,6 +11,10 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.practices.PracticeAreaRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
+import de.tum.cit.aet.hephaestus.practices.feedback.DeliveryPolicyEvaluation;
+import de.tum.cit.aet.hephaestus.practices.feedback.DeliveryPolicyEvaluationRepository;
+import de.tum.cit.aet.hephaestus.practices.feedback.DeliveryPolicyStage;
+import de.tum.cit.aet.hephaestus.practices.feedback.DeliveryPolicySurface;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState;
@@ -81,6 +85,9 @@ class PracticeReviewOutputControllerIntegrationTest extends AbstractWorkspaceInt
 
     @Autowired
     private FeedbackPlacementRepository feedbackPlacementRepository;
+
+    @Autowired
+    private DeliveryPolicyEvaluationRepository deliveryPolicyEvaluationRepository;
 
     private Workspace workspace;
     private Workspace otherWorkspace;
@@ -899,6 +906,38 @@ class PracticeReviewOutputControllerIntegrationTest extends AbstractWorkspaceInt
 
         @Test
         @WithAdminUser
+        void detailIncludesOnlyThePolicyTraceForThatFeedback() {
+            Feedback unit = persistUnit(
+                workspace,
+                job,
+                alice,
+                0,
+                FeedbackDeliveryState.SUPPRESSED,
+                FeedbackSuppressionReason.RECIPIENT_OPTED_OUT,
+                "Withheld"
+            );
+            deliveryPolicyEvaluationRepository.save(
+                policyEvaluation(job, unit.getId(), DeliveryPolicySurface.ARTIFACT)
+            );
+            deliveryPolicyEvaluationRepository.save(policyEvaluation(job, null, DeliveryPolicySurface.CONVERSATION));
+
+            getOk(FEEDBACK + "/{id}", workspace.getWorkspaceSlug(), unit.getId())
+                .jsonPath("$.deliveryPolicy.length()")
+                .isEqualTo(1)
+                .jsonPath("$.deliveryPolicy[0].reviewId")
+                .isEqualTo(job.getId().toString())
+                .jsonPath("$.deliveryPolicy[0].surface")
+                .isEqualTo("ARTIFACT")
+                .jsonPath("$.deliveryPolicy[0].decisiveReason")
+                .isEqualTo("RECIPIENT_OPTED_OUT")
+                .jsonPath("$.deliveryPolicy[0].checks[0].check")
+                .isEqualTo("RECIPIENT_CONSENT")
+                .jsonPath("$.deliveryPolicy[0].checks[0].status")
+                .isEqualTo("DENIED");
+        }
+
+        @Test
+        @WithAdminUser
         void filtersByStateReasonAndRun() {
             persistUnit(workspace, job, alice, 0, FeedbackDeliveryState.DELIVERED, null, "Delivered");
             persistUnit(
@@ -1298,5 +1337,27 @@ class PracticeReviewOutputControllerIntegrationTest extends AbstractWorkspaceInt
                 .jsonPath("$.content[0].deliveryState")
                 .isEqualTo("DELIVERED");
         }
+    }
+
+    private DeliveryPolicyEvaluation policyEvaluation(
+        AgentJob sourceJob,
+        @Nullable UUID feedbackId,
+        DeliveryPolicySurface surface
+    ) {
+        return DeliveryPolicyEvaluation.builder()
+            .workspaceId(sourceJob.getWorkspace().getId())
+            .agentJobId(sourceJob.getId())
+            .feedbackId(feedbackId)
+            .admittedRevision(0L)
+            .evaluatedRevision(1L)
+            .resolverVersion("v1")
+            .surface(surface)
+            .stage(DeliveryPolicyStage.EGRESS)
+            .allowed(false)
+            .decisiveReason(FeedbackSuppressionReason.RECIPIENT_OPTED_OUT)
+            .checks(OBJECT_MAPPER.readTree("[{\"check\":\"RECIPIENT_CONSENT\",\"status\":\"DENIED\"}]"))
+            .facts(OBJECT_MAPPER.createObjectNode())
+            .evaluatedAt(Instant.now())
+            .build();
     }
 }

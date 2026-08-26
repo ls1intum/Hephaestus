@@ -334,7 +334,6 @@ export const artifactTrace = {
 	container: "ls1intum/Hephaestus",
 	url: "https://github.com/ls1intum/Hephaestus/pull/1423",
 	signals: tracedSignals,
-	deliveryPolicy: [deniedDeliveryPolicyEvaluation],
 	practices: practiceTraceEntries,
 } satisfies ArtifactTrace;
 
@@ -357,7 +356,6 @@ export const untouchedArtifactTrace = {
 			stateReason: "NO_ACTIVE_PRACTICE",
 		},
 	],
-	deliveryPolicy: [],
 	practices: [
 		{
 			practiceSlug: "issue-hygiene",
@@ -392,7 +390,6 @@ export const documentArtifactTrace = {
 			state: "TRIGGERED",
 		},
 	],
-	deliveryPolicy: [],
 	practices: [
 		{
 			practiceSlug: "written-for-a-newcomer",

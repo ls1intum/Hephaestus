@@ -199,14 +199,6 @@ class ProductionSchemaContractIntegrationTest {
         assertConstraintExists("chk_feedback_dispatch_suppression");
     }
 
-    /**
-     * {@code WorkspaceReviewScope} is a two-key vocabulary whose closure is enforced at the column, not by
-     * the deserializer: a reader configured to ignore unknown fields would drop a third key in silence and
-     * leave a workspace believing a restriction was in force. The column outlives every version of the code
-     * that reads it, so {@code chk_workspace_review_scope} is the thing that has to refuse the write — and
-     * only the Liquibase-built schema carries it, because the shared test profile builds the schema with
-     * Hibernate {@code ddl-auto: create} and never runs a changeset.
-     */
     @Test
     @DisplayName("The coverage-mode columns refuse a mode the vocabulary does not have")
     void coverageModeColumnsRefuseAnythingOutsideTheirVocabulary() {
@@ -243,38 +235,117 @@ class ProductionSchemaContractIntegrationTest {
     @MethodSource("invalidBaseBranches")
     @DisplayName("A covered repository's base branches must be short strings in an array")
     void baseBranchesRefusesMalformedValues(String branches) {
+        long workspaceId = insertWorkspace("base-branches-" + UUID.randomUUID());
+        Long monitorId = jdbcTemplate.queryForObject(
+            "INSERT INTO repository_to_monitor (workspace_id, name_with_owner) VALUES (?, ?) RETURNING id",
+            Long.class,
+            workspaceId,
+            "acme/repository"
+        );
+        assertThatCode(() ->
+            jdbcTemplate.update(
+                "INSERT INTO practice_review_repository_target " +
+                    "(workspace_id, repository_monitor_id, base_branches) VALUES (?, ?, '[]'::jsonb)",
+                workspaceId,
+                monitorId
+            )
+        ).doesNotThrowAnyException();
+
         assertThatThrownBy(() ->
             jdbcTemplate.update(
-                "INSERT INTO practice_review_repository_target (workspace_id, repository_monitor_id, base_branches) " +
-                    "VALUES (?, ?, CAST(? AS jsonb))",
-                insertWorkspace("base-branches-check"),
-                1L,
-                branches
+                "UPDATE practice_review_repository_target SET base_branches = CAST(? AS jsonb) " +
+                    "WHERE workspace_id = ? AND repository_monitor_id = ?",
+                branches,
+                workspaceId,
+                monitorId
             )
         )
-            .as("an axis that is not an array cannot be read as the list it claims to be")
-            .isInstanceOf(DataIntegrityViolationException.class);
+            .isInstanceOf(DataIntegrityViolationException.class)
+            .hasMessageContaining("chk_practice_review_repository_target_branches");
+    }
+
+    @Test
+    void repositoryCoverageCannotReferenceAnotherWorkspacesMonitor() {
+        long ownerWorkspace = insertWorkspace("monitor-owner-" + UUID.randomUUID());
+        long targetWorkspace = insertWorkspace("monitor-target-" + UUID.randomUUID());
+        Long monitorId = jdbcTemplate.queryForObject(
+            "INSERT INTO repository_to_monitor (workspace_id, name_with_owner) VALUES (?, ?) RETURNING id",
+            Long.class,
+            ownerWorkspace,
+            "acme/repository"
+        );
+
+        assertThatThrownBy(() ->
+            jdbcTemplate.update(
+                "INSERT INTO practice_review_repository_target " +
+                    "(workspace_id, repository_monitor_id, base_branches) VALUES (?, ?, '[]'::jsonb)",
+                targetWorkspace,
+                monitorId
+            )
+        )
+            .isInstanceOf(DataIntegrityViolationException.class)
+            .hasMessageContaining("sfk_practice_review_repository_target_monitor");
+    }
+
+    @Test
+    void peopleCoverageCannotReferenceAnotherWorkspacesMember() {
+        long ownerWorkspace = insertWorkspace("member-owner-" + UUID.randomUUID());
+        long targetWorkspace = insertWorkspace("member-target-" + UUID.randomUUID());
+        Long providerId = jdbcTemplate.queryForObject(
+            "INSERT INTO identity_provider (type, server_url) VALUES ('GITHUB', ?) RETURNING id",
+            Long.class,
+            "https://provider.example/" + UUID.randomUUID()
+        );
+        Long userId = jdbcTemplate.queryForObject(
+            "INSERT INTO \"user\" (native_id, provider_id, login, type) VALUES (1, ?, ?, 'USER') RETURNING id",
+            Long.class,
+            providerId,
+            "member-" + UUID.randomUUID()
+        );
+        jdbcTemplate.update(
+            "INSERT INTO workspace_membership (workspace_id, user_id, role, league_points, hidden, created_at) " +
+                "VALUES (?, ?, 'MEMBER', 0, false, now())",
+            ownerWorkspace,
+            userId
+        );
+
+        assertThatThrownBy(() ->
+            jdbcTemplate.update(
+                "INSERT INTO practice_review_person_target (workspace_id, user_id) VALUES (?, ?)",
+                targetWorkspace,
+                userId
+            )
+        )
+            .isInstanceOf(DataIntegrityViolationException.class)
+            .hasMessageContaining("sfk_practice_review_person_target_membership");
     }
 
     @ParameterizedTest
     @MethodSource("invalidDispatchStates")
     @DisplayName("Dispatch state fields cannot contradict one another")
-    void feedbackDispatchRefusesContradictoryState(String assignment) {
+    void feedbackDispatchRefusesContradictoryState(String assignment, String constraint) {
         UUID dispatchId = insertDispatch("invalid-dispatch-" + UUID.randomUUID());
 
         assertThatThrownBy(() ->
             jdbcTemplate.update("UPDATE feedback_dispatch SET " + assignment + " WHERE id = ?", dispatchId)
-        ).isInstanceOf(DataIntegrityViolationException.class);
+        )
+            .isInstanceOf(DataIntegrityViolationException.class)
+            .hasMessageContaining(constraint);
     }
 
-    static Stream<String> invalidDispatchStates() {
+    static Stream<org.junit.jupiter.params.provider.Arguments> invalidDispatchStates() {
         return Stream.of(
-            "state = 'CLAIMED'",
-            "lease_owner = 'worker', lease_expires_at = now()",
-            "state = 'SENT'",
-            "delivered_external_ref = 'provider-1'",
-            "state = 'SUPPRESSED'",
-            "suppression_reason = 'WORKSPACE_DELIVERY_PAUSED'"
+            org.junit.jupiter.params.provider.Arguments.of("state = 'CLAIMED'", "chk_feedback_dispatch_lease"),
+            org.junit.jupiter.params.provider.Arguments.of(
+                "lease_owner = 'worker', lease_expires_at = now()",
+                "chk_feedback_dispatch_lease"
+            ),
+            org.junit.jupiter.params.provider.Arguments.of("state = 'SENT'", "chk_feedback_dispatch_delivery"),
+            org.junit.jupiter.params.provider.Arguments.of("state = 'SUPPRESSED'", "chk_feedback_dispatch_suppression"),
+            org.junit.jupiter.params.provider.Arguments.of(
+                "suppression_reason = 'WORKSPACE_DELIVERY_PAUSED'",
+                "chk_feedback_dispatch_suppression"
+            )
         );
     }
 
@@ -316,7 +387,7 @@ class ProductionSchemaContractIntegrationTest {
     void approvedDispatchRequiresFeedbackAndSummaryDispatchForbidsIt() {
         DispatchOwner owner = insertDispatchOwner("dispatch-destination");
         UUID feedbackId = insertFeedback(owner, "destination");
-        UUID summary = insertDispatch(owner, "summary-destination", "ARTIFACT_SUMMARY", null);
+        UUID summary = insertDispatch(owner, "summary-destination", "AUTOMATIC_REVIEW_PACKAGE", null);
 
         assertThatThrownBy(() ->
             jdbcTemplate.update(
@@ -341,7 +412,7 @@ class ProductionSchemaContractIntegrationTest {
     @Test
     void deletingAJobErasesItsPolicyEvaluationsAndDispatches() {
         DispatchOwner owner = insertDispatchOwner("job-erasure");
-        UUID dispatchId = insertDispatch(owner, "job-erasure-dispatch", "ARTIFACT_SUMMARY", null);
+        UUID dispatchId = insertDispatch(owner, "job-erasure-dispatch", "AUTOMATIC_REVIEW_PACKAGE", null);
         UUID evaluationId = insertPolicyEvaluation(owner, null);
 
         jdbcTemplate.update("DELETE FROM agent_job WHERE id = ?", owner.jobId());
@@ -371,7 +442,7 @@ class ProductionSchemaContractIntegrationTest {
 
     private UUID insertDispatch(String key) {
         DispatchOwner owner = insertDispatchOwner(key);
-        return insertDispatch(owner, key, "ARTIFACT_SUMMARY", null);
+        return insertDispatch(owner, key, "AUTOMATIC_REVIEW_PACKAGE", null);
     }
 
     private DispatchOwner insertDispatchOwner(String key) {
@@ -392,9 +463,10 @@ class ProductionSchemaContractIntegrationTest {
         UUID dispatchId = UUID.randomUUID();
         jdbcTemplate.update(
             "INSERT INTO feedback_dispatch (id, destination_key, workspace_id, agent_job_id, feedback_id, " +
-                "destination, state, body, practice_slugs, write_started, next_attempt_at, attempt_count, " +
-                "created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, 'PENDING', 'body', '[]'::jsonb, false, now(), " +
-                "0, now(), now())",
+                "destination, state, body, practice_slugs, package_content, delivered_placements, write_started, " +
+                "next_attempt_at, attempt_count, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, 'PENDING', " +
+                "'body', '[]'::jsonb, '{\"mrNote\":\"body\",\"diffNotes\":[],\"withheld\":[]}'::jsonb, " +
+                "'[]'::jsonb, false, now(), 0, now(), now())",
             dispatchId,
             key,
             owner.workspaceId(),

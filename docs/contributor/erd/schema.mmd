@@ -405,8 +405,9 @@ erDiagram
         VARCHAR(40) destination "NOT NULL"
         VARCHAR(16) state "NOT NULL"
         TEXT body "NOT NULL"
-        VARCHAR(255) target_external_ref
         JSONB practice_slugs "NOT NULL"
+        JSONB package_content "NOT NULL"
+        JSONB delivered_placements "NOT NULL"
         BOOLEAN write_started "NOT NULL"
         VARCHAR(255) delivered_external_ref
         VARCHAR(64) lease_owner
@@ -415,6 +416,9 @@ erDiagram
         INTEGER attempt_count "NOT NULL"
         VARCHAR(48) suppression_reason
         VARCHAR(512) last_error
+        TIMESTAMPTZ projected_at
+        VARCHAR(64) projection_owner
+        TIMESTAMPTZ projection_expires_at
         TIMESTAMPTZ created_at "NOT NULL"
         TIMESTAMPTZ updated_at "NOT NULL"
     }

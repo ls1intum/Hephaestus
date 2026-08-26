@@ -15,6 +15,10 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
+import de.tum.cit.aet.hephaestus.practices.feedback.DeliveryPolicyEvaluation;
+import de.tum.cit.aet.hephaestus.practices.feedback.DeliveryPolicyEvaluationRepository;
+import de.tum.cit.aet.hephaestus.practices.feedback.DeliveryPolicyStage;
+import de.tum.cit.aet.hephaestus.practices.feedback.DeliveryPolicySurface;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
@@ -68,6 +72,9 @@ class ArtifactTraceControllerIntegrationTest extends AbstractWorkspaceIntegratio
     @Autowired
     private AgentJobRepository agentJobRepository;
 
+    @Autowired
+    private DeliveryPolicyEvaluationRepository deliveryPolicyEvaluationRepository;
+
     private Workspace workspace;
     private Workspace otherWorkspace;
     private User author;
@@ -106,12 +113,31 @@ class ArtifactTraceControllerIntegrationTest extends AbstractWorkspaceIntegratio
 
         @Test
         @WithUser
-        void admitsAnOrdinaryWorkspaceMember() {
-            recordSignal(workspace, ScmSignals.PULL_REQUEST_READY, SignalState.RECORDED, null, null);
+        void admitsAnOrdinaryWorkspaceMemberWithoutAdminPolicyFacts() {
+            AgentJob job = persistJob();
+            recordSignal(workspace, ScmSignals.PULL_REQUEST_READY, SignalState.TRIGGERED, null, job.getId());
+            deliveryPolicyEvaluationRepository.save(
+                DeliveryPolicyEvaluation.builder()
+                    .workspaceId(workspace.getId())
+                    .agentJobId(job.getId())
+                    .admittedRevision(0L)
+                    .evaluatedRevision(0L)
+                    .resolverVersion("v1")
+                    .surface(DeliveryPolicySurface.ARTIFACT)
+                    .stage(DeliveryPolicyStage.EGRESS)
+                    .allowed(false)
+                    .checks(OBJECT_MAPPER.createArrayNode())
+                    .facts(OBJECT_MAPPER.createObjectNode().put("recipientConsent", false))
+                    .evaluatedAt(Instant.now())
+                    .build()
+            );
 
             get(TRACE, workspace.getWorkspaceSlug(), ArtifactKinds.PULL_REQUEST.value(), ARTIFACT_ID)
                 .expectStatus()
-                .isOk();
+                .isOk()
+                .expectBody()
+                .jsonPath("$.deliveryPolicy")
+                .doesNotExist();
         }
 
         /** The ledger, not the mirror, decides visibility: another tenant's artifact id has no row here. */

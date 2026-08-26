@@ -14,12 +14,6 @@ export type PracticeReviewSettingsField = NonNullable<
 	UpdatePracticeReviewSettingsRequest["reset"]
 >[number];
 
-/**
- * One place that knows what a write to this resource invalidates, because two screens write it. The
- * workspace default sits at the bottom of the practice → area → workspace chain, so changing it
- * changes the autonomy in force on everything holding none of its own — and none of that is in the
- * response.
- */
 export function usePracticeReviewSettingsMutation(
 	workspaceSlug: string,
 	messages: { success: string; error: string },
@@ -38,7 +32,7 @@ export function usePracticeReviewSettingsMutation(
 			if (previous && !variables.headers?.["If-Match"]) {
 				variables.headers = { "If-Match": previous.etag };
 			}
-			if (previous) {
+			if (previous && !variables.body.reset?.some((field) => field !== "REVIEW_SCOPE")) {
 				const patch = variables.body;
 				const reset = patch.reset;
 				queryClient.setQueryData<PracticeReviewSettings>(settingsQueryKey, {
@@ -53,9 +47,6 @@ export function usePracticeReviewSettingsMutation(
 								},
 							}
 						: {}),
-					...(reset?.includes("DEFAULT_AUTONOMY") ? { defaultAutonomyOverride: undefined } : {}),
-					...(reset?.includes("DELIVER_TO_MERGED") ? { deliverToMergedOverride: undefined } : {}),
-					...(reset?.includes("COOLDOWN_MINUTES") ? { cooldownMinutesOverride: undefined } : {}),
 					...(patch.reviewScope ? { reviewScope: patch.reviewScope } : {}),
 					...(patch.deliveryStatus ? { deliveryStatus: patch.deliveryStatus } : {}),
 					...(patch.defaultAutonomy

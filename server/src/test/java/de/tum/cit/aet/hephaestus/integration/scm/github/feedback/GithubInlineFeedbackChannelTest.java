@@ -69,12 +69,12 @@ class GithubInlineFeedbackChannelTest extends BaseUnitTest {
     }
 
     @Test
-    void immutablePackageDefersWhenPriorThreadsCannotBeRead() {
+    void automaticPackageDefersWhenPriorThreadsCannotBeRead() {
         when(gitHubProvider.isRateLimitCritical(1L)).thenReturn(false);
         when(gitHubProvider.forScope(1L)).thenThrow(new RuntimeException("provider unavailable"));
 
         assertThatThrownBy(() ->
-            channel.postImmutablePackage(
+            channel.postInlineFeedback(
                 githubTarget(),
                 List.of(
                     new InlineFeedback(
@@ -86,6 +86,15 @@ class GithubInlineFeedbackChannelTest extends BaseUnitTest {
                 )
             )
         ).isInstanceOf(FeedbackDeliveryException.class);
+    }
+
+    @Test
+    void clearStaleDefersWhenRateLimitIsCritical() {
+        when(gitHubProvider.isRateLimitCritical(1L)).thenReturn(true);
+
+        assertThatThrownBy(() -> channel.clearStaleFeedback(githubTarget(), "marker")).isInstanceOf(
+            FeedbackDeliveryException.class
+        );
     }
 
     @Test

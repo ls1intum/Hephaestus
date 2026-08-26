@@ -17,6 +17,8 @@ import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.testconfig.TestUserFactory;
 import de.tum.cit.aet.hephaestus.testconfig.WorkspaceTestFixtures;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
+import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembership;
+import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembershipRepository;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.util.Map;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -42,6 +44,9 @@ abstract class AbstractSlackConsentGateIntegrationTest extends BaseIntegrationTe
     WorkspaceRepository workspaceRepository;
 
     @Autowired
+    WorkspaceMembershipRepository workspaceMembershipRepository;
+
+    @Autowired
     IdentityProviderRepository identityProviderRepository;
 
     @Autowired
@@ -55,13 +60,19 @@ abstract class AbstractSlackConsentGateIntegrationTest extends BaseIntegrationTe
 
     /** Saves the workspace + a GitHub-identity recipient user; call from each subclass's {@code @BeforeEach}. */
     void setUpWorkspaceAndRecipient(String workspaceSlug) {
-        workspace = workspaceRepository.save(WorkspaceTestFixtures.activeWorkspace(workspaceSlug));
+        Workspace activeWorkspace = WorkspaceTestFixtures.activeWorkspace(workspaceSlug);
+        activeWorkspace.getFeatures().setPracticesEnabled(true);
+        workspace = workspaceRepository.save(activeWorkspace);
         IdentityProvider provider = identityProviderRepository
             .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
             .orElseGet(() ->
                 identityProviderRepository.save(new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com"))
             );
         recipient = userRepository.save(TestUserFactory.createUser(100L, "recipient", provider));
+        WorkspaceMembership membership = new WorkspaceMembership();
+        membership.setWorkspace(workspace);
+        membership.setUser(recipient);
+        workspaceMembershipRepository.save(membership);
     }
 
     /** Seed a monitored channel at {@code consent} plus one thread on it; return the generated {@code slack_thread.id}. */
@@ -84,6 +95,8 @@ abstract class AbstractSlackConsentGateIntegrationTest extends BaseIntegrationTe
         AgentJob job = new AgentJob();
         job.setWorkspace(workspace);
         job.setJobType(AgentJobType.CONVERSATION_REVIEW);
+        job.setMetadata(OM.valueToTree(Map.of("about_user_id", recipient.getId())));
+        job.setPracticeRolloutRevision(workspace.getReviewSettings().getRolloutRevision());
         job.setConfigSnapshot(OM.valueToTree(Map.of("model", "test")));
         job.setEvidenceSnapshot(OM.readTree("{\"manifest\":{\"contractVersion\":\"1.0.0\"}}"));
         return agentJobRepository.save(job);

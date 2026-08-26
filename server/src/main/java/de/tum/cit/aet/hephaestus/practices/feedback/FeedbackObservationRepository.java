@@ -162,6 +162,7 @@ public interface FeedbackObservationRepository extends JpaRepository<FeedbackObs
     @Query(
         """
         SELECT fo.feedback.id AS feedbackId,
+               fo.feedback.agentJobId AS agentJobId,
                o.id AS observationId,
                p.slug AS practiceSlug,
                p.name AS practiceName,
@@ -291,6 +292,7 @@ public interface FeedbackObservationRepository extends JpaRepository<FeedbackObs
     /** Projection: facts + practice for one PREPARED conversational unit (no body - composed at delivery). */
     interface PreparedConversationFact {
         UUID getFeedbackId();
+        UUID getAgentJobId();
         UUID getObservationId();
         String getPracticeSlug();
         String getPracticeName();

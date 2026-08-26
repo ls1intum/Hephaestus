@@ -111,8 +111,7 @@ public class GitlabInlineFeedbackChannel implements InlineFeedbackChannel {
         }
         long scopeId = target.ref().workspaceId();
         if (gitLabProvider.isRateLimitCritical(scopeId)) {
-            log.warn("GitLab rate limit critical — skipping stale inline-note clear: workspaceId={}", scopeId);
-            return;
+            throw new FeedbackDeliveryException("GitLab rate limit is too low to reconcile stale inline notes");
         }
         MrCoordinates mr = GitlabMrResolver.parseSubjectExternalId(target.subjectExternalId());
         deleteOldMarkedNotes(scopeId, mr.projectPath(), mr.iid(), marker);
@@ -120,18 +119,17 @@ public class GitlabInlineFeedbackChannel implements InlineFeedbackChannel {
 
     @Override
     public InlineResult postInlineFeedback(SummaryChannel.FeedbackTarget target, List<InlineFeedback> feedbackItems) {
-        return postInlineFeedback(target, feedbackItems, false);
+        return reconcileInlineFeedback(target, feedbackItems);
     }
 
     @Override
     public InlineResult postImmutablePackage(SummaryChannel.FeedbackTarget target, List<InlineFeedback> feedbackItems) {
-        return postInlineFeedback(target, feedbackItems, true);
+        return reconcileInlineFeedback(target, feedbackItems);
     }
 
-    private InlineResult postInlineFeedback(
+    private InlineResult reconcileInlineFeedback(
         SummaryChannel.FeedbackTarget target,
-        List<InlineFeedback> feedbackItems,
-        boolean failClosedLookup
+        List<InlineFeedback> feedbackItems
     ) {
         if (feedbackItems == null || feedbackItems.isEmpty()) {
             return InlineResult.counts(0, 0);
@@ -157,17 +155,8 @@ public class GitlabInlineFeedbackChannel implements InlineFeedbackChannel {
             return InlineResult.counts(0, feedbackItems.size());
         }
 
-        // Index this reviewer's prior threads by correlation key so a stable finding edits its existing thread
-        // instead of being cleared-then-reposted. Best-effort: a failed read yields an empty index, degrading to
-        // fresh keyed posts (no edit, no delete) rather than blocking delivery.
         String marker = feedbackItems.get(0).marker();
-        Map<String, PriorThread> priorByKey = indexPriorThreads(
-            scopeId,
-            mr.projectPath(),
-            mr.iid(),
-            marker,
-            failClosedLookup
-        );
+        Map<String, PriorThread> priorByKey = indexPriorThreads(scopeId, mr.projectPath(), mr.iid(), marker);
 
         int posted = 0;
         int failed = 0;
@@ -375,50 +364,26 @@ public class GitlabInlineFeedbackChannel implements InlineFeedbackChannel {
         }
     }
 
-    /**
-     * Reads the MR's discussions and indexes this reviewer's own prior threads by their embedded correlation
-     * key. A discussion is "ours" when it has a marker-bearing note carrying a key; if it also has any
-     * non-system note WITHOUT the marker, a human (or another tool) joined it and the thread is flagged as
-     * human-replied. Best-effort: any failure yields an empty index so delivery degrades to fresh keyed posts.
-     */
-    private Map<String, PriorThread> indexPriorThreads(
-        long scopeId,
-        String projectPath,
-        int mrIid,
-        String marker,
-        boolean failClosed
-    ) {
+    private Map<String, PriorThread> indexPriorThreads(long scopeId, String projectPath, int mrIid, String marker) {
         Map<String, PriorThread> byKey = new LinkedHashMap<>();
         if (marker == null || marker.isBlank()) {
             return byKey;
         }
         try {
-            for (Map<String, Object> discussion : fetchAllDiscussions(scopeId, projectPath, mrIid, failClosed)) {
+            for (Map<String, Object> discussion : fetchAllDiscussions(scopeId, projectPath, mrIid)) {
                 indexDiscussion(discussion, marker, byKey);
             }
         } catch (OutboundEgressSuppressedException e) {
             throw e;
+        } catch (FeedbackDeliveryException e) {
+            throw e;
         } catch (Exception e) {
-            if (failClosed) {
-                throw new FeedbackDeliveryException("GitLab discussion lookup was inconclusive", e);
-            }
-            log.debug("Failed to read MR discussions for correlation reconcile: workspaceId={}", scopeId, e);
+            throw new FeedbackDeliveryException("GitLab discussion lookup was inconclusive", e);
         }
         return byKey;
     }
 
-    /**
-     * Reads every discussion on the MR, paging on {@code discussions.pageInfo.{hasNextPage,endCursor}} via the
-     * already-declared {@code $after} variable — an active MR carries far more than one page of human + bot
-     * threads, and a single-page read would leave prior bot threads on page 2+ neither editable nor reapable.
-     * Bounded by {@link #MAX_DISCUSSION_PAGES}. Best-effort: a failed page returns what was accumulated so far.
-     */
-    private List<Map<String, Object>> fetchAllDiscussions(
-        long scopeId,
-        String projectPath,
-        int mrIid,
-        boolean failClosed
-    ) {
+    private List<Map<String, Object>> fetchAllDiscussions(long scopeId, String projectPath, int mrIid) {
         List<Map<String, Object>> all = new ArrayList<>();
         String cursor = null;
         int page = 0;
@@ -434,8 +399,10 @@ public class GitlabInlineFeedbackChannel implements InlineFeedbackChannel {
                 .block(GRAPHQL_TIMEOUT);
 
             if (response == null) {
-                if (failClosed) throw new FeedbackDeliveryException("GitLab discussion lookup returned no response");
-                break;
+                throw new FeedbackDeliveryException("GitLab discussion lookup returned no response");
+            }
+            if (!Objects.requireNonNull(response).getErrors().isEmpty()) {
+                throw new FeedbackDeliveryException("GitLab discussion lookup returned errors");
             }
             List<Map<String, Object>> nodes = Objects.requireNonNull(response)
                 .field("project.mergeRequest.discussions.nodes")
@@ -448,22 +415,19 @@ public class GitlabInlineFeedbackChannel implements InlineFeedbackChannel {
                 .toEntity(GitLabPageInfo.class);
             page++;
             if (pageInfo == null) {
-                if (failClosed) throw new FeedbackDeliveryException("GitLab discussion pagination was incomplete");
-                break;
+                throw new FeedbackDeliveryException("GitLab discussion pagination was incomplete");
             }
             if (!pageInfo.hasNextPage()) {
                 break;
             }
             if (pageInfo.endCursor() == null) {
-                if (failClosed) throw new FeedbackDeliveryException("GitLab discussion pagination lost its cursor");
-                break;
+                throw new FeedbackDeliveryException("GitLab discussion pagination lost its cursor");
             }
             cursor = pageInfo.endCursor();
         }
         return all;
     }
 
-    /** Indexes one discussion's marked bot note (if any) under its parsed correlation key. */
     private static void indexDiscussion(Map<String, Object> discussion, String marker, Map<String, PriorThread> byKey) {
         List<Map<String, Object>> notes = notesOf(discussion);
         if (notes.isEmpty()) {
@@ -495,10 +459,6 @@ public class GitlabInlineFeedbackChannel implements InlineFeedbackChannel {
         byKey.put(botKey, new PriorThread(botKey, botNoteId, discussionId, humanReplied));
     }
 
-    /**
-     * Destroys prior bot threads whose key is absent from the current run and that no developer engaged with —
-     * the feedbackItems that genuinely went away. Returns the number deleted. Best-effort per note.
-     */
     private int destroyVanishedThreads(long scopeId, Map<String, PriorThread> priorByKey, Set<String> seenKeys) {
         int deleted = 0;
         for (PriorThread prior : priorByKey.values()) {
@@ -588,7 +548,7 @@ public class GitlabInlineFeedbackChannel implements InlineFeedbackChannel {
             return;
         }
         try {
-            List<Map<String, Object>> discussions = fetchAllDiscussions(scopeId, projectPath, mrIid, false);
+            List<Map<String, Object>> discussions = fetchAllDiscussions(scopeId, projectPath, mrIid);
             if (discussions.isEmpty()) {
                 return;
             }
@@ -645,8 +605,10 @@ public class GitlabInlineFeedbackChannel implements InlineFeedbackChannel {
             }
         } catch (OutboundEgressSuppressedException e) {
             throw e;
+        } catch (FeedbackDeliveryException e) {
+            throw e;
         } catch (Exception e) {
-            log.debug("Failed to reconcile existing MR discussions for dedup: workspaceId={}", scopeId, e);
+            throw new FeedbackDeliveryException("GitLab stale-note reconciliation was inconclusive", e);
         }
     }
 
@@ -671,19 +633,19 @@ public class GitlabInlineFeedbackChannel implements InlineFeedbackChannel {
                 .execute()
                 .block(GRAPHQL_TIMEOUT);
             if (deleteResponse == null) {
-                return false;
+                throw new FeedbackDeliveryException("GitLab stale-note deletion returned no response");
             }
             List<String> errors = deleteResponse.field("destroyNote.errors").getValue();
             if (errors == null || errors.isEmpty()) {
                 return true;
             }
-            log.debug("Failed to delete old diff note: noteId={}, errors={}", noteId, errors);
-            return false;
+            throw new FeedbackDeliveryException("GitLab stale-note deletion returned errors");
         } catch (OutboundEgressSuppressedException e) {
             throw e;
+        } catch (FeedbackDeliveryException e) {
+            throw e;
         } catch (Exception e) {
-            log.debug("Failed to delete old diff note: noteId={}", noteId, e);
-            return false;
+            throw new FeedbackDeliveryException("GitLab stale-note deletion was inconclusive", e);
         }
     }
 

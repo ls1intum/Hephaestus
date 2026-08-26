@@ -12,5 +12,6 @@ public record FeedbackDispatchCompletion(
     @Nullable String externalRef,
     @Nullable String error,
     @Nullable String suppressionReason,
+    String deliveredPlacements,
     Instant nextAttemptAt
 ) {}

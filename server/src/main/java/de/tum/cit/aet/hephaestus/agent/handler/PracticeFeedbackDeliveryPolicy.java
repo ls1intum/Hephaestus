@@ -4,6 +4,7 @@ import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.core.auth.spi.AccountPreferencesQuery;
 import de.tum.cit.aet.hephaestus.core.settings.spi.SilentModeQuery;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ReviewSubject;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
@@ -17,6 +18,8 @@ import de.tum.cit.aet.hephaestus.practices.feedback.DeliveryPolicyResolver.FactA
 import de.tum.cit.aet.hephaestus.practices.feedback.DeliveryPolicyStage;
 import de.tum.cit.aet.hephaestus.practices.feedback.DeliveryPolicySurface;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
+import de.tum.cit.aet.hephaestus.practices.feedback.approval.FeedbackApprovalDecision;
+import de.tum.cit.aet.hephaestus.practices.feedback.approval.FeedbackApprovalRepository;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewCoverageService;
@@ -51,6 +54,7 @@ public class PracticeFeedbackDeliveryPolicy {
     private final PracticeReviewCoverageService coverageService;
     private final DeliveryPolicyEvaluationRecorder evaluationRecorder;
     private final PracticeRepository practiceRepository;
+    private final FeedbackApprovalRepository approvalRepository;
 
     PracticeFeedbackDeliveryPolicy(
         IssueRepository issueRepository,
@@ -62,7 +66,8 @@ public class PracticeFeedbackDeliveryPolicy {
         SilentModeQuery silentModeQuery,
         PracticeReviewCoverageService coverageService,
         DeliveryPolicyEvaluationRecorder evaluationRecorder,
-        PracticeRepository practiceRepository
+        PracticeRepository practiceRepository,
+        FeedbackApprovalRepository approvalRepository
     ) {
         this.issueRepository = issueRepository;
         this.pullRequestRepository = pullRequestRepository;
@@ -74,6 +79,7 @@ public class PracticeFeedbackDeliveryPolicy {
         this.coverageService = coverageService;
         this.evaluationRecorder = evaluationRecorder;
         this.practiceRepository = practiceRepository;
+        this.approvalRepository = approvalRepository;
     }
 
     @Transactional(readOnly = true)
@@ -341,6 +347,17 @@ public class PracticeFeedbackDeliveryPolicy {
         if (metadata != null && metadata.path("pull_request_id").isIntegralNumber()) {
             return evaluatePullRequest(job, DeliveryPolicyStage.COMPOSITION, null, surface, Set.of()).allowed();
         }
+        Long aboutUserId = integralId(metadata, "about_user_id").orElse(null);
+        if (aboutUserId != null) {
+            return evaluateRepositorylessWithinTransaction(
+                job,
+                DeliveryPolicyStage.COMPOSITION,
+                null,
+                surface,
+                aboutUserId,
+                Set.of()
+            ).allowed();
+        }
         long workspaceId = requireWorkspaceId(job);
         Workspace workspace = activePracticeWorkspace(workspaceId);
         Resolution resolution = resolve(
@@ -361,6 +378,71 @@ public class PracticeFeedbackDeliveryPolicy {
         );
         record(job, workspaceId, null, surface, DeliveryPolicyStage.COMPOSITION, resolution);
         return resolution.result().allowed();
+    }
+
+    @Transactional(readOnly = true)
+    public Decision<Long> evaluateRepositoryless(
+        AgentJob job,
+        DeliveryPolicyStage stage,
+        @Nullable UUID feedbackId,
+        DeliveryPolicySurface surface,
+        long aboutUserId,
+        Collection<String> contributingPracticeSlugs
+    ) {
+        return evaluateRepositorylessWithinTransaction(
+            job,
+            stage,
+            feedbackId,
+            surface,
+            aboutUserId,
+            contributingPracticeSlugs
+        );
+    }
+
+    private Decision<Long> evaluateRepositorylessWithinTransaction(
+        AgentJob job,
+        DeliveryPolicyStage stage,
+        @Nullable UUID feedbackId,
+        DeliveryPolicySurface surface,
+        long aboutUserId,
+        Collection<String> contributingPracticeSlugs
+    ) {
+        if (surface == DeliveryPolicySurface.ARTIFACT) {
+            throw new IllegalArgumentException("Repository-less feedback must name a non-artifact surface");
+        }
+        long workspaceId = requireWorkspaceId(job);
+        Workspace workspace = activePracticeWorkspace(workspaceId);
+        JsonNode metadata = job.getMetadata();
+        boolean subjectMatches =
+            metadata != null &&
+            metadata.path("about_user_id").isIntegralNumber() &&
+            metadata.path("about_user_id").asLong() == aboutUserId;
+        CoverageAssessment coverage =
+            workspace == null
+                ? null
+                : coverageService.assessRepositoryless(workspace, new ReviewSubject(aboutUserId, true));
+        Resolution resolution = resolve(
+            job,
+            surface,
+            !silentModeQuery.isSilentModeEngaged(),
+            workspace,
+            coverage,
+            subjectMatches
+                ? FactAnswer.of(accountPreferencesQuery.practiceFeedbackDeliveryEnabled(aboutUserId))
+                : FactAnswer.NOT_APPLICABLE,
+            FactAnswer.of(subjectMatches),
+            subjectMatches ? null : FeedbackSuppressionReason.ARTIFACT_GONE,
+            stage,
+            feedbackId,
+            contributingPracticeSlugs,
+            null,
+            null,
+            job.getArtifactKind() == null ? null : job.getArtifactKind().value()
+        );
+        record(job, workspaceId, feedbackId, surface, stage, resolution);
+        return resolution.result().allowed()
+            ? Decision.allowed(aboutUserId)
+            : Decision.suppressed(resolution.result().refusal());
     }
 
     static boolean matchesArtifact(Issue artifact, @Nullable JsonNode metadata, String numberKey) {
@@ -427,19 +509,22 @@ public class PracticeFeedbackDeliveryPolicy {
     ) {
         Long admittedRevision = job.getPracticeRolloutRevision();
         Long evaluatedRevision = workspace == null ? null : workspace.getReviewSettings().getRolloutRevision();
-        AutonomyAssessment autonomy = autonomy(workspace, stage, feedbackId, contributingPracticeSlugs);
+        boolean approvedAttempt = isApprovedAttempt(workspace, stage, feedbackId);
+        AutonomyAssessment autonomy = autonomy(workspace, feedbackId, contributingPracticeSlugs, approvedAttempt);
         DeliveryPolicyResolver.Result result = DeliveryPolicyResolver.resolve(
             new DeliveryPolicyResolver.Facts(
-                egressBrakesApply(surface) ? FactAnswer.of(instanceMayDeliver) : FactAnswer.NOT_APPLICABLE,
+                isExternalSurface(surface) ? FactAnswer.of(instanceMayDeliver) : FactAnswer.NOT_APPLICABLE,
                 workspace != null,
                 workspace == null
                     ? FactAnswer.NOT_APPLICABLE
-                    : FactAnswer.of(
-                          admittedRevision != null &&
-                              evaluatedRevision != null &&
-                              admittedRevision.longValue() == evaluatedRevision.longValue()
-                      ),
-                workspace == null || !egressBrakesApply(surface)
+                    : approvedAttempt
+                        ? FactAnswer.NOT_APPLICABLE
+                        : FactAnswer.of(
+                              admittedRevision != null &&
+                                  evaluatedRevision != null &&
+                                  admittedRevision.longValue() == evaluatedRevision.longValue()
+                          ),
+                workspace == null || !isExternalSurface(surface)
                     ? FactAnswer.NOT_APPLICABLE
                     : FactAnswer.of(workspace.getReviewSettings().getDeliveryStatus() == PracticeDeliveryStatus.ACTIVE),
                 coverage == null ? FactAnswer.NOT_APPLICABLE : FactAnswer.of(coverage.admitted()),
@@ -469,9 +554,9 @@ public class PracticeFeedbackDeliveryPolicy {
 
     private AutonomyAssessment autonomy(
         @Nullable Workspace workspace,
-        DeliveryPolicyStage stage,
         @Nullable UUID feedbackId,
-        Collection<String> contributingPracticeSlugs
+        Collection<String> contributingPracticeSlugs,
+        boolean approvedAttempt
     ) {
         if (workspace == null) return new AutonomyAssessment(FactAnswer.NOT_APPLICABLE, List.of());
         if (feedbackId == null && contributingPracticeSlugs.isEmpty()) {
@@ -479,15 +564,16 @@ public class PracticeFeedbackDeliveryPolicy {
         }
         List<Practice> practices;
         int expected;
-        if (feedbackId != null) {
+        Set<String> slugs = Set.copyOf(contributingPracticeSlugs);
+        if (!slugs.isEmpty()) {
+            practices = practiceRepository.findByWorkspaceIdAndSlugIn(workspace.getId(), slugs);
+            expected = slugs.size();
+        } else if (feedbackId != null) {
             practices = practiceRepository.findContributingPractices(workspace.getId(), feedbackId);
             expected = practices.size();
         } else {
-            Set<String> slugs = Set.copyOf(contributingPracticeSlugs);
-            practices = slugs.isEmpty()
-                ? List.of()
-                : practiceRepository.findByWorkspaceIdAndSlugIn(workspace.getId(), slugs);
-            expected = slugs.size();
+            practices = List.of();
+            expected = 0;
         }
         PracticeAutonomy workspaceDefault = WorkspaceReviewDefaults.of(workspace).defaultAutonomy();
         List<DeliveryPolicyFactsSnapshot.PracticeFact> facts = practices
@@ -500,7 +586,6 @@ public class PracticeFeedbackDeliveryPolicy {
             )
             .sorted(java.util.Comparator.comparing(DeliveryPolicyFactsSnapshot.PracticeFact::slug))
             .toList();
-        boolean approvedAttempt = isApprovedAttempt(stage, feedbackId);
         boolean authorized = !facts.isEmpty() && facts.size() == expected;
         if (approvedAttempt) {
             authorized =
@@ -513,12 +598,22 @@ public class PracticeFeedbackDeliveryPolicy {
         return new AutonomyAssessment(FactAnswer.of(authorized), facts);
     }
 
-    static PracticeAutonomy requiredAutonomy(DeliveryPolicyStage stage, @Nullable UUID feedbackId) {
-        return isApprovedAttempt(stage, feedbackId) ? PracticeAutonomy.HUMAN_APPROVAL : PracticeAutonomy.AUTOMATIC;
-    }
-
-    private static boolean isApprovedAttempt(DeliveryPolicyStage stage, @Nullable UUID feedbackId) {
-        return feedbackId != null && (stage == DeliveryPolicyStage.APPROVED || stage == DeliveryPolicyStage.EGRESS);
+    private boolean isApprovedAttempt(
+        @Nullable Workspace workspace,
+        DeliveryPolicyStage stage,
+        @Nullable UUID feedbackId
+    ) {
+        if (
+            workspace == null ||
+            feedbackId == null ||
+            (stage != DeliveryPolicyStage.APPROVED && stage != DeliveryPolicyStage.EGRESS)
+        ) {
+            return false;
+        }
+        return approvalRepository
+            .findByFeedbackIdAndWorkspaceId(feedbackId, workspace.getId())
+            .filter(approval -> approval.getDecision() == FeedbackApprovalDecision.APPROVED)
+            .isPresent();
     }
 
     private static @Nullable Boolean recordedConsent(FactAnswer consent) {
@@ -529,12 +624,7 @@ public class PracticeFeedbackDeliveryPolicy {
         };
     }
 
-    /**
-     * Silent Mode and the workspace pause stop what leaves Hephaestus. An in-app unit is read on the
-     * developer's own page here and leaves nothing, so gating it would blank that page as a side effect
-     * of quietening a pull request.
-     */
-    private static boolean egressBrakesApply(DeliveryPolicySurface surface) {
+    private static boolean isExternalSurface(DeliveryPolicySurface surface) {
         return surface != DeliveryPolicySurface.IN_APP;
     }
 
@@ -583,24 +673,24 @@ public class PracticeFeedbackDeliveryPolicy {
         return job.getWorkspace().getId();
     }
 
-    record Decision<T extends Issue>(@Nullable T artifact, @Nullable FeedbackSuppressionReason suppressionReason) {
-        static <T extends Issue> Decision<T> allowed(T artifact) {
+    public record Decision<T>(@Nullable T artifact, @Nullable FeedbackSuppressionReason suppressionReason) {
+        static <T> Decision<T> allowed(T artifact) {
             return new Decision<>(artifact, null);
         }
 
-        T target() {
+        public T target() {
             return java.util.Objects.requireNonNull(artifact, "an allowed decision always carries its artifact");
         }
 
-        FeedbackSuppressionReason refusal() {
+        public FeedbackSuppressionReason refusal() {
             return java.util.Objects.requireNonNull(suppressionReason, "a suppressed decision always names its reason");
         }
 
-        static <T extends Issue> Decision<T> suppressed(FeedbackSuppressionReason reason) {
+        static <T> Decision<T> suppressed(FeedbackSuppressionReason reason) {
             return new Decision<>(null, reason);
         }
 
-        boolean allowed() {
+        public boolean allowed() {
             return artifact != null;
         }
     }

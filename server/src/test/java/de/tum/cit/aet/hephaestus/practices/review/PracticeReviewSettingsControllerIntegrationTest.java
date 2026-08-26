@@ -141,11 +141,17 @@ class PracticeReviewSettingsControllerIntegrationTest extends AbstractWorkspaceI
         String slug = workspace.getWorkspaceSlug();
         String etag = currentEtag(slug);
         String token = TestAuthUtils.getCurrentUserToken();
+        CountDownLatch ready = new CountDownLatch(2);
         CountDownLatch start = new CountDownLatch(1);
 
         try (var executor = Executors.newFixedThreadPool(2)) {
-            var first = executor.submit(() -> patchAfter(start, slug, etag, token, Map.of("cooldownMinutes", 10)));
-            var second = executor.submit(() -> patchAfter(start, slug, etag, token, Map.of("cooldownMinutes", 20)));
+            var first = executor.submit(() ->
+                patchAfter(ready, start, slug, etag, token, Map.of("cooldownMinutes", 10))
+            );
+            var second = executor.submit(() ->
+                patchAfter(ready, start, slug, etag, token, Map.of("cooldownMinutes", 20))
+            );
+            assertThat(ready.await(10, TimeUnit.SECONDS)).isTrue();
             start.countDown();
 
             assertThat(
@@ -155,6 +161,7 @@ class PracticeReviewSettingsControllerIntegrationTest extends AbstractWorkspaceI
     }
 
     private HttpStatus patchAfter(
+        CountDownLatch ready,
         CountDownLatch start,
         String slug,
         String etag,
@@ -162,6 +169,7 @@ class PracticeReviewSettingsControllerIntegrationTest extends AbstractWorkspaceI
         Map<String, Object> body
     ) {
         try {
+            ready.countDown();
             if (!start.await(10, TimeUnit.SECONDS)) throw new IllegalStateException("concurrent PATCHes did not start");
             return HttpStatus.valueOf(
                 webTestClient

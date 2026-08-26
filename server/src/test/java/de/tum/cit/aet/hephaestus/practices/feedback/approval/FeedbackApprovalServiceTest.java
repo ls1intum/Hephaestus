@@ -177,7 +177,7 @@ class FeedbackApprovalServiceTest {
     }
 
     @Test
-    void shouldRejectConcurrentSecondDecision() {
+    void shouldReportACompareAndSetLossAsAlreadyDecided() {
         when(feedbackRepository.decideProposal(7L, feedbackId, "PREPARED")).thenReturn(0);
 
         assertThatThrownBy(() ->

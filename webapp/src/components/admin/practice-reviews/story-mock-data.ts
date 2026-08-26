@@ -881,6 +881,7 @@ const DISPOSITION_OF: Record<ReviewFeedback["deliveryState"], Disposition> = {
 	DISCARDED: "suppressed",
 	FAILED: "failed",
 	PARTIALLY_DELIVERED: "prepared",
+	PARTIALLY_FAILED: "failed",
 	PREPARED: "prepared",
 	SUPERSEDED: "superseded",
 	SUPPRESSED: "suppressed",
@@ -1074,8 +1075,6 @@ export function feedbackDetail(feedbackId: string): ReviewFeedbackDetail {
 				summary: source.summary,
 			};
 		}),
-		// Only feedback that reached the work has a placement. Deriving it from the outcome keeps a
-		// withheld record from claiming a place it never occupied.
 		placements:
 			item.outcome !== "DELIVERED" || item.channel !== "IN_CONTEXT"
 				? []
@@ -1117,6 +1116,7 @@ export function feedbackDetail(feedbackId: string): ReviewFeedbackDetail {
 		reviewedRevision: item.outcome === "AWAITING_APPROVAL" ? "27f4e88c9f5a" : undefined,
 		subject: run.developer,
 		suppressionReason: item.withheldFor,
+		deliveryPolicy: [],
 	};
 }
 

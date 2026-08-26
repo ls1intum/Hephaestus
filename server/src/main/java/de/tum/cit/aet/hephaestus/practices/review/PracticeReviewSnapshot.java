@@ -19,11 +19,7 @@ record PracticeReviewSnapshot(
     long revision,
     @Nullable String defaultAutonomy
 ) implements ConfigAuditSnapshot {
-    /**
-     * The delivery status participates because a review admitted before a pause must remain stale after
-     * resume. Otherwise work that happened not to reach egress while paused could leave later.
-     */
-    boolean samePolicyAs(PracticeReviewSnapshot other) {
+    boolean sameRolloutPolicyAs(PracticeReviewSnapshot other) {
         return (
             java.util.Objects.equals(deliverToMerged, other.deliverToMerged) &&
             java.util.Objects.equals(reviewScope, other.reviewScope) &&

@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.practices.review;
 
 import de.tum.cit.aet.hephaestus.integration.core.signal.SignalName;
 import de.tum.cit.aet.hephaestus.integration.core.signal.SignalStateReason;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ReviewSubject;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
@@ -19,14 +20,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
-/**
- * Decides whether to run the practice review agent for a PR or issue event, running checks ordered
- * cheap-to-expensive to short-circuit before sandbox execution. The reviewable's repository must be
- * loaded before calling {@link #evaluate}; audience selection belongs to delivery, not detection.
- *
- * <p>{@link #evaluateSignal} is the entry point for a kind with no repository, branch or assignee; it
- * shares the workspace/signal steps below with the reviewable path via {@code evaluateWorkspaceAndSignal}.
- */
 @Service
 public class PracticeReviewDetectionGate {
 
@@ -63,10 +56,6 @@ public class PracticeReviewDetectionGate {
         return evaluateReviewable(pullRequest, pullRequest.isDraft(), signal, TriggerMode.MANUAL, true);
     }
 
-    /**
-     * Issue-side counterpart of {@link #evaluate}. A signal name carries its artifact kind, so only
-     * issue practices can match an issue signal; an issue is never a draft.
-     */
     public GateDecision evaluateIssue(
         @NonNull Issue issue,
         @NonNull SignalName signal,
@@ -79,26 +68,28 @@ public class PracticeReviewDetectionGate {
         return evaluateReviewable(issue, false, signal, TriggerMode.MANUAL, true);
     }
 
-    /**
-     * The kind-generic half of the gate, for an artifact that has no repository, branch or assignee.
-     *
-     * <p>Consent is <em>not</em> checked here: there is nothing kind-generic to check it on, so the
-     * caller that resolved the subject is the one that must answer for them.
-     */
     public GateDecision evaluateSignal(
         @NonNull Workspace workspace,
         @NonNull SignalName signal,
-        @NonNull TriggerMode triggerMode
+        @NonNull TriggerMode triggerMode,
+        @NonNull ReviewSubject subject
     ) {
-        // Never a draft: draftness is a pull request's state, so the draft half of a binding must not
-        // filter a kind that has no such state.
+        var coverage = coverageService.assessRepositoryless(workspace, subject);
+        GateDecision.@Nullable Skip scopeSkip = coverage.admitted()
+            ? null
+            : new GateDecision.Skip(
+                  "the artifact or linked subject is outside review coverage",
+                  coverage.subjectStatus() == ReviewSubjectStatus.RESOLVED_LINKED_HUMAN
+                      ? SignalStateReason.OUT_OF_REVIEW_SCOPE
+                      : SignalStateReason.SUBJECT_UNLINKED
+              );
         return evaluateWorkspaceAndSignal(
             workspace,
             signal,
             false,
             triggerMode,
             "workspace:" + workspace.getId(),
-            null
+            scopeSkip
         );
     }
 
@@ -109,7 +100,6 @@ public class PracticeReviewDetectionGate {
         @NonNull TriggerMode triggerMode,
         boolean allowOutsideCoverage
     ) {
-        // Workspace resolution first: per-workspace settings drive the checks below.
         String nameWithOwner =
             reviewable.getRepository() != null ? reviewable.getRepository().getNameWithOwner() : null;
         Workspace workspace = workspaceResolver.resolveForRepository(nameWithOwner).orElse(null);
@@ -145,7 +135,6 @@ public class PracticeReviewDetectionGate {
             );
         }
 
-        // Workspace- and signal-level checks, shared with evaluateSignal.
         GateDecision shared = evaluateWorkspaceAndSignal(
             workspace,
             signal,
@@ -157,12 +146,6 @@ public class PracticeReviewDetectionGate {
         return shared;
     }
 
-    /**
-     * The workspace- and signal-level gate: the checks an artifact contributes nothing to. Shared rather
-     * than duplicated for repo-less kinds, so the two paths cannot disagree about what {@code OFF} means.
-     *
-     * @param subject an identifier for the logs only; the gate makes no decision from it
-     */
     private GateDecision evaluateWorkspaceAndSignal(
         Workspace workspace,
         SignalName signal,
@@ -207,7 +190,6 @@ public class PracticeReviewDetectionGate {
             return new GateDecision.Skip("manual trigger disabled for workspace");
         }
 
-        // Skip rather than incur LLM cost for a detection run that would submit no jobs.
         if (!practiceDetectionReadiness.hasRunnableAgent(workspace.getId())) {
             log.debug(
                 "Practice review gate: SKIP, reason=noRunnableDetectionAgent, subject={}, workspaceId={}",
@@ -217,12 +199,8 @@ public class PracticeReviewDetectionGate {
             return new GateDecision.Skip("no runnable practice-review agent");
         }
 
-        // A binding decides its own draft policy rather than a fleet-wide veto ahead of it, otherwise no
-        // binding could ever fire on a draft.
         SignalMatch match = findMatchingPractices(workspace, signal, draft);
         if (match.admitted().isEmpty()) {
-            // Two reasons, not one: "bound and turned all the way down" is a deliberate act and must stay
-            // answerable apart from "nothing bound".
             if (match.hasDisabledPractice()) {
                 log.debug(
                     "Practice review gate: SKIP, reason=allBoundPracticesOff, subject={}, signal={}, workspaceId={}",
@@ -255,18 +233,8 @@ public class PracticeReviewDetectionGate {
         );
     }
 
-    /**
-     * @param admitted the practices to review — bound to the signal and above {@link PracticeAutonomy#OFF}
-     * @param hasDisabledPractice at least one practice was bound to the signal and sat at {@code OFF}; this is
-     *     what lets the caller record "deliberately silenced" rather than "nothing bound"
-     */
     private record SignalMatch(List<Practice> admitted, boolean hasDisabledPractice) {}
 
-    /**
-     * The practices a signal occasions. A manual request is matched differently: it admits every practice
-     * bound to the artifact's kind, ignoring both the specific signal and the draft filter, since asking
-     * "review this now" has already answered the draft question. {@code OFF} still means off either way.
-     */
     private SignalMatch findMatchingPractices(Workspace workspace, SignalName signal, boolean draft) {
         boolean requestedByHand = signalOptions.isManualRequest(signal);
         List<Practice> bound = practiceRepository
@@ -281,8 +249,6 @@ public class PracticeReviewDetectionGate {
                     )
             )
             .toList();
-        // Reading the autonomy column raw would ask a practice that holds no opinion for one; resolve it
-        // through practice -> area -> workspace instead.
         PracticeAutonomy workspaceDefault = WorkspaceReviewDefaults.of(workspace).defaultAutonomy();
         List<Practice> admitted = bound
             .stream()

@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.practices.feedback.approval;
 
 import de.tum.cit.aet.hephaestus.core.settings.spi.SilentModeQuery;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
 import de.tum.cit.aet.hephaestus.practices.review.WorkspaceReviewDefaultsProvider;
@@ -22,11 +23,15 @@ public class FeedbackApprovalEligibility {
     private final WorkspaceReviewDefaultsProvider defaultsProvider;
     private final WorkspaceRepository workspaceRepository;
     private final SilentModeQuery silentModeQuery;
+    private final FeedbackRepository feedbackRepository;
 
     @Transactional(readOnly = true)
     public boolean isEligible(Long workspaceId, UUID feedbackId) {
-        var practices = practiceRepository.findContributingPractices(workspaceId, feedbackId);
-        if (practices.isEmpty()) return false;
+        var feedback = feedbackRepository.findByIdAndWorkspaceId(feedbackId, workspaceId).orElse(null);
+        if (feedback == null || feedback.getProposedPracticeSlugs().isEmpty()) return false;
+        var slugs = java.util.Set.copyOf(feedback.getProposedPracticeSlugs());
+        var practices = practiceRepository.findByWorkspaceIdAndSlugIn(workspaceId, slugs);
+        if (practices.size() != slugs.size()) return false;
         PracticeAutonomy workspaceDefault = defaultsProvider.forWorkspace(workspaceId).defaultAutonomy();
         var authorities = practices
             .stream()
@@ -38,11 +43,6 @@ public class FeedbackApprovalEligibility {
         );
     }
 
-    /**
-     * The brake that would refuse this workspace's feedback at egress right now, or null if none would.
-     * Approving spends the proposal whatever happens next, so a brake the operator can lift has to refuse
-     * the decision rather than let it succeed and be discarded on the way out.
-     */
     @Transactional(readOnly = true)
     public @Nullable FeedbackSuppressionReason brakeOnDelivery(Long workspaceId) {
         if (silentModeQuery.isSilentModeEngaged()) {

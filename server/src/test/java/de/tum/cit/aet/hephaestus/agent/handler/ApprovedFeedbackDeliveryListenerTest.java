@@ -57,7 +57,12 @@ class ApprovedFeedbackDeliveryListenerTest {
         when(
             fixture
                 .policy()
-                .evaluatePullRequest(fixture.job(), DeliveryPolicyStage.APPROVED, fixture.feedback().getId())
+                .evaluatePullRequest(
+                    fixture.job(),
+                    DeliveryPolicyStage.APPROVED,
+                    fixture.feedback().getId(),
+                    fixture.feedback().getProposedPracticeSlugs()
+                )
         ).thenReturn(PracticeFeedbackDeliveryPolicy.Decision.suppressed(FeedbackSuppressionReason.RECIPIENT_OPTED_OUT));
 
         fixture.listener().deliver(event(fixture.feedback()));
@@ -91,7 +96,7 @@ class ApprovedFeedbackDeliveryListenerTest {
         when(
             fixture
                 .policy()
-                .evaluatePullRequest(fixture.job(), DeliveryPolicyStage.APPROVED, fixture.feedback().getId())
+                .evaluatePullRequest(fixture.job(), DeliveryPolicyStage.APPROVED, fixture.feedback().getId(), List.of())
         ).thenReturn(PracticeFeedbackDeliveryPolicy.Decision.allowed(current));
         Feedback stale = Feedback.builder()
             .id(fixture.feedback().getId())
@@ -216,7 +221,12 @@ class ApprovedFeedbackDeliveryListenerTest {
         when(
             fixture
                 .policy()
-                .evaluatePullRequest(fixture.job(), DeliveryPolicyStage.APPROVED, fixture.feedback().getId())
+                .evaluatePullRequest(
+                    fixture.job(),
+                    DeliveryPolicyStage.APPROVED,
+                    fixture.feedback().getId(),
+                    fixture.feedback().getProposedPracticeSlugs()
+                )
         ).thenReturn(PracticeFeedbackDeliveryPolicy.Decision.allowed(new PullRequest()));
     }
 
@@ -245,13 +255,20 @@ class ApprovedFeedbackDeliveryListenerTest {
         );
         when(eligibility.isEligible(7L, feedback.getId())).thenReturn(true);
         when(jobRepository.findByIdAndWorkspaceId(feedback.getAgentJobId(), 7L)).thenReturn(Optional.of(job));
+        org.mockito.Mockito.lenient()
+            .when(dispatchService.projectApproved(any(), any()))
+            .thenAnswer(invocation -> {
+                ((Runnable) invocation.getArgument(1)).run();
+                return true;
+            });
         ApprovedFeedbackDeliveryListener listener = new ApprovedFeedbackDeliveryListener(
             feedbackRepository,
             approvalRepository,
             jobRepository,
             policy,
             dispatchService,
-            eligibility
+            eligibility,
+            mock(FeedbackLedgerRecorder.class)
         );
         return new Fixture(
             listener,
@@ -282,7 +299,7 @@ class ApprovedFeedbackDeliveryListenerTest {
             .deliveryState(FeedbackDeliveryState.PREPARED)
             .body(body)
             .proposedPlacements(new ArrayList<>(List.of(ProposedPlacement.summary(body))))
-            .proposedPracticeSlugs(new ArrayList<>())
+            .proposedPracticeSlugs(new ArrayList<>(List.of("review-quality")))
             .source(FeedbackSource.AGENT)
             .build();
     }
