@@ -101,8 +101,7 @@ class DiffNotePosterTest extends BaseUnitTest {
         assertThat(anchor.filePath()).isEqualTo("src/A.java");
         assertThat(anchor.newLineNumber()).isEqualTo(14);
         assertThat(f.body())
-            .contains("<sub>React with 👍 or 👎, or reply, to give feedback.</sub>")
-            .doesNotContain("AI-generated")
+            .contains("<sub>AI-generated &middot; React with 👍 or 👎, or reply, to give feedback.</sub>")
             .doesNotContain("Why you're seeing this");
         assertThat(anchor.startLine()).isEqualTo(10);
         assertThat(f.recurrenceKey()).isEqualTo("ck-multi");

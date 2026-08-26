@@ -61,7 +61,8 @@ class PracticeFeedbackCommentFormatterTest extends BaseUnitTest {
         String result = formatter("https://hephaestus.example").appendInlineFeedbackPrompt("Inline feedback");
 
         assertThat(result).isEqualTo(
-            "Inline feedback\n\n<sub>React with 👍 or 👎, or reply, to give feedback.</sub>\n"
+            "Inline feedback\n\n" +
+                "<sub>AI-generated &middot; React with 👍 or 👎, or reply, to give feedback.</sub>\n"
         );
     }
 

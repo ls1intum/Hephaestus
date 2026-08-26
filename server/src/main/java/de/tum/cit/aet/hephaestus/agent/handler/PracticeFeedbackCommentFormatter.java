@@ -43,7 +43,7 @@ class PracticeFeedbackCommentFormatter {
     String appendInlineFeedbackPrompt(String sanitizedBody) {
         var sb = new StringBuilder(sanitizedBody.length() + 120);
         sb.append(sanitizedBody).append("\n\n");
-        sb.append("<sub>React with 👍 or 👎, or reply, to give feedback.</sub>\n");
+        sb.append("<sub>AI-generated &middot; React with 👍 or 👎, or reply, to give feedback.</sub>\n");
         return sb.toString();
     }
 
