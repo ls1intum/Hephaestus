@@ -1510,6 +1510,18 @@ let softTimeoutFired = false;
 let hardAborted = false;
 let retryAborted = false;
 
+function scheduleDeadline(timeoutMs: number, onTimeout: () => void) {
+	let release = () => {};
+	const elapsed = new Promise<void>((resolve) => {
+		release = resolve;
+	});
+	const timer = setTimeout(() => {
+		onTimeout();
+		release();
+	}, timeoutMs);
+	return { elapsed, timer };
+}
+
 function scheduleTurnTimers(
 	session: AgentSession,
 	turnNumber: number,
@@ -1531,16 +1543,14 @@ function scheduleTurnTimers(
 			.steer(steerMessage)
 			.catch((err) => console.error(`[pi-runner] steer failed: ${errorText(err)}`));
 	}, softNudgeMs);
-	const hardTimer = setTimeout(() => {
+	const hard = scheduleDeadline(hardLimitMs, () => {
 		state.hardTimedOut = true;
 		console.error(
 			`[pi-runner] turn ${turnNumber}/${turnCount} exhausted its fair share — aborting this turn`,
 		);
-		session
-			.abort()
-			.catch((err) => console.error(`[pi-runner] turn abort failed: ${errorText(err)}`));
-	}, hardLimitMs);
-	return { softTimer, hardTimer, state };
+		session.dispose();
+	});
+	return { softTimer, hardTimer: hard.timer, hardDeadline: hard.elapsed, state };
 }
 
 async function main() {
@@ -1624,26 +1634,26 @@ async function main() {
 		}
 		const unsubscribeComposer = subscribeSession(composerSession, "composer");
 		const instructions = readFileSync(COMPOSER_PROMPT_PATH, "utf8");
-		const compositionTimer = setTimeout(() => {
+		const compositionDeadline = scheduleDeadline(COMPOSITION_TIMEOUT_MS, () => {
 			console.error(
 				`[pi-runner] Composition timeout — preserving observations and composed units so far`,
 			);
-			composerSession
-				.abort()
-				.catch((error) =>
-					console.error(`[pi-runner] composition abort failed: ${errorText(error)}`),
-				);
-		}, COMPOSITION_TIMEOUT_MS);
+			composerSession.dispose();
+		});
 		try {
-			await composerSession.prompt(
-				`${instructions}\n\n${buildCompositionTurn(compositionRequest, admittedObservations)}`,
-			);
+			await Promise.race([
+				composerSession.prompt(
+					`${instructions}\n\n${buildCompositionTurn(compositionRequest, admittedObservations)}`,
+				),
+				compositionDeadline.elapsed,
+			]);
 		} finally {
-			clearTimeout(compositionTimer);
+			clearTimeout(compositionDeadline.timer);
 			unsubscribeComposer();
 		}
 		persistComposedFeedback();
 		const combinedUsage = extractUsageFromSession(composerSession.state, streamUsage);
+		composerSession.dispose();
 		accumulateUsage(prevUsage, combinedUsage);
 		prevUsage = combinedUsage;
 		persistUsage();
@@ -1656,9 +1666,7 @@ async function main() {
 		hardAborted = true;
 		console.error(`[pi-runner] Hard timeout — aborting ${activeSessions.size} active session(s)`);
 		for (const activeSession of activeSessions) {
-			activeSession
-				.abort()
-				.catch((err) => console.error(`[pi-runner] abort failed: ${errorText(err)}`));
+			activeSession.dispose();
 		}
 	}, INITIAL_TIMEOUT_MS);
 
@@ -1713,19 +1721,20 @@ async function main() {
 						Math.floor((remainingMs * concurrency) / (tree.groups.length + allSlugs.length)),
 					),
 				);
-				const parentTimer = setTimeout(() => {
-					parentSession
-						.abort()
-						.catch((error) => console.error(`[pi-runner] recon abort failed: ${errorText(error)}`));
-				}, parentBudgetMs);
+				const parentDeadline = scheduleDeadline(parentBudgetMs, () => {
+					parentSession.dispose();
+				});
 				try {
-					await parentSession.prompt(
-						`Build shared reconnaissance for the '${group.id}' observation group. ` +
-							`The child observers will evaluate these practices later: ${group.practiceSlugs.join(", ")}. ` +
-							`Read only the evidence needed to understand their shared context, starting with these source kinds: ${group.evidenceSources.join(", ") || "the staged manifest"}. ` +
-							`Map relevant files, hunks, symbols, metadata, tests, and uncertainties with exact paths and lines. ` +
-							`Do not assess a practice, recommend feedback, or claim GOOD/BAD. End with a compact factual evidence map for child sessions.`,
-					);
+					await Promise.race([
+						parentSession.prompt(
+							`Build shared reconnaissance for the '${group.id}' observation group. ` +
+								`The child observers will evaluate these practices later: ${group.practiceSlugs.join(", ")}. ` +
+								`Read only the evidence needed to understand their shared context, starting with these source kinds: ${group.evidenceSources.join(", ") || "the staged manifest"}. ` +
+								`Map relevant files, hunks, symbols, metadata, tests, and uncertainties with exact paths and lines. ` +
+								`Do not assess a practice, recommend feedback, or claim GOOD/BAD. End with a compact factual evidence map for child sessions.`,
+						),
+						parentDeadline.elapsed,
+					]);
 					const checkpointEntryId = manager.getLeafId();
 					const seedSessionFile = manager.getSessionFile();
 					if (!checkpointEntryId || !seedSessionFile)
@@ -1740,9 +1749,10 @@ async function main() {
 					console.error(`[pi-runner] reconnaissance ${group.id} failed: ${errorText(error)}`);
 					return group.practiceSlugs.map((practiceSlug) => ({ practiceSlug, groupId: group.id }));
 				} finally {
-					clearTimeout(parentTimer);
+					clearTimeout(parentDeadline.timer);
 					activeSessions.delete(parentSession);
 					unsubscribeParent();
+					parentSession.dispose();
 				}
 			},
 		);
@@ -1784,11 +1794,14 @@ async function main() {
 				timing.fairShareMs,
 			);
 			try {
-				await observerSession.prompt(
-					`${prompt}\n\n## Practice branch\nContinue from the shared '${task.groupId}' reconnaissance above. ` +
-						`Read inputs/practices/${task.practiceSlug}.md and evaluate ONLY '${task.practiceSlug}'. ` +
-						`Persist the result with report_observation before doing anything else outside this scope.`,
-				);
+				await Promise.race([
+					observerSession.prompt(
+						`${prompt}\n\n## Practice branch\nContinue from the shared '${task.groupId}' reconnaissance above. ` +
+							`Read inputs/practices/${task.practiceSlug}.md and evaluate ONLY '${task.practiceSlug}'. ` +
+							`Persist the result with report_observation before doing anything else outside this scope.`,
+					),
+					timers.hardDeadline,
+				]);
 			} catch (error) {
 				console.error(`[pi-runner] observer ${task.practiceSlug} failed: ${errorText(error)}`);
 			} finally {
@@ -1797,6 +1810,7 @@ async function main() {
 				clearTimeout(timers.hardTimer);
 				activeSessions.delete(observerSession);
 				unsubscribeObserver();
+				observerSession.dispose();
 				remainingObservers--;
 			}
 		});
@@ -1851,9 +1865,7 @@ async function main() {
 		retryAborted = true;
 		console.error(`[pi-runner] Retry hard timeout — aborting`);
 		for (const activeSession of activeSessions) {
-			activeSession
-				.abort()
-				.catch((err) => console.error(`[pi-runner] retry abort failed: ${errorText(err)}`));
+			activeSession.dispose();
 		}
 	}, RETRY_TIMEOUT_MS);
 
@@ -1881,23 +1893,25 @@ async function main() {
 				1,
 				Math.floor((RETRY_TIMEOUT_MS * activeSlots) / retriesRemaining),
 			);
-			const timer = setTimeout(() => {
-				retrySession
-					.abort()
-					.catch((error) => console.error(`[pi-runner] retry abort failed: ${errorText(error)}`));
-			}, retryBudgetMs);
+			const retryDeadline = scheduleDeadline(retryBudgetMs, () => {
+				retrySession.dispose();
+			});
 			try {
-				await retrySession.prompt(
-					`${prompt}\n\n## Recovery practice branch\nThe earlier observer did not persist '${practiceSlug}'. ` +
-						`Read inputs/practices/${practiceSlug}.md and the staged evidence needed to evaluate ONLY this practice. ` +
-						`Persist exactly one justified outcome with report_observation. ${PERSIST_DISCIPLINE}`,
-				);
+				await Promise.race([
+					retrySession.prompt(
+						`${prompt}\n\n## Recovery practice branch\nThe earlier observer did not persist '${practiceSlug}'. ` +
+							`Read inputs/practices/${practiceSlug}.md and the staged evidence needed to evaluate ONLY this practice. ` +
+							`Persist exactly one justified outcome with report_observation. ${PERSIST_DISCIPLINE}`,
+					),
+					retryDeadline.elapsed,
+				]);
 			} catch (error) {
 				console.error(`[pi-runner] retry ${practiceSlug} failed: ${errorText(error)}`);
 			} finally {
-				clearTimeout(timer);
+				clearTimeout(retryDeadline.timer);
 				activeSessions.delete(retrySession);
 				unsubscribeRetry();
+				retrySession.dispose();
 				retriesRemaining--;
 			}
 		});
