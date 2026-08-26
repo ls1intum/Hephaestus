@@ -140,11 +140,12 @@ class PracticeReviewSettingsControllerIntegrationTest extends AbstractWorkspaceI
         Workspace workspace = setupWorkspace("review-concurrent");
         String slug = workspace.getWorkspaceSlug();
         String etag = currentEtag(slug);
+        String token = TestAuthUtils.getCurrentUserToken();
         CountDownLatch start = new CountDownLatch(1);
 
         try (var executor = Executors.newFixedThreadPool(2)) {
-            var first = executor.submit(() -> patchAfter(start, slug, etag, Map.of("cooldownMinutes", 10)));
-            var second = executor.submit(() -> patchAfter(start, slug, etag, Map.of("cooldownMinutes", 20)));
+            var first = executor.submit(() -> patchAfter(start, slug, etag, token, Map.of("cooldownMinutes", 10)));
+            var second = executor.submit(() -> patchAfter(start, slug, etag, token, Map.of("cooldownMinutes", 20)));
             start.countDown();
 
             assertThat(
@@ -153,10 +154,30 @@ class PracticeReviewSettingsControllerIntegrationTest extends AbstractWorkspaceI
         }
     }
 
-    private HttpStatus patchAfter(CountDownLatch start, String slug, String etag, Map<String, Object> body) {
+    private HttpStatus patchAfter(
+        CountDownLatch start,
+        String slug,
+        String etag,
+        String token,
+        Map<String, Object> body
+    ) {
         try {
             if (!start.await(10, TimeUnit.SECONDS)) throw new IllegalStateException("concurrent PATCHes did not start");
-            return HttpStatus.valueOf(patch(slug, etag, body).returnResult(Void.class).getStatus().value());
+            return HttpStatus.valueOf(
+                webTestClient
+                    .patch()
+                    .uri("/workspaces/{slug}/practices/review-settings", slug)
+                    .headers(headers -> {
+                        headers.setBearerAuth(token);
+                        headers.setIfMatch(etag);
+                    })
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .bodyValue(body)
+                    .exchange()
+                    .returnResult(Void.class)
+                    .getStatus()
+                    .value()
+            );
         } catch (InterruptedException exception) {
             Thread.currentThread().interrupt();
             throw new IllegalStateException(exception);
