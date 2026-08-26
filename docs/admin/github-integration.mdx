@@ -19,14 +19,15 @@ This page covers the other two.
 
 ## Choosing PAT vs GitHub App
 
-**PAT mode is fully supported** and is the right starting point for a single-org install:
+**PAT mode is fully supported for synchronization** and is the simplest way to evaluate a single-org
+install. Use a GitHub App before enabling feedback delivery so comments have a distinct app identity.
 
 | | PAT | GitHub App |
 | --- | --- | --- |
 | Setup effort | Paste a token in the workspace UI | Create + install an App, manage a private key |
 | Environment variables | None | `GH_APP_ID`, `GH_APP_PRIVATE_KEY`, `GH_APP_INSTALLATION_URL` |
 | Rate limits | 5,000 req/h, shared across all of that user's tokens | 5,000+ req/h **per installation**, scaling with org size (up to 12,500) |
-| AI-review feedback posted back to GitHub (PR comments, inline notes, approvals) | Posted as the token's user | Posted as the App (recommended) |
+| AI-review feedback posted back to GitHub (PR comments, inline notes, approvals) | Posted as the token's user; do not use for active delivery | Posted as the App |
 | Webhooks | Create manually (below) | Configured once on the App |
 
 Tokens are stored encrypted (AES-256-GCM) per workspace in the database.
@@ -34,10 +35,9 @@ Tokens are stored encrypted (AES-256-GCM) per workspace in the database.
 ### PAT mode
 
 1. Create a token: **classic PAT** with `repo` + `read:org` (the `repo` scope already
-   grants PR/issue write for feedback delivery), or a **fine-grained PAT** whose *resource
+   grants PR/issue write access), or a **fine-grained PAT** whose *resource
    owner* is the organization, with repository permissions Contents, Issues, Pull requests
-   and Discussions (Read — add Write on Issues and Pull requests to deliver AI-review
-   feedback) plus organization permissions Members and Projects (Read). Omitting
+   and Discussions (Read) plus organization permissions Members and Projects (Read). Omitting
    Discussions or Projects leaves those syncs silently empty.
 2. Leave `GH_APP_ID` unset (defaults to `0` = PAT mode).
 3. Paste the token when creating/configuring the workspace in the UI.

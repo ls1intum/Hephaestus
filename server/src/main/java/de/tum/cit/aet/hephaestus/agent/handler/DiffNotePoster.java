@@ -18,12 +18,11 @@ import java.util.Objects;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/** Reconciles sanitized inline observations through the provider-specific channel. */
 class DiffNotePoster {
 
     private static final Logger log = LoggerFactory.getLogger(DiffNotePoster.class);
 
-    /** Invisible marker appended to diff note bodies to identify hephaestus-posted notes. */
+    /** Identifies inline feedback created by Hephaestus during reconciliation. */
     static final String HEPHAESTUS_MARKER = "<!-- hephaestus-diff-note -->";
 
     private final PullRequestCommentPoster commentPoster;
@@ -71,10 +70,11 @@ class DiffNotePoster {
         SummaryChannel.FeedbackTarget target = commentPoster.buildTarget(job, kind, job.getWorkspace().getId());
 
         List<InlineFeedbackChannel.InlineFeedback> observations = mapObservations(
+            job,
             diffNotes == null ? List.of() : diffNotes
         );
 
-        // An empty reconcile clears stale notes; non-empty channels reconcile by recurrence key.
+        // Clearing on an empty run removes inline feedback that no longer recurs.
         if (observations.isEmpty()) {
             try {
                 channel.clearStaleFeedback(target, HEPHAESTUS_MARKER);
@@ -114,14 +114,14 @@ class DiffNotePoster {
         }
     }
 
-    private List<InlineFeedbackChannel.InlineFeedback> mapObservations(List<DiffNote> diffNotes) {
+    private List<InlineFeedbackChannel.InlineFeedback> mapObservations(AgentJob job, List<DiffNote> diffNotes) {
         List<InlineFeedbackChannel.InlineFeedback> observations = new ArrayList<>(diffNotes.size());
         for (DiffNote note : diffNotes) {
             String sanitized = PullRequestCommentPoster.sanitize(note.body());
             if (sanitized.isBlank()) {
                 continue;
             }
-            // A multi-line DiffAnchor stores the end first and optional range start second.
+            // DiffAnchor expects the range end before its optional start.
             Integer endLine = note.endLine();
             boolean isMultiLine = endLine != null && endLine > note.startLine();
             FeedbackAnchor.DiffAnchor anchor = isMultiLine
@@ -130,7 +130,7 @@ class DiffNotePoster {
             observations.add(
                 new InlineFeedbackChannel.InlineFeedback(
                     anchor,
-                    commentFormatter.appendSettingsNotice(sanitized),
+                    commentFormatter.appendInlineFeedbackPrompt(sanitized),
                     HEPHAESTUS_MARKER,
                     note.recurrenceKey()
                 )
