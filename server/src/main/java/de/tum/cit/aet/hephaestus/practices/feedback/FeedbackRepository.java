@@ -262,7 +262,6 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
     )
     int markSuperseded(@Param("workspaceId") Long workspaceId, @Param("id") UUID id);
 
-    /** Retires undecided predecessors; decided proposals are immutable. */
     @Modifying(flushAutomatically = true)
     @Transactional
     @Query(

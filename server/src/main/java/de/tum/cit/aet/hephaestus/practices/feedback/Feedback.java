@@ -88,7 +88,6 @@ public class Feedback {
     @Column(name = "delivery_state", nullable = false, length = 32)
     private FeedbackDeliveryState deliveryState;
 
-    /** Why delivery stopped. Set on withheld or terminally partial feedback. */
     @Enumerated(EnumType.STRING)
     @Column(name = "suppression_reason", length = 32)
     private @Nullable FeedbackSuppressionReason suppressionReason;

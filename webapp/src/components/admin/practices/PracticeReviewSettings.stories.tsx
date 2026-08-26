@@ -433,7 +433,7 @@ export const CoveragePreviewLoading: Story = {
 			preview: fn(
 				() =>
 					new Promise<PracticeReviewCoveragePreview>(() => {
-						// Deliberately pending to keep the loading state visible.
+						// Keep the preview pending so the intermediate interaction remains observable.
 					}),
 			),
 		},

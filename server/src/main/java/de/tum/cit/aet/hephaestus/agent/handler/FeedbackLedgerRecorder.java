@@ -48,7 +48,6 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Persists feedback units and their provider placement handles. */
 @Component
 public class FeedbackLedgerRecorder {
 

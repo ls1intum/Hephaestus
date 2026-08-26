@@ -20,12 +20,10 @@ import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/** Reconciles sanitized inline observations through the provider-specific channel. */
 class DiffNotePoster {
 
     private static final Logger log = LoggerFactory.getLogger(DiffNotePoster.class);
 
-    /** Invisible marker appended to diff note bodies to identify hephaestus-posted notes. */
     static final String HEPHAESTUS_MARKER = "<!-- hephaestus-diff-note -->";
 
     private final PullRequestCommentPoster commentPoster;
@@ -85,7 +83,6 @@ class DiffNotePoster {
             packageId
         );
 
-        // An empty reconcile clears stale notes; non-empty channels reconcile by recurrence key.
         if (observations.isEmpty()) {
             try {
                 channel.clearStaleFeedback(target, HEPHAESTUS_MARKER);
