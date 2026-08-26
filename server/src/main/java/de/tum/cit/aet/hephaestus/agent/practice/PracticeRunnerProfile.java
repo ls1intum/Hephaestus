@@ -21,6 +21,7 @@ public final class PracticeRunnerProfile implements PiRunnerProfile {
         "pi-runner-usage.ts",
         "pi-runner-timings.ts",
         "pi-runner-composition.ts",
+        "pi-runner-fanout.ts",
         SandboxLayout.PROVIDER_HELPER_FILENAME
     );
 

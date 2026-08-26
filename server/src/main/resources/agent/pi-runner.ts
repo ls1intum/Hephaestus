@@ -28,6 +28,7 @@ import {
 	type ComposedFeedbackUnit,
 	undeliverableUnits,
 } from "./pi-runner-composition.ts";
+import { buildPracticeFanout } from "./pi-runner-fanout.ts";
 import { deriveTimeouts } from "./pi-runner-timings.ts";
 import {
 	addAssistantUsage,
@@ -782,27 +783,6 @@ function tryRescueFromTextResponse(sessionState: SessionState): boolean {
 	console.error(`[pi-runner] Text rescue: extracted ${payload.observations.length} observations`);
 	writeFileSync(RESULT_PATH, JSON.stringify(payload, null, 2));
 	return checkResultFile();
-}
-
-function chunkArray<T>(arr: readonly T[], size: number): T[][] {
-	const out: T[][] = [];
-	for (let i = 0; i < arr.length; i += size) {
-		out.push(arr.slice(i, i + size));
-	}
-	return out;
-}
-
-/** The practices to review, grouped into the areas the fan-out turns them into. */
-function loadPracticeGroups(): { area: string; slugs: string[] }[] {
-	const byArea = new Map<string, string[]>();
-	for (const practice of practiceIndex) {
-		if (!practice.slug) continue;
-		const area = practice.area ?? practice.slug;
-		const slugs = byArea.get(area) ?? [];
-		slugs.push(practice.slug);
-		byArea.set(area, slugs);
-	}
-	return [...byArea.entries()].map(([area, slugs]) => ({ area, slugs }));
 }
 
 function loadPracticeSlugs(): string[] {
@@ -1755,18 +1735,12 @@ async function main() {
 	const startMs = Date.now();
 
 	const allSlugs = loadPracticeSlugs();
-	const batchSize = Number(process.env.PI_PRACTICE_BATCH_SIZE) || 6;
-	const groups = loadPracticeGroups();
-	const batches: string[][] = [];
-	if (groups.length > 0) {
-		for (const g of groups) {
-			for (const chunk of chunkArray(g.slugs, batchSize)) batches.push(chunk);
-		}
-	} else {
-		batches.push(...(allSlugs.length > batchSize ? chunkArray(allSlugs, batchSize) : [allSlugs]));
-	}
+	const batchSize = process.env.PI_PRACTICE_BATCH_SIZE
+		? Number(process.env.PI_PRACTICE_BATCH_SIZE)
+		: 6;
+	const { areaCount, batches } = buildPracticeFanout(practiceIndex, batchSize);
 	console.error(
-		`[pi-runner] Fan-out: ${allSlugs.length} practices in ${groups.length || "?"} areas -> ${batches.length} focused turn(s)`,
+		`[pi-runner] Fan-out: ${allSlugs.length} practices in ${areaCount} areas -> ${batches.length} focused turn(s)`,
 	);
 
 	try {
