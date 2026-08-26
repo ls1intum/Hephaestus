@@ -63,6 +63,36 @@ const coverage = {
 	},
 };
 
+function selectedRepositorySettings(baseBranches: string[]) {
+	return {
+		...settings,
+		reviewScope: {
+			repositoryMode: "SELECTED" as const,
+			personMode: "ALL_ELIGIBLE" as const,
+			repositories: [{ nameWithOwner: "acme/widgets", baseBranches }],
+			personUserIds: [],
+		},
+	};
+}
+
+function narrowingCoverage() {
+	return {
+		...coverage,
+		preview: fn(async () => ({
+			current: settings.coverageSummary,
+			proposed: settings.coverageSummary,
+			widens: false,
+		})),
+	};
+}
+
+function pendingCoverage() {
+	return {
+		...coverage,
+		preview: fn(() => new Promise<PracticeReviewCoveragePreview>(() => {})),
+	};
+}
+
 const meta = {
 	title: "Workspace admin/Practices/Review/When and where",
 	component: PracticeReviewSettings,
@@ -95,7 +125,12 @@ export const Configured: Story = {
 		viewport: { defaultViewport: "reflow" },
 		chromatic: { viewports: [320, 1440] },
 	},
-	play: async () => {
+	play: async ({ canvas }) => {
+		const requestedReviews = canvas.getByText(/Turning this off stops every one of them/i);
+		await expect(requestedReviews).toHaveTextContent("Review this now");
+		await expect(requestedReviews).toHaveTextContent("backfill of past work");
+		await expect(requestedReviews).toHaveTextContent("recurring check");
+		await expect(requestedReviews).toHaveTextContent("GitLab merge request comment");
 		await expectNoPageOverflow();
 	},
 };
@@ -214,24 +249,9 @@ export const NarrowingToABaseBranch: Story = {
 		policy: {
 			...policy,
 			onUpdate: fn(),
-			settings: {
-				...settings,
-				reviewScope: {
-					repositoryMode: "SELECTED",
-					personMode: "ALL_ELIGIBLE",
-					repositories: [{ nameWithOwner: "acme/widgets", baseBranches: [] }],
-					personUserIds: [],
-				},
-			},
+			settings: selectedRepositorySettings([]),
 		},
-		coverage: {
-			...coverage,
-			preview: fn(async () => ({
-				current: settings.coverageSummary,
-				proposed: settings.coverageSummary,
-				widens: false,
-			})),
-		},
+		coverage: narrowingCoverage(),
 	},
 	play: async ({ args, canvas }) => {
 		await userEvent.click(canvas.getByRole("button", { name: "Base branches for acme/widgets" }));
@@ -254,6 +274,32 @@ export const NarrowingToABaseBranch: Story = {
 			},
 			settings.etag,
 		);
+	},
+};
+
+export const RemovingABaseBranch: Story = {
+	args: {
+		policy: {
+			...policy,
+			settings: selectedRepositorySettings(["main", "release/2026.1"]),
+		},
+		coverage: pendingCoverage(),
+	},
+	parameters: { chromatic: { disableSnapshot: true } },
+	play: async ({ args, canvas }) => {
+		await userEvent.click(canvas.getByRole("button", { name: "Base branches for acme/widgets" }));
+		await userEvent.click(
+			canvas.getByRole("button", {
+				name: "Remove release/2026.1 from base branches for acme/widgets",
+			}),
+		);
+
+		await expect(args.coverage.preview).toHaveBeenCalledWith({
+			repositoryMode: "SELECTED",
+			personMode: "ALL_ELIGIBLE",
+			repositories: [{ nameWithOwner: "acme/widgets", baseBranches: ["main"] }],
+			personUserIds: [],
+		});
 	},
 };
 
