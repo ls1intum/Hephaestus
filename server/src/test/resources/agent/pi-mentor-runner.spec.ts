@@ -22,9 +22,9 @@ import path from "node:path";
 import test from "node:test";
 import {
 	JSONRPC_VERSION,
-	MENTOR_TOOL_NAMES,
 	type JsonRpcErrorResponse,
 	type JsonRpcSuccessResponse,
+	MENTOR_TOOL_NAMES,
 	type MentorEventNotification,
 	type MentorOutboundFrame,
 	type MentorRequest,
