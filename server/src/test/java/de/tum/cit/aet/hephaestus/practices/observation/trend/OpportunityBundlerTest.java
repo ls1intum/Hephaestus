@@ -56,7 +56,6 @@ class OpportunityBundlerTest {
     @Test
     void shouldDiscardOpportunitiesOutsideTheHorizon() {
         OpportunityBundler.Bundles result = OpportunityBundler.bundle(
-            "testing",
             List.of(
                 observation(1, UUID.randomUUID(), "2026-01-01T09:00:00Z", Assessment.BAD),
                 observation(2, UUID.randomUUID(), "2026-08-11T09:00:00Z", Assessment.GOOD)
@@ -113,7 +112,7 @@ class OpportunityBundlerTest {
     }
 
     private static OpportunityBundler.Bundles bundle(Observation... observations) {
-        return OpportunityBundler.bundle("testing", List.of(observations), Instant.parse("2026-05-01T00:00:00Z"), 4);
+        return OpportunityBundler.bundle(List.of(observations), Instant.parse("2026-05-01T00:00:00Z"), 4);
     }
 
     private static Observation observation(long artifactId, UUID jobId, String observedAt, Assessment assessment) {

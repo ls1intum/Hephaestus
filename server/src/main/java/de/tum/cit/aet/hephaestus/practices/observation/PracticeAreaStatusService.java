@@ -25,6 +25,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
@@ -36,7 +37,7 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class PracticeAreaStatusService {
 
-    /** Evidence cap on the area-status surface — enough to make the status inspectable, not an exhaustive log. */
+    /** Evidence cap: enough to make a status inspectable, not an exhaustive log. */
     private static final int MAX_AREA_EVIDENCE_ITEMS = 5;
 
     private final PracticeReflectionService practiceReflectionService;
@@ -45,13 +46,12 @@ public class PracticeAreaStatusService {
     private final Clock clock;
 
     /**
-     * Derives one status per requested area by rolling up the practice standings of the same learner-safe
-     * reflection snapshot the per-practice surface renders. Findings are loaded once for the workspace and
-     * partitioned in memory, avoiding one observation query per card.
+     * One status per requested group, rolled up from the practice standings of the same learner-safe snapshot
+     * the per-practice surface renders. Observations are loaded once and partitioned in memory rather than
+     * queried per card.
      *
-     * <p>When no practice in the area has a displayable finding, the status reports WHY rather than a single
-     * empty state: {@code NO_OPPORTUNITY} or {@code NOT_OBSERVED} (which also covers
-     * a caller who is not yet a synced developer).
+     * <p>With nothing displayable the status reports WHY, as {@code NO_OPPORTUNITY} or {@code NOT_OBSERVED},
+     * instead of one undifferentiated empty state.
      */
     @Transactional(readOnly = true)
     public List<PracticeAreaStatusDTO> getAreaStatuses(Long workspaceId, List<PracticeArea> areas) {
@@ -99,10 +99,7 @@ public class PracticeAreaStatusService {
         return cardsByArea;
     }
 
-    /**
-     * Aggregated guidance overrides the deterministic fallback when a provider has material for an area.
-     * A provider may intentionally cover only some areas; missing entries continue to use the rule-based text.
-     */
+    /** Overrides the deterministic fallback where a provider has material. A missing entry keeps the rule. */
     private Map<String, AreaGuidanceProvider.AreaGuidance> aggregatedGuidance(
         Long workspaceId,
         @Nullable Long developerId,
@@ -123,7 +120,15 @@ public class PracticeAreaStatusService {
         AreaSignal signal,
         AreaGuidanceProvider.@Nullable AreaGuidance aggregatedGuidance
     ) {
-        PracticeAreaStatusDTO.AreaStatus status = areaStatus(cards, standingShareByPractice, areaWeightByPractice);
+        // The practices that get a vote, derived once. The status and the sentence explaining it must name the
+        // same set, or the card can read "focus on X next" about a practice its own status did not count.
+        List<ReflectionPracticeDTO> verdicts = votingVerdicts(cards, areaWeightByPractice);
+        PracticeAreaStatusDTO.AreaStatus status = areaStatus(
+            cards,
+            verdicts,
+            standingShareByPractice,
+            areaWeightByPractice
+        );
         boolean hasDisplayableData = PracticeAreaStatusDTO.isVerdict(status);
         // Item-level, unlike the status: the question here is which KINDS of evidence exist to show, which a
         // practice standing has already abstracted away.
@@ -137,7 +142,7 @@ public class PracticeAreaStatusService {
                 guidance = aggregatedGuidance.text();
                 guidanceSource = aggregatedGuidance.source();
             } else {
-                guidance = DeterministicAreaGuidanceComposer.compose(status, cards);
+                guidance = DeterministicAreaGuidanceComposer.compose(status, verdicts);
                 guidanceSource = PracticeAreaStatusDTO.GuidanceSource.RULE_BASED;
             }
         }
@@ -158,40 +163,39 @@ public class PracticeAreaStatusService {
     }
 
     /**
-     * A verdict aggregated from the standings of the area's practices; otherwise the REASON there is none.
+     * A verdict rolled up from the practice standings, or the REASON there is none.
      *
-     * <p>The area reads its practices, not their findings. A practice standing is the single authority on
-     * where that practice stands — it already weighs recent evidence against the older record — so going back
-     * to the underlying items here would let an area contradict the very cards it is built from, and a
-     * practice the reflection page acknowledges as fixed would keep dragging its area down for the rest of the
-     * look-back window.
+     * <p>Reads the standings, never the findings under them. A standing already weighs recent evidence against
+     * the older record, so going back to the items would let this contradict the cards it is built from.
      *
-     * <p>It aggregates the CONTINUOUS standing, not the rendered label, and then applies
-     * {@link StandingScale} once. Averaging labels would classify twice: a practice at 0.79 and one at 0.51
-     * are both {@code MIXED}, and collapsing them to a single weight before averaging discards exactly the
-     * resolution the practice rule computed. One classification, at the end.
+     * <p>Aggregates the CONTINUOUS standing and applies {@link StandingScale} once at the end. Averaging the
+     * rendered labels would classify twice and throw away the resolution the practice rule just computed.
      *
-     * <p>Only practices that reached a VERDICT are counted. Weighing an unreviewed practice as "not a strength"
-     * would turn thin coverage into a negative verdict about the developer, which is the one thing a formative
-     * surface must never do.
+     * <p>Only practices that reached a verdict count. Weighing an unreviewed one as "not a strength" would turn
+     * thin coverage into a negative claim about the developer.
      *
-     * <p>Reason precedence is deliberate and orders by how much the learner can act on it: a review that ran
-     * and found nothing to report ({@code NO_OPPORTUNITY}) outranks never having been looked at
-     * ({@code NOT_OBSERVED}). Collapsing these back into one state would make a working detector
-     * indistinguishable from an unconfigured one. Both answers come from the practices themselves, which is
-     * why this needs no separate census of what the reviews did: a practice that knows why it has nothing to
-     * say is a practice its area can simply ask.
+     * <p>{@code NO_OPPORTUNITY} outranks {@code NOT_OBSERVED} because it is the more actionable of the two: a
+     * working instrument that found nothing is not an unconfigured one. Both answers come from the practices
+     * themselves, so no separate census of what the reviews did is needed.
      */
-    private static PracticeAreaStatusDTO.AreaStatus areaStatus(
+    /** The cards that reached a verdict AND still count toward their area — the area's electorate. */
+    private static List<ReflectionPracticeDTO> votingVerdicts(
         List<ReflectionPracticeDTO> cards,
-        Map<String, Double> standingShareByPractice,
         Map<String, Double> areaWeightByPractice
     ) {
-        List<ReflectionPracticeDTO> verdicts = cards
+        return cards
             .stream()
             .filter(card -> ReflectionPracticeDTO.isVerdict(card.standing()))
             .filter(card -> areaWeight(card, areaWeightByPractice) > 0.0)
             .toList();
+    }
+
+    private static PracticeAreaStatusDTO.AreaStatus areaStatus(
+        List<ReflectionPracticeDTO> cards,
+        List<ReflectionPracticeDTO> verdicts,
+        Map<String, Double> standingShareByPractice,
+        Map<String, Double> areaWeightByPractice
+    ) {
         if (verdicts.isEmpty()) {
             return cards.stream().anyMatch(card -> card.standing() == ReflectionPracticeDTO.Standing.NO_OPPORTUNITY)
                 ? PracticeAreaStatusDTO.AreaStatus.NO_OPPORTUNITY
@@ -216,11 +220,11 @@ public class PracticeAreaStatusService {
     }
 
     /**
-     * How much one practice counts toward its area, defaulting to neutral.
+     * How much one practice counts toward its group. Absent means zero, not neutral.
      *
-     * <p>A card with no entry is a practice review is no longer admitted for — its feedback still stands on the
-     * reflection surface, but it has stopped being part of what the area currently watches, so it does not vote.
-     * A weight of zero means the same thing by explicit configuration rather than by autonomy.
+     * <p>A card with no entry belongs to a practice review is no longer admitted for. Its feedback still stands
+     * on the reflection surface, but it has stopped being part of what is watched, so it does not vote. An
+     * explicit zero says the same thing by configuration rather than by autonomy.
      */
     private static double areaWeight(ReflectionPracticeDTO card, Map<String, Double> areaWeightByPractice) {
         return areaWeightByPractice.getOrDefault(card.slug(), 0.0);
@@ -264,9 +268,13 @@ public class PracticeAreaStatusService {
     }
 
     /**
-     * Aggregates practice trends with equal default weights and derives feedback span/source counts
-     * from the observations that survived the reflection surface's learner-safety filters. A later
-     * admin-configurable weight can be passed to {@link PracticeTrendService} without changing this service.
+     * Aggregates the eligible practices' trends into one per area, and derives feedback span and source
+     * counts from the observations that survived the reflection surface's learner-safety filters.
+     *
+     * <p>Each practice counts by its own {@code areaWeight}, the same map the standing weighs. Both halves of
+     * a status must answer for the same practices, so a practice review is no longer admitted for is dropped
+     * here rather than left to the weight lookup. That lookup is not a second safeguard: the trend calculator
+     * is a general estimator and treats an unnamed practice as neutral, which is right there and wrong here.
      */
     private Map<String, AreaSignal> areaSignals(
         Map<String, List<Observation>> evidenceByPractice,
@@ -276,6 +284,11 @@ public class PracticeAreaStatusService {
     ) {
         Map<String, List<Observation>> evidenceByArea = new LinkedHashMap<>();
         Map<String, List<PracticeTrend>> trendsByArea = new LinkedHashMap<>();
+        Set<String> eligibleSlugs = eligiblePracticesByArea
+            .values()
+            .stream()
+            .flatMap(List::stream)
+            .collect(Collectors.toSet());
         for (Map.Entry<String, List<Observation>> entry : evidenceByPractice.entrySet()) {
             List<Observation> practiceEvidence = entry.getValue();
             if (practiceEvidence.isEmpty()) {
@@ -287,7 +300,11 @@ public class PracticeAreaStatusService {
             }
             evidenceByArea.computeIfAbsent(area.getSlug(), ignored -> new ArrayList<>()).addAll(practiceEvidence);
             PracticeTrend practiceTrend = practiceTrends.get(entry.getKey());
-            if (practiceTrend != null) {
+            // Only an eligible practice's trend joins the group's. The evidence map stays unfiltered on
+            // purpose: a practice review is no longer admitted for still has findings worth showing, and the
+            // feedback span is still dated by them. Its VERDICT is what it has stopped casting, and the
+            // standing beside this already excludes it.
+            if (practiceTrend != null && eligibleSlugs.contains(entry.getKey())) {
                 trendsByArea.computeIfAbsent(area.getSlug(), ignored -> new ArrayList<>()).add(practiceTrend);
             }
         }

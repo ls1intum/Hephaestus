@@ -1,12 +1,14 @@
 /**
  * Opportunity-indexed trend estimation: whether a developer's evidence for a practice, or for an area, is
- * moving. The research grounding is {@code docs/contributor/practice-proficiency-and-trends.md}; the
- * derived build specification is {@code practice-trend-display-spec.md}.
+ * moving.
  *
- * <p><b>The one idea the package rests on:</b> the unit of analysis is an evidence opportunity — one reviewed
- * work item — never a unit of clock time. Repository activity is bursty, so a calendar bin gives unequal and
- * partly empty samples; a day with six pull requests and a day with one are not two comparable draws.
- * Timestamps survive as provenance only, never as a bin, an axis, or a comparison boundary.
+ * <p><b>The one idea the package rests on:</b> the unit of analysis is an evidence opportunity, meaning one
+ * reviewed work item, and never a unit of clock time. Repository activity is bursty, so a calendar bin gives
+ * unequal and partly empty samples; a day with six pull requests and a day with one are not two comparable
+ * draws. Timestamps survive as provenance only, never as a bin, an axis, or a comparison boundary.
+ *
+ * <p>Same choice as opportunity-indexed learner models (Bayesian Knowledge Tracing, Performance Factors
+ * Analysis), which count practice opportunities rather than calendar periods.
  *
  * <h2>The pipeline, in order</h2>
  * <ol>

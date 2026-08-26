@@ -14,6 +14,7 @@ import static org.mockito.Mockito.when;
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.ValidatedObservation;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackResolution;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
@@ -23,7 +24,6 @@ import de.tum.cit.aet.hephaestus.practices.model.Severity;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationFingerprint;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
 import de.tum.cit.aet.hephaestus.practices.observation.reaction.Reaction;
-import de.tum.cit.aet.hephaestus.practices.observation.reaction.ReactionAction;
 import de.tum.cit.aet.hephaestus.practices.observation.reaction.ReactionRepository;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
@@ -81,7 +81,7 @@ class ReactionSuppressionFilterTest extends BaseUnitTest {
 
     @Test
     void disputedLocus_isSuppressedAndLedgered() {
-        stubPersistedAndReaction(ReactionAction.DISPUTED);
+        stubPersistedAndReaction(FeedbackResolution.DISPUTED);
 
         var d = filter(true).evaluate(TestEntities.agentJob(), List.of(vf(SLUG, Presence.ABSENT)));
 
@@ -97,7 +97,7 @@ class ReactionSuppressionFilterTest extends BaseUnitTest {
 
     @Test
     void suppression_survivesLedgerWriteFailure() {
-        stubPersistedAndReaction(ReactionAction.NOT_APPLICABLE);
+        stubPersistedAndReaction(FeedbackResolution.NOT_APPLICABLE);
         doThrow(new RuntimeException("ledger down"))
             .when(feedbackLedgerRecorder)
             .recordSuppressed(any(), any(), any(), anyInt());
@@ -114,7 +114,7 @@ class ReactionSuppressionFilterTest extends BaseUnitTest {
     void unreactedLocus_isDelivered() {
         var pf = pf(CK);
         when(observationRepository.findByAgentJobId(any())).thenReturn(List.of(pf));
-        when(reactionRepository.findLatestByRecurrenceKeysAndReactor(any(), eq(CONTRIBUTOR))).thenReturn(List.of());
+        when(reactionRepository.findCurrentResolutionByRecurrenceKeys(any(), eq(CONTRIBUTOR))).thenReturn(List.of());
 
         var d = filter(true).evaluate(TestEntities.agentJob(), List.of(vf(SLUG, Presence.ABSENT)));
 
@@ -124,7 +124,7 @@ class ReactionSuppressionFilterTest extends BaseUnitTest {
 
     @Test
     void addressedButStillBad_isKeptWithStifferOpener() {
-        stubPersistedAndReaction(ReactionAction.ADDRESSED);
+        stubPersistedAndReaction(FeedbackResolution.ADDRESSED);
 
         var d = filter(true).evaluate(TestEntities.agentJob(), List.of(vf(SLUG, Presence.ABSENT)));
 
@@ -137,7 +137,7 @@ class ReactionSuppressionFilterTest extends BaseUnitTest {
     void addressedAndNowGood_isDeliveredPlainNotEscalated() {
         // ADDRESSED only escalates a STILL-failing locus; if the practice is now PRESENT/GOOD the observation passes
         // through untouched (escalation is keyed on assessment == BAD, not on the reaction alone).
-        stubPersistedAndReaction(ReactionAction.ADDRESSED);
+        stubPersistedAndReaction(FeedbackResolution.ADDRESSED);
 
         var d = filter(true).evaluate(TestEntities.agentJob(), List.of(vf(SLUG, Presence.PRESENT)));
 
@@ -156,11 +156,9 @@ class ReactionSuppressionFilterTest extends BaseUnitTest {
             null
         );
         var pf = pf(secretKey);
-        var reaction = org.mockito.Mockito.mock(Reaction.class);
-        when(reaction.getRecurrenceKey()).thenReturn(secretKey);
-        when(reaction.getAction()).thenReturn(ReactionAction.DISPUTED);
+        var reaction = locus(secretKey, FeedbackResolution.DISPUTED);
         when(observationRepository.findByAgentJobId(any())).thenReturn(List.of(pf));
-        when(reactionRepository.findLatestByRecurrenceKeysAndReactor(any(), eq(CONTRIBUTOR))).thenReturn(
+        when(reactionRepository.findCurrentResolutionByRecurrenceKeys(any(), eq(CONTRIBUTOR))).thenReturn(
             List.of(reaction)
         );
 
@@ -198,16 +196,16 @@ class ReactionSuppressionFilterTest extends BaseUnitTest {
 
         assertThat(d.deliverable()).hasSize(1);
         assertThat(d.suppressedCount()).isZero();
-        verify(reactionRepository, never()).findLatestByRecurrenceKeysAndReactor(any(), any());
+        verify(reactionRepository, never()).findCurrentResolutionByRecurrenceKeys(any(), any());
     }
 
     // --- helpers ---
 
-    private void stubPersistedAndReaction(ReactionAction action) {
+    private void stubPersistedAndReaction(FeedbackResolution action) {
         var pf = pf(CK);
         var reaction = reaction(action);
         when(observationRepository.findByAgentJobId(any())).thenReturn(List.of(pf));
-        when(reactionRepository.findLatestByRecurrenceKeysAndReactor(any(), eq(CONTRIBUTOR))).thenReturn(
+        when(reactionRepository.findCurrentResolutionByRecurrenceKeys(any(), eq(CONTRIBUTOR))).thenReturn(
             List.of(reaction)
         );
     }
@@ -224,9 +222,9 @@ class ReactionSuppressionFilterTest extends BaseUnitTest {
         Observation first = pf(CK, "occ-first");
         Observation second = pf(CK, "occ-second");
         List<Observation> persisted = List.of(first, second);
-        List<Reaction> disputed = List.of(reaction(ReactionAction.DISPUTED));
+        var disputed = List.of(reaction(FeedbackResolution.DISPUTED));
         when(observationRepository.findByAgentJobId(any())).thenReturn(persisted);
-        when(reactionRepository.findLatestByRecurrenceKeysAndReactor(any(), eq(CONTRIBUTOR))).thenReturn(disputed);
+        when(reactionRepository.findCurrentResolutionByRecurrenceKeys(any(), eq(CONTRIBUTOR))).thenReturn(disputed);
 
         var decision = filter(true).evaluate(
             TestEntities.agentJob(),
@@ -291,10 +289,15 @@ class ReactionSuppressionFilterTest extends BaseUnitTest {
         return pf;
     }
 
-    private static Reaction reaction(ReactionAction action) {
-        Reaction r = org.mockito.Mockito.mock(Reaction.class);
-        when(r.getRecurrenceKey()).thenReturn(CK);
-        when(r.getAction()).thenReturn(action);
-        return r;
+    private static ReactionRepository.LocusResolutionProjection reaction(FeedbackResolution resolution) {
+        return locus(CK, resolution);
+    }
+
+    /** The repository answers with the resolution that CURRENTLY stands at a locus, not with a stored row. */
+    private static ReactionRepository.LocusResolutionProjection locus(String key, FeedbackResolution resolution) {
+        var row = org.mockito.Mockito.mock(ReactionRepository.LocusResolutionProjection.class);
+        when(row.getRecurrenceKey()).thenReturn(key);
+        when(row.getResolution()).thenReturn(resolution.name());
+        return row;
     }
 }

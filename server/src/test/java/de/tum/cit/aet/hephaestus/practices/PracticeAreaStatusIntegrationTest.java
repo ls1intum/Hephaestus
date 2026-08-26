@@ -15,6 +15,7 @@ import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSource;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeArea;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeRevision;
 import de.tum.cit.aet.hephaestus.practices.observation.AreaGuidanceProvider;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
@@ -729,6 +730,37 @@ class PracticeAreaStatusIntegrationTest extends AbstractWorkspaceIntegrationTest
                 .expectBody()
                 .jsonPath("$[0].status")
                 .isEqualTo("MIXED");
+        }
+
+        @Test
+        @WithUser
+        @DisplayName("a practice no longer reviewed does not vote in the area trend either")
+        void shouldKeepAnIneligiblePracticeOutOfTheAreaTrend() {
+            // The area standing has always excluded a practice review is no longer admitted for. Its TREND
+            // used to include it anyway, because this surface passed every practice with evidence to the
+            // aggregator and an unnamed practice counts as neutral there. The two halves of one status then
+            // answered for different populations — and the area detail page, which does filter, disagreed with
+            // both. The opportunity count is the cheapest place to see it: two practices, one work item each.
+            persistStrengthPractice("commit-messages", "Commit Messages", 1L);
+            Practice retired = persistPractice(workspace, area, "test-coverage", "Test Coverage");
+            retired.setAutonomy(PracticeAutonomy.OFF);
+            practiceRepository.saveAndFlush(retired);
+            insertFinding(agentJob, retired, developer, "Gap in Test Coverage", "ABSENT", "MAJOR", 2L);
+
+            webTestClient
+                .get()
+                .uri(STATUS_URI, workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                // One, not two: the retired practice's work item is not the area's evidence of movement.
+                .jsonPath("$[0].trendSupport.currentOpportunities")
+                .isEqualTo(1)
+                // Its finding is still shown, and its own card still stands — only its vote is gone.
+                .jsonPath("$[0].items.length()")
+                .isEqualTo(2);
         }
 
         @Test

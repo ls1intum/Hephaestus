@@ -170,7 +170,7 @@ class ActivityModuleBoundaryTest extends HephaestusArchitectureTest {
                 .orShould()
                 .haveSimpleName("ObservationController")
                 .orShould()
-                .haveSimpleName("ReactionController")
+                .haveSimpleName("FeedbackResponseController")
                 .orShould()
                 .haveSimpleName("PracticeReviewSettingsController")
                 .orShould()
@@ -187,14 +187,11 @@ class ActivityModuleBoundaryTest extends HephaestusArchitectureTest {
                 .haveSimpleName("InAppFeedbackController")
                 .orShould()
                 .haveSimpleName("PracticeAreaDetailController")
-                .orShould()
-                .haveSimpleName("FeedbackRatingController")
                 .because(
                     "Only PracticeCatalogController, PracticeAreaController, ObservationController, " +
-                        "ReactionController, PracticeReviewSettingsController, PracticeReviewOutputController, " +
+                        "FeedbackResponseController, PracticeReviewSettingsController, PracticeReviewOutputController, " +
                         "CuratedCatalogAdminController, CuratedPracticeCatalogController, CatalogAdoptionController, " +
-                        "ArtifactTraceController, InAppFeedbackController, PracticeAreaDetailController and " +
-                        "FeedbackRatingController are allowed REST entry points"
+                        "ArtifactTraceController, InAppFeedbackController and PracticeAreaDetailController are allowed REST entry points"
                 );
             rule.check(classes);
         }

@@ -44,26 +44,24 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class PracticeReflectionService {
 
-    /** Look-back for the reflection surface — mirrors the mentor's findings window. */
+    /** Look-back for the reflection surface, matching the mentor's findings window. */
     public static final int LOOKBACK_DAYS = 90;
-    /** Per-practice cap on "to work on" items — the highest-impact few, not an exhaustive log. */
+    /** Per-practice cap on "to work on" items: the highest-impact few, not an exhaustive log. */
     private static final int MAX_ITEMS_PER_PRACTICE = 5;
     /**
      * How many of the newest reviewed work items a standing is read off. Four, matching the trend's bundle
-     * size, so both surfaces on a card answer their question from the same stretch of work. Fewer is fine:
-     * a standing derived from one opportunity is thin, and the card says so through its trend support rather
-     * than by withholding the standing.
+     * size, so both numbers on a card come from the same stretch of work. Fewer is fine: the card says how
+     * thin the evidence is through its trend support rather than by withholding the standing.
      */
     private static final int STANDING_WINDOW = 4;
     /**
-     * Per-opportunity weight decay, newest first. Derived, not picked: the design requirement carried over
-     * from the previous iteration is that TWO problem-free work items in a row must be enough to acknowledge a
-     * fixed habit. With weights {@code 1, d, d², d³} that holds exactly when {@code (1 + d) > 4·(d² + d³)},
-     * i.e. {@code d < 0.5}; 0.4 takes that with margin. The consequence is symmetric and intended — the newest
-     * opportunity carries the majority of the weight, so a fresh regression shows up as fast as a fresh fix.
+     * Per-opportunity weight decay, newest first. Derived rather than picked: two problem-free work items in a
+     * row must be enough to acknowledge a fixed habit, which with weights {@code 1, d, d², d³} holds exactly
+     * when {@code (1 + d) > 4·(d² + d³)}, i.e. {@code d < 0.5}. The effect is symmetric and intended: a fresh
+     * regression shows up as fast as a fresh fix.
      */
     private static final double STANDING_DECAY = 0.4;
-    /** Per-practice cap on acknowledged strengths — enough to affirm without drowning the signal. */
+    /** Per-practice cap on acknowledged strengths: enough to affirm without drowning the signal. */
     private static final int MAX_STRENGTHS_PER_PRACTICE = 3;
 
     private final ObservationRepository observationRepository;
@@ -88,12 +86,11 @@ public class PracticeReflectionService {
     /**
      * Shared evidence snapshot used by both the practice reflection and practice-area status surfaces.
      *
-     * <p>Three passes, in this order and for this reason: classify every practice's observations, derive the
-     * trends from what the classification kept, then build each card once with its final standing. The standing
-     * rule needs the trend (only the trend carries the recent-evidence streak) and the trend needs the
+     * <p>Three passes, and the order is forced: classify the observations, derive the trends from what the
+     * classification kept, then build each card once. A standing needs its trend and a trend needs the
      * classification, so a card cannot be built before both exist.
      *
-     * <p>Assumes a caller-provided transaction — it navigates lazy {@code Observation.practice} relationships.
+     * <p>Assumes a caller-provided transaction, since it navigates lazy {@code Observation.practice}.
      */
     public ReflectionSnapshot getReflectionSnapshot(Long workspaceId) {
         Optional<Long> currentDeveloperId = currentDeveloperLookup.currentDeveloperId();
@@ -108,11 +105,10 @@ public class PracticeReflectionService {
             developerId,
             workspaceId,
             since,
-            // Verdictless rows included on purpose. This surface renders none of them, but it has to COUNT
-            // them: "the practice ran and found nothing to judge" and "the practice was never looked at" are
-            // different answers, and only the rows themselves tell them apart. Asking for them here is what
-            // lets one pass classify and count in the same place — the alternative was a second query whose
-            // predicates had to be kept identical to this one by hand.
+            // Verdictless rows on purpose. None are rendered, but they have to be COUNTED: "ran and found
+            // nothing to judge" and "was never looked at" are different answers, and only the rows tell them
+            // apart. Asking here lets one pass classify and count; the alternative was a second query whose
+            // predicates had to be kept identical by hand.
             false,
             Pageable.unpaged()
         );
@@ -221,10 +217,9 @@ public class PracticeReflectionService {
     /**
      * Every practice the developer should see, whether or not it has anything to say.
      *
-     * <p>The set is the UNION of two groups, and both are needed. The eligible practices are what the
-     * workspace currently watches — they belong on the surface even with nothing to report, because
-     * "no observation reached this" and "the reviews ran and found nothing" are different answers to
-     * "how am I doing here", and a surface that shows neither leaves the learner unable to tell them apart.
+     * <p>The UNION of two sets, both needed. The eligible practices are what the workspace currently watches;
+     * they belong here even with nothing to report, because "no observation reached this" and "the reviews ran
+     * and found nothing" are different answers a learner cannot otherwise tell apart.
      * The practices that produced a card are added even when review is no longer admitted for them: that
      * feedback was raised and delivered, and switching a practice off does not un-say it.
      */
@@ -260,11 +255,9 @@ public class PracticeReflectionService {
     /**
      * A practice with nothing to report, carrying WHICH silence it is.
      *
-     * <p>{@code NO_OPPORTUNITY} outranks {@code NOT_OBSERVED} because it is the more actionable of the two: a
-     * review that ran and found nothing to say is a working instrument, and collapsing it into "never looked
-     * at" would make it indistinguishable from an unconfigured one. Suppressed strengths count as evidence for
-     * exactly that reason — a defect-detector's silence is not a demonstrated behaviour, but it does prove the
-     * detector ran.
+     * <p>{@code NO_OPPORTUNITY} outranks {@code NOT_OBSERVED}: a review that ran and found nothing to say is a
+     * working instrument, not an unconfigured one. Suppressed strengths count for the same reason. A
+     * defect-detector's silence is no demonstrated behaviour, but it does prove the detector ran.
      *
      * <p>No trend either: a direction over evidence that produced no verdict would be a claim about nothing.
      */
@@ -340,23 +333,15 @@ public class PracticeReflectionService {
     }
 
     /**
-     * How positive this practice's recent evidence was, in {@code [0,1]} — the continuous value the standing
-     * label is only a rendering of.
+     * How positive this practice's recent evidence was, in {@code [0,1]}. The standing label is a rendering of
+     * this number, and the level above consumes the number rather than the label.
      *
-     * <p>One rule, one unit, one denominator. It replaced a pair of rules that disagreed about both: an
-     * existence test over ITEMS ("any problem at all in 90 days") that could not tell one problem from fifty,
-     * plus a clean-streak override over OPPORTUNITIES that could. Reading the whole
-     * {@link de.tum.cit.aet.hephaestus.practices.observation.trend.OutcomeVector} of the newest
-     * {@link #STANDING_WINDOW} opportunities answers both questions at once, and the recency weighting keeps
-     * the property the streak existed for: a fixed habit is acknowledged within two reviews.
+     * <p>One rule over the newest {@link #STANDING_WINDOW} opportunities, weighted by recency. It replaced a
+     * pair that disagreed about both unit and denominator: an existence test over items that could not tell
+     * one problem from fifty, plus a clean-streak override over opportunities that could.
      *
-     * <p>The area consumes this number rather than the label, so the resolution won here is not quantised away
-     * one level up.
-     *
-     * <p>The fallback is unreachable while the reflection look-back and the trend horizon are both
-     * {@link #LOOKBACK_DAYS} days: a card exists only if some observation produced a verdict, and any such
-     * observation is an applicable opportunity. It mirrors what the same rule would yield from the card's own
-     * items, so even the impossible case cannot contradict the rule.
+     * <p>The fallback is unreachable while the look-back and the trend horizon are both
+     * {@link #LOOKBACK_DAYS} days, since a card exists only where some observation produced a verdict.
      */
     private static double standingShare(PracticeEvidence evidence, PracticeTrend trend) {
         return trend
@@ -367,9 +352,9 @@ public class PracticeReflectionService {
     /**
      * One practice's window of observations, split by what each one says about the developer.
      *
-     * <p>The split happens once and feeds everything downstream — the card's two lists, the trend's evidence,
-     * and the census. Deriving each of those from the raw group separately is what previously required three
-     * output parameters and a provisional card.
+     * <p>Split once, then read by everything downstream: the card's two lists, the trend's evidence, the
+     * census. Deriving each separately from the raw group is what previously required three output parameters
+     * and a provisional card.
      */
     private record PracticeEvidence(
         Practice practice,
@@ -388,17 +373,14 @@ public class PracticeReflectionService {
          * evaluated the matrix two to four times per row and left "nothing falls through" as a claim in prose
          * rather than something the code shows.
          *
-         * <p>Every problem the practice raised is kept, worst severity first. Nothing is withheld: an earlier
-         * revision suppressed single-artifact problems below a model-reported confidence floor, but that column
-         * was dropped after validation found it carried no discriminating information, and the per-locus
-         * corroboration meant to stand in for it cannot be satisfied — {@code recurrenceKey} hashes the
-         * artifact, so a locus is single-artifact by construction. Showing the record and letting the surface
-         * say how often something was seen is the honest version of that intent.
+         * <p>Every problem is kept, worst severity first. Nothing is withheld: an earlier confidence floor was
+         * dropped after validation found it carried no signal, and the per-locus corroboration meant to replace
+         * it cannot work, since {@code recurrenceKey} hashes the artifact and a locus is therefore
+         * single-artifact by construction.
          *
-         * <p>A defect-detector practice's {@code DEMONSTRATED_STRENGTH} rows are counted, not discarded: what
-         * would be demonstrated is the defect, so they are no strength to show — but they still prove the
-         * detector ran, which is what separates {@code NO_OPPORTUNITY} from {@code NOT_OBSERVED} for its area.
-         * The rule is applied once to the bucket here instead of once per row.
+         * <p>A defect-detector's {@code DEMONSTRATED_STRENGTH} rows are counted, not discarded. What would be
+         * demonstrated is the defect, so they are no strength to show, but they do prove the detector ran. The
+         * rule is applied once to the bucket rather than once per row.
          */
         static PracticeEvidence classify(List<Observation> group) {
             Practice practice = group.get(0).getPractice();
@@ -438,7 +420,7 @@ public class PracticeReflectionService {
         }
 
         /**
-         * Everything the practice's latest runs said, verdict or not — the trend's input.
+         * Everything the practice's latest runs said, verdict or not. This is the trend's input.
          *
          * <p>The verdictless rows belong here even though they can never move a direction. The bundler drops an
          * opportunity that produced no verdict at all, so including them changes no share and no posterior; what
@@ -461,10 +443,8 @@ public class PracticeReflectionService {
 
     /**
      * @param standingShareByPractice the continuous standing of every practice that produced a card, keyed by
-     *     slug. The area aggregates THIS rather than the cards' labels: rounding each practice to one of three
-     *     labels and then averaging those would throw away the resolution the practice rule just computed, and
-     *     0.79 and 0.51 would weigh the same. It stays out of {@link ReflectionPracticeDTO} on purpose — the
-     *     learner-facing card carries no raw score.
+     *     slug. The level above aggregates THIS rather than the rendered labels, which would put 0.79 and 0.51
+     *     at the same weight. Kept out of {@link ReflectionPracticeDTO}: the learner's card carries no score.
      */
     public record ReflectionSnapshot(
         @Nullable Long developerId,

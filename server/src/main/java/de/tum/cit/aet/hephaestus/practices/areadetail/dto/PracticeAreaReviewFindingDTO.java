@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.practices.areadetail.dto;
 
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRatingState;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackResolution;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackUsefulness;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
@@ -24,8 +25,9 @@ import org.jspecify.annotations.Nullable;
 public record PracticeAreaReviewFindingDTO(
     @NonNull UUID observationId,
     @Nullable UUID feedbackId,
-    @Nullable FeedbackRatingState rating,
-    @Nullable String ratingComment,
+    @Nullable FeedbackUsefulness feedbackUsefulness,
+    @Nullable FeedbackResolution feedbackResolution,
+    @Nullable String feedbackResponseComment,
     @NonNull String practiceSlug,
     @NonNull String practiceName,
     @NonNull String title,
@@ -39,14 +41,16 @@ public record PracticeAreaReviewFindingDTO(
     public static PracticeAreaReviewFindingDTO from(
         Observation observation,
         @Nullable UUID feedbackId,
-        @Nullable FeedbackRatingState rating,
-        @Nullable String ratingComment
+        @Nullable FeedbackUsefulness feedbackUsefulness,
+        @Nullable FeedbackResolution feedbackResolution,
+        @Nullable String feedbackResponseComment
     ) {
         return new PracticeAreaReviewFindingDTO(
             observation.getId(),
             feedbackId,
-            rating,
-            ratingComment,
+            feedbackUsefulness,
+            feedbackResolution,
+            feedbackResponseComment,
             observation.getPractice().getSlug(),
             observation.getPractice().getName(),
             observation.getSummary(),

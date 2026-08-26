@@ -221,4 +221,24 @@ class PracticeAreaReviewHistoryIntegrationTest extends AbstractWorkspaceIntegrat
 
         getHistory().jsonPath("$.content.length()").isEqualTo(0);
     }
+
+    @Test
+    @WithUser
+    @DisplayName("a run whose findings the visibility gate withholds leaves the page entirely")
+    void shouldWithholdARunMeasuredAgainstSupersededReviewRules() {
+        // What this pins is that the gate runs here at all, not how it decides. Superseded review rules are
+        // the half of it an integration test can stage without a second module: the finding was measured
+        // against revision 1, and publishing different criteria as revision 2 makes it speak for a rule the
+        // practice no longer has. The reflection surface has always dropped such a claim; this one used to
+        // show it.
+        insertFinding("Motivation is clear", "PRESENT", "GOOD", null, ArtifactKinds.PULL_REQUEST.value(), 1L);
+        practice.setCriteria("Rewritten criteria, which is what makes the fingerprint differ");
+        // The revision snapshots the area too, and this practice's is a detached lazy proxy by now.
+        practice.setArea(area);
+        practice.setCurrentRevision(practiceRevisionRepository.save(new PracticeRevision(practice, 2)));
+        practiceRepository.saveAndFlush(practice);
+
+        // Not an empty moment with a review id and no findings — the run is gone.
+        getHistory().jsonPath("$.content.length()").isEqualTo(0);
+    }
 }

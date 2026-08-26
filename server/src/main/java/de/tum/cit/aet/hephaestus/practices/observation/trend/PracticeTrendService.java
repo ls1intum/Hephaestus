@@ -34,13 +34,7 @@ public class PracticeTrendService {
         Collection<PracticeTrend> practiceTrends,
         Map<String, Double> weights
     ) {
-        return PracticeTrendCalculator.aggregateArea(
-            areaSlug,
-            eligiblePracticeSlugs,
-            practiceTrends,
-            weights,
-            properties
-        );
+        return AreaTrendAggregator.aggregate(areaSlug, eligiblePracticeSlugs, practiceTrends, weights, properties);
     }
 
     public PracticeAreaTrendDTO detail(

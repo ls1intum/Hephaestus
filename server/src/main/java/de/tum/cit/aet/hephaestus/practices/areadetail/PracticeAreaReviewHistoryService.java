@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.practices.areadetail;
 
+import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.practices.PracticeAreaService;
 import de.tum.cit.aet.hephaestus.practices.areadetail.dto.PracticeAreaReviewArtifactDTO;
@@ -7,25 +8,30 @@ import de.tum.cit.aet.hephaestus.practices.areadetail.dto.PracticeAreaReviewFind
 import de.tum.cit.aet.hephaestus.practices.areadetail.dto.PracticeAreaReviewMomentDTO;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository.DeliveredFeedbackBinding;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRatingState;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackResolution;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackUsefulness;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository.ReviewHistoryRunRow;
+import de.tum.cit.aet.hephaestus.practices.observation.ObservationVisibilityPolicy;
 import de.tum.cit.aet.hephaestus.practices.spi.CurrentDeveloperLookup;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewRunTargetLookup;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -40,6 +46,7 @@ public class PracticeAreaReviewHistoryService {
     private final FeedbackObservationRepository feedbackObservationRepository;
     private final ReviewRunTargetLookup reviewRunTargetLookup;
     private final CurrentDeveloperLookup currentDeveloperLookup;
+    private final ObservationVisibilityPolicy visibilityPolicy;
 
     @Transactional(readOnly = true)
     public Page<PracticeAreaReviewMomentDTO> list(
@@ -84,7 +91,7 @@ public class PracticeAreaReviewHistoryService {
         }
 
         List<UUID> jobIds = runs.stream().map(ReviewHistoryRunRow::getJobId).toList();
-        List<Observation> observations = observationRepository.findReviewHistoryObservationsByJobs(
+        List<Observation> found = observationRepository.findReviewHistoryObservationsByJobs(
             jobIds,
             currentDeveloperId.get(),
             workspaceContext.id(),
@@ -95,6 +102,18 @@ public class PracticeAreaReviewHistoryService {
             hasSeverities,
             severityFilter
         );
+        // The same gate the reflection surface applies, for the same reason and with the same purpose: a
+        // finding may cite a source this caller is not cleared to be shown, and a claim measured against
+        // superseded review rules no longer speaks for the practice. Asked once for the whole page.
+        Set<UUID> visible = visibilityPolicy.permitsAll(
+            workspaceContext.id(),
+            found,
+            SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY
+        );
+        List<Observation> observations = found
+            .stream()
+            .filter(row -> visible.contains(row.getId()))
+            .toList();
         Map<UUID, List<Observation>> observationsByJob = observations
             .stream()
             .collect(Collectors.groupingBy(Observation::getAgentJobId));
@@ -108,9 +127,18 @@ public class PracticeAreaReviewHistoryService {
             jobIds
         );
 
-        return runs.map(run ->
-            toMoment(run, observationsByJob.getOrDefault(run.getJobId(), List.of()), feedbackByObservation, targets)
-        );
+        // A run whose every finding the gate withheld is not an empty moment to render — it is a moment this
+        // caller does not get to see, so it leaves the page rather than showing as a review that found
+        // nothing. The total still counts it: the gate answers per observation in Java, after the database
+        // has already counted rows, and a total that quietly disagreed with the pages would be the worse lie.
+        List<PracticeAreaReviewMomentDTO> moments = new ArrayList<>();
+        for (ReviewHistoryRunRow run : runs) {
+            List<Observation> visibleFindings = observationsByJob.getOrDefault(run.getJobId(), List.of());
+            if (!visibleFindings.isEmpty()) {
+                moments.add(toMoment(run, visibleFindings, feedbackByObservation, targets));
+            }
+        }
+        return new PageImpl<>(moments, pageable, runs.getTotalElements());
     }
 
     private Map<UUID, DeliveredFeedbackBinding> feedbackByObservation(
@@ -150,17 +178,24 @@ public class PracticeAreaReviewHistoryService {
                 return PracticeAreaReviewFindingDTO.from(
                     observation,
                     binding == null ? null : binding.getFeedbackId(),
-                    ratingState(binding),
-                    binding == null ? null : binding.getRatingComment()
+                    usefulness(binding),
+                    resolution(binding),
+                    binding == null ? null : binding.getResponseComment()
                 );
             })
             .toList();
         return new PracticeAreaReviewMomentDTO(run.getJobId(), run.getReviewedAt(), artifact, findings);
     }
 
-    private @Nullable FeedbackRatingState ratingState(@Nullable DeliveredFeedbackBinding binding) {
-        return binding == null || binding.getRatingState() == null
+    private @Nullable FeedbackUsefulness usefulness(@Nullable DeliveredFeedbackBinding binding) {
+        return binding == null || binding.getResponseUsefulness() == null
             ? null
-            : FeedbackRatingState.valueOf(binding.getRatingState());
+            : FeedbackUsefulness.valueOf(binding.getResponseUsefulness());
+    }
+
+    private @Nullable FeedbackResolution resolution(@Nullable DeliveredFeedbackBinding binding) {
+        return binding == null || binding.getResponseResolution() == null
+            ? null
+            : FeedbackResolution.valueOf(binding.getResponseResolution());
     }
 }

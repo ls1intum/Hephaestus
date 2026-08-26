@@ -2638,50 +2638,6 @@ export type ReflectionItem = {
 };
 
 /**
- * Reaction engagement for a developer, split into the response (uptake) and validity axes
- */
-export type ReactionEngagement = {
-    /**
-     * RESPONSE: observations the developer acted on (the recipience act, not the outcome)
-     */
-    addressed: number;
-    /**
-     * RESPONSE: observations the developer rejected with a reasoned explanation
-     */
-    disputed: number;
-    /**
-     * VALIDITY: observations marked out-of-scope — a detector-scope signal, NOT an uptake count
-     */
-    notApplicable: number;
-};
-
-/**
- * Developer reaction to a delivered unit of feedback
- */
-export type Reaction = {
-    /**
-     * The reaction action taken
-     */
-    action: 'ADDRESSED' | 'DISPUTED' | 'NOT_APPLICABLE';
-    /**
-     * When the reaction was submitted
-     */
-    createdAt: Date;
-    /**
-     * Optional explanation for the reaction
-     */
-    explanation?: string;
-    /**
-     * ID of the feedback unit this reaction is about
-     */
-    feedbackId: string;
-    /**
-     * Unique reaction ID
-     */
-    id: string;
-};
-
-/**
  * Vendor API rate-limit observation, read from in-memory trackers (not persisted across restarts). Every field except observedAt is present only if the vendor actually reported it.
  */
 export type RateLimitSnapshot = {
@@ -3345,12 +3301,13 @@ export type PracticeAreaReviewFinding = {
      */
     assessment?: 'GOOD' | 'BAD';
     feedbackId?: string;
+    feedbackResolution?: 'ADDRESSED' | 'DISPUTED' | 'NOT_APPLICABLE';
+    feedbackResponseComment?: string;
+    feedbackUsefulness?: 'HELPFUL' | 'UNHELPFUL';
     observationId: string;
     practiceName: string;
     practiceSlug: string;
     presence: 'PRESENT' | 'ABSENT' | 'NOT_APPLICABLE' | 'INCONCLUSIVE';
-    rating?: 'HELPFUL' | 'UNHELPFUL' | 'INCORRECT';
-    ratingComment?: string;
     recurrenceKey?: string;
     severity?: 'CRITICAL' | 'MAJOR' | 'MINOR' | 'INFO';
     title: string;
@@ -4678,27 +4635,45 @@ export type GitLabGroup = {
 };
 
 /**
- * Mark delivered practice feedback as helpful, unhelpful, or incorrect
+ * Assess delivered feedback, say what you will do with it, or take your answer back
  */
-export type FeedbackRatingRequest = {
+export type FeedbackResponseRequest = {
     /**
-     * Optional comment explaining the assessment
+     * Optional explanation; required when resolution is DISPUTED
      */
     comment?: string;
     /**
-     * The recipient's assessment
+     * What the recipient decided to do with the feedback
      */
-    state: 'HELPFUL' | 'UNHELPFUL' | 'INCORRECT';
+    resolution?: 'ADDRESSED' | 'DISPUTED' | 'NOT_APPLICABLE';
+    /**
+     * How useful the feedback was
+     */
+    usefulness?: 'HELPFUL' | 'UNHELPFUL';
+    /**
+     * Take the whole response back, leaving no answer on record. Carries nothing else.
+     */
+    withdraw?: boolean;
 };
 
 /**
- * The recipient's current rating for a delivered feedback unit
+ * The recipient's current assessment and resolution of delivered feedback
  */
-export type FeedbackRating = {
+export type FeedbackResponse = {
     comment?: string;
     feedbackId: string;
-    state: 'HELPFUL' | 'UNHELPFUL' | 'INCORRECT';
-    updatedAt: Date;
+    resolution?: 'ADDRESSED' | 'DISPUTED' | 'NOT_APPLICABLE';
+    respondedAt?: Date;
+    usefulness?: 'HELPFUL' | 'UNHELPFUL';
+};
+
+/**
+ * Feedback resolution counts for the current developer
+ */
+export type FeedbackEngagement = {
+    addressed?: number;
+    disputed?: number;
+    notApplicable?: number;
 };
 
 export type FeedbackApproval = {
@@ -5101,20 +5076,6 @@ export type CreateReviewBackfillRunRequest = {
      * Window end, exclusive
      */
     toAt: Date;
-};
-
-/**
- * Submit a reaction to a delivered feedback unit
- */
-export type CreateReaction = {
-    /**
-     * The reaction action to record
-     */
-    action: 'ADDRESSED' | 'DISPUTED' | 'NOT_APPLICABLE';
-    /**
-     * Explanation for the reaction. Required when action is DISPUTED.
-     */
-    explanation?: string;
 };
 
 /**
@@ -9868,7 +9829,7 @@ export type GetPracticeDefinitionOptionsResponses = {
 
 export type GetPracticeDefinitionOptionsResponse = GetPracticeDefinitionOptionsResponses[keyof GetPracticeDefinitionOptionsResponses];
 
-export type GetEngagementData = {
+export type GetFeedbackEngagementData = {
     body?: never;
     path: {
         /**
@@ -9880,14 +9841,14 @@ export type GetEngagementData = {
     url: '/workspaces/{workspaceSlug}/practices/feedback/engagement';
 };
 
-export type GetEngagementResponses = {
+export type GetFeedbackEngagementResponses = {
     /**
-     * Engagement statistics returned
+     * OK
      */
-    200: ReactionEngagement;
+    200: FeedbackEngagement;
 };
 
-export type GetEngagementResponse = GetEngagementResponses[keyof GetEngagementResponses];
+export type GetFeedbackEngagementResponse = GetFeedbackEngagementResponses[keyof GetFeedbackEngagementResponses];
 
 export type GetInAppFeedbackData = {
     body?: never;
@@ -9910,7 +9871,7 @@ export type GetInAppFeedbackResponses = {
 
 export type GetInAppFeedbackResponse = GetInAppFeedbackResponses[keyof GetInAppFeedbackResponses];
 
-export type RemoveFeedbackRatingData = {
+export type GetLatestFeedbackResponseData = {
     body?: never;
     path: {
         /**
@@ -9920,20 +9881,20 @@ export type RemoveFeedbackRatingData = {
         feedbackId: string;
     };
     query?: never;
-    url: '/workspaces/{workspaceSlug}/practices/feedback/{feedbackId}/rating';
+    url: '/workspaces/{workspaceSlug}/practices/feedback/{feedbackId}/response';
 };
 
-export type RemoveFeedbackRatingResponses = {
+export type GetLatestFeedbackResponseResponses = {
     /**
-     * Rating removed or did not exist
+     * OK
      */
-    204: void;
+    200: FeedbackResponse;
 };
 
-export type RemoveFeedbackRatingResponse = RemoveFeedbackRatingResponses[keyof RemoveFeedbackRatingResponses];
+export type GetLatestFeedbackResponseResponse = GetLatestFeedbackResponseResponses[keyof GetLatestFeedbackResponseResponses];
 
-export type SetFeedbackRatingData = {
-    body: FeedbackRatingRequest;
+export type SubmitFeedbackResponseData = {
+    body: FeedbackResponseRequest;
     path: {
         /**
          * Workspace slug
@@ -9942,94 +9903,24 @@ export type SetFeedbackRatingData = {
         feedbackId: string;
     };
     query?: never;
-    url: '/workspaces/{workspaceSlug}/practices/feedback/{feedbackId}/rating';
+    url: '/workspaces/{workspaceSlug}/practices/feedback/{feedbackId}/response';
 };
 
-export type SetFeedbackRatingErrors = {
+export type SubmitFeedbackResponseErrors = {
     /**
-     * Feedback not found
-     */
-    404: unknown;
-};
-
-export type SetFeedbackRatingResponses = {
-    /**
-     * Rating recorded
-     */
-    200: FeedbackRating;
-};
-
-export type SetFeedbackRatingResponse = SetFeedbackRatingResponses[keyof SetFeedbackRatingResponses];
-
-export type GetLatestReactionData = {
-    body?: never;
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-        feedbackId: string;
-    };
-    query?: never;
-    url: '/workspaces/{workspaceSlug}/practices/feedback/{feedbackId}/reactions';
-};
-
-export type GetLatestReactionErrors = {
-    /**
-     * Feedback not found in this workspace
-     */
-    404: unknown;
-};
-
-export type GetLatestReactionResponses = {
-    /**
-     * Latest reaction returned
-     */
-    200: Reaction;
-    /**
-     * No reaction exists for this feedback unit
-     */
-    204: void;
-};
-
-export type GetLatestReactionResponse = GetLatestReactionResponses[keyof GetLatestReactionResponses];
-
-export type SubmitReactionData = {
-    body: CreateReaction;
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-        feedbackId: string;
-    };
-    query?: never;
-    url: '/workspaces/{workspaceSlug}/practices/feedback/{feedbackId}/reactions';
-};
-
-export type SubmitReactionErrors = {
-    /**
-     * Invalid request (e.g., DISPUTED without explanation)
+     * Invalid response
      */
     400: unknown;
-    /**
-     * Current user is not the feedback's recipient
-     */
-    403: unknown;
-    /**
-     * Feedback not found in this workspace
-     */
-    404: unknown;
 };
 
-export type SubmitReactionResponses = {
+export type SubmitFeedbackResponseResponses = {
     /**
-     * Reaction recorded
+     * Response recorded
      */
-    201: Reaction;
+    201: FeedbackResponse;
 };
 
-export type SubmitReactionResponse = SubmitReactionResponses[keyof SubmitReactionResponses];
+export type SubmitFeedbackResponseResponse = SubmitFeedbackResponseResponses[keyof SubmitFeedbackResponseResponses];
 
 export type ListLearnerPracticesData = {
     body?: never;

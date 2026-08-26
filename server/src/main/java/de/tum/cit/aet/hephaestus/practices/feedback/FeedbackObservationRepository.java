@@ -6,6 +6,7 @@ import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
+import de.tum.cit.aet.hephaestus.practices.observation.reaction.ReactionRepository;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
@@ -135,20 +136,44 @@ public interface FeedbackObservationRepository extends JpaRepository<FeedbackObs
     /** Newest delivered feedback unit that actually carried each observation to this learner. */
     @Query(
         value = """
-        SELECT DISTINCT ON (fo.observation_id)
-               fo.observation_id AS "observationId",
-               f.id AS "feedbackId",
-               r.state AS "ratingState",
-               r.comment AS "ratingComment"
-        FROM feedback_observation fo
-        JOIN feedback f ON f.id = fo.feedback_id
-        LEFT JOIN feedback_rating r ON r.feedback_id = f.id
-        WHERE fo.observation_id IN (:observationIds)
-          AND f.workspace_id = :workspaceId
-          AND f.recipient_user_id = :recipientUserId
-          AND f.delivery_state = 'DELIVERED'
-        ORDER BY fo.observation_id, f.delivered_at DESC NULLS LAST, f.created_at DESC, f.id DESC
-        """,
+                    SELECT DISTINCT ON (fo.observation_id)
+                           fo.observation_id AS "observationId",
+                           f.id AS "feedbackId",
+                           response.usefulness AS "responseUsefulness",
+                           response.action AS "responseResolution",
+                           response.explanation AS "responseComment"
+                    FROM feedback_observation fo
+                    JOIN feedback f ON f.id = fo.feedback_id
+                    LEFT JOIN LATERAL (
+                        SELECT
+                            (SELECT r.usefulness FROM reaction r
+                              WHERE r.feedback_id = f.id AND r.reactor_user_id = :recipientUserId
+                                AND r.usefulness IS NOT NULL
+            """ +
+            ReactionRepository.STILL_SPEAKS +
+            """
+                              ORDER BY r.created_at DESC, r.id DESC LIMIT 1) AS usefulness,
+                            (SELECT r.action FROM reaction r
+                              WHERE r.feedback_id = f.id AND r.reactor_user_id = :recipientUserId
+                                AND r.action IS NOT NULL
+            """ +
+            ReactionRepository.STILL_SPEAKS +
+            """
+                              ORDER BY r.created_at DESC, r.id DESC LIMIT 1) AS action,
+                            (SELECT r.explanation FROM reaction r
+                              WHERE r.feedback_id = f.id AND r.reactor_user_id = :recipientUserId
+                                AND r.action IS NOT NULL
+            """ +
+            ReactionRepository.STILL_SPEAKS +
+            """
+                      ORDER BY r.created_at DESC, r.id DESC LIMIT 1) AS explanation
+            ) response ON TRUE
+            WHERE fo.observation_id IN (:observationIds)
+              AND f.workspace_id = :workspaceId
+              AND f.recipient_user_id = :recipientUserId
+              AND f.delivery_state = 'DELIVERED'
+            ORDER BY fo.observation_id, f.delivered_at DESC NULLS LAST, f.created_at DESC, f.id DESC
+            """,
         nativeQuery = true
     )
     List<DeliveredFeedbackBinding> findDeliveredFeedbackBindings(
@@ -160,8 +185,9 @@ public interface FeedbackObservationRepository extends JpaRepository<FeedbackObs
     interface DeliveredFeedbackBinding {
         UUID getObservationId();
         UUID getFeedbackId();
-        String getRatingState();
-        String getRatingComment();
+        String getResponseUsefulness();
+        String getResponseResolution();
+        String getResponseComment();
     }
 
     // --- conversational feedback delivery loop ---

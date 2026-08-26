@@ -63,6 +63,43 @@ Before upgrading to any new `0.x.0` version:
 Entries exist only for releases that need operator action. Everything else is in the
 [release notes](https://github.com/ls1intum/Hephaestus/releases).
 
+### v0.75.0
+
+#### 🔴 The feedback reaction and rating endpoints are replaced by one response endpoint
+
+**Affected**: anything calling the application API directly. The Hephaestus web app is unaffected —
+it never used these endpoints outside its generated client, which ships regenerated in this release.
+
+Removed:
+
+```
+POST /workspaces/{workspaceSlug}/practices/observations/{id}/reactions   (submitReaction)
+GET  /workspaces/{workspaceSlug}/practices/observations/{id}/reactions   (getLatestReaction)
+```
+
+**Before**: a developer answered two questions about one piece of delivered feedback through two
+separate mechanisms — a reaction saying what they would do about it, and a rating saying whether it
+helped. The two disagreed about their own history: reactions accumulated, ratings were overwritten.
+
+**After**: one endpoint per feedback unit, carrying both answers, either of them, or neither:
+
+```
+POST /workspaces/{workspaceSlug}/practices/feedback/{feedbackId}/response
+GET  /workspaces/{workspaceSlug}/practices/feedback/{feedbackId}/response
+GET  /workspaces/{workspaceSlug}/practices/feedback/engagement
+```
+
+The request body carries `usefulness` (`HELPFUL` / `UNHELPFUL`), `resolution` (`ADDRESSED` /
+`DISPUTED` / `NOT_APPLICABLE`), an optional `comment` — required when disputing — and `withdraw`,
+which takes the whole answer back. Every submit appends; the GET returns the answer as it currently
+stands, which is the newest value of each question independently.
+
+Note the anchor moved: a response is filed against the delivered **feedback unit**, not against the
+internal observation behind it, because the feedback unit is what the developer was actually shown.
+
+**Action**: repoint any direct API caller at the new endpoint. Stored reactions are untouched and
+keep answering; nothing needs migrating and no data is lost.
+
 ### v0.74.0
 
 #### 🔴 An agent image reference naming a channel tag is now refused

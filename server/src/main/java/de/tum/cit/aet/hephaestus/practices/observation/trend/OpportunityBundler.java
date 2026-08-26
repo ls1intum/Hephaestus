@@ -15,7 +15,7 @@ final class OpportunityBundler {
 
     private OpportunityBundler() {}
 
-    static Bundles bundle(String practiceSlug, List<Observation> observations, Instant cutoff, int bundleSize) {
+    static Bundles bundle(List<Observation> observations, Instant cutoff, int bundleSize) {
         Map<ArtifactKey, List<Observation>> byArtifact = new LinkedHashMap<>();
         observations
             .stream()
@@ -32,7 +32,7 @@ final class OpportunityBundler {
         List<EvidenceOpportunity> all = byArtifact
             .entrySet()
             .stream()
-            .map(entry -> latestRunOpportunity(practiceSlug, entry.getKey(), entry.getValue()))
+            .map(entry -> latestRunOpportunity(entry.getKey(), entry.getValue()))
             .sorted(Comparator.comparing(EvidenceOpportunity::occurredAt).reversed())
             .toList();
         List<EvidenceOpportunity> applicable = all.stream().filter(EvidenceOpportunity::applicable).toList();
@@ -54,11 +54,7 @@ final class OpportunityBundler {
         return new Bundles(current, previous, trail);
     }
 
-    private static EvidenceOpportunity latestRunOpportunity(
-        String practiceSlug,
-        ArtifactKey artifact,
-        List<Observation> observations
-    ) {
+    private static EvidenceOpportunity latestRunOpportunity(ArtifactKey artifact, List<Observation> observations) {
         UUID latestJob = observations
             .stream()
             .collect(
@@ -82,14 +78,29 @@ final class OpportunityBundler {
             .map(row -> OutcomeVector.of(row.getPresence(), row.getAssessment()))
             .reduce(OutcomeVector.EMPTY, OutcomeVector::plus);
         Instant occurredAt = latest.stream().map(Observation::getObservedAt).max(Instant::compareTo).orElseThrow();
-        return new EvidenceOpportunity(
-            practiceSlug,
-            artifact.type(),
-            artifact.id(),
-            occurredAt,
-            outcomes,
-            TrendBundle.OLDER
-        );
+        return new EvidenceOpportunity(artifact.type(), artifact.id(), occurredAt, outcomes, TrendBundle.OLDER);
+    }
+
+    /**
+     * Keeps the newest opportunities that still SAID something, plus whatever fell between them.
+     *
+     * <p>The cap bounds what a sparkline has to draw, so it counts the opportunities a reader can see a
+     * verdict in. Counting rows instead would let a stretch of work that offered this practice no opportunity
+     * push real evidence out of the window — and the standing reads its window off this same list, so that
+     * would quietly shrink the sample a standing rests on rather than merely shortening a chart.
+     */
+    static List<EvidenceOpportunity> cappedTrail(List<EvidenceOpportunity> trail, int bundleSize) {
+        int cap = 2 * bundleSize + 4;
+        int applicable = 0;
+        for (int index = trail.size() - 1; index >= 0; index--) {
+            if (trail.get(index).applicable()) {
+                applicable++;
+            }
+            if (applicable == cap) {
+                return trail.subList(index, trail.size());
+            }
+        }
+        return trail;
     }
 
     private static List<EvidenceOpportunity> tagged(List<EvidenceOpportunity> opportunities, TrendBundle bundle) {

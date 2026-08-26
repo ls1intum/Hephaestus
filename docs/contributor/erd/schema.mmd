@@ -395,14 +395,6 @@ erDiagram
         UUID chat_message_id FK
     }
 
-    FeedbackRating {
-        UUID feedback_id PK,FK
-        VARCHAR(16) state "NOT NULL"
-        TEXT comment
-        TIMESTAMPTZ created_at "NOT NULL"
-        TIMESTAMPTZ updated_at "NOT NULL"
-    }
-
     FxRate {
         BIGINT id PK
         DATE rate_date UK "NOT NULL"
@@ -1055,11 +1047,12 @@ erDiagram
     Reaction {
         UUID id PK
         BIGINT reactor_user_id FK "NOT NULL"
-        VARCHAR(16) action "NOT NULL"
+        VARCHAR(16) action
         TEXT explanation
         TIMESTAMPTZ created_at "NOT NULL"
         UUID feedback_id FK "NOT NULL"
         VARCHAR(64) recurrence_key
+        VARCHAR(16) usefulness
     }
 
     Repository {
@@ -1439,7 +1432,6 @@ erDiagram
     %% One-to-One relationships
     ChatMessage ||--|| ChatMessageVote : has
     DiscussionComment ||--|| Discussion : references
-    Feedback ||--|| FeedbackRating : has
     PracticeRevision ||--|| Practice : references
     Workspace ||--|| PracticeCatalogInstallation : has
     PullRequestReviewComment ||--|| PullRequestReviewThread : reviewed

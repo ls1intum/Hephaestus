@@ -1,25 +1,19 @@
 package de.tum.cit.aet.hephaestus.practices.observation.trend;
 
-import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import java.time.Instant;
-import java.time.ZoneOffset;
-import java.time.temporal.ChronoUnit;
-import java.util.Collection;
-import java.util.Comparator;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import org.jspecify.annotations.Nullable;
 
 /**
- * Pure opportunity-indexed Bayesian trend calculator.
+ * Pure opportunity-indexed Bayesian trend calculator for one practice.
  *
  * <p>Calendar units are never samples: bursty repository activity is ordered by evidence opportunity, while
  * timestamps survive only as provenance. Recalculation after every event is legitimate because this is a
- * Bayesian posterior, not a repeatedly peeked frequentist test. The anytime-valid and human-dynamics grounding
- * is documented in {@code practice-trend-display-spec.md} §0.
+ * Bayesian posterior, not a repeatedly peeked frequentist test. The package javadoc carries the grounding for
+ * both halves of that sentence.
+ *
+ * <p>Aggregating several of these into an area is a different estimator and lives in
+ * {@link AreaTrendAggregator}.
  */
 final class PracticeTrendCalculator {
 
@@ -32,19 +26,25 @@ final class PracticeTrendCalculator {
         TrendProperties properties
     ) {
         OpportunityBundler.Bundles bundles = OpportunityBundler.bundle(
-            practiceSlug,
             observations,
             cutoff,
             properties.getBundleSize()
         );
         int missing = bundles.opportunitiesUntilComparable(properties.getMinBundleSize());
-        List<EvidenceOpportunity> trail = cappedTrail(bundles.trail(), properties.getBundleSize());
+        List<EvidenceOpportunity> trail = OpportunityBundler.cappedTrail(bundles.trail(), properties.getBundleSize());
+        TrendSupport support = TrendSupportFactory.forPractice(
+            properties,
+            bundles.current().size(),
+            bundles.previous().size(),
+            missing,
+            trail
+        );
         if (missing > 0) {
             return new PracticeTrend(
                 practiceSlug,
                 TrendScope.PRACTICE,
                 TrendDirection.INSUFFICIENT_EVIDENCE,
-                support(properties, bundles, missing, null, null, trail),
+                support,
                 null,
                 null,
                 trail,
@@ -52,11 +52,9 @@ final class PracticeTrendCalculator {
             );
         }
 
-        OutcomeVector currentOutcomes = outcomes(bundles.current());
-        OutcomeVector previousOutcomes = outcomes(bundles.previous());
-        BetaPosterior current = posterior(bundles.current());
-        BetaPosterior previous = posterior(bundles.previous());
-        BetaPosterior.Difference difference = current.differenceFrom(previous);
+        BetaPosterior.Difference difference = posterior(bundles.current()).differenceFrom(
+            posterior(bundles.previous())
+        );
         TrendDirection direction = TrendDirectionRule.classify(
             difference,
             properties.getRopeHalfWidth(),
@@ -66,118 +64,12 @@ final class PracticeTrendCalculator {
             practiceSlug,
             TrendScope.PRACTICE,
             direction,
-            support(properties, bundles, 0, null, null, trail),
-            currentOutcomes,
-            previousOutcomes,
+            support,
+            outcomes(bundles.current()),
+            outcomes(bundles.previous()),
             trail,
             difference
         );
-    }
-
-    static PracticeTrend aggregateArea(
-        String areaSlug,
-        Collection<String> eligiblePracticeSlugs,
-        Collection<PracticeTrend> practiceTrends,
-        Map<String, Double> weights,
-        TrendProperties properties
-    ) {
-        List<PracticeTrend> comparable = practiceTrends
-            .stream()
-            .filter(trend -> trend.difference() != null)
-            .filter(trend -> weightFor(trend.slug(), weights) > 0.0)
-            .toList();
-        List<EvidenceOpportunity> areaTrail = areaTrail(practiceTrends, properties.getBundleSize());
-        if (comparable.isEmpty()) {
-            int current = distinctOpportunityCount(practiceTrends, TrendBundle.CURRENT);
-            int previous = distinctOpportunityCount(practiceTrends, TrendBundle.PREVIOUS);
-            int missing = Math.max(0, properties.getMinBundleSize() - previous);
-            return new PracticeTrend(
-                areaSlug,
-                TrendScope.AREA,
-                TrendDirection.INSUFFICIENT_EVIDENCE,
-                areaSupport(properties, current, previous, missing, 0, eligiblePracticeSlugs.size(), areaTrail),
-                null,
-                null,
-                areaTrail,
-                null
-            );
-        }
-
-        double weightedMean = 0.0;
-        double totalPrecision = 0.0;
-        for (PracticeTrend trend : comparable) {
-            // `comparable` was filtered on difference() != null above; the nullness analysis
-            // does not carry that across the stream boundary.
-            BetaPosterior.Difference difference = Objects.requireNonNull(trend.difference());
-            double precision = weightFor(trend.slug(), weights) / difference.variance();
-            weightedMean += precision * difference.mean();
-            totalPrecision += precision;
-        }
-        double mean = weightedMean / totalPrecision;
-        double variance = 1.0 / totalPrecision;
-        TrendDirection direction = classifyNormal(
-            mean,
-            variance,
-            properties.getRopeHalfWidth(),
-            properties.getCredibilityThreshold()
-        );
-        OutcomeVector current = comparable
-            .stream()
-            .map(PracticeTrend::currentOutcomes)
-            .filter(java.util.Objects::nonNull)
-            .reduce(OutcomeVector.EMPTY, OutcomeVector::plus);
-        OutcomeVector previous = comparable
-            .stream()
-            .map(PracticeTrend::previousOutcomes)
-            .filter(java.util.Objects::nonNull)
-            .reduce(OutcomeVector.EMPTY, OutcomeVector::plus);
-        int currentCount = distinctOpportunityCount(comparable, TrendBundle.CURRENT);
-        int previousCount = distinctOpportunityCount(comparable, TrendBundle.PREVIOUS);
-        return new PracticeTrend(
-            areaSlug,
-            TrendScope.AREA,
-            direction,
-            areaSupport(
-                properties,
-                currentCount,
-                previousCount,
-                0,
-                comparable.size(),
-                eligiblePracticeSlugs.size(),
-                areaTrail
-            ),
-            current,
-            previous,
-            areaTrail,
-            null
-        );
-    }
-
-    private static double weightFor(String slug, Map<String, Double> weights) {
-        double weight = weights.getOrDefault(slug, 1.0);
-        if (!Double.isFinite(weight) || weight < 0.0) {
-            throw new IllegalArgumentException("Practice trend weight must be finite and non-negative");
-        }
-        return weight;
-    }
-
-    private static TrendDirection classifyNormal(double mean, double variance, double rope, double threshold) {
-        double standardDeviation = Math.sqrt(variance);
-        double above = 1.0 - normalCdf((rope - mean) / standardDeviation);
-        double below = normalCdf((-rope - mean) / standardDeviation);
-        if (above >= threshold) return TrendDirection.IMPROVING;
-        if (below >= threshold) return TrendDirection.DECLINING;
-        return TrendDirection.UNCERTAIN;
-    }
-
-    private static double normalCdf(double value) {
-        double sign = value < 0 ? -1.0 : 1.0;
-        double x = Math.abs(value) / Math.sqrt(2.0);
-        double t = 1.0 / (1.0 + 0.3275911 * x);
-        double polynomial =
-            (((((1.061405429 * t - 1.453152027) * t) + 1.421413741) * t - 0.284496736) * t + 0.254829592) * t;
-        double erf = sign * (1.0 - polynomial * Math.exp(-x * x));
-        return 0.5 * (1.0 + erf);
     }
 
     private static BetaPosterior posterior(List<EvidenceOpportunity> opportunities) {
@@ -193,154 +85,5 @@ final class PracticeTrendCalculator {
             .stream()
             .map(EvidenceOpportunity::outcomes)
             .reduce(OutcomeVector.EMPTY, OutcomeVector::plus);
-    }
-
-    private static TrendSupport support(
-        TrendProperties properties,
-        OpportunityBundler.Bundles bundles,
-        int missing,
-        @Nullable Integer comparablePractices,
-        @Nullable Integer eligiblePractices,
-        List<EvidenceOpportunity> trail
-    ) {
-        return support(
-            properties,
-            bundles.current().size(),
-            bundles.previous().size(),
-            missing,
-            comparablePractices,
-            eligiblePractices,
-            trail
-        );
-    }
-
-    private static TrendSupport areaSupport(
-        TrendProperties properties,
-        int current,
-        int previous,
-        int missing,
-        int comparablePractices,
-        int eligiblePractices,
-        List<EvidenceOpportunity> trail
-    ) {
-        return support(properties, current, previous, missing, comparablePractices, eligiblePractices, trail);
-    }
-
-    private static TrendSupport support(
-        TrendProperties properties,
-        int current,
-        int previous,
-        int missing,
-        @Nullable Integer comparablePractices,
-        @Nullable Integer eligiblePractices,
-        List<EvidenceOpportunity> trail
-    ) {
-        // Provenance for what was COMPARED, so only opportunities that produced a verdict date it. The trail
-        // also carries the ones where the practice looked and found nothing to judge — they belong in it, and
-        // in the chart drawn from it, because "we saw this work item" is a fact worth showing. But letting one
-        // date the span would answer a question nobody asked: a stretch of work offering no opportunity would
-        // stretch "these N comparisons span X days" without adding a comparison.
-        List<Instant> dated = trail
-            .stream()
-            .filter(EvidenceOpportunity::applicable)
-            .map(EvidenceOpportunity::occurredAt)
-            .toList();
-        Instant first = dated.stream().min(Instant::compareTo).orElse(null);
-        Instant last = dated.stream().max(Instant::compareTo).orElse(null);
-        Integer span =
-            first == null || last == null
-                ? null
-                : (int) ChronoUnit.DAYS.between(
-                      first.atZone(ZoneOffset.UTC).toLocalDate(),
-                      last.atZone(ZoneOffset.UTC).toLocalDate()
-                  ) +
-                  1;
-        return new TrendSupport(
-            current,
-            previous,
-            missing,
-            comparablePractices,
-            eligiblePractices,
-            first,
-            last,
-            span,
-            properties.getBundleSize(),
-            properties.getRopeHalfWidth(),
-            properties.getCredibilityThreshold()
-        );
-    }
-
-    /**
-     * Keeps the newest opportunities that still SAID something, plus whatever fell between them.
-     *
-     * <p>The cap bounds what a sparkline has to draw, so it counts the opportunities a reader can see a
-     * verdict in. Counting rows instead would let a stretch of work that offered this practice no opportunity
-     * push real evidence out of the window — and the standing reads its window off this same list, so that
-     * would quietly shrink the sample a standing rests on rather than merely shortening a chart.
-     */
-    private static List<EvidenceOpportunity> cappedTrail(List<EvidenceOpportunity> trail, int bundleSize) {
-        int cap = 2 * bundleSize + 4;
-        int applicable = 0;
-        for (int index = trail.size() - 1; index >= 0; index--) {
-            if (trail.get(index).applicable()) {
-                applicable++;
-            }
-            if (applicable == cap) {
-                return trail.subList(index, trail.size());
-            }
-        }
-        return trail;
-    }
-
-    private static List<EvidenceOpportunity> areaTrail(Collection<PracticeTrend> trends, int bundleSize) {
-        record Key(ArtifactKind type, long id) {}
-        Map<Key, EvidenceOpportunity> combined = new LinkedHashMap<>();
-        for (PracticeTrend trend : trends) {
-            for (EvidenceOpportunity opportunity : trend.opportunities()) {
-                Key key = new Key(opportunity.artifactKind(), opportunity.artifactId());
-                combined.merge(
-                    key,
-                    new EvidenceOpportunity(
-                        "",
-                        opportunity.artifactKind(),
-                        opportunity.artifactId(),
-                        opportunity.occurredAt(),
-                        opportunity.outcomes(),
-                        opportunity.bundle()
-                    ),
-                    (left, right) ->
-                        new EvidenceOpportunity(
-                            "",
-                            left.artifactKind(),
-                            left.artifactId(),
-                            left.occurredAt().isAfter(right.occurredAt()) ? left.occurredAt() : right.occurredAt(),
-                            left.outcomes().plus(right.outcomes()),
-                            strongerBundle(left.bundle(), right.bundle())
-                        )
-                );
-            }
-        }
-        List<EvidenceOpportunity> sorted = combined
-            .values()
-            .stream()
-            .sorted(Comparator.comparing(EvidenceOpportunity::occurredAt))
-            .toList();
-        return cappedTrail(sorted, bundleSize);
-    }
-
-    private static TrendBundle strongerBundle(TrendBundle left, TrendBundle right) {
-        if (left == TrendBundle.CURRENT || right == TrendBundle.CURRENT) return TrendBundle.CURRENT;
-        if (left == TrendBundle.PREVIOUS || right == TrendBundle.PREVIOUS) return TrendBundle.PREVIOUS;
-        return TrendBundle.OLDER;
-    }
-
-    private static int distinctOpportunityCount(Collection<PracticeTrend> trends, TrendBundle bundle) {
-        return (int) trends
-            .stream()
-            .flatMap(trend -> trend.opportunities().stream())
-            .filter(opportunity -> opportunity.bundle() == bundle)
-            .map(opportunity -> opportunity.artifactKind() + ":" + opportunity.artifactId())
-            .distinct()
-            .count();
     }
 }

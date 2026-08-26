@@ -16,6 +16,8 @@ class PracticeTrendBoundaryArchitectureTest extends HephaestusArchitectureTest {
             "BetaPosterior",
             "TrendDirectionRule",
             "PracticeTrendCalculator",
+            "AreaTrendAggregator",
+            "TrendSupportFactory",
         }) {
             noClasses()
                 .that()

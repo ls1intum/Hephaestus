@@ -4,9 +4,15 @@ import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import java.time.Instant;
 import org.jspecify.annotations.NonNull;
 
-/** One comparable practice opportunity, normalized across all findings in the latest run of one artifact. */
+/**
+ * One comparable practice opportunity, normalized across all findings in the latest run of one artifact.
+ *
+ * <p>Carries no practice slug. The owning {@link PracticeTrend} already names the scope this list belongs to,
+ * and the area aggregation merges opportunities that several practices saw on the same artifact — a merged
+ * one answers to no single practice. A field nothing reads is a field that can only go stale or, worse, be
+ * filtered on later as though it meant something.
+ */
 record EvidenceOpportunity(
-    @NonNull String practiceSlug,
     @NonNull ArtifactKind artifactKind,
     long artifactId,
     @NonNull Instant occurredAt,
@@ -18,6 +24,6 @@ record EvidenceOpportunity(
     }
 
     EvidenceOpportunity withBundle(TrendBundle value) {
-        return new EvidenceOpportunity(practiceSlug, artifactKind, artifactId, occurredAt, outcomes, value);
+        return new EvidenceOpportunity(artifactKind, artifactId, occurredAt, outcomes, value);
     }
 }

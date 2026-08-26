@@ -29,7 +29,7 @@ Use the executable sources for exact details:
 | `FeedbackApproval`    | Immutable decision to approve or reject one exact feedback proposal        | Stores the feedback ID, workspace, actor, decision context, content digest, and time |
 | `FeedbackObservation` | Ordered evidence binding between one piece of feedback and one observation | Joins feedback to observations with a primary or supporting role                |
 | `FeedbackPlacement`   | Where a piece of feedback was placed                                       | Belongs to one `Feedback`; records a summary, inline, or conversation placement |
-| `Reaction`            | A developer response to delivered feedback                                 | Belongs to one `Feedback` and retains its recurrence key                        |
+| `Reaction`            | An immutable snapshot of a developer's response to delivered feedback       | Belongs to one `Feedback` and retains its recurrence key                        |
 
 ## Invariants
 
@@ -114,6 +114,17 @@ and limitations.
 `PREPARED` or terminal `DISCARDED` and writes one `FeedbackApproval`. The digest binds the approved content,
 recipient, channel, and artifact target; release refuses a stale or mismatched decision. Approval records
 retain identifier snapshots rather than JPA relationships so account erasure does not rewrite the audit.
+
+### One feedback response has two independent dimensions
+
+The recipient responds to the delivered `Feedback` unit, not to a private observation. One response may
+record perceived usefulness (`HELPFUL` or `UNHELPFUL`), a resolution (`ADDRESSED`, `DISPUTED`, or
+`NOT_APPLICABLE`), or both. `DISPUTED` requires a comment because it rejects the feedback's judgement;
+usefulness alone does not change standing, trend, or re-nag suppression.
+
+Responses are append-only. Submitting again creates a new snapshot, and read projections use the newest
+snapshot for that feedback and recipient. This preserves changes of mind without counting historical
+answers as several currently resolved pieces of feedback.
 
 ## Read projections and access
 

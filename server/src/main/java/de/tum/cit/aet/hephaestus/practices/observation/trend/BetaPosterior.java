@@ -5,10 +5,11 @@ import java.util.Arrays;
 /**
  * Deterministic beta-posterior maths for continuously recomputed opportunity-indexed trends.
  *
- * <p>The estimator is Bayesian deliberately: repository evidence arrives in bursts and the surface is
- * recomputed after every new opportunity. Bayesian posterior inference remains valid under optional stopping;
- * replacing this with a repeatedly peeked frequentist two-sample test would inflate false positives. See the
- * anytime-valid comparison literature cited in {@code practice-trend-display-spec.md} §0.
+ * <p>Bayesian because the surface recomputes after every opportunity, and a posterior stays valid under
+ * optional stopping where a repeatedly peeked frequentist test would not.
+ *
+ * <p>Successes are fractional: the shape parameters take a sum of per-opportunity positive shares. That is a
+ * weighted quasi-likelihood, not exact updating, and it overstates the variance rather than understating it.
  */
 final class BetaPosterior {
 
@@ -75,7 +76,7 @@ final class BetaPosterior {
      *
      * <p>Only the unnormalised kernel is evaluated. The beta normaliser {@code B(α, β)} is one constant
      * subtracted from every grid point, and both the max-shift below and the final division by the total
-     * remove any constant — computing it (a log-gamma approximation) could not change a single output.
+     * remove any constant, so computing it (a log-gamma approximation) could not change a single output.
      *
      * <p>Midpoints, not cell edges: with the Jeffreys prior {@code α} and {@code β} can be below one, so
      * the density diverges at 0 and 1. A grid that evaluated the edges would produce infinities.
@@ -114,7 +115,7 @@ final class BetaPosterior {
          *
          * <p>For a fixed current point the condition is an interval on the previous point, so its mass is a
          * prefix sum. The interval's edge moves monotonically with the current point, which lets a single
-         * forward pointer find it — each grid point is visited once per axis rather than once per pair.
+         * forward pointer find it, so each grid point is visited once per axis rather than once per pair.
          * The comparisons are the same ones the pairwise form made, so cells on the edge fall the same way.
          */
         private double probabilityWhere(double boundary, boolean above) {

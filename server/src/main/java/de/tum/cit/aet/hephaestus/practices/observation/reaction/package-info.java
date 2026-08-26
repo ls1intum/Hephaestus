@@ -1,9 +1,9 @@
 /**
- * Practice-observation reactions (ADDRESSED / DISPUTED / NOT_APPLICABLE) — the developer's response to an
- * observation, the closed-loop research signal. Carries each reaction's {@code recurrence_key} (ADR 0021)
- * so it follows one concern across the detector's per-run re-detections. Exposed as a named interface so the
- * {@code agent} delivery layer may read it for reaction-aware re-nag suppression, mirroring the sibling
- * {@code observation} / {@code model} / {@code feedback} interfaces.
+ * Internal, append-only storage for a recipient's combined response to delivered feedback. A response can
+ * capture perceived usefulness (HELPFUL / UNHELPFUL), resolution (ADDRESSED / DISPUTED / NOT_APPLICABLE), or
+ * both. The public API lives in the sibling {@code feedback} package; this package retains the historical
+ * {@code reaction} table name and the suppression query that follows a concern across review runs via its
+ * {@code recurrence_key} (ADR 0021).
  */
 @org.springframework.modulith.NamedInterface("reaction")
 @org.jspecify.annotations.NullMarked

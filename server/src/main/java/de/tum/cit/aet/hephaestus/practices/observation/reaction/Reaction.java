@@ -1,6 +1,8 @@
 package de.tum.cit.aet.hephaestus.practices.observation.reaction;
 
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackResolution;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackUsefulness;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -26,13 +28,23 @@ import org.hibernate.annotations.OnDeleteAction;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Immutable record of a developer's reaction to a delivered unit of {@link Feedback}.
+ * Immutable record of a developer's combined response to a delivered unit of {@link Feedback}.
  *
  * <p>A developer reacts to the feedback they were shown — not to an internal {@code Observation} — so the row
  * anchors on the {@link Feedback} unit (ADR 0022). {@code @Immutable} + append-only: a second reaction to the
  * same unit inserts a new row rather than mutating the first, so the temporal record of an initial response
- * and a later change of mind is preserved for research. The latest row per (feedback, reactor) is the
- * "current" state for dashboard display.
+ * and a later change of mind is preserved for research.
+ *
+ * <p><b>A row is a delta, not a snapshot.</b> It carries exactly what the recipient said at that moment, and
+ * each of the two dimensions is null where they said nothing. That is deliberate: the research record must be
+ * able to show that someone rated a unit helpful on Monday and disputed it on Thursday without inventing a
+ * Monday dispute. The consequence is that the CURRENT state is not the newest row — it is the newest non-null
+ * value of each dimension independently, which {@code ReactionRepository} computes and is the only correct way
+ * to read this table.
+ *
+ * <p><b>A row with neither dimension is a withdrawal.</b> It is how a recipient takes an answer back, and it
+ * ends the run of rows before it: nothing older than the newest withdrawal speaks for them any more. Without
+ * it an append-only table could only ever accumulate, and a mis-click would be permanent.
  *
  * <p>Anchoring on the delivered unit is the reviewer-side firewall: a reaction is always about, and submitted
  * by, the unit's recipient, so this table never holds a judgement about a third party. The about-vs-recipient
@@ -44,7 +56,7 @@ import org.jspecify.annotations.Nullable;
  * content into the detector prompt.
  *
  * @see Feedback for the delivered feedback unit being reacted to
- * @see ReactionAction for the action taxonomy
+ * @see FeedbackResolution for the resolution taxonomy
  */
 @Entity
 @Immutable
@@ -88,7 +100,7 @@ public class Reaction {
      * @implNote Because this column is {@code insertable=false/updatable=false}, a builder-set
      *     {@code .feedbackId(...)} is NOT persisted and is NOT repopulated from the association after
      *     {@code save()}. Callers MUST set {@link #feedback}; the in-memory {@code feedbackId} is only
-     *     reliable when it was set in sync with {@code feedback} (as {@code ReactionService.submitReaction}
+     *     reliable when it was set in sync with {@code feedback} (as {@code FeedbackResponseService.submitResponse}
      *     does). Never rely on a builder-set {@code feedbackId} alone post-persist.
      */
     @Column(name = "feedback_id", nullable = false, insertable = false, updatable = false, columnDefinition = "UUID")
@@ -126,18 +138,24 @@ public class Reaction {
     @Column(name = "reactor_user_id", nullable = false)
     private Long reactorUserId;
 
-    /**
-     * What the recipient did with the unit. Persisted as the enum name; the DB CHECK
-     * {@code chk_reaction_action} pins the column to the {@link ReactionAction} value set.
-     */
-    @NotNull
+    /** How useful the recipient found the unit; null when this row did not answer that question. */
     @Enumerated(EnumType.STRING)
-    @Column(name = "action", nullable = false, length = 16)
-    private ReactionAction action;
+    @Column(name = "usefulness", length = 16)
+    private @Nullable FeedbackUsefulness usefulness;
+
+    /**
+     * What the recipient decided to do; null when this row did not answer that question.
+     *
+     * <p>Column {@code action} rather than {@code resolution}: the column shipped under that name and a
+     * released one is renamed only across two releases. The field says what the value means.
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "action", length = 16)
+    private @Nullable FeedbackResolution resolution;
 
     /**
      * The recipient's free-text rationale. NULL means none was given. Coupled to {@link #action} by the DB
-     * CHECK {@code chk_reaction_disputed_explanation}: a {@link ReactionAction#DISPUTED} row must carry a
+     * CHECK {@code chk_reaction_disputed_explanation}: a {@link FeedbackResolution#DISPUTED} row must carry a
      * non-blank explanation (the reasoned rejection IS the evaluative judgement), while {@code ADDRESSED} and
      * {@code NOT_APPLICABLE} may leave it NULL.
      */

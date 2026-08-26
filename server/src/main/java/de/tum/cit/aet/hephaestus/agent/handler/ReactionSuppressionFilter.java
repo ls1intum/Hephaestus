@@ -2,12 +2,11 @@ package de.tum.cit.aet.hephaestus.agent.handler;
 
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.ValidatedObservation;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackResolution;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
-import de.tum.cit.aet.hephaestus.practices.observation.reaction.Reaction;
-import de.tum.cit.aet.hephaestus.practices.observation.reaction.ReactionAction;
 import de.tum.cit.aet.hephaestus.practices.observation.reaction.ReactionRepository;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties;
 import java.util.ArrayList;
@@ -38,9 +37,9 @@ class ReactionSuppressionFilter {
 
     private static final Logger log = LoggerFactory.getLogger(ReactionSuppressionFilter.class);
 
-    private static final Set<ReactionAction> SUPPRESS_ACTIONS = Set.of(
-        ReactionAction.DISPUTED,
-        ReactionAction.NOT_APPLICABLE
+    private static final Set<FeedbackResolution> SUPPRESS_ACTIONS = Set.of(
+        FeedbackResolution.DISPUTED,
+        FeedbackResolution.NOT_APPLICABLE
     );
 
     private static final String SECRET_SCANNER = "secret-diff-scanner";
@@ -101,9 +100,12 @@ class ReactionSuppressionFilter {
         if (recurrenceKeys.isEmpty()) {
             return new ReactionDecision(scopedObservations, 0);
         }
-        Map<String, ReactionAction> actionByKey = new HashMap<>();
-        for (Reaction r : reactionRepository.findLatestByRecurrenceKeysAndReactor(recurrenceKeys, aboutUserId)) {
-            actionByKey.put(r.getRecurrenceKey(), r.getAction());
+        // The repository answers with the resolution that CURRENTLY stands at each locus, not with whatever
+        // the newest row happens to hold: a recipient who rated a unit helpful after disputing it did not
+        // un-dispute it. Only a withdrawal clears the locus, and then it simply returns no row for it.
+        Map<String, FeedbackResolution> actionByKey = new HashMap<>();
+        for (var row : reactionRepository.findCurrentResolutionByRecurrenceKeys(recurrenceKeys, aboutUserId)) {
+            actionByKey.put(row.getRecurrenceKey(), FeedbackResolution.valueOf(row.getResolution()));
         }
         if (actionByKey.isEmpty()) {
             return new ReactionDecision(scopedObservations, 0);
@@ -122,7 +124,7 @@ class ReactionSuppressionFilter {
                 deliverable.add(vf);
                 continue;
             }
-            ReactionAction action = actionByKey.get(key);
+            FeedbackResolution action = actionByKey.get(key);
             boolean unsuppressableSecret =
                 vf.assessment() == Assessment.BAD &&
                 vf.evidence() != null &&
@@ -139,7 +141,7 @@ class ReactionSuppressionFilter {
                 suppressed++;
                 continue;
             }
-            if (action == ReactionAction.ADDRESSED && vf.assessment() == Assessment.BAD) {
+            if (action == FeedbackResolution.ADDRESSED && vf.assessment() == Assessment.BAD) {
                 deliverable.add(withEscalatedReasoning(vf)); // student said "fixed", but it recurs
                 continue;
             }
@@ -177,8 +179,8 @@ class ReactionSuppressionFilter {
         );
     }
 
-    private static FeedbackSuppressionReason reasonFor(ReactionAction action) {
-        return action == ReactionAction.DISPUTED
+    private static FeedbackSuppressionReason reasonFor(FeedbackResolution action) {
+        return action == FeedbackResolution.DISPUTED
             ? FeedbackSuppressionReason.REACTED_DISPUTED
             : FeedbackSuppressionReason.REACTED_NOT_APPLICABLE;
     }
