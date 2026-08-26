@@ -17,10 +17,16 @@ export interface ComposedFeedbackUnit {
 	[key: string]: unknown;
 }
 
+export interface PreparedFeedbackTarget {
+	threadKey: string;
+	channel: Channel;
+	practiceSlug: string;
+}
+
 export interface ComposedFeedbackEnvelope {
 	admissionDigest?: string | null;
 	observations?: unknown[];
-	preparedThreadKeys?: string[];
+	preparedTargets?: PreparedFeedbackTarget[];
 	units?: ComposedFeedbackUnit[];
 	/** How the review opens, in the composer's words. */
 	lead?: string | null;
@@ -28,8 +34,8 @@ export interface ComposedFeedbackEnvelope {
 
 /**
  * Units the reader will discard. It resolves every SUPERSEDE against the envelope's own
- * `preparedThreadKeys`, so a unit naming a thread the envelope does not list is feedback that was
- * composed, accepted by the tool, and then dropped on the way out.
+ * staged targets, including their channel and practice, so a unit naming a mismatched target is
+ * feedback that was composed, accepted by the tool, and then dropped on the way out.
  *
  * The tool already refuses a SUPERSEDE whose key is not staged, so this can only be non-empty when
  * the envelope and the tool disagree about which threads were staged.
@@ -37,10 +43,19 @@ export interface ComposedFeedbackEnvelope {
 export function undeliverableUnits(
 	envelope?: ComposedFeedbackEnvelope | null,
 ): ComposedFeedbackUnit[] {
-	const prepared = new Set(envelope?.preparedThreadKeys);
+	const prepared = new Set(
+		envelope?.preparedTargets?.map(
+			(target) => `${target.threadKey}\u0000${target.channel}\u0000${target.practiceSlug}`,
+		),
+	);
 	return (envelope?.units ?? []).filter((unit) => {
 		if (unit.action !== "SUPERSEDE") return false;
 		const target = unit.supersedesThreadKey;
-		return target === undefined || !prepared.has(target);
+		return (
+			target === undefined ||
+			unit.channel === undefined ||
+			unit.practiceSlug === undefined ||
+			!prepared.has(`${target}\u0000${unit.channel}\u0000${unit.practiceSlug}`)
+		);
 	});
 }

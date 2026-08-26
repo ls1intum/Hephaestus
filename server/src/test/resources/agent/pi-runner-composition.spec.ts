@@ -6,6 +6,7 @@ import test from "node:test";
 import {
 	type ComposedFeedbackEnvelope,
 	type ComposedFeedbackUnit,
+	type Channel,
 	undeliverableUnits,
 } from "../../../main/resources/agent/pi-runner-composition.ts";
 
@@ -16,11 +17,17 @@ const supersede = (threadKey: string): ComposedFeedbackUnit => ({
 	supersedesThreadKey: threadKey,
 });
 
+const target = (threadKey: string, channel: Channel = "IN_CONTEXT") => ({
+	threadKey,
+	channel,
+	practiceSlug: "writes-focused-pull-requests",
+});
+
 // `void`: node:test's own runner owns the promise each test hands back, and awaiting one here
 // would register the next test only after the previous had finished.
 void test("an envelope that lists the threads its units supersede delivers all of them", () => {
 	const envelope = {
-		preparedThreadKeys: ["t-1", "t-2"],
+		preparedTargets: [target("t-1"), target("t-2")],
 		units: [supersede("t-1"), supersede("t-2")],
 	};
 
@@ -29,20 +36,29 @@ void test("an envelope that lists the threads its units supersede delivers all o
 
 void test("a superseding unit is undeliverable when the envelope lists no threads", () => {
 	// The incident: the tool was given the staged keys and accepted the unit, the envelope was not.
-	const envelope = { preparedThreadKeys: [], units: [supersede("t-1")] };
+	const envelope = { preparedTargets: [], units: [supersede("t-1")] };
 
 	assert.deepEqual(undeliverableUnits(envelope), [supersede("t-1")]);
 });
 
 void test("only the unit naming an unlisted thread is undeliverable", () => {
-	const envelope = { preparedThreadKeys: ["t-1"], units: [supersede("t-1"), supersede("t-9")] };
+	const envelope = {
+		preparedTargets: [target("t-1")],
+		units: [supersede("t-1"), supersede("t-9")],
+	};
 
 	assert.deepEqual(undeliverableUnits(envelope), [supersede("t-9")]);
 });
 
+void test("a thread cannot be superseded from another lane", () => {
+	const envelope = { preparedTargets: [target("t-1", "IN_APP")], units: [supersede("t-1")] };
+
+	assert.deepEqual(undeliverableUnits(envelope), [supersede("t-1")]);
+});
+
 void test("units that supersede nothing are unaffected by an empty thread list", () => {
 	const envelope: ComposedFeedbackEnvelope = {
-		preparedThreadKeys: [],
+		preparedTargets: [],
 		units: [
 			{ action: "NEW", channel: "IN_APP", practiceSlug: "p" },
 			{ action: "WITHHOLD", channel: "IN_CHAT", practiceSlug: "p", withholdReason: "ALREADY_SAID" },

@@ -26,9 +26,10 @@ import {
 	CHANNELS,
 	type ComposedFeedbackEnvelope,
 	type ComposedFeedbackUnit,
+	type PreparedFeedbackTarget,
 	undeliverableUnits,
 } from "./pi-runner-composition.ts";
-import { buildReviewTree, mapConcurrent } from "./pi-review-tree.ts";
+import { buildReviewTree, mapConcurrent, missingPracticeSlugs } from "./pi-review-tree.ts";
 import { forkPracticeSessions } from "./pi-session-tree.ts";
 import { deriveTimeouts, deriveTurnTiming } from "./pi-runner-timings.ts";
 import {
@@ -787,7 +788,6 @@ console.error(
 const COMPOSITION_REQUEST_PATH = `${CWD}/inputs/feedback-composition.json`;
 const FEEDBACK_PATH = `${OUTPUT}/feedback.json`;
 const COMPOSER_PROMPT_PATH = `${CWD}/feedback-composer.md`;
-const OBSERVATION_HISTORY_PATH = `${CWD}/inputs/history/observations.json`;
 const PREPARED_FEEDBACK_PATH = `${CWD}/inputs/history/prepared.json`;
 const COMPOSITION_OBSERVATIONS_PATH = `${CWD}/work/composition/observations.json`;
 let compositionAdmitted = false;
@@ -934,7 +934,7 @@ interface LeanObservation {
 interface ComposedFeedback extends ComposedFeedbackEnvelope {
 	admissionDigest: string | null;
 	observations: LeanObservation[];
-	preparedThreadKeys: string[];
+	preparedTargets: PreparedFeedbackTarget[];
 	units: FeedbackUnit[];
 	lead: string | null;
 }
@@ -943,7 +943,7 @@ interface ComposedFeedback extends ComposedFeedbackEnvelope {
 const composedFeedback: ComposedFeedback = {
 	admissionDigest: null,
 	observations: [],
-	preparedThreadKeys: [],
+	preparedTargets: [],
 	units: [],
 	lead: null,
 };
@@ -999,42 +999,27 @@ function loadCompositionRequest(): CompositionRequest | null {
 	}
 }
 
-// Longitudinal feedback may reference practices found only in this developer's history.
 function composablePracticeSlugs(): string[] {
-	const slugs = new Set(admittedPractices);
-	try {
-		if (existsSync(OBSERVATION_HISTORY_PATH)) {
-			const history = parseJson(readFileSync(OBSERVATION_HISTORY_PATH, "utf8"));
-			const entries = isRecord(history) ? jsonArray(history.observations) : [];
-			for (const entry of entries) {
-				if (
-					isRecord(entry) &&
-					typeof entry.practiceSlug === "string" &&
-					entry.practiceSlug.trim()
-				) {
-					slugs.add(entry.practiceSlug);
-				}
-			}
-		}
-	} catch (e) {
-		console.error(`[pi-runner] observation history unreadable for composition: ${errorText(e)}`);
-	}
-	return [...slugs].toSorted();
+	return [...admittedPractices].toSorted();
 }
 
 // Supersession is limited to unread thread keys present in this snapshot.
-function stagedPreparedThreadKeys(): string[] {
+function stagedPreparedTargets(): PreparedFeedbackTarget[] {
 	try {
 		if (!existsSync(PREPARED_FEEDBACK_PATH)) return [];
 		const prepared = parseJson(readFileSync(PREPARED_FEEDBACK_PATH, "utf8"));
 		const entries = isRecord(prepared) ? jsonArray(prepared.prepared) : [];
-		return [
-			...new Set(
-				entries
-					.map((entry) => (isRecord(entry) ? entry.threadKey : undefined))
-					.filter((key): key is string => typeof key === "string" && key.trim().length > 0),
-			),
-		];
+		return entries.flatMap((entry) => {
+			if (!isRecord(entry)) return [];
+			const { threadKey, channel, practiceSlug } = entry;
+			return typeof threadKey === "string" &&
+				threadKey.trim() &&
+				isChannel(channel) &&
+				typeof practiceSlug === "string" &&
+				practiceSlug.trim()
+				? [{ threadKey, channel, practiceSlug }]
+				: [];
+		});
 	} catch (e) {
 		console.error(`[pi-runner] prepared feedback unreadable for composition: ${errorText(e)}`);
 		return [];
@@ -1085,11 +1070,11 @@ function buildFeedbackTool(
 	practiceSlugs: string[],
 	request: CompositionRequest,
 	observations: readonly AdmittedObservation[],
-	preparedThreadKeys: string[],
+	preparedTargets: PreparedFeedbackTarget[],
 ) {
 	// The reader resolves supersession against the envelope's copy of this list and drops any unit
 	// naming a thread outside it, so the vocabulary is recorded here, where it is decided.
-	composedFeedback.preparedThreadKeys = preparedThreadKeys;
+	composedFeedback.preparedTargets = preparedTargets;
 	const enabledChannels = CHANNELS.filter((channel) => request.channels[channel].enabled);
 	const placementKinds = request.inContextPlacementKinds;
 	const usedPerChannel: Record<Channel, number> = { IN_CONTEXT: 0, IN_APP: 0, IN_CHAT: 0 };
@@ -1130,8 +1115,7 @@ function buildFeedbackTool(
 							minItems: 1,
 							items: { type: "string", minLength: 1 },
 							description:
-								"What this rests on: ids from this run's observations, and/or 'prior:<practiceSlug>' " +
-								"for a claim that rests on the staged record rather than on this run.",
+								"What this rests on: ids of admitted observations from this run for the same practice.",
 						},
 						action: {
 							type: "string",
@@ -1157,7 +1141,7 @@ function buildFeedbackTool(
 							type: "string",
 							maxLength: 8000,
 							description:
-								"IN_APP only: begin with what delta.json says changed, then name the cross-artifact work pattern; never quote a line. Markdown, read verbatim.",
+								"IN_APP only: explain the cross-artifact work pattern grounded in current observations; never quote a line or claim change over time from the pre-run history. Markdown, read verbatim.",
 						},
 						nextStep: {
 							type: "string",
@@ -1270,7 +1254,7 @@ function buildFeedbackTool(
 			if (delivers && usedPerChannel[unit.channel] >= bounds.maxUnits) {
 				return refuse(`${unit.channel} cap of ${bounds.maxUnits} reached; skipped.`);
 			}
-			const rejection = validateUnit(unit, observationsById, preparedThreadKeys, placementKinds);
+			const rejection = validateUnit(unit, observationsById, preparedTargets, placementKinds);
 			if (rejection) {
 				return refuse(rejection);
 			}
@@ -1350,13 +1334,12 @@ function asFeedbackUnit(value: unknown): FeedbackUnit | null {
 function validateUnit(
 	unit: FeedbackUnit,
 	observationsById: ReadonlyMap<string, AdmittedObservation>,
-	preparedThreadKeys: readonly string[],
+	preparedTargets: readonly PreparedFeedbackTarget[],
 	placementKinds: readonly PlacementKind[],
 ): string | null {
-	const invalidEvidence = unit.basedOn.find((reference) => {
-		if (reference === `prior:${unit.practiceSlug}`) return false;
-		return observationsById.get(reference)?.practiceSlug !== unit.practiceSlug;
-	});
+	const invalidEvidence = unit.basedOn.find(
+		(reference) => observationsById.get(reference)?.practiceSlug !== unit.practiceSlug,
+	);
 	if (invalidEvidence) {
 		return `Evidence '${invalidEvidence}' does not name an admitted observation for ${unit.practiceSlug}; skipped.`;
 	}
@@ -1367,7 +1350,14 @@ function validateUnit(
 	if (!unit.title?.trim()) return "A unit that is not a WITHHOLD needs a title; skipped.";
 	if (unit.action === "SUPERSEDE") {
 		if (!unit.supersedesThreadKey) return "SUPERSEDE needs a supersedesThreadKey; skipped.";
-		if (!preparedThreadKeys.includes(unit.supersedesThreadKey)) {
+		if (
+			!preparedTargets.some(
+				(target) =>
+					target.threadKey === unit.supersedesThreadKey &&
+					target.channel === unit.channel &&
+					target.practiceSlug === unit.practiceSlug,
+			)
+		) {
 			return `No queued message has threadKey '${unit.supersedesThreadKey}'; it must come from inputs/history/prepared.json. Skipped.`;
 		}
 	}
@@ -1586,7 +1576,7 @@ async function main() {
 				composablePracticeSlugs(),
 				compositionRequest,
 				admittedObservations,
-				stagedPreparedThreadKeys(),
+				stagedPreparedTargets(),
 			)
 		: null;
 	const events: { type: string; timestamp: number }[] = [];
@@ -1841,8 +1831,10 @@ async function main() {
 	);
 
 	const resultFileSource = resolveResultFile();
-	const coveredAfterInitial = new Set(reviewState.observations.map((item) => item.practiceSlug));
-	const missingAfterInitial = allSlugs.filter((slug) => !coveredAfterInitial.has(slug));
+	const missingAfterInitial = missingPracticeSlugs(
+		allSlugs,
+		reviewState.observations.map((item) => item.practiceSlug),
+	);
 
 	if (resultFileSource === "agent" && missingAfterInitial.length === 0) {
 		console.error(`[pi-runner] SUCCESS: result.json valid after initial run`);
@@ -1939,6 +1931,16 @@ async function main() {
 	console.error(
 		`[pi-runner] Retry: ${(retryDurationMs / 1000).toFixed(1)}s, resultFile=${existsSync(RESULT_PATH)}, reviewState=${hasPersistedReviewState()}`,
 	);
+	const missingAfterRetry = missingPracticeSlugs(
+		allSlugs,
+		reviewState.observations.map((item) => item.practiceSlug),
+	);
+	if (missingAfterRetry.length > 0) {
+		console.error(
+			`[pi-runner] FAILED: ${missingAfterRetry.length} practice observer(s) still missing after retry: ${missingAfterRetry.join(", ")}`,
+		);
+		process.exit(1);
+	}
 
 	if (checkResultFile()) {
 		console.error(`[pi-runner] SUCCESS: result.json valid after retry`);

@@ -9,9 +9,7 @@ import org.jspecify.annotations.Nullable;
  * One composition decision for one channel. It references observations but carries no measurement
  * verdict; the server resolves evidence and placement independently.
  *
- * @param basedOn what this rests on: ids of this run's observations, and/or {@code prior:<practiceSlug>}
- *     for a claim that rests on the record rather than on this run — which is how a message about
- *     something that got <em>fixed</em> can exist at all, since nothing was measured for it this time
+ * @param basedOn ids of admitted observations from this run for the same practice
  * @param body the in-app words, read verbatim. Null on the in-context lane, where the server renders
  *     evidence around {@link #nextStep}, and on the conversation lane, where {@link #notes} carries notes
  *     to the mentor

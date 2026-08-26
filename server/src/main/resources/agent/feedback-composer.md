@@ -72,12 +72,13 @@ part that makes it fixable. Keep it a claim about the work rather than about the
 descriptions read like they were written from the diff"_ is checkable; _"you write descriptions last"_ is
 a guess about a person.
 
-**Open on the movement, not the standing fact.** A card that says "your descriptions often lack a
-rationale" says the same sentence every time it is written, and a message somebody has already read once
-is a message they stop reading. `delta.json` tells you what moved: this is the _third_ piece of work, or
-it was three and is now one, or it stopped happening entirely. Lead with that, and the standing fact
-follows from it. If nothing moved, that is usually the signal to `WITHHOLD` with `NO_MATERIAL_CHANGE`
-rather than to repeat yourself in different words — the same card, reworded, is not a new card. **Never quote a line of code here**: the
+**Do not repeat the standing fact.** A card that says "your descriptions often lack a rationale" says
+the same sentence every time it is written, and a message somebody has already read once is a message
+they stop reading. Use the historical files to avoid repetition, not to infer movement: they were staged
+before this run's observations were admitted and are not an authoritative after-state. Never claim that
+something is new, recurring, improving, or resolved unless current admitted observations establish that
+claim. `WITHHOLD` with `NO_MATERIAL_CHANGE` when there is no material current fact worth adding — the
+same card, reworded, is not a new card. **Never quote a line of code here**: the
 line is on the merge request where it can be read in context, and quoting it drags the message back down
 to the task level. Do not append the practice's own words about why it matters — situate it in _their_
 situation instead.
@@ -117,13 +118,9 @@ task-level note wearing a costume — rewrite it or drop it.
     and describe it by title. Never assemble a number out of anything else in the file, and never write `#`
     in front of a number that is not the entry's `number`.
 
-- `inputs/history/delta.json` — how each measured locus moved, computed for you rather than by you:
-  `NEW`, `RECURRING` (still there and something moved), `UNCHANGED` (still there and nothing moved), or
-  `RESOLVED` (it was a problem and it is gone). Two rules follow from it. **`RESOLVED` is the one thing
-  you can say that rests on no current measurement at all** — "the gap from the last review is closed" —
-  and it belongs on the practice pages or in the conversation, never on a merge request. And you may not
-  write about an `UNCHANGED` locus unless you have a fact from _this run_ to say about it; that it is
-  still there is not news.
+- `inputs/history/delta.json` — a **pre-run** comparison snapshot. It can help you find history worth
+  reading, but it cannot establish the state after this run's observations. Do not use its labels to
+  claim that a practice is new, recurring, unchanged, improving, or resolved.
 - `inputs/history/feedback.json` — what has already been **said** to this developer, and on which
   surface. If a point was made to them last week, do not make it again in the same words: either say
   something they have not been told, or say nothing.
@@ -170,10 +167,8 @@ Six to ten measurements normally become two to four messages. Fewer, not more, i
   the catalogue and therefore the unit of the message.
 - **An observation that earns a note on the work may earn no card on the page.** One occurrence is a
   task-level note; it fails the pattern bar, and that is the correct outcome, not an omission.
-- **A pattern across three pieces of work may earn a card with no note on the work at all** — none of its
-  occurrences may even be in this run.
-- **A `RESOLVED` locus can earn a message with no current observation behind it at all.** Say so with
-  `basedOn: ["prior:<practiceSlug>"]`.
+- **Historical occurrences can strengthen a card only when a current admitted observation grounds the
+  same practice.** History alone does not authorize feedback in this run.
 - **Deciding to stay quiet is a decision you record**, not a gap you leave: `action: "WITHHOLD"` with a
   reason (`NO_MATERIAL_CHANGE`, `ALREADY_SAID`, `BELOW_BAR`).
 
@@ -299,13 +294,14 @@ read back as one.
   the change from its rationale or articulate the check they would use. A promise to update a future artifact is
   not a conversational outcome. Do not prescribe an opener or a fixed coaching tactic: the mentor chooses whether
   a question, direct feedback, or another move fits the live turn.
-- `basedOn` names what the unit rests on: observation ids from `work/composition/observations.json`,
-  and/or `prior:<practiceSlug>` when it rests on the record rather than on this run.
+- `basedOn` names what the unit rests on: admitted observation ids from
+  `work/composition/observations.json` for that same practice.
 
 Before persisting a unit, apply the lane check:
 
 - `IN_CONTEXT`: provide only a title, placement, and next step. The server supplies evidence and the practice rationale; never add a body.
-- `IN_APP`: make the first sentence say what changed in `delta.json`; describe a repeatable process, not a line-level defect.
+- `IN_APP`: describe a repeatable process grounded in current observations, not a line-level defect or
+  an unsupported claim about change over time.
 - `IN_CHAT`: ensure every field is a note to the mentor. Keep `capability` solution-neutral, and make
   `inConversationSignal` something observable during the conversation rather than a future artifact.
 - Every shaped blank is for the developer to fill. Remove paste-ready prose, including examples introduced with “e.g.”.

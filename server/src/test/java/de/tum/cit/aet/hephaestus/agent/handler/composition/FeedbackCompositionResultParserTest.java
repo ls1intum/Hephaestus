@@ -111,7 +111,7 @@ class FeedbackCompositionResultParserTest extends BaseUnitTest {
             output(
                 """
                 { "channel": "IN_CHAT", "practiceSlug": "ships-tests-with-the-change",
-                  "basedOn": ["prior:ships-tests-with-the-change"], "action": "NEW",
+                  "basedOn": ["obs-0"], "action": "NEW",
                   "title": "Tests arrive after review",
                   "notes": {
                     "situation": "On !18, !20 and !22 the test landed a push after the review comment.",
@@ -160,7 +160,7 @@ class FeedbackCompositionResultParserTest extends BaseUnitTest {
                 output(
                     """
                     { "channel": "IN_CHAT", "practiceSlug": "ships-tests-with-the-change",
-                      "basedOn": ["prior:ships-tests-with-the-change"], "action": "NEW",
+                      "basedOn": ["obs-0"], "action": "NEW",
                       "title": "Tests arrive after review",
                       "notes": { %s } }
                     """.formatted(notes),
@@ -178,7 +178,7 @@ class FeedbackCompositionResultParserTest extends BaseUnitTest {
                 output(
                     """
                     { "channel": "IN_CHAT", "practiceSlug": "ships-tests-with-the-change",
-                      "basedOn": ["prior:ships-tests-with-the-change"], "action": "NEW",
+                      "basedOn": ["obs-0"], "action": "NEW",
                       "title": "Tests arrive after review",
                       "notes": {
                         "situation": "Tests repeatedly arrived after review.",
@@ -307,7 +307,12 @@ class FeedbackCompositionResultParserTest extends BaseUnitTest {
 
     @Test
     void rejectsEvidenceFromAnotherPracticeOrAnUnknownObservation() {
-        for (String reference : List.of("obs-1", "obs-missing", "prior:keeps-the-thread-moving")) {
+        for (String reference : List.of(
+            "obs-1",
+            "obs-missing",
+            "prior:ships-tests-with-the-change",
+            "prior:keeps-the-thread-moving"
+        )) {
             assertThat(
                 parser.parse(
                     output(
@@ -460,7 +465,15 @@ class FeedbackCompositionResultParserTest extends BaseUnitTest {
     private JsonNode outputOf(JsonNode units, String preparedThreadKeysJson) {
         var payload = objectMapper.createObjectNode();
         payload.set("observations", objectMapper.readTree(OBSERVATIONS));
-        payload.set("preparedThreadKeys", objectMapper.readTree(preparedThreadKeysJson));
+        var preparedTargets = objectMapper.createArrayNode();
+        for (JsonNode key : objectMapper.readTree(preparedThreadKeysJson)) {
+            preparedTargets
+                .addObject()
+                .put("threadKey", key.asString())
+                .put("channel", "IN_APP")
+                .put("practiceSlug", "ships-tests-with-the-change");
+        }
+        payload.set("preparedTargets", preparedTargets);
         payload.set("units", units);
         var jobOutput = objectMapper.createObjectNode();
         jobOutput.set("feedback", payload);

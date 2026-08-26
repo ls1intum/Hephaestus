@@ -26,6 +26,14 @@ export interface ReviewTree {
 	groups: ReviewGroup[];
 }
 
+export function missingPracticeSlugs(
+	selected: readonly string[],
+	observed: readonly string[],
+): string[] {
+	const covered = new Set(observed);
+	return selected.filter((slug) => !covered.has(slug));
+}
+
 const LANE_ORDER: readonly EvidenceLane[] = [
 	"pull-request",
 	"linked-work",

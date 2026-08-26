@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
 	buildReviewTree,
 	mapConcurrent,
+	missingPracticeSlugs,
 	type ReviewPractice,
 } from "../../../main/resources/agent/pi-review-tree";
 
@@ -81,6 +82,11 @@ describe("buildReviewTree", () => {
 			"duplicate practice slug: same",
 		);
 	});
+});
+
+test("missingPracticeSlugs requires explicit coverage for every selected practice", () => {
+	expect(missingPracticeSlugs(["a", "b", "c"], ["c", "a"])).toEqual(["b"]);
+	expect(missingPracticeSlugs(["a", "b"], ["b", "a"])).toEqual([]);
 });
 
 test("mapConcurrent bounds active work and preserves input order", async () => {
