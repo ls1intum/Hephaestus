@@ -93,6 +93,13 @@ export const PartiallyDelivered: Story = {
 	},
 };
 
+export const NoObservations: Story = {
+	args: { feedback: { ...reviewFeedbackDetail, observations: [] } },
+	play: async ({ canvas }) => {
+		await expect(canvas.getByText("No observations are linked to this feedback")).toBeVisible();
+	},
+};
+
 /**
  * A note of the length the composer really produces. Nothing on this page truncates it: the cut an
  * operator sees in the delivery list is a list preview and stops there.

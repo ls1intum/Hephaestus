@@ -112,6 +112,15 @@ export const Allowed: Story = {
 	},
 };
 
+export const NoEvaluations: Story = {
+	args: { evaluations: [] },
+	play: async ({ canvas }) => {
+		await expect(
+			canvas.queryByRole("button", { name: "Technical delivery policy trace" }),
+		).not.toBeInTheDocument();
+	},
+};
+
 export const BroadCoverage: Story = {
 	args: { evaluations: [openScopeEvaluation] },
 	play: async ({ canvas }) => {

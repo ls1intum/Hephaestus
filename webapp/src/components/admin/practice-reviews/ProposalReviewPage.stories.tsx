@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn, screen, userEvent, within } from "storybook/test";
+import { expectGenuinelyDisabled } from "@/test/controls";
 import { expectNoPageOverflow } from "@/test/reflow";
 import { ProposalReviewPage } from "./ProposalReviewPage";
 import { reviewFeedbackDetail, workspacePractices } from "./story-mock-data";
@@ -67,6 +68,15 @@ export const Ready: Story = {
 	},
 };
 
+export const PackageUnavailable: Story = {
+	args: { feedback: { ...feedback, proposedPlacements: [] } },
+	play: async ({ canvas }) => {
+		await expect(canvas.getByRole("alert")).toHaveTextContent("This review package is unavailable");
+		await expectGenuinelyDisabled(canvas.getByRole("button", { name: "Approve and send review" }));
+		await expect(canvas.getByRole("button", { name: "Reject feedback" })).toBeEnabled();
+	},
+};
+
 export const RejectingWithContext: Story = {
 	play: async ({ canvas, args }) => {
 		await userEvent.click(canvas.getByRole("button", { name: "Reject feedback" }));
@@ -88,7 +98,7 @@ export const RejectingWithContext: Story = {
 export const Deciding: Story = {
 	args: { isDeciding: true },
 	play: async ({ canvas }) => {
-		await expect(canvas.getByRole("button", { name: /Approve and send/ })).toBeDisabled();
-		await expect(canvas.getByRole("button", { name: "Reject feedback" })).toBeDisabled();
+		await expectGenuinelyDisabled(canvas.getByRole("button", { name: /Approve and send/ }));
+		await expectGenuinelyDisabled(canvas.getByRole("button", { name: "Reject feedback" }));
 	},
 };

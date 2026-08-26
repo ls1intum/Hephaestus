@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn, screen, userEvent, within } from "storybook/test";
 import type { AgentBinding, PracticeReviewCoveragePreview } from "@/api/types.gen";
-import { expectUnavailable } from "@/test/controls";
+import { expectGenuinelyDisabled, expectUnavailable } from "@/test/controls";
 import { expectSettledVisible } from "@/test/overlay";
 import { expectNoPageOverflow } from "@/test/reflow";
 import { PracticeReviewSettings } from "./PracticeReviewSettings";
@@ -280,9 +280,9 @@ export const RefusingADuplicate: Story = {
 
 		await expect(input).toBeInvalid();
 		await expect(input).toHaveAccessibleDescription(/main is already listed\./);
-		await expect(
+		await expectGenuinelyDisabled(
 			canvas.getByRole("button", { name: "Add to base branches for acme/widgets" }),
-		).toBeDisabled();
+		);
 
 		await userEvent.type(input, "{Enter}");
 		await expect(args.policy.onUpdate).not.toHaveBeenCalled();
