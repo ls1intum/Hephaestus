@@ -690,7 +690,7 @@ function buildReportObservationTool(allowedPracticeSlug?: string) {
 					details: { inserted: 0 },
 				});
 			}
-			const { inserted, duplicates, negatives } = appendObservations([normalized]);
+			const { inserted, duplicates, negatives } = appendObservations([params.observation]);
 			return Promise.resolve({
 				content: [
 					{
