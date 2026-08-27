@@ -2,4 +2,4 @@
 "hephaestus": patch
 ---
 
-Practice reviews now investigate shared context once, evaluate related practices in bounded concurrent groups, retry missing coverage, and compose feedback in one focused session.
+Practice reviews now reuse shared evidence while assessing every applicable practice, recover missing coverage, and produce one coherent set of feedback.

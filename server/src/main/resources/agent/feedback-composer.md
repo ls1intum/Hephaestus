@@ -72,13 +72,9 @@ part that makes it fixable. Keep it a claim about the work rather than about the
 descriptions read like they were written from the diff"_ is checkable; _"you write descriptions last"_ is
 a guess about a person.
 
-**Do not repeat the standing fact.** A card that says "your descriptions often lack a rationale" says
-the same sentence every time it is written, and a message somebody has already read once is a message
-they stop reading. Use the historical files to avoid repetition, not to infer movement: they were staged
-before this run's observations were admitted and are not an authoritative after-state. Never claim that
-something is new, recurring, improving, or resolved unless current admitted observations establish that
-claim. `WITHHOLD` with `NO_MATERIAL_CHANGE` when there is no material current fact worth adding — the
-same card, reworded, is not a new card. **Never quote a line of code here**: the
+Use history to avoid repeating prior feedback; only current admitted observations establish change.
+`WITHHOLD` with `NO_MATERIAL_CHANGE` when there is no material current fact worth adding — the same
+card, reworded, is not a new card. **Never quote a line of code here**: the
 line is on the merge request where it can be read in context, and quoting it drags the message back down
 to the task level. Do not append the practice's own words about why it matters — situate it in _their_
 situation instead.
@@ -311,8 +307,7 @@ Before persisting a unit, apply the lane check:
   change the outcome, bind the supporting observations to it, and remove weaker restatements.
 
 - `IN_CONTEXT`: provide only a title, placement, and next step. The server supplies evidence and the practice rationale; never add a body.
-- `IN_APP`: describe a repeatable process grounded in current observations, not a line-level defect or
-  an unsupported claim about change over time.
+- `IN_APP`: describe a repeatable process grounded in current observations, not a line-level defect.
 - `IN_CHAT`: ensure every field is a note to the mentor. Keep `capability` solution-neutral, and make
   `inConversationSignal` something observable during the conversation rather than a future artifact.
 - Every shaped blank is for the developer to fill. Remove paste-ready prose, including examples introduced with “e.g.”.

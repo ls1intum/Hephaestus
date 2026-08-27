@@ -288,9 +288,6 @@ function AgentPurposeCard({
 						<CardDescription>
 							{meta.description}
 							{!featureEnabled &&
-								// Two links rather than one with a ternary destination: the switch that turns
-								// practice reviews on lives in a section of the Review page, which is a search
-								// param, and the workspace one is a route of its own.
 								(meta.purpose === "PRACTICE_REVIEW" ? (
 									<div>
 										<Link

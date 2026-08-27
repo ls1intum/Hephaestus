@@ -1,6 +1,3 @@
-// Run locally with:
-//   pnpm run test:agents
-
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
@@ -34,7 +31,6 @@ void test("an envelope that lists the threads its units supersede delivers all o
 });
 
 void test("a superseding unit is undeliverable when the envelope lists no threads", () => {
-	// The incident: the tool was given the staged keys and accepted the unit, the envelope was not.
 	const envelope = { preparedTargets: [], units: [supersede("t-1")] };
 
 	assert.deepEqual(undeliverableUnits(envelope), [supersede("t-1")]);

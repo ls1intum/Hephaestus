@@ -426,9 +426,6 @@ async function ensureRuntime(): Promise<MentorRuntime> {
 	runtimeInitPromise = (async () => {
 		mkdirSync(SESSIONS_DIR, { recursive: true });
 		const sdk = PROTOCOL_ONLY ? null : await import("@earendil-works/pi-coding-agent");
-		// `getAgentDir()` is the SDK's canonical default ("~/.pi/agent") and only exists once the
-		// SDK is loaded; protocol-only mode never loads it and falls back to the sandbox layout's
-		// own agent dir, which is what production's PI_CODING_AGENT_DIR points at anyway.
 		const agentDir = AGENT_DIR_OVERRIDE ?? sdk?.getAgentDir() ?? PI_AGENT_DIR;
 		cacheSystemPrompt();
 		const r = sdk === null ? createStubRuntime() : await createPiRuntime(sdk, agentDir);
@@ -448,11 +445,6 @@ async function ensureRuntime(): Promise<MentorRuntime> {
 	}
 }
 
-//
-// When Pi calls this tool, we emit a JSON-RPC request to Java and await a matching response.
-// 10s timeout — on miss, we resolve Pi's tool call with an error result so the agent reasons
-// about the gap rather than crashing the turn.
-
 function defineFetchContextTool(sdk: PiSdk) {
 	const { defineTool } = sdk;
 	return defineTool({
@@ -470,8 +462,6 @@ function defineFetchContextTool(sdk: PiSdk) {
 			},
 		},
 		execute: async (_toolCallId, params): Promise<FetchContextToolResult> => {
-			// NOT `path` — that's the imported `node:path` module; shadowing it here is a
-			// future footgun if anyone adds `path.join(...)`.
 			const contextKey = jsonText(params.path).trim();
 			// Pi treats THROWN errors as the tool's failure signal — a returned `isError:true`
 			// is ignored by the runtime, so throw to flag the call as failed.
@@ -526,14 +516,11 @@ function defineLinkObservationTool(sdk: PiSdk) {
 				observationId: { type: "string", minLength: 1 },
 			},
 		},
-		// Nothing here waits on anything. Pi reads a rejection as the tool's failure, which is what a
-		// missing observationId owes the model.
 		execute: (_toolCallId, params): Promise<AgentToolResult<{ observationId: string }>> => {
 			const observationId = jsonText(params.observationId).trim();
 			if (!observationId) {
 				return Promise.reject(new Error("link_observation: observationId is required"));
 			}
-			// Emit a synthetic event the Java translator maps to a `data-observation` UI chunk.
 			if (activeThreadId) {
 				sendEvent(activeThreadId, { type: "link_observation", observationId });
 			}
@@ -546,12 +533,9 @@ function defineLinkObservationTool(sdk: PiSdk) {
 }
 
 function handleHello(id: JsonRpcId | undefined /*, params */) {
-	// Java validates `protocolVersion` AND `protocolOnly` (MentorChatService#verifyProtocol);
-	// shipping the latter on hello lets Java fail-closed if MENTOR_RUNNER_PROTOCOL_ONLY=1
-	// leaks into a real deploy, instead of every user receiving stubbed answers.
+	// Java validates protocolOnly so a stub runtime cannot answer production traffic.
 	sendResult(id, { protocolVersion: PROTOCOL_VERSION, protocolOnly: PROTOCOL_ONLY });
-	// Prewarm the SDK in the background while Java orchestrates DB load + context build.
-	// Fired AFTER the hello reply because SDK module evaluation is synchronous.
+	// Reply before synchronously evaluating the SDK during background prewarm.
 	if (!PROTOCOL_ONLY) {
 		setImmediate(() => {
 			ensureRuntime().catch((e) => log("prewarm ensureRuntime failed (will retry on demand):", e));
@@ -559,32 +543,15 @@ function handleHello(id: JsonRpcId | undefined /*, params */) {
 	}
 }
 
-/**
- * Inbound `params`, as they arrive: parsed JSON with no guarantees. The declared shapes in
- * pi-mentor-protocol.ts say what Java sends; the handlers below still coerce every field, because
- * this is a trust boundary and `path.join` is downstream of it.
- */
+/** Untrusted JSON-RPC parameters. */
 type MentorParams = Record<string, unknown>;
 
-/**
- * One dispatch entry. Handlers that ignore `params` simply declare fewer parameters, and the ones
- * that settle a request without waiting on the runtime return nothing at all.
- *
- * `id` is `undefined` for a JSON-RPC notification (§4: no response may be sent) and `null` for a
- * request whose id could not be determined (§6), which still gets one.
- */
+/** An undefined id identifies a JSON-RPC notification and receives no response. */
 type MethodHandler = (id: JsonRpcId | undefined, params: MentorParams) => void | Promise<void>;
 
-// Canonical lowercase UUID, the only shape Java ever sends. Validating defensively at the
-// runner boundary means a future caller that bypasses Java (dev bridge, mis-routed message)
-// cannot land an arbitrary path inside `path.join(SESSIONS_DIR, …)` — `path.join` is NOT a
-// security primitive and happily resolves `..` / absolute paths out of the base.
+// Prevent thread IDs from escaping SESSIONS_DIR.
 const THREAD_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
-// Canonicalise the thread id the SAME way for open AND every later lookup. open_thread stores
-// state under this key, so a caller sending an uppercase UUID (the dev-bridge / mis-routed
-// threat model THREAD_ID_PATTERN guards) must be normalised identically on prompt/steer/abort/
-// close or `threads.get()` misses and returns a spurious THREAD_NOT_OPEN.
 function normalizeThreadId(params: MentorParams) {
 	return jsonText(params.threadId).trim().toLowerCase();
 }

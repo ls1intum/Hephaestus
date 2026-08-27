@@ -18,7 +18,7 @@ public enum RevisionScheme {
     /** The identity of one explicit request to review. Two asks are two revisions, by construction. */
     RUN_ID("run~"),
 
-    /** The provider-independent identity of one mirrored domain event. */
+    /** The identity of one mirrored domain event within its signal. */
     EVENT_ID("event~");
 
     private final String prefix;

@@ -192,7 +192,6 @@ public final class ScmSignals {
             case TERMINAL_STATE -> Optional.of(SignalRevision.ofTerminalState(lastSegmentOf(signal)));
             // A requested run carries its own identity; no domain event raises one.
             case RUN_ID -> Optional.empty();
-            // Review events use pullRequestReviewKey because their identity is not a property of PR prose.
             case EVENT_ID -> Optional.empty();
         };
     }

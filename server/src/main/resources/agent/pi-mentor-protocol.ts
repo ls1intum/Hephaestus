@@ -168,7 +168,6 @@ export interface RunnerReadyEvent {
 	turnGraceMs: number;
 }
 
-/** Complete session JSONL emitted after the run settles for persistence by Java. */
 export interface SessionPersistedEvent {
 	type: "session_persisted";
 	jsonl: string;

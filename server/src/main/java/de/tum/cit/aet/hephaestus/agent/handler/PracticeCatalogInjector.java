@@ -240,19 +240,6 @@ class PracticeCatalogInjector {
         return practices;
     }
 
-    /**
-     * Whether this run can name the person a practice's result would be about.
-     *
-     * <p>A review job resolves exactly one person — the artifact's author, or the subject a repo-less job
-     * carries explicitly ({@code PracticeDetectionDeliveryService#resolveTarget}). A practice whose
-     * occasion is about a REVIEWER therefore has nobody this job can attribute it to: the review event
-     * names no reviewer, and the mirrored threads routinely carry several. Running it anyway is what
-     * filed a judgement of Bob's review under Alice's name, on every pull request Alice opened.
-     *
-     * <p>Refused here rather than at delivery so the run is never paid for. Delivery refuses it again —
-     * a job already in flight, and a review asked for by hand (which names no occasion and so injects
-     * every practice of the kind), both reach the ledger without passing this.
-     */
     private boolean attributable(Practice practice, @Nullable SignalName signal, AgentJob job) {
         ActorRole subject = PracticeBinding.subjectRoleOf(practice.getBindings(), signal);
         JsonNode metadata = job.getMetadata();

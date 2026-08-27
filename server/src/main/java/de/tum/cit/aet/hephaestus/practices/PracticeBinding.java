@@ -36,11 +36,7 @@ import org.jspecify.annotations.Nullable;
  * @param signals  the signals that occasion this review; at least one, and all of one artifact kind
  * @param onDrafts whether a draft artifact occasions this review; defaults to false since most
  *                 practices judge work that has been handed over
- * @param subject  whose conduct a review occasioned this way judges. Defaults to {@link ActorRole#AUTHOR},
- *                 which is what almost every practice is about; a practice about reviewing names
- *                 {@link ActorRole#REVIEWER}. Declared on the occasion rather than on the signal because
- *                 one signal may describe practices about different roles; the submitted-review path
- *                 uses the triggering reviewer as its assessed subject and withholds author practices.
+ * @param subject whose conduct is assessed; defaults to {@link ActorRole#AUTHOR}
  */
 @Schema(description = "An occasion that starts a review, and the evidence that review reads")
 public record PracticeBinding(

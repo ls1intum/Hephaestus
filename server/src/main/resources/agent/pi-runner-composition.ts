@@ -28,7 +28,6 @@ export interface ComposedFeedbackEnvelope {
 	observations?: unknown[];
 	preparedTargets?: PreparedFeedbackTarget[];
 	units?: ComposedFeedbackUnit[];
-	/** How the review opens, in the composer's words. */
 	lead?: string | null;
 }
 
@@ -46,7 +45,6 @@ export function validateFeedbackEvidence(
 	return null;
 }
 
-/** Returns SUPERSEDE units whose thread key, channel, and practice do not match a staged target. */
 export function undeliverableUnits(
 	envelope?: ComposedFeedbackEnvelope | null,
 ): ComposedFeedbackUnit[] {

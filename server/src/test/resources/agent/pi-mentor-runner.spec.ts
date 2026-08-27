@@ -23,18 +23,11 @@ void test("mentor exposes only read and inline-rendering tools", () => {
 	assert.deepEqual(MENTOR_TOOL_NAMES, ["fetch_context", "link_observation"]);
 });
 
-// Production runner targets /workspace/.sessions, which is unwritable in CI / local node test
-// runs. Spawn each runner with an isolated tmpdir to keep the smoke tests hermetic.
 const SESSIONS_TMPDIR = mkdtempSync(path.join(tmpdir(), "pi-mentor-runner-spec-"));
 process.on("exit", () => {
-	try {
-		rmSync(SESSIONS_TMPDIR, { recursive: true, force: true });
-	} catch {
-		/* best-effort tmpdir cleanup; safe to ignore on shutdown */
-	}
+	rmSync(SESSIONS_TMPDIR, { recursive: true, force: true });
 });
 
-/** The envelope every frame the runner writes shares; the helpers below narrow it further. */
 function isOutboundFrame(value: unknown): value is MentorOutboundFrame {
 	return (
 		typeof value === "object" &&
@@ -44,12 +37,6 @@ function isOutboundFrame(value: unknown): value is MentorOutboundFrame {
 	);
 }
 
-/**
- * The runner writes JSON; this is the one place bytes become values. Everything downstream reads
- * the frame through `MentorOutboundFrame`, so the assertions below are checked against the same
- * declarations the runner produces — and a line that is not a frame at all fails here, by that name,
- * rather than as a missing field several assertions later.
- */
 function parseFrame(line: string): MentorOutboundFrame {
 	const frame: unknown = JSON.parse(line);
 	if (!isOutboundFrame(frame)) {
@@ -70,12 +57,10 @@ function isFailure(frame: MentorOutboundFrame): frame is JsonRpcErrorResponse {
 	return "error" in frame;
 }
 
-/** `params.event.type` for an event frame, or undefined for anything else. */
 function eventType(frame: MentorOutboundFrame): string | undefined {
 	return isEventNotification(frame) ? frame.params.event.type : undefined;
 }
 
-/** `params.threadId` for an event frame, or undefined for anything else. */
 function eventThreadId(frame: MentorOutboundFrame): string | null | undefined {
 	return isEventNotification(frame) ? frame.params.threadId : undefined;
 }
@@ -89,7 +74,6 @@ interface Reader {
 	next: (timeoutMs?: number) => Promise<string>;
 }
 
-// ─── Test-side line splitter mirrors the runner's strict semantics ───────────
 function createReader(): Reader {
 	let buffer: Buffer = Buffer.alloc(0);
 	const queue: string[] = [];
@@ -142,10 +126,6 @@ interface RunnerHandle {
 	send: (request: MentorRequest) => void;
 }
 
-/**
- * `env` overrides are merged over the process env, so a caller only names what it changes.
- * MENTOR_RUNNER_SESSIONS_DIR always points at the hermetic tmpdir.
- */
 function spawnRunner(env: Record<string, string> = {}): RunnerHandle {
 	const child = spawn(process.execPath, [RUNNER], {
 		env: {
@@ -159,7 +139,6 @@ function spawnRunner(env: Record<string, string> = {}): RunnerHandle {
 	});
 	const reader = createReader();
 	child.stdout.on("data", (chunk: Buffer) => reader.push(chunk));
-	// Surface runner stderr to test output for diagnostics; never assert against it.
 	child.stderr.on("data", (chunk: Buffer) =>
 		process.stderr.write(`[runner-stderr] ${chunk.toString("utf8")}`),
 	);
@@ -169,7 +148,6 @@ function spawnRunner(env: Record<string, string> = {}): RunnerHandle {
 	return { child, reader, send };
 }
 
-/** Send `shutdown` and wait for the child to exit — the teardown every test shares. */
 async function shutdown({ child, send }: RunnerHandle): Promise<void> {
 	send({ jsonrpc: "2.0", id: "shut", method: "shutdown", params: {} });
 	await new Promise<void>((resolve) => {
@@ -194,12 +172,6 @@ async function readReady(reader: Reader): Promise<MentorOutboundFrame> {
 	return readUntil(reader, (f) => eventType(f) === "runner_ready");
 }
 
-/**
- * Read the response to `id` and hand back its `result`.
- *
- * A wrong-shaped response throws rather than asserting: the shape is a precondition for the
- * assertions each test then makes, not a claim the test is here to check.
- */
 async function readResult(reader: Reader, id: string): Promise<JsonRpcSuccessResponse["result"]> {
 	const frame = await readUntil(reader, (f) => frameId(f) === id);
 	if (!isSuccess(frame)) {
@@ -208,7 +180,6 @@ async function readResult(reader: Reader, id: string): Promise<JsonRpcSuccessRes
 	return frame.result;
 }
 
-/** Read the response to `id` and hand back its `error`. See `readResult` on why this throws. */
 async function readError(reader: Reader, id: string): Promise<JsonRpcErrorResponse["error"]> {
 	const frame = await readUntil(reader, (f) => frameId(f) === id);
 	if (!isFailure(frame)) {
@@ -231,18 +202,15 @@ void test("hello handshake returns protocolVersion 1", async () => {
 });
 
 void test("U+2028 and U+2029 inside JSON strings do NOT split frames", async () => {
-	// The most insidious bug in the framing layer: many naive line splitters split on
-	// U+2028/U+2029, but JSON.stringify leaves those 3-byte UTF-8 sequences unescaped inside
-	// string values. The runner uses Buffer.indexOf(0x0a) directly to avoid this. Drive a real
-	// prompt frame whose text carries the chars; if the splitter mis-handled the bytes, the
-	// runner would see two malformed halves and we would never match the accept ack.
 	const runner = spawnRunner();
 	try {
 		await readReady(runner.reader);
 		const tid = "11111111-2222-3333-4444-555555555555";
 		runner.send({ jsonrpc: "2.0", id: "o", method: "open_thread", params: { threadId: tid } });
 		await readResult(runner.reader, "o");
-		const tricky = `line1 line2 line3`;
+		const tricky = `line1
+line2
+line3`;
 		runner.send({
 			jsonrpc: "2.0",
 			id: "p",
@@ -258,9 +226,6 @@ void test("U+2028 and U+2029 inside JSON strings do NOT split frames", async () 
 });
 
 void test("path-traversal threadId rejected with -32600", async () => {
-	// The runner is a security boundary: even though Java only ever passes UUIDs, a future
-	// bridge or debug shell that bypasses Java must not be able to coax path.join into
-	// resolving outside SESSIONS_DIR. Reject anything that is not a canonical UUID.
 	const runner = spawnRunner();
 	try {
 		await readReady(runner.reader);
@@ -277,7 +242,6 @@ void test("path-traversal threadId rejected with -32600", async () => {
 });
 
 void test("second concurrent prompt returns -32001 turn_already_in_flight", async () => {
-	// Use a slow stub so the first prompt is still in flight when we fire the second.
 	const runner = spawnRunner({ MENTOR_RUNNER_STUB_DELAY_MS: "150" });
 	const threadId = "22222222-2222-2222-2222-222222222222";
 	try {
@@ -295,7 +259,6 @@ void test("second concurrent prompt returns -32001 turn_already_in_flight", asyn
 		assert.ok("accepted" in accepted, "first prompt must be accepted");
 		assert.equal(accepted.accepted, true);
 
-		// Fire the second prompt immediately — stub delay is 150ms so the first is still streaming.
 		runner.send({
 			jsonrpc: "2.0",
 			id: "p2",
@@ -414,22 +377,16 @@ void test("forwards only the final attempt after Pi settles", async () => {
 });
 
 void test("batch JSON-RPC request is rejected with -32600 (not silently dropped)", async () => {
-	// JSON-RPC 2.0 §6 permits top-level arrays as batches. Neither end emits batches today;
-	// the runner rejects them loudly so a future Java caller that bundles requests doesn't
-	// see its frames vanish into the runner's log.
 	const runner = spawnRunner();
 	try {
 		await readReady(runner.reader);
 
-		// Send a batch (top-level array) with two requests. `send` takes a single request by
-		// design, so this one frame goes out through stdin directly.
 		const batch: MentorRequest[] = [
 			{ jsonrpc: "2.0", id: "b1", method: "hello", params: {} },
 			{ jsonrpc: "2.0", id: "b2", method: "hello", params: {} },
 		];
 		runner.child.stdin?.write(`${JSON.stringify(batch)}\n`);
 
-		// Expect a single error frame with id:null and code -32600.
 		const frame = await readUntil(runner.reader, (f) => isFailure(f) && f.error.code === -32600);
 		assert.equal(frameId(frame), null, "batch rejection error must carry id:null per JSON-RPC §6");
 	} finally {
@@ -438,7 +395,6 @@ void test("batch JSON-RPC request is rejected with -32600 (not silently dropped)
 });
 
 void test("watchdog cross-thread rebind: no event leakage from concurrently-bound thread", async () => {
-	// Switching to B while A times out must not leave B subscribed after A is rebound.
 	const threadA = "33333333-3333-3333-3333-333333333333";
 	const threadB = "44444444-4444-4444-4444-444444444444";
 	const runner = spawnRunner({
@@ -508,7 +464,3 @@ void test("watchdog cross-thread rebind: no event leakage from concurrently-boun
 		await shutdown(runner);
 	}
 });
-
-// Note: fetch_context end-to-end coverage lives Java-side in MentorRunnerClientTest +
-// MentorChatServiceTest. A Node-side smoke test would either assert on stderr text (brittle)
-// or require a real Pi LLM round-trip.

@@ -7,7 +7,7 @@
         <preConditions onFail="MARK_RAN">
             <columnExists tableName="workspace_agent_binding" columnName="timeout_seconds"/>
         </preConditions>
-        <comment>Give comprehensive practice reviews a three-hour database default.</comment>
+        <comment>Set the default agent run timeout to three hours.</comment>
         <addDefaultValue
             tableName="workspace_agent_binding"
             columnName="timeout_seconds"

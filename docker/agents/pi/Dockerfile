@@ -43,7 +43,7 @@ ARG PI_VERSION=0.84.3
 # resolves through the symlink PiRuntimeFactory plants at /<workspace>/node_modules → here.
 #
 # Bun blocks lifecycle scripts by default and no `trustedDependencies` is declared.
-# Lifecycle scripts stay disabled; the image build verifies the installed SDK before publishing.
+# Lifecycle scripts remain disabled.
 RUN mkdir -p /opt/pi-sdk && cd /opt/pi-sdk && \
     printf '{"name":"hephaestus-pi-sdk","private":true,"dependencies":{"@earendil-works/pi-coding-agent":"%s"}}\n' \
         "${PI_VERSION}" > package.json && \
