@@ -196,17 +196,34 @@ jobs:
           CHROMATIC_BRANCH: ${{ github.head_ref || github.ref_name }}
           CHROMATIC_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
 
+      - name: Deploy public Storybook preview
+        id: storybook_preview
+        if: >-
+          steps.should_run.outputs.run == 'true' && matrix.test-type == 'webapp-storybook' &&
+          github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository &&
+          startsWith(steps.chromatic.outputs.storybookUrl, 'http')
+        env:
+          PREVIEW_URL: ls1intum-hephaestus-storybook-pr-${{ github.event.number }}.surge.sh
+          SURGE_TOKEN: ${{ secrets.SURGE_TOKEN }}
+        run: pnpm dlx surge ./webapp/storybook-static "$PREVIEW_URL" --token "$SURGE_TOKEN"
+
       - name: "Create Storybook status check"
-        if: steps.should_run.outputs.run == 'true' && matrix.test-type == 'webapp-storybook' && always() && startsWith(steps.chromatic.outputs.storybookUrl, 'http')
+        if: >-
+          steps.should_run.outputs.run == 'true' && matrix.test-type == 'webapp-storybook' && always() &&
+          startsWith(steps.chromatic.outputs.storybookUrl, 'http') &&
+          (github.event_name != 'pull_request' || steps.storybook_preview.outcome == 'success')
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
+            const storybookUrl = context.payload.pull_request
+              ? 'https://ls1intum-hephaestus-storybook-pr-${{ github.event.number }}.surge.sh'
+              : '${{ steps.chromatic.outputs.storybookUrl }}';
             await github.rest.repos.createCommitStatus({
               owner: context.repo.owner,
               repo: context.repo.repo,
               sha: context.payload.pull_request?.head?.sha || context.sha,
               state: 'success',
-              target_url: '${{ steps.chromatic.outputs.storybookUrl }}',
+              target_url: storybookUrl,
               description: 'Click Details to view your Storybook',
               context: 'Preview / Storybook'
             });
