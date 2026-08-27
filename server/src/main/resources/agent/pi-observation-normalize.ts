@@ -83,6 +83,17 @@ export interface NormalizedObservation {
 	assessment?: Assessment;
 }
 
+/** Replace every earlier disposition for one practice with its reconciled observation. */
+export function replacePracticeObservations(
+	observations: readonly NormalizedObservation[],
+	replacement: NormalizedObservation,
+): NormalizedObservation[] {
+	return [
+		...observations.filter((item) => item.practiceSlug !== replacement.practiceSlug),
+		replacement,
+	];
+}
+
 /**
  * The narrowing every reader of model-authored or file-authored JSON in this runtime starts from.
  *

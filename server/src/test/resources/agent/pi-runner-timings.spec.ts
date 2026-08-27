@@ -12,6 +12,7 @@ void test("review budget reserves fifteen percent for a retry", () => {
 	assert.deepEqual(deriveTimeouts(900_000), {
 		initialMs: 765_000,
 		retryMs: 135_000,
+		reconciliationMs: 0,
 		compositionMs: 0,
 	});
 });
@@ -20,22 +21,25 @@ void test("a small review never allocates more time than it owns", () => {
 	assert.deepEqual(deriveTimeouts(10_000), {
 		initialMs: 8_500,
 		retryMs: 1_500,
+		reconciliationMs: 0,
 		compositionMs: 0,
 	});
 });
 
 void test("a composing review reserves time for intervention before detection starts", () => {
 	assert.deepEqual(deriveTimeouts(900_000, true), {
-		initialMs: 650_250,
-		retryMs: 114_750,
+		initialMs: 612_000,
+		retryMs: 108_000,
+		reconciliationMs: 45_000,
 		compositionMs: 135_000,
 	});
 });
 
 void test("composition and retry stay inside a small budget", () => {
 	assert.deepEqual(deriveTimeouts(10_000, true), {
-		initialMs: 7_225,
-		retryMs: 1_275,
+		initialMs: 6_800,
+		retryMs: 1_200,
+		reconciliationMs: 500,
 		compositionMs: 1_500,
 	});
 });

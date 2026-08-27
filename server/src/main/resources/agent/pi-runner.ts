@@ -16,6 +16,7 @@ import {
 	isRecord,
 	type NormalizedObservation,
 	normalizeObservation,
+	replacePracticeObservations,
 	validateEvidenceSources,
 	validateInapplicabilityScope,
 	validateSearchScope,
@@ -184,6 +185,7 @@ if (!AGENT_DIR) {
 const {
 	initialMs: INITIAL_TIMEOUT_MS,
 	retryMs: RETRY_TIMEOUT_MS,
+	reconciliationMs: RECONCILIATION_TIMEOUT_MS,
 	compositionMs: COMPOSITION_TIMEOUT_MS,
 } = deriveTimeouts(AGENT_BUDGET_MS, existsSync(`${CWD}/inputs/feedback-composition.json`));
 
@@ -621,6 +623,15 @@ function appendObservations(observations: unknown[]): {
 	return { inserted, duplicates, negatives };
 }
 
+function replacePracticeObservation(rawObservation: unknown): NormalizedObservation {
+	const observation = normalizeAndValidateObservation(rawObservation);
+	reviewState.observations = replacePracticeObservations(reviewState.observations, observation);
+	reviewState.observationKeys = reviewState.observations.map(dedupeKeyForObservation);
+	persistReviewState();
+	maybeWriteResultFile();
+	return observation;
+}
+
 function normalizeAndValidateObservation(rawObservation: unknown): NormalizedObservation {
 	const observation = normalizeObservation(rawObservation);
 	if (!admittedPractices.has(observation.practiceSlug))
@@ -725,6 +736,45 @@ function buildReportObservationTool(allowedPracticeSlugs?: readonly string[]) {
 					totalObservations: reviewState.observations.length,
 					remainingPractices,
 				},
+			});
+		},
+	});
+}
+
+function buildReviseObservationTool(candidatePracticeSlugs: readonly string[]) {
+	const allowed = new Set(candidatePracticeSlugs);
+	return defineTool({
+		name: "revise_observation",
+		label: "Revise Observation",
+		description:
+			"Replace one candidate practice's stored observation after finding a real outcome inconsistency. " +
+			"Do not call this merely to reword a valid observation.",
+		parameters: {
+			...observationSchema,
+			properties: {
+				...observationSchema.properties,
+				practiceSlug: { type: "string", enum: candidatePracticeSlugs },
+			},
+		},
+		execute: (_toolCallId, params): Promise<AgentToolResult<{ practiceSlug?: string }>> => {
+			const normalized = normalizeObservation(params);
+			if (!allowed.has(normalized.practiceSlug)) {
+				return Promise.resolve({
+					content: [
+						{ type: "text", text: "Only listed reconciliation candidates may be revised." },
+					],
+					details: {},
+				});
+			}
+			const revised = replacePracticeObservation(params);
+			return Promise.resolve({
+				content: [
+					{
+						type: "text",
+						text: `Replaced the stored observation for ${revised.practiceSlug}. Recheck the remaining candidates; do not rewrite valid records.`,
+					},
+				],
+				details: { practiceSlug: revised.practiceSlug },
 			});
 		},
 	});
@@ -1633,7 +1683,90 @@ async function main() {
 			events.push({ type: `${label}:${event.type}`, timestamp: Date.now() });
 		});
 
+	async function reconcileObservations() {
+		if (RECONCILIATION_TIMEOUT_MS === 0) return;
+		const counts = new Map<string, number>();
+		for (const observation of reviewState.observations) {
+			counts.set(observation.practiceSlug, (counts.get(observation.practiceSlug) ?? 0) + 1);
+		}
+		const candidateSlugs = [
+			...new Set(
+				reviewState.observations
+					.filter(
+						(observation) =>
+							(counts.get(observation.practiceSlug) ?? 0) === 1 &&
+							(observation.presence === "NOT_APPLICABLE" ||
+								observation.presence === "INCONCLUSIVE"),
+					)
+					.map((observation) => observation.practiceSlug),
+			),
+		].toSorted();
+		if (candidateSlugs.length === 0) return;
+
+		const reconciliationDir = `${CWD}/work/reconciliation`;
+		mkdirSync(reconciliationDir, { recursive: true });
+		writeFileSync(
+			`${reconciliationDir}/candidates.json`,
+			JSON.stringify(
+				{
+					observations: reviewState.observations.filter((observation) =>
+						candidateSlugs.includes(observation.practiceSlug),
+					),
+				},
+				null,
+				2,
+			),
+		);
+		const revisionTool = buildReviseObservationTool(candidateSlugs);
+		const reconciliationStartedAt = Date.now();
+		const { session } = await createAgentSession({
+			cwd: CWD,
+			agentDir: AGENT_DIR,
+			tools: ["read", "grep", "revise_observation"],
+			customTools: [revisionTool],
+			sessionManager: SessionManager.inMemory(),
+			settingsManager,
+			modelRuntime,
+			model,
+		});
+		const unsubscribe = subscribeSession(session, "reconciler");
+		const deadline = scheduleDeadline(RECONCILIATION_TIMEOUT_MS, () => session.dispose());
+		try {
+			await Promise.race([
+				session.prompt(
+					`Audit only the outcome consistency of the observations in work/reconciliation/candidates.json. ` +
+						`Read each candidate's practice contract and cited evidence. A handled or safely absent harmful ` +
+						`behavior is a BEHAVIOR_*_GOOD result, not NO_REVIEW_OCCASION. Missing evidence is ` +
+						`INSUFFICIENT_EVIDENCE. NO_REVIEW_OCCASION is correct only when the practice's prerequisite situation ` +
+						`did not occur at all. Use revise_observation only when the stored outcome is materially inconsistent ` +
+						`with those meanings. Keep valid records unchanged. Do not search ` +
+						`for new findings, broaden the review, or write feedback.`,
+				),
+				deadline.elapsed,
+			]);
+		} finally {
+			clearTimeout(deadline.timer);
+			unsubscribe();
+			const combinedUsage = extractUsageFromSession(session.state, streamUsage);
+			session.dispose();
+			accumulateUsage(prevUsage, combinedUsage);
+			prevUsage = combinedUsage;
+			runnerDebug.attempts.push({
+				label: `reconciliation:${candidateSlugs.length}-candidates`,
+				durationMs: Date.now() - reconciliationStartedAt,
+				hardAborted: false,
+				assistantMessages: combinedUsage.assistantMessages,
+				stopReasons: combinedUsage.stopReasons,
+				usage: combinedUsage,
+				resultFilePresent: existsSync(RESULT_PATH),
+			});
+			persistRunnerDebug();
+			persistUsage();
+		}
+	}
+
 	async function completeWithAdmittedComposition() {
+		await reconcileObservations();
 		measurementClosed = true;
 		await admitObservations();
 		const parsed = parseJson(readFileSync(RESULT_PATH, "utf8"));
