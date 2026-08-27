@@ -108,24 +108,6 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
         Long getFailed();
     }
 
-    /**
-     * The {@code recurrence_key} of a piece of feedback's earliest {@code PRIMARY}-role observation, denormalized
-     * onto a {@link de.tum.cit.aet.hephaestus.practices.observation.reaction.Reaction} (ADR 0021) so reaction
-     * suppression can follow a reacted locus across re-detections. Null-key rows are filtered out rather than
-     * returned as a false locus.
-     */
-    @Query(
-        """
-        SELECT fo.observation.recurrenceKey FROM FeedbackObservation fo
-        WHERE fo.feedback.id = :feedbackId
-          AND fo.role = de.tum.cit.aet.hephaestus.practices.feedback.EvidenceRole.PRIMARY
-          AND fo.observation.recurrenceKey IS NOT NULL
-        ORDER BY fo.ordinal ASC
-        LIMIT 1
-        """
-    )
-    Optional<String> findHeadlineRecurrenceKey(@Param("feedbackId") UUID feedbackId);
-
     /** Delivered summary and inline-only feedback for a recipient, newest first. */
     @Query(
         """

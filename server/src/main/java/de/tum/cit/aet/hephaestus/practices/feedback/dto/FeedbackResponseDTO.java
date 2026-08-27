@@ -12,9 +12,8 @@ import org.jspecify.annotations.Nullable;
 /**
  * The recipient's response to one delivered piece of feedback, as it currently stands.
  *
- * <p>Not one stored row: the two dimensions are answered independently and may have been said at different
- * times, so this is the fold across everything the recipient has said and not withdrawn. {@code respondedAt}
- * is when they last said any of it.
+ * <p>Not one stored row: usefulness, resolution, and comment may have been submitted at different times.
+ * {@code respondedAt} is the time of the newest active response event.
  */
 @Schema(description = "The recipient's current assessment and resolution of delivered feedback")
 public record FeedbackResponseDTO(
@@ -34,7 +33,6 @@ public record FeedbackResponseDTO(
         );
     }
 
-    /** What a recipient who has just withdrawn everything now says: nothing. */
     public static FeedbackResponseDTO none(UUID feedbackId) {
         return new FeedbackResponseDTO(feedbackId, null, null, null, null);
     }

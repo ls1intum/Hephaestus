@@ -19,7 +19,10 @@ public record FeedbackResponseRequestDTO(
     @Nullable @Schema(description = "What the recipient decided to do with the feedback") FeedbackResolution resolution,
     @Nullable
     @Size(max = 2000)
-    @Schema(description = "Optional explanation; required when resolution is DISPUTED", maxLength = 2000)
+    @Schema(
+        description = "Optional explanation; required when resolution is DISPUTED. Omit it to retain the current comment.",
+        maxLength = 2000
+    )
     String comment,
     @Nullable
     @Schema(description = "Take the whole response back, leaving no answer on record. Carries nothing else.")

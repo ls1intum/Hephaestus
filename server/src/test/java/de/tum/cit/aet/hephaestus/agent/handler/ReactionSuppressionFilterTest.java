@@ -28,6 +28,7 @@ import de.tum.cit.aet.hephaestus.practices.observation.reaction.ReactionReposito
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.testconfig.TestEntities;
+import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import java.util.List;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
@@ -68,11 +69,19 @@ class ReactionSuppressionFilterTest extends BaseUnitTest {
         );
     }
 
+    private AgentJob job() {
+        AgentJob job = TestEntities.agentJob();
+        Workspace workspace = new Workspace();
+        workspace.setId(1L);
+        job.setWorkspace(workspace);
+        return job;
+    }
+
     @Test
     void flagOff_passesThroughUnchanged_noRepoCalls() {
         List<ValidatedObservation> in = List.of(vf(SLUG, Presence.ABSENT));
 
-        var d = filter(false).evaluate(TestEntities.agentJob(), in);
+        var d = filter(false).evaluate(job(), in);
 
         assertThat(d.deliverable()).isEqualTo(in);
         assertThat(d.suppressedCount()).isZero();
@@ -83,7 +92,7 @@ class ReactionSuppressionFilterTest extends BaseUnitTest {
     void disputedLocus_isSuppressedAndLedgered() {
         stubPersistedAndReaction(FeedbackResolution.DISPUTED);
 
-        var d = filter(true).evaluate(TestEntities.agentJob(), List.of(vf(SLUG, Presence.ABSENT)));
+        var d = filter(true).evaluate(job(), List.of(vf(SLUG, Presence.ABSENT)));
 
         assertThat(d.deliverable()).isEmpty();
         assertThat(d.suppressedCount()).isEqualTo(1);
@@ -103,7 +112,7 @@ class ReactionSuppressionFilterTest extends BaseUnitTest {
             .recordSuppressed(any(), any(), any(), anyInt());
 
         var filter = filter(true);
-        var job = TestEntities.agentJob();
+        var job = job();
         var in = List.of(vf(SLUG, Presence.ABSENT));
 
         assertThatCode(() -> filter.evaluate(job, in)).doesNotThrowAnyException();
@@ -114,9 +123,11 @@ class ReactionSuppressionFilterTest extends BaseUnitTest {
     void unreactedLocus_isDelivered() {
         var pf = pf(CK);
         when(observationRepository.findByAgentJobId(any())).thenReturn(List.of(pf));
-        when(reactionRepository.findCurrentResolutionByRecurrenceKeys(any(), eq(CONTRIBUTOR))).thenReturn(List.of());
+        when(reactionRepository.findCurrentResolutionByRecurrenceKeys(any(), eq(CONTRIBUTOR), any())).thenReturn(
+            List.of()
+        );
 
-        var d = filter(true).evaluate(TestEntities.agentJob(), List.of(vf(SLUG, Presence.ABSENT)));
+        var d = filter(true).evaluate(job(), List.of(vf(SLUG, Presence.ABSENT)));
 
         assertThat(d.deliverable()).hasSize(1);
         assertThat(d.suppressedCount()).isZero();
@@ -126,7 +137,7 @@ class ReactionSuppressionFilterTest extends BaseUnitTest {
     void addressedButStillBad_isKeptWithStifferOpener() {
         stubPersistedAndReaction(FeedbackResolution.ADDRESSED);
 
-        var d = filter(true).evaluate(TestEntities.agentJob(), List.of(vf(SLUG, Presence.ABSENT)));
+        var d = filter(true).evaluate(job(), List.of(vf(SLUG, Presence.ABSENT)));
 
         assertThat(d.deliverable()).hasSize(1);
         assertThat(d.suppressedCount()).isZero();
@@ -139,7 +150,7 @@ class ReactionSuppressionFilterTest extends BaseUnitTest {
         // through untouched (escalation is keyed on assessment == BAD, not on the reaction alone).
         stubPersistedAndReaction(FeedbackResolution.ADDRESSED);
 
-        var d = filter(true).evaluate(TestEntities.agentJob(), List.of(vf(SLUG, Presence.PRESENT)));
+        var d = filter(true).evaluate(job(), List.of(vf(SLUG, Presence.PRESENT)));
 
         assertThat(d.deliverable()).hasSize(1);
         assertThat(d.suppressedCount()).isZero();
@@ -158,11 +169,11 @@ class ReactionSuppressionFilterTest extends BaseUnitTest {
         var pf = pf(secretKey);
         var reaction = locus(secretKey, FeedbackResolution.DISPUTED);
         when(observationRepository.findByAgentJobId(any())).thenReturn(List.of(pf));
-        when(reactionRepository.findCurrentResolutionByRecurrenceKeys(any(), eq(CONTRIBUTOR))).thenReturn(
+        when(reactionRepository.findCurrentResolutionByRecurrenceKeys(any(), eq(CONTRIBUTOR), any())).thenReturn(
             List.of(reaction)
         );
 
-        var d = filter(true).evaluate(TestEntities.agentJob(), List.of(secretScannerObservation(secretKey)));
+        var d = filter(true).evaluate(job(), List.of(secretScannerObservation(secretKey)));
 
         assertThat(d.deliverable()).hasSize(1);
         assertThat(d.suppressedCount()).isZero();
@@ -192,11 +203,11 @@ class ReactionSuppressionFilterTest extends BaseUnitTest {
         var pf = pf(null);
         when(observationRepository.findByAgentJobId(any())).thenReturn(List.of(pf));
 
-        var d = filter(true).evaluate(TestEntities.agentJob(), List.of(vf(SLUG, Presence.ABSENT)));
+        var d = filter(true).evaluate(job(), List.of(vf(SLUG, Presence.ABSENT)));
 
         assertThat(d.deliverable()).hasSize(1);
         assertThat(d.suppressedCount()).isZero();
-        verify(reactionRepository, never()).findCurrentResolutionByRecurrenceKeys(any(), any());
+        verify(reactionRepository, never()).findCurrentResolutionByRecurrenceKeys(any(), any(), any());
     }
 
     // --- helpers ---
@@ -205,7 +216,7 @@ class ReactionSuppressionFilterTest extends BaseUnitTest {
         var pf = pf(CK);
         var reaction = reaction(action);
         when(observationRepository.findByAgentJobId(any())).thenReturn(List.of(pf));
-        when(reactionRepository.findCurrentResolutionByRecurrenceKeys(any(), eq(CONTRIBUTOR))).thenReturn(
+        when(reactionRepository.findCurrentResolutionByRecurrenceKeys(any(), eq(CONTRIBUTOR), any())).thenReturn(
             List.of(reaction)
         );
     }
@@ -224,10 +235,12 @@ class ReactionSuppressionFilterTest extends BaseUnitTest {
         List<Observation> persisted = List.of(first, second);
         var disputed = List.of(reaction(FeedbackResolution.DISPUTED));
         when(observationRepository.findByAgentJobId(any())).thenReturn(persisted);
-        when(reactionRepository.findCurrentResolutionByRecurrenceKeys(any(), eq(CONTRIBUTOR))).thenReturn(disputed);
+        when(reactionRepository.findCurrentResolutionByRecurrenceKeys(any(), eq(CONTRIBUTOR), any())).thenReturn(
+            disputed
+        );
 
         var decision = filter(true).evaluate(
-            TestEntities.agentJob(),
+            job(),
             List.of(vf(SLUG, Presence.ABSENT, CK, "occ-first"), vf(SLUG, Presence.ABSENT, CK, "occ-second"))
         );
 

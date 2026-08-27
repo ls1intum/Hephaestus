@@ -104,7 +104,11 @@ class ReactionSuppressionFilter {
         // the newest row happens to hold: a recipient who rated a unit helpful after disputing it did not
         // un-dispute it. Only a withdrawal clears the locus, and then it simply returns no row for it.
         Map<String, FeedbackResolution> actionByKey = new HashMap<>();
-        for (var row : reactionRepository.findCurrentResolutionByRecurrenceKeys(recurrenceKeys, aboutUserId)) {
+        for (var row : reactionRepository.findCurrentResolutionByRecurrenceKeys(
+            recurrenceKeys,
+            aboutUserId,
+            job.getWorkspace().getId()
+        )) {
             actionByKey.put(row.getRecurrenceKey(), FeedbackResolution.valueOf(row.getResolution()));
         }
         if (actionByKey.isEmpty()) {

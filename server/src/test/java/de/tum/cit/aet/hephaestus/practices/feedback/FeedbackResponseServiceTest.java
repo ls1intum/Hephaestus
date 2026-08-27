@@ -21,6 +21,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -55,68 +56,25 @@ class FeedbackResponseServiceTest extends BaseUnitTest {
     void setUp() {
         service = new FeedbackResponseService(reactionRepository, feedbackRepository, currentDeveloperLookup);
         workspaceContext = new WorkspaceContext(WORKSPACE_ID, "test-ws", "Test WS", null, null, false, false, Set.of());
-        appended.clear();
-        // Both shapes of the port: a write demands an id, a read accepts its absence. Lenient because most
-        // tests exercise only one of the two paths.
         org.mockito.Mockito.lenient()
             .when(currentDeveloperLookup.currentDeveloperIdElseThrow())
             .thenReturn(CONTRIBUTOR_ID);
         org.mockito.Mockito.lenient()
             .when(currentDeveloperLookup.currentDeveloperId())
             .thenReturn(Optional.of(CONTRIBUTOR_ID));
-        org.mockito.Mockito.lenient()
-            .when(reactionRepository.save(any(Reaction.class)))
-            .thenAnswer(invocation -> {
-                Reaction row = invocation.getArgument(0);
-                appended.add(row);
-                return row;
-            });
-        // Stands in for the repository's fold so the returned DTO says something here. Deliberately naive —
-        // it reads the rows this test appended, one dimension at a time. Whether the SQL folds them the same
-        // way is what FeedbackResponseControllerIntegrationTest is for; this class tests validation and what
-        // gets written.
-        org.mockito.Mockito.lenient()
-            .when(reactionRepository.findCurrentResponse(any(), any()))
-            .thenAnswer(invocation -> Optional.ofNullable(fold()));
     }
 
-    private final List<Reaction> appended = new java.util.ArrayList<>();
-
-    private ReactionRepository.@org.jspecify.annotations.Nullable CurrentResponseProjection fold() {
-        int withdrawnAt = -1;
-        for (int index = appended.size() - 1; index >= 0; index--) {
-            Reaction row = appended.get(index);
-            if (row.getUsefulness() == null && row.getResolution() == null) {
-                withdrawnAt = index;
-                break;
-            }
-        }
-        FeedbackUsefulness usefulness = null;
-        FeedbackResolution resolution = null;
-        String comment = null;
-        for (int index = appended.size() - 1; index > withdrawnAt; index--) {
-            Reaction row = appended.get(index);
-            if (usefulness == null) {
-                usefulness = row.getUsefulness();
-            }
-            if (resolution == null && row.getResolution() != null) {
-                resolution = row.getResolution();
-                comment = row.getExplanation();
-            }
-        }
-        if (usefulness == null && resolution == null) {
-            return null;
-        }
+    private void stubCurrentResponse(
+        @Nullable FeedbackUsefulness usefulness,
+        @Nullable FeedbackResolution resolution,
+        @Nullable String comment
+    ) {
         var projection = org.mockito.Mockito.mock(ReactionRepository.CurrentResponseProjection.class);
-        org.mockito.Mockito.lenient()
-            .when(projection.getUsefulness())
-            .thenReturn(usefulness == null ? null : usefulness.name());
-        org.mockito.Mockito.lenient()
-            .when(projection.getResolution())
-            .thenReturn(resolution == null ? null : resolution.name());
-        org.mockito.Mockito.lenient().when(projection.getComment()).thenReturn(comment);
-        org.mockito.Mockito.lenient().when(projection.getRespondedAt()).thenReturn(Instant.now());
-        return projection;
+        when(projection.getUsefulness()).thenReturn(usefulness == null ? null : usefulness.name());
+        when(projection.getResolution()).thenReturn(resolution == null ? null : resolution.name());
+        when(projection.getComment()).thenReturn(comment);
+        when(projection.getRespondedAt()).thenReturn(Instant.now());
+        when(reactionRepository.findCurrentResponse(FEEDBACK_ID, CONTRIBUTOR_ID)).thenReturn(Optional.of(projection));
     }
 
     private Feedback createFeedback(Long recipientUserId) {
@@ -148,6 +106,7 @@ class FeedbackResponseServiceTest extends BaseUnitTest {
                 "Clear and actionable.",
                 null
             );
+            stubCurrentResponse(FeedbackUsefulness.HELPFUL, FeedbackResolution.ADDRESSED, "Clear and actionable.");
 
             FeedbackResponseDTO result = service.submitResponse(workspaceContext, FEEDBACK_ID, request);
 
@@ -193,21 +152,14 @@ class FeedbackResponseServiceTest extends BaseUnitTest {
                     FeedbackDeliveryState.DELIVERED
                 )
             ).thenReturn(Optional.of(feedback));
-            when(feedbackRepository.findHeadlineRecurrenceKey(FEEDBACK_ID)).thenReturn(Optional.of("ck-abc123"));
 
             var request = new FeedbackResponseRequestDTO(null, FeedbackResolution.ADDRESSED, null, null);
-            FeedbackResponseDTO result = service.submitResponse(workspaceContext, FEEDBACK_ID, request);
-
-            assertThat(result.resolution()).isEqualTo(FeedbackResolution.ADDRESSED);
-            assertThat(result.comment()).isNull();
+            service.submitResponse(workspaceContext, FEEDBACK_ID, request);
 
             verify(reactionRepository).save(reactionCaptor.capture());
             Reaction saved = reactionCaptor.getValue();
             assertThat(saved.getReactorUserId()).isEqualTo(CONTRIBUTOR_ID);
             assertThat(saved.getResolution()).isEqualTo(FeedbackResolution.ADDRESSED);
-            // Denormalization (ADR 0021): the saved reaction must carry the headline recurrence key so
-            // suppression can follow the reacted locus across the detector's per-run re-detections.
-            assertThat(saved.getRecurrenceKey()).isEqualTo("ck-abc123");
         }
 
         @Test
@@ -245,10 +197,11 @@ class FeedbackResponseServiceTest extends BaseUnitTest {
                 "The AI is wrong about this",
                 null
             );
-            FeedbackResponseDTO result = service.submitResponse(workspaceContext, FEEDBACK_ID, request);
+            service.submitResponse(workspaceContext, FEEDBACK_ID, request);
 
-            assertThat(result.resolution()).isEqualTo(FeedbackResolution.DISPUTED);
-            assertThat(result.comment()).isEqualTo("The AI is wrong about this");
+            verify(reactionRepository).save(reactionCaptor.capture());
+            assertThat(reactionCaptor.getValue().getResolution()).isEqualTo(FeedbackResolution.DISPUTED);
+            assertThat(reactionCaptor.getValue().getExplanation()).isEqualTo("The AI is wrong about this");
         }
 
         @Test
@@ -269,9 +222,10 @@ class FeedbackResponseServiceTest extends BaseUnitTest {
                 "Not relevant to my use case",
                 null
             );
-            FeedbackResponseDTO result = service.submitResponse(workspaceContext, FEEDBACK_ID, request);
+            service.submitResponse(workspaceContext, FEEDBACK_ID, request);
 
-            assertThat(result.resolution()).isEqualTo(FeedbackResolution.NOT_APPLICABLE);
+            verify(reactionRepository).save(reactionCaptor.capture());
+            assertThat(reactionCaptor.getValue().getResolution()).isEqualTo(FeedbackResolution.NOT_APPLICABLE);
         }
 
         @Test
@@ -361,18 +315,9 @@ class FeedbackResponseServiceTest extends BaseUnitTest {
                 )
             ).thenReturn(Optional.of(feedback));
 
-            appended.add(
-                Reaction.builder()
-                    .id(UUID.randomUUID())
-                    .feedback(feedback)
-                    .feedbackId(FEEDBACK_ID)
-                    .reactorUserId(CONTRIBUTOR_ID)
-                    .resolution(FeedbackResolution.ADDRESSED)
-                    .createdAt(Instant.now())
-                    .build()
-            );
+            stubCurrentResponse(null, FeedbackResolution.ADDRESSED, null);
 
-            Optional<FeedbackResponseDTO> result = service.getLatestResponse(workspaceContext, FEEDBACK_ID);
+            Optional<FeedbackResponseDTO> result = service.getResponse(workspaceContext, FEEDBACK_ID);
 
             assertThat(result).isPresent();
             assertThat(result.get().resolution()).isEqualTo(FeedbackResolution.ADDRESSED);
@@ -391,7 +336,7 @@ class FeedbackResponseServiceTest extends BaseUnitTest {
                 )
             ).thenReturn(Optional.of(feedback));
 
-            Optional<FeedbackResponseDTO> result = service.getLatestResponse(workspaceContext, FEEDBACK_ID);
+            Optional<FeedbackResponseDTO> result = service.getResponse(workspaceContext, FEEDBACK_ID);
 
             assertThat(result).isEmpty();
         }
@@ -403,7 +348,7 @@ class FeedbackResponseServiceTest extends BaseUnitTest {
             // the reflection and review-history surfaces already keep.
             when(currentDeveloperLookup.currentDeveloperId()).thenReturn(Optional.empty());
 
-            assertThat(service.getLatestResponse(workspaceContext, FEEDBACK_ID)).isEmpty();
+            assertThat(service.getResponse(workspaceContext, FEEDBACK_ID)).isEmpty();
         }
 
         @Test
@@ -417,7 +362,7 @@ class FeedbackResponseServiceTest extends BaseUnitTest {
                 )
             ).thenReturn(Optional.empty());
 
-            assertThatThrownBy(() -> service.getLatestResponse(workspaceContext, FEEDBACK_ID)).isInstanceOf(
+            assertThatThrownBy(() -> service.getResponse(workspaceContext, FEEDBACK_ID)).isInstanceOf(
                 EntityNotFoundException.class
             );
         }

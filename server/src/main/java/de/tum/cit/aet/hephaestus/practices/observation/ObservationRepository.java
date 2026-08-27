@@ -18,6 +18,7 @@ import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Slice;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
@@ -426,7 +427,7 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
 
     /**
      * Review-history page at the run grain. Paging observations directly can split one review across pages,
-     * which leaves the learner with an incomplete explanation of what the reviewer saw. This projection first
+     * which leaves the developer with an incomplete explanation of what the reviewer saw. This projection first
      * selects complete agent-job runs; {@link #findReviewHistoryObservationsByJobs} loads their observations next.
      *
      * <p>Carries {@link #HIDDEN_REPOSITORY_GUARD}, which is what keeps a hidden repository out of the whole
@@ -444,8 +445,8 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
                       AND p.workspace_id = :workspaceId
                       AND a.slug = :areaSlug
                       AND (:practiceSlug IS NULL OR p.slug = :practiceSlug)
-                      AND (:hasArtifactKinds = FALSE OR f.artifact_kind IN (:artifactKinds))
-                      AND (:hasSeverities = FALSE OR f.severity IS NULL OR f.severity IN (:severities))
+                      AND (:artifactKinds IS NULL OR f.artifact_kind = ANY(string_to_array(:artifactKinds, ',')))
+                      AND (:severities IS NULL OR f.severity = ANY(string_to_array(:severities, ',')))
                       AND f.presence <> 'NOT_APPLICABLE'
             """ +
             HIDDEN_REPOSITORY_GUARD +
@@ -453,33 +454,15 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
             GROUP BY f.agent_job_id
             ORDER BY MAX(f.observed_at) DESC, f.agent_job_id DESC
             """,
-        countQuery = """
-                    SELECT COUNT(DISTINCT f.agent_job_id)
-                    FROM observation f
-                    JOIN practice p ON p.id = f.practice_id
-                    JOIN practice_area a ON a.id = p.practice_area_id
-                    WHERE f.about_user_id = :aboutUserId
-                      AND p.workspace_id = :workspaceId
-                      AND a.slug = :areaSlug
-                      AND (:practiceSlug IS NULL OR p.slug = :practiceSlug)
-                      AND (:hasArtifactKinds = FALSE OR f.artifact_kind IN (:artifactKinds))
-                      AND (:hasSeverities = FALSE OR f.severity IS NULL OR f.severity IN (:severities))
-                      AND f.presence <> 'NOT_APPLICABLE'
-            """ +
-            HIDDEN_REPOSITORY_GUARD +
-            """
-            """,
         nativeQuery = true
     )
-    Page<ReviewHistoryRunRow> findReviewHistoryRuns(
+    Slice<ReviewHistoryRunRow> findReviewHistoryRuns(
         @Param("aboutUserId") Long aboutUserId,
         @Param("workspaceId") Long workspaceId,
         @Param("areaSlug") @Nullable String areaSlug,
         @Param("practiceSlug") @Nullable String practiceSlug,
-        @Param("hasArtifactKinds") boolean hasArtifactKinds,
-        @Param("artifactKinds") Collection<String> artifactKinds,
-        @Param("hasSeverities") boolean hasSeverities,
-        @Param("severities") Collection<String> severities,
+        @Param("artifactKinds") @Nullable String artifactKinds,
+        @Param("severities") @Nullable String severities,
         Pageable pageable
     );
 

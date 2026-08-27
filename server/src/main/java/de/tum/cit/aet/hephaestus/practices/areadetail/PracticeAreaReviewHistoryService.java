@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.practices.areadetail;
 import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.practices.PracticeAreaService;
+import de.tum.cit.aet.hephaestus.practices.areadetail.dto.PracticeAreaReviewHistoryPageDTO;
 import de.tum.cit.aet.hephaestus.practices.areadetail.dto.PracticeAreaReviewMomentDTO;
 import de.tum.cit.aet.hephaestus.practices.areadetail.dto.PracticeAreaReviewObservationDTO;
 import de.tum.cit.aet.hephaestus.practices.areadetail.dto.PracticeAreaReviewedWorkDTO;
@@ -10,7 +11,6 @@ import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepositor
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository.DeliveredFeedbackBinding;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackResolution;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackUsefulness;
-import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
@@ -23,16 +23,15 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Slice;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -49,7 +48,7 @@ public class PracticeAreaReviewHistoryService {
     private final ObservationVisibilityPolicy visibilityPolicy;
 
     @Transactional(readOnly = true)
-    public Page<PracticeAreaReviewMomentDTO> list(
+    public PracticeAreaReviewHistoryPageDTO list(
         WorkspaceContext workspaceContext,
         String areaSlug,
         @Nullable String practiceSlug,
@@ -60,50 +59,77 @@ public class PracticeAreaReviewHistoryService {
         practiceAreaService.getArea(workspaceContext, areaSlug);
         var currentDeveloperId = currentDeveloperLookup.currentDeveloperId();
         if (currentDeveloperId.isEmpty()) {
-            return Page.empty(pageable);
+            return new PracticeAreaReviewHistoryPageDTO(
+                List.of(),
+                pageable.getPageNumber(),
+                pageable.getPageSize(),
+                false
+            );
         }
 
-        boolean hasArtifactKinds = artifactKinds != null && !artifactKinds.isEmpty();
-        boolean hasSeverities = severities != null && !severities.isEmpty();
-        // Placeholders, never evaluated: each query gates its IN clause on the matching flag, so with the flag
-        // false the predicate short-circuits before the list is read. They are nonetheless non-empty because
-        // `findReviewHistoryRuns` is a native query whose collection parameter is expanded into the SQL text —
-        // an empty one yields `IN ()`, which Postgres rejects at parse time, before any short-circuit applies.
-        // These are NOT defaults: an unfiltered request still returns issues and conversation threads.
-        List<ArtifactKind> artifactFilter = hasArtifactKinds
-            ? Objects.requireNonNull(artifactKinds)
-            : List.of(ArtifactKinds.PULL_REQUEST);
-        List<Severity> severityFilter = hasSeverities ? Objects.requireNonNull(severities) : List.of(Severity.INFO);
+        String artifactFilter =
+            artifactKinds == null || artifactKinds.isEmpty()
+                ? null
+                : artifactKinds.stream().map(ArtifactKind::value).collect(Collectors.joining(","));
+        String severityFilter =
+            severities == null || severities.isEmpty()
+                ? null
+                : severities.stream().map(Enum::name).collect(Collectors.joining(","));
 
-        Page<ReviewHistoryRunRow> runs = observationRepository.findReviewHistoryRuns(
-            currentDeveloperId.get(),
-            workspaceContext.id(),
-            areaSlug,
-            practiceSlug,
-            hasArtifactKinds,
-            artifactFilter.stream().map(ArtifactKind::value).toList(),
-            hasSeverities,
-            severityFilter.stream().map(Enum::name).toList(),
-            pageable
+        int first = Math.multiplyExact(pageable.getPageNumber(), pageable.getPageSize());
+        int required = Math.addExact(first, pageable.getPageSize() + 1);
+        List<PracticeAreaReviewMomentDTO> visibleMoments = new ArrayList<>(required);
+        int candidatePage = 0;
+        boolean moreCandidates;
+        do {
+            Slice<ReviewHistoryRunRow> runs = observationRepository.findReviewHistoryRuns(
+                currentDeveloperId.get(),
+                workspaceContext.id(),
+                areaSlug,
+                practiceSlug,
+                artifactFilter,
+                severityFilter,
+                PageRequest.of(candidatePage++, Math.max(pageable.getPageSize(), 50))
+            );
+            visibleMoments.addAll(
+                toVisibleMoments(workspaceContext.id(), currentDeveloperId.get(), runs.getContent(), areaSlug)
+            );
+            moreCandidates = runs.hasNext();
+        } while (visibleMoments.size() < required && moreCandidates);
+
+        int end = Math.min(first + pageable.getPageSize(), visibleMoments.size());
+        List<PracticeAreaReviewMomentDTO> content =
+            first >= visibleMoments.size() ? List.of() : List.copyOf(visibleMoments.subList(first, end));
+        return new PracticeAreaReviewHistoryPageDTO(
+            content,
+            pageable.getPageNumber(),
+            pageable.getPageSize(),
+            visibleMoments.size() > end
         );
+    }
+
+    private List<PracticeAreaReviewMomentDTO> toVisibleMoments(
+        long workspaceId,
+        long developerId,
+        List<ReviewHistoryRunRow> runs,
+        String areaSlug
+    ) {
         if (runs.isEmpty()) {
-            // Empty content, but the count the database made: a page read past the last one still has to say
-            // how many runs there are, or a stale deep link reads as "this area was never reviewed".
-            return new PageImpl<>(List.of(), pageable, runs.getTotalElements());
+            return List.of();
         }
 
         List<UUID> jobIds = runs.stream().map(ReviewHistoryRunRow::getJobId).toList();
         List<Observation> found = observationRepository.findReviewHistoryObservationsByJobs(
             jobIds,
-            currentDeveloperId.get(),
-            workspaceContext.id(),
+            developerId,
+            workspaceId,
             areaSlug
         );
         // The same gate the reflection surface applies, for the same reason and with the same purpose: a
         // observation may cite a source this caller is not cleared to be shown, and a claim measured against
         // superseded review rules no longer speaks for the practice. Asked once for the whole page.
         Set<UUID> visible = visibilityPolicy.permitsAll(
-            workspaceContext.id(),
+            workspaceId,
             found,
             SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY
         );
@@ -115,19 +141,12 @@ public class PracticeAreaReviewHistoryService {
             .stream()
             .collect(Collectors.groupingBy(Observation::getAgentJobId));
         Map<UUID, DeliveredFeedbackBinding> feedbackByObservation = feedbackByObservation(
-            workspaceContext.id(),
-            currentDeveloperId.get(),
+            workspaceId,
+            developerId,
             observations
         );
-        Map<UUID, ReviewRunTargetLookup.Target> targets = reviewRunTargetLookup.findByJobIds(
-            workspaceContext.id(),
-            jobIds
-        );
+        Map<UUID, ReviewRunTargetLookup.Target> targets = reviewRunTargetLookup.findByJobIds(workspaceId, jobIds);
 
-        // A run whose every observation the gate withheld is not an empty moment to render — it is a moment this
-        // caller does not get to see, so it leaves the page rather than showing as a review that found
-        // nothing. The total still counts it: the gate answers per observation in Java, after the database
-        // has already counted rows, and a total that quietly disagreed with the pages would be the worse lie.
         List<PracticeAreaReviewMomentDTO> moments = new ArrayList<>();
         for (ReviewHistoryRunRow run : runs) {
             List<Observation> visibleObservations = observationsByJob.getOrDefault(run.getJobId(), List.of());
@@ -135,7 +154,7 @@ public class PracticeAreaReviewHistoryService {
                 moments.add(toMoment(run, visibleObservations, feedbackByObservation, targets));
             }
         }
-        return new PageImpl<>(moments, pageable, runs.getTotalElements());
+        return moments;
     }
 
     private Map<UUID, DeliveredFeedbackBinding> feedbackByObservation(

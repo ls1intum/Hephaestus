@@ -4331,7 +4331,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/PagedModelPracticeAreaReviewMoment"
+                $ref: "#/components/schemas/PracticeAreaReviewHistoryPage"
           description: Paginated review moments returned
         "400":
           content:
@@ -4899,7 +4899,7 @@ paths:
       - In-App Feedback
   /workspaces/{workspaceSlug}/practices/feedback/{feedbackId}/response:
     get:
-      operationId: getLatestFeedbackResponse
+      operationId: getFeedbackResponse
       parameters:
       - description: Workspace slug
         in: path
@@ -4933,7 +4933,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/FeedbackResponse"
           description: Delivered feedback not found for the current recipient
-      summary: Get the latest feedback response
+      summary: Get the current feedback response
       tags:
       - Feedback Response
     post:
@@ -9735,7 +9735,8 @@ components:
       properties:
         comment:
           type: string
-          description: Optional explanation; required when resolution is DISPUTED
+          description: Optional explanation; required when resolution is DISPUTED.
+            Omit it to retain the current comment.
           maxLength: 2000
           minLength: 0
         resolution:
@@ -11180,15 +11181,6 @@ components:
           $ref: "#/components/schemas/SortObject"
         unpaged:
           type: boolean
-    PagedModelPracticeAreaReviewMoment:
-      type: object
-      properties:
-        content:
-          type: array
-          items:
-            $ref: "#/components/schemas/PracticeAreaReviewMoment"
-        page:
-          $ref: "#/components/schemas/PageMetadata"
     PagedModelReviewFeedback:
       type: object
       properties:
@@ -11370,6 +11362,24 @@ components:
       - name
       - slug
       - visibleInPracticeDashboards
+    PracticeAreaReviewHistoryPage:
+      type: object
+      description: A page of visible review moments
+      properties:
+        content:
+          type: array
+          items:
+            $ref: "#/components/schemas/PracticeAreaReviewMoment"
+        hasNext:
+          type: boolean
+        page:
+          type: integer
+          format: int32
+        size:
+          type: integer
+          format: int32
+      required:
+      - content
     PracticeAreaReviewMoment:
       type: object
       description: A complete review run in a developer's practice-area history

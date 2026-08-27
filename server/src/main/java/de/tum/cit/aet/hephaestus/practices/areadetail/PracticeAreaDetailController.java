@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.practices.areadetail;
 
-import de.tum.cit.aet.hephaestus.practices.areadetail.dto.PracticeAreaReviewMomentDTO;
+import de.tum.cit.aet.hephaestus.practices.areadetail.dto.PracticeAreaReviewHistoryPageDTO;
 import de.tum.cit.aet.hephaestus.practices.observation.trend.dto.PracticeAreaTrendDTO;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceScopedController;
@@ -13,7 +13,6 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springdoc.core.annotations.ParameterObject;
-import org.springframework.data.web.PagedModel;
 import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
@@ -76,21 +75,19 @@ public class PracticeAreaDetailController {
         content = @Content(schema = @Schema(hidden = true))
     )
     @SecurityRequirements
-    public ResponseEntity<PagedModel<PracticeAreaReviewMomentDTO>> listReviewHistory(
+    public ResponseEntity<PracticeAreaReviewHistoryPageDTO> listReviewHistory(
         WorkspaceContext workspaceContext,
         @PathVariable String areaSlug,
         @Valid @ParameterObject PracticeAreaReviewHistoryFilterParams filter
     ) {
         return ResponseEntity.ok(
-            new PagedModel<>(
-                reviewHistoryService.list(
-                    workspaceContext,
-                    areaSlug,
-                    filter.practiceSlug(),
-                    filter.kinds(),
-                    filter.severities(),
-                    filter.pageable()
-                )
+            reviewHistoryService.list(
+                workspaceContext,
+                areaSlug,
+                filter.practiceSlug(),
+                filter.kinds(),
+                filter.severities(),
+                filter.pageable()
             )
         );
     }

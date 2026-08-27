@@ -55,6 +55,7 @@ import tools.jackson.databind.ObjectMapper;
 class FeedbackResponseControllerIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+    private static final String RECURRENCE_KEY = "ck-integration-observation";
     private static final String FEEDBACK_URI = "/workspaces/{workspaceSlug}/practices/feedback/{feedbackId}/response";
     private static final String ENGAGEMENT_URI = "/workspaces/{workspaceSlug}/practices/feedback/engagement";
 
@@ -79,8 +80,6 @@ class FeedbackResponseControllerIntegrationTest extends AbstractWorkspaceIntegra
     @Autowired
     private AgentJobRepository agentJobRepository;
 
-    private static final String HEADLINE_RECURRENCE_KEY = "ck-integration-headline";
-
     private Workspace workspace;
     private User adminUser;
     private Feedback feedbackUnit;
@@ -90,7 +89,6 @@ class FeedbackResponseControllerIntegrationTest extends AbstractWorkspaceIntegra
         User owner = persistUser("feedback-owner");
         workspace = createWorkspace("feedback-ws", "Feedback WS", "feedback-org", AccountType.ORG, owner);
 
-        // The "admin" user (from @WithAdminUser) must exist and hold workspace membership.
         adminUser = ensureAdminMembership(workspace).getUser();
 
         Practice practice = new Practice();
@@ -102,7 +100,6 @@ class FeedbackResponseControllerIntegrationTest extends AbstractWorkspaceIntegra
         practice.setBindings(PracticeTestEvidence.bindings(ScmSignals.PULL_REQUEST_OPENED));
         practice = practiceRepository.save(practice);
 
-        // Agent job is a required FK for the observation.
         AgentJob agentJob = new AgentJob();
         agentJob.setWorkspace(workspace);
         agentJob.setJobType(AgentJobType.PULL_REQUEST_REVIEW);
@@ -111,6 +108,7 @@ class FeedbackResponseControllerIntegrationTest extends AbstractWorkspaceIntegra
 
         Observation finding = Observation.builder()
             .occurrenceKey("test-key-" + UUID.randomUUID())
+            .recurrenceKey(RECURRENCE_KEY)
             .agentJobId(agentJob.getId())
             .practice(practice)
             .artifactKind(ArtifactKinds.PULL_REQUEST)
@@ -120,12 +118,10 @@ class FeedbackResponseControllerIntegrationTest extends AbstractWorkspaceIntegra
             .presence(Presence.ABSENT)
             .assessment(Assessment.BAD)
             .severity(Severity.MAJOR)
-            .recurrenceKey(HEADLINE_RECURRENCE_KEY)
             .observedAt(Instant.now())
             .build();
         finding = observationRepository.save(finding);
 
-        // Create the delivered feedback unit the admin user reacts to (recipient == subject).
         feedbackUnit = feedbackRepository.save(
             Feedback.builder()
                 .agentJobId(agentJob.getId())
@@ -143,8 +139,6 @@ class FeedbackResponseControllerIntegrationTest extends AbstractWorkspaceIntegra
                 .build()
         );
 
-        // Bind the observation as the feedback's PRIMARY evidence so findHeadlineRecurrenceKey resolves the
-        // headline locus the reaction must denormalize.
         feedbackObservationRepository.insertIfAbsent(
             feedbackUnit.getId(),
             finding.getId(),
@@ -152,8 +146,6 @@ class FeedbackResponseControllerIntegrationTest extends AbstractWorkspaceIntegra
             0
         );
     }
-
-    // POST /{feedbackId}/response
 
     @Nested
     @DisplayName("POST /{feedbackId}/response")
@@ -211,8 +203,6 @@ class FeedbackResponseControllerIntegrationTest extends AbstractWorkspaceIntegra
             assertThat(response.feedbackId()).isEqualTo(feedbackUnit.getId());
             assertThat(response.respondedAt()).isNotNull();
 
-            // The persisted reaction carries the feedback's headline recurrence key. Fetched by feedback
-            // rather than by a response id, because the payload is the folded state and names no single row.
             Reaction saved = reactionRepository
                 .findAll()
                 .stream()
@@ -220,7 +210,6 @@ class FeedbackResponseControllerIntegrationTest extends AbstractWorkspaceIntegra
                 .findFirst()
                 .orElseThrow();
             assertThat(saved.getUsefulness()).isEqualTo(FeedbackUsefulness.HELPFUL);
-            assertThat(saved.getRecurrenceKey()).isEqualTo(HEADLINE_RECURRENCE_KEY);
         }
 
         @Test
@@ -249,6 +238,34 @@ class FeedbackResponseControllerIntegrationTest extends AbstractWorkspaceIntegra
             assertThat(response).isNotNull();
             assertThat(response.resolution()).isEqualTo(FeedbackResolution.DISPUTED);
             assertThat(response.comment()).isEqualTo("The AI is wrong about this");
+        }
+
+        @Test
+        @WithAdminUser
+        void resolutionLookupUsesTheFeedbackObservationBinding() {
+            var request = new FeedbackResponseRequestDTO(null, FeedbackResolution.DISPUTED, "Incorrect", null);
+
+            webTestClient
+                .post()
+                .uri(FEEDBACK_URI, workspace.getWorkspaceSlug(), feedbackUnit.getId())
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(request)
+                .exchange()
+                .expectStatus()
+                .isCreated();
+
+            var resolutions = reactionRepository.findCurrentResolutionByRecurrenceKeys(
+                List.of(RECURRENCE_KEY),
+                adminUser.getId(),
+                workspace.getId()
+            );
+            assertThat(resolutions)
+                .singleElement()
+                .satisfies(resolution -> {
+                    assertThat(resolution.getRecurrenceKey()).isEqualTo(RECURRENCE_KEY);
+                    assertThat(resolution.getResolution()).isEqualTo(FeedbackResolution.DISPUTED.name());
+                });
         }
 
         @Test
@@ -283,7 +300,6 @@ class FeedbackResponseControllerIntegrationTest extends AbstractWorkspaceIntegra
                 .expectStatus()
                 .isCreated();
 
-            // Append-only: the second submit creates a new row rather than upserting.
             webTestClient
                 .post()
                 .uri(FEEDBACK_URI, workspace.getWorkspaceSlug(), feedbackUnit.getId())
@@ -316,7 +332,6 @@ class FeedbackResponseControllerIntegrationTest extends AbstractWorkspaceIntegra
         @Test
         @WithMentorUser
         void nonRecipientReturns404() {
-            // "mentor" user exists in DB and has workspace membership, but is NOT the feedback's recipient
             User mentorUser = persistUser("mentor");
             ensureWorkspaceMembership(workspace, mentorUser, WorkspaceMembership.WorkspaceRole.MEMBER);
 
@@ -336,10 +351,6 @@ class FeedbackResponseControllerIntegrationTest extends AbstractWorkspaceIntegra
         @Test
         @WithMentorUser
         void subjectButNotRecipientReturns404() {
-            // Reviewer-side firewall: the gate is the RECIPIENT (who was delivered to), not the SUBJECT
-            // (who the feedback is ABOUT). Build a unit delivered to the admin but ABOUT the mentor, then
-            // authenticate as the mentor (the subject, a workspace member) — the subject must NOT be able
-            // to react to feedback they were never shown.
             User mentorUser = persistUser("mentor");
             ensureWorkspaceMembership(workspace, mentorUser, WorkspaceMembership.WorkspaceRole.MEMBER);
 
@@ -352,7 +363,6 @@ class FeedbackResponseControllerIntegrationTest extends AbstractWorkspaceIntegra
                     .recipientUserId(adminUser.getId())
                     .aboutUserId(mentorUser.getId())
                     .channel(FeedbackChannel.IN_CONTEXT)
-                    // position 1: distinct unit within the same job (uk_feedback_unit is (agent_job_id, position)).
                     .position(1)
                     .deliveryState(FeedbackDeliveryState.DELIVERED)
                     .source(FeedbackSource.AGENT)
@@ -378,8 +388,6 @@ class FeedbackResponseControllerIntegrationTest extends AbstractWorkspaceIntegra
         void unauthenticatedMutationRejected() {
             var request = new FeedbackResponseRequestDTO(null, FeedbackResolution.ADDRESSED, null, null);
 
-            // Anonymous POST → the double-submit CSRF gate (ADR 0017) rejects it 403 before auth runs
-            // (no X-XSRF-TOKEN). The mutation stays blocked for anonymous callers.
             webTestClient
                 .post()
                 .uri(FEEDBACK_URI, workspace.getWorkspaceSlug(), feedbackUnit.getId())
@@ -387,11 +395,9 @@ class FeedbackResponseControllerIntegrationTest extends AbstractWorkspaceIntegra
                 .bodyValue(request)
                 .exchange()
                 .expectStatus()
-                .isNotFound();
+                .isForbidden();
         }
     }
-
-    // GET /{feedbackId}/response
 
     @Nested
     class GetLatestFeedback {
@@ -467,9 +473,6 @@ class FeedbackResponseControllerIntegrationTest extends AbstractWorkspaceIntegra
         @WithAdminUser
         @DisplayName("rating a unit helpful afterwards does not erase the dispute")
         void keepsEachDimensionFromTheRowThatLastAnsweredIt() {
-            // The two questions are answered independently, so the current answer is not the newest row: a
-            // thumbs-up appended after a dispute says nothing about the dispute. Reading the newest row would
-            // report no resolution here — and, worse, would let the suppressed finding be delivered again.
             submit(new FeedbackResponseRequestDTO(null, FeedbackResolution.DISPUTED, "Actually wrong", null));
             submit(new FeedbackResponseRequestDTO(FeedbackUsefulness.HELPFUL, null, null, null));
 
@@ -485,10 +488,6 @@ class FeedbackResponseControllerIntegrationTest extends AbstractWorkspaceIntegra
         @WithAdminUser
         @DisplayName("a comment written alongside usefulness alone is still readable")
         void keepsACommentThatCameWithoutAResolution() {
-            // The request permits saying "unhelpful, and here is why" without touching the resolution, so the
-            // comment has to be found by its own presence. Looking for the newest row that carries a resolution
-            // instead would store this text and then never return it — the recipient explains themselves into
-            // nothing, and a later resolution would overwrite the reading with its own empty comment.
             submit(new FeedbackResponseRequestDTO(FeedbackUsefulness.UNHELPFUL, null, "Missed the point", null));
 
             FeedbackResponseDTO response = current();
@@ -503,7 +502,6 @@ class FeedbackResponseControllerIntegrationTest extends AbstractWorkspaceIntegra
         @WithAdminUser
         @DisplayName("withdrawing leaves no answer, and a later one starts clean")
         void withdrawalEndsEverythingBeforeIt() {
-            // Without this an append-only table could only accumulate, and a mis-click would be permanent.
             submit(
                 new FeedbackResponseRequestDTO(FeedbackUsefulness.HELPFUL, FeedbackResolution.ADDRESSED, null, null)
             );
@@ -517,7 +515,6 @@ class FeedbackResponseControllerIntegrationTest extends AbstractWorkspaceIntegra
                 .expectStatus()
                 .isNoContent();
 
-            // Only what was said after it counts — the withdrawn ADDRESSED must not come back.
             submit(new FeedbackResponseRequestDTO(FeedbackUsefulness.UNHELPFUL, null, null, null));
             FeedbackResponseDTO response = current();
 
@@ -567,8 +564,6 @@ class FeedbackResponseControllerIntegrationTest extends AbstractWorkspaceIntegra
         }
     }
 
-    // Workspace isolation
-
     @Nested
     class WorkspaceIsolation {
 
@@ -590,7 +585,6 @@ class FeedbackResponseControllerIntegrationTest extends AbstractWorkspaceIntegra
             Workspace otherWorkspace = createWorkspace("other-ws", "Other WS", "other-org", AccountType.ORG, owner2);
             ensureWorkspaceMembership(otherWorkspace, adminUser, WorkspaceMembership.WorkspaceRole.ADMIN);
 
-            // Engagement in the second workspace must be all zeros — reactions do not cross workspaces.
             FeedbackEngagementDTO response = webTestClient
                 .get()
                 .uri(ENGAGEMENT_URI, otherWorkspace.getWorkspaceSlug())
@@ -608,8 +602,6 @@ class FeedbackResponseControllerIntegrationTest extends AbstractWorkspaceIntegra
             assertThat(response.notApplicable()).isZero();
         }
     }
-
-    // GET /engagement
 
     @Nested
     class GetEngagement {
@@ -637,10 +629,6 @@ class FeedbackResponseControllerIntegrationTest extends AbstractWorkspaceIntegra
         @Test
         @WithAdminUser
         void returnsCorrectCounts() {
-            // C1: react ADDRESSED then change the mind to DISPUTED on the SAME feedback unit. Reaction is
-            // @Immutable / append-only, so the second submit appends a new row and only the LATEST row per
-            // feedback_id is the current reaction. Engagement must therefore count ONLY the latest (DISPUTED=1),
-            // not double-count the superseded ADDRESSED row.
             webTestClient
                 .post()
                 .uri(FEEDBACK_URI, workspace.getWorkspaceSlug(), feedbackUnit.getId())
@@ -673,7 +661,6 @@ class FeedbackResponseControllerIntegrationTest extends AbstractWorkspaceIntegra
                 .getResponseBody();
 
             assertThat(response).isNotNull();
-            // The superseded ADDRESSED row no longer counts — only the current DISPUTED reaction does.
             assertThat(response.addressed()).isZero();
             assertThat(response.disputed()).isEqualTo(1);
             assertThat(response.notApplicable()).isZero();
@@ -682,9 +669,6 @@ class FeedbackResponseControllerIntegrationTest extends AbstractWorkspaceIntegra
         @Test
         @WithAdminUser
         void countsDistinctFeedbackUnitsNotHistoricalRows() {
-            // Two DISTINCT feedback units, each reacted ADDRESSED once → addressed=2 (distinct current
-            // reactions). Guards that the DISTINCT ON (feedback_id) collapse does not over-collapse across
-            // different feedback units.
             Feedback secondFeedbackUnit = feedbackRepository.save(
                 Feedback.builder()
                     .agentJobId(feedbackUnit.getAgentJobId())

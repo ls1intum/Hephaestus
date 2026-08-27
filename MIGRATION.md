@@ -92,7 +92,7 @@ GET  /workspaces/{workspaceSlug}/practices/feedback/engagement
 The request body carries `usefulness` (`HELPFUL` / `UNHELPFUL`), `resolution` (`ADDRESSED` /
 `DISPUTED` / `NOT_APPLICABLE`), an optional `comment` — required when disputing — and `withdraw`,
 which takes the whole answer back. Every submit appends; the GET returns the answer as it currently
-stands, which is the newest value of each question independently.
+stands. Omitted fields retain their current values; `withdraw` clears the complete response.
 
 **Action**: repoint any direct API caller at the new endpoint. Stored reactions are untouched and
 keep answering; nothing needs migrating and no data is lost.

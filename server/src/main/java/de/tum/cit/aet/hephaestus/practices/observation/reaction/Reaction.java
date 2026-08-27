@@ -67,9 +67,6 @@ import org.jspecify.annotations.Nullable;
         @Index(name = "idx_reaction_reactor_created", columnList = "reactor_user_id, created_at DESC"),
         // Resolve the latest reaction for a given (feedback, reactor) — the "current state" lookup.
         @Index(name = "idx_reaction_feedback_reactor", columnList = "feedback_id, reactor_user_id, created_at DESC"),
-        // Cross-run re-nag suppression: locate a prior reaction by its stable locus across per-run re-detections,
-        // since the per-run feedback FK does not recur but the recurrence_key does.
-        @Index(name = "idx_reaction_correlation", columnList = "recurrence_key"),
     }
 )
 @Getter
@@ -105,26 +102,6 @@ public class Reaction {
      */
     @Column(name = "feedback_id", nullable = false, insertable = false, updatable = false, columnDefinition = "UUID")
     private UUID feedbackId;
-
-    /**
-     * Denormalized copy of the reacted feedback's headline {@code Observation.recurrenceKey}, captured at
-     * reaction-write time. Stored, not joined: the reacted piece of feedback is per-run, so its FK alone cannot
-     * locate this reaction on a later run, but the {@code recurrence_key} is the stable (practice, target,
-     * subject, file) locus that DOES recur. Re-nag suppression matches on it to find a prior DISPUTED /
-     * NOT_APPLICABLE reaction against a re-detected locus — the cross-run grain, distinct from the per-occurrence
-     * {@code Observation.occurrenceKey}. NULL means the source unit bound no PRIMARY observation carrying a
-     * non-null {@code recurrence_key} ({@code FeedbackRepository.findHeadlineRecurrenceKey} skips null-key PRIMARY
-     * rows and takes the earliest one that has a key), so the reaction cannot participate in cross-run suppression.
-     *
-     * <p><b>Headline-only by design.</b> A {@link Feedback} unit can fuse several observations (one PRIMARY per
-     * problem, ADR 0022), but only the headline locus is captured here. So when a recipient disputes a
-     * multi-observation unit, suppression matches only the headline locus on re-run; the non-headline loci bundled
-     * into the same unit recur and may re-nag. This is the known suppression grain, not a defect. Full-unit
-     * suppression would require capturing every member recurrence key (e.g. a child {@code reaction_locus}
-     * table keyed off {@code FeedbackObservation}), which is out of scope.
-     */
-    @Column(name = "recurrence_key", length = 64)
-    private @Nullable String recurrenceKey;
 
     /**
      * The user who submitted this reaction — always the feedback's recipient, since only the recipient may

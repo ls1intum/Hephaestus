@@ -60,7 +60,6 @@ public class FeedbackResponseService {
             .usefulness(withdrawing ? null : request.usefulness())
             .resolution(withdrawing ? null : request.resolution())
             .explanation(withdrawing ? null : request.comment())
-            .recurrenceKey(feedbackRepository.findHeadlineRecurrenceKey(feedbackId).orElse(null))
             .build();
         reactionRepository.save(response);
 
@@ -82,7 +81,7 @@ public class FeedbackResponseService {
      * nothing rather than an error, which is the contract {@link CurrentDeveloperLookup} states.
      */
     @Transactional(readOnly = true)
-    public Optional<FeedbackResponseDTO> getLatestResponse(WorkspaceContext workspaceContext, UUID feedbackId) {
+    public Optional<FeedbackResponseDTO> getResponse(WorkspaceContext workspaceContext, UUID feedbackId) {
         Optional<Long> recipient = currentDeveloperLookup.currentDeveloperId();
         if (recipient.isEmpty()) {
             return Optional.empty();
@@ -92,7 +91,7 @@ public class FeedbackResponseService {
         return currentResponse(feedbackId, recipientId);
     }
 
-    /** Zeroes for a caller who is not a synced developer, for the same reason as {@link #getLatestResponse}. */
+    /** Zeroes for a caller who is not a synced developer, for the same reason as {@link #getResponse}. */
     @Transactional(readOnly = true)
     public FeedbackEngagementDTO getEngagement(WorkspaceContext workspaceContext) {
         Optional<Long> recipient = currentDeveloperLookup.currentDeveloperId();

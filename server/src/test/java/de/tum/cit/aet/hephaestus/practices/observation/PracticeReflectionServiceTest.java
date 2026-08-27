@@ -80,8 +80,6 @@ class PracticeReflectionServiceTest extends BaseUnitTest {
     void setUp() {
         when(currentDeveloperLookup.currentDeveloperId()).thenReturn(Optional.of(USER_ID));
         when(clock.instant()).thenReturn(NOW);
-        // Consent is decided elsewhere and has its own tests; here every observation is permitted so the
-        // sort under test sees the full set. Echoing the argument keeps a filtered-out fixture impossible.
         lenient()
             .when(visibilityPolicy.permitsAll(anyLong(), any(), any()))
             .thenAnswer(invocation -> {
@@ -91,8 +89,6 @@ class PracticeReflectionServiceTest extends BaseUnitTest {
         lenient()
             .when(workspaceReviewDefaultsProvider.forWorkspace(WORKSPACE_ID))
             .thenReturn(WorkspaceReviewDefaults.UNSET);
-        // The trend service is REAL, not a mock: the standing rule reads the recent-evidence streak off its
-        // result, so a stub would assert the mock's shape instead of the rule.
         practiceReflectionService = new PracticeReflectionService(
             observationRepository,
             feedbackObservationRepository,
@@ -173,7 +169,6 @@ class PracticeReflectionServiceTest extends BaseUnitTest {
     @DisplayName("two clean newer work items restore STRENGTH even though an older review found a problem")
     void recentCleanEvidenceOutweighsTheOlderRecord() {
         Practice practice = practice("robust-error-handling");
-        // Oldest work item carried a confident problem; the two after it were clean.
         when(
             observationRepository.findRecentByDeveloperAndWorkspace(
                 eq(USER_ID),
@@ -191,8 +186,6 @@ class PracticeReflectionServiceTest extends BaseUnitTest {
 
         assertThat(cards).hasSize(1);
         assertThat(cards.get(0).standing()).isEqualTo(ReflectionPracticeDTO.Standing.STRENGTH);
-        // The fixed problem is still DELIVERED as an item: the standing describes recent evidence, while the
-        // list stays the complete record of what was raised in the window.
         assertThat(cards.get(0).toWorkOn()).hasSize(1);
     }
 
@@ -223,9 +216,6 @@ class PracticeReflectionServiceTest extends BaseUnitTest {
     @DisplayName("one problem on the newest work item moves the standing to MIXED, but does not condemn")
     void aSingleFreshProblemDoesNotCondemn() {
         Practice practice = practice("robust-error-handling");
-        // The scale draws its lower line between ONE setback and a PATTERN of them. A developer working at a
-        // 80% success rate trips this on one review in five; reading that as "needs attention" while the
-        // trend beside it stays silent — a single item is no evidence of a change — told them off for noise.
         when(
             observationRepository.findRecentByDeveloperAndWorkspace(
                 eq(USER_ID),
@@ -310,7 +300,6 @@ class PracticeReflectionServiceTest extends BaseUnitTest {
 
         assertThat(cards).hasSize(1);
         assertThat(cards.get(0).standing()).isEqualTo(ReflectionPracticeDTO.Standing.STRENGTH);
-        // The standing describes the window; the list stays the complete record of what the 90 days raised.
         assertThat(cards.get(0).toWorkOn()).hasSize(5);
     }
 
@@ -344,7 +333,6 @@ class PracticeReflectionServiceTest extends BaseUnitTest {
             .stream()
             .map(i -> i.severity())
             .toList();
-        // CRITICAL leads; the null-severity item sorts last (treated as least-severe).
         assertThat(order).containsExactly(Severity.CRITICAL, null);
     }
 
@@ -352,9 +340,6 @@ class PracticeReflectionServiceTest extends BaseUnitTest {
     @DisplayName("a problem seen on a single work item is shown, not withheld for lack of corroboration")
     void singleArtifactProblemIsShownWorstFirst() {
         Practice practice = practice("robust-error-handling");
-        // Each seen exactly once, on the same work item. An earlier revision withheld both — it required a
-        // second artifact before a problem could reach the learner, using a detector-reported confidence that
-        // was dropped after validation found it carried no signal. Everything is shown now, worst first.
         Observation critical = bad(practice, Severity.CRITICAL, 42L);
         Observation minor = bad(practice, Severity.MINOR, 42L);
 
@@ -385,8 +370,6 @@ class PracticeReflectionServiceTest extends BaseUnitTest {
     @DisplayName("every problem in the window reaches the card, whichever locus or work item it came from")
     void unrelatedProblemsAcrossLociAreAllListed() {
         Practice practice = practice("robust-error-handling");
-        // Two unrelated problems, different loci, different work items, neither repeated. Nothing about this
-        // shape may cause one of them to be silently dropped: the card is the complete record for the window.
         Observation locusA = bad(practice, Severity.CRITICAL, 42L, "locus-A");
         Observation locusB = bad(practice, Severity.MINOR, 43L, "locus-B");
 

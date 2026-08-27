@@ -2,4 +2,4 @@
 "hephaestus": minor
 ---
 
-A practice area now reports how it has developed: recent evidence compared with earlier reviewed work, and how much evidence stands behind the direction it shows. When the reviewed work is too thin to support any direction, it says so instead of showing one — a direction and an absence of evidence are never presented as the same thing.
+A practice area now reports how it has developed by comparing its four most recent relevant work items with the four before them. It shows improvement or decline only when that evidence supports a direction; otherwise it reports that the direction is unclear or that more reviewed work is needed.

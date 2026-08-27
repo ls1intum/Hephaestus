@@ -56,16 +56,16 @@ public class FeedbackResponseController {
     }
 
     @GetMapping("/{feedbackId}/response")
-    @Operation(operationId = "getLatestFeedbackResponse", summary = "Get the latest feedback response")
+    @Operation(operationId = "getFeedbackResponse", summary = "Get the current feedback response")
     @ApiResponse(responseCode = "200", description = "Current response returned")
     @ApiResponse(responseCode = "204", description = "No response is currently recorded")
     @ApiResponse(responseCode = "404", description = "Delivered feedback not found for the current recipient")
-    public ResponseEntity<FeedbackResponseDTO> latest(
+    public ResponseEntity<FeedbackResponseDTO> current(
         WorkspaceContext workspaceContext,
         @PathVariable UUID feedbackId
     ) {
         return responseService
-            .getLatestResponse(workspaceContext, feedbackId)
+            .getResponse(workspaceContext, feedbackId)
             .map(ResponseEntity::ok)
             .orElseGet(() -> ResponseEntity.noContent().build());
     }

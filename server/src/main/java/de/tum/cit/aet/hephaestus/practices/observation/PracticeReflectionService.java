@@ -44,15 +44,8 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class PracticeReflectionService {
 
-    /** Look-back for the reflection surface, matching the mentor's findings window. */
     public static final int LOOKBACK_DAYS = 90;
-    /** Per-practice cap on "to work on" items: the highest-impact few, not an exhaustive log. */
     private static final int MAX_ITEMS_PER_PRACTICE = 5;
-    /**
-     * How many of the newest reviewed work items a standing is read off. Four, matching the trend's bundle
-     * size, so both numbers on a card come from the same stretch of work. Fewer is fine: the card says how
-     * thin the evidence is through its trend support rather than by withholding the standing.
-     */
     private static final int STANDING_WINDOW = 4;
     /**
      * Per-opportunity weight decay, newest first. Derived rather than picked: two problem-free work items in a
@@ -61,7 +54,6 @@ public class PracticeReflectionService {
      * regression shows up as fast as a fresh fix.
      */
     private static final double STANDING_DECAY = 0.4;
-    /** Per-practice cap on acknowledged strengths: enough to affirm without drowning the signal. */
     private static final int MAX_STRENGTHS_PER_PRACTICE = 3;
 
     private final ObservationRepository observationRepository;
@@ -73,47 +65,26 @@ public class PracticeReflectionService {
     private final PracticeTrendService practiceTrendService;
     private final Clock clock;
 
-    /**
-     * Returns practice cards built from each target's latest review run. Observations that produced no verdict
-     * do not reach this developer surface, and neither does anything the caller is not cleared to see;
-     * every problem that survives both is shown, worst severity first.
-     */
     @Transactional(readOnly = true)
     public List<ReflectionPracticeDTO> getReflection(Long workspaceId) {
         return getReflectionSnapshot(workspaceId).cards();
     }
 
-    /**
-     * Shared evidence snapshot used by both the practice reflection and practice-area status surfaces.
-     *
-     * <p>Three passes, and the order is forced: classify the observations, derive the trends from what the
-     * classification kept, then build each card once. A standing needs its trend and a trend needs the
-     * classification, so a card cannot be built before both exist.
-     *
-     * <p>Assumes a caller-provided transaction, since it navigates lazy {@code Observation.practice}.
-     */
     public ReflectionSnapshot getReflectionSnapshot(Long workspaceId) {
         Optional<Long> currentDeveloperId = currentDeveloperLookup.currentDeveloperId();
         if (currentDeveloperId.isEmpty()) {
             return ReflectionSnapshot.EMPTY;
         }
         Instant since = clock.instant().minus(LOOKBACK_DAYS, ChronoUnit.DAYS);
-        // No global row cap: it could silently remove complete practices. Per-practice caps are applied only
-        // after every eligible latest-run finding has been grouped.
         Long developerId = currentDeveloperId.get();
         List<Observation> recent = observationRepository.findRecentByDeveloperAndWorkspace(
             developerId,
             workspaceId,
             since,
-            // Verdictless rows on purpose. None are rendered, but they have to be COUNTED: "ran and found
-            // nothing to judge" and "was never looked at" are different answers, and only the rows tell them
-            // apart. Asking here lets one pass classify and count; the alternative was a second query whose
-            // predicates had to be kept identical by hand.
+            // Verdictless observations distinguish NO_OPPORTUNITY from NOT_OBSERVED.
             false,
             Pageable.unpaged()
         );
-        // An observation may cite a source the learner is not cleared to be shown. The policy answers that
-        // per observation, so it gates this surface before anything is grouped, counted, or trended.
         Set<UUID> visible = visibilityPolicy.permitsAll(
             workspaceId,
             recent,
@@ -165,9 +136,6 @@ public class PracticeReflectionService {
                     LinkedHashMap::new
                 )
             );
-        // "Eligible" is an autonomy question, not a boolean: a practice contributes to its area's coverage
-        // when review is admitted for it at all. AutonomyResolver already folds in the area's and the
-        // workspace's answer, so an area silenced upstream drops out with its practices.
         PracticeAutonomy workspaceDefault = workspaceReviewDefaultsProvider.forWorkspace(workspaceId).defaultAutonomy();
         List<Practice> eligiblePractices = practiceRepository
             .findByWorkspaceId(workspaceId)
@@ -205,7 +173,7 @@ public class PracticeReflectionService {
      *
      * <p>The UNION of two sets, both needed. The eligible practices are what the workspace currently watches;
      * they belong here even with nothing to report, because "no observation reached this" and "the reviews ran
-     * and found nothing" are different answers a learner cannot otherwise tell apart.
+     * and found nothing" are different answers a developer cannot otherwise tell apart.
      * The practices that produced a card are added even when review is no longer admitted for them: that
      * feedback was raised and delivered, and switching a practice off does not un-say it.
      */
@@ -421,7 +389,7 @@ public class PracticeReflectionService {
             ).toList();
         }
 
-        /** Whether this practice has anything to say to the learner at all. */
+        /** Whether this practice has anything to say to the developer. */
         boolean hasCard() {
             return !problems.isEmpty() || !strengths.isEmpty();
         }
@@ -430,7 +398,7 @@ public class PracticeReflectionService {
     /**
      * @param standingShareByPractice the continuous standing of every practice that produced a card, keyed by
      *     slug. The level above aggregates THIS rather than the rendered labels, which would put 0.79 and 0.51
-     *     at the same weight. Kept out of {@link ReflectionPracticeDTO}: the learner's card carries no score.
+     *     at the same weight. Kept out of {@link ReflectionPracticeDTO}: the developer's card carries no score.
      */
     public record ReflectionSnapshot(
         @Nullable Long developerId,
@@ -463,7 +431,7 @@ public class PracticeReflectionService {
             .collect(Collectors.toMap(ObservationFeedbackBody::getObservationId, ObservationFeedbackBody::getBody));
     }
 
-    /** Verdicts first and worst first, because they are what a learner can act on; silences last. */
+    /** Verdicts first and worst first; silences last. */
     private static int standingRank(ReflectionPracticeDTO.Standing standing) {
         return switch (standing) {
             case DEVELOPING -> 0;

@@ -3328,6 +3328,16 @@ export type PracticeAreaReviewMoment = {
 };
 
 /**
+ * A page of visible review moments
+ */
+export type PracticeAreaReviewHistoryPage = {
+    content: Array<PracticeAreaReviewMoment>;
+    hasNext?: boolean;
+    page?: number;
+    size?: number;
+};
+
+/**
  * A practice area grouping related practices into a learning objective
  */
 export type PracticeArea = {
@@ -3518,11 +3528,6 @@ export type PagedModelReviewObservation = {
 
 export type PagedModelReviewFeedback = {
     content?: Array<ReviewFeedback>;
-    page?: PageMetadata;
-};
-
-export type PagedModelPracticeAreaReviewMoment = {
-    content?: Array<PracticeAreaReviewMoment>;
     page?: PageMetadata;
 };
 
@@ -9396,7 +9401,7 @@ export type ListPracticeAreaReviewHistoryResponses = {
     /**
      * Paginated review moments returned
      */
-    200: PagedModelPracticeAreaReviewMoment;
+    200: PracticeAreaReviewHistoryPage;
 };
 
 export type ListPracticeAreaReviewHistoryResponse = ListPracticeAreaReviewHistoryResponses[keyof ListPracticeAreaReviewHistoryResponses];
@@ -9871,7 +9876,7 @@ export type GetInAppFeedbackResponses = {
 
 export type GetInAppFeedbackResponse = GetInAppFeedbackResponses[keyof GetInAppFeedbackResponses];
 
-export type GetLatestFeedbackResponseData = {
+export type GetFeedbackResponseData = {
     body?: never;
     path: {
         /**
@@ -9884,16 +9889,16 @@ export type GetLatestFeedbackResponseData = {
     url: '/workspaces/{workspaceSlug}/practices/feedback/{feedbackId}/response';
 };
 
-export type GetLatestFeedbackResponseErrors = {
+export type GetFeedbackResponseErrors = {
     /**
      * Delivered feedback not found for the current recipient
      */
     404: FeedbackResponse;
 };
 
-export type GetLatestFeedbackResponseError = GetLatestFeedbackResponseErrors[keyof GetLatestFeedbackResponseErrors];
+export type GetFeedbackResponseError = GetFeedbackResponseErrors[keyof GetFeedbackResponseErrors];
 
-export type GetLatestFeedbackResponseResponses = {
+export type GetFeedbackResponseResponses = {
     /**
      * Current response returned
      */
@@ -9904,7 +9909,7 @@ export type GetLatestFeedbackResponseResponses = {
     204: FeedbackResponse;
 };
 
-export type GetLatestFeedbackResponseResponse = GetLatestFeedbackResponseResponses[keyof GetLatestFeedbackResponseResponses];
+export type GetFeedbackResponseResponse = GetFeedbackResponseResponses[keyof GetFeedbackResponseResponses];
 
 export type SubmitFeedbackResponseData = {
     body: FeedbackResponseRequest;

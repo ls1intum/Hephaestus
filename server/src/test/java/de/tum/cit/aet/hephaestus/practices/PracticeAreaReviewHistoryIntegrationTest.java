@@ -125,13 +125,37 @@ class PracticeAreaReviewHistoryIntegrationTest extends AbstractWorkspaceIntegrat
         String artifactKind,
         Long artifactId
     ) {
+        insertFinding(
+            practice,
+            agentJob,
+            title,
+            presence,
+            assessment,
+            severity,
+            artifactKind,
+            artifactId,
+            Instant.now()
+        );
+    }
+
+    private void insertFinding(
+        Practice observedPractice,
+        AgentJob reviewJob,
+        String title,
+        String presence,
+        @org.jspecify.annotations.Nullable String assessment,
+        @org.jspecify.annotations.Nullable String severity,
+        String artifactKind,
+        Long artifactId,
+        Instant observedAt
+    ) {
         UUID id = UUID.randomUUID();
         observationRepository.insertIfAbsent(
             id,
             "key-" + id,
-            agentJob.getId(),
-            practice.getId(),
-            practice.getCurrentRevision().getId(),
+            reviewJob.getId(),
+            observedPractice.getId(),
+            observedPractice.getCurrentRevision().getId(),
             artifactKind,
             artifactId,
             developer.getId(),
@@ -142,7 +166,7 @@ class PracticeAreaReviewHistoryIntegrationTest extends AbstractWorkspaceIntegrat
             DIFF_EVIDENCE_JSON,
             "Test reasoning for " + title,
             null,
-            Instant.now(),
+            observedAt,
             "LIVE"
         );
     }
@@ -170,7 +194,6 @@ class PracticeAreaReviewHistoryIntegrationTest extends AbstractWorkspaceIntegrat
             .isEqualTo(1)
             .jsonPath("$.content[0].reviewId")
             .isEqualTo(agentJob.getId().toString())
-            // One run, both sides of it — the grain the surface promises.
             .jsonPath("$.content[0].observations.length()")
             .isEqualTo(2);
     }
@@ -179,8 +202,6 @@ class PracticeAreaReviewHistoryIntegrationTest extends AbstractWorkspaceIntegrat
     @WithUser
     @DisplayName("carries an undecided observation with a null assessment rather than dropping it")
     void shouldCarryInconclusiveFindingWithoutAnAssessment() {
-        // The presence/assessment coherence rule forbids an assessment here, so the payload has to admit the
-        // absence. Marking the field required made the wire contract promise something the data cannot hold.
         insertFinding("Could not tell from the diff", "INCONCLUSIVE", null, null, "scm.pull_request", 1L);
 
         getHistory()
@@ -198,10 +219,6 @@ class PracticeAreaReviewHistoryIntegrationTest extends AbstractWorkspaceIntegrat
     @WithUser
     @DisplayName("an unfiltered request is not silently narrowed to pull requests")
     void shouldNotDefaultToPullRequestsWhenNoKindFilterIsGiven() {
-        // The placeholder passed for an absent artifact-kind filter is a real kind, so a broken flag would
-        // narrow the history to pull requests without failing anywhere. A observation on another kind surviving is
-        // what proves the predicate stays disabled. The moment's `artifact.type` is deliberately not asserted:
-        // it comes from the run's target rather than from the observation, so it would test the job fixture.
         insertFinding("Issue lacks acceptance criteria", "ABSENT", "BAD", "MINOR", ArtifactKinds.ISSUE.value(), 7L);
 
         getHistory()
@@ -224,21 +241,86 @@ class PracticeAreaReviewHistoryIntegrationTest extends AbstractWorkspaceIntegrat
 
     @Test
     @WithUser
+    void shouldSelectRunsByMatchingSeverityWithoutTreatingStrengthsAsMatches() {
+        insertFinding("Motivation is clear", "PRESENT", "GOOD", null, ArtifactKinds.PULL_REQUEST.value(), 1L);
+
+        webTestClient
+            .get()
+            .uri(uriBuilder ->
+                uriBuilder
+                    .path(HISTORY_URI)
+                    .queryParam("severities", "MAJOR")
+                    .build(workspace.getWorkspaceSlug(), area.getSlug())
+            )
+            .headers(TestAuthUtils.withCurrentUser())
+            .exchange()
+            .expectStatus()
+            .isOk()
+            .expectBody()
+            .jsonPath("$.content.length()")
+            .isEqualTo(0);
+    }
+
+    @Test
+    @WithUser
+    void shouldFillAPageAfterWithholdingANewerRun() {
+        AgentJob olderJob = persistAgentJob(workspace);
+        insertFinding(
+            practice,
+            olderJob,
+            "Visible observation",
+            "PRESENT",
+            "GOOD",
+            null,
+            ArtifactKinds.PULL_REQUEST.value(),
+            1L,
+            Instant.parse("2025-01-01T00:00:00Z")
+        );
+
+        Practice superseded = persistPractice(workspace, area, "superseded", "Superseded");
+        AgentJob newerJob = persistAgentJob(workspace);
+        insertFinding(
+            superseded,
+            newerJob,
+            "Withheld observation",
+            "PRESENT",
+            "GOOD",
+            null,
+            ArtifactKinds.PULL_REQUEST.value(),
+            2L,
+            Instant.parse("2025-01-02T00:00:00Z")
+        );
+        superseded.setCriteria("New criteria");
+        superseded.setArea(area);
+        superseded.setCurrentRevision(practiceRevisionRepository.save(new PracticeRevision(superseded, 2)));
+        practiceRepository.saveAndFlush(superseded);
+
+        webTestClient
+            .get()
+            .uri(uriBuilder ->
+                uriBuilder.path(HISTORY_URI).queryParam("size", 1).build(workspace.getWorkspaceSlug(), area.getSlug())
+            )
+            .headers(TestAuthUtils.withCurrentUser())
+            .exchange()
+            .expectStatus()
+            .isOk()
+            .expectBody()
+            .jsonPath("$.content[0].observations[0].title")
+            .isEqualTo("Visible observation")
+            .jsonPath("$.hasNext")
+            .isEqualTo(false);
+    }
+
+    @Test
+    @WithUser
     @DisplayName("a run whose observations the visibility gate withholds leaves the page entirely")
     void shouldWithholdARunMeasuredAgainstSupersededReviewRules() {
-        // What this pins is that the gate runs here at all, not how it decides. Superseded review rules are
-        // the half of it an integration test can stage without a second module: the observation was measured
-        // against revision 1, and publishing different criteria as revision 2 makes it speak for a rule the
-        // practice no longer has. The reflection surface has always dropped such a claim; this one used to
-        // show it.
         insertFinding("Motivation is clear", "PRESENT", "GOOD", null, ArtifactKinds.PULL_REQUEST.value(), 1L);
         practice.setCriteria("Rewritten criteria, which is what makes the fingerprint differ");
-        // The revision snapshots the area too, and this practice's is a detached lazy proxy by now.
         practice.setArea(area);
         practice.setCurrentRevision(practiceRevisionRepository.save(new PracticeRevision(practice, 2)));
         practiceRepository.saveAndFlush(practice);
 
-        // Not an empty moment with a review id and no observations — the run is gone.
         getHistory().jsonPath("$.content.length()").isEqualTo(0);
     }
 }

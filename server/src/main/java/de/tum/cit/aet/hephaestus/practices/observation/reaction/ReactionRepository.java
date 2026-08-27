@@ -113,20 +113,13 @@ public interface ReactionRepository extends JpaRepository<Reaction, UUID> {
     }
 
     /**
-     * Current resolution per {@code recurrence_key} (stable locus) for the given keys, restricted to one
-     * reacting developer (the feedback's recipient — only the recipient may react). Used by reaction
-     * suppression to suppress re-nagging a locus the student already DISPUTED / marked NOT_APPLICABLE on an
-     * earlier run, even though the per-run feedback row (and its {@code feedback_id}) is different this run.
+     * Current resolution for each requested observation locus and recipient. Joining through
+     * {@code feedback_observation} applies a response to every observation in the delivered feedback.
      *
      * <p>Rows carrying no resolution are skipped rather than ending the search: a recipient who rated a unit
      * helpful after disputing it did not un-dispute it, and a suppression that read the newest row would
      * start re-nagging on the strength of a thumbs-up. Taking the answer back — a withdrawal row — does end
      * it, which is the point of {@link #STILL_SPEAKS}.
-     *
-     * <p>Not workspace-joined, and that is safe: the {@code recurrence_key} embeds {@code artifactKind} +
-     * {@code artifactId}, and {@code artifactId} is the GLOBAL PR/Issue primary key (one identity sequence
-     * across all workspaces), so a key resolves to exactly one artifact in exactly one workspace — two
-     * workspaces cannot share one. The reactor scope already pins the recipient.
      *
      * <p><b>Precondition:</b> the caller MUST pass a non-empty {@code recurrenceKeys}. This is a native
      * query: an empty collection renders {@code IN ()}, which Postgres rejects as a syntax error at
@@ -135,21 +128,26 @@ public interface ReactionRepository extends JpaRepository<Reaction, UUID> {
      */
     @Query(
         value = """
-            SELECT DISTINCT ON (r.recurrence_key) r.recurrence_key AS "recurrenceKey", r.action AS "resolution"
+            SELECT DISTINCT ON (o.recurrence_key) o.recurrence_key AS "recurrenceKey", r.action AS "resolution"
             FROM reaction r
-            WHERE r.recurrence_key IN (:recurrenceKeys)
+            JOIN feedback fb ON fb.id = r.feedback_id
+            JOIN feedback_observation fo ON fo.feedback_id = r.feedback_id
+            JOIN observation o ON o.id = fo.observation_id
+            WHERE o.recurrence_key IN (:recurrenceKeys)
               AND r.reactor_user_id = :reactorUserId
+              AND fb.workspace_id = :workspaceId
               AND r.action IS NOT NULL
             """ +
             STILL_SPEAKS +
             """
-            ORDER BY r.recurrence_key, r.created_at DESC, r.id DESC
+            ORDER BY o.recurrence_key, r.created_at DESC, r.id DESC
             """,
         nativeQuery = true
     )
     List<LocusResolutionProjection> findCurrentResolutionByRecurrenceKeys(
         @Param("recurrenceKeys") Collection<String> recurrenceKeys,
-        @Param("reactorUserId") Long reactorUserId
+        @Param("reactorUserId") Long reactorUserId,
+        @Param("workspaceId") Long workspaceId
     );
 
     /** The resolution that currently stands at one recurrence locus. */

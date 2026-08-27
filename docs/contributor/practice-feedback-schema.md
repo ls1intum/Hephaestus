@@ -122,6 +122,9 @@ record perceived usefulness (`HELPFUL` or `UNHELPFUL`), a resolution (`ADDRESSED
 `NOT_APPLICABLE`), or both. `DISPUTED` requires a comment because it rejects the feedback's judgement;
 usefulness alone does not change standing, trend, or re-nag suppression.
 
+Usefulness, resolution, and the optional comment are retained independently when a later submission omits
+them. A withdrawal clears all three.
+
 Responses are append-only. Each submission records an event, and read projections fold the active events
 for that feedback and recipient into the current response. This preserves changes of mind without counting
 historical answers as several currently resolved pieces of feedback.
