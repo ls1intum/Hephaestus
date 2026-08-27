@@ -1,5 +1,5 @@
 name: "Setup CI caches"
-description: "Caches Maven repo + generated sources, Playwright browsers, and Storybook builds. Node/pnpm setup happens in the calling workflow via pnpm/action-setup + actions/setup-node (cache: pnpm)."
+description: "Caches Maven dependencies and Playwright browsers. Node/pnpm setup happens in the calling workflow."
 inputs:
   cache-type:
     description: "Type of cache to setup"
@@ -43,14 +43,3 @@ runs:
         key: ${{ inputs.os }}-playwright-${{ hashFiles('pnpm-lock.yaml') }}
         restore-keys: |
           ${{ inputs.os }}-playwright-
-
-    - name: Cache Storybook build
-      if: contains(fromJSON('["webapp-visual", "webapp-storybook"]'), inputs.cache-type)
-      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-      with:
-        path: |
-          webapp/storybook-static
-          webapp/.storybook/.cache
-        key: ${{ inputs.os }}-storybook-${{ hashFiles('webapp/**/*.stories.tsx', 'webapp/.storybook/**', 'pnpm-lock.yaml') }}
-        restore-keys: |
-          ${{ inputs.os }}-storybook-
