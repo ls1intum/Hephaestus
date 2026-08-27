@@ -7,11 +7,6 @@ const meta = {
 	component: FeatureCard,
 	parameters: { layout: "padded" },
 	tags: ["autodocs"],
-	argTypes: {
-		feature: {
-			description: "Feature data object containing icon, badge, title, description, and content",
-		},
-	},
 } satisfies Meta<typeof FeatureCard>;
 
 export default meta;
@@ -20,12 +15,12 @@ type Story = StoryObj<typeof meta>;
 export const Default: Story = {
 	args: {
 		feature: {
-			icon: Code,
+			icon: <Code className="size-5" />,
 			badge: "Core feature",
 			title: "Practice feedback",
 			description: "Specific feedback on how the work was done",
 			content:
-				"Hephaestus reviews pull requests, merge requests, and issues against the practices a workspace has chosen. Each piece of feedback points to evidence in the work and suggests what to try next.",
+				"Hephaestus reviews pull requests, merge requests, and issues against the practices a workspace has chosen. Feedback points to evidence in the work and can suggest what to try next.",
 		},
 	},
 };
@@ -33,7 +28,7 @@ export const Default: Story = {
 export const AIMentorship: Story = {
 	args: {
 		feature: {
-			icon: Sparkles,
+			icon: <Sparkles className="size-5" />,
 			badge: "Core feature",
 			title: "Chat with Heph",
 			description: "Talk through feedback and recent work",
@@ -46,7 +41,7 @@ export const AIMentorship: Story = {
 export const SlackIntegration: Story = {
 	args: {
 		feature: {
-			icon: MessageSquare,
+			icon: <MessageSquare className="size-5" />,
 			badge: "Integration",
 			title: "Heph in Slack",
 			description: "Talk with Heph in a direct message",
@@ -59,7 +54,7 @@ export const SlackIntegration: Story = {
 export const Recognition: Story = {
 	args: {
 		feature: {
-			icon: Trophy,
+			icon: <Trophy className="size-5" />,
 			badge: "Optional",
 			title: "Achievements and leaderboard",
 			description: "Recognition features a workspace can switch on",

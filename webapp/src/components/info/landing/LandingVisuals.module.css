@@ -1,0 +1,524 @@
+/*
+ * The landing illustration: work cards, feedback slips and Heph, arranged as one scene.
+ *
+ * A scene is a single list in reading order. Below its breakpoint the list is a plain column;
+ * above it, it becomes a grid whose column and row each cluster names through `--col`/`--row`.
+ * One DOM serves both, so the scattered and stacked forms cannot say different things.
+ *
+ * The scatter breakpoint is owned here and nowhere else. A px breakpoint on the JSX would be a
+ * second owner in a second unit — `80rem` tracks the root font size and `1281px` does not — so at
+ * any root size but 16px the two would disagree. The Tailwind `lg:` that lays out the grid hosting
+ * the feature scene is a different switch, and stays in rem so it cannot drift from this file.
+ *
+ * Nothing in a scene is pinned to a coordinate. Cards flow inside their cluster and clusters flow
+ * inside their grid column, so text that grows — a translation, or the WCAG 1.4.12 text-spacing
+ * metrics — pushes what is below it down instead of landing on top of it.
+ *
+ * Vite emits these rules unlayered while Tailwind utilities sit in `@layer utilities`, so anything
+ * declared here beats a utility on the same element regardless of order. Own a property in one
+ * place or the other, never both.
+ */
+
+.atom {
+	position: relative;
+	pointer-events: auto;
+	text-align: left;
+	border: 1px solid var(--border);
+	border-radius: 1rem;
+	background: var(--background);
+	transform: rotate(var(--rot, 0deg));
+	box-shadow:
+		0 1px 2px color-mix(in oklab, var(--foreground) 6%, transparent),
+		0 0.55rem 0.9rem -0.6rem color-mix(in oklab, var(--foreground) 16%, transparent),
+		0 1.75rem 3rem -1.6rem color-mix(in oklab, var(--foreground) 28%, transparent);
+}
+
+:global(.dark) .atom {
+	box-shadow:
+		inset 0 1px 0 color-mix(in oklab, var(--foreground) 7%, transparent),
+		0 0.75rem 1.25rem -0.8rem color-mix(in oklab, black 70%, transparent),
+		0 2rem 3.5rem -1.6rem color-mix(in oklab, black 85%, transparent);
+}
+
+.slip {
+	padding-bottom: 0.35rem;
+	border-color: color-mix(in oklab, var(--mentor) 34%, var(--border));
+	background: linear-gradient(
+		152deg,
+		color-mix(in oklab, var(--mentor) 9%, var(--background)) 0%,
+		var(--background) 76%
+	);
+}
+
+:global(.dark) .slip {
+	border-color: color-mix(in oklab, var(--mentor) 42%, var(--border));
+	background: linear-gradient(
+		152deg,
+		color-mix(in oklab, var(--mentor) 20%, var(--background)) 0%,
+		var(--background) 78%
+	);
+}
+
+.accent {
+	position: absolute;
+	height: auto;
+	color: var(--mentor);
+	opacity: 0.45;
+	transform: rotate(var(--rot, 0deg));
+	pointer-events: none;
+}
+
+.glow {
+	position: absolute;
+	border-radius: 50%;
+	background: radial-gradient(
+		closest-side,
+		color-mix(in oklab, var(--mentor) 18%, transparent),
+		transparent
+	);
+	filter: blur(28px);
+	pointer-events: none;
+}
+
+:global(.dark) .glow {
+	background: radial-gradient(
+		closest-side,
+		color-mix(in oklab, var(--mentor) 16%, transparent),
+		transparent
+	);
+	filter: blur(48px);
+}
+
+/* Heph and the bubble are one element so they move together by construction. */
+.hephFigure {
+	display: flex;
+	align-items: flex-start;
+	width: min(100%, 32rem);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+	.hephFigure {
+		animation: landing-heph-float 4s ease-in-out infinite;
+	}
+
+	.atom {
+		transition:
+			transform 220ms cubic-bezier(0.05, 0.7, 0.1, 1),
+			box-shadow 220ms cubic-bezier(0.05, 0.7, 0.1, 1);
+	}
+
+	.atom:hover {
+		transform: rotate(0deg) translateY(-3px);
+	}
+}
+
+/* Whatever the pointer is on comes out of the pile, motion preference or not. */
+.atom:hover {
+	z-index: 3;
+	border-color: color-mix(in oklab, var(--mentor) 45%, var(--border));
+	box-shadow:
+		0 1px 2px color-mix(in oklab, var(--foreground) 8%, transparent),
+		0 1rem 1.6rem -0.8rem color-mix(in oklab, var(--foreground) 22%, transparent),
+		0 2.5rem 4rem -1.8rem color-mix(in oklab, var(--foreground) 34%, transparent);
+}
+
+@keyframes landing-heph-float {
+	0%,
+	100% {
+		transform: translate3d(0, 0, 0);
+	}
+	50% {
+		transform: translate3d(0, -0.2rem, 0);
+	}
+}
+
+.hephAvatar {
+	display: block;
+	flex: none;
+	width: 7.5rem;
+	color: var(--foreground);
+	filter: drop-shadow(0 1.4rem 1.1rem color-mix(in oklab, var(--foreground) 20%, transparent));
+}
+
+.hephAvatar svg {
+	display: block;
+	width: 100%;
+	height: auto;
+}
+
+:global(.dark) .hephAvatar {
+	filter: drop-shadow(0 0.5rem 1.25rem color-mix(in oklab, var(--mentor) 26%, transparent));
+}
+
+.speechBubble {
+	position: relative;
+	flex: 1;
+	margin: 1.5rem 0 0 -0.6rem;
+	padding: 0.9rem 1.05rem;
+	border: 3px solid var(--foreground);
+	border-radius: 1.4rem 1.4rem 1.4rem 0.4rem;
+	background: linear-gradient(
+		145deg,
+		color-mix(in oklab, var(--mentor) 11%, var(--background)) 0%,
+		var(--background) 62%
+	);
+	box-shadow:
+		0.45rem 0.5rem 0 color-mix(in oklab, var(--mentor) 70%, transparent),
+		0 1.75rem 2.5rem -1.5rem color-mix(in oklab, var(--foreground) 45%, transparent);
+}
+
+/* The tail points back at the avatar beside it. */
+.speechBubble::before {
+	content: "";
+	position: absolute;
+	top: 1.2rem;
+	left: -0.62rem;
+	width: 1.05rem;
+	height: 1.05rem;
+	transform: rotate(45deg);
+	border-bottom: 3px solid var(--foreground);
+	border-left: 3px solid var(--foreground);
+	background: color-mix(in oklab, var(--mentor) 10%, var(--background));
+}
+
+.cardText {
+	font-size: 0.8125rem;
+}
+
+/* Marks the card as Hephaestus speaking, without taking a place in the chip row. */
+.slipMark {
+	position: absolute;
+	right: 0.5rem;
+	bottom: 0.4rem;
+	color: var(--mentor);
+	opacity: 0.35;
+}
+
+/* The pointer a review comment has in GitHub's conversation view. */
+.commentBubble {
+	position: relative;
+}
+
+.commentBubble::before,
+.commentBubble::after {
+	content: "";
+	position: absolute;
+	top: 0.55rem;
+	width: 0;
+	height: 0;
+	border-top: 0.3rem solid transparent;
+	border-bottom: 0.3rem solid transparent;
+}
+
+.commentBubble::before {
+	left: -0.35rem;
+	border-right: 0.35rem solid var(--border);
+}
+
+.commentBubble::after {
+	left: -0.28rem;
+	border-right: 0.35rem solid color-mix(in oklab, var(--muted) 40%, var(--background));
+}
+
+.bubbleLead {
+	font-weight: 700;
+	letter-spacing: -0.01em;
+}
+
+.bubbleBody {
+	margin-top: 0.25rem;
+	color: var(--muted-foreground);
+}
+
+/*
+ * A scene has three tiers, and the middle one matters most: between a phone and a wide desktop
+ * there is no room for the scene beside the copy, but a single column strands it in the middle of
+ * a viewport twice its width. So it pairs up before it scatters.
+ */
+.sceneList {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 1.25rem;
+	width: min(100%, 28rem);
+	margin: 0 auto;
+	padding: 0;
+	list-style: none;
+}
+
+.cluster {
+	width: 100%;
+}
+
+@media (width >= 40rem) {
+	.sceneList {
+		display: grid;
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+		align-items: start;
+		gap: 1.5rem;
+		width: min(100%, 58rem);
+	}
+
+	.clusterFull {
+		grid-column: 1 / -1;
+		justify-self: center;
+		width: min(100%, 34rem);
+	}
+}
+
+/* The slip sits under the card it comments on, inset and tinted so the pairing reads without
+   covering the card's last row. */
+.cluster .slip {
+	width: 92%;
+	margin: 0.35rem 0 0 8%;
+}
+
+.heroScene,
+.featureScene {
+	position: relative;
+}
+
+.heroCanvas {
+	isolation: isolate;
+}
+
+.heroCanvas::before {
+	content: "";
+	position: absolute;
+	inset: -2rem 0;
+	z-index: -1;
+	background-image: radial-gradient(
+		circle at 1px 1px,
+		color-mix(in oklab, var(--foreground) 14%, transparent) 1px,
+		transparent 0
+	);
+	background-size: 2rem 2rem;
+	mask-image: radial-gradient(ellipse 80% 60% at 50% 45%, black 20%, transparent 75%);
+	pointer-events: none;
+}
+
+.heroScene .glow,
+.featureScene .glow {
+	display: none;
+}
+
+.heroFigure {
+	margin: 2rem 0 0;
+}
+
+/* The headline's hand-drawn underline. */
+.headlineMark {
+	height: 0.75rem;
+	border-radius: 55%;
+	background: color-mix(in oklab, var(--mentor) 20%, transparent);
+	transform: rotate(-1deg);
+	clip-path: polygon(
+		0 38%,
+		12% 18%,
+		27% 36%,
+		42% 10%,
+		59% 31%,
+		74% 8%,
+		89% 25%,
+		100% 4%,
+		98% 76%,
+		82% 68%,
+		64% 92%,
+		45% 72%,
+		27% 94%,
+		10% 75%,
+		0 86%
+	);
+}
+
+@media (width >= 40rem) {
+	.headlineMark {
+		height: 1rem;
+	}
+}
+
+.featureHeph {
+	margin-top: 2.5rem;
+}
+
+/* ---- Scattered hero: the section becomes the canvas and the list its background layer. --- */
+
+@media (width > 80rem) {
+	.heroCanvas {
+		display: grid;
+		grid-template-columns: 17rem 1fr 17rem;
+		align-items: center;
+		min-height: 40rem;
+	}
+
+	/* Both occupy the one grid row, so the row is as tall as the taller of them and the scene
+	   can never spill onto the section below, however far its text grows. */
+	.heroCopy {
+		grid-area: 1 / 2;
+		z-index: 1;
+	}
+
+	.heroFigure {
+		grid-area: 1 / 1 / 2 / 4;
+		align-self: stretch;
+		margin: 0;
+		pointer-events: none;
+	}
+
+	.heroScene {
+		height: 100%;
+	}
+
+	.heroScene .glow {
+		display: block;
+	}
+
+	.heroScene .sceneList {
+		display: grid;
+		grid-template-columns: 17rem 1fr 17rem;
+		align-content: start;
+		row-gap: 2rem;
+		width: auto;
+		max-width: none;
+	}
+
+	.heroScene .cluster {
+		grid-column: var(--col);
+		grid-row: var(--row);
+		width: auto;
+		margin-top: var(--offset);
+	}
+
+	.heroHeph {
+		width: min(100%, 34rem);
+		margin: 0 auto;
+	}
+
+	.heroHeph .hephAvatar {
+		width: 9rem;
+	}
+
+	.heroGlowLeft {
+		top: 2rem;
+		left: 0;
+		width: 22rem;
+		height: 17rem;
+	}
+
+	.heroGlowRight {
+		top: 1rem;
+		right: 0;
+		width: 20rem;
+		height: 17rem;
+	}
+
+	.heroGlowBottom {
+		right: 1rem;
+		bottom: 0;
+		width: 22rem;
+		height: 15rem;
+	}
+}
+
+/* ---- Scattered "how it works" scene. ---- */
+
+@media (width >= 64rem) {
+	.featureScene {
+		align-self: start;
+		min-height: 30rem;
+	}
+
+	.featureScene .glow {
+		display: block;
+	}
+
+	.featureScene .sceneList {
+		display: grid;
+		grid-template-columns: 20rem 20rem;
+		justify-content: space-between;
+		align-content: start;
+		row-gap: 2rem;
+		width: auto;
+		max-width: none;
+	}
+
+	.featureScene .cluster {
+		grid-column: var(--col);
+		grid-row: var(--row);
+		width: auto;
+		margin-top: var(--offset);
+	}
+
+	.featureHeph .hephAvatar {
+		width: 9rem;
+	}
+
+	.featureGlowA {
+		top: 1rem;
+		left: 1rem;
+		width: 20rem;
+		height: 16rem;
+	}
+
+	.featureGlowB {
+		right: 0;
+		bottom: -2rem;
+		width: 24rem;
+		height: 20rem;
+	}
+}
+
+/* ---- Closing call to action. ---- */
+
+.ctaScene {
+	position: relative;
+	width: min(100%, 28rem);
+}
+
+.ctaScene .hephAvatar {
+	width: 11rem;
+}
+
+.ctaGlow {
+	top: -2rem;
+	left: -1rem;
+	width: 18rem;
+	height: 16rem;
+}
+
+.ctaSparkA {
+	top: -0.5rem;
+	right: 1.5rem;
+	width: 1.3rem;
+	--rot: 12deg;
+}
+
+.ctaSparkB {
+	bottom: 0.5rem;
+	left: 0;
+	width: 1rem;
+	--rot: -10deg;
+}
+
+@media (width >= 64rem) {
+	.ctaScene {
+		width: 100%;
+	}
+
+	.ctaScene .hephAvatar {
+		width: 12.5rem;
+	}
+}
+
+/* Last, so it outranks the per-scene avatar widths above: they are compound selectors and a
+   media query adds no specificity of its own. */
+@media (width < 26rem) {
+	.hephAvatar,
+	.ctaScene .hephAvatar {
+		width: 6rem;
+	}
+
+	.speechBubble {
+		padding: 0.75rem 0.85rem;
+	}
+}

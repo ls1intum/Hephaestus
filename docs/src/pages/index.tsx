@@ -1,7 +1,7 @@
 import Link from "@docusaurus/Link";
 import useDocusaurusContext from "@docusaurus/useDocusaurusContext";
-import feedbackPreviewDark from "@site/images/readme/landing-feedback-preview-dark.png";
-import feedbackPreviewLight from "@site/images/readme/landing-feedback-preview-light.png";
+import landingHeroDark from "@site/images/readme/landing-hero-dark.png";
+import landingHeroLight from "@site/images/readme/landing-hero-light.png";
 import HomepageFeatures from "@site/src/components/HomepageFeatures";
 import Heading from "@theme/Heading";
 import Layout from "@theme/Layout";
@@ -17,13 +17,13 @@ const guideLinks = [
 	},
 	{
 		title: "Contributor guide",
-		description: "Set up local services, follow coding standards, and ship with confidence.",
+		description: "Set up local services and open your first pull request.",
 		to: "/contributor/overview",
 	},
 	{
 		title: "Admin guide",
-		description: "Install Hephaestus on your own server and operate it.",
-		to: "/admin/install",
+		description: "Install Hephaestus on your own server and keep it running.",
+		to: "/admin/overview",
 	},
 ];
 
@@ -33,15 +33,16 @@ function HomepageHeader() {
 			<div className="container">
 				<div className={styles.heroGrid}>
 					<div className={styles.heroCopy}>
-						<span className={styles.heroKicker}>Practice feedback for software teams</span>
+						<span className={styles.heroKicker}>Practice feedback for GitHub and GitLab teams</span>
 						<Heading as="h1" className={styles.heroTitle}>
 							Learn from the work you&apos;re{" "}
 							<span className={styles.heroHighlight}>already doing</span>
 						</Heading>
 						<p className={styles.heroSubtitle}>
-							Hephaestus turns project activity already recorded in your team&apos;s tools into
-							feedback on engineering practices. See what worked, what could improve, and what to
-							try next.
+							Hephaestus is an open-source AI mentor for software teams. It reads the work you
+							already do — issues, pull requests, reviews and the discussion around them — against
+							the practices your project cares about, then says what went well, what could be
+							better, and a way to get there.
 						</p>
 						<div className={styles.heroActions}>
 							<Link className="button button--primary button--lg" to="/user/overview">
@@ -58,15 +59,14 @@ function HomepageHeader() {
 					<div className={styles.heroVisual}>
 						<img
 							className={styles.heroVisualLight}
-							src={feedbackPreviewLight}
-							alt="An example of practice feedback and a question answered by Heph."
+							src={landingHeroLight}
+							alt="An illustration of one change through a project: issue #412 has no acceptance criteria, the pull request grew to 34 files and picked up an unrelated rename, a reviewer asks a good question, and it merges with that thread unresolved. Hephaestus points back to the issue."
 						/>
 						<img
 							className={styles.heroVisualDark}
-							src={feedbackPreviewDark}
-							alt="An example of practice feedback and a question answered by Heph."
+							src={landingHeroDark}
+							alt="An illustration of one change through a project: issue #412 has no acceptance criteria, the pull request grew to 34 files and picked up an unrelated rename, a reviewer asks a good question, and it merges with that thread unresolved. Hephaestus points back to the issue."
 						/>
-						<p>Practice feedback, followed by a conversation with Heph</p>
 					</div>
 				</div>
 			</div>
@@ -103,12 +103,12 @@ export default function Home(): ReactNode {
 	return (
 		<Layout
 			title={siteConfig.title}
-			description="Hephaestus gives developers practice feedback on software project work, plus an AI mentor for talking through feedback and next steps."
+			description="Hephaestus is an open-source AI mentor for software teams. It reads the work developers already do against the practices their project cares about, and writes back feedback they can act on."
 		>
 			<HomepageHeader />
 			<main>
-				<HomepageFeatures />
 				<QuickstartGuides />
+				<HomepageFeatures />
 			</main>
 		</Layout>
 	);

@@ -1,0 +1,115 @@
+.icon {
+	--mentor-shadow-opacity: 0.08;
+	--mentor-blush-opacity: 0.25;
+}
+
+.shadow {
+	opacity: var(--mentor-shadow-opacity);
+	transform-origin: 50% 50%;
+}
+
+.float {
+	transform-origin: 50% 50%;
+}
+
+.wobble {
+	transform-origin: 12px 14px;
+}
+
+.ping {
+	transform-origin: 12px 3px;
+}
+
+.eyes {
+	transform-origin: 12px 13.5px;
+}
+
+.blush {
+	opacity: var(--mentor-blush-opacity);
+}
+
+:global(.dark) .icon {
+	--mentor-shadow-opacity: 0.15;
+	--mentor-blush-opacity: 0.2;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+	.animated .float {
+		animation: float 4s cubic-bezier(0.25, 0.1, 0.25, 1) infinite;
+	}
+
+	.animated .wobble {
+		animation: wobble 3.6s cubic-bezier(0.25, 0.1, 0.25, 1) infinite;
+	}
+
+	.animated .ping {
+		animation: ping 2.2s ease-out infinite;
+	}
+
+	.animated .streaming {
+		animation: streaming-ping 1.2s ease-out infinite;
+	}
+
+	.animated .eyes {
+		animation: blink 6.5s steps(1, end) infinite;
+	}
+
+	.animated .shadow {
+		animation: shadow 4s cubic-bezier(0.25, 0.1, 0.25, 1) infinite;
+	}
+}
+
+@keyframes float {
+	50% {
+		transform: translateY(-0.7px);
+	}
+}
+
+@keyframes wobble {
+	50% {
+		transform: rotate(1.25deg);
+	}
+}
+
+@keyframes ping {
+	0% {
+		transform: scale(0.6);
+		opacity: 0.45;
+	}
+	70%,
+	100% {
+		transform: scale(1.9);
+		opacity: 0;
+	}
+}
+
+@keyframes streaming-ping {
+	0% {
+		transform: scale(0.6);
+		opacity: 0.6;
+	}
+	70%,
+	100% {
+		transform: scale(2.4);
+		opacity: 0;
+	}
+}
+
+@keyframes blink {
+	0%,
+	86%,
+	92%,
+	100% {
+		transform: scaleY(1);
+	}
+	89% {
+		transform: scaleY(0.12);
+	}
+}
+
+@keyframes shadow {
+	50% {
+		transform: scaleX(0.85);
+		opacity: calc(var(--mentor-shadow-opacity) * 0.6);
+	}
+}

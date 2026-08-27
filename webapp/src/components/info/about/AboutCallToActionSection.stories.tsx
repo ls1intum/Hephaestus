@@ -1,11 +1,8 @@
 import type { Meta, StoryObj } from "@storybook/react";
+import { expect } from "storybook/test";
 
 import { AboutCallToActionSection } from "./AboutCallToActionSection";
 
-/**
- * AboutCallToActionSection component for encouraging user engagement with the project.
- * Features prominent GitHub repository and documentation links with inviting messaging.
- */
 const meta = {
 	component: AboutCallToActionSection,
 	parameters: { layout: "padded" },
@@ -15,7 +12,15 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/**
- * Default call-to-action section with standard styling and content.
- */
-export const Default: Story = {};
+export const Default: Story = {
+	play: async ({ canvas }) => {
+		await expect(canvas.getByRole("link", { name: /View on GitHub/ })).toHaveAttribute(
+			"href",
+			"https://github.com/ls1intum/Hephaestus",
+		);
+		await expect(canvas.getByRole("link", { name: /Read the contributor guide/ })).toHaveAttribute(
+			"href",
+			"https://ls1intum.github.io/Hephaestus/contributor/overview",
+		);
+	},
+};

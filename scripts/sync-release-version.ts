@@ -13,6 +13,11 @@ const edits = [
 		re: /^VERSION=\S+(\s+# the release you are installing.*)$/m,
 		line: `VERSION=${version}$1`,
 	},
+	{
+		file: "README.md",
+		re: /^\s*VERSION=\S+(\s+# the release you are installing.*)$/m,
+		line: `  VERSION=${version}$1`,
+	},
 ];
 
 for (const { file, re, line } of edits) {

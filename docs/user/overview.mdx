@@ -2,38 +2,37 @@
 id: overview
 sidebar_position: 1
 title: Welcome to Hephaestus
-description: Learn how Hephaestus gives developers practice feedback and how Heph helps them talk through their work.
+description: Learn how Hephaestus gives developers feedback on the practices behind their work, and how to talk it through.
 ---
 
-**Feedback on how you work.** Hephaestus gives developers feedback on the engineering practices they use in software projects. It draws on evidence from connected tools to explain what worked, what could improve, and what to try next. The feedback is advisory: you decide what to use, question, or skip.
+**Learn from the work you're already doing.** Hephaestus is an open-source AI mentor for software teams. It reads the work you already do — issues, pull requests, reviews and the discussion around them — against the practices your project cares about, then says what went well, what could be better, and a way to get there. Ask it why, push back, or work out the next step together.
 
-This guide is for developers who use Hephaestus and workspace admins who set it up. Deployment and development documentation lives in the **Admin Guide** and **Contributor Guide**.
+This guide is for developers who use Hephaestus and workspace admins who set it up. Deployment and development documentation live in the **Admin Guide** and **Contributor Guide**.
 
 ## What Hephaestus offers
 
 ### Practice feedback
 
-- Uses AI to review pull requests, merge requests, and issues against the practices configured for your workspace.
-- Points to evidence in your work rather than giving generic advice.
-- May post a comment with an explanation and a practical next step. A review can also stay private or
-  deliberately produce no feedback.
+- Uses AI to read pull requests, merge requests, issues and the conversation around them against the practices configured for your workspace.
+- Names the practice each piece of feedback came from, and points to the evidence in your work.
+- Says what went well as well as what could be better, and suggests a way to get there.
+- Reaches you where you will see it: on the work itself, on your own practice pages, or in your next conversation with Hephaestus.
 
-### Heph, the AI mentor
+### Talking it through
 
-- Can use recent project activity, feedback you have received, and selected Slack messages or Outline documents as context.
-- Helps you talk through feedback, reflect on a recent change, or decide what to try next.
-- Is available in the web app and, when connected, in a Slack direct message.
+- In chat Hephaestus goes by **Heph**.
+- Draws on recent project activity, the feedback you have received, team conversations, and documentation as context.
+- Available in the web app and, when connected, in a Slack direct message.
 
 ### Project context
 
-- GitHub and GitLab supply activity from the repositories connected to your workspace.
-- Workspace admins can add selected, visibly monitored Slack channels and selected Outline collections.
-- Outline documents are used as context only. Hephaestus does not write to Outline.
+Connected GitHub, GitLab, Slack, and Outline integrations provide project activity, team conversations, and documentation that can help Hephaestus understand the work.
 
 ### Workspace management
 
 - Connect GitHub or GitLab repositories and keep each team's data separate.
-- Choose the practice catalog and AI model, and set a monthly spending cap.
+- Adopt practices from the curated catalog and rewrite them for your project.
+- Choose the AI model and set a monthly spending cap.
 - Manage members, teams, integrations, and optional features.
 
 ### Optional recognition features
@@ -44,17 +43,16 @@ Workspace admins can enable achievements, leagues, and a weekly leaderboard of r
 
 - **Engineering practice:** an observable way of working, such as keeping a change reviewable or explaining why it is needed.
 - **Practice feedback:** feedback about one or more engineering practices, tied to evidence from software project work.
-- **Heph:** the conversational AI mentor in the web app and Slack. Heph is one part of the Hephaestus platform.
+- **Heph:** what Hephaestus is called in the chat, in the web app or Slack.
 - **Workspace:** the repositories, members, teams, practice catalog, and settings for one group.
 - **Workspace admin:** a member who configures a workspace. An **instance admin** operates the whole deployment.
-
-Technical documentation also uses **observation** for the evidence-backed assessment produced before feedback is composed. Developers normally see the resulting practice feedback, not the internal observation.
 
 ## Quick start
 
 1. Sign in with one of the providers offered by your deployment.
 2. Choose a workspace you belong to.
-3. Open **Heph** to start a conversation, if the mentor is enabled.
-4. Watch for practice feedback on your next pull request, merge request, or issue, if practice reviews are enabled.
+3. Work normally in a connected GitHub or GitLab repository.
+4. Open feedback from a contribution when practice reviews are enabled.
+5. Ask a follow-up question about any feedback you receive.
 
 Continue with [Getting started](./getting-started) for a tour of the current navigation.

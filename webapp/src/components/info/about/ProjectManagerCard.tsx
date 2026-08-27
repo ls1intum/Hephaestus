@@ -24,7 +24,7 @@ export function ProjectManagerCard({ projectManager }: ProjectManagerCardProps) 
 		<div className="mb-16 rounded-lg border border-muted bg-gradient-to-br from-background to-muted/30 p-6 sm:p-8">
 			<div className="flex flex-col md:flex-row gap-8 items-center md:items-start">
 				<Avatar className="h-32 w-32 border-4 border-background">
-					<AvatarImage src={projectManager.avatarUrl} alt={`${projectManager.login}'s avatar`} />
+					<AvatarImage src={projectManager.avatarUrl} alt={projectManager.name} />
 					<AvatarFallback className="text-2xl">
 						{projectManager.name
 							.split(" ")

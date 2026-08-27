@@ -6,15 +6,11 @@ const envBaseUrl = process.env.DOCUSAURUS_BASE_URL;
 
 const config: Config = {
 	title: "Hephaestus Documentation",
-	tagline: "Feedback on how you work",
+	tagline: "Learn from the work you're already doing",
 	favicon: "img/favicon.ico",
 
-	// Future flags and performance optimizations
-	// See https://docusaurus.io/docs/api/docusaurus-config#future
 	future: {
 		v4: true,
-		// Docusaurus Faster: Uses Rspack, SWC, and LightningCSS for 2-4x faster builds
-		// https://docusaurus.io/blog/releases/3.6#docusaurus-faster
 		faster: {
 			swcJsLoader: true,
 			swcJsMinimizer: true,
@@ -37,9 +33,6 @@ const config: Config = {
 	onDuplicateRoutes: "throw",
 	trailingSlash: false,
 
-	// Even if you don't use internationalization, you can use this field to set
-	// useful metadata like html lang. For example, if your site is Chinese, you
-	// may want to replace "en" with "zh-Hans".
 	i18n: {
 		defaultLocale: "en",
 		locales: ["en"],
@@ -69,15 +62,12 @@ const config: Config = {
 				theme: {
 					customCss: "./src/css/custom.css",
 				},
-				// Sitemap generation with lastmod for SEO
 				sitemap: {
 					lastmod: "datetime",
 					changefreq: "weekly",
 					priority: 0.5,
 					filename: "sitemap.xml",
 				},
-				// Google Tag Manager can be configured here if needed
-				// gtag: { trackingID: 'G-XXXXXXXXXX' },
 			} satisfies Preset.Options,
 		],
 	],
@@ -150,7 +140,7 @@ const config: Config = {
 			{
 				name: "description",
 				content:
-					"Hephaestus gives developers practice feedback on software project work, plus an AI mentor for talking through feedback and next steps.",
+					"Hephaestus is an open-source AI mentor for software teams. It reads the work developers already do against the practices their project cares about, and writes back feedback they can act on.",
 			},
 			{
 				name: "keywords",
@@ -162,7 +152,7 @@ const config: Config = {
 			{
 				name: "twitter:description",
 				content:
-					"Hephaestus gives developers practice feedback on software project work, plus an AI mentor for talking through feedback and next steps.",
+					"Hephaestus is an open-source AI mentor for software teams. It reads the work developers already do against the practices their project cares about, and writes back feedback they can act on.",
 			},
 		],
 		navbar: {
@@ -248,12 +238,12 @@ const config: Config = {
 					items: [
 						{
 							label: "Admin Guide",
-							to: "/admin/install",
+							to: "/admin/overview",
 						},
 					],
 				},
 				{
-					title: "Community",
+					title: "Project",
 					items: [
 						{
 							label: "Applied Education Technologies",
@@ -266,7 +256,7 @@ const config: Config = {
 					],
 				},
 			],
-			copyright: `© ${new Date().getFullYear()} Technical University of Munich · Built with ❤️ by the Hephaestus Team at Applied Education Technologies (AET)`,
+			copyright: `Hephaestus is an MIT-licensed open-source project developed by Applied Education Technologies at the Technical University of Munich.`,
 		},
 		docs: {
 			sidebar: {
@@ -274,7 +264,6 @@ const config: Config = {
 				autoCollapseCategories: true,
 			},
 		},
-		// Table of contents configuration
 		tableOfContents: {
 			minHeadingLevel: 2,
 			maxHeadingLevel: 4,

@@ -12,71 +12,37 @@ const storybookUrl = `http://127.0.0.1:${port}`;
 
 type Theme = "light" | "dark";
 
-type Breakpoint = "desktop" | "tablet" | "mobile";
-
 interface CaptureConfig {
 	storyId: string;
 	selector: string;
+	/** Wide enough for the scattered composition; the export surface itself stays narrower. */
 	viewportWidth: number;
 	/** Asserted after render; a mismatch fails the export instead of committing a resized image. */
 	expectedWidth: number;
 }
 
-interface AssetExport {
-	name: string;
-	desktop: CaptureConfig;
-	tablet?: CaptureConfig;
-	mobile: CaptureConfig;
+const themes: Theme[] = ["light", "dark"];
+const captureConfig: CaptureConfig = {
+	storyId: "components-info-landing-landingherosection--readme-export",
+	selector: '[data-readme-export="landing-hero"]',
+	viewportWidth: 1440,
+	expectedWidth: 1280,
+};
+
+function indexContains(index: unknown, storyId: string): boolean {
+	if (!index || typeof index !== "object" || !("entries" in index)) return false;
+	const { entries } = index;
+	return Boolean(entries && typeof entries === "object" && storyId in entries);
 }
 
-const themes: Theme[] = ["light", "dark"];
-
-const exportsToCapture: AssetExport[] = [
-	{
-		name: "landing-feedback-preview",
-		desktop: {
-			storyId: "components-info-landing-landingfeedbackpreview--readme-export",
-			selector: '[data-readme-export="landing-feedback-preview"]',
-			viewportWidth: 900,
-			expectedWidth: 744,
-		},
-		mobile: {
-			storyId: "components-info-landing-landingfeedbackpreview--readme-export",
-			selector: '[data-readme-export="landing-feedback-preview"]',
-			viewportWidth: 390,
-			expectedWidth: 390,
-		},
-	},
-	{
-		name: "feedback-loop",
-		desktop: {
-			storyId: "components-info-landing-landingfeedbackloop--readme-desktop-export",
-			selector: '[data-readme-export="feedback-loop-desktop"]',
-			viewportWidth: 1280,
-			expectedWidth: 1224,
-		},
-		tablet: {
-			storyId: "components-info-landing-landingfeedbackloop--readme-tablet-export",
-			selector: '[data-readme-export="feedback-loop-tablet"]',
-			viewportWidth: 824,
-			expectedWidth: 768,
-		},
-		mobile: {
-			storyId: "components-info-landing-landingfeedbackloop--readme-mobile-export",
-			selector: '[data-readme-export="feedback-loop-mobile"]',
-			viewportWidth: 390,
-			expectedWidth: 390,
-		},
-	},
-];
-
-async function waitForStorybook(): Promise<void> {
+async function waitForStorybook(storyId: string): Promise<void> {
 	for (let attempt = 0; attempt < 120; attempt += 1) {
-		try {
-			const response = await fetch(`${storybookUrl}/index.json`);
-			if (response.ok) return;
-		} catch {
-			// Storybook is still starting.
+		const response = await fetch(`${storybookUrl}/index.json`).catch(() => undefined);
+		if (response?.ok) {
+			if (!indexContains(await response.json(), storyId)) {
+				throw new Error(`Story ${storyId} is not in the Storybook index. Was it renamed?`);
+			}
+			return;
 		}
 		await new Promise((resolveDelay) => {
 			setTimeout(resolveDelay, 500);
@@ -89,7 +55,6 @@ async function capture(
 	browser: Browser,
 	theme: Theme,
 	name: string,
-	mode: Breakpoint,
 	config: CaptureConfig,
 ): Promise<void> {
 	const page = await browser.newPage({
@@ -108,7 +73,9 @@ async function capture(
 		await page.evaluate(() => document.fonts.ready);
 		await page.addStyleTag({
 			content:
-				"*,*::before,*::after{animation:none!important;transition:none!important;caret-color:transparent!important}",
+				"*,*::before,*::after{animation:none!important;transition:none!important;caret-color:transparent!important}" +
+				// Repository documentation should not reproduce the web app's own navigation.
+				"[data-hero-actions]{display:none!important}",
 		});
 
 		const exportSurface = page.locator(config.selector);
@@ -116,15 +83,13 @@ async function capture(
 		const bounds = await exportSurface.boundingBox();
 		if (!bounds || Math.round(bounds.width) !== config.expectedWidth) {
 			throw new Error(
-				`${name} ${mode} export width was ${bounds?.width ?? "missing"}px; expected ${config.expectedWidth}px.`,
+				`${name} export width was ${bounds?.width ?? "missing"}px; expected ${config.expectedWidth}px.`,
 			);
 		}
 
-		const modeSuffix = mode === "desktop" ? "" : `${mode}-`;
-		const outputPath = resolve(outputDirectory, `${name}-${modeSuffix}${theme}.png`);
+		const outputPath = resolve(outputDirectory, `${name}-${theme}.png`);
 		await exportSurface.screenshot({ path: outputPath });
-		// oxlint-disable-next-line no-console -- This is a terminal script whose product is a set of image files, and stdout is the only channel that tells its operator which paths were written.
-		console.log(`Exported ${outputPath}`);
+		process.stdout.write(`Exported ${outputPath}\n`);
 	} finally {
 		await page.close();
 	}
@@ -141,17 +106,11 @@ const storybook = spawn(
 );
 
 try {
-	await waitForStorybook();
+	await waitForStorybook(captureConfig.storyId);
 	const browser = await chromium.launch();
 	try {
 		for (const theme of themes) {
-			for (const asset of exportsToCapture) {
-				await capture(browser, theme, asset.name, "desktop", asset.desktop);
-				if (asset.tablet) {
-					await capture(browser, theme, asset.name, "tablet", asset.tablet);
-				}
-				await capture(browser, theme, asset.name, "mobile", asset.mobile);
-			}
+			await capture(browser, theme, "landing-hero", captureConfig);
 		}
 	} finally {
 		await browser.close();

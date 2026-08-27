@@ -17,11 +17,11 @@ const FeatureList: FeatureItem[] = [
 		title: "Practice feedback",
 		kicker: "Specific feedback on how the work was done",
 		description:
-			"Hephaestus reviews evidence from project work against the practices your workspace has chosen.",
+			"Hephaestus can review pull requests, merge requests, and issues against the engineering practices chosen for a workspace. Feedback links back to evidence in the work.",
 		bullets: [
 			"Points to evidence in the work",
-			"Explains what worked or what could improve",
-			"Suggests a practical next step when useful",
+			"Names the missing decision or working-practice gap",
+			"Suggests a concrete next step",
 		],
 		cta: { label: "How practice feedback works", to: "/user/ai-code-review" },
 	},
@@ -31,7 +31,7 @@ const FeatureList: FeatureItem[] = [
 		description: "Heph can use recent project activity and feedback you have received as context.",
 		bullets: [
 			"Ask a question about a recent change",
-			"Reflect on feedback before deciding what to do",
+			"Question a suggestion or compare possible next steps",
 			"Use the web app or a Slack direct message",
 		],
 		cta: { label: "How to chat with Heph", to: "/user/ai-mentor" },
