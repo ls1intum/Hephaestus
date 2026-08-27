@@ -8,7 +8,6 @@ import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import java.time.Instant;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -30,57 +29,10 @@ class AreaTrendAggregatorTest {
             "quality",
             List.of("well", "thin"),
             List.of(wellEvidenced, thin),
-            Map.of(),
             properties
         );
 
         assertThat(area.direction()).isNotEqualTo(TrendDirection.DECLINING);
-    }
-
-    @Test
-    void shouldExcludePracticeWithZeroAdminWeight() {
-        PracticeTrend improving = trend(
-            "testing",
-            BetaPosterior.from(12, 11).differenceFrom(BetaPosterior.from(12, 1))
-        );
-        PracticeTrend declining = trend("naming", BetaPosterior.from(12, 1).differenceFrom(BetaPosterior.from(12, 11)));
-
-        PracticeTrend area = AreaTrendAggregator.aggregate(
-            "quality",
-            List.of("testing", "naming"),
-            List.of(improving, declining),
-            Map.of("naming", 0.0),
-            properties
-        );
-
-        assertThat(area.direction()).isEqualTo(TrendDirection.IMPROVING);
-        assertThat(area.support().comparablePractices()).isEqualTo(1);
-    }
-
-    @Test
-    void shouldNotGainConfidenceWhenEveryWeightIsScaledAlike() {
-        // Scaling every practice's weight by the same factor says nothing new about the area, so the pooled
-        // variance has to come out unchanged. It only does when the numerator carries Σ(w²/v) — the shorthand
-        // 1/Σ(w/v) holds for unit weights alone and would shrink the variance by the factor instead, turning
-        // this borderline case into a confident verdict on the strength of an admin setting.
-        BetaPosterior.Difference difference = BetaPosterior.from(4, 4).differenceFrom(BetaPosterior.from(4, 2));
-
-        TrendDirection unweighted = AreaTrendAggregator.aggregate(
-            "quality",
-            List.of("testing"),
-            List.of(trend("testing", difference)),
-            Map.of(),
-            properties
-        ).direction();
-        TrendDirection doubled = AreaTrendAggregator.aggregate(
-            "quality",
-            List.of("testing"),
-            List.of(trend("testing", difference)),
-            Map.of("testing", 2.0),
-            properties
-        ).direction();
-
-        assertThat(doubled).isEqualTo(unweighted);
     }
 
     @Test
@@ -107,7 +59,6 @@ class AreaTrendAggregatorTest {
             "quality",
             List.of("naming", "testing"),
             List.of(looked, judged),
-            Map.of(),
             properties
         );
 
@@ -137,7 +88,6 @@ class AreaTrendAggregatorTest {
             "quality",
             List.of("naming", "testing"),
             List.of(naming, testing),
-            Map.of(),
             properties
         );
 

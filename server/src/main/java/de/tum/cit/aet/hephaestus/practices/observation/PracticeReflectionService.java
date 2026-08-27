@@ -39,7 +39,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Builds the current developer's learner-safe, per-practice reflection read model. */
+/** Builds the current developer's per-practice reflection read model. */
 @Service
 @RequiredArgsConstructor
 public class PracticeReflectionService {
@@ -75,7 +75,7 @@ public class PracticeReflectionService {
 
     /**
      * Returns practice cards built from each target's latest review run. Observations that produced no verdict
-     * do not reach this learner-facing surface, and neither does anything the caller is not cleared to see;
+     * do not reach this developer surface, and neither does anything the caller is not cleared to see;
      * every problem that survives both is shown, worst severity first.
      */
     @Transactional(readOnly = true)
@@ -183,19 +183,6 @@ public class PracticeReflectionService {
                     .add(practice.getSlug());
             }
         }
-        // Read once here so both area surfaces weigh the same practices the same way. Only eligible practices
-        // carry a weight: one that is no longer reviewed contributes nothing to its area regardless.
-        Map<String, Double> areaWeightByPractice = eligiblePractices
-            .stream()
-            .collect(
-                Collectors.toMap(
-                    Practice::getSlug,
-                    Practice::getAreaWeight,
-                    (left, ignored) -> left,
-                    LinkedHashMap::new
-                )
-            );
-
         List<ReflectionPracticeDTO> cards = cards(
             evidenceBySlug,
             eligiblePractices,
@@ -209,8 +196,7 @@ public class PracticeReflectionService {
             cards,
             evidenceByPractice,
             eligiblePracticesByArea,
-            standingShareByPractice,
-            areaWeightByPractice
+            standingShareByPractice
         );
     }
 
@@ -451,17 +437,9 @@ public class PracticeReflectionService {
         List<ReflectionPracticeDTO> cards,
         Map<String, List<Observation>> evidenceByPractice,
         Map<String, List<String>> eligiblePracticesByArea,
-        Map<String, Double> standingShareByPractice,
-        Map<String, Double> areaWeightByPractice
+        Map<String, Double> standingShareByPractice
     ) {
-        static final ReflectionSnapshot EMPTY = new ReflectionSnapshot(
-            null,
-            List.of(),
-            Map.of(),
-            Map.of(),
-            Map.of(),
-            Map.of()
-        );
+        static final ReflectionSnapshot EMPTY = new ReflectionSnapshot(null, List.of(), Map.of(), Map.of(), Map.of());
     }
 
     /**

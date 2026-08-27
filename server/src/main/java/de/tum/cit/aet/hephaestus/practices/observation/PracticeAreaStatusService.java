@@ -22,7 +22,6 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.stream.Collectors;
@@ -41,12 +40,11 @@ public class PracticeAreaStatusService {
     private static final int MAX_AREA_EVIDENCE_ITEMS = 5;
 
     private final PracticeReflectionService practiceReflectionService;
-    private final Optional<AreaGuidanceProvider> areaGuidanceProvider;
     private final PracticeTrendService practiceTrendService;
     private final Clock clock;
 
     /**
-     * One status per requested group, rolled up from the practice standings of the same learner-safe snapshot
+     * One status per requested group, rolled up from the practice standings of the same developer snapshot
      * the per-practice surface renders. Observations are loaded once and partitioned in memory rather than
      * queried per card.
      *
@@ -65,15 +63,8 @@ public class PracticeAreaStatusService {
         Map<String, AreaSignal> signalsByArea = areaSignals(
             snapshot.evidenceByPractice(),
             practiceTrends,
-            snapshot.eligiblePracticesByArea(),
-            snapshot.areaWeightByPractice()
+            snapshot.eligiblePracticesByArea()
         );
-        Map<String, AreaGuidanceProvider.AreaGuidance> guidanceByArea = aggregatedGuidance(
-            workspaceId,
-            snapshot.developerId(),
-            areas
-        );
-
         return areas
             .stream()
             .map(area ->
@@ -81,9 +72,8 @@ public class PracticeAreaStatusService {
                     area,
                     cardsByArea.getOrDefault(area.getSlug(), List.of()),
                     snapshot.standingShareByPractice(),
-                    snapshot.areaWeightByPractice(),
-                    signalsByArea.getOrDefault(area.getSlug(), AreaSignal.NONE),
-                    guidanceByArea.get(area.getSlug())
+                    Set.copyOf(snapshot.eligiblePracticesByArea().getOrDefault(area.getSlug(), List.of())),
+                    signalsByArea.getOrDefault(area.getSlug(), AreaSignal.NONE)
                 )
             )
             .toList();
@@ -99,53 +89,25 @@ public class PracticeAreaStatusService {
         return cardsByArea;
     }
 
-    /** Overrides the deterministic fallback where a provider has material. A missing entry keeps the rule. */
-    private Map<String, AreaGuidanceProvider.AreaGuidance> aggregatedGuidance(
-        Long workspaceId,
-        @Nullable Long developerId,
-        List<PracticeArea> areas
-    ) {
-        AreaGuidanceProvider provider = areaGuidanceProvider.orElse(null);
-        if (provider == null || developerId == null) {
-            return Map.of();
-        }
-        return provider.findGuidance(workspaceId, developerId, areas.stream().map(PracticeArea::getSlug).toList());
-    }
-
     private static PracticeAreaStatusDTO toAreaStatus(
         PracticeArea area,
         List<ReflectionPracticeDTO> cards,
         Map<String, Double> standingShareByPractice,
-        Map<String, Double> areaWeightByPractice,
-        AreaSignal signal,
-        AreaGuidanceProvider.@Nullable AreaGuidance aggregatedGuidance
+        Set<String> eligiblePracticeSlugs,
+        AreaSignal signal
     ) {
-        // The practices that get a vote, derived once. The status and the sentence explaining it must name the
-        // same set, or the card can read "focus on X next" about a practice its own status did not count.
-        List<ReflectionPracticeDTO> verdicts = votingVerdicts(cards, areaWeightByPractice);
-        PracticeAreaStatusDTO.AreaStatus status = areaStatus(
-            cards,
-            verdicts,
-            standingShareByPractice,
-            areaWeightByPractice
-        );
+        List<ReflectionPracticeDTO> verdicts = votingVerdicts(cards, eligiblePracticeSlugs);
+        PracticeAreaStatusDTO.AreaStatus status = areaStatus(cards, verdicts, standingShareByPractice);
         boolean hasDisplayableData = PracticeAreaStatusDTO.isVerdict(status);
         // Item-level, unlike the status: the question here is which KINDS of evidence exist to show, which a
         // practice standing has already abstracted away.
         boolean hasProblems = cards.stream().anyMatch(card -> !card.toWorkOn().isEmpty());
         boolean hasStrengths = cards.stream().anyMatch(card -> !card.strengths().isEmpty());
 
-        String guidance = null;
-        PracticeAreaStatusDTO.GuidanceSource guidanceSource = null;
-        if (hasDisplayableData) {
-            if (aggregatedGuidance != null) {
-                guidance = aggregatedGuidance.text();
-                guidanceSource = aggregatedGuidance.source();
-            } else {
-                guidance = DeterministicAreaGuidanceComposer.compose(status, verdicts);
-                guidanceSource = PracticeAreaStatusDTO.GuidanceSource.RULE_BASED;
-            }
-        }
+        String guidance = hasDisplayableData ? DeterministicAreaGuidanceComposer.compose(status, verdicts) : null;
+        PracticeAreaStatusDTO.GuidanceSource guidanceSource = hasDisplayableData
+            ? PracticeAreaStatusDTO.GuidanceSource.RULE_BASED
+            : null;
 
         return new PracticeAreaStatusDTO(
             area.getSlug(),
@@ -162,53 +124,32 @@ public class PracticeAreaStatusService {
         );
     }
 
-    /**
-     * A verdict rolled up from the practice standings, or the REASON there is none.
-     *
-     * <p>Reads the standings, never the findings under them. A standing already weighs recent evidence against
-     * the older record, so going back to the items would let this contradict the cards it is built from.
-     *
-     * <p>Aggregates the CONTINUOUS standing and applies {@link StandingScale} once at the end. Averaging the
-     * rendered labels would classify twice and throw away the resolution the practice rule just computed.
-     *
-     * <p>Only practices that reached a verdict count. Weighing an unreviewed one as "not a strength" would turn
-     * thin coverage into a negative claim about the developer.
-     *
-     * <p>{@code NO_OPPORTUNITY} outranks {@code NOT_OBSERVED} because it is the more actionable of the two: a
-     * working instrument that found nothing is not an unconfigured one. Both answers come from the practices
-     * themselves, so no separate census of what the reviews did is needed.
-     */
-    /** The cards that reached a verdict AND still count toward their area — the area's electorate. */
     private static List<ReflectionPracticeDTO> votingVerdicts(
         List<ReflectionPracticeDTO> cards,
-        Map<String, Double> areaWeightByPractice
+        Set<String> eligiblePracticeSlugs
     ) {
         return cards
             .stream()
             .filter(card -> ReflectionPracticeDTO.isVerdict(card.standing()))
-            .filter(card -> areaWeight(card, areaWeightByPractice) > 0.0)
+            .filter(card -> eligiblePracticeSlugs.contains(card.slug()))
             .toList();
     }
 
     private static PracticeAreaStatusDTO.AreaStatus areaStatus(
         List<ReflectionPracticeDTO> cards,
         List<ReflectionPracticeDTO> verdicts,
-        Map<String, Double> standingShareByPractice,
-        Map<String, Double> areaWeightByPractice
+        Map<String, Double> standingShareByPractice
     ) {
         if (verdicts.isEmpty()) {
             return cards.stream().anyMatch(card -> card.standing() == ReflectionPracticeDTO.Standing.NO_OPPORTUNITY)
                 ? PracticeAreaStatusDTO.AreaStatus.NO_OPPORTUNITY
                 : PracticeAreaStatusDTO.AreaStatus.NOT_OBSERVED;
         }
-        double weighted = 0.0;
-        double totalWeight = 0.0;
-        for (ReflectionPracticeDTO card : verdicts) {
-            double weight = areaWeight(card, areaWeightByPractice);
-            weighted += weight * standingShareByPractice.getOrDefault(card.slug(), 0.0);
-            totalWeight += weight;
-        }
-        double areaShare = weighted / totalWeight;
+        double areaShare = verdicts
+            .stream()
+            .mapToDouble(card -> standingShareByPractice.getOrDefault(card.slug(), 0.0))
+            .average()
+            .orElseThrow();
         return switch (StandingScale.classify(areaShare)) {
             case STRENGTH -> PracticeAreaStatusDTO.AreaStatus.STRENGTH;
             case MIXED -> PracticeAreaStatusDTO.AreaStatus.MIXED;
@@ -217,17 +158,6 @@ public class PracticeAreaStatusService {
                 "StandingScale only classifies verdicts"
             );
         };
-    }
-
-    /**
-     * How much one practice counts toward its group. Absent means zero, not neutral.
-     *
-     * <p>A card with no entry belongs to a practice review is no longer admitted for. Its feedback still stands
-     * on the reflection surface, but it has stopped being part of what is watched, so it does not vote. An
-     * explicit zero says the same thing by configuration rather than by autonomy.
-     */
-    private static double areaWeight(ReflectionPracticeDTO card, Map<String, Double> areaWeightByPractice) {
-        return areaWeightByPractice.getOrDefault(card.slug(), 0.0);
     }
 
     /**
@@ -256,7 +186,7 @@ public class PracticeAreaStatusService {
         return Stream.concat(problems.stream(), strengths.stream()).limit(MAX_AREA_EVIDENCE_ITEMS).toList();
     }
 
-    /** Area-level direction and provenance, all derived from the same learner-visible evidence as its card. */
+    /** Area-level direction and provenance, derived from the same visible evidence as its card. */
     private record AreaSignal(
         @Nullable TrendDirection direction,
         @Nullable TrendSupportDTO trendSupport,
@@ -267,20 +197,10 @@ public class PracticeAreaStatusService {
         private static final AreaSignal NONE = new AreaSignal(null, null, null, null, List.of());
     }
 
-    /**
-     * Aggregates the eligible practices' trends into one per area, and derives feedback span and source
-     * counts from the observations that survived the reflection surface's learner-safety filters.
-     *
-     * <p>Each practice counts by its own {@code areaWeight}, the same map the standing weighs. Both halves of
-     * a status must answer for the same practices, so a practice review is no longer admitted for is dropped
-     * here rather than left to the weight lookup. That lookup is not a second safeguard: the trend calculator
-     * is a general estimator and treats an unnamed practice as neutral, which is right there and wrong here.
-     */
     private Map<String, AreaSignal> areaSignals(
         Map<String, List<Observation>> evidenceByPractice,
         Map<String, PracticeTrend> practiceTrends,
-        Map<String, List<String>> eligiblePracticesByArea,
-        Map<String, Double> areaWeightByPractice
+        Map<String, List<String>> eligiblePracticesByArea
     ) {
         Map<String, List<Observation>> evidenceByArea = new LinkedHashMap<>();
         Map<String, List<PracticeTrend>> trendsByArea = new LinkedHashMap<>();
@@ -318,8 +238,7 @@ public class PracticeAreaStatusService {
             PracticeTrend direction = practiceTrendService.calculateArea(
                 entry.getKey(),
                 eligiblePracticesByArea.getOrDefault(entry.getKey(), List.of()),
-                trendsByArea.getOrDefault(entry.getKey(), List.of()),
-                areaWeightByPractice
+                trendsByArea.getOrDefault(entry.getKey(), List.of())
             );
             signals.put(
                 entry.getKey(),
@@ -336,8 +255,7 @@ public class PracticeAreaStatusService {
             PracticeTrend direction = practiceTrendService.calculateArea(
                 entry.getKey(),
                 entry.getValue(),
-                trendsByArea.getOrDefault(entry.getKey(), List.of()),
-                areaWeightByPractice
+                trendsByArea.getOrDefault(entry.getKey(), List.of())
             );
             signals.putIfAbsent(
                 entry.getKey(),

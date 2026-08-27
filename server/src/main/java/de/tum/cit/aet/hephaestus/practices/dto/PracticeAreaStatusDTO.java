@@ -23,7 +23,7 @@ public record PracticeAreaStatusDTO(
     @NonNull @Schema(description = "Derived qualitative status across the area's practices") AreaStatus status,
     @Nullable
     @Schema(
-        description = "Learner-facing guidance aggregated from the area's feedback (null unless the status is a verdict). " +
+        description = "Developer guidance aggregated from the area's feedback (null unless the status is a verdict). " +
             "The deterministic summary combines standing, next focus, and developer-facing catalog guidance; " +
             "the same field carries AI-aggregated guidance when a provider supplies it."
     )
@@ -86,14 +86,7 @@ public record PracticeAreaStatusDTO(
         return status == AreaStatus.DEVELOPING || status == AreaStatus.MIXED || status == AreaStatus.STRENGTH;
     }
 
-    /**
-     * Provenance of the guidance text. The UI labels AI-produced guidance, so a reader always knows
-     * whether a sentence was assembled by a rule or written by a model.
-     */
     public enum GuidanceSource {
-        /** Deterministic sentence assembled from the area's practice names and standings. */
         RULE_BASED,
-        /** Aggregated by an AI model over the area's feedback (e.g. a persisted nightly summary). */
-        AI_AGGREGATED,
     }
 }

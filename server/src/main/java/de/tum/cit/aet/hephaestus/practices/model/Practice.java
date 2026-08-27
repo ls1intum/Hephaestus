@@ -129,21 +129,6 @@ public class Practice {
     private int displayOrder = 0;
 
     /**
-     * How much this practice counts when its AREA is summarised — both the area standing and the area trend.
-     * It changes nothing about the practice's own card: a practice is never judged more or less harshly for
-     * being weighted, only listened to more or less when its area speaks for it.
-     *
-     * <p>{@code 1.0} is the neutral default and keeps an unconfigured workspace on a plain average.
-     * {@code 0.0} excludes the practice from its area's summary while leaving it fully reviewed and fully
-     * visible on the reflection surface — "does not count toward the area" is a different statement from
-     * "is not looked at", and the autonomy ladder already says the latter. Must be finite and non-negative;
-     * a negative weight would let one practice subtract another's evidence, which is not a weighting.
-     */
-    @Column(name = "area_weight", nullable = false)
-    @ColumnDefault("1.0")
-    private double areaWeight = 1.0;
-
-    /**
      * The occasions this practice is reviewed on and the evidence each reads, stored as a JSONB array; the
      * detection gate starts a review only when the observed signal is bound here. Named {@code bindings}
      * rather than {@code on} because {@code ON} is reserved SQL (the authoring file still spells it {@code on}).

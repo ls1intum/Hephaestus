@@ -23,11 +23,10 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 
-/** Learner-facing read endpoints for one practice-area detail page. */
 @WorkspaceScopedController
 @PreAuthorize("@workspaceSecure.isMember()")
 @RequestMapping("/practice-areas/{areaSlug}")
-@Tag(name = "Practice Area Detail", description = "Learner-facing practice-area detail views")
+@Tag(name = "Practice Area Detail", description = "Developer practice-area detail views")
 @RequiredArgsConstructor
 @Validated
 public class PracticeAreaDetailController {

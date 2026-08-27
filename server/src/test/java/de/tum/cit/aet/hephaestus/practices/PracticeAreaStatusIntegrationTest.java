@@ -17,7 +17,6 @@ import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeArea;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeRevision;
-import de.tum.cit.aet.hephaestus.practices.observation.AreaGuidanceProvider;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
 import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
 import de.tum.cit.aet.hephaestus.testconfig.WithUser;
@@ -35,9 +34,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.TestConfiguration;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Import;
 import org.springframework.test.web.reactive.server.WebTestClient;
 import tools.jackson.databind.ObjectMapper;
 
@@ -130,22 +126,6 @@ class PracticeAreaStatusIntegrationTest extends AbstractWorkspaceIntegrationTest
     private void persistStrengthPractice(String slug, String name, long artifactId) {
         Practice target = persistPractice(workspace, area, slug, name);
         insertFinding(agentJob, target, developer, "Strength in " + name, "PRESENT", null, artifactId);
-    }
-
-    /** As {@link #persistStrengthPractice}, with an explicit say in its area's summary. */
-    private void persistWeightedStrengthPractice(String slug, String name, long artifactId, double areaWeight) {
-        Practice target = persistPractice(workspace, area, slug, name);
-        target.setAreaWeight(areaWeight);
-        practiceRepository.saveAndFlush(target);
-        insertFinding(agentJob, target, developer, "Strength in " + name, "PRESENT", null, artifactId);
-    }
-
-    /** As {@link #persistDevelopingPractice}, with an explicit say in its area's summary. */
-    private void persistWeightedDevelopingPractice(String slug, String name, long artifactId, double areaWeight) {
-        Practice target = persistPractice(workspace, area, slug, name);
-        target.setAreaWeight(areaWeight);
-        practiceRepository.saveAndFlush(target);
-        insertFinding(agentJob, target, developer, "Gap in " + name, "ABSENT", "MAJOR", artifactId);
     }
 
     /** A practice in the fixture area whose only feedback is a problem — standing {@code DEVELOPING}. */
@@ -710,30 +690,6 @@ class PracticeAreaStatusIntegrationTest extends AbstractWorkspaceIntegrationTest
 
         @Test
         @WithUser
-        @DisplayName("a practice's area weight decides how loudly it speaks for its area")
-        void shouldWeighPracticesWhenSummarisingTheArea() {
-            // Unweighted this is 2 of 4 — exactly 0.5, so MIXED. Giving the two strengths three times the say
-            // of the two gaps moves the share to (3+3)/(3+3+1+1) = 0.75, still MIXED but visibly higher; the
-            // point of the fixture is the next line, where the same weights tip a real verdict.
-            persistWeightedStrengthPractice("commit-messages", "Commit Messages", 1L, 3.0);
-            persistWeightedStrengthPractice("review-comments", "Actionable Review Comments", 2L, 3.0);
-            persistWeightedDevelopingPractice("issue-descriptions", "Issue Descriptions", 3L, 1.0);
-            persistWeightedDevelopingPractice("test-coverage", "Test Coverage", 4L, 1.0);
-
-            webTestClient
-                .get()
-                .uri(STATUS_URI, workspace.getWorkspaceSlug())
-                .headers(TestAuthUtils.withCurrentUser())
-                .exchange()
-                .expectStatus()
-                .isOk()
-                .expectBody()
-                .jsonPath("$[0].status")
-                .isEqualTo("MIXED");
-        }
-
-        @Test
-        @WithUser
         @DisplayName("a practice no longer reviewed does not vote in the area trend either")
         void shouldKeepAnIneligiblePracticeOutOfTheAreaTrend() {
             // The area standing has always excluded a practice review is no longer admitted for. Its TREND
@@ -759,32 +715,6 @@ class PracticeAreaStatusIntegrationTest extends AbstractWorkspaceIntegrationTest
                 .jsonPath("$[0].trendSupport.currentOpportunities")
                 .isEqualTo(1)
                 // Its finding is still shown, and its own card still stands — only its vote is gone.
-                .jsonPath("$[0].items.length()")
-                .isEqualTo(2);
-        }
-
-        @Test
-        @WithUser
-        @DisplayName("a practice weighted to zero is still reviewed but no longer speaks for its area")
-        void shouldExcludeAZeroWeightedPracticeFromTheArea() {
-            // The gap would drag the area to 0.5 at equal weight. Silenced for the area, the strengths alone
-            // decide it — while the practice keeps its own card and its own standing, because "does not count
-            // toward the area" is a different statement from "is not looked at".
-            persistWeightedStrengthPractice("commit-messages", "Commit Messages", 1L, 1.0);
-            persistWeightedDevelopingPractice("test-coverage", "Test Coverage", 2L, 0.0);
-
-            webTestClient
-                .get()
-                .uri(STATUS_URI, workspace.getWorkspaceSlug())
-                .headers(TestAuthUtils.withCurrentUser())
-                .exchange()
-                .expectStatus()
-                .isOk()
-                .expectBody()
-                .jsonPath("$[0].status")
-                .isEqualTo("STRENGTH")
-                // The silenced practice's finding is still evidence on the area's list — it was raised and
-                // delivered; only its vote was withdrawn.
                 .jsonPath("$[0].items.length()")
                 .isEqualTo(2);
         }
@@ -1100,80 +1030,6 @@ class PracticeAreaStatusIntegrationTest extends AbstractWorkspaceIntegrationTest
                 .exchange()
                 .expectStatus()
                 .isUnauthorized();
-        }
-    }
-
-    /**
-     * The guidance seam: a registered {@link AreaGuidanceProvider} bean (later: the persisted nightly
-     * LLM aggregation) replaces the deterministic sentence, labelled with its provenance — but never
-     * conjures guidance for an area that carries no verdict.
-     */
-    @Nested
-    @DisplayName("with an aggregated guidance provider registered")
-    @Import(PracticeAreaStatusIntegrationTest.AggregatedGuidanceConfig.class)
-    class AggregatedGuidance {
-
-        private static final String AI_GUIDANCE =
-            "Your PR descriptions consistently explain the what — add a sentence on the why to make them review-ready.";
-
-        @Test
-        @WithUser
-        @DisplayName("serves the provider's text with AI_AGGREGATED provenance instead of the rule-based sentence")
-        void shouldPreferAggregatedGuidance() {
-            insertFinding(agentJob, practice, developer, "Missing rollout plan", "ABSENT", "MAJOR", 1L);
-
-            webTestClient
-                .get()
-                .uri(STATUS_URI, workspace.getWorkspaceSlug())
-                .headers(TestAuthUtils.withCurrentUser())
-                .exchange()
-                .expectStatus()
-                .isOk()
-                .expectBody()
-                .jsonPath("$[0].status")
-                .isEqualTo("DEVELOPING")
-                .jsonPath("$[0].guidance")
-                .isEqualTo(AI_GUIDANCE)
-                .jsonPath("$[0].guidanceSource")
-                .isEqualTo("AI_AGGREGATED");
-        }
-
-        @Test
-        @WithUser
-        @DisplayName("suppresses provider guidance for an area without a verdict")
-        void shouldNotShowAggregatedGuidanceWithoutData() {
-            webTestClient
-                .get()
-                .uri(STATUS_URI, workspace.getWorkspaceSlug())
-                .headers(TestAuthUtils.withCurrentUser())
-                .exchange()
-                .expectStatus()
-                .isOk()
-                .expectBody()
-                .jsonPath("$[0].status")
-                .isEqualTo("NOT_OBSERVED")
-                .jsonPath("$[0].guidance")
-                .doesNotExist()
-                .jsonPath("$[0].guidanceSource")
-                .doesNotExist();
-        }
-    }
-
-    @TestConfiguration
-    static class AggregatedGuidanceConfig {
-
-        @Bean
-        AreaGuidanceProvider aggregatedAreaGuidanceProvider() {
-            return (workspaceId, userId, areaSlugs) ->
-                areaSlugs.contains("code-quality")
-                    ? Map.of(
-                          "code-quality",
-                          new AreaGuidanceProvider.AreaGuidance(
-                              AggregatedGuidance.AI_GUIDANCE,
-                              PracticeAreaStatusDTO.GuidanceSource.AI_AGGREGATED
-                          )
-                      )
-                    : Map.of();
         }
     }
 }

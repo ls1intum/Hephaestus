@@ -32,8 +32,6 @@ tags:
   name: LLM Usage
 - description: Manage practice areas
   name: Practice Areas
-- description: Learner-facing practice-area detail views
-  name: Practice Area Detail
 - description: Workspace-scoped mentor chat threads
   name: Mentor Threads
 - description: Recipient responses to delivered practice feedback
@@ -67,6 +65,8 @@ tags:
   name: Practice reviews
 - description: GDPR Art. 20 self-service data export
   name: Account
+- description: Developer practice-area detail views
+  name: Practice Area Detail
 - description: Workspace-scoped history of admin configuration changes
   name: Config Audit
 - description: |-
@@ -4920,13 +4920,24 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/FeedbackResponse"
-          description: OK
+          description: Current response returned
+        "204":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FeedbackResponse"
+          description: No response is currently recorded
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FeedbackResponse"
+          description: Delivered feedback not found for the current recipient
       summary: Get the latest feedback response
       tags:
       - Feedback Response
     post:
-      description: "Records usefulness, resolution, or both as a new immutable response\
-        \ snapshot."
+      description: Appends a response event and returns the recipient's current response.
       operationId: submitFeedbackResponse
       parameters:
       - description: Workspace slug
@@ -4957,6 +4968,12 @@ paths:
           description: Response recorded
         "400":
           description: Invalid response
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FeedbackResponse"
+          description: Delivered feedback not found for the current recipient
       summary: Respond to delivered feedback
       tags:
       - Feedback Response
@@ -11494,8 +11511,8 @@ components:
             \ never a trend-analysis unit"
         guidance:
           type: string
-          description: "Learner-facing guidance aggregated from the area's feedback\
-            \ (null unless the status is a verdict). The deterministic summary combines\
+          description: "Developer guidance aggregated from the area's feedback (null\
+            \ unless the status is a verdict). The deterministic summary combines\
             \ standing, next focus, and developer-facing catalog guidance; the same\
             \ field carries AI-aggregated guidance when a provider supplies it."
         guidanceSource:
@@ -11503,7 +11520,6 @@ components:
           description: How the guidance text was produced (null when there is no guidance)
           enum:
           - RULE_BASED
-          - AI_AGGREGATED
         items:
           type: array
           description: Supporting feedback the status derives from (problems first);

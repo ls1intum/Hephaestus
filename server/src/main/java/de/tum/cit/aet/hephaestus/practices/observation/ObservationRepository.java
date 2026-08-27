@@ -552,6 +552,8 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
                   SELECT f2.agent_job_id FROM observation f2
                   JOIN practice p2 ON p2.id = f2.practice_id
                   WHERE p2.workspace_id = p.workspace_id
+                    AND f2.practice_id = f.practice_id
+                    AND f2.about_user_id = f.about_user_id
                     AND f2.artifact_kind = f.artifact_kind
                     AND f2.artifact_id = f.artifact_id
                     AND f2.origin <> 'BACKFILL'
@@ -645,13 +647,6 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
      * rather than over the union: origin-blind, a campaign's job could become "the latest run" and erase
      * already-delivered live feedback from the list. {@code ReflectionItemDTO.origin()} carries the class
      * through so the surface can label a backfilled item rather than pass it off as live.
-     *
-     * <p>Aggregate policy deliberately DIVERGES from {@link #findSummaryByDeveloperAndWorkspace} here in two
-     * ways. The first is backfill, above. The second is the correlation grain: the mentor aggregates still
-     * correlate on the artifact alone, so they keep the older, coarser meaning of "latest run". That is a known
-     * gap, not a considered difference — the argument above applies to them too — but the learner surfaces were
-     * corrected on their own so a change in the numbers the mentor speaks from stays a separate, deliberate
-     * decision. Do not "restore consistency" by copying either form across without making that decision.
      */
     @Query(
         value = """
@@ -709,6 +704,8 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
                   SELECT f2.agent_job_id FROM observation f2
                   JOIN practice p2 ON p2.id = f2.practice_id
                   WHERE p2.workspace_id = p.workspace_id
+                    AND f2.practice_id = f.practice_id
+                    AND f2.about_user_id = f.about_user_id
                     AND f2.artifact_kind = f.artifact_kind AND f2.artifact_id = f.artifact_id
                     AND f2.origin <> 'BACKFILL'
                   ORDER BY f2.observed_at DESC, f2.agent_job_id DESC LIMIT 1
@@ -744,6 +741,8 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
                   SELECT f2.agent_job_id FROM observation f2
                   JOIN practice p2 ON p2.id = f2.practice_id
                   WHERE p2.workspace_id = p.workspace_id
+                    AND f2.practice_id = f.practice_id
+                    AND f2.about_user_id = f.about_user_id
                     AND f2.artifact_kind = f.artifact_kind AND f2.artifact_id = f.artifact_id
                     AND f2.origin <> 'BACKFILL'
                   ORDER BY f2.observed_at DESC, f2.agent_job_id DESC LIMIT 1

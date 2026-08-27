@@ -65,7 +65,7 @@ Entries exist only for releases that need operator action. Everything else is in
 
 ### v0.75.0
 
-#### 🔴 The feedback reaction and rating endpoints are replaced by one response endpoint
+#### 🔴 The feedback reaction endpoint is replaced by a response endpoint
 
 **Affected**: anything calling the application API directly. The Hephaestus web app is unaffected —
 it never used these endpoints outside its generated client, which ships regenerated in this release.
@@ -73,15 +73,15 @@ it never used these endpoints outside its generated client, which ships regenera
 Removed:
 
 ```
-POST /workspaces/{workspaceSlug}/practices/observations/{id}/reactions   (submitReaction)
-GET  /workspaces/{workspaceSlug}/practices/observations/{id}/reactions   (getLatestReaction)
+POST /workspaces/{workspaceSlug}/practices/feedback/{feedbackId}/reactions   (submitReaction)
+GET  /workspaces/{workspaceSlug}/practices/feedback/{feedbackId}/reactions   (getLatestReaction)
 ```
 
-**Before**: a developer answered two questions about one piece of delivered feedback through two
-separate mechanisms — a reaction saying what they would do about it, and a rating saying whether it
-helped. The two disagreed about their own history: reactions accumulated, ratings were overwritten.
+**Before**: a developer submitted an `action` (`ADDRESSED`, `DISPUTED`, or `NOT_APPLICABLE`) and an
+optional `explanation`. Submissions were append-only and the GET returned the latest reaction.
 
-**After**: one endpoint per piece of feedback, carrying both answers, either of them, or neither:
+**After**: the response endpoint renames `action` to `resolution` and `explanation` to `comment`. It
+also accepts an independent, optional `usefulness` answer:
 
 ```
 POST /workspaces/{workspaceSlug}/practices/feedback/{feedbackId}/response
@@ -93,9 +93,6 @@ The request body carries `usefulness` (`HELPFUL` / `UNHELPFUL`), `resolution` (`
 `DISPUTED` / `NOT_APPLICABLE`), an optional `comment` — required when disputing — and `withdraw`,
 which takes the whole answer back. Every submit appends; the GET returns the answer as it currently
 stands, which is the newest value of each question independently.
-
-Note the anchor moved: a response is filed against the delivered **piece of feedback**, not against the
-internal observation behind it, because the piece of feedback is what the developer was actually shown.
 
 **Action**: repoint any direct API caller at the new endpoint. Stored reactions are untouched and
 keep answering; nothing needs migrating and no data is lost.

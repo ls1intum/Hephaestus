@@ -36,7 +36,7 @@ public class FeedbackResponseController {
     @Operation(
         operationId = "submitFeedbackResponse",
         summary = "Respond to delivered feedback",
-        description = "Records usefulness, resolution, or both as a new immutable response snapshot."
+        description = "Appends a response event and returns the recipient's current response."
     )
     @ApiResponse(responseCode = "201", description = "Response recorded")
     @ApiResponse(
@@ -44,6 +44,7 @@ public class FeedbackResponseController {
         description = "Invalid response",
         content = @Content(schema = @Schema(hidden = true))
     )
+    @ApiResponse(responseCode = "404", description = "Delivered feedback not found for the current recipient")
     public ResponseEntity<FeedbackResponseDTO> submit(
         WorkspaceContext workspaceContext,
         @PathVariable UUID feedbackId,
@@ -56,6 +57,9 @@ public class FeedbackResponseController {
 
     @GetMapping("/{feedbackId}/response")
     @Operation(operationId = "getLatestFeedbackResponse", summary = "Get the latest feedback response")
+    @ApiResponse(responseCode = "200", description = "Current response returned")
+    @ApiResponse(responseCode = "204", description = "No response is currently recorded")
+    @ApiResponse(responseCode = "404", description = "Delivered feedback not found for the current recipient")
     public ResponseEntity<FeedbackResponseDTO> latest(
         WorkspaceContext workspaceContext,
         @PathVariable UUID feedbackId

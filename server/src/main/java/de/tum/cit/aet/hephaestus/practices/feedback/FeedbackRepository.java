@@ -309,7 +309,7 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
      * {@link de.tum.cit.aet.hephaestus.practices.spi.ConversationFeedbackErasure} when a channel's consent is
      * withdrawn.
      *
-     * @return the number of piece of feedbacks deleted
+     * @return the number of pieces of feedback deleted
      */
     @Modifying
     @Transactional
@@ -335,7 +335,7 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
      * Erases every {@code chat.conversation_thread} piece of feedback for a workspace, invoked on app-uninstall /
      * workspace-purge.
      *
-     * @return the number of piece of feedbacks deleted
+     * @return the number of pieces of feedback deleted
      */
     @Modifying
     @Transactional
@@ -360,7 +360,7 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
      * the SCM mirror is erased. These units hold mirrored third-party content directly, so they neither
      * cascade with the repository delete nor survive it meaningfully.
      *
-     * @return the number of piece of feedbacks deleted
+     * @return the number of pieces of feedback deleted
      */
     @Modifying
     @Transactional
@@ -386,7 +386,7 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
      * {@link de.tum.cit.aet.hephaestus.practices.spi.ConversationFeedbackErasure#eraseConversationFeedbackAboutUser}
      * for a person opt-out / account hard-delete.
      *
-     * @return the number of piece of feedbacks deleted
+     * @return the number of pieces of feedback deleted
      */
     @Modifying
     @Transactional
@@ -521,7 +521,7 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
         """;
 
     /**
-     * The operator's page of piece of feedbacks.
+     * The operator's page of feedback.
      *
      * <p><b>IN_APP bodies are never returned here.</b> {@code IN_CONTEXT} bodies are already public on
      * the pull request and {@code IN_CHAT} bodies are NULL by construction, so until now "operators

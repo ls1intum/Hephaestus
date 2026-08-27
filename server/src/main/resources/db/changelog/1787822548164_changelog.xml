@@ -30,28 +30,6 @@
             <dropColumn tableName="reaction" columnName="usefulness"/>
         </rollback>
     </changeSet>
-    <changeSet author="practice-area-weight" id="1787822548164-2">
-        <preConditions onFail="MARK_RAN" onFailMessage="practice.area_weight already exists">
-            <not><columnExists tableName="practice" columnName="area_weight"/></not>
-        </preConditions>
-        <comment>How much a practice counts when its area is summarised; 1.0 keeps a plain average.</comment>
-        <addColumn tableName="practice">
-            <column name="area_weight" type="DOUBLE PRECISION" defaultValueNumeric="1.0">
-                <constraints nullable="false"/>
-            </column>
-        </addColumn>
-        <sql>
-            ALTER TABLE practice
-            ADD CONSTRAINT chk_practice_area_weight CHECK (
-                area_weight &gt;= 0
-                AND area_weight &lt; 'Infinity'::double precision
-                AND area_weight &lt;&gt; 'NaN'::double precision
-            );
-        </sql>
-        <rollback>
-            <dropColumn tableName="practice" columnName="area_weight"/>
-        </rollback>
-    </changeSet>
     <changeSet author="practice-feedback-response" id="1787822548164-3">
         <preConditions onFail="MARK_RAN" onFailMessage="chk_reaction_response_present already dropped">
             <sqlCheck expectedResult="1">

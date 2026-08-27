@@ -3243,13 +3243,13 @@ export type PracticeAreaStatus = {
      */
     feedbackSpanDays?: number;
     /**
-     * Learner-facing guidance aggregated from the area's feedback (null unless the status is a verdict). The deterministic summary combines standing, next focus, and developer-facing catalog guidance; the same field carries AI-aggregated guidance when a provider supplies it.
+     * Developer guidance aggregated from the area's feedback (null unless the status is a verdict). The deterministic summary combines standing, next focus, and developer-facing catalog guidance; the same field carries AI-aggregated guidance when a provider supplies it.
      */
     guidance?: string;
     /**
      * How the guidance text was produced (null when there is no guidance)
      */
-    guidanceSource?: 'RULE_BASED' | 'AI_AGGREGATED';
+    guidanceSource?: 'RULE_BASED';
     /**
      * Supporting feedback the status derives from (problems first); empty without a verdict
      */
@@ -9884,11 +9884,24 @@ export type GetLatestFeedbackResponseData = {
     url: '/workspaces/{workspaceSlug}/practices/feedback/{feedbackId}/response';
 };
 
+export type GetLatestFeedbackResponseErrors = {
+    /**
+     * Delivered feedback not found for the current recipient
+     */
+    404: FeedbackResponse;
+};
+
+export type GetLatestFeedbackResponseError = GetLatestFeedbackResponseErrors[keyof GetLatestFeedbackResponseErrors];
+
 export type GetLatestFeedbackResponseResponses = {
     /**
-     * OK
+     * Current response returned
      */
     200: FeedbackResponse;
+    /**
+     * No response is currently recorded
+     */
+    204: FeedbackResponse;
 };
 
 export type GetLatestFeedbackResponseResponse = GetLatestFeedbackResponseResponses[keyof GetLatestFeedbackResponseResponses];
@@ -9911,7 +9924,13 @@ export type SubmitFeedbackResponseErrors = {
      * Invalid response
      */
     400: unknown;
+    /**
+     * Delivered feedback not found for the current recipient
+     */
+    404: FeedbackResponse;
 };
+
+export type SubmitFeedbackResponseError = SubmitFeedbackResponseErrors[keyof SubmitFeedbackResponseErrors];
 
 export type SubmitFeedbackResponseResponses = {
     /**

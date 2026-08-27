@@ -31,17 +31,15 @@ public class PracticeTrendService {
     public PracticeTrend calculateArea(
         String areaSlug,
         Collection<String> eligiblePracticeSlugs,
-        Collection<PracticeTrend> practiceTrends,
-        Map<String, Double> weights
+        Collection<PracticeTrend> practiceTrends
     ) {
-        return AreaTrendAggregator.aggregate(areaSlug, eligiblePracticeSlugs, practiceTrends, weights, properties);
+        return AreaTrendAggregator.aggregate(areaSlug, eligiblePracticeSlugs, practiceTrends, properties);
     }
 
     public PracticeAreaTrendDTO detail(
         String areaSlug,
         Collection<String> eligiblePracticeSlugs,
-        Map<String, List<Observation>> evidenceByPractice,
-        Map<String, Double> weights
+        Map<String, List<Observation>> evidenceByPractice
     ) {
         Map<String, PracticeTrend> all = calculatePractices(evidenceByPractice);
         List<PracticeTrend> practices = eligiblePracticeSlugs
@@ -53,7 +51,7 @@ public class PracticeTrendService {
                 )
             )
             .toList();
-        PracticeTrend area = calculateArea(areaSlug, eligiblePracticeSlugs, practices, weights);
+        PracticeTrend area = calculateArea(areaSlug, eligiblePracticeSlugs, practices);
         return new PracticeAreaTrendDTO(area.toDto(), practices.stream().map(PracticeTrend::toDto).toList());
     }
 }

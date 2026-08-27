@@ -16,9 +16,6 @@ import org.jspecify.annotations.Nullable;
  * <p>An area combines already-computed practice differences using inverse-variance weights. Because practices
  * can share reviewed work, the pooled variance uses the conservative perfect-correlation bound rather than
  * pretending the estimates are independent.
- *
- * <p>A practice with weight zero is excluded rather than down-weighted, so an area can be composed without
- * one of its practices moving it at all.
  */
 final class AreaTrendAggregator {
 
@@ -28,13 +25,11 @@ final class AreaTrendAggregator {
         String areaSlug,
         Collection<String> eligiblePracticeSlugs,
         Collection<PracticeTrend> practiceTrends,
-        Map<String, Double> weights,
         TrendProperties properties
     ) {
         List<PracticeTrend> comparable = practiceTrends
             .stream()
             .filter(trend -> trend.difference() != null)
-            .filter(trend -> weightFor(trend.slug(), weights) > 0.0)
             .toList();
         List<EvidenceOpportunity> trail = mergedTrail(practiceTrends, properties.getBundleSize());
         if (comparable.isEmpty()) {
@@ -42,7 +37,6 @@ final class AreaTrendAggregator {
             int previous = distinctOpportunityCount(practiceTrends, TrendBundle.PREVIOUS);
             int missing = practiceTrends
                 .stream()
-                .filter(trend -> weightFor(trend.slug(), weights) > 0.0)
                 .mapToInt(trend -> trend.support().opportunitiesUntilComparable())
                 .min()
                 .orElse(properties.getMinBundleSize());
@@ -66,7 +60,7 @@ final class AreaTrendAggregator {
             );
         }
 
-        Pooled pooled = pool(comparable, weights);
+        Pooled pooled = pool(comparable);
         TrendDirection direction = classifyNormal(
             pooled.mean(),
             pooled.variance(),
@@ -89,25 +83,19 @@ final class AreaTrendAggregator {
             summed(comparable, PracticeTrend::currentOutcomes),
             summed(comparable, PracticeTrend::previousOutcomes),
             trail,
-            // No pooled Difference: the area never diffed two bundles, and publishing one would invite a
-            // reader to treat the normal approximation as though it were the exact posterior.
             null
         );
     }
 
-    /** The inverse-variance pooled estimate of the area's change. */
     private record Pooled(double mean, double variance) {}
 
-    private static Pooled pool(List<PracticeTrend> comparable, Map<String, Double> weights) {
+    private static Pooled pool(List<PracticeTrend> comparable) {
         double weightedMean = 0.0;
         double totalPrecision = 0.0;
         double correlatedStandardDeviation = 0.0;
         for (PracticeTrend trend : comparable) {
-            // `comparable` was filtered on difference() != null above; the nullness analysis
-            // does not carry that across the stream boundary.
             BetaPosterior.Difference difference = Objects.requireNonNull(trend.difference());
-            double weight = weightFor(trend.slug(), weights);
-            double precision = weight / difference.variance();
+            double precision = 1.0 / difference.variance();
             weightedMean += precision * difference.mean();
             totalPrecision += precision;
             // Practices are often reviewed on the same work. Treating their estimates as independent would
@@ -118,26 +106,11 @@ final class AreaTrendAggregator {
         return new Pooled(weightedMean / totalPrecision, standardDeviation * standardDeviation);
     }
 
-    /**
-     * Adds up one bundle's outcomes across the practices.
-     *
-     * <p>The accessor is nullable — a trend that was never comparable carries no vectors — but every trend
-     * here passed the {@code difference() != null} filter, so in practice none is skipped. The filter states
-     * that rather than asserting it, because the alternative is an exception if the two conditions ever part.
-     */
     private static OutcomeVector summed(
         List<PracticeTrend> trends,
         Function<PracticeTrend, @Nullable OutcomeVector> axis
     ) {
         return trends.stream().map(axis).filter(Objects::nonNull).reduce(OutcomeVector.EMPTY, OutcomeVector::plus);
-    }
-
-    private static double weightFor(String slug, Map<String, Double> weights) {
-        double weight = weights.getOrDefault(slug, 1.0);
-        if (!Double.isFinite(weight) || weight < 0.0) {
-            throw new IllegalArgumentException("Practice trend weight must be finite and non-negative");
-        }
-        return weight;
     }
 
     private static TrendDirection classifyNormal(double mean, double variance, double rope, double threshold) {

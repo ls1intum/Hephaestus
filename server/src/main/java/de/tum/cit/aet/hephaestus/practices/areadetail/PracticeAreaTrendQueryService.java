@@ -40,8 +40,6 @@ public class PracticeAreaTrendQueryService {
             .collect(
                 Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue, (left, right) -> left, LinkedHashMap::new)
             );
-        // Weights come from the same snapshot for the same reason: this detail view and the area status must
-        // not disagree about how much a practice counts.
-        return trendService.detail(areaSlug, eligible, evidence, snapshot.areaWeightByPractice());
+        return trendService.detail(areaSlug, eligible, evidence);
     }
 }

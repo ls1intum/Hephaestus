@@ -159,7 +159,7 @@ public interface ReactionRepository extends JpaRepository<Reaction, UUID> {
     }
 
     /**
-     * Engagement statistics: how many piece of feedbacks the developer currently resolves each way, scoped to a
+     * Engagement statistics: how many pieces of feedback the developer currently resolves each way, scoped to a
      * workspace through the feedback → workspace relationship.
      *
      * <p>Counts units, not rows. A developer who changed their mind appended a second row, and counting both
