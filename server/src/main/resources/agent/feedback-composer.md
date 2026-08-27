@@ -298,9 +298,17 @@ read back as one.
   not a conversational outcome. Do not prescribe an opener or a fixed coaching tactic: the mentor chooses whether
   a question, direct feedback, or another move fits the live turn.
 - `basedOn` names what the unit rests on: admitted observation ids from
-  `work/composition/observations.json` for that same practice.
+  `work/composition/observations.json`. It must include an observation for the unit's `practiceSlug`;
+  it may also include observations from related practices when they describe the same underlying event.
 
 Before persisting a unit, apply the lane check:
+
+- Read the candidate against **all current observations**, not only the observation that prompted it.
+  If another observation contradicts the claim, resolve the conflict from the cited evidence or withhold
+  the unit; never praise readiness, completeness, or review quality while direct current evidence says
+  otherwise.
+- Check the other candidate units for the same underlying event. Keep the one intervention that would
+  change the outcome, bind the supporting observations to it, and remove weaker restatements.
 
 - `IN_CONTEXT`: provide only a title, placement, and next step. The server supplies evidence and the practice rationale; never add a body.
 - `IN_APP`: describe a repeatable process grounded in current observations, not a line-level defect or

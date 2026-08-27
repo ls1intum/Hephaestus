@@ -676,14 +676,7 @@ function buildReportObservationTool(allowedPracticeSlugs?: readonly string[]) {
 		label: "Report Observation",
 		description:
 			"Persist exactly one structured observation immediately so it survives retries and timeouts. Call this as soon as one observation is ready. Do not wait to batch observations.",
-		parameters: {
-			type: "object",
-			additionalProperties: false,
-			required: ["observation"],
-			properties: {
-				observation: scopedObservationSchema,
-			},
-		},
+		parameters: scopedObservationSchema,
 		execute: (_toolCallId, params): Promise<AgentToolResult<ReportObservationDetails>> => {
 			if (measurementClosed) {
 				return Promise.resolve({
@@ -696,7 +689,7 @@ function buildReportObservationTool(allowedPracticeSlugs?: readonly string[]) {
 					details: { inserted: 0, measurementClosed: true },
 				});
 			}
-			const normalized = normalizeObservation(params.observation);
+			const normalized = normalizeObservation(params);
 			if (allowed && !allowed.has(normalized.practiceSlug)) {
 				return Promise.resolve({
 					content: [
@@ -708,7 +701,7 @@ function buildReportObservationTool(allowedPracticeSlugs?: readonly string[]) {
 					details: { inserted: 0, remainingPractices: [...allowed] },
 				});
 			}
-			const { inserted, duplicates, negatives } = appendObservations([params.observation]);
+			const { inserted, duplicates, negatives } = appendObservations([params]);
 			const observed = new Set(reviewState.observations.map((item) => item.practiceSlug));
 			const remainingPractices = allowed
 				? [...allowed].filter((practiceSlug) => !observed.has(practiceSlug))
@@ -1715,7 +1708,7 @@ async function main() {
 	const sessionDir = `${CWD}/.sessions`;
 	const reviewDeadline = startMs + INITIAL_TIMEOUT_MS;
 	console.error(
-		`[pi-runner] Review tree: ${tree.practiceCount} practices, ${tree.groups.length} reconnaissance parent(s), concurrency=${concurrency}`,
+		`[pi-runner] Review tree: ${tree.practiceCount} practices, ${tree.groups.length} evidence group(s), concurrency=${concurrency}`,
 	);
 
 	const groupSessionFiles = new Map<string, string>();
@@ -1808,10 +1801,11 @@ async function main() {
 					observerSession.prompt(
 						`${prompt}\n\n## Practice group: ${group.id}\nEvaluate exactly these practices: ${group.practiceSlugs.join(", ")}. ` +
 							`Read their files under inputs/practices/ and build one shared evidence map before drawing conclusions. ` +
-							`First report practices whose explicit review occasion clearly did not occur. Then investigate the ` +
-							`remaining practices together, reusing reads across them. Persist exactly one observation for every ` +
-							`listed practice. Do not turn missing evidence into NO_REVIEW_OCCASION, and do not skip a practice ` +
-							`because its behavior is absent.`,
+							`Investigate the practices together and reuse reads across them. Persist at least one disposition for ` +
+							`every listed practice, plus any distinct material problems a practice exposes. Use ` +
+							`NO_REVIEW_OCCASION only after complete evidence proves the practice's explicit prerequisite did not ` +
+							`occur; missing evidence is not an occasion that failed to happen. Do not skip a practice because its ` +
+							`behavior is absent.`,
 					),
 					timers.hardDeadline,
 				]);
