@@ -27,7 +27,7 @@ public class FeedbackCompositionResultParser {
      * A bound on how much composed prose one cycle can offer, before each lane's per-recipient cap
      * applies. Not a policy — a guard against a runaway turn filling the ledger.
      */
-    static final int MAX_UNITS = 24;
+    static final int MAX_UNITS = 30;
 
     private static final int MAX_PRACTICE_SLUG_LENGTH = 128;
 

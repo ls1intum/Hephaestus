@@ -108,6 +108,7 @@ export function buildReviewTree(
 
 	const groups: ReviewGroup[] = [];
 	for (const lane of LANE_ORDER) {
+		let laneGroupIndex = 0;
 		const laneGroups = [...byGroup.values()]
 			.filter((group) => group.lane === lane)
 			.toSorted((left, right) => (left.area ?? "").localeCompare(right.area ?? ""));
@@ -115,9 +116,9 @@ export function buildReviewTree(
 			const entries = group.entries.toSorted((left, right) => left.slug.localeCompare(right.slug));
 			for (let offset = 0; offset < entries.length; offset += maxPracticesPerGroup) {
 				const chunk = entries.slice(offset, offset + maxPracticesPerGroup);
-				const areaId = group.area?.replace(/[^a-z0-9-]+/gi, "-").toLowerCase();
+				laneGroupIndex++;
 				groups.push({
-					id: `${lane}-${areaId ? `${areaId}-` : ""}${Math.floor(offset / maxPracticesPerGroup) + 1}`,
+					id: `${lane}-${laneGroupIndex}`,
 					lane,
 					practiceSlugs: chunk.map((entry) => entry.slug),
 					evidenceSources: [...new Set(chunk.flatMap((entry) => entry.sources))].toSorted(),

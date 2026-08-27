@@ -56,6 +56,19 @@ describe("buildReviewTree", () => {
 		expect(reverse).toEqual(forward);
 	});
 
+	test("keeps group ids unique when area names normalize alike", () => {
+		const tree = buildReviewTree(
+			[
+				{ slug: "api", area: "API / UX", readsSources: ["scm.pull-request.diff"] },
+				{ slug: "ux", area: "API---UX", readsSources: ["scm.pull-request.diff"] },
+			],
+			1,
+		);
+
+		expect(tree.groups.map((group) => group.id)).toEqual(["code-1", "code-2"]);
+		expect(new Set(tree.groups.map((group) => group.id)).size).toBe(tree.groups.length);
+	});
+
 	test("normalizes and combines the sources required by a group", () => {
 		const tree = buildReviewTree(
 			[

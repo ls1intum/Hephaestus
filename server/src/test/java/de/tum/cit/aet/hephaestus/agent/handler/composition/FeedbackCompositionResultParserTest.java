@@ -89,7 +89,7 @@ class FeedbackCompositionResultParserTest extends BaseUnitTest {
     }
 
     @Test
-    void readsAUnitGroundedInPrimaryAndRelatedPracticeEvidence() {
+    void shouldReadUnitWhenGroundedInPrimaryAndRelatedPracticeEvidence() {
         List<ComposedFeedbackUnit> units = parser.parse(
             output(
                 """
@@ -109,7 +109,7 @@ class FeedbackCompositionResultParserTest extends BaseUnitTest {
     }
 
     @Test
-    void rejectsCoordinatesOnAnArtifactPlacement() {
+    void shouldRejectUnitWhenArtifactPlacementHasCoordinates() {
         assertThat(
             parser.parse(
                 output(
@@ -126,7 +126,7 @@ class FeedbackCompositionResultParserTest extends BaseUnitTest {
     }
 
     @Test
-    void readsAConversationUnitAsNotesRatherThanAScript() {
+    void shouldReadNotesWhenConversationUnitIsValid() {
         List<ComposedFeedbackUnit> units = parser.parse(
             output(
                 """
@@ -174,7 +174,7 @@ class FeedbackCompositionResultParserTest extends BaseUnitTest {
             """,
         }
     )
-    void refusesAConversationUnitMissingOneOfItsNotes(String notes) {
+    void shouldRejectConversationUnitWhenRequiredNoteIsMissing(String notes) {
         assertThat(
             parser.parse(
                 output(
@@ -294,7 +294,7 @@ class FeedbackCompositionResultParserTest extends BaseUnitTest {
     }
 
     @Test
-    void keepsAWithholdWithItsReasonAndDropsOneWithout() {
+    void shouldKeepOnlyWithholdWhenReasonIsPresent() {
         assertThat(
             parser.parse(
                 output(
@@ -411,6 +411,30 @@ class FeedbackCompositionResultParserTest extends BaseUnitTest {
             .singleElement()
             .extracting(ComposedFeedbackUnit::title)
             .isEqualTo("on the page");
+    }
+
+    @Test
+    void shouldKeepAllUnitsWhenEveryLaneUsesItsFullCapacity() {
+        var observations = objectMapper.createArrayNode();
+        var units = objectMapper.createArrayNode();
+        for (int practice = 0; practice < 10; practice++) {
+            String practiceSlug = "practice-" + practice;
+            String observationId = "obs-" + practice;
+            observations.addObject().put("id", observationId).put("practiceSlug", practiceSlug);
+            for (FeedbackChannel channel : FeedbackChannel.values()) {
+                var unit = units.addObject().put("channel", channel.name()).put("practiceSlug", practiceSlug);
+                unit.putArray("basedOn").add(observationId);
+                unit.put("action", "WITHHOLD").put("withholdReason", "ALREADY_SAID");
+            }
+        }
+        var payload = objectMapper.createObjectNode();
+        payload.set("observations", observations);
+        payload.set("preparedTargets", objectMapper.createArrayNode());
+        payload.set("units", units);
+        var output = objectMapper.createObjectNode();
+        output.set("feedback", payload);
+
+        assertThat(parser.parse(output)).hasSize(30);
     }
 
     @Test
