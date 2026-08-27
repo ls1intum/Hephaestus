@@ -34,7 +34,7 @@ function recordRequests() {
 		),
 		http.get("*/workspaces/:workspaceSlug/members", () => HttpResponse.json([])),
 		http.get("*/workspaces/:workspaceSlug/practices", () => HttpResponse.json([])),
-		http.get("*/workspaces/:workspaceSlug/practice-areas", () => HttpResponse.json([])),
+		http.get("*/workspaces/:workspaceSlug/practice-groups", () => HttpResponse.json([])),
 		http.get("*/workspaces/:workspaceSlug/practices/reviews/observations", ({ request }) => {
 			observationUrls.push(new URL(request.url));
 			return HttpResponse.json(emptyPage);

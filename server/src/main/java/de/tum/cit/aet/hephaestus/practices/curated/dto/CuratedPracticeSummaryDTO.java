@@ -12,7 +12,7 @@ public record CuratedPracticeSummaryDTO(
     @NonNull String name,
     @NonNull ArtifactKind artifactKind,
     @NonNull PracticeAutomatedReview automatedReview,
-    @Nullable String areaSlug,
+    @Nullable String groupSlug,
     @NonNull Integer position,
     @NonNull Boolean effectivelyOffered,
     @NonNull CatalogEntryStatusDTO status
@@ -23,7 +23,7 @@ public record CuratedPracticeSummaryDTO(
             entry.effective().name(),
             entry.effective().artifactKind(),
             entry.effective().automatedReviewPolicy().automatedReview(),
-            entry.effective().areaSlug(),
+            entry.effective().groupSlug(),
             entry.position(),
             effectivelyOffered,
             CatalogEntryStatusDTO.from(entry)

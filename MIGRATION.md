@@ -65,6 +65,21 @@ Entries exist only for releases that need operator action. Everything else is in
 
 ### v0.75.0
 
+#### 🔴 Practice area API names are replaced by practice group names
+
+**Affected**: anything calling the application API directly. The generated Hephaestus web client is
+updated in this release.
+
+The product concept previously exposed as a *practice area* is now consistently named a **practice
+group**. All `/practice-areas` routes move to `/practice-groups`; request and response fields such as
+`areaSlug` and `areaName` become `groupSlug` and `groupName`; catalog collections named `areas` become `groups`. Generated schema
+names likewise use `PracticeGroup` instead of `PracticeArea`. The developer-facing practice projection
+moves from `/practices/learner` to `/practices/reviewed` and is named `ReviewedPractice`. The old routes
+and field names are removed rather than aliased. This rename does not change which practices belong together.
+
+**Action**: regenerate API clients and replace direct uses of the retired routes, schema names, and
+fields. No operator configuration changes are required; the database migration runs automatically.
+
 #### 🔴 The feedback reaction endpoint is replaced by a response endpoint
 
 **Affected**: anything calling the application API directly. The Hephaestus web app is unaffected —
@@ -357,7 +372,7 @@ Update clients in the same deployment as the server and webapp. The old names ha
 | `evidenceRequirements` | `automatedReviewPolicy` |
 | `evidenceSupport` | `evidenceSufficiency` |
 | practice `active` and `/active` | `reviewTier` and `/review-tier` (see below) |
-| practice-area `active` | `visibleInPracticeDashboards` |
+| practice-group `active` | `visibleInPracticeDashboards` |
 | observation `artifactType` | `artifactKind` |
 | observation `title` | `summary` |
 | observation `reasoning` | `evidenceRationale` |
@@ -385,8 +400,8 @@ reviews becomes `DELIVER`, one that was not becomes `OFF`, and the migration run
 and every observation is still recorded, and nothing is sent to anyone. All three values are settable
 at every level; a practice only lands on `PROPOSE` because somebody put it there.
 
-Omitting `reviewTier`, or sending it as `null`, clears the setting so the practice follows its area,
-and the area follows the workspace default.
+Omitting `reviewTier`, or sending it as `null`, clears the setting so the practice follows its group,
+and the group follows the workspace default.
 
 #### 🟢 A workspace can restrict review to some branches and repositories
 

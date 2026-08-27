@@ -10,7 +10,7 @@ import org.jspecify.annotations.Nullable;
  * Builds the provenance a trend direction is published with.
  *
  * <p>Two entry points rather than one with optional arguments. {@link TrendSupport#comparablePractices()} and
- * {@link TrendSupport#eligiblePractices()} are absent at practice scope and present at area scope, and that
+ * {@link TrendSupport#eligiblePractices()} are absent at practice scope and present at group scope, and that
  * absence reaches the client, so it is part of the contract rather than a gap. Encoding it in the method name
  * means neither caller passes a null to say which case it is in, and adding a scope later forces a new
  * factory instead of a fourth nullable argument.
@@ -38,8 +38,8 @@ final class TrendSupportFactory {
         );
     }
 
-    /** Support for an aggregate — additionally says how many of the area's practices could be compared. */
-    static TrendSupport forArea(
+    /** Support for an aggregate — additionally says how many of the group's practices could be compared. */
+    static TrendSupport forGroup(
         TrendProperties properties,
         int currentOpportunities,
         int previousOpportunities,

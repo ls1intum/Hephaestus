@@ -58,9 +58,9 @@ export function CuratedPracticeCreateLevel({ nested, onDone }: CuratedPracticeCr
 				<CuratedPracticeForm
 					mode="create"
 					cancel={<LevelCancel />}
-					areas={catalogQuery.data.areas.map((area) => ({
-						slug: area.slug,
-						name: area.definition.name,
+					groups={catalogQuery.data.groups.map((group) => ({
+						slug: group.slug,
+						name: group.definition.name,
 					}))}
 					isPending={createPractice.isPending}
 					definitionOptions={definitionOptionsQuery.data}

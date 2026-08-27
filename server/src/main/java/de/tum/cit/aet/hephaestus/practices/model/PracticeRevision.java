@@ -113,20 +113,20 @@ public class PracticeRevision {
     @ToString.Exclude
     private @Nullable String whatGoodLooksLike;
 
-    @Column(name = "area_slug", length = 64)
-    private @Nullable String areaSlug;
+    @Column(name = "group_slug", length = 64)
+    private @Nullable String groupSlug;
 
-    @Column(name = "area_name", length = 128)
-    private @Nullable String areaName;
+    @Column(name = "group_name", length = 128)
+    private @Nullable String groupName;
 
-    @Column(name = "area_description", columnDefinition = "TEXT")
-    private @Nullable String areaDescription;
+    @Column(name = "group_description", columnDefinition = "TEXT")
+    private @Nullable String groupDescription;
 
-    @Column(name = "area_icon", length = 64)
-    private @Nullable String areaIcon;
+    @Column(name = "group_icon", length = 64)
+    private @Nullable String groupIcon;
 
-    @Column(name = "area_color", length = 32)
-    private @Nullable String areaColor;
+    @Column(name = "group_color", length = 32)
+    private @Nullable String groupColor;
 
     @Column(name = "review_rule_fingerprint", length = 96)
     private String reviewRuleFingerprint;
@@ -152,13 +152,13 @@ public class PracticeRevision {
         );
         this.whyItMatters = practice.getWhyItMatters();
         this.whatGoodLooksLike = practice.getWhatGoodLooksLike();
-        PracticeArea area = practice.getArea();
-        if (area != null) {
-            this.areaSlug = area.getSlug();
-            this.areaName = area.getName();
-            this.areaDescription = area.getDescription();
-            this.areaIcon = area.getIcon();
-            this.areaColor = area.getColor();
+        PracticeGroup group = practice.getGroup();
+        if (group != null) {
+            this.groupSlug = group.getSlug();
+            this.groupName = group.getName();
+            this.groupDescription = group.getDescription();
+            this.groupIcon = group.getIcon();
+            this.groupColor = group.getColor();
         }
         this.reviewRuleFingerprint = computeReviewRuleFingerprint();
     }
@@ -171,7 +171,7 @@ public class PracticeRevision {
             criteria,
             precomputeScript,
             automatedReviewPolicy,
-            areaSlug
+            groupSlug
         );
     }
 

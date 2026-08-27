@@ -1,6 +1,6 @@
 import { Link } from "@tanstack/react-router";
-import type { Practice, ReviewPracticeArea } from "@/api/types.gen";
-import { AreaPill } from "@/components/admin/practice-catalog/AreaPill";
+import type { Practice, ReviewPracticeGroup } from "@/api/types.gen";
+import { GroupPill } from "@/components/admin/practice-catalog/GroupPill";
 import { PracticeDetailHoverCard } from "@/components/admin/practice-catalog/PracticeDetailHoverCard";
 import { cn } from "@/lib/utils";
 
@@ -9,11 +9,11 @@ export interface ReviewPracticeLinkProps {
 	practiceSlug: string;
 	practiceName: string;
 	/** Absent when the practice is Unassigned, which is a real state and not a missing value. */
-	area: ReviewPracticeArea | undefined;
+	group: ReviewPracticeGroup | undefined;
 	/**
 	 * The full practice record behind `practiceSlug`, which the screen holding this link fetched with
 	 * the rest of its data. Optional because nothing the hover card shows is load-bearing — the name
-	 * and area are on the row, and the rest is a field on the page the link goes to — so a caller
+	 * and group are on the row, and the rest is a field on the page the link goes to — so a caller
 	 * without the record, like a reader on a touchscreen who gets no card either way, loses nothing.
 	 */
 	practice?: Practice;
@@ -29,7 +29,7 @@ export function ReviewPracticeLink({
 	workspaceSlug,
 	practiceSlug,
 	practiceName,
-	area,
+	group,
 	practice,
 	className,
 }: ReviewPracticeLinkProps) {
@@ -44,7 +44,7 @@ export function ReviewPracticeLink({
 				className,
 			)}
 		>
-			<PracticeAreaMark area={area} />
+			<PracticeGroupMark group={group} />
 			<span className="min-w-0 break-words">{practiceName}</span>
 		</Link>
 	);
@@ -57,19 +57,19 @@ export function ReviewPracticeLink({
 }
 
 /**
- * The colour is what an operator scans an area by, so the name is carried by the `title` and the
+ * The colour is what an operator scans a group by, so the name is carried by the `title` and the
  * screen-reader text rather than taking visible space on a row that already names the practice, the
  * person, the work and the time.
  */
-function PracticeAreaMark({ area }: { area: ReviewPracticeArea | undefined }) {
-	if (!area) return null;
+function PracticeGroupMark({ group }: { group: ReviewPracticeGroup | undefined }) {
+	if (!group) return null;
 	return (
-		<AreaPill
+		<GroupPill
 			size="sm"
-			slug={area.slug}
-			name={area.name}
-			icon={area.icon}
-			color={area.color}
+			slug={group.slug}
+			name={group.name}
+			icon={group.icon}
+			color={group.color}
 			srLabel
 		/>
 	);

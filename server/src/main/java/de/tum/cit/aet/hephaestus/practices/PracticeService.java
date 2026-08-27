@@ -10,8 +10,8 @@ import de.tum.cit.aet.hephaestus.practices.dto.ClearablePracticeField;
 import de.tum.cit.aet.hephaestus.practices.dto.CreatePracticeRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.UpdatePracticeRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeArea;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeGroup;
 import de.tum.cit.aet.hephaestus.practices.review.WorkspaceReviewDefaultsProvider;
 import de.tum.cit.aet.hephaestus.practices.review.autonomy.AutonomyResolver;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
@@ -39,8 +39,8 @@ public class PracticeService {
     private static final Logger log = LoggerFactory.getLogger(PracticeService.class);
 
     private final PracticeRepository practiceRepository;
-    private final PracticeAreaRepository practiceAreaRepository;
-    private final PracticeAreaService practiceAreaService;
+    private final PracticeGroupRepository practiceGroupRepository;
+    private final PracticeGroupService practiceGroupService;
     private final ConfigAuditPort configAudit;
     private final PracticeRevisionService practiceRevisionService;
     private final WorkspaceRepository workspaceRepository;
@@ -74,7 +74,7 @@ public class PracticeService {
      * Every practice this workspace actually reviews, at any effective autonomy above {@code OFF}.
      *
      * <p>Includes {@code HUMAN_APPROVAL}: that autonomy promises the developer no <em>feedback</em>, not concealment,
-     * so the learner-facing catalogue lists what is observed while the autonomy governs what is said.
+     * so the developer-facing catalogue lists what is observed while the autonomy governs what is said.
      */
     @Transactional(readOnly = true)
     public List<Practice> listReviewedPractices(WorkspaceContext ctx) {
@@ -87,7 +87,7 @@ public class PracticeService {
     }
 
     @Transactional
-    public void reorderPractices(WorkspaceContext ctx, String areaSlug, List<String> orderedSlugs) {
+    public void reorderPractices(WorkspaceContext ctx, String groupSlug, List<String> orderedSlugs) {
         if (new HashSet<>(orderedSlugs).size() != orderedSlugs.size()) {
             throw new IllegalArgumentException("orderedSlugs must not contain duplicate slugs");
         }
@@ -95,7 +95,7 @@ public class PracticeService {
         List<Practice> bucket = practiceRepository
             .findAllForCatalog(ctx.id())
             .stream()
-            .filter(p -> Objects.equals(areaSlug, p.getArea() == null ? null : p.getArea().getSlug()))
+            .filter(p -> Objects.equals(groupSlug, p.getGroup() == null ? null : p.getGroup().getSlug()))
             .toList();
         Set<String> existing = bucket.stream().map(Practice::getSlug).collect(Collectors.toSet());
         Set<String> requested = new HashSet<>(orderedSlugs);
@@ -109,7 +109,7 @@ public class PracticeService {
                 throw new EntityNotFoundException("Practice", unknown);
             }
             throw new IllegalArgumentException(
-                "orderedSlugs must contain every practice in the area (a complete ordering)"
+                "orderedSlugs must contain every practice in the group (a complete ordering)"
             );
         }
         Map<String, Practice> bySlug = bucket.stream().collect(Collectors.toMap(Practice::getSlug, p -> p));
@@ -125,7 +125,7 @@ public class PracticeService {
     public List<Practice> placePractice(
         WorkspaceContext ctx,
         String practiceSlug,
-        @Nullable String areaSlug,
+        @Nullable String groupSlug,
         int position
     ) {
         lockWorkspace(ctx);
@@ -133,28 +133,28 @@ public class PracticeService {
             .findByWorkspaceIdAndSlug(ctx.id(), practiceSlug)
             .orElseThrow(() -> new EntityNotFoundException("Practice", practiceSlug));
         PracticeDefinitionSnapshot before = PracticeDefinitionSnapshot.of(practice, currentRevisionNumber(practice));
-        PracticeArea destination =
-            areaSlug == null
+        PracticeGroup destination =
+            groupSlug == null
                 ? null
-                : practiceAreaRepository
-                      .findByWorkspaceIdAndSlug(ctx.id(), areaSlug)
-                      .orElseThrow(() -> new EntityNotFoundException("PracticeArea", areaSlug));
+                : practiceGroupRepository
+                      .findByWorkspaceIdAndSlug(ctx.id(), groupSlug)
+                      .orElseThrow(() -> new EntityNotFoundException("PracticeGroup", groupSlug));
 
-        Long sourceAreaId = practice.getArea() == null ? null : practice.getArea().getId();
-        Long destinationAreaId = destination == null ? null : destination.getId();
+        Long sourceGroupId = practice.getGroup() == null ? null : practice.getGroup().getId();
+        Long destinationGroupId = destination == null ? null : destination.getId();
         List<Practice> allPractices = practiceRepository.findAllForCatalog(ctx.id());
-        List<Practice> source = practicesInArea(allPractices, sourceAreaId, practice);
-        List<Practice> target = Objects.equals(sourceAreaId, destinationAreaId)
+        List<Practice> source = practicesInGroup(allPractices, sourceGroupId, practice);
+        List<Practice> target = Objects.equals(sourceGroupId, destinationGroupId)
             ? source
-            : practicesInArea(allPractices, destinationAreaId, practice);
+            : practicesInGroup(allPractices, destinationGroupId, practice);
 
         if (position > target.size()) {
             throw new IllegalArgumentException("position exceeds the destination size");
         }
         target.add(position, practice);
-        practice.setArea(destination);
+        practice.setGroup(destination);
         resequence(target);
-        if (!Objects.equals(sourceAreaId, destinationAreaId)) {
+        if (!Objects.equals(sourceGroupId, destinationGroupId)) {
             resequence(source);
             int revisionNumber = practiceRevisionService.append(practice).getRevisionNumber();
             configAudit.record(
@@ -170,10 +170,12 @@ public class PracticeService {
         return allPractices;
     }
 
-    private List<Practice> practicesInArea(List<Practice> allPractices, @Nullable Long areaId, Practice excluded) {
+    private List<Practice> practicesInGroup(List<Practice> allPractices, @Nullable Long groupId, Practice excluded) {
         return allPractices
             .stream()
-            .filter(practice -> Objects.equals(areaId, practice.getArea() == null ? null : practice.getArea().getId()))
+            .filter(practice ->
+                Objects.equals(groupId, practice.getGroup() == null ? null : practice.getGroup().getId())
+            )
             .filter(practice -> !practice.getId().equals(excluded.getId()))
             .collect(Collectors.toCollection(ArrayList::new));
     }
@@ -229,23 +231,23 @@ public class PracticeService {
         Workspace workspace = lockWorkspace(ctx);
 
         Practice practice = new Practice();
-        String areaSlug = definition.areaSlug();
-        var area =
-            areaSlug == null
+        String groupSlug = definition.groupSlug();
+        var group =
+            groupSlug == null
                 ? null
-                : practiceAreaRepository
-                      .findByWorkspaceIdAndSlug(ctx.id(), areaSlug)
-                      .orElseThrow(() -> new EntityNotFoundException("PracticeArea", areaSlug));
+                : practiceGroupRepository
+                      .findByWorkspaceIdAndSlug(ctx.id(), groupSlug)
+                      .orElseThrow(() -> new EntityNotFoundException("PracticeGroup", groupSlug));
         practice.setWorkspace(workspace);
         practice.setSourceCuratedSlug(sourceCuratedSlug);
         practice.setSourceCuratedFingerprint(sourceCuratedFingerprint);
-        practice.setArea(area);
+        practice.setGroup(group);
         practice.setDisplayOrder(
-            practiceRepository.findMaxDisplayOrder(ctx.id(), area == null ? null : area.getId()) + 1
+            practiceRepository.findMaxDisplayOrder(ctx.id(), group == null ? null : group.getId()) + 1
         );
         practice.setSlug(slug);
         applyDefinition(practice, definition);
-        // A new practice holds no opinion of its own and inherits its area's (and through it the
+        // A new practice holds no opinion of its own and inherits its group's (and through it the
         // workspace's) — stamping the resolved default here would give every practice an opinion nobody
         // expressed. Exception: a practice whose policy cannot attempt automated review is written OFF
         // explicitly, since that's a fact about the practice, not a preference to inherit over.
@@ -348,15 +350,15 @@ public class PracticeService {
                 request.whatGoodLooksLike(),
                 fieldsToClear.contains(ClearablePracticeField.WHAT_GOOD_LOOKS_LIKE)
             ),
-            request.area() == null ? beforeDefinition.areaSlug() : request.area().areaSlug()
+            request.group() == null ? beforeDefinition.groupSlug() : request.group().groupSlug()
         );
 
         if (afterDefinition.equals(beforeDefinition)) {
             return practice;
         }
 
-        if (request.area() != null) {
-            practiceAreaService.applyBinding(ctx, practice, request.area().areaSlug());
+        if (request.group() != null) {
+            practiceGroupService.applyBinding(ctx, practice, request.group().groupSlug());
         }
         PracticeAutonomy autonomyBefore = practice.getAutonomy();
         applyDefinition(practice, afterDefinition);
@@ -393,9 +395,9 @@ public class PracticeService {
     /**
      * Sets one practice's own autonomy, or clears it back to inherit.
      *
-     * @param autonomy the autonomy to hold, or {@code null} to hold none and inherit the area's — and through
+     * @param autonomy the autonomy to hold, or {@code null} to hold none and inherit the group's — and through
      *     it the workspace's. Clearing has to be expressible or the chain is write-once: an administrator
-     *     who set one practice explicitly could never put it back under the area's decision.
+     *     who set one practice explicitly could never put it back under the group's decision.
      */
     @Transactional
     public Practice setAutonomy(WorkspaceContext ctx, String slug, @Nullable PracticeAutonomy autonomy) {
@@ -410,10 +412,10 @@ public class PracticeService {
         }
         // Every autonomy above OFF starts a review, so every autonomy above OFF needs a policy that can run one.
         // Asked of the autonomy that would be IN FORCE, not of the one being written: "inherit" is a request
-        // for whatever the area says, and if that admits a review the practice still cannot run it.
+        // for whatever the group says, and if that admits a review the practice still cannot run it.
         PracticeAutonomy effective = AutonomyResolver.resolvePractice(
             autonomy,
-            practice.getArea() == null ? null : practice.getArea().getAutonomy(),
+            practice.getGroup() == null ? null : practice.getGroup().getAutonomy(),
             workspaceDefaults.forWorkspace(ctx.id()).defaultAutonomy()
         ).autonomy();
         if (
@@ -479,7 +481,7 @@ public class PracticeService {
                 : request.automatedReviewPolicy(),
             request.whyItMatters(),
             request.whatGoodLooksLike(),
-            request.areaSlug()
+            request.groupSlug()
         );
     }
 
@@ -525,7 +527,7 @@ public class PracticeService {
             definition.automatedReviewPolicy(),
             definition.whyItMatters(),
             definition.whatGoodLooksLike(),
-            definition.areaSlug()
+            definition.groupSlug()
         );
     }
 

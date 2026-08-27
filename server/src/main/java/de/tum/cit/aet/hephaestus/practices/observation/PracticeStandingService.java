@@ -8,8 +8,8 @@ import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepositor
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.ObservationOutcome;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeArea;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeGroup;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
 import de.tum.cit.aet.hephaestus.practices.observation.dto.PracticeStandingDTO;
 import de.tum.cit.aet.hephaestus.practices.observation.dto.PracticeStandingObservationDTO;
@@ -142,12 +142,12 @@ public class PracticeStandingService {
             .stream()
             .filter(practice -> AutonomyResolver.effectiveAutonomyOf(practice, workspaceDefault).admitsReview())
             .toList();
-        Map<String, List<String>> eligiblePracticesByArea = new LinkedHashMap<>();
+        Map<String, List<String>> eligiblePracticesByGroup = new LinkedHashMap<>();
         for (Practice practice : eligiblePractices) {
-            PracticeArea area = practice.getArea();
-            if (area != null) {
-                eligiblePracticesByArea
-                    .computeIfAbsent(area.getSlug(), slug -> new ArrayList<>())
+            PracticeGroup group = practice.getGroup();
+            if (group != null) {
+                eligiblePracticesByGroup
+                    .computeIfAbsent(group.getSlug(), slug -> new ArrayList<>())
                     .add(practice.getSlug());
             }
         }
@@ -163,7 +163,7 @@ public class PracticeStandingService {
             developerId,
             practices,
             evidenceByPractice,
-            eligiblePracticesByArea,
+            eligiblePracticesByGroup,
             standingShareByPractice
         );
     }
@@ -218,12 +218,12 @@ public class PracticeStandingService {
     private static PracticeStandingDTO silentStanding(Practice practice, @Nullable PracticeEvidence evidence) {
         boolean exercised =
             evidence != null && (!evidence.withoutVerdict().isEmpty() || evidence.suppressedStrengths() > 0);
-        PracticeArea area = practice.getArea();
+        PracticeGroup group = practice.getGroup();
         return new PracticeStandingDTO(
             practice.getSlug(),
             practice.getName(),
-            area != null ? area.getSlug() : null,
-            area != null ? area.getName() : null,
+            group != null ? group.getSlug() : null,
+            group != null ? group.getName() : null,
             practice.getWhyItMatters(),
             practice.getWhatGoodLooksLike(),
             exercised ? PracticeStandingDTO.Standing.NO_OPPORTUNITY : PracticeStandingDTO.Standing.NOT_OBSERVED,
@@ -248,12 +248,12 @@ public class PracticeStandingService {
         double standingShare
     ) {
         Practice practice = evidence.practice();
-        PracticeArea area = practice.getArea();
+        PracticeGroup group = practice.getGroup();
         return new PracticeStandingDTO(
             practice.getSlug(),
             practice.getName(),
-            area != null ? area.getSlug() : null,
-            area != null ? area.getName() : null,
+            group != null ? group.getSlug() : null,
+            group != null ? group.getName() : null,
             practice.getWhyItMatters(),
             practice.getWhatGoodLooksLike(),
             StandingScale.classify(standingShare),
@@ -406,7 +406,7 @@ public class PracticeStandingService {
         @Nullable Long developerId,
         List<PracticeStandingDTO> practices,
         Map<String, List<Observation>> evidenceByPractice,
-        Map<String, List<String>> eligiblePracticesByArea,
+        Map<String, List<String>> eligiblePracticesByGroup,
         Map<String, Double> standingShareByPractice
     ) {
         static final StandingSnapshot EMPTY = new StandingSnapshot(null, List.of(), Map.of(), Map.of(), Map.of());

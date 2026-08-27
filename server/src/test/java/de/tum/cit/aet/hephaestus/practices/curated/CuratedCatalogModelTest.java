@@ -1,9 +1,9 @@
 package de.tum.cit.aet.hephaestus.practices.curated;
 
-import static de.tum.cit.aet.hephaestus.practices.curated.CuratedCatalogFixtures.area;
+import static de.tum.cit.aet.hephaestus.practices.curated.CuratedCatalogFixtures.group;
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.tum.cit.aet.hephaestus.practices.AreaDefinition;
+import de.tum.cit.aet.hephaestus.practices.GroupDefinition;
 import de.tum.cit.aet.hephaestus.practices.curated.BundledPracticeCatalog.BundledEntry;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.time.Instant;
@@ -16,7 +16,7 @@ class CuratedCatalogModelTest extends BaseUnitTest {
 
     @Test
     void customEntryDoesNotFreezeTheBundledOrder() {
-        CuratedAreaOverride custom = customArea("custom", "Custom");
+        CuratedGroupOverride custom = customGroup("custom", "Custom");
         BundledPracticeCatalog first = catalog(entry("a", "A", 0), entry("b", "B", 1));
         BundledPracticeCatalog reordered = catalog(entry("b", "B", 0), entry("a", "A", 1));
 
@@ -34,8 +34,8 @@ class CuratedCatalogModelTest extends BaseUnitTest {
 
     @Test
     void sameNameCustomEntriesHaveAStableSlugTieBreak() {
-        CuratedAreaOverride second = customArea("z-second", "Same name");
-        CuratedAreaOverride first = customArea("a-first", "Same name");
+        CuratedGroupOverride second = customGroup("z-second", "Same name");
+        CuratedGroupOverride first = customGroup("a-first", "Same name");
 
         assertThat(slugs(CuratedCatalogModel.compose(catalog(), List.of(second, first), List.of()))).containsExactly(
             "a-first",
@@ -43,22 +43,22 @@ class CuratedCatalogModelTest extends BaseUnitTest {
         );
     }
 
-    private static CuratedAreaOverride customArea(String slug, String name) {
-        CuratedAreaOverride override = new CuratedAreaOverride(slug, NOW);
-        override.write(area(name, "Description"), null, NOW);
+    private static CuratedGroupOverride customGroup(String slug, String name) {
+        CuratedGroupOverride override = new CuratedGroupOverride(slug, NOW);
+        override.write(group(name, "Description"), null, NOW);
         return override;
     }
 
-    private static BundledEntry<AreaDefinition> entry(String slug, String name, int position) {
-        return new BundledEntry<>(slug, area(name, "Description"), position);
+    private static BundledEntry<GroupDefinition> entry(String slug, String name, int position) {
+        return new BundledEntry<>(slug, group(name, "Description"), position);
     }
 
     @SafeVarargs
-    private static BundledPracticeCatalog catalog(BundledEntry<AreaDefinition>... areas) {
-        return new BundledPracticeCatalog(List.of(areas), List.of());
+    private static BundledPracticeCatalog catalog(BundledEntry<GroupDefinition>... groups) {
+        return new BundledPracticeCatalog(List.of(groups), List.of());
     }
 
     private static List<String> slugs(EffectiveCatalog catalog) {
-        return catalog.areas().stream().map(CatalogEntry::slug).toList();
+        return catalog.groups().stream().map(CatalogEntry::slug).toList();
     }
 }

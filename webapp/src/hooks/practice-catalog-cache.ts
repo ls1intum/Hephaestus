@@ -1,7 +1,7 @@
 import type {
 	Practice,
-	PracticeArea,
-	UpdatePracticeAreaRequest,
+	PracticeGroup,
+	UpdatePracticeGroupRequest,
 	UpdatePracticeRequest,
 } from "@/api/types.gen";
 
@@ -20,37 +20,37 @@ export function applyDisplayOrder<T extends { displayOrder: number; slug: string
 	});
 }
 
-function replaceArea(areas: PracticeArea[], updated: PracticeArea): PracticeArea[] {
-	return areas.map((area) => (area.slug === updated.slug ? updated : area));
+function replaceGroup(groups: PracticeGroup[], updated: PracticeGroup): PracticeGroup[] {
+	return groups.map((group) => (group.slug === updated.slug ? updated : group));
 }
 
-export function upsertArea(areas: PracticeArea[], updated: PracticeArea): PracticeArea[] {
-	return areas.some((area) => area.slug === updated.slug)
-		? replaceArea(areas, updated)
-		: [...areas, updated];
+export function upsertGroup(groups: PracticeGroup[], updated: PracticeGroup): PracticeGroup[] {
+	return groups.some((group) => group.slug === updated.slug)
+		? replaceGroup(groups, updated)
+		: [...groups, updated];
 }
 
-export function patchArea(
-	areas: PracticeArea[],
+export function patchGroup(
+	groups: PracticeGroup[],
 	slug: string,
-	patch: UpdatePracticeAreaRequest,
-): PracticeArea[] {
-	return areas.map((area) => (area.slug === slug ? { ...area, ...patch } : area));
+	patch: UpdatePracticeGroupRequest,
+): PracticeGroup[] {
+	return groups.map((group) => (group.slug === slug ? { ...group, ...patch } : group));
 }
 
-export function selectAreaPatch(
-	area: PracticeArea,
-	request: UpdatePracticeAreaRequest,
-): UpdatePracticeAreaRequest {
+export function selectGroupPatch(
+	group: PracticeGroup,
+	request: UpdatePracticeGroupRequest,
+): UpdatePracticeGroupRequest {
 	return {
 		...(request.visibleInPracticeDashboards !== undefined
-			? { visibleInPracticeDashboards: area.visibleInPracticeDashboards }
+			? { visibleInPracticeDashboards: group.visibleInPracticeDashboards }
 			: {}),
-		...("color" in request ? { color: area.color } : {}),
-		...("description" in request ? { description: area.description } : {}),
-		...("displayOrder" in request ? { displayOrder: area.displayOrder } : {}),
-		...("icon" in request ? { icon: area.icon } : {}),
-		...("name" in request ? { name: area.name } : {}),
+		...("color" in request ? { color: group.color } : {}),
+		...("description" in request ? { description: group.description } : {}),
+		...("displayOrder" in request ? { displayOrder: group.displayOrder } : {}),
+		...("icon" in request ? { icon: group.icon } : {}),
+		...("name" in request ? { name: group.name } : {}),
 	};
 }
 
@@ -102,49 +102,49 @@ export function selectPracticePatch(
 		...("whyItMatters" in request || clear.has("WHY_IT_MATTERS")
 			? { whyItMatters: practice.whyItMatters }
 			: {}),
-		...("area" in request
-			? { areaSlug: practice.areaSlug, displayOrder: practice.displayOrder }
+		...("group" in request
+			? { groupSlug: practice.groupSlug, displayOrder: practice.displayOrder }
 			: {}),
 	};
 }
 
-export type PracticePlacement = Pick<Practice, "areaSlug" | "displayOrder" | "slug">;
+export type PracticePlacement = Pick<Practice, "groupSlug" | "displayOrder" | "slug">;
 
 export function placePractice(
 	practices: Practice[],
 	slug: string,
-	areaSlug: string | null,
+	groupSlug: string | null,
 	position: number,
 ): Practice[] {
 	const moving = practices.find((practice) => practice.slug === slug);
 	if (!moving) return practices;
 
-	const sourceAreaSlug = moving.areaSlug ?? null;
-	const inArea = (candidate: Practice, candidateAreaSlug: string | null) =>
-		candidate.slug !== slug && (candidate.areaSlug ?? null) === candidateAreaSlug;
+	const sourceGroupSlug = moving.groupSlug ?? null;
+	const inGroup = (candidate: Practice, candidateGroupSlug: string | null) =>
+		candidate.slug !== slug && (candidate.groupSlug ?? null) === candidateGroupSlug;
 	const byOrder = (a: Practice, b: Practice) =>
 		a.displayOrder - b.displayOrder || a.name.localeCompare(b.name);
-	const source = practices.filter((practice) => inArea(practice, sourceAreaSlug)).sort(byOrder);
+	const source = practices.filter((practice) => inGroup(practice, sourceGroupSlug)).sort(byOrder);
 	const destination =
-		sourceAreaSlug === areaSlug
+		sourceGroupSlug === groupSlug
 			? source
-			: practices.filter((practice) => inArea(practice, areaSlug)).sort(byOrder);
+			: practices.filter((practice) => inGroup(practice, groupSlug)).sort(byOrder);
 	destination.splice(Math.min(position, destination.length), 0, {
 		...moving,
-		areaSlug: areaSlug ?? undefined,
+		groupSlug: groupSlug ?? undefined,
 	});
 
 	const placements = [
-		...(sourceAreaSlug === areaSlug
+		...(sourceGroupSlug === groupSlug
 			? []
 			: source.map((practice, displayOrder) => ({
 					slug: practice.slug,
-					areaSlug: sourceAreaSlug ?? undefined,
+					groupSlug: sourceGroupSlug ?? undefined,
 					displayOrder,
 				}))),
 		...destination.map((practice, displayOrder) => ({
 			slug: practice.slug,
-			areaSlug: areaSlug ?? undefined,
+			groupSlug: groupSlug ?? undefined,
 			displayOrder,
 		})),
 	];
@@ -154,16 +154,16 @@ export function placePractice(
 export function practicePlacementSnapshot(
 	practices: Practice[],
 	practiceSlug: string,
-	destinationAreaSlug: string | null,
+	destinationGroupSlug: string | null,
 ): PracticePlacement[] {
-	const sourceAreaSlug =
-		practices.find((practice) => practice.slug === practiceSlug)?.areaSlug ?? null;
+	const sourceGroupSlug =
+		practices.find((practice) => practice.slug === practiceSlug)?.groupSlug ?? null;
 	return practices
 		.filter((practice) => {
-			const areaSlug = practice.areaSlug ?? null;
-			return areaSlug === sourceAreaSlug || areaSlug === destinationAreaSlug;
+			const groupSlug = practice.groupSlug ?? null;
+			return groupSlug === sourceGroupSlug || groupSlug === destinationGroupSlug;
 		})
-		.map(({ slug, areaSlug, displayOrder }) => ({ slug, areaSlug, displayOrder }));
+		.map(({ slug, groupSlug, displayOrder }) => ({ slug, groupSlug, displayOrder }));
 }
 
 export function applyPracticePlacements(
@@ -176,31 +176,31 @@ export function applyPracticePlacements(
 		return placement
 			? {
 					...practice,
-					areaSlug: placement.areaSlug,
+					groupSlug: placement.groupSlug,
 					displayOrder: placement.displayOrder,
 				}
 			: practice;
 	});
 }
 
-export function removeArea(areas: PracticeArea[], slug: string): PracticeArea[] {
-	return areas.filter((area) => area.slug !== slug);
+export function removeGroup(groups: PracticeGroup[], slug: string): PracticeGroup[] {
+	return groups.filter((group) => group.slug !== slug);
 }
 
-export function unassignPractices(practices: Practice[], areaSlug: string): Practice[] {
+export function unassignPractices(practices: Practice[], groupSlug: string): Practice[] {
 	const firstDisplayOrder =
 		Math.max(
 			-1,
 			...practices
-				.filter((practice) => practice.areaSlug == null)
+				.filter((practice) => practice.groupSlug == null)
 				.map((practice) => practice.displayOrder),
 		) + 1;
 	let offset = 0;
 	return practices.map((practice) =>
-		practice.areaSlug === areaSlug
+		practice.groupSlug === groupSlug
 			? {
 					...practice,
-					areaSlug: undefined,
+					groupSlug: undefined,
 					displayOrder: firstDisplayOrder + offset++,
 				}
 			: practice,

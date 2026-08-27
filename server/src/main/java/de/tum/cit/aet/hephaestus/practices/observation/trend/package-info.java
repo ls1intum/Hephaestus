@@ -1,5 +1,5 @@
 /**
- * Opportunity-indexed trend estimation: whether a developer's evidence for a practice, or for an area, is
+ * Opportunity-indexed trend estimation: whether a developer's evidence for a practice, or for a group, is
  * moving.
  *
  * <p><b>The one idea the package rests on:</b> the unit of analysis is an evidence opportunity, meaning one
@@ -26,7 +26,7 @@
  *       "how sure are we" and "what do we call that" can be argued about one at a time.</li>
  *   <li>{@code PracticeTrend} — the result, and {@code TrendSupport} the provenance beside it: how much
  *       evidence, over which span, still missing how much.</li>
- *   <li>{@code PracticeTrendService} — the only producer of trend results in the application. Area results
+ *   <li>{@code PracticeTrendService} — the only producer of trend results in the application. Group results
  *       are an inverse-variance weighted combination of practice results, so a thinly evidenced practice
  *       speaks more quietly than a well evidenced one.</li>
  * </ol>

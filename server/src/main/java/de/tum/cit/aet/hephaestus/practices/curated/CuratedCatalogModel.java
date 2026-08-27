@@ -2,8 +2,8 @@ package de.tum.cit.aet.hephaestus.practices.curated;
 
 import de.tum.cit.aet.hephaestus.core.EntityTagPrecondition;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
-import de.tum.cit.aet.hephaestus.practices.AreaDefinition;
 import de.tum.cit.aet.hephaestus.practices.CatalogDefinition;
+import de.tum.cit.aet.hephaestus.practices.GroupDefinition;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
 import de.tum.cit.aet.hephaestus.practices.curated.BundledPracticeCatalog.BundledEntry;
 import java.time.Instant;
@@ -22,28 +22,28 @@ import org.jspecify.annotations.Nullable;
 final class CuratedCatalogModel {
 
     private static final String CATALOG = "Practice catalog";
-    private static final String CATALOG_AREA = "Catalog area";
+    private static final String CATALOG_GROUP = "Catalog group";
 
     private CuratedCatalogModel() {}
 
     static EffectiveCatalog compose(
         BundledPracticeCatalog bundled,
-        List<CuratedAreaOverride> areaOverrides,
+        List<CuratedGroupOverride> groupOverrides,
         List<CuratedPracticeOverride> practiceOverrides
     ) {
         return new EffectiveCatalog(
-            orderAreas(
+            orderGroups(
                 composeEntries(
-                    bundled.areas(),
-                    areaOverrides,
-                    CuratedAreaOverride::getSlug,
-                    CuratedAreaOverride::definition,
-                    CuratedAreaOverride::getAcceptedBundledDigest,
-                    CuratedAreaOverride::getRetiredAt,
-                    CuratedAreaOverride::getPosition,
-                    CuratedAreaOverride::getUpdatedAt
+                    bundled.groups(),
+                    groupOverrides,
+                    CuratedGroupOverride::getSlug,
+                    CuratedGroupOverride::definition,
+                    CuratedGroupOverride::getAcceptedBundledDigest,
+                    CuratedGroupOverride::getRetiredAt,
+                    CuratedGroupOverride::getPosition,
+                    CuratedGroupOverride::getUpdatedAt
                 ),
-                positionedSlugs(areaOverrides, CuratedAreaOverride::getSlug, CuratedAreaOverride::getPosition)
+                positionedSlugs(groupOverrides, CuratedGroupOverride::getSlug, CuratedGroupOverride::getPosition)
             ),
             orderPractices(
                 composeEntries(
@@ -62,16 +62,16 @@ final class CuratedCatalogModel {
                     CuratedPracticeOverride::getPosition
                 )
             ),
-            areaOverrides.stream().anyMatch(override -> override.getPosition() != null) ||
+            groupOverrides.stream().anyMatch(override -> override.getPosition() != null) ||
                 practiceOverrides.stream().anyMatch(override -> override.getPosition() != null)
         );
     }
 
-    static List<CatalogEntry<PracticeDefinition>> practicesIn(EffectiveCatalog catalog, @Nullable String areaSlug) {
+    static List<CatalogEntry<PracticeDefinition>> practicesIn(EffectiveCatalog catalog, @Nullable String groupSlug) {
         return catalog
             .practices()
             .stream()
-            .filter(entry -> Objects.equals(entry.effective().areaSlug(), areaSlug))
+            .filter(entry -> Objects.equals(entry.effective().groupSlug(), groupSlug))
             .toList();
     }
 
@@ -104,9 +104,9 @@ final class CuratedCatalogModel {
         throw new IllegalArgumentException("orderedSlugs must contain every entry in the list");
     }
 
-    static void validatePracticeArea(EffectiveCatalog catalog, PracticeDefinition definition) {
-        if (definition.areaSlug() != null && catalog.area(definition.areaSlug()).isEmpty()) {
-            throw new EntityNotFoundException(CATALOG_AREA, definition.areaSlug());
+    static void validatePracticeGroup(EffectiveCatalog catalog, PracticeDefinition definition) {
+        if (definition.groupSlug() != null && catalog.group(definition.groupSlug()).isEmpty()) {
+            throw new EntityNotFoundException(CATALOG_GROUP, definition.groupSlug());
         }
     }
 
@@ -130,19 +130,19 @@ final class CuratedCatalogModel {
         return definition == null ? null : CuratedDefinitionDigest.of(slug, definition);
     }
 
-    static List<CatalogEntry<AreaDefinition>> orderAreas(
-        List<CatalogEntry<AreaDefinition>> entries,
+    static List<CatalogEntry<GroupDefinition>> orderGroups(
+        List<CatalogEntry<GroupDefinition>> entries,
         Set<String> positionedSlugs
     ) {
         boolean locallyOrdered = entries.stream().anyMatch(entry -> positionedSlugs.contains(entry.slug()));
-        Comparator<CatalogEntry<AreaDefinition>> order = Comparator.comparingInt((CatalogEntry<AreaDefinition> entry) ->
-            locallyOrdered && !positionedSlugs.contains(entry.slug()) ? 1 : 0
+        Comparator<CatalogEntry<GroupDefinition>> order = Comparator.comparingInt(
+            (CatalogEntry<GroupDefinition> entry) -> locallyOrdered && !positionedSlugs.contains(entry.slug()) ? 1 : 0
         )
             .thenComparingInt(CatalogEntry::position)
             .thenComparing(entry -> entry.effective().name())
             .thenComparing(CatalogEntry::slug);
-        List<CatalogEntry<AreaDefinition>> sorted = entries.stream().sorted(order).toList();
-        List<CatalogEntry<AreaDefinition>> result = new ArrayList<>(sorted.size());
+        List<CatalogEntry<GroupDefinition>> sorted = entries.stream().sorted(order).toList();
+        List<CatalogEntry<GroupDefinition>> result = new ArrayList<>(sorted.size());
         for (int position = 0; position < sorted.size(); position++) {
             result.add(withPosition(sorted.get(position), position));
         }
@@ -153,18 +153,18 @@ final class CuratedCatalogModel {
         List<CatalogEntry<PracticeDefinition>> entries,
         Set<String> positionedSlugs
     ) {
-        Set<@Nullable String> locallyOrderedAreas = new HashSet<>();
+        Set<@Nullable String> locallyOrderedGroups = new HashSet<>();
         entries
             .stream()
             .filter(entry -> positionedSlugs.contains(entry.slug()))
-            .map(entry -> entry.effective().areaSlug())
-            .forEach(locallyOrderedAreas::add);
+            .map(entry -> entry.effective().groupSlug())
+            .forEach(locallyOrderedGroups::add);
         Comparator<CatalogEntry<PracticeDefinition>> order = Comparator.comparing(
-            (CatalogEntry<PracticeDefinition> entry) -> entry.effective().areaSlug(),
+            (CatalogEntry<PracticeDefinition> entry) -> entry.effective().groupSlug(),
             Comparator.nullsLast(Comparator.naturalOrder())
         )
             .thenComparingInt(entry ->
-                locallyOrderedAreas.contains(entry.effective().areaSlug()) && !positionedSlugs.contains(entry.slug())
+                locallyOrderedGroups.contains(entry.effective().groupSlug()) && !positionedSlugs.contains(entry.slug())
                     ? 1
                     : 0
             )
@@ -174,14 +174,14 @@ final class CuratedCatalogModel {
         List<CatalogEntry<PracticeDefinition>> sorted = entries.stream().sorted(order).toList();
         List<CatalogEntry<PracticeDefinition>> result = new ArrayList<>(sorted.size());
         @Nullable
-        String previousArea = null;
+        String previousGroup = null;
         int position = 0;
         boolean first = true;
         for (CatalogEntry<PracticeDefinition> entry : sorted) {
-            String area = entry.effective().areaSlug();
-            if (first || !Objects.equals(previousArea, area)) {
+            String group = entry.effective().groupSlug();
+            if (first || !Objects.equals(previousGroup, group)) {
                 position = 0;
-                previousArea = area;
+                previousGroup = group;
                 first = false;
             } else {
                 position++;

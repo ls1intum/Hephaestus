@@ -8,7 +8,6 @@ import io.swagger.v3.oas.annotations.media.ArraySchema;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
-import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -47,7 +46,6 @@ public class InAppFeedbackController {
         description = "In-app messages returned, newest first",
         content = @Content(array = @ArraySchema(schema = @Schema(implementation = InAppFeedbackDTO.class)))
     )
-    @SecurityRequirements
     public ResponseEntity<List<InAppFeedbackDTO>> getInAppFeedback(WorkspaceContext workspaceContext) {
         return ResponseEntity.ok(inAppFeedbackService.getInAppFeedback(workspaceContext.id()));
     }

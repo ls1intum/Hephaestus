@@ -149,8 +149,8 @@ class CodeQualityTest extends HephaestusArchitectureTest {
                 "ObservationRepository.findByAboutUserAndWorkspaceSeverityFirst",
                 // Review-run pagination at the run grain: same per-facet @Param binding, plus the
                 // native run projection whose GROUP BY cannot be expressed through a derived query.
-                "ObservationRepository.findPracticeAreaReviewRuns",
-                "ObservationRepository.findPracticeAreaReviewRunObservations"
+                "ObservationRepository.findPracticeGroupReviewRuns",
+                "ObservationRepository.findPracticeGroupReviewRunObservations"
             );
 
             ArchCondition<JavaClass> haveMethodsWithLimitedParams = new ArchCondition<>(

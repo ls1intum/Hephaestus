@@ -3,12 +3,12 @@ import { useRef, useState } from "react";
 import { toast } from "sonner";
 import {
 	autonomyRollupQueryKey,
-	listAreasQueryKey,
+	listGroupsQueryKey,
 	listPracticesQueryKey,
-	setAreaAutonomyMutation,
 	setAutonomyMutation,
+	setGroupAutonomyMutation,
 } from "@/api/@tanstack/react-query.gen";
-import type { PracticeArea } from "@/api/types.gen";
+import type { PracticeGroup } from "@/api/types.gen";
 import { filedUnder, pathString, usePendingMutationIds } from "@/hooks/use-pending-mutation-ids";
 import type { PracticeAutonomy } from "@/lib/practice-autonomy";
 import { problemDetailOf } from "@/lib/problem-detail";
@@ -20,9 +20,9 @@ export interface BulkProgress {
 
 /**
  * Every write here invalidates the rollup and the practice list rather than patching them: the
- * inheritance chain is resolved server-side, and a client predicting what an area autonomy does to the
- * practices inheriting it would be a second implementation of that chain. The area response carries
- * the area and nothing else.
+ * inheritance chain is resolved server-side, and a client predicting what a group autonomy does to the
+ * practices inheriting it would be a second implementation of that chain. The group response carries
+ * the group and nothing else.
  */
 export function usePracticeAutonomyMutations(workspaceSlug: string) {
 	const queryClient = useQueryClient();
@@ -30,7 +30,7 @@ export function usePracticeAutonomyMutations(workspaceSlug: string) {
 	// A ref rather than the state above: the mutation's callbacks close over the render that created
 	// them and would keep reading `null` for the whole run.
 	const bulkRunning = useRef(false);
-	const areaMutationKey = ["practice-autonomy", workspaceSlug, "areas"] as const;
+	const groupMutationKey = ["practice-autonomy", workspaceSlug, "groups"] as const;
 	const practiceMutationKey = ["practice-autonomy", workspaceSlug, "practices"] as const;
 
 	const invalidateResolved = () => {
@@ -42,23 +42,23 @@ export function usePracticeAutonomyMutations(workspaceSlug: string) {
 		});
 	};
 
-	const setAreaAutonomy = useMutation({
-		...filedUnder(areaMutationKey, setAreaAutonomyMutation()),
+	const setGroupAutonomy = useMutation({
+		...filedUnder(groupMutationKey, setGroupAutonomyMutation()),
 		onSuccess: (updated) => {
-			queryClient.setQueryData<PracticeArea[]>(
-				listAreasQueryKey({ path: { workspaceSlug } }),
-				(areas) =>
-					areas?.map((area) =>
-						area.slug === updated.slug ? { ...area, autonomy: updated.autonomy } : area,
+			queryClient.setQueryData<PracticeGroup[]>(
+				listGroupsQueryKey({ path: { workspaceSlug } }),
+				(groups) =>
+					groups?.map((group) =>
+						group.slug === updated.slug ? { ...group, autonomy: updated.autonomy } : group,
 					),
 			);
 		},
 		onError: (error) =>
-			toast.error("Couldn't change the area", { description: problemDetailOf(error) }),
+			toast.error("Couldn't change the group", { description: problemDetailOf(error) }),
 		onSettled: () => {
-			if (queryClient.isMutating({ mutationKey: areaMutationKey }) === 1) {
+			if (queryClient.isMutating({ mutationKey: groupMutationKey }) === 1) {
 				void queryClient.invalidateQueries({
-					queryKey: listAreasQueryKey({ path: { workspaceSlug } }),
+					queryKey: listGroupsQueryKey({ path: { workspaceSlug } }),
 				});
 				invalidateResolved();
 			}
@@ -124,8 +124,8 @@ export function usePracticeAutonomyMutations(workspaceSlug: string) {
 		}
 	};
 
-	const pendingAreaSlugs = usePendingMutationIds(areaMutationKey, (variables) =>
-		pathString(variables, "areaSlug"),
+	const pendingGroupSlugs = usePendingMutationIds(groupMutationKey, (variables) =>
+		pathString(variables, "groupSlug"),
 	);
 	const pendingPracticeSlugs = usePendingMutationIds(practiceMutationKey, (variables) =>
 		pathString(variables, "practiceSlug"),
@@ -133,9 +133,9 @@ export function usePracticeAutonomyMutations(workspaceSlug: string) {
 
 	return {
 		bulk,
-		pendingAreaSlugs,
+		pendingGroupSlugs,
 		pendingPracticeSlugs,
-		setAreaAutonomy,
+		setGroupAutonomy,
 		setPracticeAutonomy,
 		setManyPracticeAutonomies,
 	};

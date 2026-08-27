@@ -17,9 +17,9 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
+import de.tum.cit.aet.hephaestus.practices.feedback.DeveloperTextSanitizer;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
-import de.tum.cit.aet.hephaestus.practices.feedback.StudentTextSanitizer;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationDelta;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
@@ -387,7 +387,7 @@ public class ReviewHistoryContentSource implements EvidenceSource {
             // Notes to the mentor on the conversation lane, never the mentor's words: that lane stores the
             // situation, coaching goal, evidence summary and success signal, and the turn itself is still written live. Null when the run that queued it composed nothing,
             // which leaves only the fact that something is queued.
-            node.put("body", StudentTextSanitizer.sanitize(f.getBody()));
+            node.put("body", DeveloperTextSanitizer.sanitize(f.getBody()));
         }
         return root;
     }
@@ -422,7 +422,7 @@ public class ReviewHistoryContentSource implements EvidenceSource {
             node.put("severity", o.getSeverity() == null ? null : o.getSeverity().name());
             names.stageInto(node, o.getArtifactKind(), o.getArtifactId());
             node.put("observedAt", o.getObservedAt() == null ? null : o.getObservedAt().toString());
-            node.put("evidenceRationale", StudentTextSanitizer.sanitize(o.getEvidenceRationale()));
+            node.put("evidenceRationale", DeveloperTextSanitizer.sanitize(o.getEvidenceRationale()));
         }
         return root;
     }
@@ -450,7 +450,7 @@ public class ReviewHistoryContentSource implements EvidenceSource {
             node.put("channel", f.getChannel() == null ? null : f.getChannel().name());
             names.stageInto(node, f.getArtifactKind(), f.getArtifactId());
             node.put("deliveredAt", f.getDeliveredAt() == null ? null : f.getDeliveredAt().toString());
-            node.put("body", StudentTextSanitizer.sanitize(f.getBody()));
+            node.put("body", DeveloperTextSanitizer.sanitize(f.getBody()));
         }
         return root;
     }

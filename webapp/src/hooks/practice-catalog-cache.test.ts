@@ -19,13 +19,13 @@ function withAutonomy(practices: Practice[], slug: string, autonomy: Practice["a
 	return practices.map((item) => (item.slug === slug ? { ...item, autonomy } : item));
 }
 
-function practice(slug: string, areaSlug: string | undefined, displayOrder: number): Practice {
+function practice(slug: string, groupSlug: string | undefined, displayOrder: number): Practice {
 	return {
 		...mockPractice,
 		id: displayOrder + 1,
 		name: slug,
 		slug,
-		areaSlug,
+		groupSlug,
 		displayOrder,
 	};
 }
@@ -47,7 +47,7 @@ describe("practice catalog cache updates", () => {
 		]);
 	});
 
-	it("places a practice between rows in another area and compacts both buckets", () => {
+	it("places a practice between rows in another group and compacts both buckets", () => {
 		const practices = [
 			practice("first", "quality", 0),
 			practice("moving", "quality", 1),
@@ -60,7 +60,7 @@ describe("practice catalog cache updates", () => {
 
 		expect(
 			result
-				.filter(({ areaSlug }) => areaSlug === "quality")
+				.filter(({ groupSlug }) => groupSlug === "quality")
 				.sort((a, b) => a.displayOrder - b.displayOrder)
 				.map(({ slug, displayOrder }) => [slug, displayOrder]),
 		).toStrictEqual([
@@ -69,7 +69,7 @@ describe("practice catalog cache updates", () => {
 		]);
 		expect(
 			result
-				.filter(({ areaSlug }) => areaSlug === "delivery")
+				.filter(({ groupSlug }) => groupSlug === "delivery")
 				.sort((a, b) => a.displayOrder - b.displayOrder)
 				.map(({ slug, displayOrder }) => [slug, displayOrder]),
 		).toStrictEqual([
@@ -79,7 +79,7 @@ describe("practice catalog cache updates", () => {
 		]);
 	});
 
-	it("unassigns an area's practices without disturbing existing unassigned order", () => {
+	it("unassigns a group's practices without disturbing existing unassigned order", () => {
 		const practices = [
 			practice("existing", undefined, 0),
 			practice("first", "quality", 0),
@@ -90,7 +90,7 @@ describe("practice catalog cache updates", () => {
 		const result = unassignPractices(practices, "quality");
 
 		expect(
-			result.map(({ slug, areaSlug, displayOrder }) => [slug, areaSlug, displayOrder]),
+			result.map(({ slug, groupSlug, displayOrder }) => [slug, groupSlug, displayOrder]),
 		).toStrictEqual([
 			["existing", undefined, 0],
 			["first", undefined, 1],
@@ -115,7 +115,7 @@ describe("practice catalog cache updates", () => {
 
 		expect(restored.find(({ slug }) => slug === "moving")).toMatchObject({
 			autonomy: chosenAutonomy("OFF"),
-			areaSlug: "quality",
+			groupSlug: "quality",
 			displayOrder: 0,
 		});
 		expect(restored.find(({ slug }) => slug === "remaining")?.displayOrder).toBe(1);
@@ -131,9 +131,9 @@ describe("practice catalog cache updates", () => {
 		expect(selectPracticePatch(updated, { name: "Updated" })).toStrictEqual({ name: "Updated" });
 		expect(
 			selectPracticePatch(updated, {
-				area: { areaSlug: "delivery" },
+				group: { groupSlug: "delivery" },
 			}),
-		).toStrictEqual({ areaSlug: "delivery", displayOrder: 4 });
+		).toStrictEqual({ groupSlug: "delivery", displayOrder: 4 });
 		expect(
 			selectPracticePatch({ ...updated, whyItMatters: undefined }, { clear: ["WHY_IT_MATTERS"] }),
 		).toStrictEqual({ whyItMatters: undefined });

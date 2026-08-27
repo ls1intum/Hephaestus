@@ -7,8 +7,8 @@ import static org.assertj.core.api.Assertions.tuple;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeArea;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeGroup;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.testconfig.WorkspaceTestFixtures;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
@@ -33,7 +33,7 @@ class PracticeRepositoryIntegrationTest extends BaseIntegrationTest {
     private PracticeRepository practiceRepository;
 
     @Autowired
-    private PracticeAreaRepository practiceAreaRepository;
+    private PracticeGroupRepository practiceGroupRepository;
 
     @Autowired
     private WorkspaceRepository workspaceRepository;
@@ -56,14 +56,14 @@ class PracticeRepositoryIntegrationTest extends BaseIntegrationTest {
         return practice;
     }
 
-    private PracticeArea persistArea(String slug, @Nullable PracticeAutonomy autonomy, int displayOrder) {
-        PracticeArea area = new PracticeArea();
-        area.setWorkspace(workspace);
-        area.setSlug(slug);
-        area.setName("Area " + slug);
-        area.setAutonomy(autonomy);
-        area.setDisplayOrder(displayOrder);
-        return practiceAreaRepository.save(area);
+    private PracticeGroup persistGroup(String slug, @Nullable PracticeAutonomy autonomy, int displayOrder) {
+        PracticeGroup group = new PracticeGroup();
+        group.setWorkspace(workspace);
+        group.setSlug(slug);
+        group.setName("Group " + slug);
+        group.setAutonomy(autonomy);
+        group.setDisplayOrder(displayOrder);
+        return practiceGroupRepository.save(group);
     }
 
     @Nested
@@ -191,52 +191,52 @@ class PracticeRepositoryIntegrationTest extends BaseIntegrationTest {
          * projection that turned it into a value would resolve the chain wrongly and silently.
          */
         @Test
-        @DisplayName("findAutonomyRows carries the practice's autonomy and its area's, nulls kept as nulls")
+        @DisplayName("findAutonomyRows carries the practice's autonomy and its group's, nulls kept as nulls")
         void autonomyRowsCarryBothLevelsAndKeepTheirNulls() {
-            PracticeArea silencedArea = persistArea("silenced-area", PracticeAutonomy.OFF, 0);
-            PracticeArea undecidedArea = persistArea("undecided-area", null, 1);
+            PracticeGroup silencedGroup = persistGroup("silenced-group", PracticeAutonomy.OFF, 0);
+            PracticeGroup undecidedGroup = persistGroup("undecided-group", null, 1);
             Practice ownTier = createPractice("own-autonomy", "Own autonomy");
             ownTier.setAutonomy(PracticeAutonomy.HUMAN_APPROVAL);
-            ownTier.setArea(silencedArea);
-            Practice fromArea = createPractice("from-area", "From area");
-            fromArea.setArea(silencedArea);
+            ownTier.setGroup(silencedGroup);
+            Practice fromGroup = createPractice("from-group", "From group");
+            fromGroup.setGroup(silencedGroup);
             Practice fromWorkspace = createPractice("from-workspace", "From workspace");
-            fromWorkspace.setArea(undecidedArea);
+            fromWorkspace.setGroup(undecidedGroup);
             Practice unfiled = createPractice("unfiled", "Unfiled");
-            practiceRepository.saveAll(List.of(ownTier, fromArea, fromWorkspace, unfiled));
+            practiceRepository.saveAll(List.of(ownTier, fromGroup, fromWorkspace, unfiled));
 
             List<PracticeRepository.PracticeAutonomyRow> rows = practiceRepository.findAutonomyRows(workspace.getId());
 
             assertThat(rows)
                 .extracting(
                     PracticeRepository.PracticeAutonomyRow::getPracticeAutonomy,
-                    PracticeRepository.PracticeAutonomyRow::getAreaAutonomy,
-                    PracticeRepository.PracticeAutonomyRow::getAreaId,
+                    PracticeRepository.PracticeAutonomyRow::getGroupAutonomy,
+                    PracticeRepository.PracticeAutonomyRow::getGroupId,
                     PracticeRepository.PracticeAutonomyRow::getArtifactKind
                 )
                 .containsExactlyInAnyOrder(
                     tuple(
                         PracticeAutonomy.HUMAN_APPROVAL,
                         PracticeAutonomy.OFF,
-                        silencedArea.getId(),
+                        silencedGroup.getId(),
                         ArtifactKinds.PULL_REQUEST
                     ),
-                    tuple(null, PracticeAutonomy.OFF, silencedArea.getId(), ArtifactKinds.PULL_REQUEST),
-                    tuple(null, null, undecidedArea.getId(), ArtifactKinds.PULL_REQUEST),
-                    // No area at all: the chain falls straight through to the workspace.
+                    tuple(null, PracticeAutonomy.OFF, silencedGroup.getId(), ArtifactKinds.PULL_REQUEST),
+                    tuple(null, null, undecidedGroup.getId(), ArtifactKinds.PULL_REQUEST),
+                    // No group at all: the chain falls straight through to the workspace.
                     tuple(null, null, null, ArtifactKinds.PULL_REQUEST)
                 );
         }
 
         @Test
-        @DisplayName("findAllForCatalog returns the whole workspace catalogue, areas first")
-        void catalogQueryReturnsEveryPracticeOrderedByArea() {
-            PracticeArea first = persistArea("first-area", null, 0);
-            PracticeArea second = persistArea("second-area", null, 1);
+        @DisplayName("findAllForCatalog returns the whole workspace catalogue, groups first")
+        void catalogQueryReturnsEveryPracticeOrderedByGroup() {
+            PracticeGroup first = persistGroup("first-group", null, 0);
+            PracticeGroup second = persistGroup("second-group", null, 1);
             Practice inSecond = createPractice("in-second", "In second");
-            inSecond.setArea(second);
+            inSecond.setGroup(second);
             Practice inFirst = createPractice("in-first", "In first");
-            inFirst.setArea(first);
+            inFirst.setGroup(first);
             // Holds no autonomy: findByFilters' `p.autonomy = :autonomy` could never have matched it.
             Practice unfiled = createPractice("unfiled", "Unfiled");
             practiceRepository.saveAll(List.of(inSecond, inFirst, unfiled));

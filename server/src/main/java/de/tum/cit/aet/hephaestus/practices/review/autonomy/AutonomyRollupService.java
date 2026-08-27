@@ -1,13 +1,13 @@
 package de.tum.cit.aet.hephaestus.practices.review.autonomy;
 
-import de.tum.cit.aet.hephaestus.practices.PracticeAreaRepository;
+import de.tum.cit.aet.hephaestus.practices.PracticeGroupRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
-import de.tum.cit.aet.hephaestus.practices.dto.AreaAutonomyRollupDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.AutonomyAssignmentDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.AutonomyRollupDTO;
+import de.tum.cit.aet.hephaestus.practices.dto.GroupAutonomyRollupDTO;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeArea;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeGroup;
 import de.tum.cit.aet.hephaestus.practices.review.WorkspaceReviewDefaults;
 import de.tum.cit.aet.hephaestus.practices.review.WorkspaceReviewDefaultsProvider;
 import java.util.ArrayList;
@@ -26,7 +26,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class AutonomyRollupService {
 
     private final PracticeRepository practiceRepository;
-    private final PracticeAreaRepository areaRepository;
+    private final PracticeGroupRepository groupRepository;
     private final WorkspaceReviewDefaultsProvider workspaceDefaults;
 
     public AutonomyRollupDTO rollup(Long workspaceId) {
@@ -34,21 +34,21 @@ public class AutonomyRollupService {
         PracticeAutonomy workspaceDefault = defaults.defaultAutonomy();
 
         Map<PracticeAutonomy, Integer> workspaceCounts = emptyCounts();
-        Map<Long, List<Practice>> byArea = new LinkedHashMap<>();
+        Map<Long, List<Practice>> byGroup = new LinkedHashMap<>();
         for (Practice practice : practiceRepository.findAllForCatalog(workspaceId)) {
-            PracticeArea area = practice.getArea();
-            byArea.computeIfAbsent(area == null ? null : area.getId(), key -> new ArrayList<>()).add(practice);
+            PracticeGroup group = practice.getGroup();
+            byGroup.computeIfAbsent(group == null ? null : group.getId(), key -> new ArrayList<>()).add(practice);
             PracticeAutonomy effective = AutonomyResolver.effectiveAutonomyOf(practice, workspaceDefault);
             workspaceCounts.merge(effective, 1, Integer::sum);
         }
 
-        List<AreaAutonomyRollupDTO> areas = new ArrayList<>();
-        for (PracticeArea area : areaRepository.findByWorkspaceIdOrderByDisplayOrderAscNameAsc(workspaceId)) {
-            areas.add(areaRollup(area, byArea.getOrDefault(area.getId(), List.of()), workspaceDefault));
+        List<GroupAutonomyRollupDTO> groups = new ArrayList<>();
+        for (PracticeGroup group : groupRepository.findByWorkspaceIdOrderByDisplayOrderAscNameAsc(workspaceId)) {
+            groups.add(groupRollup(group, byGroup.getOrDefault(group.getId(), List.of()), workspaceDefault));
         }
-        List<Practice> ungrouped = byArea.get(null);
+        List<Practice> ungrouped = byGroup.get(null);
         if (ungrouped != null && !ungrouped.isEmpty()) {
-            areas.add(areaRollup(null, ungrouped, workspaceDefault));
+            groups.add(groupRollup(null, ungrouped, workspaceDefault));
         }
 
         return new AutonomyRollupDTO(
@@ -57,12 +57,12 @@ public class AutonomyRollupService {
                 workspaceDefaults.rawDefaultAutonomy(workspaceId)
             ),
             workspaceCounts,
-            List.copyOf(areas)
+            List.copyOf(groups)
         );
     }
 
-    private AreaAutonomyRollupDTO areaRollup(
-        @Nullable PracticeArea area,
+    private GroupAutonomyRollupDTO groupRollup(
+        @Nullable PracticeGroup group,
         List<Practice> practices,
         PracticeAutonomy workspaceDefault
     ) {
@@ -74,12 +74,12 @@ public class AutonomyRollupService {
                 overridden++;
             }
         }
-        return new AreaAutonomyRollupDTO(
-            area == null ? null : area.getSlug(),
-            area == null ? null : area.getName(),
+        return new GroupAutonomyRollupDTO(
+            group == null ? null : group.getSlug(),
+            group == null ? null : group.getName(),
             AutonomyAssignmentDTO.of(
-                AutonomyResolver.resolveArea(area, workspaceDefault),
-                area == null ? null : area.getAutonomy()
+                AutonomyResolver.resolveGroup(group, workspaceDefault),
+                group == null ? null : group.getAutonomy()
             ),
             counts,
             overridden

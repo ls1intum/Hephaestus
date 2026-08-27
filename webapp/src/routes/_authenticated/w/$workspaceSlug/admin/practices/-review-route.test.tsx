@@ -10,7 +10,7 @@ vi.setConfig({ testTimeout: 20_000 });
 
 const fixture = buildAutonomyFixture({
 	workspaceDefault: "HUMAN_APPROVAL",
-	areas: [
+	groups: [
 		{
 			slug: "hygiene",
 			name: "Hygiene",
@@ -45,10 +45,10 @@ describe("review route", () => {
 		await screen.findByRole("heading", { name: "Review" }, ROUTE_RENDER_WAIT);
 		await screen.findByRole("button", { name: /Hygiene/ }, ROUTE_RENDER_WAIT);
 
-		// The counts are the server's; nothing here adds up practice rows, and the areas are shut. Twice
+		// The counts are the server's; nothing here adds up practice rows, and the groups are shut. Twice
 		// over, on purpose: once for the workspace in the strip that stays on screen, once for the only
-		// area, which happens to hold every practice. The strip's copy carries a second sentence — how
-		// many of those counts somebody chose one at a time — which the area heading has no room for.
+		// group, which happens to hold every practice. The strip's copy carries a second sentence — how
+		// many of those counts somebody chose one at a time — which the group heading has no room for.
 		screen.getByText("2 practices: 1 off and 1 review before sending. 1 practice set by hand.");
 		screen.getByText("2 practices: 1 off and 1 review before sending.");
 		expect(screen.queryByText("States the motivation")).toBeNull();
@@ -135,7 +135,7 @@ describe("review route", () => {
 					bodies.push(await request.json());
 					return HttpResponse.json({
 						...fixture.practices[1],
-						autonomy: { effective: "HUMAN_APPROVAL", source: "AREA", inherited: true },
+						autonomy: { effective: "HUMAN_APPROVAL", source: "GROUP", inherited: true },
 					});
 				},
 			),
@@ -143,8 +143,8 @@ describe("review route", () => {
 
 		renderRouteAt("/w/acme/admin/practices/review");
 
-		const area = await screen.findByRole("button", { name: /Hygiene/ }, ROUTE_RENDER_WAIT);
-		await userEvent.click(area);
+		const group = await screen.findByRole("button", { name: /Hygiene/ }, ROUTE_RENDER_WAIT);
+		await userEvent.click(group);
 		const row = (await screen.findByText("Links the issue")).closest("li");
 		assert(row instanceof HTMLElement, "Practice row not rendered");
 

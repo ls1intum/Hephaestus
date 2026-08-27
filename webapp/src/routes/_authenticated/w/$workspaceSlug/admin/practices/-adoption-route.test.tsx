@@ -20,9 +20,9 @@ const preview: CatalogPracticePreview = {
 	etag: '"reviewed-plan"',
 	initialAutonomy: "HUMAN_APPROVAL",
 	sourceReviewRuleFingerprint: mockAuthorDeclaredEvidenceValidation.reviewRuleFingerprint,
-	area: {
+	group: {
 		slug: "review-ready-work",
-		disposition: "CREATE_CATALOG_AREA",
+		disposition: "CREATE_CATALOG_GROUP",
 		definition: { name: "Review-ready work" },
 	},
 	definition: {
@@ -34,7 +34,7 @@ const preview: CatalogPracticePreview = {
 		criteria: "Explain the change and why it is needed.",
 		whyItMatters: "Reviewers need intent.",
 		whatGoodLooksLike: "A concise summary and motivation.",
-		areaSlug: "review-ready-work",
+		groupSlug: "review-ready-work",
 	},
 };
 
@@ -82,7 +82,7 @@ const workspacePractice = {
 	...mockPractices[0],
 	slug: "already-mine",
 	name: "Already mine",
-	areaSlug: undefined,
+	groupSlug: undefined,
 };
 
 describe("catalog adoption over practice setup", () => {
@@ -91,7 +91,7 @@ describe("catalog adoption over practice setup", () => {
 			http.get("*/workspaces/:workspaceSlug/practices/definition-options", () =>
 				HttpResponse.json(mockPracticeDefinitionOptions),
 			),
-			http.get("*/workspaces/:workspaceSlug/practice-areas", () => HttpResponse.json([])),
+			http.get("*/workspaces/:workspaceSlug/practice-groups", () => HttpResponse.json([])),
 			http.get("*/workspaces/:workspaceSlug/practices", () => HttpResponse.json([])),
 			http.get("*/workspaces/:workspaceSlug/members/me", () =>
 				HttpResponse.json({ role: "ADMIN", userId: 1, userLogin: "ada", userName: "Ada" }),
@@ -124,7 +124,7 @@ describe("catalog adoption over practice setup", () => {
 						slug: preview.slug,
 						name: preview.definition.name,
 						artifactKind: "scm.pull_request",
-						areaSlug: "review-ready-work",
+						groupSlug: "review-ready-work",
 						availability: "AVAILABLE",
 						automatedReviewValidation: mockAuthorDeclaredEvidenceValidation,
 					},
@@ -152,7 +152,7 @@ describe("catalog adoption over practice setup", () => {
 		expect(screen.queryByText("Available")).toBeNull();
 		await screen.findByText("Name unavailable");
 		// The row's accessible name is its own visible text plus the registry's action phrase, not an
-		// `aria-label` that would have replaced the work type and area for a screen reader.
+		// `aria-label` that would have replaced the work type and group for a screen reader.
 		screen.getByRole("link", { name: /Describe what changed and why/ });
 		screen.getByRole("link", {
 			name: /Include enough issue context, see why it cannot be added/,
@@ -167,7 +167,7 @@ describe("catalog adoption over practice setup", () => {
 						slug: preview.slug,
 						name: preview.definition.name,
 						artifactKind: "scm.pull_request",
-						areaSlug: "review-ready-work",
+						groupSlug: "review-ready-work",
 						availability: "AVAILABLE",
 						automatedReviewValidation: mockAuthorDeclaredEvidenceValidation,
 					},

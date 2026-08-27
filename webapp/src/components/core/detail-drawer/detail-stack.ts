@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { multiValue } from "@/lib/search-params";
 
-/** Encoded in the URL as `kind:id`; repeated for depth, as `?detail=area:code-review&detail=practice:x`. */
+/** Encoded in the URL as `kind:id`; repeated for depth, as `?detail=group:code-review&detail=practice:x`. */
 export interface DetailStackEntry<TKind extends string = string> {
 	kind: TKind;
 	id: string;

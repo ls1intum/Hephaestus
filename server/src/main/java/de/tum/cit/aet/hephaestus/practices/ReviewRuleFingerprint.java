@@ -23,7 +23,7 @@ public final class ReviewRuleFingerprint {
         String criteria,
         @Nullable String precomputeScript,
         PracticeAutomatedReviewPolicy automatedReviewPolicy,
-        @Nullable String areaSlug
+        @Nullable String groupSlug
     ) {
         CanonicalDigest digest = new CanonicalDigest().add(slug).add(name);
         addBindings(digest, bindings);
@@ -33,7 +33,7 @@ public final class ReviewRuleFingerprint {
                 .add(criteria)
                 .addNullable(precomputeScript)
                 .add(PracticeAutomatedReviewPolicyDigest.digest(automatedReviewPolicy))
-                .addNullable(areaSlug)
+                .addNullable(groupSlug)
                 .hex()
         );
     }

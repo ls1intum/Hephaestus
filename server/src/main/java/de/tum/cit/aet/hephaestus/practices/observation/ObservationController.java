@@ -13,7 +13,6 @@ import io.swagger.v3.oas.annotations.media.ArraySchema;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
-import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -51,7 +50,6 @@ public class ObservationController {
         description = "Paginated observations for the authenticated developer with optional filters"
     )
     @ApiResponse(responseCode = "200", description = "Paginated observations returned")
-    @SecurityRequirements
     public ResponseEntity<Page<ObservationListDTO>> listObservations(
         WorkspaceContext workspaceContext,
         @Valid @ParameterObject ObservationFeedFilterParams filter
@@ -74,7 +72,6 @@ public class ObservationController {
         description = "Practice summaries returned",
         content = @Content(array = @ArraySchema(schema = @Schema(implementation = DeveloperPracticeSummaryDTO.class)))
     )
-    @SecurityRequirements
     public ResponseEntity<List<DeveloperPracticeSummaryDTO>> getSummary(WorkspaceContext workspaceContext) {
         List<DeveloperPracticeSummaryDTO> summaries = observationService
             .getSummary(workspaceContext.id())
@@ -96,7 +93,6 @@ public class ObservationController {
         description = "Observation not found or not owned by current user",
         content = @Content(schema = @Schema(hidden = true))
     )
-    @SecurityRequirements
     public ResponseEntity<ObservationDetailDTO> getObservation(
         WorkspaceContext workspaceContext,
         @PathVariable UUID observationId
@@ -126,7 +122,6 @@ public class ObservationController {
         description = "PR observations returned",
         content = @Content(array = @ArraySchema(schema = @Schema(implementation = ObservationListDTO.class)))
     )
-    @SecurityRequirements
     public ResponseEntity<List<ObservationListDTO>> getObservationsForPullRequest(
         WorkspaceContext workspaceContext,
         @PathVariable Long prId

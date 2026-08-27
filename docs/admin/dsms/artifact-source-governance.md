@@ -108,7 +108,7 @@ data:
   incidentalSensitiveContent: "Controls for free text"
 access:
   permittedRoles: [practice-review-runtime]
-  learnerDisclosure: "Permitted disclosure"
+  developerDisclosure: "Permitted disclosure"
   tenantIsolation: "Enforcement and tests"
 processorEgress:
   permitted: true
@@ -198,7 +198,7 @@ automated review claim from it.
 - [ ] Update the Art. 30 record and privacy notice before collection.
 - [ ] Record the DPIA determination and all required approvals.
 - [ ] Approve processor, region, transfer, training, and provider-retention terms.
-- [ ] Define operator, learner, and evaluation audiences and propagation rules.
+- [ ] Define operator, developer, and evaluation audiences and propagation rules.
 - [ ] Define product, evaluation, log, cache, broker, and backup retention separately.
 - [ ] Implement disconnect, purge, person erasure, expiry, export, and external-delivery handling.
 - [ ] Inventory all files, mounts, caches, tools, and derivations; reject undeclared transformed views.

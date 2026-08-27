@@ -20,7 +20,9 @@ public record ReviewObservationDTO(
     @NonNull UUID agentJobId,
     @NonNull String practiceSlug,
     @NonNull String practiceName,
-    @Schema(description = "Practice area; null when the practice is Unassigned") @Nullable ReviewPracticeAreaDTO area,
+    @Schema(description = "Practice group; null when the practice is Unassigned")
+    @Nullable
+    ReviewPracticeGroupDTO group,
     @NonNull ReviewArtifactDTO artifact,
     @Schema(description = "Whose work the observation is about; null when the identity is no longer resolvable")
     @Nullable
@@ -53,7 +55,12 @@ public record ReviewObservationDTO(
             row.getAgentJobId(),
             row.getPracticeSlug(),
             row.getPracticeName(),
-            ReviewPracticeAreaDTO.from(row.getAreaSlug(), row.getAreaName(), row.getAreaIcon(), row.getAreaColor()),
+            ReviewPracticeGroupDTO.from(
+                row.getGroupSlug(),
+                row.getGroupName(),
+                row.getGroupIcon(),
+                row.getGroupColor()
+            ),
             artifact,
             subjects.get(row.getAboutUserId()),
             row.getSummary(),

@@ -6,7 +6,7 @@ import {
 } from "@/lib/practice-autonomy";
 import {
 	countOverrides,
-	groupPracticesByArea,
+	groupPracticesByGroup,
 	isOverridden,
 	reviewableByHephaestus,
 	UNASSIGNED_AREA_KEY,
@@ -15,7 +15,7 @@ import { buildAutonomyFixture, scaleFixture } from "./story-mock-data";
 
 const fixture = buildAutonomyFixture({
 	workspaceDefault: "HUMAN_APPROVAL",
-	areas: [
+	groups: [
 		{
 			slug: "hygiene",
 			name: "Hygiene",
@@ -26,45 +26,45 @@ const fixture = buildAutonomyFixture({
 	],
 });
 
-describe("groupPracticesByArea", () => {
-	it("keeps the server's area order and its counts", () => {
-		const groups = groupPracticesByArea(fixture.rollup, fixture.practices);
+describe("groupPracticesByGroup", () => {
+	it("keeps the server's group order and its counts", () => {
+		const groups = groupPracticesByGroup(fixture.rollup, fixture.practices);
 
 		expect(groups.map((group) => group.name)).toStrictEqual(["Hygiene", "Testing", "Unassigned"]);
 		const [hygiene] = groups;
-		const [hygieneRollup] = fixture.rollup.areas;
+		const [hygieneRollup] = fixture.rollup.groups;
 		assert(hygiene);
 		assert(hygieneRollup);
 		expect(hygiene.counts).toStrictEqual(hygieneRollup.counts);
 	});
 
-	it("keys the no-area group so it can be rendered, and leaves it without an area slug", () => {
-		const groups = groupPracticesByArea(fixture.rollup, fixture.practices);
+	it("keys the no-group group so it can be rendered, and leaves it without a group slug", () => {
+		const groups = groupPracticesByGroup(fixture.rollup, fixture.practices);
 		const unassigned = groups.at(-1);
 
 		expect(unassigned?.key).toBe(UNASSIGNED_AREA_KEY);
-		expect(unassigned?.areaSlug).toBeNull();
+		expect(unassigned?.groupSlug).toBeNull();
 		expect(unassigned?.practices.map((practice) => practice.name)).toStrictEqual(["Four"]);
 	});
 
-	it("keeps an area the rollup lists with no practices, so its own autonomy stays reachable", () => {
+	it("keeps a group the rollup lists with no practices, so its own autonomy stays reachable", () => {
 		const empty = buildAutonomyFixture({
-			areas: [{ slug: "quiet", name: "Quiet", override: "OFF", practices: [] }],
+			groups: [{ slug: "quiet", name: "Quiet", override: "OFF", practices: [] }],
 		});
 
-		const groups = groupPracticesByArea(empty.rollup, empty.practices);
+		const groups = groupPracticesByGroup(empty.rollup, empty.practices);
 
 		expect(groups).toHaveLength(1);
 		const [quiet] = groups;
 		assert(quiet);
 		expect(quiet.practices).toStrictEqual([]);
-		expect(quiet.areaSlug).toBe("quiet");
+		expect(quiet.groupSlug).toBe("quiet");
 	});
 
-	it("does not drop a practice whose area the rollup has not caught up with", () => {
-		const stale = { ...fixture.rollup, areas: fixture.rollup.areas.slice(1) };
+	it("does not drop a practice whose group the rollup has not caught up with", () => {
+		const stale = { ...fixture.rollup, groups: fixture.rollup.groups.slice(1) };
 
-		const groups = groupPracticesByArea(stale, fixture.practices);
+		const groups = groupPracticesByGroup(stale, fixture.practices);
 
 		expect(groups.at(-1)?.practices.map((practice) => practice.name)).toStrictEqual(["One", "Two"]);
 	});
@@ -72,7 +72,7 @@ describe("groupPracticesByArea", () => {
 
 describe("the overrides-only filter", () => {
 	it("keeps only the practices somebody set by hand", () => {
-		const groups = groupPracticesByArea(fixture.rollup, fixture.practices, {
+		const groups = groupPracticesByGroup(fixture.rollup, fixture.practices, {
 			overridesOnly: true,
 		});
 
@@ -81,51 +81,51 @@ describe("the overrides-only filter", () => {
 		).toStrictEqual(["Two"]);
 	});
 
-	it("keeps an area that decided for itself even when none of its practices did", () => {
-		const groups = groupPracticesByArea(fixture.rollup, fixture.practices, {
+	it("keeps a group that decided for itself even when none of its practices did", () => {
+		const groups = groupPracticesByGroup(fixture.rollup, fixture.practices, {
 			overridesOnly: true,
 		});
 
-		const testing = groups.find((group) => group.areaSlug === "testing");
+		const testing = groups.find((group) => group.groupSlug === "testing");
 		expect(testing).toBeDefined();
 		expect(testing?.practices).toStrictEqual([]);
 		// It still knows how many rows it is hiding, so the group can say so rather than look broken.
 		expect(testing?.totalPractices).toBe(1);
 	});
 
-	it("drops the no-area group, which cannot hold a decision of its own", () => {
-		const groups = groupPracticesByArea(fixture.rollup, fixture.practices, {
+	it("drops the no-group group, which cannot hold a decision of its own", () => {
+		const groups = groupPracticesByGroup(fixture.rollup, fixture.practices, {
 			overridesOnly: true,
 		});
 
-		expect(groups.some((group) => group.areaSlug === null)).toBe(false);
+		expect(groups.some((group) => group.groupSlug === null)).toBe(false);
 	});
 });
 
 describe("isOverridden", () => {
 	it("reads the override, not the level that decided the autonomy", () => {
-		// An area that chose its own autonomy reports source AREA and inherited false; deriving it from
+		// A group that chose its own autonomy reports source GROUP and inherited false; deriving it from
 		// `source` instead would call it inherited and hide it from the filter above.
-		const [hygiene, testing] = fixture.rollup.areas;
+		const [hygiene, testing] = fixture.rollup.groups;
 		assert(hygiene);
 		assert(testing);
 
-		expect(testing.autonomy.source).toBe("AREA");
+		expect(testing.autonomy.source).toBe("GROUP");
 		expect(isOverridden(testing.autonomy)).toBe(true);
 		expect(isOverridden(hygiene.autonomy)).toBe(false);
 	});
 });
 
 describe("countOverrides", () => {
-	it("counts both levels, because an admin who only set area autonomies has still decided something", () => {
-		expect(countOverrides(fixture.rollup)).toStrictEqual({ practices: 1, areas: 1 });
+	it("counts both levels, because an admin who only set group autonomies has still decided something", () => {
+		expect(countOverrides(fixture.rollup)).toStrictEqual({ practices: 1, groups: 1 });
 	});
 });
 
 describe("reviewableByHephaestus", () => {
 	it("refuses the modes the server refuses, so the control is never offered a choice that fails", () => {
 		const unreviewable = buildAutonomyFixture({
-			areas: [{ slug: "a", name: "A", practices: [{ name: "Manual", reviewable: false }] }],
+			groups: [{ slug: "a", name: "A", practices: [{ name: "Manual", reviewable: false }] }],
 		});
 
 		const [manual] = unreviewable.practices;
@@ -165,7 +165,7 @@ describe("the workspace summary", () => {
 		const scale = scaleFixture();
 
 		expect(autonomyTotal(scale.rollup.counts)).toBe(100);
-		expect(scale.rollup.areas).toHaveLength(25);
+		expect(scale.rollup.groups).toHaveLength(25);
 		expect(autonomyDistributionSentence(scale.rollup.counts)).toBe(
 			"100 practices: 6 off, 89 review before sending and 5 send automatically.",
 		);

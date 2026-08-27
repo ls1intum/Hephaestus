@@ -4,7 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
-import de.tum.cit.aet.hephaestus.practices.PracticeAreaRepository;
+import de.tum.cit.aet.hephaestus.practices.PracticeGroupRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeRevisionRepository;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
@@ -34,7 +34,7 @@ import org.springframework.test.web.reactive.server.WebTestClient;
 class CatalogAdoptionControllerIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     private static final String PRACTICE = "describe-what-and-why";
-    private static final String AREA = "review-ready-work";
+    private static final String GROUP = "review-ready-work";
     private static final String BASE = "/workspaces/{workspaceSlug}/practice-catalog/adoption";
 
     @Autowired
@@ -47,7 +47,7 @@ class CatalogAdoptionControllerIntegrationTest extends AbstractWorkspaceIntegrat
     private PracticeRevisionRepository revisionRepository;
 
     @Autowired
-    private PracticeAreaRepository areaRepository;
+    private PracticeGroupRepository groupRepository;
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
@@ -82,7 +82,7 @@ class CatalogAdoptionControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
     @Test
     @WithAdminUser
-    void shouldReturnDefinitionAreaAutonomyAndValidationWhenPreviewIsRequested() {
+    void shouldReturnDefinitionGroupAutonomyAndValidationWhenPreviewIsRequested() {
         ensureAdminMembership(workspace);
 
         webTestClient
@@ -99,11 +99,11 @@ class CatalogAdoptionControllerIntegrationTest extends AbstractWorkspaceIntegrat
             .isNotEmpty()
             .jsonPath("$.definition.bindings.length()")
             .value(value -> assertThat((Integer) value).isPositive())
-            .jsonPath("$.area.disposition")
-            .isEqualTo("CREATE_CATALOG_AREA")
-            .jsonPath("$.area.slug")
-            .isEqualTo(AREA)
-            .jsonPath("$.area.definition.name")
+            .jsonPath("$.group.disposition")
+            .isEqualTo("CREATE_CATALOG_GROUP")
+            .jsonPath("$.group.slug")
+            .isEqualTo(GROUP)
+            .jsonPath("$.group.definition.name")
             .isNotEmpty()
             .jsonPath("$.initialAutonomy")
             .isEqualTo("HUMAN_APPROVAL")
@@ -193,7 +193,7 @@ class CatalogAdoptionControllerIntegrationTest extends AbstractWorkspaceIntegrat
         assertThat(practice.getSourceCuratedSlug()).isEqualTo(PRACTICE);
         assertThat(practice.getSourceCuratedFingerprint()).matches("v3:[0-9a-f]{64}");
         assertThat(practice.getAutonomy()).isEqualTo(PracticeAutonomy.HUMAN_APPROVAL);
-        assertThat(areaRepository.findByWorkspaceIdAndSlug(workspace.getId(), AREA)).isPresent();
+        assertThat(groupRepository.findByWorkspaceIdAndSlug(workspace.getId(), GROUP)).isPresent();
         assertThat(revisionRepository.findFirstByPracticeIdOrderByRevisionNumberDesc(practice.getId()))
             .get()
             .extracting(revision -> revision.getReviewRuleFingerprint())
@@ -201,7 +201,7 @@ class CatalogAdoptionControllerIntegrationTest extends AbstractWorkspaceIntegrat
             .matches("v3:[0-9a-f]{64}");
         assertThat(
             jdbcTemplate.queryForObject(
-                "SELECT count(*) FROM config_audit_event WHERE workspace_id = ? AND entity_type IN ('PRACTICE_AREA', 'PRACTICE_DEFINITION', 'PRACTICE_USAGE')",
+                "SELECT count(*) FROM config_audit_event WHERE workspace_id = ? AND entity_type IN ('PRACTICE_GROUP', 'PRACTICE_DEFINITION', 'PRACTICE_USAGE')",
                 Long.class,
                 workspace.getId()
             )
@@ -275,23 +275,23 @@ class CatalogAdoptionControllerIntegrationTest extends AbstractWorkspaceIntegrat
         adopt(previewEtag()).expectStatus().isCreated();
 
         assertThat(practiceRepository.findAllForCatalog(workspace.getId())).hasSize(1);
-        assertThat(areaRepository.findByWorkspaceIdAndSlug(workspace.getId(), AREA)).isPresent();
+        assertThat(groupRepository.findByWorkspaceIdAndSlug(workspace.getId(), GROUP)).isPresent();
     }
 
     @Test
     @WithAdminUser
-    void shouldAdoptEveryAvailablePracticeInAreaAtomically() {
+    void shouldAdoptEveryAvailablePracticeInGroupAtomically() {
         ensureAdminMembership(workspace);
         var preview = webTestClient
             .get()
-            .uri(BASE + "/areas/" + AREA, workspace.getWorkspaceSlug())
+            .uri(BASE + "/groups/" + GROUP, workspace.getWorkspaceSlug())
             .headers(TestAuthUtils.withCurrentUser())
             .exchange()
             .expectStatus()
             .isOk()
             .expectHeader()
             .exists(HttpHeaders.ETAG)
-            .expectBody(CatalogAreaAdoptionPreviewDTO.class)
+            .expectBody(CatalogGroupAdoptionPreviewDTO.class)
             .returnResult()
             .getResponseBody();
         assertThat(preview).isNotNull();
@@ -301,7 +301,7 @@ class CatalogAdoptionControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
         webTestClient
             .post()
-            .uri(BASE + "/areas/" + AREA, workspace.getWorkspaceSlug())
+            .uri(BASE + "/groups/" + GROUP, workspace.getWorkspaceSlug())
             .headers(headers -> {
                 TestAuthUtils.withCurrentUser().accept(headers);
                 headers.set(HttpHeaders.IF_MATCH, preview.etag());
@@ -315,62 +315,62 @@ class CatalogAdoptionControllerIntegrationTest extends AbstractWorkspaceIntegrat
             .jsonPath("$.moved.length()")
             .isEqualTo(0);
 
-        assertThat(areaRepository.findByWorkspaceIdAndSlug(workspace.getId(), AREA)).isPresent();
+        assertThat(groupRepository.findByWorkspaceIdAndSlug(workspace.getId(), GROUP)).isPresent();
         assertThat(practiceRepository.findAllForCatalog(workspace.getId())).hasSize(preview.practices().size());
     }
 
     @Test
     @WithAdminUser
-    void shouldAllowWholeAreaAdoptionAgainAfterAreaAndPracticesAreDeleted() {
+    void shouldAllowWholeGroupAdoptionAgainAfterGroupAndPracticesAreDeleted() {
         ensureAdminMembership(workspace);
-        CatalogAreaAdoptionPreviewDTO firstPreview = previewArea();
-        adoptArea(firstPreview.etag()).expectStatus().isOk();
+        CatalogGroupAdoptionPreviewDTO firstPreview = previewGroup();
+        adoptGroup(firstPreview.etag()).expectStatus().isOk();
 
         webTestClient
             .delete()
             .uri(
-                "/workspaces/{workspaceSlug}/practice-areas/{areaSlug}?deletePractices=true",
+                "/workspaces/{workspaceSlug}/practice-groups/{groupSlug}?deletePractices=true",
                 workspace.getWorkspaceSlug(),
-                AREA
+                GROUP
             )
             .headers(TestAuthUtils.withCurrentUser())
             .exchange()
             .expectStatus()
             .isNoContent();
 
-        assertThat(areaRepository.findByWorkspaceIdAndSlug(workspace.getId(), AREA)).isEmpty();
+        assertThat(groupRepository.findByWorkspaceIdAndSlug(workspace.getId(), GROUP)).isEmpty();
         assertThat(practiceRepository.findAllForCatalog(workspace.getId())).isEmpty();
-        CatalogAreaAdoptionPreviewDTO secondPreview = previewArea();
+        CatalogGroupAdoptionPreviewDTO secondPreview = previewGroup();
         assertThat(secondPreview.practices()).allMatch(
             practice -> practice.availability() == CatalogAdoptionAvailability.AVAILABLE
         );
 
-        adoptArea(secondPreview.etag()).expectStatus().isOk();
+        adoptGroup(secondPreview.etag()).expectStatus().isOk();
 
-        assertThat(areaRepository.findByWorkspaceIdAndSlug(workspace.getId(), AREA)).isPresent();
+        assertThat(groupRepository.findByWorkspaceIdAndSlug(workspace.getId(), GROUP)).isPresent();
         assertThat(practiceRepository.findAllForCatalog(workspace.getId())).hasSize(secondPreview.practices().size());
     }
 
     @Test
     @WithAdminUser
-    void shouldRestoreUnassignedCatalogPracticesWhenDeletedAreaIsAdoptedAgain() {
+    void shouldRestoreUnassignedCatalogPracticesWhenDeletedGroupIsAdoptedAgain() {
         ensureAdminMembership(workspace);
-        CatalogAreaAdoptionPreviewDTO firstPreview = previewArea();
-        adoptArea(firstPreview.etag()).expectStatus().isOk();
+        CatalogGroupAdoptionPreviewDTO firstPreview = previewGroup();
+        adoptGroup(firstPreview.etag()).expectStatus().isOk();
 
         webTestClient
             .delete()
-            .uri("/workspaces/{workspaceSlug}/practice-areas/{areaSlug}", workspace.getWorkspaceSlug(), AREA)
+            .uri("/workspaces/{workspaceSlug}/practice-groups/{groupSlug}", workspace.getWorkspaceSlug(), GROUP)
             .headers(TestAuthUtils.withCurrentUser())
             .exchange()
             .expectStatus()
             .isNoContent();
 
-        CatalogAreaAdoptionPreviewDTO restorePreview = previewArea();
+        CatalogGroupAdoptionPreviewDTO restorePreview = previewGroup();
         assertThat(restorePreview.actions()).allMatch(
-            action -> action.action() == CatalogAreaPracticeAction.MOVE_TO_AREA
+            action -> action.action() == CatalogGroupPracticeAction.MOVE_TO_GROUP
         );
-        adoptArea(restorePreview.etag())
+        adoptGroup(restorePreview.etag())
             .expectStatus()
             .isOk()
             .expectBody()
@@ -383,8 +383,8 @@ class CatalogAdoptionControllerIntegrationTest extends AbstractWorkspaceIntegrat
             practiceRepository
                 .findAllForCatalog(workspace.getId())
                 .stream()
-                .map(practice -> practice.getArea() == null ? null : practice.getArea().getSlug())
-        ).containsOnly(AREA);
+                .map(practice -> practice.getGroup() == null ? null : practice.getGroup().getSlug())
+        ).containsOnly(GROUP);
     }
 
     @Test
@@ -410,7 +410,7 @@ class CatalogAdoptionControllerIntegrationTest extends AbstractWorkspaceIntegrat
         }
 
         assertThat(practiceRepository.findAllForCatalog(workspace.getId())).hasSize(1);
-        assertThat(areaRepository.findByWorkspaceIdAndSlug(workspace.getId(), AREA)).isPresent();
+        assertThat(groupRepository.findByWorkspaceIdAndSlug(workspace.getId(), GROUP)).isPresent();
         var practice = practiceRepository.findByWorkspaceIdAndSlug(workspace.getId(), PRACTICE).orElseThrow();
         assertThat(
             jdbcTemplate.queryForObject(
@@ -421,7 +421,7 @@ class CatalogAdoptionControllerIntegrationTest extends AbstractWorkspaceIntegrat
         ).isEqualTo(1);
         assertThat(
             jdbcTemplate.queryForObject(
-                "SELECT count(*) FROM config_audit_event WHERE workspace_id = ? AND entity_type IN ('PRACTICE_AREA', 'PRACTICE_DEFINITION', 'PRACTICE_USAGE')",
+                "SELECT count(*) FROM config_audit_event WHERE workspace_id = ? AND entity_type IN ('PRACTICE_GROUP', 'PRACTICE_DEFINITION', 'PRACTICE_USAGE')",
                 Long.class,
                 workspace.getId()
             )
@@ -477,25 +477,25 @@ class CatalogAdoptionControllerIntegrationTest extends AbstractWorkspaceIntegrat
         );
     }
 
-    private CatalogAreaAdoptionPreviewDTO previewArea() {
+    private CatalogGroupAdoptionPreviewDTO previewGroup() {
         return required(
             webTestClient
                 .get()
-                .uri(BASE + "/areas/" + AREA, workspace.getWorkspaceSlug())
+                .uri(BASE + "/groups/" + GROUP, workspace.getWorkspaceSlug())
                 .headers(TestAuthUtils.withCurrentUser())
                 .exchange()
                 .expectStatus()
                 .isOk()
-                .expectBody(CatalogAreaAdoptionPreviewDTO.class)
+                .expectBody(CatalogGroupAdoptionPreviewDTO.class)
                 .returnResult()
                 .getResponseBody()
         );
     }
 
-    private WebTestClient.ResponseSpec adoptArea(String etag) {
+    private WebTestClient.ResponseSpec adoptGroup(String etag) {
         return webTestClient
             .post()
-            .uri(BASE + "/areas/" + AREA, workspace.getWorkspaceSlug())
+            .uri(BASE + "/groups/" + GROUP, workspace.getWorkspaceSlug())
             .headers(headers -> {
                 TestAuthUtils.withCurrentUser().accept(headers);
                 headers.set(HttpHeaders.IF_MATCH, etag);

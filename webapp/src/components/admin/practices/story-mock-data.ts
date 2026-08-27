@@ -1,7 +1,7 @@
 import type {
 	AutonomyAssignment,
 	Practice,
-	PracticeArea,
+	PracticeGroup,
 	PracticeReviewSettings,
 	ReviewBackfillRun,
 	ReviewSweepSchedule,
@@ -68,8 +68,8 @@ export function inheritedAutonomy(effective: PracticeAutonomy = "AUTOMATIC"): Au
 	return { effective, source: "WORKSPACE", inherited: true };
 }
 
-export function areaAutonomy(effective: PracticeAutonomy): AutonomyAssignment {
-	return { effective, source: "AREA", inherited: true };
+export function groupAutonomy(effective: PracticeAutonomy): AutonomyAssignment {
+	return { effective, source: "GROUP", inherited: true };
 }
 
 export function chosenAutonomy(effective: PracticeAutonomy): AutonomyAssignment {
@@ -206,7 +206,7 @@ export const mockPracticeWithAllTriggers: Practice = {
 	updatedAt: new Date("2025-06-16"),
 };
 
-export const mockAreas: PracticeArea[] = [
+export const mockGroups: PracticeGroup[] = [
 	{
 		id: 1,
 		slug: "review-ready-work",

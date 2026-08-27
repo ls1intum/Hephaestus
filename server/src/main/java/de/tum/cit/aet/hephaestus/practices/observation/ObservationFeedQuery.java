@@ -11,7 +11,7 @@ import org.jspecify.annotations.Nullable;
  * signature stays readable as filters accumulate.
  *
  * <p>Distinct from {@link ObservationQueryFilter}, which is the admin/cross-developer query shape with
- * multi-valued facets. This record is the single-developer feed: at most one practice, one area, one
+ * multi-valued facets. This record is the single-developer feed: at most one practice, one group, one
  * presence, plus the repeatable artifact-kind and severity facets the developer surfaces expose.
  *
  * @param mostSevereFirst only meaningful when {@code sort} is {@code SEVERITY}; the date sort carries its
@@ -19,7 +19,7 @@ import org.jspecify.annotations.Nullable;
  */
 public record ObservationFeedQuery(
     @Nullable String practiceSlug,
-    @Nullable String areaSlug,
+    @Nullable String groupSlug,
     @Nullable Presence presence,
     @Nullable List<ArtifactKind> artifactKinds,
     @Nullable List<Severity> severities,

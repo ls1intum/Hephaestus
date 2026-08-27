@@ -270,11 +270,11 @@ class PracticeCatalogInjector {
 
         ArrayNode index = objectMapper.createArrayNode();
         for (Practice p : practices) {
-            String areaSlug = p.getArea() != null ? p.getArea().getSlug() : p.getSlug();
+            String groupSlug = p.getGroup() != null ? p.getGroup().getSlug() : p.getSlug();
             ObjectNode entry = index.addObject();
             entry.put("slug", p.getSlug());
             entry.put("name", p.getName());
-            entry.put("area", areaSlug);
+            entry.put("group", groupSlug);
             if (p.getCurrentRevision() == null || p.getCurrentRevision().getId() == null) {
                 throw new JobPreparationException("Practice has no current revision: " + p.getSlug());
             }

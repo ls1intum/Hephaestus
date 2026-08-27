@@ -6,7 +6,7 @@ import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
-import de.tum.cit.aet.hephaestus.practices.PracticeAreaRepository;
+import de.tum.cit.aet.hephaestus.practices.PracticeGroupRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeRevisionRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
@@ -18,8 +18,8 @@ import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSource;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeArea;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeGroup;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeRevision;
 import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
 import de.tum.cit.aet.hephaestus.testconfig.WithUser;
@@ -61,7 +61,7 @@ class ObservationControllerIntegrationTest extends AbstractWorkspaceIntegrationT
     private PracticeRevisionRepository practiceRevisionRepository;
 
     @Autowired
-    private PracticeAreaRepository areaRepository;
+    private PracticeGroupRepository groupRepository;
 
     @Autowired
     private AgentJobRepository agentJobRepository;
@@ -249,24 +249,24 @@ class ObservationControllerIntegrationTest extends AbstractWorkspaceIntegrationT
 
         @Test
         @WithUser
-        @DisplayName("filters by the practice area the observed practice belongs to")
-        void shouldFilterByAreaSlug() {
-            PracticeArea area = new PracticeArea();
-            area.setWorkspace(workspace);
-            area.setSlug("review-communication");
-            area.setName("Review Communication");
-            area = areaRepository.save(area);
-            practiceA.setArea(area);
+        @DisplayName("filters by the practice group the observed practice belongs to")
+        void shouldFilterByGroupSlug() {
+            PracticeGroup group = new PracticeGroup();
+            group.setWorkspace(workspace);
+            group.setSlug("review-communication");
+            group.setName("Review Communication");
+            group = groupRepository.save(group);
+            practiceA.setGroup(group);
             practiceRepository.save(practiceA);
 
             Instant now = Instant.now();
-            insertFinding(practiceA, developer, "In area", "PRESENT", "INFO", 0.9f, "scm.pull_request", 1L, now);
-            // practiceB has NO area — the LEFT JOIN must keep it visible when no filter is set.
-            insertFinding(practiceB, developer, "No area", "ABSENT", "MAJOR", 0.8f, "scm.pull_request", 2L, now);
+            insertFinding(practiceA, developer, "In group", "PRESENT", "INFO", 0.9f, "scm.pull_request", 1L, now);
+            // practiceB has NO group — the LEFT JOIN must keep it visible when no filter is set.
+            insertFinding(practiceB, developer, "No group", "ABSENT", "MAJOR", 0.8f, "scm.pull_request", 2L, now);
 
             webTestClient
                 .get()
-                .uri(BASE_URI + "?areaSlug={areaSlug}", workspace.getWorkspaceSlug(), "review-communication")
+                .uri(BASE_URI + "?groupSlug={groupSlug}", workspace.getWorkspaceSlug(), "review-communication")
                 .headers(TestAuthUtils.withCurrentUser())
                 .exchange()
                 .expectStatus()
@@ -275,7 +275,7 @@ class ObservationControllerIntegrationTest extends AbstractWorkspaceIntegrationT
                 .jsonPath("$.content.length()")
                 .isEqualTo(1)
                 .jsonPath("$.content[0].summary")
-                .isEqualTo("In area");
+                .isEqualTo("In group");
 
             webTestClient
                 .get()

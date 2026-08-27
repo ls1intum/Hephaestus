@@ -9,38 +9,38 @@ import { StatefulPatch } from "@/stories/stateful";
 import { expectNoPageOverflow } from "@/test/reflow";
 import { PracticeCatalog } from "./PracticeCatalog";
 import {
-	areaAutonomy,
 	chosenAutonomy,
+	groupAutonomy,
 	inheritedAutonomy,
-	mockAreas,
+	mockGroups,
 	mockPracticeLongText,
 	mockPractices,
 	mockUnassignedPractice,
 } from "./story-mock-data";
 
-const [reviewReadyArea, issueAuthoringArea] = mockAreas;
+const [reviewReadyGroup, issueAuthoringGroup] = mockGroups;
 const [prDescriptionPractice, reviewThoroughnessPractice, testCoveragePractice] = mockPractices;
 if (
-	!reviewReadyArea ||
-	!issueAuthoringArea ||
+	!reviewReadyGroup ||
+	!issueAuthoringGroup ||
 	!prDescriptionPractice ||
 	!reviewThoroughnessPractice ||
 	!testCoveragePractice
 ) {
-	throw new Error("The shared practice fixtures no longer cover two areas and three practices");
+	throw new Error("The shared practice fixtures no longer cover two groups and three practices");
 }
 
-const longNamedArea = {
-	...reviewReadyArea,
+const longNamedGroup = {
+	...reviewReadyGroup,
 	name: "Packaging work so reviewers can understand its purpose without reconstructing context",
 	visibleInPracticeDashboards: false,
 };
 
-const areas = [longNamedArea, issueAuthoringArea];
+const groups = [longNamedGroup, issueAuthoringGroup];
 
 const longTextPractice = {
 	...mockPracticeLongText,
-	areaSlug: longNamedArea.slug,
+	groupSlug: longNamedGroup.slug,
 	precomputeScript: "export default {};",
 };
 
@@ -53,14 +53,14 @@ const practices = [
 	longTextPractice,
 	{
 		...testCoveragePractice,
-		areaSlug: longNamedArea.slug,
+		groupSlug: longNamedGroup.slug,
 		displayOrder: 1,
 	},
 	issuePractice,
 ];
 
 // The size a workspace installs the shipped catalogue at.
-const scaleAreas = [
+const scaleGroups = [
 	"Submitting review-ready work",
 	"Writing issues a maintainer can act on",
 	"Reviewing other people's work",
@@ -70,14 +70,14 @@ const scaleAreas = [
 	"Talking about work in the open",
 	"Dependencies and supply chain",
 ].map((name, index) => ({
-	...reviewReadyArea,
+	...reviewReadyGroup,
 	id: 100 + index,
-	slug: `scale-area-${index}`,
+	slug: `scale-group-${index}`,
 	name,
 	displayOrder: index,
 }));
 
-const scalePractices = scaleAreas.flatMap((area, areaIndex) =>
+const scalePractices = scaleGroups.flatMap((group, groupIndex) =>
 	[
 		"states the motivation",
 		"links the issue it closes",
@@ -85,21 +85,21 @@ const scalePractices = scaleAreas.flatMap((area, areaIndex) =>
 		"keeps the change reviewable in one sitting",
 	].map((suffix, practiceIndex) => ({
 		...prDescriptionPractice,
-		id: 1000 + areaIndex * 10 + practiceIndex,
-		slug: `${area.slug}-${practiceIndex}`,
-		name: `${area.name}: ${suffix}`,
-		areaSlug: area.slug,
+		id: 1000 + groupIndex * 10 + practiceIndex,
+		slug: `${group.slug}-${practiceIndex}`,
+		name: `${group.name}: ${suffix}`,
+		groupSlug: group.slug,
 		displayOrder: practiceIndex,
 	})),
 );
 
 const idlePending = {
-	areaSlugs: new Set<string>(),
+	groupSlugs: new Set<string>(),
 	practiceSlugs: new Set<string>(),
-	areaStructure: false,
+	groupStructure: false,
 	blockedMoveDestinationSlugs: new Set<string>(),
 	blockedPracticeOrderBuckets: new Set<string>(),
-	creatingArea: false,
+	creatingGroup: false,
 };
 
 const meta = {
@@ -112,18 +112,18 @@ const meta = {
 	},
 	args: {
 		workspaceSlug: "demo",
-		areas,
+		groups,
 		practices,
 		definitionOptions: mockPracticeDefinitionOptions,
 		pending: idlePending,
 		focusFilter: "ALL",
 		onFocusFilterChange: fn(),
-		onCreateArea: fn(async () => true),
-		onUpdateArea: fn(async () => true),
-		onSetAreaDashboardVisibility: fn(),
-		onDeleteArea: fn(),
-		onReorderAreas: fn(),
-		onSetAreaVisual: fn(),
+		onCreateGroup: fn(async () => true),
+		onUpdateGroup: fn(async () => true),
+		onSetGroupDashboardVisibility: fn(),
+		onDeleteGroup: fn(),
+		onReorderGroups: fn(),
+		onSetGroupVisual: fn(),
 		onDeletePractice: fn(),
 		onPlacePractice: fn(),
 	},
@@ -136,27 +136,29 @@ const meta = {
 	],
 	tags: ["autodocs"],
 	render: (args) => (
-		<StatefulPatch initial={{ focusFilter: args.focusFilter, areas: args.areas }}>
+		<StatefulPatch initial={{ focusFilter: args.focusFilter, groups: args.groups }}>
 			{(view, patch) => (
 				<PracticeCatalog
 					{...args}
 					focusFilter={view.focusFilter}
-					areas={view.areas}
+					groups={view.groups}
 					onFocusFilterChange={(focusFilter) => {
 						args.onFocusFilterChange(focusFilter);
 						patch({ focusFilter });
 					}}
-					onSetAreaVisual={(slug, visual) => {
-						args.onSetAreaVisual(slug, visual);
+					onSetGroupVisual={(slug, visual) => {
+						args.onSetGroupVisual(slug, visual);
 						patch({
-							areas: view.areas.map((area) => (area.slug === slug ? { ...area, ...visual } : area)),
+							groups: view.groups.map((group) =>
+								group.slug === slug ? { ...group, ...visual } : group,
+							),
 						});
 					}}
-					onSetAreaDashboardVisibility={(slug, visibleInPracticeDashboards) => {
-						args.onSetAreaDashboardVisibility(slug, visibleInPracticeDashboards);
+					onSetGroupDashboardVisibility={(slug, visibleInPracticeDashboards) => {
+						args.onSetGroupDashboardVisibility(slug, visibleInPracticeDashboards);
 						patch({
-							areas: view.areas.map((area) =>
-								area.slug === slug ? { ...area, visibleInPracticeDashboards } : area,
+							groups: view.groups.map((group) =>
+								group.slug === slug ? { ...group, visibleInPracticeDashboards } : group,
 							),
 						});
 					}}
@@ -189,8 +191,8 @@ export const WithInstanceCatalog: Story = {
 						artifactKind: "scm.pull_request",
 						whyItMatters:
 							"A reviewer who has to reconstruct intent from the diff reviews the code and not the decision.",
-						areaSlug: "review-ready-work",
-						areaName: "Review-ready work",
+						groupSlug: "review-ready-work",
+						groupName: "Review-ready work",
 						availability: "AVAILABLE",
 						automatedReviewValidation: mockAuthorDeclaredEvidenceValidation,
 					},
@@ -198,8 +200,8 @@ export const WithInstanceCatalog: Story = {
 						slug: longTextPractice.slug,
 						name: longTextPractice.name,
 						artifactKind: longTextPractice.artifactKind,
-						areaSlug: longTextPractice.areaSlug,
-						areaName: longNamedArea.name,
+						groupSlug: longTextPractice.groupSlug,
+						groupName: longNamedGroup.name,
 						availability: "ADOPTED",
 						automatedReviewValidation: mockAuthorDeclaredEvidenceValidation,
 					},
@@ -264,11 +266,11 @@ export const FilteredToNothing: Story = {
 };
 
 /**
- * The move menu lists every area in the workspace, so it is the one control whose height grows with
+ * The move menu lists every group in the workspace, so it is the one control whose height grows with
  * the catalogue rather than with the row it belongs to.
  */
 export const AtScale: Story = {
-	args: { areas: scaleAreas, practices: scalePractices },
+	args: { groups: scaleGroups, practices: scalePractices },
 	parameters: { chromatic: { viewports: [320, 1440] } },
 	play: async ({ canvas }) => {
 		await expect(canvas.getAllByRole("button", { name: /^Reorder / })).toHaveLength(40);
@@ -279,8 +281,8 @@ export const AtScale: Story = {
 export const PracticeNameOpensTheDetailLevel: Story = {
 	args: {
 		practices: [
-			{ ...prDescriptionPractice, areaSlug: longNamedArea.slug, displayOrder: 0 },
-			{ ...mockUnassignedPractice, areaSlug: longNamedArea.slug, displayOrder: 1 },
+			{ ...prDescriptionPractice, groupSlug: longNamedGroup.slug, displayOrder: 0 },
+			{ ...mockUnassignedPractice, groupSlug: longNamedGroup.slug, displayOrder: 1 },
 		],
 	},
 	parameters: { chromatic: { disableSnapshot: true } },
@@ -303,7 +305,7 @@ export const Filtered: Story = {
 			canvas.queryByRole("button", { name: `Reorder ${issuePractice.name}` }),
 		).not.toBeInTheDocument();
 		await expect(
-			canvas.getByRole("button", { name: `Reorder ${longNamedArea.name}` }),
+			canvas.getByRole("button", { name: `Reorder ${longNamedGroup.name}` }),
 		).toBeVisible();
 	},
 };
@@ -328,22 +330,22 @@ export const MoveWithoutDragging: Story = {
 		await userEvent.click(await screen.findByRole("menuitem", { name: "Move down" }));
 		await expect(args.onPlacePractice).toHaveBeenCalledWith(
 			mockPracticeLongText.slug,
-			longNamedArea.slug,
+			longNamedGroup.slug,
 			1,
 		);
 	},
 };
 
-export const MoveAreaWithoutDragging: Story = {
+export const MoveGroupWithoutDragging: Story = {
 	parameters: { chromatic: { disableSnapshot: true } },
 	play: async ({ args, canvas, userEvent }) => {
 		await userEvent.click(
-			canvas.getByRole("button", { name: `More actions for ${longNamedArea.name}` }),
+			canvas.getByRole("button", { name: `More actions for ${longNamedGroup.name}` }),
 		);
 		await userEvent.click(await screen.findByRole("menuitem", { name: "Move down" }));
-		await expect(args.onReorderAreas).toHaveBeenCalledWith([
-			issueAuthoringArea.slug,
-			longNamedArea.slug,
+		await expect(args.onReorderGroups).toHaveBeenCalledWith([
+			issueAuthoringGroup.slug,
+			longNamedGroup.slug,
 		]);
 	},
 };
@@ -364,7 +366,7 @@ export const KeyboardReordering: Story = {
 		handle.dispatchEvent(new KeyboardEvent("keydown", { key: " ", code: "Space", bubbles: true }));
 		await expect(args.onPlacePractice).toHaveBeenCalledWith(
 			mockPracticeLongText.slug,
-			longNamedArea.slug,
+			longNamedGroup.slug,
 			1,
 		);
 	},
@@ -374,7 +376,7 @@ export const Reordering: Story = {
 	args: {
 		pending: {
 			...idlePending,
-			blockedPracticeOrderBuckets: new Set([longNamedArea.slug]),
+			blockedPracticeOrderBuckets: new Set([longNamedGroup.slug]),
 		},
 	},
 	play: async ({ canvas }) => {
@@ -391,14 +393,14 @@ export const Reordering: Story = {
 	},
 };
 
-export const DeletingArea: Story = {
+export const DeletingGroup: Story = {
 	args: {
 		pending: {
 			...idlePending,
-			areaSlugs: new Set([longNamedArea.slug]),
-			areaStructure: true,
-			blockedMoveDestinationSlugs: new Set([longNamedArea.slug]),
-			blockedPracticeOrderBuckets: new Set([longNamedArea.slug, "__unassigned__"]),
+			groupSlugs: new Set([longNamedGroup.slug]),
+			groupStructure: true,
+			blockedMoveDestinationSlugs: new Set([longNamedGroup.slug]),
+			blockedPracticeOrderBuckets: new Set([longNamedGroup.slug, "__unassigned__"]),
 		},
 	},
 	play: async ({ canvas, userEvent }) => {
@@ -407,9 +409,9 @@ export const DeletingArea: Story = {
 		});
 		await userEvent.click(actions);
 		await expect(
-			await screen.findByRole("menuitemradio", { name: issueAuthoringArea.name }),
+			await screen.findByRole("menuitemradio", { name: issueAuthoringGroup.name }),
 		).toBeEnabled();
-		await expect(screen.getByRole("menuitemradio", { name: longNamedArea.name })).toHaveAttribute(
+		await expect(screen.getByRole("menuitemradio", { name: longNamedGroup.name })).toHaveAttribute(
 			"aria-disabled",
 			"true",
 		);
@@ -418,7 +420,7 @@ export const DeletingArea: Story = {
 
 export const Empty: Story = {
 	args: {
-		areas: [],
+		groups: [],
 		practices: [],
 		library: { open: false, onOpenChange: fn(), state: { status: "loading" } },
 	},
@@ -427,33 +429,35 @@ export const Empty: Story = {
 
 export const EmptyDestinations: Story = {
 	args: {
-		areas: mockAreas,
+		groups: mockGroups,
 		practices: [],
 	},
 	play: async ({ canvas }) => {
-		for (const area of mockAreas) {
-			const areaSection = canvas.getByText(area.name).closest('[data-slot="accordion-item"]');
-			if (!(areaSection instanceof HTMLElement)) throw new Error(`Area ${area.name} not rendered`);
-			await expect(within(areaSection).getByText("No practices here.")).toBeVisible();
+		for (const group of mockGroups) {
+			const groupSection = canvas.getByText(group.name).closest('[data-slot="accordion-item"]');
+			if (!(groupSection instanceof HTMLElement))
+				throw new Error(`Group ${group.name} not rendered`);
+			await expect(within(groupSection).getByText("No practices here.")).toBeVisible();
 		}
 		await expect(canvas.getByText("Nothing unassigned.")).toBeVisible();
 		await expectNoPageOverflow();
 	},
 };
 
-export const CrossAreaDrag: Story = {
+export const CrossGroupDrag: Story = {
 	args: {
-		areas: mockAreas,
-		practices: [{ ...prDescriptionPractice, areaSlug: reviewReadyArea.slug }],
+		groups: mockGroups,
+		practices: [{ ...prDescriptionPractice, groupSlug: reviewReadyGroup.slug }],
 	},
 	parameters: { chromatic: { disableSnapshot: true } },
 	play: async ({ args, canvas, userEvent }) => {
 		const handle = canvas.getByRole("button", { name: `Reorder ${prDescriptionPractice.name}` });
-		const destinationArea = canvas
-			.getByText(issueAuthoringArea.name)
+		const destinationGroup = canvas
+			.getByText(issueAuthoringGroup.name)
 			.closest('[data-slot="accordion-item"]');
-		if (!(destinationArea instanceof HTMLElement)) throw new Error("Destination area not rendered");
-		const destination = within(destinationArea).getByText("No practices here.");
+		if (!(destinationGroup instanceof HTMLElement))
+			throw new Error("Destination group not rendered");
+		const destination = within(destinationGroup).getByText("No practices here.");
 		const sourceRow = handle.closest('[data-slot="item"]');
 		if (!(sourceRow instanceof HTMLElement)) throw new Error("Practice row not rendered");
 		const start = handle.getBoundingClientRect();
@@ -494,7 +498,7 @@ export const CrossAreaDrag: Story = {
 
 		await expect(args.onPlacePractice).toHaveBeenCalledWith(
 			prDescriptionPractice.slug,
-			issueAuthoringArea.slug,
+			issueAuthoringGroup.slug,
 			0,
 		);
 	},
@@ -502,11 +506,11 @@ export const CrossAreaDrag: Story = {
 
 export const BetweenRowsDrag: Story = {
 	args: {
-		areas: mockAreas,
+		groups: mockGroups,
 		practices: [
-			{ ...prDescriptionPractice, areaSlug: reviewReadyArea.slug },
-			{ ...reviewThoroughnessPractice, areaSlug: issueAuthoringArea.slug, displayOrder: 0 },
-			{ ...testCoveragePractice, areaSlug: issueAuthoringArea.slug, displayOrder: 1 },
+			{ ...prDescriptionPractice, groupSlug: reviewReadyGroup.slug },
+			{ ...reviewThoroughnessPractice, groupSlug: issueAuthoringGroup.slug, displayOrder: 0 },
+			{ ...testCoveragePractice, groupSlug: issueAuthoringGroup.slug, displayOrder: 1 },
 		],
 	},
 	parameters: { chromatic: { disableSnapshot: true } },
@@ -538,7 +542,7 @@ export const BetweenRowsDrag: Story = {
 
 		await expect(args.onPlacePractice).toHaveBeenCalledWith(
 			source.slug,
-			issueAuthoringArea.slug,
+			issueAuthoringGroup.slug,
 			1,
 		);
 	},
@@ -546,21 +550,21 @@ export const BetweenRowsDrag: Story = {
 
 export const BlockedDestinationDrag: Story = {
 	args: {
-		areas: mockAreas,
-		practices: [{ ...prDescriptionPractice, areaSlug: undefined }],
+		groups: mockGroups,
+		practices: [{ ...prDescriptionPractice, groupSlug: undefined }],
 		pending: {
 			...idlePending,
-			blockedMoveDestinationSlugs: new Set([issueAuthoringArea.slug]),
+			blockedMoveDestinationSlugs: new Set([issueAuthoringGroup.slug]),
 		},
 	},
 	parameters: { chromatic: { disableSnapshot: true } },
 	play: async ({ args, canvas, userEvent }) => {
 		const handle = canvas.getByRole("button", { name: `Reorder ${prDescriptionPractice.name}` });
-		const destinationArea = canvas
-			.getByText(issueAuthoringArea.name)
+		const destinationGroup = canvas
+			.getByText(issueAuthoringGroup.name)
 			.closest<HTMLElement>('[data-slot="accordion-item"]');
-		if (!destinationArea) throw new Error("Blocked destination area not rendered");
-		const destination = within(destinationArea).getByText("No practices here.");
+		if (!destinationGroup) throw new Error("Blocked destination group not rendered");
+		const destination = within(destinationGroup).getByText("No practices here.");
 		const start = handle.getBoundingClientRect();
 		const end = destination.getBoundingClientRect();
 
@@ -587,7 +591,7 @@ export const BlockedDestinationDrag: Story = {
 
 export const AutonomyLevels: Story = {
 	args: {
-		areas: mockAreas,
+		groups: mockGroups,
 		practices: [
 			{
 				...prDescriptionPractice,
@@ -597,9 +601,9 @@ export const AutonomyLevels: Story = {
 			},
 			{
 				...prDescriptionPractice,
-				slug: "from-area",
-				name: "Its area decided",
-				autonomy: areaAutonomy("HUMAN_APPROVAL"),
+				slug: "from-group",
+				name: "Its group decided",
+				autonomy: groupAutonomy("HUMAN_APPROVAL"),
 			},
 			{
 				...prDescriptionPractice,
@@ -607,14 +611,14 @@ export const AutonomyLevels: Story = {
 				name: "Singled out",
 				autonomy: chosenAutonomy("OFF"),
 			},
-		].map((practice) => ({ ...practice, areaSlug: reviewReadyArea.slug })),
+		].map((practice) => ({ ...practice, groupSlug: reviewReadyGroup.slug })),
 	},
 	play: async ({ canvas }) => {
 		// Scoped row by row: asserting that all three sentences exist somewhere on the page would pass
 		// just as well if every row carried the same one, which is the mix-up this story is about.
 		const expected = [
 			["Nobody has touched this one", "Send automatically", "Follows the workspace default"],
-			["Its area decided", "Review before sending", `Follows ${reviewReadyArea.name}`],
+			["Its group decided", "Review before sending", `Follows ${reviewReadyGroup.name}`],
 			["Singled out", "Off", "Set for this practice"],
 		] as const;
 
@@ -631,7 +635,7 @@ export const AutonomyLevels: Story = {
 
 export const AutonomyIsReadOnlyHere: Story = {
 	args: {
-		areas: mockAreas,
+		groups: mockGroups,
 		practices: [
 			{
 				...prDescriptionPractice,
@@ -639,11 +643,11 @@ export const AutonomyIsReadOnlyHere: Story = {
 				name: "Set here",
 				autonomy: chosenAutonomy("HUMAN_APPROVAL"),
 			},
-		].map((practice) => ({ ...practice, areaSlug: reviewReadyArea.slug })),
+		].map((practice) => ({ ...practice, groupSlug: reviewReadyGroup.slug })),
 	},
 	parameters: {
 		chromatic: { disableSnapshot: true },
-		// The actions menu holds every area in the workspace, so on a short viewport Base UI caps it at
+		// The actions menu holds every group in the workspace, so on a short viewport Base UI caps it at
 		// the available height and the a11y check rejects the scrollable region that makes — a property
 		// of the menu, not of the link this story is about.
 		viewport: { defaultViewport: "desktop" },
@@ -655,7 +659,7 @@ export const AutonomyIsReadOnlyHere: Story = {
 			"href",
 			"/w/demo/admin/practices/review",
 		);
-		// The menuitemradios in this menu are the "Move to" area picker. Autonomy is set on Review,
+		// The menuitemradios in this menu are the "Move to" group picker. Autonomy is set on Review,
 		// so none of its levels may appear as a choice here.
 		for (const { label } of Object.values(AUTONOMY_DEFS)) {
 			await expect(menu.queryByRole("menuitemradio", { name: label })).not.toBeInTheDocument();

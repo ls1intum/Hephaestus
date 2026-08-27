@@ -3,7 +3,7 @@ import type { ReviewFeedback, ReviewObservation } from "@/api/types.gen";
 import {
 	feedbackDetail,
 	observationDetail,
-	practiceAreas,
+	practiceGroups,
 	reviewFeedback,
 	reviewJob,
 	reviewObservations,
@@ -77,7 +77,7 @@ function filterObservations(rows: ReviewObservation[], url: URL) {
 		(row) =>
 			withinScope(url, row) &&
 			withinDates(url, row.observedAt) &&
-			matches(values(url, "areaSlug"), row.area?.slug) &&
+			matches(values(url, "groupSlug"), row.group?.slug) &&
 			matches(values(url, "practiceSlug"), row.practiceSlug) &&
 			matches(values(url, "presence"), row.presence) &&
 			matches(values(url, "assessment"), row.assessment) &&
@@ -180,7 +180,9 @@ export function reviewHandlers({
 			HttpResponse.json(reviewJob(String(params.jobId))),
 		),
 		http.get("*/workspaces/:workspaceSlug/practices", () => HttpResponse.json(workspacePractices)),
-		http.get("*/workspaces/:workspaceSlug/practice-areas", () => HttpResponse.json(practiceAreas)),
+		http.get("*/workspaces/:workspaceSlug/practice-groups", () =>
+			HttpResponse.json(practiceGroups),
+		),
 		http.get("*/workspaces/:workspaceSlug/members", () => HttpResponse.json(workspaceMembers)),
 	];
 }

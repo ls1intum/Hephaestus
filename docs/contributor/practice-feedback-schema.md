@@ -21,8 +21,8 @@ Use the executable sources for exact details:
 
 | Concept               | Role                                                                       | Relationships                                                                   |
 | --------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
-| `PracticeArea`        | Workspace-defined grouping for practices                                   | Has many practices; a practice may be unassigned                                |
-| `Practice`            | Configurable criterion used by detection                                   | Belongs to a workspace and may belong to an area                                |
+| `PracticeGroup`        | Workspace-defined grouping for practices                                   | Has many practices; a practice may be unassigned                                |
+| `Practice`            | Configurable criterion used by detection                                   | Belongs to a workspace and may belong to a group                                |
 | `PracticeRevision`    | Criteria snapshot used to interpret a past result                          | Belongs to one practice; an observation may pin one revision                    |
 | `Observation`         | Evidence produced by one review job                                        | Belongs to one practice and one job; may support many pieces of feedback        |
 | `Feedback`            | One recipient-specific piece of feedback and its delivery outcome          | Belongs to one job; may draw on many observations and have many placements      |
@@ -137,7 +137,7 @@ The persistence model is not an authorization boundary. Controllers define who m
 - the pull-request observation projection shows workspace members every relevant observation for that pull
   request;
 - the workspace-admin practice-review endpoints expose observations and feedback across that workspace;
-- learner-facing practice projections omit detector criteria by construction.
+- developer-facing practice projections omit detector criteria by construction.
 
 Keep these rules enforceable in controller authorization, repository predicates, DTO shape, and tests.
 Do not add a field matrix here: the

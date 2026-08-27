@@ -88,7 +88,7 @@ function listOrEmpty<T>(items: T[] | undefined): T[] {
 /** One practice this run may report on, as inputs/practices/index.json describes it. */
 interface PracticeIndexEntry {
 	slug: string;
-	area?: string;
+	group?: string;
 	readsSources: string[];
 	exhaustiveSources: string[];
 }
@@ -249,7 +249,8 @@ function readPracticeIndex(): PracticeIndexEntry[] {
 		}
 		return {
 			slug: practice.slug,
-			area: typeof practice.area === "string" && practice.area !== "" ? practice.area : undefined,
+			group:
+				typeof practice.group === "string" && practice.group !== "" ? practice.group : undefined,
 			readsSources: jsonArray(practice.readsSources).filter(
 				(kind): kind is string => typeof kind === "string",
 			),
@@ -699,6 +700,7 @@ function accumulateUsage(prev: UsageReport | null, curr: UsageReport): void {
 	usageTotals.costUsd += Math.max(0, curr.costUsd - (prev?.costUsd ?? 0));
 	usageTotals.totalCalls += Math.max(0, curr.totalCalls - (prev?.totalCalls ?? 0));
 }
+
 
 function loadPracticeSlugs(): string[] {
 	return practiceIndex.map((practice) => practice.slug).filter(Boolean);

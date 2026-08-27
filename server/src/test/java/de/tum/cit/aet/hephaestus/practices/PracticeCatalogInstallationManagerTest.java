@@ -18,7 +18,7 @@ import de.tum.cit.aet.hephaestus.practices.curated.CuratedCatalogLock;
 import de.tum.cit.aet.hephaestus.practices.curated.CuratedCatalogService;
 import de.tum.cit.aet.hephaestus.practices.curated.EffectiveCatalog;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeArea;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeGroup;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
@@ -35,13 +35,13 @@ import org.springframework.transaction.support.TransactionOperations;
 class PracticeCatalogInstallationManagerTest extends BaseUnitTest {
 
     @Mock
-    private PracticeAreaService areaService;
+    private PracticeGroupService groupService;
 
     @Mock
     private PracticeService practiceService;
 
     @Mock
-    private PracticeAreaRepository areaRepository;
+    private PracticeGroupRepository groupRepository;
 
     @Mock
     private PracticeRepository practiceRepository;
@@ -69,11 +69,11 @@ class PracticeCatalogInstallationManagerTest extends BaseUnitTest {
     void installsWhatTheInstanceOffers() {
         when(workspaceRepository.findAll()).thenReturn(List.of(workspace(1L)));
         when(catalogService.catalog()).thenReturn(catalog());
-        when(areaService.createAreaFromCatalog(any(), any(), any(), anyInt())).thenReturn(new PracticeArea());
+        when(groupService.createGroupFromCatalog(any(), any(), any(), anyInt())).thenReturn(new PracticeGroup());
 
         manager(true).repairIncompleteInstallations();
 
-        verify(areaService).createAreaFromCatalog(any(), eq("packaging"), any(), eq(0));
+        verify(groupService).createGroupFromCatalog(any(), eq("packaging"), any(), eq(0));
         ArgumentCaptor<PracticeDefinition> definition = ArgumentCaptor.forClass(PracticeDefinition.class);
         verify(practiceService).createPracticeFromCatalog(any(), eq("small-prs"), definition.capture());
         assertThat(definition.getValue().criteria()).isEqualTo("Seed criteria");
@@ -99,7 +99,7 @@ class PracticeCatalogInstallationManagerTest extends BaseUnitTest {
     void recordsNothingWhenCopyingFails() {
         when(workspaceRepository.findAll()).thenReturn(List.of(workspace(1L)));
         when(catalogService.catalog()).thenReturn(catalog());
-        when(areaService.createAreaFromCatalog(any(), any(), any(), anyInt())).thenReturn(new PracticeArea());
+        when(groupService.createGroupFromCatalog(any(), any(), any(), anyInt())).thenReturn(new PracticeGroup());
         when(practiceService.createPracticeFromCatalog(any(), any(), any())).thenThrow(new RuntimeException("nope"));
 
         assertThatCode(() -> manager(true).repairIncompleteInstallations()).doesNotThrowAnyException();
@@ -112,7 +112,7 @@ class PracticeCatalogInstallationManagerTest extends BaseUnitTest {
         manager(true).onWorkspaceCreated(new WorkspaceCreatedEvent(7L, IntegrationKind.GITLAB));
 
         verify(installationRepository).save(any());
-        verifyNoInteractions(catalogService, practiceService, areaService);
+        verifyNoInteractions(catalogService, practiceService, groupService);
     }
 
     @Test
@@ -125,7 +125,7 @@ class PracticeCatalogInstallationManagerTest extends BaseUnitTest {
     }
 
     private static EffectiveCatalog catalog() {
-        AreaDefinition area = new AreaDefinition("Packaging work", null, null, null);
+        GroupDefinition group = new GroupDefinition("Packaging work", null, null, null);
         PracticeDefinition practice = new PracticeDefinition(
             "Small PRs",
             PracticeTestEvidence.bindings(ArtifactKinds.PULL_REQUEST),
@@ -137,7 +137,7 @@ class PracticeCatalogInstallationManagerTest extends BaseUnitTest {
             "packaging"
         );
         return new EffectiveCatalog(
-            List.of(CatalogEntry.shippedOnly("packaging", area, 0)),
+            List.of(CatalogEntry.shippedOnly("packaging", group, 0)),
             List.of(CatalogEntry.shippedOnly("small-prs", practice, 0))
         );
     }
@@ -150,9 +150,9 @@ class PracticeCatalogInstallationManagerTest extends BaseUnitTest {
         }
         return new PracticeCatalogInstallationManager(
             enabled,
-            areaService,
+            groupService,
             practiceService,
-            areaRepository,
+            groupRepository,
             practiceRepository,
             catalogService,
             catalogLock,

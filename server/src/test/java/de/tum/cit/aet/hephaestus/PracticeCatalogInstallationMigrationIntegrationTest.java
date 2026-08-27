@@ -128,10 +128,10 @@ class PracticeCatalogInstallationMigrationIntegrationTest {
     private static void seedLegacyCuratedOverrides() throws SQLException {
         execute(
             """
-            INSERT INTO curated_area_override (
+            INSERT INTO curated_group_override (
                 slug, name, description, based_on_digest, created_at, updated_at, version
             ) VALUES (
-                'real-area', 'Real area override', 'Preserve this curated intent', repeat('a', 64), now(), now(), 0
+                'real-group', 'Real group override', 'Preserve this curated intent', repeat('a', 64), now(), now(), 0
             )
             """,
             """
@@ -168,7 +168,7 @@ class PracticeCatalogInstallationMigrationIntegrationTest {
             Connection connection = connect();
             Statement statement = connection.createStatement();
             ResultSet rows = statement.executeQuery(
-                "SELECT slug, name, bindings::text, criteria, automated_review_policy::text, area_slug " +
+                "SELECT slug, name, bindings::text, criteria, automated_review_policy::text, group_slug " +
                     "FROM curated_practice_override ORDER BY slug"
             )
         ) {
@@ -190,7 +190,7 @@ class PracticeCatalogInstallationMigrationIntegrationTest {
                         policy,
                         null,
                         null,
-                        rows.getString("area_slug")
+                        rows.getString("group_slug")
                     )
                 );
                 if (rows.getString("slug").equals("real-practice")) {
@@ -219,8 +219,8 @@ class PracticeCatalogInstallationMigrationIntegrationTest {
     }
 
     private static void assertLegacyCuratedDigestsVersioned() throws SQLException {
-        assertThat(scalar("SELECT based_on_digest FROM curated_area_override WHERE slug = 'real-area'")).isEqualTo(
-            "area:v1:" + "a".repeat(64)
+        assertThat(scalar("SELECT based_on_digest FROM curated_group_override WHERE slug = 'real-group'")).isEqualTo(
+            "group:v1:" + "a".repeat(64)
         );
         assertThat(
             scalar("SELECT based_on_digest FROM curated_practice_override WHERE slug = 'real-practice'")
@@ -278,12 +278,12 @@ class PracticeCatalogInstallationMigrationIntegrationTest {
     }
 
     private static void assertMarkerRepair() throws SQLException {
-        assertThat(markedWorkspaceSlugs()).containsExactly("area-only", "practice-only");
+        assertThat(markedWorkspaceSlugs()).containsExactly("group-only", "practice-only");
     }
 
-    private static void assertCatalogBootstrap(int practices, int areas) throws SQLException {
+    private static void assertCatalogBootstrap(int practices, int groups) throws SQLException {
         assertThat(scalar("SELECT count(*)::text FROM curated_practice_override")).isEqualTo(String.valueOf(practices));
-        assertThat(scalar("SELECT count(*)::text FROM curated_area_override")).isEqualTo(String.valueOf(areas));
+        assertThat(scalar("SELECT count(*)::text FROM curated_group_override")).isEqualTo(String.valueOf(groups));
         assertThat(
             scalar("SELECT count(*)::text FROM practice_catalog_installation WHERE provenance_linked_at IS NOT NULL")
         ).isEqualTo("1");
@@ -307,7 +307,7 @@ class PracticeCatalogInstallationMigrationIntegrationTest {
                 SELECT count(*)::text
                 FROM practice practice
                 JOIN practice_revision revision ON revision.id = practice.current_revision_id
-                LEFT JOIN practice_area area ON area.id = practice.practice_area_id
+                LEFT JOIN practice_group group ON group.id = practice.practice_group_id
                 WHERE practice.id IN (136301, 136302)
                   AND revision.practice_id = practice.id
                   AND revision.slug = practice.slug
@@ -318,7 +318,7 @@ class PracticeCatalogInstallationMigrationIntegrationTest {
                   AND revision.precompute_script IS NOT DISTINCT FROM practice.precompute_script
                   AND revision.why_it_matters IS NOT DISTINCT FROM practice.why_it_matters
                   AND revision.what_good_looks_like IS NOT DISTINCT FROM practice.what_good_looks_like
-                  AND revision.area_slug IS NOT DISTINCT FROM area.slug
+                  AND revision.group_slug IS NOT DISTINCT FROM group.slug
                 """
             )
         ).isEqualTo("2");
@@ -492,7 +492,7 @@ class PracticeCatalogInstallationMigrationIntegrationTest {
                     practice_id, revision_number, criteria, created_at,
                     slug, name, applies_to, bindings, precompute_script,
                     why_it_matters, what_good_looks_like,
-                    area_slug, area_name, area_description, area_icon, area_color,
+                    group_slug, group_name, group_description, group_icon, group_color,
                     review_rule_fingerprint, automated_review_policy
                 )
                 SELECT practice.id,
@@ -506,15 +506,15 @@ class PracticeCatalogInstallationMigrationIntegrationTest {
                        practice.precompute_script,
                        practice.why_it_matters,
                        practice.what_good_looks_like,
-                       area.slug,
-                       area.name,
-                       area.description,
-                       area.icon,
-                       area.color,
+                       group.slug,
+                       group.name,
+                       group.description,
+                       group.icon,
+                       group.color,
                        ('v2:' || repeat('a', 64)),
                        practice.automated_review_policy
                 FROM practice
-                LEFT JOIN practice_area area ON area.id = practice.practice_area_id
+                LEFT JOIN practice_group group ON group.id = practice.practice_group_id
                 WHERE practice.id = 136301
                 """
             );
@@ -655,20 +655,20 @@ class PracticeCatalogInstallationMigrationIntegrationTest {
             """
             INSERT INTO workspace (id, account_login, account_type, display_name, slug, status, is_publicly_viewable)
             VALUES (136101, 'migration-empty-marked',   'ORG', 'Empty marked',   'empty-marked',   'ACTIVE', false),
-                   (136102, 'migration-area-only',      'ORG', 'Area only',      'area-only',      'ACTIVE', false),
+                   (136102, 'migration-group-only',      'ORG', 'Group only',      'group-only',      'ACTIVE', false),
                    (136103, 'migration-practice-only',  'ORG', 'Practice only',  'practice-only',  'ACTIVE', false),
                    (136104, 'migration-empty-unmarked', 'ORG', 'Empty unmarked', 'empty-unmarked', 'ACTIVE', false)
             """,
             """
-            INSERT INTO practice_area (
+            INSERT INTO practice_group (
                 id, workspace_id, slug, name, is_active, display_order, icon, color, created_at
             ) VALUES
-                (136201, 136102, 'existing-area', 'Existing area', true, 0, 'Package', 'sky', now()),
-                (136202, 136103, 'practice-area', 'Practice area', true, 0, 'Package', 'sky', now())
+                (136201, 136102, 'existing-group', 'Existing group', true, 0, 'Package', 'sky', now()),
+                (136202, 136103, 'practice-group', 'Practice group', true, 0, 'Package', 'sky', now())
             """,
             """
             INSERT INTO practice (
-                id, workspace_id, practice_area_id, slug, name, applies_to, display_order,
+                id, workspace_id, practice_group_id, slug, name, applies_to, display_order,
                 trigger_events, criteria, precompute_script, why_it_matters, what_good_looks_like,
                 is_active, created_at
             ) VALUES

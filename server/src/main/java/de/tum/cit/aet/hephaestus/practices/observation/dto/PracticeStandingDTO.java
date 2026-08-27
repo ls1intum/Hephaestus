@@ -12,8 +12,8 @@ import org.jspecify.annotations.Nullable;
 public record PracticeStandingDTO(
     @NonNull @Schema(description = "Practice slug") String slug,
     @NonNull @Schema(description = "Practice name") String name,
-    @Nullable @Schema(description = "Area slug this practice belongs to, if any") String areaSlug,
-    @Nullable @Schema(description = "Area name this practice belongs to, if any") String areaName,
+    @Nullable @Schema(description = "Group slug this practice belongs to, if any") String groupSlug,
+    @Nullable @Schema(description = "Group name this practice belongs to, if any") String groupName,
     @Nullable @Schema(description = "Why this practice matters, in plain language") String whyItMatters,
     @Nullable @Schema(description = "A concrete picture of doing this well") String whatGoodLooksLike,
     @NonNull
@@ -42,10 +42,10 @@ public record PracticeStandingDTO(
      * <p>The first three are verdicts, read off the share of that evidence that was positive. The last two are
      * the reasons there is NO verdict, and they are deliberately separate: a developer cannot act on an empty
      * state that means "nothing was reviewed" and "your work offered no opportunity" interchangeably. The same
-     * split runs through the area standing and, as {@code UNCERTAIN} against {@code INSUFFICIENT_EVIDENCE},
+     * split runs through the group standing and, as {@code UNCERTAIN} against {@code INSUFFICIENT_EVIDENCE},
      * through the trend — absence of a claim is not the same fact as a claim of absence.
      *
-     * <p>Carrying the non-verdicts HERE rather than beside the practice response is what lets the area be a pure roll-up of
+     * <p>Carrying the non-verdicts HERE rather than beside the practice response is what lets the group be a pure roll-up of
      * its practices. It costs a longer list: a practice the workspace watches appears even when it has nothing
      * to say yet, which is also the honest answer to "what is being looked at".
      */

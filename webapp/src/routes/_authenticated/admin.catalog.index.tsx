@@ -3,20 +3,20 @@ import { createFileRoute, retainSearchParams, useNavigate } from "@tanstack/reac
 import { LibraryBig, Plus } from "lucide-react";
 import { toast } from "sonner";
 import {
-	adminGetCuratedAreaQueryKey,
 	adminGetCuratedCatalogOptions,
 	adminGetCuratedCatalogQueryKey,
+	adminGetCuratedGroupQueryKey,
 	adminGetCuratedPracticeQueryKey,
 	adminPlaceCuratedPracticeMutation,
-	adminReorderCuratedAreasMutation,
+	adminReorderCuratedGroupsMutation,
 	adminReorderCuratedPracticesMutation,
 	adminResetCuratedCatalogOrderMutation,
-	adminUpdateCuratedAreaStatusMutation,
+	adminUpdateCuratedGroupStatusMutation,
 	adminUpdateCuratedPracticeStatusMutation,
 } from "@/api/@tanstack/react-query.gen";
 import type {
 	CuratedCatalog as Catalog,
-	CuratedArea,
+	CuratedGroup,
 	CuratedPractice,
 	CuratedPracticeSummary,
 } from "@/api/types.gen";
@@ -24,15 +24,15 @@ import { CuratedCatalog } from "@/components/admin/curated-catalog/CuratedCatalo
 import {
 	orderedPracticeSlugs,
 	placeCuratedPractice,
-	reorderCuratedAreas,
+	reorderCuratedGroups,
 	reorderCuratedPractices,
 } from "@/components/admin/curated-catalog/curated-catalog-cache";
 import {
 	CURATED_CATALOG_SEARCH_PARAMS,
 	CURATED_LEVEL_KINDS,
 	type CuratedCatalogSearch,
-	curatedAreaLevel,
 	curatedCatalogSearchSchema,
+	curatedGroupLevel,
 	curatedPracticeLevel,
 	GUARDED_CURATED_LEVEL_KINDS,
 } from "@/components/admin/curated-catalog/curated-catalog-search";
@@ -48,8 +48,8 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { filedUnder, pathString, usePendingMutationIds } from "@/hooks/use-pending-mutation-ids";
 import { instanceAdminHead } from "@/lib/page-title";
 import { problemDetailOf, problemStatusOf } from "@/lib/problem-detail";
-import { CuratedAreaCreateLevel } from "./-CuratedAreaCreateLevel";
-import { CuratedAreaEditLevel } from "./-CuratedAreaEditLevel";
+import { CuratedGroupCreateLevel } from "./-CuratedGroupCreateLevel";
+import { CuratedGroupEditLevel } from "./-CuratedGroupEditLevel";
 import { CuratedPracticeCreateLevel } from "./-CuratedPracticeCreateLevel";
 import { CuratedPracticeEditLevel } from "./-CuratedPracticeEditLevel";
 
@@ -61,7 +61,7 @@ export const Route = createFileRoute("/_authenticated/admin/catalog/")({
 });
 
 const PRACTICE_STATUS_KEY = ["adminWriteCuratedPracticeStatus"];
-const AREA_STATUS_KEY = ["adminWriteCuratedAreaStatus"];
+const AREA_STATUS_KEY = ["adminWriteCuratedGroupStatus"];
 const STRUCTURE_SCOPE = { id: "admin-curated-catalog-structure" };
 
 function AdminCuratedCatalogPage() {
@@ -72,10 +72,10 @@ function AdminCuratedCatalogPage() {
 	const stackControls = useDetailStack(detailStack);
 	const catalogQuery = useQuery({ ...adminGetCuratedCatalogOptions() });
 
-	const detailKey = (kind: "practice" | "area", slug: string) =>
+	const detailKey = (kind: "practice" | "group", slug: string) =>
 		kind === "practice"
 			? adminGetCuratedPracticeQueryKey({ path: { slug } })
-			: adminGetCuratedAreaQueryKey({ path: { slug } });
+			: adminGetCuratedGroupQueryKey({ path: { slug } });
 	const invalidateCatalog = () => {
 		void queryClient.invalidateQueries({ queryKey: adminGetCuratedCatalogQueryKey() });
 	};
@@ -100,14 +100,14 @@ function AdminCuratedCatalogPage() {
 			);
 		},
 	});
-	const onAreaStatusSettled = (slug: string, offered: boolean) => ({
+	const onGroupStatusSettled = (slug: string, offered: boolean) => ({
 		onSuccess: (catalog: Catalog) => {
 			queryClient.setQueryData(adminGetCuratedCatalogQueryKey(), catalog);
-			queryClient.removeQueries({ queryKey: detailKey("area", slug), exact: true });
+			queryClient.removeQueries({ queryKey: detailKey("group", slug), exact: true });
 			toast.success(offered ? "Group included for workspaces" : "Group is no longer included");
 		},
 		onError: (error: unknown) => {
-			queryClient.removeQueries({ queryKey: detailKey("area", slug), exact: true });
+			queryClient.removeQueries({ queryKey: detailKey("group", slug), exact: true });
 			invalidateCatalog();
 			toast.error(
 				problemStatusOf(error) === 412
@@ -121,8 +121,8 @@ function AdminCuratedCatalogPage() {
 	const updatePracticeStatus = useMutation(
 		filedUnder(PRACTICE_STATUS_KEY, adminUpdateCuratedPracticeStatusMutation()),
 	);
-	const updateAreaStatus = useMutation(
-		filedUnder(AREA_STATUS_KEY, adminUpdateCuratedAreaStatusMutation()),
+	const updateGroupStatus = useMutation(
+		filedUnder(AREA_STATUS_KEY, adminUpdateCuratedGroupStatusMutation()),
 	);
 	const invalidateStructure = invalidateCatalog;
 	const structureError = (error: unknown) => {
@@ -133,8 +133,8 @@ function AdminCuratedCatalogPage() {
 			{ description: problemDetailOf(error) },
 		);
 	};
-	const reorderAreas = useMutation({
-		...adminReorderCuratedAreasMutation(),
+	const reorderGroups = useMutation({
+		...adminReorderCuratedGroupsMutation(),
 		scope: STRUCTURE_SCOPE,
 		onMutate: async (variables) => {
 			await queryClient.cancelQueries({ queryKey: adminGetCuratedCatalogQueryKey() });
@@ -142,7 +142,7 @@ function AdminCuratedCatalogPage() {
 			if (previous) {
 				queryClient.setQueryData(
 					adminGetCuratedCatalogQueryKey(),
-					reorderCuratedAreas(previous, variables.body.orderedSlugs),
+					reorderCuratedGroups(previous, variables.body.orderedSlugs),
 				);
 			}
 			return { previous };
@@ -163,10 +163,10 @@ function AdminCuratedCatalogPage() {
 			await queryClient.cancelQueries({ queryKey: adminGetCuratedCatalogQueryKey() });
 			const previous = queryClient.getQueryData<Catalog>(adminGetCuratedCatalogQueryKey());
 			if (previous) {
-				const areaSlug = variables.body.areaSlug ?? null;
+				const groupSlug = variables.body.groupSlug ?? null;
 				queryClient.setQueryData(
 					adminGetCuratedCatalogQueryKey(),
-					reorderCuratedPractices(previous, areaSlug, variables.body.orderedSlugs),
+					reorderCuratedPractices(previous, groupSlug, variables.body.orderedSlugs),
 				);
 			}
 			return { previous };
@@ -192,7 +192,7 @@ function AdminCuratedCatalogPage() {
 					placeCuratedPractice(
 						previous,
 						variables.path.slug,
-						variables.body.areaSlug ?? null,
+						variables.body.groupSlug ?? null,
 						variables.body.position,
 					),
 				);
@@ -227,23 +227,23 @@ function AdminCuratedCatalogPage() {
 	const pendingPracticeSlugs = usePendingMutationIds(PRACTICE_STATUS_KEY, (variables) =>
 		pathString(variables, "slug"),
 	);
-	const pendingAreaSlugs = usePendingMutationIds(AREA_STATUS_KEY, (variables) =>
+	const pendingGroupSlugs = usePendingMutationIds(AREA_STATUS_KEY, (variables) =>
 		pathString(variables, "slug"),
 	);
 	const structurePending =
-		reorderAreas.isPending ||
+		reorderGroups.isPending ||
 		reorderPractices.isPending ||
 		placePractice.isPending ||
 		resetOrder.isPending;
 	const writePending =
-		structurePending || pendingAreaSlugs.size > 0 || pendingPracticeSlugs.size > 0;
+		structurePending || pendingGroupSlugs.size > 0 || pendingPracticeSlugs.size > 0;
 
 	return (
 		<PageLayout>
 			<PageHeader
 				icon={<LibraryBig />}
 				title="Practice catalog"
-				description="Choose which areas and practices workspace administrators can add. Catalog changes never rewrite existing workspace practices."
+				description="Choose which groups and practices workspace administrators can add. Catalog changes never rewrite existing workspace practices."
 				actions={
 					<div className="flex flex-wrap gap-2">
 						{writePending ? (
@@ -253,7 +253,7 @@ function AdminCuratedCatalogPage() {
 							</Button>
 						) : (
 							<DetailStackLink
-								entry={curatedAreaLevel()}
+								entry={curatedGroupLevel()}
 								className={buttonVariants({ variant: "outline" })}
 							>
 								<Plus className="mr-1.5 size-4" aria-hidden />
@@ -276,7 +276,7 @@ function AdminCuratedCatalogPage() {
 			/>
 
 			{catalogQuery.isPending ? (
-				<PracticeTreeSkeleton areas={3} practicesPerArea={3} />
+				<PracticeTreeSkeleton groups={3} practicesPerGroup={3} />
 			) : catalogQuery.isError ? (
 				<QueryErrorAlert
 					error={catalogQuery.error}
@@ -285,22 +285,22 @@ function AdminCuratedCatalogPage() {
 				/>
 			) : (
 				<CuratedCatalog
-					areas={catalogQuery.data.areas}
+					groups={catalogQuery.data.groups}
 					practices={catalogQuery.data.practices}
 					summary={catalogQuery.data.summary}
 					search={search}
 					customOrder={catalogQuery.data.customOrder}
 					pendingPracticeSlugs={pendingPracticeSlugs}
-					pendingAreaSlugs={pendingAreaSlugs}
+					pendingGroupSlugs={pendingGroupSlugs}
 					writePending={writePending}
 					onSearchChange={(next: CuratedCatalogSearch) =>
 						void navigate({ search: (previous) => ({ ...previous, ...next }), replace: true })
 					}
 					onPracticeStatusChange={(practice: CuratedPracticeSummary, offered) => {
-						const parent = practice.areaSlug
-							? catalogQuery.data.areas.find((area) => area.slug === practice.areaSlug)
+						const parent = practice.groupSlug
+							? catalogQuery.data.groups.find((group) => group.slug === practice.groupSlug)
 							: undefined;
-						const availabilityMessage = practice.areaSlug
+						const availabilityMessage = practice.groupSlug
 							? parent
 								? parent.status.offered
 									? undefined
@@ -320,18 +320,18 @@ function AdminCuratedCatalogPage() {
 							),
 						);
 					}}
-					onAreaStatusChange={(area: CuratedArea, offered) =>
-						updateAreaStatus.mutate(
+					onGroupStatusChange={(group: CuratedGroup, offered) =>
+						updateGroupStatus.mutate(
 							{
-								path: { slug: area.slug },
+								path: { slug: group.slug },
 								headers: { "If-Match": `"${catalogQuery.data.etag}"` },
 								body: { status: offered ? "AVAILABLE" : "RETIRED" },
 							},
-							onAreaStatusSettled(area.slug, offered),
+							onGroupStatusSettled(group.slug, offered),
 						)
 					}
-					onReorderAreas={(orderedSlugs) =>
-						reorderAreas.mutate({
+					onReorderGroups={(orderedSlugs) =>
+						reorderGroups.mutate({
 							headers: { "If-Match": `"${catalogQuery.data.etag}"` },
 							body: { orderedSlugs },
 						})
@@ -341,7 +341,7 @@ function AdminCuratedCatalogPage() {
 							headers: { "If-Match": `"${catalogQuery.data.etag}"` },
 						})
 					}
-					onPlacePractice={(practiceSlug, areaSlug, position) => {
+					onPlacePractice={(practiceSlug, groupSlug, position) => {
 						const practice = catalogQuery.data.practices.find(
 							(candidate) => candidate.slug === practiceSlug,
 						);
@@ -349,20 +349,20 @@ function AdminCuratedCatalogPage() {
 						const optimistic = placeCuratedPractice(
 							catalogQuery.data,
 							practiceSlug,
-							areaSlug,
+							groupSlug,
 							position,
 						);
-						if ((practice.areaSlug ?? null) === areaSlug) {
+						if ((practice.groupSlug ?? null) === groupSlug) {
 							reorderPractices.mutate({
 								headers: { "If-Match": `"${catalogQuery.data.etag}"` },
-								body: { areaSlug, orderedSlugs: orderedPracticeSlugs(optimistic, areaSlug) },
+								body: { groupSlug, orderedSlugs: orderedPracticeSlugs(optimistic, groupSlug) },
 							});
 							return;
 						}
 						placePractice.mutate({
 							path: { slug: practiceSlug },
 							headers: { "If-Match": `"${catalogQuery.data.etag}"` },
-							body: { areaSlug: areaSlug ?? undefined, position },
+							body: { groupSlug: groupSlug ?? undefined, position },
 						});
 					}}
 				/>
@@ -387,10 +387,10 @@ function AdminCuratedCatalogPage() {
 							/>
 						);
 					}
-					if (entry.kind === "area-new") {
-						return <CuratedAreaCreateLevel nested={level.nested} onDone={done} />;
+					if (entry.kind === "group-new") {
+						return <CuratedGroupCreateLevel nested={level.nested} onDone={done} />;
 					}
-					return <CuratedAreaEditLevel areaSlug={entry.id} nested={level.nested} onDone={done} />;
+					return <CuratedGroupEditLevel groupSlug={entry.id} nested={level.nested} onDone={done} />;
 				}}
 			</DetailDrawerStack>
 		</PageLayout>

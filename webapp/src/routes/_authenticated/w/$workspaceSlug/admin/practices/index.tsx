@@ -4,24 +4,24 @@ import { ListChecks } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import {
-	adoptAreaMutation,
+	adoptGroupMutation,
 	adoptPracticeMutation,
 	getPracticeDefinitionOptionsOptions,
 	getPracticeOptions,
 	listAdoptablePracticesOptions,
-	listAreasOptions,
+	listGroupsOptions,
 	listPracticeEvidenceOutcomesOptions,
 	listPracticesOptions,
-	previewAreaAdoptionOptions,
+	previewGroupAdoptionOptions,
 	previewPracticeAdoptionOptions,
 } from "@/api/@tanstack/react-query.gen";
 import type {
-	CatalogAreaAdoptionPreview,
+	CatalogGroupAdoptionPreview,
 	CatalogPracticePreview,
 	Practice,
-	PracticeArea,
+	PracticeGroup,
 } from "@/api/types.gen";
-import { AreaAdoptionPanel } from "@/components/admin/practice-adoption/AreaAdoptionPanel";
+import { GroupAdoptionPanel } from "@/components/admin/practice-adoption/GroupAdoptionPanel";
 import { PracticeAdoptionPanel } from "@/components/admin/practice-adoption/PracticeAdoptionPanel";
 import { generateSlug } from "@/components/admin/practice-catalog/constants";
 import { type FocusFilter, PracticeCatalog } from "@/components/admin/practices/PracticeCatalog";
@@ -75,7 +75,7 @@ function PracticeCatalogRoute() {
 	const { focus, library, detail } = Route.useSearch();
 	const setSearch = useSearchState();
 
-	const [deletingArea, setDeletingArea] = useState<PracticeArea | null>(null);
+	const [deletingGroup, setDeletingGroup] = useState<PracticeGroup | null>(null);
 	const [deletingPractice, setDeletingPractice] = useState<Practice | null>(null);
 	const [staleLevelKey, setStaleLevelKey] = useState<string | null>(null);
 	const catalog = usePracticeCatalogMutations(workspaceSlug);
@@ -86,8 +86,8 @@ function PracticeCatalogRoute() {
 	const detailStack = parseDetailStack(detail, DETAIL_LEVEL_KINDS);
 	const stackControls = useDetailStack(detailStack);
 
-	const areasQuery = useQuery({
-		...listAreasOptions({ path: { workspaceSlug } }),
+	const groupsQuery = useQuery({
+		...listGroupsOptions({ path: { workspaceSlug } }),
 	});
 	const practicesQuery = useQuery({
 		...listPracticesOptions({ path: { workspaceSlug } }),
@@ -108,10 +108,10 @@ function PracticeCatalogRoute() {
 	// rather than a type error.
 	const levelQueries = useQueries({
 		queries: detailStack.map((entry) => {
-			if (entry.kind === "catalog-area") {
+			if (entry.kind === "catalog-group") {
 				return {
-					...previewAreaAdoptionOptions({ path: { workspaceSlug, slug: entry.id } }),
-					select: (data: CatalogAreaAdoptionPreview) => ({ kind: "catalog-area", data }) as const,
+					...previewGroupAdoptionOptions({ path: { workspaceSlug, slug: entry.id } }),
+					select: (data: CatalogGroupAdoptionPreview) => ({ kind: "catalog-group", data }) as const,
 				};
 			}
 			if (entry.kind === "catalog-practice") {
@@ -132,7 +132,7 @@ function PracticeCatalogRoute() {
 	});
 
 	/** The groups the editor offers. A hidden group still holds practices but is not a destination. */
-	const editableAreas = areasQuery.data?.filter((area) => area.visibleInPracticeDashboards);
+	const editableGroups = groupsQuery.data?.filter((group) => group.visibleInPracticeDashboards);
 
 	/**
 	 * Reads a level's payload only when it is the kind the caller is rendering. One reader per kind
@@ -140,9 +140,9 @@ function PracticeCatalogRoute() {
 	 * nothing, so a shared reader would have to assert back what the tag already proves.
 	 */
 	type LevelQuery = (typeof levelQueries)[number] | undefined;
-	const areaAdoptionAt = (query: LevelQuery) => {
+	const groupAdoptionAt = (query: LevelQuery) => {
 		const tagged = query?.data;
-		return tagged?.kind === "catalog-area" ? tagged.data : undefined;
+		return tagged?.kind === "catalog-group" ? tagged.data : undefined;
 	};
 	const practiceAdoptionAt = (query: LevelQuery) => {
 		const tagged = query?.data;
@@ -155,16 +155,16 @@ function PracticeCatalogRoute() {
 
 	const refreshCatalog = () =>
 		Promise.all([
-			areasQuery.refetch(),
+			groupsQuery.refetch(),
 			practicesQuery.refetch(),
 			catalogQuery.refetch(),
-			// A practice added from inside an area drawer changes what the area behind it would do.
+			// A practice added from inside a group drawer changes what the group behind it would do.
 			...levelQueries
-				.filter((_query, index) => detailStack[index]?.kind === "catalog-area")
+				.filter((_query, index) => detailStack[index]?.kind === "catalog-group")
 				.map((q) => q.refetch()),
 		]);
-	const adoptCatalogArea = useMutation({
-		...adoptAreaMutation(),
+	const adoptCatalogGroup = useMutation({
+		...adoptGroupMutation(),
 		onSuccess: async (result) => {
 			stackControls.close(0);
 			await refreshCatalog();
@@ -174,7 +174,7 @@ function PracticeCatalogRoute() {
 			].filter(Boolean);
 			toast.success("Group updated", { description: changes.join(", ") });
 		},
-		onError: () => toast.error("Couldn't add the area. Nothing was changed."),
+		onError: () => toast.error("Couldn't add the group. Nothing was changed."),
 	});
 	const adoptCatalogPractice = useMutation({
 		...adoptPracticeMutation(),
@@ -236,14 +236,14 @@ function PracticeCatalogRoute() {
 					</>
 				}
 			/>
-			{areasQuery.isPending || practicesQuery.isPending || definitionOptionsQuery.isPending ? (
-				<PracticeTreeSkeleton areas={3} practicesPerArea={3} />
-			) : areasQuery.isError || practicesQuery.isError || definitionOptionsQuery.isError ? (
+			{groupsQuery.isPending || practicesQuery.isPending || definitionOptionsQuery.isPending ? (
+				<PracticeTreeSkeleton groups={3} practicesPerGroup={3} />
+			) : groupsQuery.isError || practicesQuery.isError || definitionOptionsQuery.isError ? (
 				<QueryErrorAlert
-					error={areasQuery.error ?? practicesQuery.error ?? definitionOptionsQuery.error}
+					error={groupsQuery.error ?? practicesQuery.error ?? definitionOptionsQuery.error}
 					title="Couldn't load practices"
 					onRetry={() => {
-						void areasQuery.refetch();
+						void groupsQuery.refetch();
 						void practicesQuery.refetch();
 						void definitionOptionsQuery.refetch();
 					}}
@@ -251,16 +251,16 @@ function PracticeCatalogRoute() {
 			) : (
 				<PracticeCatalog
 					workspaceSlug={workspaceSlug}
-					areas={areasQuery.data}
+					groups={groupsQuery.data}
 					practices={practicesQuery.data}
 					definitionOptions={definitionOptionsQuery.data}
 					pending={{
-						areaSlugs: catalog.pendingAreaSlugs,
+						groupSlugs: catalog.pendingGroupSlugs,
 						practiceSlugs: catalog.pendingPracticeSlugs,
-						areaStructure: catalog.areaStructurePending,
+						groupStructure: catalog.groupStructurePending,
 						blockedMoveDestinationSlugs: catalog.blockedMoveDestinationSlugs,
 						blockedPracticeOrderBuckets: catalog.blockedPracticeOrderBuckets,
-						creatingArea: catalog.createArea.isPending,
+						creatingGroup: catalog.createGroup.isPending,
 					}}
 					focusFilter={focus ?? "ALL"}
 					library={{
@@ -283,9 +283,9 @@ function PracticeCatalogRoute() {
 							focus: next === "ALL" ? undefined : next,
 						}))
 					}
-					onCreateArea={async ({ name, icon, color }) => {
+					onCreateGroup={async ({ name, icon, color }) => {
 						try {
-							await catalog.createArea.mutateAsync({
+							await catalog.createGroup.mutateAsync({
 								path: { workspaceSlug },
 								// The picker only ever sets a value, so `null` means "not chosen" — omit it and the
 								// server keeps seeding the chip from the slug.
@@ -301,10 +301,10 @@ function PracticeCatalogRoute() {
 							return false;
 						}
 					}}
-					onUpdateArea={async (areaSlug, { name, icon, color }) => {
+					onUpdateGroup={async (groupSlug, { name, icon, color }) => {
 						try {
-							await catalog.updateArea.mutateAsync({
-								path: { workspaceSlug, areaSlug },
+							await catalog.updateGroup.mutateAsync({
+								path: { workspaceSlug, groupSlug },
 								body: { name, icon: icon ?? undefined, color: color ?? undefined },
 							});
 							return true;
@@ -312,26 +312,26 @@ function PracticeCatalogRoute() {
 							return false;
 						}
 					}}
-					onSetAreaDashboardVisibility={(areaSlug, visibleInPracticeDashboards) =>
-						catalog.updateArea.mutate({
-							path: { workspaceSlug, areaSlug },
+					onSetGroupDashboardVisibility={(groupSlug, visibleInPracticeDashboards) =>
+						catalog.updateGroup.mutate({
+							path: { workspaceSlug, groupSlug },
 							body: { visibleInPracticeDashboards },
 						})
 					}
-					onDeleteArea={(areaSlug) =>
-						setDeletingArea(areasQuery.data.find((area) => area.slug === areaSlug) ?? null)
+					onDeleteGroup={(groupSlug) =>
+						setDeletingGroup(groupsQuery.data.find((group) => group.slug === groupSlug) ?? null)
 					}
-					onReorderAreas={(orderedSlugs) =>
-						catalog.reorderAreas.mutate({ path: { workspaceSlug }, body: { orderedSlugs } })
+					onReorderGroups={(orderedSlugs) =>
+						catalog.reorderGroups.mutate({ path: { workspaceSlug }, body: { orderedSlugs } })
 					}
-					onSetAreaVisual={(areaSlug, patch) =>
-						catalog.updateArea.mutate({ path: { workspaceSlug, areaSlug }, body: patch })
+					onSetGroupVisual={(groupSlug, patch) =>
+						catalog.updateGroup.mutate({ path: { workspaceSlug, groupSlug }, body: patch })
 					}
 					onDeletePractice={setDeletingPractice}
-					onPlacePractice={(practiceSlug, areaSlug, position) =>
+					onPlacePractice={(practiceSlug, groupSlug, position) =>
 						catalog.placePractice.mutate({
 							path: { workspaceSlug, practiceSlug },
-							body: { areaSlug: areaSlug ?? undefined, position },
+							body: { groupSlug: groupSlug ?? undefined, position },
 						})
 					}
 				/>
@@ -350,14 +350,14 @@ function PracticeCatalogRoute() {
 					const levelPending = query === undefined || query.isPending;
 					const levelError = query?.isError === true ? query.error : undefined;
 					const refetchLevel = () => void query?.refetch();
-					if (entry.kind === "catalog-area") {
-						const areaPreview = areaAdoptionAt(query);
+					if (entry.kind === "catalog-group") {
+						const groupPreview = groupAdoptionAt(query);
 						const adoptGroup = async () => {
-							const preview = areaAdoptionAt(query);
+							const preview = groupAdoptionAt(query);
 							if (!query || !preview) return;
 							setStaleLevelKey(null);
 							try {
-								await adoptCatalogArea.mutateAsync({
+								await adoptCatalogGroup.mutateAsync({
 									path: { workspaceSlug, slug: entry.id },
 									headers: { "If-Match": preview.etag },
 								});
@@ -370,20 +370,20 @@ function PracticeCatalogRoute() {
 							}
 						};
 						return (
-							<AreaAdoptionPanel
+							<GroupAdoptionPanel
 								nested={level.nested}
 								state={
-									areaPreview === undefined || levelPending
+									groupPreview === undefined || levelPending
 										? { status: "loading" }
 										: levelError !== undefined
 											? { status: "error", error: levelError, onRetry: refetchLevel }
 											: {
 													status: "ready",
-													preview: areaPreview,
+													preview: groupPreview,
 													action:
 														staleLevelKey === detailStackKey(entry)
 															? "stale"
-															: adoptCatalogArea.isPending
+															: adoptCatalogGroup.isPending
 																? "adding"
 																: "idle",
 												}
@@ -418,8 +418,8 @@ function PracticeCatalogRoute() {
 													status: "ready",
 													practice: workspacePractice,
 													definitionOptions: definitionOptionsQuery.data,
-													areaName: areasQuery.data?.find(
-														(area) => area.slug === workspacePractice.areaSlug,
+													groupName: groupsQuery.data?.find(
+														(group) => group.slug === workspacePractice.groupSlug,
 													)?.name,
 												}
 								}
@@ -437,7 +437,7 @@ function PracticeCatalogRoute() {
 						};
 						return (
 							<PracticeFormLevel nested={level.nested} creating={creating}>
-								{editableAreas === undefined ||
+								{editableGroups === undefined ||
 								definitionOptionsQuery.data === undefined ||
 								(!creating && editing === undefined) ? (
 									<DrawerBody>
@@ -451,19 +451,19 @@ function PracticeCatalogRoute() {
 										{...(editing === undefined
 											? {
 													mode: "create" as const,
-													onSubmit: (data, areaSlug) => saved(editor.create(data, areaSlug)),
+													onSubmit: (data, groupSlug) => saved(editor.create(data, groupSlug)),
 												}
 											: {
 													mode: "edit" as const,
 													initialData: editing,
-													onSubmit: (slug, data, areaSlug) =>
-														saved(editor.update(slug, data, areaSlug)),
+													onSubmit: (slug, data, groupSlug) =>
+														saved(editor.update(slug, data, groupSlug)),
 													evidenceOutcome: evidenceOutcomesQuery.data?.find(
 														(outcome) => outcome.practiceSlug === entry.id,
 													),
 												})}
 										workspaceSlug={workspaceSlug}
-										areas={editableAreas}
+										groups={editableGroups}
 										definitionOptions={definitionOptionsQuery.data}
 										isPending={editor.isPending}
 										cancel={<LevelCancel />}
@@ -507,49 +507,49 @@ function PracticeCatalogRoute() {
 			</DetailDrawerStack>
 
 			<AlertDialog
-				open={deletingArea !== null}
+				open={deletingGroup !== null}
 				onOpenChange={(open) => {
-					if (!open) setDeletingArea(null);
+					if (!open) setDeletingGroup(null);
 				}}
 			>
 				<AlertDialogContent>
 					<AlertDialogHeader>
-						<AlertDialogTitle>Delete “{deletingArea?.name}”?</AlertDialogTitle>
+						<AlertDialogTitle>Delete “{deletingGroup?.name}”?</AlertDialogTitle>
 						<AlertDialogDescription>
-							Choose whether to keep this area's practices in the workspace or delete them with the
-							area. Deleting practices also permanently deletes their observations.
+							Choose whether to keep this group's practices in the workspace or delete them with the
+							group. Deleting practices also permanently deletes their observations.
 						</AlertDialogDescription>
 					</AlertDialogHeader>
 					<AlertDialogFooter className="sm:grid sm:grid-cols-3">
 						<AlertDialogCancel>Cancel</AlertDialogCancel>
 						<AlertDialogAction
 							variant="outline"
-							disabled={catalog.deleteArea.isPending}
+							disabled={catalog.deleteGroup.isPending}
 							onClick={() => {
-								if (!deletingArea) return;
-								catalog.deleteArea.mutate(
-									{ path: { workspaceSlug, areaSlug: deletingArea.slug } },
-									{ onSuccess: () => setDeletingArea(null) },
+								if (!deletingGroup) return;
+								catalog.deleteGroup.mutate(
+									{ path: { workspaceSlug, groupSlug: deletingGroup.slug } },
+									{ onSuccess: () => setDeletingGroup(null) },
 								);
 							}}
 						>
-							{catalog.deleteArea.isPending ? "Deleting…" : "Keep practices unassigned"}
+							{catalog.deleteGroup.isPending ? "Deleting…" : "Keep practices unassigned"}
 						</AlertDialogAction>
 						<AlertDialogAction
 							variant="destructive"
-							disabled={catalog.deleteArea.isPending}
+							disabled={catalog.deleteGroup.isPending}
 							onClick={() => {
-								if (!deletingArea) return;
-								catalog.deleteArea.mutate(
+								if (!deletingGroup) return;
+								catalog.deleteGroup.mutate(
 									{
-										path: { workspaceSlug, areaSlug: deletingArea.slug },
+										path: { workspaceSlug, groupSlug: deletingGroup.slug },
 										query: { deletePractices: true },
 									},
-									{ onSuccess: () => setDeletingArea(null) },
+									{ onSuccess: () => setDeletingGroup(null) },
 								);
 							}}
 						>
-							{catalog.deleteArea.isPending ? "Deleting…" : "Delete group and practices"}
+							{catalog.deleteGroup.isPending ? "Deleting…" : "Delete group and practices"}
 						</AlertDialogAction>
 					</AlertDialogFooter>
 				</AlertDialogContent>

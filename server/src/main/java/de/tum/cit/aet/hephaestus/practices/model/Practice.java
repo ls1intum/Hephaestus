@@ -60,8 +60,8 @@ import org.jspecify.annotations.Nullable;
     ),
     indexes = {
         @Index(name = "idx_practice_workspace_autonomy", columnList = "workspace_id, autonomy"),
-        @Index(name = "idx_practice_practice_area", columnList = "practice_area_id"),
-        @Index(name = "idx_practice_area_order", columnList = "practice_area_id, display_order"),
+        @Index(name = "idx_practice_practice_group", columnList = "practice_group_id"),
+        @Index(name = "idx_practice_group_order", columnList = "practice_group_id, display_order"),
         @Index(name = "idx_practice_source_curated_slug", columnList = "source_curated_slug"),
     }
 )
@@ -106,10 +106,10 @@ public class Practice {
     private ArtifactKind artifactKind = ArtifactKinds.PULL_REQUEST;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "practice_area_id", foreignKey = @ForeignKey(name = "fk_practice_area"))
+    @JoinColumn(name = "practice_group_id", foreignKey = @ForeignKey(name = "fk_practice_group"))
     @OnDelete(action = OnDeleteAction.SET_NULL)
     @ToString.Exclude
-    private @Nullable PracticeArea area;
+    private @Nullable PracticeGroup group;
 
     /** Catalog slug retained across workspace edits. */
     @Column(name = "source_curated_slug", length = 64)
@@ -141,7 +141,7 @@ public class Practice {
 
     /**
      * The detection rubric the agent evaluates the artifact against — the rule's normative text, never shown
-     * to learners. The {@code DEFECT-DETECTOR DISCIPLINE} marker token (see {@link #isDefectDetector()}) lives
+     * to developers. The {@code DEFECT-DETECTOR DISCIPLINE} marker token (see {@link #isDefectDetector()}) lives
      * in this text.
      */
     @Column(name = "criteria", columnDefinition = "TEXT", nullable = false)
@@ -181,7 +181,7 @@ public class Practice {
 
     /**
      * This practice's own answer to how much autonomy the system has over it, or {@code null} to inherit its
-     * area's (and through it the workspace's) — an autonomy rather than a boolean so silencing a noisy practice
+     * group's (and through it the workspace's) — an autonomy rather than a boolean so silencing a noisy practice
      * does not also cost its measurement.
      *
      * <p>Never read raw for a decision: {@code null} means "holds no opinion", not {@code OFF}. Resolve it

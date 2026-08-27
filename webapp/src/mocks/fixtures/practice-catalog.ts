@@ -21,8 +21,8 @@ export const realPracticeDefinition = {
 		'A decision record that names only the winner tells the next person what was done, not what it cost. When a constraint later changes — a library is deprecated, the traffic grows, the team shrinks — the first question is always "what else did we look at, and does that reason still hold?". If the alternatives were never written down, that question can only be answered by redoing the whole investigation, and usually it is not answered at all: the decision quietly becomes something nobody feels able to revisit.',
 	whatGoodLooksLike:
 		"A record that names the two or three options that were genuinely in play and gives each one a sentence saying what ruled it out — the constraint it failed, the cost it carried, the thing the team was not willing to trade. Written for someone who arrives a year later with a changed constraint, so they can tell in a minute whether the decision still stands.",
-	areaSlug: "decisions-and-documentation",
+	groupSlug: "decisions-and-documentation",
 } satisfies CuratedPracticeDefinition;
 
-export const realAreaName = "Recording decisions and documenting changes";
-export const realAreaSlug = "decisions-and-documentation";
+export const realGroupName = "Recording decisions and documenting changes";
+export const realGroupSlug = "decisions-and-documentation";

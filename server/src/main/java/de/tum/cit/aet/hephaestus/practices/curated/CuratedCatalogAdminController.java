@@ -10,19 +10,19 @@ import de.tum.cit.aet.hephaestus.practices.PracticeBinding;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinitionOptionsService;
 import de.tum.cit.aet.hephaestus.practices.PracticeEvidenceDefaults;
-import de.tum.cit.aet.hephaestus.practices.curated.dto.CreateCuratedAreaRequestDTO;
+import de.tum.cit.aet.hephaestus.practices.curated.dto.CreateCuratedGroupRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.curated.dto.CreateCuratedPracticeRequestDTO;
-import de.tum.cit.aet.hephaestus.practices.curated.dto.CuratedAreaDTO;
-import de.tum.cit.aet.hephaestus.practices.curated.dto.CuratedAreaRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.curated.dto.CuratedCatalogDTO;
 import de.tum.cit.aet.hephaestus.practices.curated.dto.CuratedCatalogSummaryDTO;
+import de.tum.cit.aet.hephaestus.practices.curated.dto.CuratedGroupDTO;
+import de.tum.cit.aet.hephaestus.practices.curated.dto.CuratedGroupRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.curated.dto.CuratedPracticeDTO;
 import de.tum.cit.aet.hephaestus.practices.curated.dto.CuratedPracticeRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.curated.dto.CuratedPracticeSummaryDTO;
 import de.tum.cit.aet.hephaestus.practices.curated.dto.UpdateCuratedStatusRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.PlacePracticeRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.PracticeDefinitionOptionsDTO;
-import de.tum.cit.aet.hephaestus.practices.dto.ReorderPracticeAreasRequestDTO;
+import de.tum.cit.aet.hephaestus.practices.dto.ReorderPracticeGroupsRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.ReorderPracticesRequestDTO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -77,7 +77,7 @@ public class CuratedCatalogAdminController {
     @GetMapping
     @Operation(
         summary = "Read the instance catalog",
-        description = "Practice summaries, complete areas, ordering, and catalog state. Fetch a practice for its full definition.",
+        description = "Practice summaries, complete groups, ordering, and catalog state. Fetch a practice for its full definition.",
         operationId = "adminGetCuratedCatalog"
     )
     public ResponseEntity<CuratedCatalogDTO> catalog() {
@@ -247,7 +247,7 @@ public class CuratedCatalogAdminController {
     }
 
     @PatchMapping("/practices/reorder")
-    @Operation(summary = "Reorder practices within one catalog area", operationId = "adminReorderCuratedPractices")
+    @Operation(summary = "Reorder practices within one catalog group", operationId = "adminReorderCuratedPractices")
     @AuditExempt(reason = "catalog order affects presentation, not review execution or delivery")
     public ResponseEntity<CuratedCatalogDTO> reorderPractices(
         @Parameter(required = true) @RequestHeader(
@@ -257,12 +257,12 @@ public class CuratedCatalogAdminController {
         @Valid @RequestBody ReorderPracticesRequestDTO request
     ) {
         return catalogResponse(
-            service.reorderPractices(precondition(ifMatch), request.areaSlug(), request.orderedSlugs())
+            service.reorderPractices(precondition(ifMatch), request.groupSlug(), request.orderedSlugs())
         );
     }
 
     @PatchMapping("/practices/{slug}/placement")
-    @Operation(summary = "Move a practice to another catalog area", operationId = "adminPlaceCuratedPractice")
+    @Operation(summary = "Move a practice to another catalog group", operationId = "adminPlaceCuratedPractice")
     @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "CURATED_PRACTICE")
     public ResponseEntity<CuratedCatalogDTO> placePractice(
         @PathVariable String slug,
@@ -273,45 +273,45 @@ public class CuratedCatalogAdminController {
         @Valid @RequestBody PlacePracticeRequestDTO request
     ) {
         return catalogResponse(
-            service.placePractice(slug, precondition(ifMatch), request.areaSlug(), request.position())
+            service.placePractice(slug, precondition(ifMatch), request.groupSlug(), request.position())
         );
     }
 
-    @GetMapping("/areas/{slug}")
-    @Operation(summary = "Read a catalog area", operationId = "adminGetCuratedArea")
+    @GetMapping("/groups/{slug}")
+    @Operation(summary = "Read a catalog group", operationId = "adminGetCuratedGroup")
     @ApiResponse(
         responseCode = "200",
-        description = "The area",
-        content = @Content(schema = @Schema(implementation = CuratedAreaDTO.class))
+        description = "The group",
+        content = @Content(schema = @Schema(implementation = CuratedGroupDTO.class))
     )
-    public ResponseEntity<CuratedAreaDTO> getArea(@PathVariable String slug) {
-        return ok(service.area(slug), CuratedAreaDTO::from);
+    public ResponseEntity<CuratedGroupDTO> getGroup(@PathVariable String slug) {
+        return ok(service.group(slug), CuratedGroupDTO::from);
     }
 
-    @PostMapping("/areas")
-    @Operation(summary = "Add an area to the catalog", operationId = "adminCreateCuratedArea")
+    @PostMapping("/groups")
+    @Operation(summary = "Add a group to the catalog", operationId = "adminCreateCuratedGroup")
     @ApiResponse(
         responseCode = "201",
-        description = "Area added",
-        content = @Content(schema = @Schema(implementation = CuratedAreaDTO.class))
+        description = "Group added",
+        content = @Content(schema = @Schema(implementation = CuratedGroupDTO.class))
     )
     @ApiResponse(
         responseCode = "409",
         description = "Slug already exists",
         content = @Content(schema = @Schema(implementation = ProblemDetail.class))
     )
-    @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "CURATED_PRACTICE_AREA")
-    public ResponseEntity<CuratedAreaDTO> createArea(@Valid @RequestBody CreateCuratedAreaRequestDTO request) {
-        var entry = service.createArea(request.slug(), request.definition().definition());
-        return created(entry.slug(), entry.etag(), CuratedAreaDTO.from(entry));
+    @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "CURATED_PRACTICE_GROUP")
+    public ResponseEntity<CuratedGroupDTO> createGroup(@Valid @RequestBody CreateCuratedGroupRequestDTO request) {
+        var entry = service.createGroup(request.slug(), request.definition().definition());
+        return created(entry.slug(), entry.etag(), CuratedGroupDTO.from(entry));
     }
 
-    @PutMapping("/areas/{slug}")
-    @Operation(summary = "Replace an area definition", operationId = "adminUpdateCuratedArea")
+    @PutMapping("/groups/{slug}")
+    @Operation(summary = "Replace a group definition", operationId = "adminUpdateCuratedGroup")
     @ApiResponse(
         responseCode = "200",
-        description = "The area",
-        content = @Content(schema = @Schema(implementation = CuratedAreaDTO.class))
+        description = "The group",
+        content = @Content(schema = @Schema(implementation = CuratedGroupDTO.class))
     )
     @ApiResponse(
         responseCode = "412",
@@ -323,23 +323,23 @@ public class CuratedCatalogAdminController {
         description = "If-Match is required",
         content = @Content(schema = @Schema(implementation = ProblemDetail.class))
     )
-    @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "CURATED_PRACTICE_AREA")
-    public ResponseEntity<CuratedAreaDTO> updateArea(
+    @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "CURATED_PRACTICE_GROUP")
+    public ResponseEntity<CuratedGroupDTO> updateGroup(
         @PathVariable String slug,
         @Parameter(required = true) @RequestHeader(
             name = HttpHeaders.IF_MATCH,
             required = false
         ) @Nullable String ifMatch,
-        @Valid @RequestBody CuratedAreaRequestDTO request
+        @Valid @RequestBody CuratedGroupRequestDTO request
     ) {
-        return ok(service.writeArea(slug, precondition(ifMatch), request.definition()), CuratedAreaDTO::from);
+        return ok(service.writeGroup(slug, precondition(ifMatch), request.definition()), CuratedGroupDTO::from);
     }
 
-    @PatchMapping("/areas/{slug}/status")
+    @PatchMapping("/groups/{slug}/status")
     @Operation(
-        summary = "Exclude an area from new workspaces, or include it again",
-        description = "Excluding an area also excludes its practices from new workspaces; existing workspaces do not change.",
-        operationId = "adminUpdateCuratedAreaStatus"
+        summary = "Exclude a group from new workspaces, or include it again",
+        description = "Excluding a group also excludes its practices from new workspaces; existing workspaces do not change.",
+        operationId = "adminUpdateCuratedGroupStatus"
     )
     @ApiResponse(
         responseCode = "200",
@@ -356,8 +356,8 @@ public class CuratedCatalogAdminController {
         description = "If-Match is required",
         content = @Content(schema = @Schema(implementation = ProblemDetail.class))
     )
-    @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "CURATED_PRACTICE_AREA")
-    public ResponseEntity<CuratedCatalogDTO> updateAreaStatus(
+    @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "CURATED_PRACTICE_GROUP")
+    public ResponseEntity<CuratedCatalogDTO> updateGroupStatus(
         @PathVariable String slug,
         @Parameter(required = true) @RequestHeader(
             name = HttpHeaders.IF_MATCH,
@@ -365,15 +365,15 @@ public class CuratedCatalogAdminController {
         ) @Nullable String ifMatch,
         @Valid @RequestBody UpdateCuratedStatusRequestDTO request
     ) {
-        return catalogResponse(service.setAreaStatus(slug, precondition(ifMatch), request.status()));
+        return catalogResponse(service.setGroupStatus(slug, precondition(ifMatch), request.status()));
     }
 
-    @DeleteMapping("/areas/{slug}/override")
-    @Operation(summary = "Use the Hephaestus definition of an area", operationId = "adminDeleteCuratedAreaOverride")
+    @DeleteMapping("/groups/{slug}/override")
+    @Operation(summary = "Use the Hephaestus definition of a group", operationId = "adminDeleteCuratedGroupOverride")
     @ApiResponse(
         responseCode = "200",
-        description = "The area",
-        content = @Content(schema = @Schema(implementation = CuratedAreaDTO.class))
+        description = "The group",
+        content = @Content(schema = @Schema(implementation = CuratedGroupDTO.class))
     )
     @ApiResponse(
         responseCode = "409",
@@ -390,23 +390,23 @@ public class CuratedCatalogAdminController {
         description = "If-Match is required",
         content = @Content(schema = @Schema(implementation = ProblemDetail.class))
     )
-    @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "CURATED_PRACTICE_AREA")
-    public ResponseEntity<CuratedAreaDTO> resetArea(
+    @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "CURATED_PRACTICE_GROUP")
+    public ResponseEntity<CuratedGroupDTO> resetGroup(
         @PathVariable String slug,
         @Parameter(required = true) @RequestHeader(
             name = HttpHeaders.IF_MATCH,
             required = false
         ) @Nullable String ifMatch
     ) {
-        return ok(service.resetArea(slug, precondition(ifMatch)), CuratedAreaDTO::from);
+        return ok(service.resetGroup(slug, precondition(ifMatch)), CuratedGroupDTO::from);
     }
 
-    @PutMapping("/areas/{slug}/override/acknowledgement")
-    @Operation(summary = "Keep the saved area customization", operationId = "adminKeepCuratedArea")
+    @PutMapping("/groups/{slug}/override/acknowledgement")
+    @Operation(summary = "Keep the saved group customization", operationId = "adminKeepCuratedGroup")
     @ApiResponse(
         responseCode = "200",
-        description = "The area",
-        content = @Content(schema = @Schema(implementation = CuratedAreaDTO.class))
+        description = "The group",
+        content = @Content(schema = @Schema(implementation = CuratedGroupDTO.class))
     )
     @ApiResponse(
         responseCode = "412",
@@ -418,28 +418,28 @@ public class CuratedCatalogAdminController {
         description = "If-Match is required",
         content = @Content(schema = @Schema(implementation = ProblemDetail.class))
     )
-    @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "CURATED_PRACTICE_AREA")
-    public ResponseEntity<CuratedAreaDTO> keepArea(
+    @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "CURATED_PRACTICE_GROUP")
+    public ResponseEntity<CuratedGroupDTO> keepGroup(
         @PathVariable String slug,
         @Parameter(required = true) @RequestHeader(
             name = HttpHeaders.IF_MATCH,
             required = false
         ) @Nullable String ifMatch
     ) {
-        return ok(service.keepArea(slug, precondition(ifMatch)), CuratedAreaDTO::from);
+        return ok(service.keepGroup(slug, precondition(ifMatch)), CuratedGroupDTO::from);
     }
 
-    @PatchMapping("/areas/reorder")
-    @Operation(summary = "Reorder catalog areas", operationId = "adminReorderCuratedAreas")
+    @PatchMapping("/groups/reorder")
+    @Operation(summary = "Reorder catalog groups", operationId = "adminReorderCuratedGroups")
     @AuditExempt(reason = "catalog order affects presentation, not review execution or delivery")
-    public ResponseEntity<CuratedCatalogDTO> reorderAreas(
+    public ResponseEntity<CuratedCatalogDTO> reorderGroups(
         @Parameter(required = true) @RequestHeader(
             name = HttpHeaders.IF_MATCH,
             required = false
         ) @Nullable String ifMatch,
-        @Valid @RequestBody ReorderPracticeAreasRequestDTO request
+        @Valid @RequestBody ReorderPracticeGroupsRequestDTO request
     ) {
-        return catalogResponse(service.reorderAreas(precondition(ifMatch), request.orderedSlugs()));
+        return catalogResponse(service.reorderGroups(precondition(ifMatch), request.orderedSlugs()));
     }
 
     @DeleteMapping("/order")
@@ -467,7 +467,7 @@ public class CuratedCatalogAdminController {
             catalog.etag(),
             catalog.customOrder(),
             CuratedCatalogSummaryDTO.from(catalog.summary()),
-            catalog.areas().stream().map(CuratedAreaDTO::from).toList(),
+            catalog.groups().stream().map(CuratedGroupDTO::from).toList(),
             catalog
                 .practices()
                 .stream()

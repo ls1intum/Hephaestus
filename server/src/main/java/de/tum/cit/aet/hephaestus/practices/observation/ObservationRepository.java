@@ -311,8 +311,8 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
      * Uses a separate {@code countQuery} because {@code JOIN FETCH} is incompatible
      * with count projections in Hibernate.
      *
-     * <p>The area join is a LEFT JOIN on purpose: an implicit {@code p.area.slug} path would
-     * inner-join and silently drop observations of area-less practices even when no area filter
+     * <p>The group join is a LEFT JOIN on purpose: an implicit {@code p.group.slug} path would
+     * inner-join and silently drop observations of group-less practices even when no group filter
      * is set. {@code displayableOnly} drops NOT_APPLICABLE rows — the activity-feed surface shows
      * what the reviewer actually observed, not the practices that did not apply to an artifact.
      *
@@ -325,11 +325,11 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
         value = """
         SELECT f FROM Observation f
         JOIN FETCH f.practice p
-        LEFT JOIN p.area a
+        LEFT JOIN p.group a
         WHERE f.aboutUserId = :aboutUserId
         AND p.workspace.id = :workspaceId
         AND (:practiceSlug IS NULL OR p.slug = :practiceSlug)
-        AND (:areaSlug IS NULL OR a.slug = :areaSlug)
+        AND (:groupSlug IS NULL OR a.slug = :groupSlug)
         AND (:presence IS NULL OR f.presence = :presence)
         AND (:hasArtifactKinds = FALSE OR f.artifactKind IN :artifactKinds)
         AND (:hasSeverities = FALSE OR f.severity IS NULL OR f.severity IN :severities)
@@ -338,11 +338,11 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
         countQuery = """
         SELECT COUNT(f) FROM Observation f
         JOIN f.practice p
-        LEFT JOIN p.area a
+        LEFT JOIN p.group a
         WHERE f.aboutUserId = :aboutUserId
         AND p.workspace.id = :workspaceId
         AND (:practiceSlug IS NULL OR p.slug = :practiceSlug)
-        AND (:areaSlug IS NULL OR a.slug = :areaSlug)
+        AND (:groupSlug IS NULL OR a.slug = :groupSlug)
         AND (:presence IS NULL OR f.presence = :presence)
         AND (:hasArtifactKinds = FALSE OR f.artifactKind IN :artifactKinds)
         AND (:hasSeverities = FALSE OR f.severity IS NULL OR f.severity IN :severities)
@@ -353,7 +353,7 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
         @Param("aboutUserId") Long aboutUserId,
         @Param("workspaceId") Long workspaceId,
         @Param("practiceSlug") @Nullable String practiceSlug,
-        @Param("areaSlug") @Nullable String areaSlug,
+        @Param("groupSlug") @Nullable String groupSlug,
         @Param("presence") @Nullable Presence presence,
         @Param("hasArtifactKinds") boolean hasArtifactKinds,
         @Param("artifactKinds") Collection<ArtifactKind> artifactKinds,
@@ -379,11 +379,11 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
         value = """
         SELECT f FROM Observation f
         JOIN FETCH f.practice p
-        LEFT JOIN p.area a
+        LEFT JOIN p.group a
         WHERE f.aboutUserId = :aboutUserId
         AND p.workspace.id = :workspaceId
         AND (:practiceSlug IS NULL OR p.slug = :practiceSlug)
-        AND (:areaSlug IS NULL OR a.slug = :areaSlug)
+        AND (:groupSlug IS NULL OR a.slug = :groupSlug)
         AND (:presence IS NULL OR f.presence = :presence)
         AND (:hasArtifactKinds = FALSE OR f.artifactKind IN :artifactKinds)
         AND (:hasSeverities = FALSE OR f.severity IS NULL OR f.severity IN :severities)
@@ -399,11 +399,11 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
         countQuery = """
         SELECT COUNT(f) FROM Observation f
         JOIN f.practice p
-        LEFT JOIN p.area a
+        LEFT JOIN p.group a
         WHERE f.aboutUserId = :aboutUserId
         AND p.workspace.id = :workspaceId
         AND (:practiceSlug IS NULL OR p.slug = :practiceSlug)
-        AND (:areaSlug IS NULL OR a.slug = :areaSlug)
+        AND (:groupSlug IS NULL OR a.slug = :groupSlug)
         AND (:presence IS NULL OR f.presence = :presence)
         AND (:hasArtifactKinds = FALSE OR f.artifactKind IN :artifactKinds)
         AND (:hasSeverities = FALSE OR f.severity IS NULL OR f.severity IN :severities)
@@ -414,7 +414,7 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
         @Param("aboutUserId") Long aboutUserId,
         @Param("workspaceId") Long workspaceId,
         @Param("practiceSlug") @Nullable String practiceSlug,
-        @Param("areaSlug") @Nullable String areaSlug,
+        @Param("groupSlug") @Nullable String groupSlug,
         @Param("presence") @Nullable Presence presence,
         @Param("hasArtifactKinds") boolean hasArtifactKinds,
         @Param("artifactKinds") Collection<ArtifactKind> artifactKinds,
@@ -428,7 +428,7 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
     /**
      * Review-history page at the run grain. Paging observations directly can split one review across pages,
      * which leaves the developer with an incomplete explanation of what the reviewer saw. This projection first
-     * selects complete agent-job runs; {@link #findPracticeAreaReviewRunObservations} loads their observations next.
+     * selects complete agent-job runs; {@link #findPracticeGroupReviewRunObservations} loads their observations next.
      *
      * <p>Carries {@link #HIDDEN_REPOSITORY_GUARD}, which is what keeps a hidden repository out of the whole
      * surface: the second query reads only the job ids this one returns, and an agent job reviews one
@@ -440,10 +440,10 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
                            MAX(f.observed_at) AS "reviewedAt"
                     FROM observation f
                     JOIN practice p ON p.id = f.practice_id
-                    JOIN practice_area a ON a.id = p.practice_area_id
+                    JOIN practice_group a ON a.id = p.practice_group_id
                     WHERE f.about_user_id = :aboutUserId
                       AND p.workspace_id = :workspaceId
-                      AND a.slug = :areaSlug
+                      AND a.slug = :groupSlug
                       AND (:practiceSlug IS NULL OR p.slug = :practiceSlug)
                       AND (:artifactKinds IS NULL OR f.artifact_kind = ANY(string_to_array(:artifactKinds, ',')))
                       AND (:severities IS NULL OR f.severity = ANY(string_to_array(:severities, ',')))
@@ -456,10 +456,10 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
             """,
         nativeQuery = true
     )
-    Slice<ReviewHistoryRunRow> findPracticeAreaReviewRuns(
+    Slice<ReviewHistoryRunRow> findPracticeGroupReviewRuns(
         @Param("aboutUserId") Long aboutUserId,
         @Param("workspaceId") Long workspaceId,
-        @Param("areaSlug") @Nullable String areaSlug,
+        @Param("groupSlug") @Nullable String groupSlug,
         @Param("practiceSlug") @Nullable String practiceSlug,
         @Param("artifactKinds") @Nullable String artifactKinds,
         @Param("severities") @Nullable String severities,
@@ -467,7 +467,7 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
     );
 
     /**
-     * Every observation in the area for the runs {@link #findPracticeAreaReviewRuns} returned. Filters select
+     * Every observation in the group for the runs {@link #findPracticeGroupReviewRuns} returned. Filters select
      * matching runs; they do not truncate a selected review run.
      *
      * <p>Fetches both revisions because every row is handed straight to {@code ObservationVisibilityPolicy},
@@ -479,20 +479,20 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
         """
         SELECT o FROM Observation o
         JOIN FETCH o.practice p
-        JOIN p.area a
+        JOIN p.group a
         WHERE o.agentJobId IN :jobIds
           AND o.aboutUserId = :aboutUserId
           AND p.workspace.id = :workspaceId
-          AND a.slug = :areaSlug
+          AND a.slug = :groupSlug
           AND o.presence <> de.tum.cit.aet.hephaestus.practices.model.Presence.NOT_APPLICABLE
         ORDER BY o.observedAt DESC, o.id ASC
         """
     )
-    List<Observation> findPracticeAreaReviewRunObservations(
+    List<Observation> findPracticeGroupReviewRunObservations(
         @Param("jobIds") Collection<UUID> jobIds,
         @Param("aboutUserId") Long aboutUserId,
         @Param("workspaceId") Long workspaceId,
-        @Param("areaSlug") @Nullable String areaSlug
+        @Param("groupSlug") @Nullable String groupSlug
     );
 
     interface ReviewHistoryRunRow {
@@ -831,7 +831,7 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
 
     String OPERATOR_PREDICATES = """
           AND (CAST(:#{#f.practiceSlugArray()} AS text[]) IS NULL OR p.slug = ANY(CAST(:#{#f.practiceSlugArray()} AS text[])))
-          AND (CAST(:#{#f.areaSlugArray()} AS text[]) IS NULL OR pa.slug = ANY(CAST(:#{#f.areaSlugArray()} AS text[])))
+          AND (CAST(:#{#f.groupSlugArray()} AS text[]) IS NULL OR pa.slug = ANY(CAST(:#{#f.groupSlugArray()} AS text[])))
           AND (CAST(:#{#f.presenceNames()} AS text[]) IS NULL OR o.presence = ANY(CAST(:#{#f.presenceNames()} AS text[])))
           AND (CAST(:#{#f.assessmentNames()} AS text[]) IS NULL OR o.assessment = ANY(CAST(:#{#f.assessmentNames()} AS text[])))
           AND (CAST(:#{#f.severityNames()} AS text[]) IS NULL OR o.severity = ANY(CAST(:#{#f.severityNames()} AS text[])))
@@ -850,10 +850,10 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
                    o.agent_job_id AS "agentJobId",
                    p.slug AS "practiceSlug",
                    p.name AS "practiceName",
-                   pa.slug AS "areaSlug",
-                   pa.name AS "areaName",
-                   pa.icon AS "areaIcon",
-                   pa.color AS "areaColor",
+                   pa.slug AS "groupSlug",
+                   pa.name AS "groupName",
+                   pa.icon AS "groupIcon",
+                   pa.color AS "groupColor",
                    o.artifact_kind AS "artifactKind",
                    o.artifact_id AS "artifactId",
                    o.about_user_id AS "aboutUserId",
@@ -871,7 +871,7 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
             JOIN practice p ON p.id = o.practice_id
             LEFT JOIN practice_revision evaluated_revision ON evaluated_revision.id = o.practice_revision_id
             LEFT JOIN practice_revision current_revision ON current_revision.id = p.current_revision_id
-            LEFT JOIN practice_area pa ON pa.id = p.practice_area_id
+            LEFT JOIN practice_group pa ON pa.id = p.practice_group_id
             WHERE p.workspace_id = :workspaceId
             """ +
             OPERATOR_PREDICATES +
@@ -896,7 +896,7 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
             SELECT count(*)
             FROM observation o
             JOIN practice p ON p.id = o.practice_id
-            LEFT JOIN practice_area pa ON pa.id = p.practice_area_id
+            LEFT JOIN practice_group pa ON pa.id = p.practice_group_id
             WHERE p.workspace_id = :workspaceId
             """ +
             OPERATOR_PREDICATES,
@@ -916,16 +916,16 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
         String getPracticeName();
 
         @Nullable
-        String getAreaSlug();
+        String getGroupSlug();
 
         @Nullable
-        String getAreaName();
+        String getGroupName();
 
         @Nullable
-        String getAreaIcon();
+        String getGroupIcon();
 
         @Nullable
-        String getAreaColor();
+        String getGroupColor();
 
         /** The raw column: a native-query projection is mapped from JDBC types, with no converter run. */
         String getArtifactKind();
@@ -997,10 +997,10 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
 
     @Query(
         """
-        SELECT o.id AS observationId, p.autonomy AS practiceAutonomy, a.autonomy AS areaAutonomy
+        SELECT o.id AS observationId, p.autonomy AS practiceAutonomy, a.autonomy AS groupAutonomy
         FROM Observation o
         JOIN o.practice p
-        LEFT JOIN p.area a
+        LEFT JOIN p.group a
         WHERE o.id IN :observationIds
         """
     )
@@ -1040,7 +1040,7 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
         PracticeAutonomy getPracticeAutonomy();
 
         @Nullable
-        PracticeAutonomy getAreaAutonomy();
+        PracticeAutonomy getGroupAutonomy();
     }
 
     /**

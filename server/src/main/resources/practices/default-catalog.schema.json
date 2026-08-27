@@ -5,7 +5,7 @@
 	"description": "Repository-managed practice definitions installed into the curated instance catalog.",
 	"type": "object",
 	"additionalProperties": false,
-	"required": ["$schema", "criteriaPreambles", "areas"],
+	"required": ["$schema", "criteriaPreambles", "groups"],
 	"properties": {
 		"$schema": {
 			"description": "Schema used by editors and CI to validate this catalog.",
@@ -20,32 +20,32 @@
 				"minLength": 1
 			}
 		},
-		"areas": {
-			"description": "Ordered practice areas; array order is the bundled display order.",
+		"groups": {
+			"description": "Ordered practice groups; array order is the bundled display order.",
 			"type": "array",
 			"minItems": 1,
 			"items": {
-				"$ref": "#/$defs/area"
+				"$ref": "#/$defs/group"
 			}
 		}
 	},
 	"$defs": {
-		"area": {
+		"group": {
 			"description": "A named group of related practices.",
 			"type": "object",
 			"additionalProperties": false,
 			"required": ["slug", "name", "practices"],
 			"properties": {
 				"slug": {
-					"description": "Stable area identifier used for provenance and URLs.",
+					"description": "Stable group identifier used for provenance and URLs.",
 					"$ref": "#/$defs/slug"
 				},
 				"name": {
-					"description": "Human-facing area name.",
+					"description": "Human-facing group name.",
 					"$ref": "#/$defs/name"
 				},
 				"description": {
-					"description": "Optional explanation of the area's purpose.",
+					"description": "Optional explanation of the group's purpose.",
 					"type": "string",
 					"minLength": 1,
 					"maxLength": 2000
@@ -63,7 +63,7 @@
 					"maxLength": 64
 				},
 				"practices": {
-					"description": "Ordered practices in this area; array order is the bundled display order.",
+					"description": "Ordered practices in this group; array order is the bundled display order.",
 					"type": "array",
 					"items": {
 						"$ref": "#/$defs/practice"

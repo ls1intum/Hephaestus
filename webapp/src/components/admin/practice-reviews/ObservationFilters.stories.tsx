@@ -3,11 +3,11 @@ import { expect, fn, screen, within } from "storybook/test";
 import type { FacetSource } from "@/components/common/FacetMultiSelect";
 import { withStandardPage } from "@/stories/decorators";
 import { StatefulPatch } from "@/stories/stateful";
-import { areaFacetOptions, ObservationFilters, practiceFacetOptions } from "./ObservationFilters";
+import { groupFacetOptions, ObservationFilters, practiceFacetOptions } from "./ObservationFilters";
 import type { ReviewPeople } from "./ReviewPersonFacet";
 import type { ObservationsSearch } from "./review-search";
 import {
-	practiceAreas,
+	practiceGroups,
 	reviewArtifact,
 	workspaceMembers,
 	workspacePractices,
@@ -26,18 +26,18 @@ const PEOPLE: ReviewPeople = {
 	isError: false,
 };
 const AREAS: FacetSource = {
-	options: areaFacetOptions(practiceAreas),
+	options: groupFacetOptions(practiceGroups),
 	isLoading: false,
 	isError: false,
 };
 const PRACTICES: FacetSource = {
-	options: practiceFacetOptions(workspacePractices, practiceAreas),
+	options: practiceFacetOptions(workspacePractices, practiceGroups),
 	isLoading: false,
 	isError: false,
 };
 
 /**
- * The Observations list's toolbar, on its own. Area and Practice are the workspace's own catalogue
+ * The Observations list's toolbar, on its own. Group and Practice are the workspace's own catalogue
  * rather than a fixed registry, so both can be empty for two different reasons and each has to say
  * which — the two states no page-level story reaches without breaking the whole screen.
  */
@@ -51,7 +51,7 @@ const meta = {
 		search: { presence: undefined, assessment: undefined, severity: undefined },
 		onPatch: fn(),
 		onReset: fn(),
-		areas: AREAS,
+		groups: AREAS,
 		practices: PRACTICES,
 		people: PEOPLE,
 		total: 12,
@@ -70,7 +70,7 @@ const meta = {
 					}}
 					onReset={() => {
 						patch({
-							areaSlug: undefined,
+							groupSlug: undefined,
 							practiceSlug: undefined,
 							presence: undefined,
 							assessment: undefined,
@@ -139,26 +139,26 @@ export const SortIsNotAFilter: Story = {
 /** The catalogue is still on its way, so the facet is disabled rather than offering nothing. */
 export const WhileTheCatalogueLoads: Story = {
 	args: {
-		areas: { options: [], isLoading: true, isError: false },
+		groups: { options: [], isLoading: true, isError: false },
 		practices: { options: [], isLoading: true, isError: false },
 	},
 	play: async ({ canvas }) => {
-		await expect(canvas.getByRole("combobox", { name: "Area" })).toBeDisabled();
+		await expect(canvas.getByRole("combobox", { name: "Group" })).toBeDisabled();
 		await expect(canvas.getByRole("combobox", { name: "Practice" })).toBeDisabled();
 	},
 };
 
 /**
- * A catalogue that failed to load is not a workspace with no areas in it, and a facet that said "No
- * areas available" after a 500 would send the reader looking for a catalogue problem.
+ * A catalogue that failed to load is not a workspace with no groups in it, and a facet that said "No
+ * groups available" after a 500 would send the reader looking for a catalogue problem.
  */
 export const TheCatalogueCouldNotBeLoaded: Story = {
 	args: {
-		areas: { options: [], isLoading: false, isError: true },
+		groups: { options: [], isLoading: false, isError: true },
 		practices: { options: [], isLoading: false, isError: true },
 	},
 	play: async ({ canvas, userEvent }) => {
-		await userEvent.click(canvas.getByRole("combobox", { name: "Area" }));
+		await userEvent.click(canvas.getByRole("combobox", { name: "Group" }));
 		await screen.findByText("Could not load groups");
 	},
 };

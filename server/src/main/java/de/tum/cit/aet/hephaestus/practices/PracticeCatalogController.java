@@ -4,13 +4,13 @@ import de.tum.cit.aet.hephaestus.core.AuditExempt;
 import de.tum.cit.aet.hephaestus.core.AuditLedger;
 import de.tum.cit.aet.hephaestus.core.Audited;
 import de.tum.cit.aet.hephaestus.practices.dto.AutonomyRollupDTO;
-import de.tum.cit.aet.hephaestus.practices.dto.BindPracticeAreaRequestDTO;
+import de.tum.cit.aet.hephaestus.practices.dto.BindPracticeGroupRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.CreatePracticeRequestDTO;
-import de.tum.cit.aet.hephaestus.practices.dto.LearnerPracticeDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.PlacePracticeRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.PracticeDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.PracticeDefinitionOptionsDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.ReorderPracticesRequestDTO;
+import de.tum.cit.aet.hephaestus.practices.dto.ReviewedPracticeDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.UpdatePracticeAutonomyRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.UpdatePracticeRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
@@ -25,7 +25,6 @@ import io.swagger.v3.oas.annotations.media.ArraySchema;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
-import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.net.URI;
@@ -58,7 +57,7 @@ public class PracticeCatalogController {
     private final PracticeService practiceService;
     private final CatalogOriginPresenter presenter;
     private final AutonomyRollupService rollupService;
-    private final PracticeAreaService areaService;
+    private final PracticeGroupService groupService;
     private final PracticeDefinitionOptionsService definitionOptionsService;
 
     @GetMapping("/definition-options")
@@ -76,7 +75,7 @@ public class PracticeCatalogController {
     @Operation(
         summary = "List practice definitions",
         description = "Returns this workspace's practices, each with the autonomy in force for it, " +
-            "whether that autonomy was set on the practice or inherited from its area or the workspace, and " +
+            "whether that autonomy was set on the practice or inherited from its group or the workspace, and " +
             "which level decided it. Optionally narrowed to one autonomy."
     )
     @ApiResponse(
@@ -98,23 +97,22 @@ public class PracticeCatalogController {
         return ResponseEntity.ok(practices);
     }
 
-    @GetMapping("/learner")
+    @GetMapping("/reviewed")
     @Operation(
-        summary = "List reviewed practices, learner-facing",
-        description = "Returns the learner-facing name, area, rationale, and example for every practice the " +
+        summary = "List reviewed practices, developer-facing",
+        description = "Returns the developer-facing name, group, rationale, and example for every practice the " +
             "workspace reviews (any autonomy above OFF)"
     )
     @ApiResponse(
         responseCode = "200",
-        description = "Learner practices returned",
-        content = @Content(array = @ArraySchema(schema = @Schema(implementation = LearnerPracticeDTO.class)))
+        description = "Developer practices returned",
+        content = @Content(array = @ArraySchema(schema = @Schema(implementation = ReviewedPracticeDTO.class)))
     )
-    @SecurityRequirements
-    public ResponseEntity<List<LearnerPracticeDTO>> listLearnerPractices(WorkspaceContext workspaceContext) {
-        List<LearnerPracticeDTO> practices = practiceService
+    public ResponseEntity<List<ReviewedPracticeDTO>> listReviewedPractices(WorkspaceContext workspaceContext) {
+        List<ReviewedPracticeDTO> practices = practiceService
             .listReviewedPractices(workspaceContext)
             .stream()
-            .map(LearnerPracticeDTO::from)
+            .map(ReviewedPracticeDTO::from)
             .toList();
         return ResponseEntity.ok(practices);
     }
@@ -160,7 +158,7 @@ public class PracticeCatalogController {
     )
     @ApiResponse(
         responseCode = "404",
-        description = "Practice area not found",
+        description = "Practice group not found",
         content = @Content(
             mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
             schema = @Schema(implementation = ProblemDetail.class)
@@ -182,7 +180,7 @@ public class PracticeCatalogController {
 
     @PatchMapping("/reorder")
     @Operation(
-        summary = "Reorder the practices within an area",
+        summary = "Reorder the practices within a group",
         description = "Sets each practice's display order to its index in the provided slug list (one atomic write)"
     )
     @ApiResponse(
@@ -192,7 +190,7 @@ public class PracticeCatalogController {
     )
     @ApiResponse(
         responseCode = "400",
-        description = "orderedSlugs is empty, has duplicates, or is not the area's complete set",
+        description = "orderedSlugs is empty, has duplicates, or is not the group's complete set",
         content = @Content(
             mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
             schema = @Schema(implementation = ProblemDetail.class)
@@ -206,7 +204,7 @@ public class PracticeCatalogController {
     ) {
         practiceService.reorderPractices(
             workspaceContext,
-            Objects.requireNonNull(request.areaSlug()),
+            Objects.requireNonNull(request.groupSlug()),
             request.orderedSlugs()
         );
         List<PracticeDTO> practices = presenter.presentPractices(
@@ -225,7 +223,7 @@ public class PracticeCatalogController {
     )
     @ApiResponse(
         responseCode = "404",
-        description = "Practice or practice area not found",
+        description = "Practice or practice group not found",
         content = @Content(
             mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
             schema = @Schema(implementation = ProblemDetail.class)
@@ -247,8 +245,8 @@ public class PracticeCatalogController {
         summary = "Set how much autonomy the system has over one practice",
         description = "OFF stops the review entirely. HUMAN_APPROVAL runs it and records every observation and " +
             "holds feedback for an authorized reviewer. AUTOMATIC sends feedback without asking, as far as this workspace's reach " +
-            "allows. Send a null autonomy to clear the practice's own setting so it follows its area, and " +
-            "through the area the workspace default."
+            "allows. Send a null autonomy to clear the practice's own setting so it follows its group, and " +
+            "through the group the workspace default."
     )
     @ApiResponse(
         responseCode = "200",
@@ -283,10 +281,10 @@ public class PracticeCatalogController {
         return ResponseEntity.ok(presenter.present(workspaceContext.id(), practice));
     }
 
-    @PutMapping("/{practiceSlug}/area")
+    @PutMapping("/{practiceSlug}/group")
     @Operation(
         summary = "Move a practice",
-        description = "Moves the practice to the requested area, or to Unassigned when areaSlug is null"
+        description = "Moves the practice to the requested group, or to Unassigned when groupSlug is null"
     )
     @ApiResponse(
         responseCode = "200",
@@ -295,7 +293,7 @@ public class PracticeCatalogController {
     )
     @ApiResponse(
         responseCode = "404",
-        description = "Practice or area not found",
+        description = "Practice or group not found",
         content = @Content(
             mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
             schema = @Schema(implementation = ProblemDetail.class)
@@ -303,19 +301,19 @@ public class PracticeCatalogController {
     )
     @RequireAtLeastWorkspaceAdmin
     @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "PRACTICE_DEFINITION")
-    public ResponseEntity<PracticeDTO> bindArea(
+    public ResponseEntity<PracticeDTO> bindGroup(
         WorkspaceContext workspaceContext,
         @PathVariable String practiceSlug,
-        @Valid @RequestBody BindPracticeAreaRequestDTO request
+        @Valid @RequestBody BindPracticeGroupRequestDTO request
     ) {
-        Practice practice = areaService.bindPractice(workspaceContext, practiceSlug, request.areaSlug());
+        Practice practice = groupService.bindPractice(workspaceContext, practiceSlug, request.groupSlug());
         return ResponseEntity.ok(presenter.present(workspaceContext.id(), practice));
     }
 
     @PutMapping("/{practiceSlug}/placement")
     @Operation(
         summary = "Place a practice in the catalog",
-        description = "Moves the practice and sets its exact position in one atomic write; omit areaSlug for Unassigned"
+        description = "Moves the practice and sets its exact position in one atomic write; omit groupSlug for Unassigned"
     )
     @ApiResponse(
         responseCode = "200",
@@ -332,7 +330,7 @@ public class PracticeCatalogController {
     )
     @ApiResponse(
         responseCode = "404",
-        description = "Practice or area not found",
+        description = "Practice or group not found",
         content = @Content(
             mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
             schema = @Schema(implementation = ProblemDetail.class)
@@ -347,7 +345,7 @@ public class PracticeCatalogController {
     ) {
         List<PracticeDTO> practices = presenter.presentPractices(
             workspaceContext.id(),
-            practiceService.placePractice(workspaceContext, practiceSlug, request.areaSlug(), request.position())
+            practiceService.placePractice(workspaceContext, practiceSlug, request.groupSlug(), request.position())
         );
         return ResponseEntity.ok(practices);
     }
@@ -372,9 +370,9 @@ public class PracticeCatalogController {
 
     @GetMapping("/autonomy")
     @Operation(
-        summary = "Summarise how much autonomy this workspace grants, by area",
+        summary = "Summarise how much autonomy this workspace grants, by group",
         description = "How many practices sit at each autonomy, for the whole workspace and for each " +
-            "area, plus the workspace default and where feedback may go. The summary a hundred-practice " +
+            "group, plus the workspace default and where feedback may go. The summary a hundred-practice " +
             "catalogue is read through — answered here so a client never has to fetch every practice to " +
             "count them."
     )

@@ -55,8 +55,8 @@ import { Route as AuthenticatedWWorkspaceSlugAdminAchievementsRouteImport } from
 import { Route as AuthenticatedWWorkspaceSlugAdminAchievementDesignerRouteImport } from './routes/_authenticated/w/$workspaceSlug/admin/achievement-designer'
 import { Route as AuthenticatedAdminCatalogPracticesNewRouteImport } from './routes/_authenticated/admin.catalog.practices.new'
 import { Route as AuthenticatedAdminCatalogPracticesPracticeSlugRouteImport } from './routes/_authenticated/admin.catalog.practices.$practiceSlug'
-import { Route as AuthenticatedAdminCatalogAreasNewRouteImport } from './routes/_authenticated/admin.catalog.areas.new'
-import { Route as AuthenticatedAdminCatalogAreasAreaSlugRouteImport } from './routes/_authenticated/admin.catalog.areas.$areaSlug'
+import { Route as AuthenticatedAdminCatalogGroupsNewRouteImport } from './routes/_authenticated/admin.catalog.groups.new'
+import { Route as AuthenticatedAdminCatalogGroupsGroupSlugRouteImport } from './routes/_authenticated/admin.catalog.groups.$groupSlug'
 import { Route as AuthenticatedWWorkspaceSlugUserUsernameIndexRouteImport } from './routes/_authenticated/w/$workspaceSlug/user/$username/index'
 import { Route as AuthenticatedWWorkspaceSlugAdminPracticesIndexRouteImport } from './routes/_authenticated/w/$workspaceSlug/admin/practices/index'
 import { Route as AuthenticatedWWorkspaceSlugAdminIntegrationsIndexRouteImport } from './routes/_authenticated/w/$workspaceSlug/admin/integrations/index'
@@ -347,16 +347,16 @@ const AuthenticatedAdminCatalogPracticesPracticeSlugRoute =
     path: '/practices/$practiceSlug',
     getParentRoute: () => AuthenticatedAdminCatalogRoute,
   } as any)
-const AuthenticatedAdminCatalogAreasNewRoute =
-  AuthenticatedAdminCatalogAreasNewRouteImport.update({
-    id: '/areas/new',
-    path: '/areas/new',
+const AuthenticatedAdminCatalogGroupsNewRoute =
+  AuthenticatedAdminCatalogGroupsNewRouteImport.update({
+    id: '/groups/new',
+    path: '/groups/new',
     getParentRoute: () => AuthenticatedAdminCatalogRoute,
   } as any)
-const AuthenticatedAdminCatalogAreasAreaSlugRoute =
-  AuthenticatedAdminCatalogAreasAreaSlugRouteImport.update({
-    id: '/areas/$areaSlug',
-    path: '/areas/$areaSlug',
+const AuthenticatedAdminCatalogGroupsGroupSlugRoute =
+  AuthenticatedAdminCatalogGroupsGroupSlugRouteImport.update({
+    id: '/groups/$groupSlug',
+    path: '/groups/$groupSlug',
     getParentRoute: () => AuthenticatedAdminCatalogRoute,
   } as any)
 const AuthenticatedWWorkspaceSlugUserUsernameIndexRoute =
@@ -596,8 +596,8 @@ export interface FileRoutesByFullPath {
   '/admin/catalog/': typeof AuthenticatedAdminCatalogIndexRoute
   '/w/$workspaceSlug/': typeof AuthenticatedWWorkspaceSlugIndexRoute
   '/workspaces/new/': typeof AuthenticatedWorkspacesNewIndexRoute
-  '/admin/catalog/areas/$areaSlug': typeof AuthenticatedAdminCatalogAreasAreaSlugRoute
-  '/admin/catalog/areas/new': typeof AuthenticatedAdminCatalogAreasNewRoute
+  '/admin/catalog/groups/$groupSlug': typeof AuthenticatedAdminCatalogGroupsGroupSlugRoute
+  '/admin/catalog/groups/new': typeof AuthenticatedAdminCatalogGroupsNewRoute
   '/admin/catalog/practices/$practiceSlug': typeof AuthenticatedAdminCatalogPracticesPracticeSlugRoute
   '/admin/catalog/practices/new': typeof AuthenticatedAdminCatalogPracticesNewRoute
   '/w/$workspaceSlug/admin/achievement-designer': typeof AuthenticatedWWorkspaceSlugAdminAchievementDesignerRoute
@@ -672,8 +672,8 @@ export interface FileRoutesByTo {
   '/admin/catalog': typeof AuthenticatedAdminCatalogIndexRoute
   '/w/$workspaceSlug': typeof AuthenticatedWWorkspaceSlugIndexRoute
   '/workspaces/new': typeof AuthenticatedWorkspacesNewIndexRoute
-  '/admin/catalog/areas/$areaSlug': typeof AuthenticatedAdminCatalogAreasAreaSlugRoute
-  '/admin/catalog/areas/new': typeof AuthenticatedAdminCatalogAreasNewRoute
+  '/admin/catalog/groups/$groupSlug': typeof AuthenticatedAdminCatalogGroupsGroupSlugRoute
+  '/admin/catalog/groups/new': typeof AuthenticatedAdminCatalogGroupsNewRoute
   '/admin/catalog/practices/$practiceSlug': typeof AuthenticatedAdminCatalogPracticesPracticeSlugRoute
   '/admin/catalog/practices/new': typeof AuthenticatedAdminCatalogPracticesNewRoute
   '/w/$workspaceSlug/admin/achievement-designer': typeof AuthenticatedWWorkspaceSlugAdminAchievementDesignerRoute
@@ -747,8 +747,8 @@ export interface FileRoutesById {
   '/_authenticated/admin/catalog/': typeof AuthenticatedAdminCatalogIndexRoute
   '/_authenticated/w/$workspaceSlug/': typeof AuthenticatedWWorkspaceSlugIndexRoute
   '/_authenticated/workspaces/new/': typeof AuthenticatedWorkspacesNewIndexRoute
-  '/_authenticated/admin/catalog/areas/$areaSlug': typeof AuthenticatedAdminCatalogAreasAreaSlugRoute
-  '/_authenticated/admin/catalog/areas/new': typeof AuthenticatedAdminCatalogAreasNewRoute
+  '/_authenticated/admin/catalog/groups/$groupSlug': typeof AuthenticatedAdminCatalogGroupsGroupSlugRoute
+  '/_authenticated/admin/catalog/groups/new': typeof AuthenticatedAdminCatalogGroupsNewRoute
   '/_authenticated/admin/catalog/practices/$practiceSlug': typeof AuthenticatedAdminCatalogPracticesPracticeSlugRoute
   '/_authenticated/admin/catalog/practices/new': typeof AuthenticatedAdminCatalogPracticesNewRoute
   '/_authenticated/w/$workspaceSlug/admin/achievement-designer': typeof AuthenticatedWWorkspaceSlugAdminAchievementDesignerRoute
@@ -828,8 +828,8 @@ export interface FileRouteTypes {
     | '/admin/catalog/'
     | '/w/$workspaceSlug/'
     | '/workspaces/new/'
-    | '/admin/catalog/areas/$areaSlug'
-    | '/admin/catalog/areas/new'
+    | '/admin/catalog/groups/$groupSlug'
+    | '/admin/catalog/groups/new'
     | '/admin/catalog/practices/$practiceSlug'
     | '/admin/catalog/practices/new'
     | '/w/$workspaceSlug/admin/achievement-designer'
@@ -904,8 +904,8 @@ export interface FileRouteTypes {
     | '/admin/catalog'
     | '/w/$workspaceSlug'
     | '/workspaces/new'
-    | '/admin/catalog/areas/$areaSlug'
-    | '/admin/catalog/areas/new'
+    | '/admin/catalog/groups/$groupSlug'
+    | '/admin/catalog/groups/new'
     | '/admin/catalog/practices/$practiceSlug'
     | '/admin/catalog/practices/new'
     | '/w/$workspaceSlug/admin/achievement-designer'
@@ -978,8 +978,8 @@ export interface FileRouteTypes {
     | '/_authenticated/admin/catalog/'
     | '/_authenticated/w/$workspaceSlug/'
     | '/_authenticated/workspaces/new/'
-    | '/_authenticated/admin/catalog/areas/$areaSlug'
-    | '/_authenticated/admin/catalog/areas/new'
+    | '/_authenticated/admin/catalog/groups/$groupSlug'
+    | '/_authenticated/admin/catalog/groups/new'
     | '/_authenticated/admin/catalog/practices/$practiceSlug'
     | '/_authenticated/admin/catalog/practices/new'
     | '/_authenticated/w/$workspaceSlug/admin/achievement-designer'
@@ -1365,18 +1365,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminCatalogPracticesPracticeSlugRouteImport
       parentRoute: typeof AuthenticatedAdminCatalogRoute
     }
-    '/_authenticated/admin/catalog/areas/new': {
-      id: '/_authenticated/admin/catalog/areas/new'
-      path: '/areas/new'
-      fullPath: '/admin/catalog/areas/new'
-      preLoaderRoute: typeof AuthenticatedAdminCatalogAreasNewRouteImport
+    '/_authenticated/admin/catalog/groups/new': {
+      id: '/_authenticated/admin/catalog/groups/new'
+      path: '/groups/new'
+      fullPath: '/admin/catalog/groups/new'
+      preLoaderRoute: typeof AuthenticatedAdminCatalogGroupsNewRouteImport
       parentRoute: typeof AuthenticatedAdminCatalogRoute
     }
-    '/_authenticated/admin/catalog/areas/$areaSlug': {
-      id: '/_authenticated/admin/catalog/areas/$areaSlug'
-      path: '/areas/$areaSlug'
-      fullPath: '/admin/catalog/areas/$areaSlug'
-      preLoaderRoute: typeof AuthenticatedAdminCatalogAreasAreaSlugRouteImport
+    '/_authenticated/admin/catalog/groups/$groupSlug': {
+      id: '/_authenticated/admin/catalog/groups/$groupSlug'
+      path: '/groups/$groupSlug'
+      fullPath: '/admin/catalog/groups/$groupSlug'
+      preLoaderRoute: typeof AuthenticatedAdminCatalogGroupsGroupSlugRouteImport
       parentRoute: typeof AuthenticatedAdminCatalogRoute
     }
     '/_authenticated/w/$workspaceSlug/user/$username/': {
@@ -1594,8 +1594,8 @@ declare module '@tanstack/react-router' {
 
 interface AuthenticatedAdminCatalogRouteChildren {
   AuthenticatedAdminCatalogIndexRoute: typeof AuthenticatedAdminCatalogIndexRoute
-  AuthenticatedAdminCatalogAreasAreaSlugRoute: typeof AuthenticatedAdminCatalogAreasAreaSlugRoute
-  AuthenticatedAdminCatalogAreasNewRoute: typeof AuthenticatedAdminCatalogAreasNewRoute
+  AuthenticatedAdminCatalogGroupsGroupSlugRoute: typeof AuthenticatedAdminCatalogGroupsGroupSlugRoute
+  AuthenticatedAdminCatalogGroupsNewRoute: typeof AuthenticatedAdminCatalogGroupsNewRoute
   AuthenticatedAdminCatalogPracticesPracticeSlugRoute: typeof AuthenticatedAdminCatalogPracticesPracticeSlugRoute
   AuthenticatedAdminCatalogPracticesNewRoute: typeof AuthenticatedAdminCatalogPracticesNewRoute
 }
@@ -1603,10 +1603,10 @@ interface AuthenticatedAdminCatalogRouteChildren {
 const AuthenticatedAdminCatalogRouteChildren: AuthenticatedAdminCatalogRouteChildren =
   {
     AuthenticatedAdminCatalogIndexRoute: AuthenticatedAdminCatalogIndexRoute,
-    AuthenticatedAdminCatalogAreasAreaSlugRoute:
-      AuthenticatedAdminCatalogAreasAreaSlugRoute,
-    AuthenticatedAdminCatalogAreasNewRoute:
-      AuthenticatedAdminCatalogAreasNewRoute,
+    AuthenticatedAdminCatalogGroupsGroupSlugRoute:
+      AuthenticatedAdminCatalogGroupsGroupSlugRoute,
+    AuthenticatedAdminCatalogGroupsNewRoute:
+      AuthenticatedAdminCatalogGroupsNewRoute,
     AuthenticatedAdminCatalogPracticesPracticeSlugRoute:
       AuthenticatedAdminCatalogPracticesPracticeSlugRoute,
     AuthenticatedAdminCatalogPracticesNewRoute:

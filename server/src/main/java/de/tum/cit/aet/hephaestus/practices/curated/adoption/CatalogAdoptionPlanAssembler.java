@@ -1,16 +1,16 @@
 package de.tum.cit.aet.hephaestus.practices.curated.adoption;
 
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
-import de.tum.cit.aet.hephaestus.practices.AreaDefinition;
-import de.tum.cit.aet.hephaestus.practices.PracticeAreaRepository;
+import de.tum.cit.aet.hephaestus.practices.GroupDefinition;
 import de.tum.cit.aet.hephaestus.practices.PracticeAutomatedReviewValidation;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
+import de.tum.cit.aet.hephaestus.practices.PracticeGroupRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.curated.CatalogEntry;
 import de.tum.cit.aet.hephaestus.practices.curated.CuratedCatalogService;
 import de.tum.cit.aet.hephaestus.practices.curated.EffectiveCatalog;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeArea;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeGroup;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import java.util.List;
 import java.util.Map;
@@ -26,7 +26,7 @@ class CatalogAdoptionPlanAssembler {
 
     private final CuratedCatalogService catalogService;
     private final PracticeRepository practiceRepository;
-    private final PracticeAreaRepository areaRepository;
+    private final PracticeGroupRepository groupRepository;
 
     List<CatalogPracticeSummaryDTO> list(WorkspaceContext context) {
         EffectiveCatalog catalog = catalogService.catalog();
@@ -34,10 +34,10 @@ class CatalogAdoptionPlanAssembler {
             .findAllForCatalog(context.id())
             .stream()
             .collect(Collectors.toMap(Practice::getSlug, Function.identity()));
-        Map<String, String> areaNames = catalog
-            .installableAreas()
+        Map<String, String> groupNames = catalog
+            .installableGroups()
             .stream()
-            .collect(Collectors.toMap(CatalogEntry::slug, area -> area.effective().name()));
+            .collect(Collectors.toMap(CatalogEntry::slug, group -> group.effective().name()));
         return catalog
             .installablePractices()
             .stream()
@@ -47,8 +47,8 @@ class CatalogAdoptionPlanAssembler {
                     entry.effective().name(),
                     entry.effective().artifactKind(),
                     entry.effective().whyItMatters(),
-                    entry.effective().areaSlug(),
-                    areaNames.get(entry.effective().areaSlug()),
+                    entry.effective().groupSlug(),
+                    groupNames.get(entry.effective().groupSlug()),
                     availability(entry.slug(), workspacePractices.get(entry.slug())),
                     PracticeAutomatedReviewValidation.authorDeclared(entry.slug(), entry.effective())
                 )
@@ -65,93 +65,97 @@ class CatalogAdoptionPlanAssembler {
             .findFirst()
             .orElseThrow(() -> new EntityNotFoundException("Offered catalog practice", slug));
         Practice existingPractice = practiceRepository.findByWorkspaceIdAndSlug(context.id(), slug).orElse(null);
-        String areaSlug = entry.effective().areaSlug();
-        if (areaSlug == null) {
+        String groupSlug = entry.effective().groupSlug();
+        if (groupSlug == null) {
             return CatalogAdoptionPlan.create(
                 slug,
                 entry.effective(),
                 availability(slug, existingPractice),
-                CatalogAreaDisposition.UNASSIGNED,
+                CatalogGroupDisposition.UNASSIGNED,
                 null,
                 null,
                 -1
             );
         }
-        PracticeArea existingArea = areaRepository.findByWorkspaceIdAndSlug(context.id(), areaSlug).orElse(null);
-        if (existingArea != null) {
+        PracticeGroup existingGroup = groupRepository.findByWorkspaceIdAndSlug(context.id(), groupSlug).orElse(null);
+        if (existingGroup != null) {
             return CatalogAdoptionPlan.create(
                 slug,
                 entry.effective(),
                 availability(slug, existingPractice),
-                CatalogAreaDisposition.REUSE_EXISTING_AREA,
-                areaSlug,
-                AreaDefinition.from(existingArea),
-                existingArea.getDisplayOrder()
+                CatalogGroupDisposition.REUSE_EXISTING_GROUP,
+                groupSlug,
+                GroupDefinition.from(existingGroup),
+                existingGroup.getDisplayOrder()
             );
         }
-        AreaDefinition catalogArea = catalog
-            .installableAreas()
+        GroupDefinition catalogGroup = catalog
+            .installableGroups()
             .stream()
-            .filter(area -> area.slug().equals(areaSlug))
+            .filter(group -> group.slug().equals(groupSlug))
             .map(CatalogEntry::effective)
             .findFirst()
-            .orElseThrow(() -> new EntityNotFoundException("Offered catalog area", areaSlug));
+            .orElseThrow(() -> new EntityNotFoundException("Offered catalog group", groupSlug));
         return CatalogAdoptionPlan.create(
             slug,
             entry.effective(),
             availability(slug, existingPractice),
-            CatalogAreaDisposition.CREATE_CATALOG_AREA,
-            areaSlug,
-            catalogArea,
-            areaRepository.findMaxDisplayOrder(context.id()) + 1
+            CatalogGroupDisposition.CREATE_CATALOG_GROUP,
+            groupSlug,
+            catalogGroup,
+            groupRepository.findMaxDisplayOrder(context.id()) + 1
         );
     }
 
-    CatalogAreaAdoptionPlan areaPlan(WorkspaceContext context, String slug) {
+    CatalogGroupAdoptionPlan groupPlan(WorkspaceContext context, String slug) {
         EffectiveCatalog catalog = catalogService.catalog();
-        CatalogEntry<AreaDefinition> entry = catalog
-            .installableAreas()
+        CatalogEntry<GroupDefinition> entry = catalog
+            .installableGroups()
             .stream()
             .filter(candidate -> candidate.slug().equals(slug))
             .findFirst()
-            .orElseThrow(() -> new EntityNotFoundException("Offered catalog area", slug));
-        PracticeArea existingArea = areaRepository.findByWorkspaceIdAndSlug(context.id(), slug).orElse(null);
-        CatalogAreaDisposition disposition =
-            existingArea == null
-                ? CatalogAreaDisposition.CREATE_CATALOG_AREA
-                : CatalogAreaDisposition.REUSE_EXISTING_AREA;
-        AreaDefinition definition = existingArea == null ? entry.effective() : AreaDefinition.from(existingArea);
+            .orElseThrow(() -> new EntityNotFoundException("Offered catalog group", slug));
+        PracticeGroup existingGroup = groupRepository.findByWorkspaceIdAndSlug(context.id(), slug).orElse(null);
+        CatalogGroupDisposition disposition =
+            existingGroup == null
+                ? CatalogGroupDisposition.CREATE_CATALOG_GROUP
+                : CatalogGroupDisposition.REUSE_EXISTING_GROUP;
+        GroupDefinition definition = existingGroup == null ? entry.effective() : GroupDefinition.from(existingGroup);
         int displayOrder =
-            existingArea == null
-                ? areaRepository.findMaxDisplayOrder(context.id()) + 1
-                : existingArea.getDisplayOrder();
+            existingGroup == null
+                ? groupRepository.findMaxDisplayOrder(context.id()) + 1
+                : existingGroup.getDisplayOrder();
         List<CatalogAdoptionPlan> practices = catalog
             .installablePractices()
             .stream()
-            .filter(practice -> slug.equals(practice.effective().areaSlug()))
+            .filter(practice -> slug.equals(practice.effective().groupSlug()))
             .map(practice -> plan(context, practice.slug()))
             .toList();
-        List<CatalogAreaPracticeActionDTO> actions = practices
+        List<CatalogGroupPracticeActionDTO> actions = practices
             .stream()
-            .map(practice -> new CatalogAreaPracticeActionDTO(practice.slug(), areaAction(context, slug, practice)))
+            .map(practice -> new CatalogGroupPracticeActionDTO(practice.slug(), groupAction(context, slug, practice)))
             .toList();
-        return CatalogAreaAdoptionPlan.create(slug, definition, disposition, displayOrder, practices, actions);
+        return CatalogGroupAdoptionPlan.create(slug, definition, disposition, displayOrder, practices, actions);
     }
 
-    private CatalogAreaPracticeAction areaAction(WorkspaceContext context, String areaSlug, CatalogAdoptionPlan plan) {
+    private CatalogGroupPracticeAction groupAction(
+        WorkspaceContext context,
+        String groupSlug,
+        CatalogAdoptionPlan plan
+    ) {
         if (plan.availability() == CatalogAdoptionAvailability.AVAILABLE) {
-            return CatalogAreaPracticeAction.ADD;
+            return CatalogGroupPracticeAction.ADD;
         }
         if (plan.availability() == CatalogAdoptionAvailability.SLUG_CONFLICT) {
-            return CatalogAreaPracticeAction.BLOCKED;
+            return CatalogGroupPracticeAction.BLOCKED;
         }
         Practice existing = practiceRepository.findByWorkspaceIdAndSlug(context.id(), plan.slug()).orElseThrow();
-        if (existing.getArea() == null) {
-            return CatalogAreaPracticeAction.MOVE_TO_AREA;
+        if (existing.getGroup() == null) {
+            return CatalogGroupPracticeAction.MOVE_TO_GROUP;
         }
-        return areaSlug.equals(existing.getArea().getSlug())
-            ? CatalogAreaPracticeAction.KEEP
-            : CatalogAreaPracticeAction.BLOCKED;
+        return groupSlug.equals(existing.getGroup().getSlug())
+            ? CatalogGroupPracticeAction.KEEP
+            : CatalogGroupPracticeAction.BLOCKED;
     }
 
     private static CatalogAdoptionAvailability availability(String slug, @Nullable Practice existingPractice) {

@@ -26,10 +26,10 @@ import org.springframework.web.bind.annotation.RequestParam;
  */
 public record ObservationFeedFilterParams(
     @Parameter(description = "Filter by practice slug") @RequestParam(required = false) @Nullable String practiceSlug,
-    @Parameter(description = "Filter by the practice area the observed practice belongs to")
+    @Parameter(description = "Filter by the practice group the observed practice belongs to")
     @RequestParam(required = false)
     @Nullable
-    String areaSlug,
+    String groupSlug,
     @Parameter(description = "Filter by presence") @RequestParam(required = false) @Nullable Presence presence,
     /**
      * Bare strings, not {@link ArtifactKind}s — {@link QueryFilterSupport#artifactKind} has the reason,
@@ -91,7 +91,7 @@ public record ObservationFeedFilterParams(
     public ObservationFeedQuery toQuery() {
         return new ObservationFeedQuery(
             practiceSlug,
-            areaSlug,
+            groupSlug,
             presence,
             QueryFilterSupport.artifactKinds(workKinds),
             severities,

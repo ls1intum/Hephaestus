@@ -19,7 +19,9 @@ public record ReviewObservationDetailDTO(
     @NonNull UUID agentJobId,
     @NonNull String practiceSlug,
     @NonNull String practiceName,
-    @Schema(description = "Practice area; null when the practice is Unassigned") @Nullable ReviewPracticeAreaDTO area,
+    @Schema(description = "Practice group; null when the practice is Unassigned")
+    @Nullable
+    ReviewPracticeGroupDTO group,
     @Schema(description = "Criteria revision selected as of job start, when available")
     @Nullable
     Long practiceRevisionId,
@@ -52,7 +54,7 @@ public record ReviewObservationDetailDTO(
             observation.getAgentJobId(),
             practice.getSlug(),
             practice.getName(),
-            practice.getArea() == null ? null : ReviewPracticeAreaDTO.from(practice.getArea()),
+            practice.getGroup() == null ? null : ReviewPracticeGroupDTO.from(practice.getGroup()),
             revision == null ? null : revision.getId(),
             artifact,
             subject,

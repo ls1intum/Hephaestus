@@ -12,8 +12,8 @@ import java.util.List;
  * Bayesian posterior, not a repeatedly peeked frequentist test. The package javadoc carries the grounding for
  * both halves of that sentence.
  *
- * <p>Aggregating several of these into an area is a different estimator and lives in
- * {@link AreaTrendAggregator}.
+ * <p>Aggregating several of these into a group is a different estimator and lives in
+ * {@link GroupTrendAggregator}.
  */
 final class PracticeTrendCalculator {
 

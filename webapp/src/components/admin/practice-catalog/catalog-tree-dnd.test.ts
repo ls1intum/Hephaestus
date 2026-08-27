@@ -4,14 +4,14 @@ import { getCatalogDropTarget } from "./catalog-tree-dnd";
 interface Entry {
 	slug: string;
 	name: string;
-	areaSlug?: string;
+	groupSlug?: string;
 	displayOrder: number;
 }
 
-const entry = (slug: string, areaSlug: string | undefined, displayOrder: number): Entry => ({
+const entry = (slug: string, groupSlug: string | undefined, displayOrder: number): Entry => ({
 	slug,
 	name: slug,
-	areaSlug,
+	groupSlug,
 	displayOrder,
 });
 
@@ -24,28 +24,28 @@ describe("catalog tree drop target", () => {
 		entry("before", "delivery", 0),
 	];
 
-	it("places before or after a row in another area", () => {
+	it("places before or after a row in another group", () => {
 		expect(getCatalogDropTarget(entries, "source", "delivery", "after")).toStrictEqual({
-			areaSlug: "delivery",
+			groupSlug: "delivery",
 			position: 1,
 		});
 		expect(getCatalogDropTarget(entries, "source", "delivery", "after", true)).toStrictEqual({
-			areaSlug: "delivery",
+			groupSlug: "delivery",
 			position: 2,
 		});
 	});
 
 	/**
 	 * The row being dragged is not in its own destination. Counting itself would put the drop off the
-	 * end of the area, and the row would come back where it started.
+	 * end of the group, and the row would come back where it started.
 	 */
-	it("does not count the moving row when it stays in its own area", () => {
+	it("does not count the moving row when it stays in its own group", () => {
 		expect(getCatalogDropTarget(entries, "before", "delivery", "after", true)).toStrictEqual({
-			areaSlug: "delivery",
+			groupSlug: "delivery",
 			position: 1,
 		});
 		expect(getCatalogDropTarget(entries, "before", "delivery", "after")).toStrictEqual({
-			areaSlug: "delivery",
+			groupSlug: "delivery",
 			position: 0,
 		});
 	});
@@ -55,18 +55,18 @@ describe("catalog tree drop target", () => {
 		const tied = [entry("beta", "delivery", 0), entry("alpha", "delivery", 0)];
 
 		expect(getCatalogDropTarget(tied, "source", "delivery", "beta")).toStrictEqual({
-			areaSlug: "delivery",
+			groupSlug: "delivery",
 			position: 1,
 		});
 	});
 
-	it("appends to empty areas and Unassigned", () => {
+	it("appends to empty groups and Unassigned", () => {
 		expect(getCatalogDropTarget(entries, "source", "empty")).toStrictEqual({
-			areaSlug: "empty",
+			groupSlug: "empty",
 			position: 0,
 		});
 		expect(getCatalogDropTarget(entries, "source", null)).toStrictEqual({
-			areaSlug: null,
+			groupSlug: null,
 			position: 0,
 		});
 	});
@@ -76,7 +76,7 @@ describe("catalog tree drop target", () => {
 	});
 
 	/**
-	 * An anchor from a stale render, or from an area the row is not in. Refusing the drop leaves the
+	 * An anchor from a stale render, or from a group the row is not in. Refusing the drop leaves the
 	 * order alone; guessing an end of the list would move the practice somewhere nobody aimed at.
 	 */
 	it("refuses a drop onto an anchor the destination does not hold", () => {

@@ -39,7 +39,7 @@ export const RemovedFromDefaults: Story = {
 };
 
 export const Excluded: Story = {
-	args: { status: status({ offered: false }), kind: "area" },
+	args: { status: status({ offered: false }), kind: "group" },
 };
 
 export const NarrowViewport: Story = {

@@ -256,7 +256,7 @@ public interface FeedbackObservationRepository extends JpaRepository<FeedbackObs
         """
         SELECT fo.observation.id AS observationId, fo.role AS role, fo.ordinal AS ordinal,
                p.slug AS practiceSlug, p.name AS practiceName, o.summary AS summary,
-               pa.slug AS areaSlug, pa.name AS areaName, pa.icon AS areaIcon, pa.color AS areaColor,
+               pa.slug AS groupSlug, pa.name AS groupName, pa.icon AS groupIcon, pa.color AS groupColor,
                o.presence AS presence, o.assessment AS assessment, o.severity AS severity,
                evaluatedRevision.id AS practiceRevisionId,
                evaluatedRevision.reviewRuleFingerprint AS practiceRevisionFingerprint,
@@ -267,7 +267,7 @@ public interface FeedbackObservationRepository extends JpaRepository<FeedbackObs
         JOIN o.practice p
         LEFT JOIN o.practiceRevision evaluatedRevision
         LEFT JOIN p.currentRevision currentRevision
-        LEFT JOIN p.area pa
+        LEFT JOIN p.group pa
         WHERE fo.feedback.id = :feedbackId
           AND fo.feedback.workspaceId = :workspaceId
           AND p.workspace.id = :workspaceId
@@ -303,16 +303,16 @@ public interface FeedbackObservationRepository extends JpaRepository<FeedbackObs
         String getPracticeName();
 
         @Nullable
-        String getAreaSlug();
+        String getGroupSlug();
 
         @Nullable
-        String getAreaName();
+        String getGroupName();
 
         @Nullable
-        String getAreaIcon();
+        String getGroupIcon();
 
         @Nullable
-        String getAreaColor();
+        String getGroupColor();
 
         String getSummary();
         Presence getPresence();

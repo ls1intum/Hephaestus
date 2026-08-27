@@ -7,7 +7,7 @@ const thinControllers = workspacePractices.find((p) => p.slug === "thin-controll
 if (!thinControllers) throw new Error("The practice fixtures no longer cover thin-controllers");
 
 /**
- * The review read models carry a practice's slug, name and area but not its prose, so the hover card
+ * The review read models carry a practice's slug, name and group but not its prose, so the hover card
  * needs the practice record itself. The screen fetches the workspace's practice list once and hands
  * the matching record down; a caller that has no record still gets a working link, which is why
  * `practice` is optional.
@@ -21,7 +21,7 @@ const meta = {
 		workspaceSlug: "demo",
 		practiceSlug: thinControllers.slug,
 		practiceName: thinControllers.name,
-		area: { slug: "code-quality", name: "Code quality" },
+		group: { slug: "code-quality", name: "Code quality" },
 		practice: thinControllers,
 	},
 } satisfies Meta<typeof ReviewPracticeLink>;
@@ -37,7 +37,7 @@ export const WithTheHoverCard: Story = {
 };
 
 /**
- * Nothing the card shows is load-bearing — the name and the area are on the row, and the rest is a
+ * Nothing the card shows is load-bearing — the name and the group are on the row, and the rest is a
  * field on the page the link goes to — so a caller without the practice record, like a reader on a
  * touchscreen who gets no card either way, loses nothing.
  */
@@ -52,11 +52,11 @@ export const WithoutThePracticeRecord: Story = {
 };
 
 /**
- * The colour is what an operator scans an area by, so the name is carried by the `title` and the
+ * The colour is what an operator scans a group by, so the name is carried by the `title` and the
  * screen-reader text rather than taking visible space on a row that already names the practice, the
  * person, the work and the time.
  */
-export const AreaIsAMarkNotAWord: Story = {
+export const GroupIsAMarkNotAWord: Story = {
 	play: async ({ canvas }) => {
 		canvas.getByTitle("Code quality");
 		// The words are in the accessible name, not on screen: a row already names the practice, the
@@ -66,8 +66,8 @@ export const AreaIsAMarkNotAWord: Story = {
 };
 
 /** Unassigned is a real state and not a missing value, so the mark is simply absent. */
-export const PracticeWithNoArea: Story = {
-	args: { area: undefined },
+export const PracticeWithNoGroup: Story = {
+	args: { group: undefined },
 	play: async ({ canvas }) => {
 		await expect(canvas.queryByTitle("Code quality")).not.toBeInTheDocument();
 		canvas.getByRole("link", { name: "Thin controllers" });

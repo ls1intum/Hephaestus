@@ -21,7 +21,7 @@ public final class PracticeTrend {
     private final @Nullable OutcomeVector previousOutcomes;
     private final List<EvidenceOpportunity> opportunities;
 
-    /** Absent for INSUFFICIENT_EVIDENCE, and for an area result, which aggregates rather than diffs. */
+    /** Absent for INSUFFICIENT_EVIDENCE, and for a group result, which aggregates rather than diffs. */
     private final BetaPosterior.@Nullable Difference difference;
 
     PracticeTrend(

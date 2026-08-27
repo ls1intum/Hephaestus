@@ -203,7 +203,7 @@ off the practice's severity table — the server nulls it everywhere else. If yo
 
 ## Pre-verdict gates (MANDATORY — run the matching gate BEFORE you emit the observation)
 
-The worst thing this system can do to a learner is land a confident BAD on a student who did the right
+The worst thing this system can do to a developer is land a confident BAD on a developer who did the right
 thing — a false "missing rationale" on documented reasoning, or an author's own note counted against them.
 These gates are not optional reasoning aids: when a gate applies to the practice you are scoring, you MUST
 perform it and quote its result in your reasoning before you may emit anything other than the gate's safe

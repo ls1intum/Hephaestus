@@ -12,7 +12,7 @@ import org.jspecify.annotations.Nullable;
 
 public record ObservationQueryFilter(
     @Nullable List<String> practiceSlugs,
-    @Nullable List<String> areaSlugs,
+    @Nullable List<String> groupSlugs,
     @Nullable List<Presence> presences,
     @Nullable List<Assessment> assessments,
     @Nullable List<Severity> severities,
@@ -31,11 +31,11 @@ public record ObservationQueryFilter(
         return practiceSlugs.toArray(String[]::new);
     }
 
-    public String@Nullable [] areaSlugArray() {
-        if (areaSlugs == null || areaSlugs.isEmpty()) {
+    public String@Nullable [] groupSlugArray() {
+        if (groupSlugs == null || groupSlugs.isEmpty()) {
             return null;
         }
-        return areaSlugs.toArray(String[]::new);
+        return groupSlugs.toArray(String[]::new);
     }
 
     public String@Nullable [] presenceNames() {

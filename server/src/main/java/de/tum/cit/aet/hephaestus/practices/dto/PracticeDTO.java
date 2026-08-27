@@ -31,14 +31,16 @@ public record PracticeDTO(
     @NonNull
     @Schema(description = "Kind of work this practice reviews, read off its bindings", example = "scm.pull_request")
     ArtifactKind artifactKind,
-    @Nullable @Schema(description = "Slug of the practice area this practice is bound to, if any") String areaSlug,
-    @NonNull @Schema(description = "Position within its area (lowest first); ties broken by name") Integer displayOrder,
-    @Nullable @Schema(description = "Developer-facing rationale (learner layer)") String whyItMatters,
-    @Nullable @Schema(description = "Developer-facing exemplar (learner layer)") String whatGoodLooksLike,
+    @Nullable @Schema(description = "Slug of the practice group this practice is bound to, if any") String groupSlug,
+    @NonNull
+    @Schema(description = "Position within its group (lowest first); ties broken by name")
+    Integer displayOrder,
+    @Nullable @Schema(description = "Developer-facing rationale (developer layer)") String whyItMatters,
+    @Nullable @Schema(description = "Developer-facing exemplar (developer layer)") String whatGoodLooksLike,
     @NonNull
     @Schema(
         description = "How much autonomy the system has over this practice, whether that was set here or " +
-            "inherited from its area or workspace, and which level decided it"
+            "inherited from its group or workspace, and which level decided it"
     )
     AutonomyAssignmentDTO autonomy,
     @NonNull @Schema(description = "Timestamp when the practice was created") Instant createdAt,
@@ -65,7 +67,7 @@ public record PracticeDTO(
             practice.getAutomatedReviewPolicy(),
             PracticeAutomatedReviewValidation.authorDeclared(practice.getSlug(), PracticeDefinition.from(practice)),
             practice.getArtifactKind(),
-            practice.getArea() != null ? practice.getArea().getSlug() : null,
+            practice.getGroup() != null ? practice.getGroup().getSlug() : null,
             practice.getDisplayOrder(),
             practice.getWhyItMatters(),
             practice.getWhatGoodLooksLike(),

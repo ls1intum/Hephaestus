@@ -8,7 +8,7 @@ import org.jspecify.annotations.NonNull;
  * One comparable practice opportunity, normalized across all observations in the latest run of one piece of reviewed work.
  *
  * <p>Carries no practice slug. The owning {@link PracticeTrend} already names the scope this list belongs to,
- * and the area aggregation merges opportunities that several practices saw on the same artifact — a merged
+ * and the group aggregation merges opportunities that several practices saw on the same artifact — a merged
  * one answers to no single practice. A field nothing reads is a field that can only go stale or, worse, be
  * filtered on later as though it meant something.
  */

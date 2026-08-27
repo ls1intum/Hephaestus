@@ -35,7 +35,7 @@ import org.springframework.dao.DataAccessResourceFailureException;
 
 /**
  * The worker and webhook tiers must not acquire an outbound dependency on ecb.europa.eu; an ungated
- * bean in this area has crash-looped them before.
+ * bean in this group has crash-looped them before.
  */
 class FxRateFetchSchedulerTest extends BaseUnitTest {
 

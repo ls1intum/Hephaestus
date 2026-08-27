@@ -4,6 +4,7 @@ import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditAction;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditActorKind;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntityType;
 import jakarta.persistence.Column;
+import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -62,7 +63,7 @@ public class ConfigAuditEvent {
     @Nullable
     private Long actingAccountId;
 
-    @Enumerated(EnumType.STRING)
+    @Convert(converter = ConfigAuditEntityTypeConverter.class)
     @Column(name = "entity_type", nullable = false, length = 48)
     private ConfigAuditEntityType entityType;
 

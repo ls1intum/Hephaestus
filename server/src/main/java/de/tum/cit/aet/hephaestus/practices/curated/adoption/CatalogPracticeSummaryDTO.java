@@ -15,8 +15,8 @@ public record CatalogPracticeSummaryDTO(
      * 8,722 characters once its preamble is composed in.
      */
     @Nullable String whyItMatters,
-    @Nullable String areaSlug,
-    @Nullable String areaName,
+    @Nullable String groupSlug,
+    @Nullable String groupName,
     @NonNull CatalogAdoptionAvailability availability,
     @NonNull PracticeAutomatedReviewValidation automatedReviewValidation
 ) {}

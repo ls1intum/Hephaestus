@@ -11,7 +11,7 @@ import {
 	adminKeepCuratedPracticeMutation,
 	adminUpdateCuratedPracticeMutation,
 } from "@/api/@tanstack/react-query.gen";
-import type { CuratedArea, CuratedPractice, PracticeDefinitionOptions } from "@/api/types.gen";
+import type { CuratedGroup, CuratedPractice, PracticeDefinitionOptions } from "@/api/types.gen";
 import { CuratedFormLevel } from "@/components/admin/curated-catalog/CuratedFormLevel";
 import {
 	CuratedPracticeForm,
@@ -64,7 +64,7 @@ export function CuratedPracticeEditLevel({
 					key={practiceSlug}
 					practiceSlug={practiceSlug}
 					initialPractice={practiceQuery.data}
-					areas={catalogQuery.data.areas}
+					groups={catalogQuery.data.groups}
 					definitionOptions={definitionOptionsQuery.data}
 					onDone={onDone}
 				/>
@@ -76,7 +76,7 @@ export function CuratedPracticeEditLevel({
 interface LoadedCuratedPracticeEditorProps {
 	practiceSlug: string;
 	initialPractice: CuratedPractice;
-	areas: CuratedArea[];
+	groups: CuratedGroup[];
 	definitionOptions: PracticeDefinitionOptions;
 	onDone: () => void;
 }
@@ -84,7 +84,7 @@ interface LoadedCuratedPracticeEditorProps {
 function LoadedCuratedPracticeEditor({
 	practiceSlug,
 	initialPractice,
-	areas,
+	groups,
 	definitionOptions,
 	onDone,
 }: LoadedCuratedPracticeEditorProps) {
@@ -189,11 +189,11 @@ function LoadedCuratedPracticeEditor({
 				precomputeScript: basePractice.definition.precomputeScript ?? undefined,
 				whyItMatters: basePractice.definition.whyItMatters ?? undefined,
 				whatGoodLooksLike: basePractice.definition.whatGoodLooksLike ?? undefined,
-				areaSlug: basePractice.definition.areaSlug ?? undefined,
+				groupSlug: basePractice.definition.groupSlug ?? undefined,
 				status: basePractice.status,
 				shipped: basePractice.shipped,
 			}}
-			areas={areas.map((area) => ({ slug: area.slug, name: area.definition.name }))}
+			groups={groups.map((group) => ({ slug: group.slug, name: group.definition.name }))}
 			definitionOptions={definitionOptions}
 			isPending={updatePractice.isPending}
 			isResetPending={deleteOverride.isPending}

@@ -30,7 +30,7 @@ All three scopes use the same definition fields. What differs is who owns the va
   adopt and changes nothing that is already adopted.
 - **Autonomy and review scope** — workspace decisions only. A curator never sets either, and a
   practice Hephaestus cannot review is forced to `OFF`.
-- **Area and order** — repository array order, overridable on the instance, then independent per
+- **Group and order** — repository array order, overridable on the instance, then independent per
   workspace.
 
 Neither step silently rewrites a customized instance definition or an existing workspace practice.
@@ -41,7 +41,7 @@ The badge tables an administrator reads for both scopes live in the
 | -------------------------- | -------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
 | Practice author            | Define the habit, guidance, and responsible mentoring support                                                              | Authorize collection or certify review accuracy  |
 | Instance administrator     | Curate the library workspaces may adopt from                                                                               | Rewrite existing workspace practices             |
-| Workspace administrator    | Adapt practices, set the workspace default autonomy and override it per area or practice, and scope which work is reviewed | Authorize a new data source for the instance     |
+| Workspace administrator    | Adapt practices, set the workspace default autonomy and override it per group or practice, and scope which work is reviewed | Authorize a new data source for the instance     |
 | Instance operator          | Approve source purposes, privacy, retention, and erasure coverage                                                          | Decide that connected evidence proves a practice |
 | Developer, peer, or mentor | Use observations and available human context in a review                                                                   | Supply hidden context to Hephaestus implicitly   |
 
@@ -50,7 +50,7 @@ The badge tables an administrator reads for both scopes live in the
 The practice editor follows the decisions an author can make confidently:
 
 1. **Practice** — give one observable habit a short, action-oriented name, choose the work it
-   applies to, and optionally group it in an area.
+   applies to, and optionally group it in a group.
 2. **Review guidance** — describe what to look for, why it matters, and one concrete example.
 3. **How Hephaestus can help** — choose AI-supported mentoring, human review, or guidance only.
 
@@ -126,12 +126,12 @@ for the architectural decision.
   API record it today — see [#1362](https://github.com/ls1intum/Hephaestus/issues/1362).
 - **Adoption is deliberate.** Workspace administrators can show the instance library alongside their
   workspace configuration, inspect a complete effective definition, and add either one practice or all
-  available practices in an area as independent copies. Area adoption is one transaction. Both flows
+  available practices in a group as independent copies. Group adoption is one transaction. Both flows
   fail when the reviewed definition or resulting workspace configuration has changed.
-- **Area removal is explicit.** Administrators choose whether an area's practices move to Unassigned or
-  are deleted with the area. The library can restore a removed catalog area by moving its matching,
+- **Group removal is explicit.** Administrators choose whether a group's practices move to Unassigned or
+  are deleted with the group. The library can restore a removed catalog group by moving its matching,
   unassigned workspace copies back without replacing local edits. Practices deliberately placed in a
-  different area are never moved implicitly.
+  different group are never moved implicitly.
 - **Adoption does not authorize automatic sending.** A reviewable practice starts at `HUMAN_APPROVAL`
   (**Review before sending**), while a practice Hephaestus cannot review remains `OFF`. Moving to **Send
   automatically** is a separate administrator decision; validation evidence does not make that
@@ -140,13 +140,13 @@ for the architectural decision.
   comparison fingerprint without a foreign key. A bundled source may have no database row and may
   disappear in a later release.
 - **Unmatched migrated copies remain unlinked.** Backfill links only definitions that still match the
-  bundled review rules or area details.
-- **Exclusion controls adoption availability.** Excluding an area also removes its practices from the
+  bundled review rules or group details.
+- **Exclusion controls adoption availability.** Excluding a group also removes its practices from the
   adoption catalogue; existing workspace copies do not change.
 
 Array order in `default-catalog.json` is the bundled order. Until an administrator reorders a list,
 bundled entries continue to follow repository order and instance-created entries append. The first
-deliberate reorder records the complete affected list. Moving a practice to another area is a
+deliberate reorder records the complete affected list. Moving a practice to another group is a
 definition change and is audited.
 
 ## Release behavior
@@ -163,7 +163,7 @@ Each effective entry is resolved from the running bundled definition and any ins
 | Customized default removed               | saved customization            | **Removed from Hephaestus defaults** |
 
 An update never replaces a customization silently. Administrators can inspect the complete bundled
-definition and whether applying it changes review rules, guidance, or area appearance. Applying an
+definition and whether applying it changes review rules, guidance, or group appearance. Applying an
 update removes only the definition customization; inclusion policy and custom order remain. Keeping
 the saved version records the bundled digest that was reviewed.
 
@@ -186,9 +186,9 @@ never rewrites the workspace.
 
 A practice comparison covers the inputs that affect review behavior: slug, name, bindings (their
 signals, draft handling, and evidence needs with stances), criteria, precompute script, the
-automated-review policy, and area. The artifact kind is not compared separately — every signal name
+automated-review policy, and group. The artifact kind is not compared separately — every signal name
 carries it, so digesting it too would only give a rename two places to be recorded. **Why it matters**
-and **What good looks like** are guidance and do not affect review-rule drift. An area comparison
+and **What good looks like** are guidance and do not affect review-rule drift. A group comparison
 covers name, description, icon, and color; position is excluded.
 
 ## Turning a practice down

@@ -42,7 +42,7 @@ class PracticeTrendCalculatorTest {
 
     @Test
     void shouldReportPracticeScopeWithoutPracticeCounts() {
-        // The two practice counts are an area fact. At practice scope they are absent, and that absence
+        // The two practice counts are a group fact. At practice scope they are absent, and that absence
         // reaches the client — which is why the support factory has two entry points rather than one with
         // optional arguments.
         PracticeTrend trend = PracticeTrendCalculator.calculatePractice(

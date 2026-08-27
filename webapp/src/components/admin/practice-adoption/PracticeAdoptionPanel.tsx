@@ -1,7 +1,7 @@
 import { CircleAlert, Copy, ShieldCheck } from "lucide-react";
 import type { CatalogPracticePreview, PracticeDefinitionOptions } from "@/api/types.gen";
 import { PracticeDefinitionPreview } from "@/components/admin/practice-adoption/PracticeDefinitionPreview";
-import { AreaPill } from "@/components/admin/practice-catalog/AreaPill";
+import { GroupPill } from "@/components/admin/practice-catalog/GroupPill";
 import { PracticeDefinitionSkeleton } from "@/components/admin/practices/PracticeSkeletons";
 import { DetailRow } from "@/components/common/DetailRow";
 import type { PanelState } from "@/components/common/panel-state";
@@ -61,12 +61,12 @@ export function PracticeAdoptionPanel({ state, onAdopt, nested }: PracticeAdopti
 	return (
 		<>
 			<DetailDrawerHeader nested={nested}>
-				<AreaPill
+				<GroupPill
 					size="lg"
-					slug={preview.area.slug}
-					name={preview.area.definition?.name}
-					icon={preview.area.definition?.icon}
-					color={preview.area.definition?.color}
+					slug={preview.group.slug}
+					name={preview.group.definition?.name}
+					icon={preview.group.definition?.icon}
+					color={preview.group.definition?.color}
 				/>
 				<div className="min-w-0 flex-1 space-y-1">
 					<DrawerTitle className="break-words">{preview.definition.name}</DrawerTitle>
@@ -116,7 +116,7 @@ export function PracticeAdoptionPanel({ state, onAdopt, nested }: PracticeAdopti
 										</ItemDescription>
 									</ItemContent>
 								</Item>
-								<AreaOutcome preview={preview} />
+								<GroupOutcome preview={preview} />
 								<AutonomyOutcome preview={preview} />
 							</ItemGroup>
 						</Section>
@@ -190,23 +190,23 @@ function PracticeAdoptionPlaceholder({
 	);
 }
 
-function AreaOutcome({ preview }: { preview: CatalogPracticePreview }) {
+function GroupOutcome({ preview }: { preview: CatalogPracticePreview }) {
 	return (
 		<Item variant="muted" size="sm" role="listitem">
 			<ItemMedia variant="icon" className="bg-transparent">
-				<AreaPill
+				<GroupPill
 					size="sm"
-					slug={preview.area.slug}
-					name={preview.area.definition?.name}
-					icon={preview.area.definition?.icon}
-					color={preview.area.definition?.color}
+					slug={preview.group.slug}
+					name={preview.group.definition?.name}
+					icon={preview.group.definition?.icon}
+					color={preview.group.definition?.color}
 				/>
 			</ItemMedia>
 			<ItemContent>
-				<ItemTitle>{areaTitle(preview)}</ItemTitle>
-				{preview.area.definition?.description && (
+				<ItemTitle>{groupTitle(preview)}</ItemTitle>
+				{preview.group.definition?.description && (
 					<ItemDescription className="line-clamp-none">
-						{preview.area.definition.description}
+						{preview.group.definition.description}
 					</ItemDescription>
 				)}
 			</ItemContent>
@@ -230,9 +230,9 @@ function AutonomyOutcome({ preview }: { preview: CatalogPracticePreview }) {
 	);
 }
 
-function areaTitle(preview: CatalogPracticePreview): string {
-	if (preview.area.disposition === "UNASSIGNED") return "Stay unassigned";
-	const name = preview.area.definition?.name ?? preview.area.slug ?? "catalog area";
-	if (preview.area.disposition === "REUSE_EXISTING_AREA") return `Join “${name}”`;
+function groupTitle(preview: CatalogPracticePreview): string {
+	if (preview.group.disposition === "UNASSIGNED") return "Stay unassigned";
+	const name = preview.group.definition?.name ?? preview.group.slug ?? "catalog group";
+	if (preview.group.disposition === "REUSE_EXISTING_GROUP") return `Join “${name}”`;
 	return `Create “${name}”`;
 }

@@ -22,7 +22,7 @@ record CuratedPracticeSnapshot(
     String automatedReviewPolicySha256,
     @Nullable String whyItMatters,
     @Nullable String whatGoodLooksLike,
-    @Nullable String areaSlug,
+    @Nullable String groupSlug,
     @Nullable String shippedDigest
 ) implements ConfigAuditSnapshot {
     static CuratedPracticeSnapshot of(CatalogEntry<PracticeDefinition> entry) {
@@ -40,7 +40,7 @@ record CuratedPracticeSnapshot(
             PracticeAutomatedReviewPolicyDigest.digest(definition.automatedReviewPolicy()),
             definition.whyItMatters(),
             definition.whatGoodLooksLike(),
-            definition.areaSlug(),
+            definition.groupSlug(),
             entry.shipped() == null ? null : entry.shipped().digest(entry.slug())
         );
     }

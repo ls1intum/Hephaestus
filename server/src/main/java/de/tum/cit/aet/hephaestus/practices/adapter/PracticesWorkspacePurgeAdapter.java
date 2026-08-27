@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.practices.adapter;
 
-import de.tum.cit.aet.hephaestus.practices.PracticeAreaRepository;
+import de.tum.cit.aet.hephaestus.practices.PracticeGroupRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
@@ -17,7 +17,7 @@ import org.springframework.stereotype.Component;
  *   <li>Feedback (CASCADE cleans feedback_observation/placement/reaction)</li>
  *   <li>Observations (via native query through practice.workspace_id)</li>
  *   <li>Practice definitions for the workspace</li>
- *   <li>Practice areas (unreferenced once practices are gone)</li>
+ *   <li>Practice groups (unreferenced once practices are gone)</li>
  * </ul>
  */
 @Component
@@ -28,18 +28,18 @@ public class PracticesWorkspacePurgeAdapter implements WorkspacePurgeContributor
     private final FeedbackRepository feedbackRepository;
     private final ObservationRepository observationRepository;
     private final PracticeRepository practiceRepository;
-    private final PracticeAreaRepository practiceAreaRepository;
+    private final PracticeGroupRepository practiceGroupRepository;
 
     public PracticesWorkspacePurgeAdapter(
         FeedbackRepository feedbackRepository,
         ObservationRepository observationRepository,
         PracticeRepository practiceRepository,
-        PracticeAreaRepository practiceAreaRepository
+        PracticeGroupRepository practiceGroupRepository
     ) {
         this.feedbackRepository = feedbackRepository;
         this.observationRepository = observationRepository;
         this.practiceRepository = practiceRepository;
-        this.practiceAreaRepository = practiceAreaRepository;
+        this.practiceGroupRepository = practiceGroupRepository;
     }
 
     @Override
@@ -50,12 +50,12 @@ public class PracticesWorkspacePurgeAdapter implements WorkspacePurgeContributor
         // Delete observations explicitly (defense-in-depth; CASCADE would also handle this).
         observationRepository.deleteAllByPracticeWorkspaceId(workspaceId);
         // Delete practice definitions (CASCADE cleans up any remaining observations); this also clears the
-        // practice → practice_area references, so areas can be removed next.
+        // practice → practice_group references, so groups can be removed next.
         practiceRepository.deleteAllByWorkspaceId(workspaceId);
-        // Delete practice areas (unreferenced once practices are gone).
-        practiceAreaRepository.deleteAllByWorkspaceId(workspaceId);
+        // Delete practice groups (unreferenced once practices are gone).
+        practiceGroupRepository.deleteAllByWorkspaceId(workspaceId);
 
-        log.info("Deleted feedback, observations, practices and areas for workspace: workspaceId={}", workspaceId);
+        log.info("Deleted feedback, observations, practices and groups for workspace: workspaceId={}", workspaceId);
     }
 
     @Override

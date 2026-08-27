@@ -98,9 +98,9 @@ export const WordingOnlyUpdate: Story = {
 	},
 };
 
-export const AreaAppearanceUpdate: Story = {
+export const GroupAppearanceUpdate: Story = {
 	args: {
-		kind: "area",
+		kind: "group",
 		status: status({ state: "UPDATE_WAITING", changeKind: "PRESENTATION" }),
 		shipped: {
 			name: "Review-ready work",
@@ -111,14 +111,14 @@ export const AreaAppearanceUpdate: Story = {
 	},
 	play: async ({ canvas }) => {
 		await expect(
-			canvas.getByText(/would change the area's name, description, icon, or color/),
+			canvas.getByText(/would change the group's name, description, icon, or color/),
 		).toBeVisible();
 		await expect(canvas.queryByText(/detect/)).not.toBeInTheDocument();
 	},
 };
 
 export const NoHephaestusDefault: Story = {
-	args: { status: status({ state: "YOURS" }), kind: "area" },
+	args: { status: status({ state: "YOURS" }), kind: "group" },
 };
 
 export const RemovedFromDefaults: Story = {

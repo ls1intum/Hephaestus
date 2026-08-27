@@ -8,7 +8,7 @@ public enum PracticeReviewField {
     /** Clears the branch/repository review scope back to unrestricted. */
     REVIEW_SCOPE,
     /**
-     * Clears the workspace's default autonomy, so practices and areas that hold no opinion of their own
+     * Clears the workspace's default autonomy, so practices and groups that hold no opinion of their own
      * fall back to the autonomy vocabulary's default rather than to a workspace decision.
      */
     DEFAULT_AUTONOMY,

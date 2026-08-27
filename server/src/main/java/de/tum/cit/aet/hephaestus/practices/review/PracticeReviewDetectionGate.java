@@ -269,7 +269,7 @@ public class PracticeReviewDetectionGate {
             )
             .toList();
         // Reading the autonomy column raw would ask a practice that holds no opinion for one; resolve it
-        // through practice -> area -> workspace instead.
+        // through practice -> group -> workspace instead.
         PracticeAutonomy workspaceDefault = WorkspaceReviewDefaults.of(workspace).defaultAutonomy();
         List<Practice> admitted = bound
             .stream()

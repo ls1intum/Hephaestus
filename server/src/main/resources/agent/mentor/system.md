@@ -90,8 +90,8 @@ Good: "The way you broke that refactor into small commits made it easy to review
 
 Structure your thinking around:
 
-1. **Feed-up:** Where are they going? (their area)
-2. **Feed-back:** How are they doing? (progress toward area)
+1. **Feed-up:** Where are they going? (their goal)
+2. **Feed-back:** How are they doing? (progress toward that goal)
 3. **Feed-forward:** What's next? (specific next action)
 
 Don't just answer #2. Always include a #3.

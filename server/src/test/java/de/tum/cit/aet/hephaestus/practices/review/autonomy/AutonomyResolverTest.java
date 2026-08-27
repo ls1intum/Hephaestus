@@ -4,8 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.cit.aet.hephaestus.practices.dto.AutonomyAssignmentDTO;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeArea;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeGroup;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -32,14 +32,14 @@ class AutonomyResolverTest extends BaseUnitTest {
         }
 
         @Test
-        void aPracticeThatDecidedNothingTakesItsAreasAnswer() {
+        void aPracticeThatDecidedNothingTakesItsGroupsAnswer() {
             EffectiveAutonomy resolved = AutonomyResolver.resolvePractice(
                 null,
                 PracticeAutonomy.HUMAN_APPROVAL,
                 PracticeAutonomy.AUTOMATIC
             );
             assertThat(resolved.autonomy()).isEqualTo(PracticeAutonomy.HUMAN_APPROVAL);
-            assertThat(resolved.source()).isEqualTo(AutonomySource.AREA);
+            assertThat(resolved.source()).isEqualTo(AutonomySource.GROUP);
         }
 
         @Test
@@ -50,10 +50,10 @@ class AutonomyResolverTest extends BaseUnitTest {
         }
 
         @Test
-        void aPracticeWithNoAreaFallsStraightThroughToTheWorkspace() {
+        void aPracticeWithNoGroupFallsStraightThroughToTheWorkspace() {
             Practice practice = new Practice();
             practice.setAutonomy(null);
-            practice.setArea(null);
+            practice.setGroup(null);
 
             EffectiveAutonomy resolved = AutonomyResolver.resolvePractice(practice, PracticeAutonomy.OFF);
             assertThat(resolved.autonomy()).isEqualTo(PracticeAutonomy.OFF);
@@ -92,36 +92,36 @@ class AutonomyResolverTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("areas")
-    class Areas {
+    @DisplayName("groups")
+    class Groups {
 
         @Test
-        void anAreaResolvesItsOwnTierTheSameWay() {
-            PracticeArea area = new PracticeArea();
-            area.setAutonomy(PracticeAutonomy.OFF);
+        void anGroupResolvesItsOwnTierTheSameWay() {
+            PracticeGroup group = new PracticeGroup();
+            group.setAutonomy(PracticeAutonomy.OFF);
 
-            EffectiveAutonomy resolved = AutonomyResolver.resolveArea(area, PracticeAutonomy.AUTOMATIC);
+            EffectiveAutonomy resolved = AutonomyResolver.resolveGroup(group, PracticeAutonomy.AUTOMATIC);
             assertThat(resolved.autonomy()).isEqualTo(PracticeAutonomy.OFF);
-            assertThat(resolved.source()).isEqualTo(AutonomySource.AREA);
+            assertThat(resolved.source()).isEqualTo(AutonomySource.GROUP);
         }
 
         @Test
-        void anAreaThatDecidedNothingReportsTheWorkspaceAsTheSource() {
-            PracticeArea area = new PracticeArea();
-            area.setAutonomy(null);
+        void anGroupThatDecidedNothingReportsTheWorkspaceAsTheSource() {
+            PracticeGroup group = new PracticeGroup();
+            group.setAutonomy(null);
 
-            EffectiveAutonomy resolved = AutonomyResolver.resolveArea(area, PracticeAutonomy.HUMAN_APPROVAL);
+            EffectiveAutonomy resolved = AutonomyResolver.resolveGroup(group, PracticeAutonomy.HUMAN_APPROVAL);
             assertThat(resolved.autonomy()).isEqualTo(PracticeAutonomy.HUMAN_APPROVAL);
             assertThat(resolved.source()).isEqualTo(AutonomySource.WORKSPACE);
         }
 
         @Test
         void resolvingThroughTheEntityAgreesWithResolvingTheColumns() {
-            PracticeArea area = new PracticeArea();
-            area.setAutonomy(PracticeAutonomy.HUMAN_APPROVAL);
+            PracticeGroup group = new PracticeGroup();
+            group.setAutonomy(PracticeAutonomy.HUMAN_APPROVAL);
             Practice practice = new Practice();
             practice.setAutonomy(null);
-            practice.setArea(area);
+            practice.setGroup(group);
 
             assertThat(AutonomyResolver.resolvePractice(practice, PracticeAutonomy.AUTOMATIC)).isEqualTo(
                 AutonomyResolver.resolvePractice(null, PracticeAutonomy.HUMAN_APPROVAL, PracticeAutonomy.AUTOMATIC)
@@ -137,30 +137,30 @@ class AutonomyResolverTest extends BaseUnitTest {
     class Inheritance {
 
         @Test
-        void anAreaThatDecidedIsNotInheritingEvenThoughTheSourceIsArea() {
-            PracticeArea area = new PracticeArea();
-            area.setAutonomy(PracticeAutonomy.OFF);
+        void anGroupThatDecidedIsNotInheritingEvenThoughTheSourceIsGroup() {
+            PracticeGroup group = new PracticeGroup();
+            group.setAutonomy(PracticeAutonomy.OFF);
 
-            EffectiveAutonomy resolved = AutonomyResolver.resolveArea(area, PracticeAutonomy.AUTOMATIC);
-            AutonomyAssignmentDTO reported = AutonomyAssignmentDTO.of(resolved, area.getAutonomy());
+            EffectiveAutonomy resolved = AutonomyResolver.resolveGroup(group, PracticeAutonomy.AUTOMATIC);
+            AutonomyAssignmentDTO reported = AutonomyAssignmentDTO.of(resolved, group.getAutonomy());
 
-            assertThat(reported.source()).isEqualTo(AutonomySource.AREA);
+            assertThat(reported.source()).isEqualTo(AutonomySource.GROUP);
             assertThat(reported.inherited()).isFalse();
             assertThat(reported.override()).isEqualTo(PracticeAutonomy.OFF);
         }
 
         @Test
-        void aPracticeUnderThatAreaIsInheritingFromTheSameSource() {
-            PracticeArea area = new PracticeArea();
-            area.setAutonomy(PracticeAutonomy.OFF);
+        void aPracticeUnderThatGroupIsInheritingFromTheSameSource() {
+            PracticeGroup group = new PracticeGroup();
+            group.setAutonomy(PracticeAutonomy.OFF);
             Practice practice = new Practice();
             practice.setAutonomy(null);
-            practice.setArea(area);
+            practice.setGroup(group);
 
             EffectiveAutonomy resolved = AutonomyResolver.resolvePractice(practice, PracticeAutonomy.AUTOMATIC);
             AutonomyAssignmentDTO reported = AutonomyAssignmentDTO.of(resolved, practice.getAutonomy());
 
-            assertThat(reported.source()).isEqualTo(AutonomySource.AREA);
+            assertThat(reported.source()).isEqualTo(AutonomySource.GROUP);
             assertThat(reported.inherited()).isTrue();
             assertThat(reported.override()).isNull();
         }
