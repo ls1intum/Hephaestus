@@ -32,11 +32,7 @@ export const Unassigned: Story = {
 export const Announced: Story = {
 	args: { srLabel: true },
 	play: async ({ canvas }) => {
-		// The one place the pill carries the name is where nothing visible repeats it, so it must
-		// stay in the accessibility tree.
-		await expect(canvas.getByText("Review-ready work:")).toHaveClass("sr-only");
-		// On the element, not on a tag selector: a pill that stopped being a span would pass a
-		// `span[aria-hidden]` query no matter what it did with the attribute.
+		await expect(canvas.getByText("Review-ready work")).toHaveClass("sr-only");
 		await expect(canvas.getByTitle("Review-ready work")).not.toHaveAttribute("aria-hidden");
 	},
 };
