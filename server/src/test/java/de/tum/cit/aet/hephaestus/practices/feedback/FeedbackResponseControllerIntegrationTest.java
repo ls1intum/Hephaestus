@@ -19,7 +19,7 @@ import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackResolution;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSource;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackUsefulness;
-import de.tum.cit.aet.hephaestus.practices.feedback.dto.FeedbackEngagementDTO;
+import de.tum.cit.aet.hephaestus.practices.feedback.dto.FeedbackResolutionCountsDTO;
 import de.tum.cit.aet.hephaestus.practices.feedback.dto.FeedbackResponseDTO;
 import de.tum.cit.aet.hephaestus.practices.feedback.dto.FeedbackResponseRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
@@ -55,8 +55,10 @@ import tools.jackson.databind.ObjectMapper;
 class FeedbackResponseControllerIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+    private static final String RECURRENCE_KEY = "ck-integration-observation";
     private static final String FEEDBACK_URI = "/workspaces/{workspaceSlug}/practices/feedback/{feedbackId}/response";
-    private static final String ENGAGEMENT_URI = "/workspaces/{workspaceSlug}/practices/feedback/engagement";
+    private static final String RESOLUTION_COUNTS_URI =
+        "/workspaces/{workspaceSlug}/practices/feedback/resolution-counts";
 
     @Autowired
     private WebTestClient webTestClient;
@@ -79,8 +81,6 @@ class FeedbackResponseControllerIntegrationTest extends AbstractWorkspaceIntegra
     @Autowired
     private AgentJobRepository agentJobRepository;
 
-    private static final String HEADLINE_RECURRENCE_KEY = "ck-integration-headline";
-
     private Workspace workspace;
     private User adminUser;
     private Feedback feedbackUnit;
@@ -90,7 +90,6 @@ class FeedbackResponseControllerIntegrationTest extends AbstractWorkspaceIntegra
         User owner = persistUser("feedback-owner");
         workspace = createWorkspace("feedback-ws", "Feedback WS", "feedback-org", AccountType.ORG, owner);
 
-        // The "admin" user (from @WithAdminUser) must exist and hold workspace membership.
         adminUser = ensureAdminMembership(workspace).getUser();
 
         Practice practice = new Practice();
@@ -102,7 +101,6 @@ class FeedbackResponseControllerIntegrationTest extends AbstractWorkspaceIntegra
         practice.setBindings(PracticeTestEvidence.bindings(ScmSignals.PULL_REQUEST_OPENED));
         practice = practiceRepository.save(practice);
 
-        // Agent job is a required FK for the observation.
         AgentJob agentJob = new AgentJob();
         agentJob.setWorkspace(workspace);
         agentJob.setJobType(AgentJobType.PULL_REQUEST_REVIEW);
@@ -111,6 +109,7 @@ class FeedbackResponseControllerIntegrationTest extends AbstractWorkspaceIntegra
 
         Observation finding = Observation.builder()
             .occurrenceKey("test-key-" + UUID.randomUUID())
+            .recurrenceKey(RECURRENCE_KEY)
             .agentJobId(agentJob.getId())
             .practice(practice)
             .artifactKind(ArtifactKinds.PULL_REQUEST)
@@ -120,12 +119,10 @@ class FeedbackResponseControllerIntegrationTest extends AbstractWorkspaceIntegra
             .presence(Presence.ABSENT)
             .assessment(Assessment.BAD)
             .severity(Severity.MAJOR)
-            .recurrenceKey(HEADLINE_RECURRENCE_KEY)
             .observedAt(Instant.now())
             .build();
         finding = observationRepository.save(finding);
 
-        // Create the delivered feedback unit the admin user reacts to (recipient == subject).
         feedbackUnit = feedbackRepository.save(
             Feedback.builder()
                 .agentJobId(agentJob.getId())
@@ -143,8 +140,6 @@ class FeedbackResponseControllerIntegrationTest extends AbstractWorkspaceIntegra
                 .build()
         );
 
-        // Bind the observation as the feedback's PRIMARY evidence so findHeadlineRecurrenceKey resolves the
-        // headline locus the reaction must denormalize.
         feedbackObservationRepository.insertIfAbsent(
             feedbackUnit.getId(),
             finding.getId(),
@@ -153,26 +148,24 @@ class FeedbackResponseControllerIntegrationTest extends AbstractWorkspaceIntegra
         );
     }
 
-    // POST /{feedbackId}/response
-
     @Nested
-    @DisplayName("POST /{feedbackId}/response")
+    @DisplayName("PUT /{feedbackId}/response")
     class SubmitFeedback {
 
         @Test
         @WithAdminUser
-        void usefulnessWithoutResolutionReturns201() {
-            var request = new FeedbackResponseRequestDTO(FeedbackUsefulness.HELPFUL, null, null, null);
+        void usefulnessWithoutResolutionReturns200() {
+            var request = new FeedbackResponseRequestDTO(FeedbackUsefulness.HELPFUL, null, null);
 
             FeedbackResponseDTO response = webTestClient
-                .post()
+                .put()
                 .uri(FEEDBACK_URI, workspace.getWorkspaceSlug(), feedbackUnit.getId())
                 .headers(TestAuthUtils.withCurrentUser())
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue(request)
                 .exchange()
                 .expectStatus()
-                .isCreated()
+                .isOk()
                 .expectBody(FeedbackResponseDTO.class)
                 .returnResult()
                 .getResponseBody();
@@ -184,23 +177,22 @@ class FeedbackResponseControllerIntegrationTest extends AbstractWorkspaceIntegra
 
         @Test
         @WithAdminUser
-        void combinedResponseReturns201() {
+        void combinedResponseReturns200() {
             var request = new FeedbackResponseRequestDTO(
                 FeedbackUsefulness.HELPFUL,
                 FeedbackResolution.ADDRESSED,
-                null,
                 null
             );
 
             FeedbackResponseDTO response = webTestClient
-                .post()
+                .put()
                 .uri(FEEDBACK_URI, workspace.getWorkspaceSlug(), feedbackUnit.getId())
                 .headers(TestAuthUtils.withCurrentUser())
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue(request)
                 .exchange()
                 .expectStatus()
-                .isCreated()
+                .isOk()
                 .expectBody(FeedbackResponseDTO.class)
                 .returnResult()
                 .getResponseBody();
@@ -211,8 +203,6 @@ class FeedbackResponseControllerIntegrationTest extends AbstractWorkspaceIntegra
             assertThat(response.feedbackId()).isEqualTo(feedbackUnit.getId());
             assertThat(response.respondedAt()).isNotNull();
 
-            // The persisted reaction carries the feedback's headline recurrence key. Fetched by feedback
-            // rather than by a response id, because the payload is the folded state and names no single row.
             Reaction saved = reactionRepository
                 .findAll()
                 .stream()
@@ -220,28 +210,26 @@ class FeedbackResponseControllerIntegrationTest extends AbstractWorkspaceIntegra
                 .findFirst()
                 .orElseThrow();
             assertThat(saved.getUsefulness()).isEqualTo(FeedbackUsefulness.HELPFUL);
-            assertThat(saved.getRecurrenceKey()).isEqualTo(HEADLINE_RECURRENCE_KEY);
         }
 
         @Test
         @WithAdminUser
-        void disputedWithExplanationReturns201() {
+        void disputedWithExplanationReturns200() {
             var request = new FeedbackResponseRequestDTO(
                 null,
                 FeedbackResolution.DISPUTED,
-                "The AI is wrong about this",
-                null
+                "The AI is wrong about this"
             );
 
             FeedbackResponseDTO response = webTestClient
-                .post()
+                .put()
                 .uri(FEEDBACK_URI, workspace.getWorkspaceSlug(), feedbackUnit.getId())
                 .headers(TestAuthUtils.withCurrentUser())
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue(request)
                 .exchange()
                 .expectStatus()
-                .isCreated()
+                .isOk()
                 .expectBody(FeedbackResponseDTO.class)
                 .returnResult()
                 .getResponseBody();
@@ -253,11 +241,39 @@ class FeedbackResponseControllerIntegrationTest extends AbstractWorkspaceIntegra
 
         @Test
         @WithAdminUser
-        void disputedWithoutExplanationReturns400() {
-            var request = new FeedbackResponseRequestDTO(null, FeedbackResolution.DISPUTED, null, null);
+        void resolutionLookupUsesTheFeedbackObservationBinding() {
+            var request = new FeedbackResponseRequestDTO(null, FeedbackResolution.DISPUTED, "Incorrect");
 
             webTestClient
-                .post()
+                .put()
+                .uri(FEEDBACK_URI, workspace.getWorkspaceSlug(), feedbackUnit.getId())
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(request)
+                .exchange()
+                .expectStatus()
+                .isOk();
+
+            var resolutions = reactionRepository.findCurrentResolutionByRecurrenceKeys(
+                List.of(RECURRENCE_KEY),
+                adminUser.getId(),
+                workspace.getId()
+            );
+            assertThat(resolutions)
+                .singleElement()
+                .satisfies(resolution -> {
+                    assertThat(resolution.getRecurrenceKey()).isEqualTo(RECURRENCE_KEY);
+                    assertThat(resolution.getResolution()).isEqualTo(FeedbackResolution.DISPUTED.name());
+                });
+        }
+
+        @Test
+        @WithAdminUser
+        void disputedWithoutExplanationReturns400() {
+            var request = new FeedbackResponseRequestDTO(null, FeedbackResolution.DISPUTED, null);
+
+            webTestClient
+                .put()
                 .uri(FEEDBACK_URI, workspace.getWorkspaceSlug(), feedbackUnit.getId())
                 .headers(TestAuthUtils.withCurrentUser())
                 .contentType(MediaType.APPLICATION_JSON)
@@ -270,29 +286,28 @@ class FeedbackResponseControllerIntegrationTest extends AbstractWorkspaceIntegra
         @Test
         @WithAdminUser
         void appendOnlyCreatesNewRow() {
-            var request1 = new FeedbackResponseRequestDTO(null, FeedbackResolution.ADDRESSED, null, null);
-            var request2 = new FeedbackResponseRequestDTO(null, FeedbackResolution.DISPUTED, "Changed my mind", null);
+            var request1 = new FeedbackResponseRequestDTO(null, FeedbackResolution.ADDRESSED, null);
+            var request2 = new FeedbackResponseRequestDTO(null, FeedbackResolution.DISPUTED, "Changed my mind");
 
             webTestClient
-                .post()
+                .put()
                 .uri(FEEDBACK_URI, workspace.getWorkspaceSlug(), feedbackUnit.getId())
                 .headers(TestAuthUtils.withCurrentUser())
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue(request1)
                 .exchange()
                 .expectStatus()
-                .isCreated();
+                .isOk();
 
-            // Append-only: the second submit creates a new row rather than upserting.
             webTestClient
-                .post()
+                .put()
                 .uri(FEEDBACK_URI, workspace.getWorkspaceSlug(), feedbackUnit.getId())
                 .headers(TestAuthUtils.withCurrentUser())
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue(request2)
                 .exchange()
                 .expectStatus()
-                .isCreated();
+                .isOk();
 
             assertThat(reactionRepository.findAll()).hasSize(2);
         }
@@ -300,10 +315,10 @@ class FeedbackResponseControllerIntegrationTest extends AbstractWorkspaceIntegra
         @Test
         @WithAdminUser
         void nonExistentFeedbackReturns404() {
-            var request = new FeedbackResponseRequestDTO(null, FeedbackResolution.ADDRESSED, null, null);
+            var request = new FeedbackResponseRequestDTO(null, FeedbackResolution.ADDRESSED, null);
 
             webTestClient
-                .post()
+                .put()
                 .uri(FEEDBACK_URI, workspace.getWorkspaceSlug(), UUID.randomUUID())
                 .headers(TestAuthUtils.withCurrentUser())
                 .contentType(MediaType.APPLICATION_JSON)
@@ -315,31 +330,26 @@ class FeedbackResponseControllerIntegrationTest extends AbstractWorkspaceIntegra
 
         @Test
         @WithMentorUser
-        void nonRecipientReturns403() {
-            // "mentor" user exists in DB and has workspace membership, but is NOT the feedback's recipient
+        void nonRecipientReturns404() {
             User mentorUser = persistUser("mentor");
             ensureWorkspaceMembership(workspace, mentorUser, WorkspaceMembership.WorkspaceRole.MEMBER);
 
-            var request = new FeedbackResponseRequestDTO(null, FeedbackResolution.ADDRESSED, null, null);
+            var request = new FeedbackResponseRequestDTO(null, FeedbackResolution.ADDRESSED, null);
 
             webTestClient
-                .post()
+                .put()
                 .uri(FEEDBACK_URI, workspace.getWorkspaceSlug(), feedbackUnit.getId())
                 .headers(TestAuthUtils.withCurrentUser())
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue(request)
                 .exchange()
                 .expectStatus()
-                .isForbidden();
+                .isNotFound();
         }
 
         @Test
         @WithMentorUser
-        void subjectButNotRecipientReturns403() {
-            // Reviewer-side firewall: the gate is the RECIPIENT (who was delivered to), not the SUBJECT
-            // (who the feedback is ABOUT). Build a unit delivered to the admin but ABOUT the mentor, then
-            // authenticate as the mentor (the subject, a workspace member) — the subject must NOT be able
-            // to react to feedback they were never shown.
+        void subjectButNotRecipientReturns404() {
             User mentorUser = persistUser("mentor");
             ensureWorkspaceMembership(workspace, mentorUser, WorkspaceMembership.WorkspaceRole.MEMBER);
 
@@ -352,7 +362,6 @@ class FeedbackResponseControllerIntegrationTest extends AbstractWorkspaceIntegra
                     .recipientUserId(adminUser.getId())
                     .aboutUserId(mentorUser.getId())
                     .channel(FeedbackChannel.IN_CONTEXT)
-                    // position 1: distinct unit within the same job (uk_feedback_unit is (agent_job_id, position)).
                     .position(1)
                     .deliveryState(FeedbackDeliveryState.DELIVERED)
                     .source(FeedbackSource.AGENT)
@@ -361,27 +370,25 @@ class FeedbackResponseControllerIntegrationTest extends AbstractWorkspaceIntegra
                     .build()
             );
 
-            var request = new FeedbackResponseRequestDTO(null, FeedbackResolution.ADDRESSED, null, null);
+            var request = new FeedbackResponseRequestDTO(null, FeedbackResolution.ADDRESSED, null);
 
             webTestClient
-                .post()
+                .put()
                 .uri(FEEDBACK_URI, workspace.getWorkspaceSlug(), aboutMentorDeliveredToAdmin.getId())
                 .headers(TestAuthUtils.withCurrentUser())
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue(request)
                 .exchange()
                 .expectStatus()
-                .isForbidden();
+                .isNotFound();
         }
 
         @Test
         void unauthenticatedMutationRejected() {
-            var request = new FeedbackResponseRequestDTO(null, FeedbackResolution.ADDRESSED, null, null);
+            var request = new FeedbackResponseRequestDTO(null, FeedbackResolution.ADDRESSED, null);
 
-            // Anonymous POST → the double-submit CSRF gate (ADR 0017) rejects it 403 before auth runs
-            // (no X-XSRF-TOKEN). The mutation stays blocked for anonymous callers.
             webTestClient
-                .post()
+                .put()
                 .uri(FEEDBACK_URI, workspace.getWorkspaceSlug(), feedbackUnit.getId())
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue(request)
@@ -391,14 +398,12 @@ class FeedbackResponseControllerIntegrationTest extends AbstractWorkspaceIntegra
         }
     }
 
-    // GET /{feedbackId}/response
-
     @Nested
     class GetLatestFeedback {
 
         @Test
         @WithAdminUser
-        @DisplayName("returns 204 when no reaction has been submitted yet")
+        @DisplayName("returns 204 when no response has been submitted yet")
         void returns204WhenEmpty() {
             webTestClient
                 .get()
@@ -424,28 +429,28 @@ class FeedbackResponseControllerIntegrationTest extends AbstractWorkspaceIntegra
         @Test
         @WithAdminUser
         void returnsLatestAfterMultipleSubmissions() {
-            var request1 = new FeedbackResponseRequestDTO(null, FeedbackResolution.ADDRESSED, null, null);
-            var request2 = new FeedbackResponseRequestDTO(null, FeedbackResolution.DISPUTED, "Actually wrong", null);
+            var request1 = new FeedbackResponseRequestDTO(null, FeedbackResolution.ADDRESSED, null);
+            var request2 = new FeedbackResponseRequestDTO(null, FeedbackResolution.DISPUTED, "Actually wrong");
 
             webTestClient
-                .post()
+                .put()
                 .uri(FEEDBACK_URI, workspace.getWorkspaceSlug(), feedbackUnit.getId())
                 .headers(TestAuthUtils.withCurrentUser())
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue(request1)
                 .exchange()
                 .expectStatus()
-                .isCreated();
+                .isOk();
 
             webTestClient
-                .post()
+                .put()
                 .uri(FEEDBACK_URI, workspace.getWorkspaceSlug(), feedbackUnit.getId())
                 .headers(TestAuthUtils.withCurrentUser())
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue(request2)
                 .exchange()
                 .expectStatus()
-                .isCreated();
+                .isOk();
 
             FeedbackResponseDTO response = webTestClient
                 .get()
@@ -465,31 +470,38 @@ class FeedbackResponseControllerIntegrationTest extends AbstractWorkspaceIntegra
 
         @Test
         @WithAdminUser
-        @DisplayName("rating a unit helpful afterwards does not erase the dispute")
-        void keepsEachDimensionFromTheRowThatLastAnsweredIt() {
-            // The two questions are answered independently, so the current answer is not the newest row: a
-            // thumbs-up appended after a dispute says nothing about the dispute. Reading the newest row would
-            // report no resolution here — and, worse, would let the suppressed finding be delivered again.
-            submit(new FeedbackResponseRequestDTO(null, FeedbackResolution.DISPUTED, "Actually wrong", null));
-            submit(new FeedbackResponseRequestDTO(FeedbackUsefulness.HELPFUL, null, null, null));
+        @DisplayName("PUT clears response dimensions omitted from the replacement")
+        void replacesTheCompleteResponse() {
+            submit(new FeedbackResponseRequestDTO(null, FeedbackResolution.DISPUTED, "Actually wrong"));
+            submit(new FeedbackResponseRequestDTO(FeedbackUsefulness.HELPFUL, null, null));
 
             FeedbackResponseDTO response = current();
 
             assertThat(response).isNotNull();
             assertThat(response.usefulness()).isEqualTo(FeedbackUsefulness.HELPFUL);
+            assertThat(response.resolution()).isNull();
+            assertThat(response.comment()).isNull();
+        }
+
+        @Test
+        @WithAdminUser
+        void resolutionOnlyReplacementClearsUsefulness() {
+            submit(new FeedbackResponseRequestDTO(FeedbackUsefulness.HELPFUL, FeedbackResolution.ADDRESSED, null));
+            submit(new FeedbackResponseRequestDTO(null, FeedbackResolution.DISPUTED, "Incorrect"));
+
+            FeedbackResponseDTO response = current();
+
+            assertThat(response).isNotNull();
+            assertThat(response.usefulness()).isNull();
             assertThat(response.resolution()).isEqualTo(FeedbackResolution.DISPUTED);
-            assertThat(response.comment()).isEqualTo("Actually wrong");
+            assertThat(response.comment()).isEqualTo("Incorrect");
         }
 
         @Test
         @WithAdminUser
         @DisplayName("a comment written alongside usefulness alone is still readable")
         void keepsACommentThatCameWithoutAResolution() {
-            // The request permits saying "unhelpful, and here is why" without touching the resolution, so the
-            // comment has to be found by its own presence. Looking for the newest row that carries a resolution
-            // instead would store this text and then never return it — the recipient explains themselves into
-            // nothing, and a later resolution would overwrite the reading with its own empty comment.
-            submit(new FeedbackResponseRequestDTO(FeedbackUsefulness.UNHELPFUL, null, "Missed the point", null));
+            submit(new FeedbackResponseRequestDTO(FeedbackUsefulness.UNHELPFUL, null, "Missed the point"));
 
             FeedbackResponseDTO response = current();
 
@@ -501,13 +513,29 @@ class FeedbackResponseControllerIntegrationTest extends AbstractWorkspaceIntegra
 
         @Test
         @WithAdminUser
+        void replacingAnAnswerDoesNotKeepItsComment() {
+            submit(new FeedbackResponseRequestDTO(null, FeedbackResolution.DISPUTED, "Actually wrong"));
+            submit(new FeedbackResponseRequestDTO(null, FeedbackResolution.ADDRESSED, null));
+
+            FeedbackResponseDTO response = current();
+
+            assertThat(response).isNotNull();
+            assertThat(response.resolution()).isEqualTo(FeedbackResolution.ADDRESSED);
+            assertThat(response.comment()).isNull();
+        }
+
+        @Test
+        @WithAdminUser
         @DisplayName("withdrawing leaves no answer, and a later one starts clean")
         void withdrawalEndsEverythingBeforeIt() {
-            // Without this an append-only table could only accumulate, and a mis-click would be permanent.
-            submit(
-                new FeedbackResponseRequestDTO(FeedbackUsefulness.HELPFUL, FeedbackResolution.ADDRESSED, null, null)
-            );
-            submit(new FeedbackResponseRequestDTO(null, null, null, true));
+            submit(new FeedbackResponseRequestDTO(FeedbackUsefulness.HELPFUL, FeedbackResolution.ADDRESSED, null));
+            webTestClient
+                .delete()
+                .uri(FEEDBACK_URI, workspace.getWorkspaceSlug(), feedbackUnit.getId())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isNoContent();
 
             webTestClient
                 .get()
@@ -517,8 +545,7 @@ class FeedbackResponseControllerIntegrationTest extends AbstractWorkspaceIntegra
                 .expectStatus()
                 .isNoContent();
 
-            // Only what was said after it counts — the withdrawn ADDRESSED must not come back.
-            submit(new FeedbackResponseRequestDTO(FeedbackUsefulness.UNHELPFUL, null, null, null));
+            submit(new FeedbackResponseRequestDTO(FeedbackUsefulness.UNHELPFUL, null, null));
             FeedbackResponseDTO response = current();
 
             assertThat(response).isNotNull();
@@ -526,31 +553,16 @@ class FeedbackResponseControllerIntegrationTest extends AbstractWorkspaceIntegra
             assertThat(response.resolution()).isNull();
         }
 
-        @Test
-        @WithAdminUser
-        @DisplayName("a withdrawal carrying an answer is rejected rather than half-applied")
-        void withdrawalCannotCarryAnAnswer() {
-            webTestClient
-                .post()
-                .uri(FEEDBACK_URI, workspace.getWorkspaceSlug(), feedbackUnit.getId())
-                .headers(TestAuthUtils.withCurrentUser())
-                .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(new FeedbackResponseRequestDTO(FeedbackUsefulness.HELPFUL, null, null, true))
-                .exchange()
-                .expectStatus()
-                .isBadRequest();
-        }
-
         private void submit(FeedbackResponseRequestDTO request) {
             webTestClient
-                .post()
+                .put()
                 .uri(FEEDBACK_URI, workspace.getWorkspaceSlug(), feedbackUnit.getId())
                 .headers(TestAuthUtils.withCurrentUser())
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue(request)
                 .exchange()
                 .expectStatus()
-                .isCreated();
+                .isOk();
         }
 
         private @org.jspecify.annotations.Nullable FeedbackResponseDTO current() {
@@ -567,38 +579,35 @@ class FeedbackResponseControllerIntegrationTest extends AbstractWorkspaceIntegra
         }
     }
 
-    // Workspace isolation
-
     @Nested
     class WorkspaceIsolation {
 
         @Test
         @WithAdminUser
-        @DisplayName("engagement does not count feedback from other workspaces")
-        void engagementIsScopedToWorkspace() {
+        @DisplayName("resolution counts exclude feedback from other workspaces")
+        void resolutionCountsAreScopedToWorkspace() {
             webTestClient
-                .post()
+                .put()
                 .uri(FEEDBACK_URI, workspace.getWorkspaceSlug(), feedbackUnit.getId())
                 .headers(TestAuthUtils.withCurrentUser())
                 .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(new FeedbackResponseRequestDTO(null, FeedbackResolution.ADDRESSED, null, null))
+                .bodyValue(new FeedbackResponseRequestDTO(null, FeedbackResolution.ADDRESSED, null))
                 .exchange()
                 .expectStatus()
-                .isCreated();
+                .isOk();
 
             User owner2 = persistUser("other-ws-owner");
             Workspace otherWorkspace = createWorkspace("other-ws", "Other WS", "other-org", AccountType.ORG, owner2);
             ensureWorkspaceMembership(otherWorkspace, adminUser, WorkspaceMembership.WorkspaceRole.ADMIN);
 
-            // Engagement in the second workspace must be all zeros — reactions do not cross workspaces.
-            FeedbackEngagementDTO response = webTestClient
+            FeedbackResolutionCountsDTO response = webTestClient
                 .get()
-                .uri(ENGAGEMENT_URI, otherWorkspace.getWorkspaceSlug())
+                .uri(RESOLUTION_COUNTS_URI, otherWorkspace.getWorkspaceSlug())
                 .headers(TestAuthUtils.withCurrentUser())
                 .exchange()
                 .expectStatus()
                 .isOk()
-                .expectBody(FeedbackEngagementDTO.class)
+                .expectBody(FeedbackResolutionCountsDTO.class)
                 .returnResult()
                 .getResponseBody();
 
@@ -609,22 +618,20 @@ class FeedbackResponseControllerIntegrationTest extends AbstractWorkspaceIntegra
         }
     }
 
-    // GET /engagement
-
     @Nested
-    class GetEngagement {
+    class GetResolutionCounts {
 
         @Test
         @WithAdminUser
         void returnsZerosWhenNoFeedback() {
-            FeedbackEngagementDTO response = webTestClient
+            FeedbackResolutionCountsDTO response = webTestClient
                 .get()
-                .uri(ENGAGEMENT_URI, workspace.getWorkspaceSlug())
+                .uri(RESOLUTION_COUNTS_URI, workspace.getWorkspaceSlug())
                 .headers(TestAuthUtils.withCurrentUser())
                 .exchange()
                 .expectStatus()
                 .isOk()
-                .expectBody(FeedbackEngagementDTO.class)
+                .expectBody(FeedbackResolutionCountsDTO.class)
                 .returnResult()
                 .getResponseBody();
 
@@ -637,43 +644,38 @@ class FeedbackResponseControllerIntegrationTest extends AbstractWorkspaceIntegra
         @Test
         @WithAdminUser
         void returnsCorrectCounts() {
-            // C1: react ADDRESSED then change the mind to DISPUTED on the SAME feedback unit. Reaction is
-            // @Immutable / append-only, so the second submit appends a new row and only the LATEST row per
-            // feedback_id is the current reaction. Engagement must therefore count ONLY the latest (DISPUTED=1),
-            // not double-count the superseded ADDRESSED row.
             webTestClient
-                .post()
+                .put()
                 .uri(FEEDBACK_URI, workspace.getWorkspaceSlug(), feedbackUnit.getId())
                 .headers(TestAuthUtils.withCurrentUser())
                 .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(new FeedbackResponseRequestDTO(null, FeedbackResolution.ADDRESSED, null, null))
+                .bodyValue(new FeedbackResponseRequestDTO(null, FeedbackResolution.ADDRESSED, null))
                 .exchange()
                 .expectStatus()
-                .isCreated();
+                .isOk();
 
             webTestClient
-                .post()
+                .put()
                 .uri(FEEDBACK_URI, workspace.getWorkspaceSlug(), feedbackUnit.getId())
                 .headers(TestAuthUtils.withCurrentUser())
                 .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(new FeedbackResponseRequestDTO(null, FeedbackResolution.DISPUTED, "Wrong detection", null))
+                .bodyValue(new FeedbackResponseRequestDTO(null, FeedbackResolution.DISPUTED, "Wrong detection"))
                 .exchange()
                 .expectStatus()
-                .isCreated();
+                .isOk();
 
-            FeedbackEngagementDTO response = webTestClient
+            FeedbackResolutionCountsDTO response = webTestClient
                 .get()
-                .uri(ENGAGEMENT_URI, workspace.getWorkspaceSlug())
+                .uri(RESOLUTION_COUNTS_URI, workspace.getWorkspaceSlug())
                 .headers(TestAuthUtils.withCurrentUser())
                 .exchange()
                 .expectStatus()
                 .isOk()
-                .expectBody(FeedbackEngagementDTO.class)
+                .expectBody(FeedbackResolutionCountsDTO.class)
                 .returnResult()
                 .getResponseBody();
 
             assertThat(response).isNotNull();
-            // The superseded ADDRESSED row no longer counts — only the current DISPUTED reaction does.
             assertThat(response.addressed()).isZero();
             assertThat(response.disputed()).isEqualTo(1);
             assertThat(response.notApplicable()).isZero();
@@ -682,9 +684,6 @@ class FeedbackResponseControllerIntegrationTest extends AbstractWorkspaceIntegra
         @Test
         @WithAdminUser
         void countsDistinctFeedbackUnitsNotHistoricalRows() {
-            // Two DISTINCT feedback units, each reacted ADDRESSED once → addressed=2 (distinct current
-            // reactions). Guards that the DISTINCT ON (feedback_id) collapse does not over-collapse across
-            // different feedback units.
             Feedback secondFeedbackUnit = feedbackRepository.save(
                 Feedback.builder()
                     .agentJobId(feedbackUnit.getAgentJobId())
@@ -703,32 +702,32 @@ class FeedbackResponseControllerIntegrationTest extends AbstractWorkspaceIntegra
             );
 
             webTestClient
-                .post()
+                .put()
                 .uri(FEEDBACK_URI, workspace.getWorkspaceSlug(), feedbackUnit.getId())
                 .headers(TestAuthUtils.withCurrentUser())
                 .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(new FeedbackResponseRequestDTO(null, FeedbackResolution.ADDRESSED, null, null))
+                .bodyValue(new FeedbackResponseRequestDTO(null, FeedbackResolution.ADDRESSED, null))
                 .exchange()
                 .expectStatus()
-                .isCreated();
+                .isOk();
             webTestClient
-                .post()
+                .put()
                 .uri(FEEDBACK_URI, workspace.getWorkspaceSlug(), secondFeedbackUnit.getId())
                 .headers(TestAuthUtils.withCurrentUser())
                 .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(new FeedbackResponseRequestDTO(null, FeedbackResolution.ADDRESSED, null, null))
+                .bodyValue(new FeedbackResponseRequestDTO(null, FeedbackResolution.ADDRESSED, null))
                 .exchange()
                 .expectStatus()
-                .isCreated();
+                .isOk();
 
-            FeedbackEngagementDTO response = webTestClient
+            FeedbackResolutionCountsDTO response = webTestClient
                 .get()
-                .uri(ENGAGEMENT_URI, workspace.getWorkspaceSlug())
+                .uri(RESOLUTION_COUNTS_URI, workspace.getWorkspaceSlug())
                 .headers(TestAuthUtils.withCurrentUser())
                 .exchange()
                 .expectStatus()
                 .isOk()
-                .expectBody(FeedbackEngagementDTO.class)
+                .expectBody(FeedbackResolutionCountsDTO.class)
                 .returnResult()
                 .getResponseBody();
 

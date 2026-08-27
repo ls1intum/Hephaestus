@@ -81,7 +81,7 @@ public class WorkspaceScopedTables {
         "instance_llm_settings",
         // Instance-wide practice catalog overrides; no workspace owner
         "curated_practice_override",
-        "curated_area_override",
+        "curated_group_override",
         // ECB daily reference rates for display-only currency conversion; not a tenant's property
         "fx_rate",
         // Liquibase machinery

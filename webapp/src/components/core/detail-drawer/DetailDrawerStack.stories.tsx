@@ -219,7 +219,7 @@ export const ArrivesWithAnEnterTransition: Story = {
 export const DetailSizeKeepsItsPeek: Story = {
 	args: {
 		stack: [
-			{ kind: "area", id: "review-ready-work" },
+			{ kind: "group", id: "review-ready-work" },
 			{ kind: "practice", id: "describe-what-and-why" },
 		],
 	},
@@ -237,7 +237,7 @@ export const DetailSizeKeepsItsPeek: Story = {
 export const DismissedLevelDoesNotComeBack: Story = {
 	args: {
 		stack: [
-			{ kind: "area", id: "review-ready-work" },
+			{ kind: "group", id: "review-ready-work" },
 			{ kind: "practice", id: "describe-what-and-why" },
 		],
 	},
@@ -343,7 +343,7 @@ export const Closed: Story = {
 export const TwoLevels: Story = {
 	args: {
 		stack: [
-			{ kind: "area", id: "review-ready-work" },
+			{ kind: "group", id: "review-ready-work" },
 			{ kind: "practice", id: "describe-what-and-why" },
 		],
 	},
@@ -358,14 +358,14 @@ export const TwoLevels: Story = {
 		const back = screen.getByRole("button", { name: "Back" });
 		await userEvent.click(back);
 		await waitFor(() => expect(args.onClose).toHaveBeenCalledWith(1));
-		await expect(await screen.findByText("area · review-ready-work")).toBeVisible();
+		await expect(await screen.findByText("group · review-ready-work")).toBeVisible();
 	},
 };
 
 export const NarrowViewport: Story = {
 	args: {
 		stack: [
-			{ kind: "area", id: "review-ready-work" },
+			{ kind: "group", id: "review-ready-work" },
 			{ kind: "practice", id: "describe-what-and-why" },
 		],
 	},
@@ -380,7 +380,7 @@ export const NarrowViewport: Story = {
 export const DarkMode: Story = {
 	args: {
 		stack: [
-			{ kind: "area", id: "review-ready-work" },
+			{ kind: "group", id: "review-ready-work" },
 			{ kind: "practice", id: "describe-what-and-why" },
 		],
 	},

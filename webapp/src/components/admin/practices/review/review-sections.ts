@@ -13,7 +13,7 @@ export const REVIEW_SECTIONS = [
 		id: "how-much",
 		label: "How much",
 		description:
-			"How far reviews go without you: one setting for the whole workspace, overridden only where an area or a single practice needs something different.",
+			"How far reviews go without you: one setting for the whole workspace, overridden only where a group or a single practice needs something different.",
 	},
 	{
 		id: "when-and-where",

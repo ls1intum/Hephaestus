@@ -1,26 +1,26 @@
 package de.tum.cit.aet.hephaestus.practices.curated;
 
-import de.tum.cit.aet.hephaestus.practices.AreaDefinition;
 import de.tum.cit.aet.hephaestus.practices.CanonicalDigest;
+import de.tum.cit.aet.hephaestus.practices.GroupDefinition;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
 import java.util.List;
 import java.util.Optional;
 
 public record EffectiveCatalog(
-    List<CatalogEntry<AreaDefinition>> areas,
+    List<CatalogEntry<GroupDefinition>> groups,
     List<CatalogEntry<PracticeDefinition>> practices,
     boolean customOrder
 ) {
     public EffectiveCatalog {
-        areas = List.copyOf(areas);
+        groups = List.copyOf(groups);
         practices = List.copyOf(practices);
     }
 
     public EffectiveCatalog(
-        List<CatalogEntry<AreaDefinition>> areas,
+        List<CatalogEntry<GroupDefinition>> groups,
         List<CatalogEntry<PracticeDefinition>> practices
     ) {
-        this(areas, practices, false);
+        this(groups, practices, false);
     }
 
     public Optional<CatalogEntry<PracticeDefinition>> practice(String slug) {
@@ -30,22 +30,22 @@ public record EffectiveCatalog(
             .findFirst();
     }
 
-    public Optional<CatalogEntry<AreaDefinition>> area(String slug) {
-        return areas
+    public Optional<CatalogEntry<GroupDefinition>> group(String slug) {
+        return groups
             .stream()
             .filter(entry -> entry.slug().equals(slug))
             .findFirst();
     }
 
     public String etag() {
-        CanonicalDigest digest = new CanonicalDigest().addInt(customOrder ? 1 : 0).addInt(areas.size());
-        areas.forEach(entry -> digest.add(entry.etag()).addInt(entry.position()));
+        CanonicalDigest digest = new CanonicalDigest().addInt(customOrder ? 1 : 0).addInt(groups.size());
+        groups.forEach(entry -> digest.add(entry.etag()).addInt(entry.position()));
         digest.addInt(practices.size());
         practices.forEach(entry -> digest.add(entry.etag()).addInt(entry.position()));
         return digest.hex();
     }
 
-    /** Returns entries included in a new workspace, respecting excluded parent areas. */
+    /** Returns entries included in a new workspace, respecting excluded parent groups. */
     public List<CatalogEntry<PracticeDefinition>> installablePractices() {
         return practices.stream().filter(this::isEffectivelyOffered).toList();
     }
@@ -54,26 +54,26 @@ public record EffectiveCatalog(
         if (!practice.offered()) {
             return false;
         }
-        String areaSlug = practice.effective().areaSlug();
-        return areaSlug == null || area(areaSlug).map(CatalogEntry::offered).orElse(false);
+        String groupSlug = practice.effective().groupSlug();
+        return groupSlug == null || group(groupSlug).map(CatalogEntry::offered).orElse(false);
     }
 
-    public List<CatalogEntry<AreaDefinition>> installableAreas() {
-        return areas.stream().filter(CatalogEntry::offered).toList();
+    public List<CatalogEntry<GroupDefinition>> installableGroups() {
+        return groups.stream().filter(CatalogEntry::offered).toList();
     }
 
-    public List<String> offeredPracticesIn(String areaSlug) {
+    public List<String> offeredPracticesIn(String groupSlug) {
         return practices
             .stream()
             .filter(CatalogEntry::offered)
-            .filter(entry -> areaSlug.equals(entry.effective().areaSlug()))
+            .filter(entry -> groupSlug.equals(entry.effective().groupSlug()))
             .map(CatalogEntry::slug)
             .toList();
     }
 
     public CatalogSummary summary() {
-        int total = practices.size() + areas.size();
-        int notOffered = total - installableAreas().size() - installablePractices().size();
+        int total = practices.size() + groups.size();
+        int notOffered = total - installableGroups().size() - installablePractices().size();
         return new CatalogSummary(
             total,
             count(CatalogEntryState.UPDATE_WAITING, CatalogChangeKind.DETECTION),
@@ -99,7 +99,7 @@ public record EffectiveCatalog(
     }
 
     private java.util.stream.Stream<CatalogEntry<?>> entries() {
-        return java.util.stream.Stream.concat(areas.stream(), practices.stream());
+        return java.util.stream.Stream.concat(groups.stream(), practices.stream());
     }
 
     public record CatalogSummary(

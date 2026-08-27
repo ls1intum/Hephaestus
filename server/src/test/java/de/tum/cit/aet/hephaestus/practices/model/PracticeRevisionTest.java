@@ -10,13 +10,13 @@ import org.junit.jupiter.api.Test;
 class PracticeRevisionTest extends BaseUnitTest {
 
     @Test
-    void shouldSnapshotCompleteDefinitionAndArea() {
-        PracticeArea area = new PracticeArea();
-        area.setSlug("review-quality");
-        area.setName("Review quality");
-        area.setDescription("Review work");
-        area.setIcon("MessageSquare");
-        area.setColor("cyan");
+    void shouldSnapshotCompleteDefinitionAndGroup() {
+        PracticeGroup group = new PracticeGroup();
+        group.setSlug("review-quality");
+        group.setName("Review quality");
+        group.setDescription("Review work");
+        group.setIcon("MessageSquare");
+        group.setColor("cyan");
         Practice practice = new Practice();
         practice.setSlug("clear-feedback");
         practice.setName("Clear feedback");
@@ -26,7 +26,7 @@ class PracticeRevisionTest extends BaseUnitTest {
         practice.setAutomatedReviewPolicy(PracticeTestEvidence.forArtifact(ArtifactKinds.PULL_REQUEST));
         practice.setWhyItMatters("Prevents rework");
         practice.setWhatGoodLooksLike("A concrete suggestion");
-        practice.setArea(area);
+        practice.setGroup(group);
 
         PracticeRevision revision = new PracticeRevision(practice, 3);
         // The revision copies the list; a later edit to the practice's bindings must not reach it.
@@ -44,11 +44,11 @@ class PracticeRevisionTest extends BaseUnitTest {
         assertThat(revision.getWhatGoodLooksLike()).isEqualTo("A concrete suggestion");
         assertThat(revision)
             .extracting(
-                PracticeRevision::getAreaSlug,
-                PracticeRevision::getAreaName,
-                PracticeRevision::getAreaDescription,
-                PracticeRevision::getAreaIcon,
-                PracticeRevision::getAreaColor
+                PracticeRevision::getGroupSlug,
+                PracticeRevision::getGroupName,
+                PracticeRevision::getGroupDescription,
+                PracticeRevision::getGroupIcon,
+                PracticeRevision::getGroupColor
             )
             .containsExactly("review-quality", "Review quality", "Review work", "MessageSquare", "cyan");
         assertThat(revision.getReviewRuleFingerprint()).hasSize(67).startsWith("v3:");

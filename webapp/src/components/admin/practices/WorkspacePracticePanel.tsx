@@ -1,7 +1,7 @@
 import { Pencil } from "lucide-react";
 import type { Practice, PracticeDefinitionOptions } from "@/api/types.gen";
 import { PracticeDefinitionPreview } from "@/components/admin/practice-adoption/PracticeDefinitionPreview";
-import { AreaPill } from "@/components/admin/practice-catalog/AreaPill";
+import { GroupPill } from "@/components/admin/practice-catalog/GroupPill";
 import { CatalogOriginBadge } from "@/components/admin/practices/CatalogOriginBadge";
 import { PracticeDefinitionSkeleton } from "@/components/admin/practices/PracticeSkeletons";
 import { practiceFormLevel } from "@/components/admin/practices/practice-search";
@@ -24,7 +24,7 @@ export type WorkspacePracticeState = PanelState<{
 	practice: Practice;
 	definitionOptions: PracticeDefinitionOptions;
 	/** The group's display name, for the inheritance sentence. Absent when unassigned. */
-	areaName?: string;
+	groupName?: string;
 }>;
 
 export interface WorkspacePracticePanelProps {
@@ -62,14 +62,14 @@ export function WorkspacePracticePanel({ state, nested }: WorkspacePracticePanel
 		);
 	}
 
-	const { practice, definitionOptions, areaName } = state;
+	const { practice, definitionOptions, groupName } = state;
 	const autonomy = AUTONOMY_DEFS[practice.autonomy.effective];
-	const autonomySource = autonomySourceOf(practice.autonomy, areaName ?? null);
+	const autonomySource = autonomySourceOf(practice.autonomy, groupName ?? null);
 
 	return (
 		<>
 			<DetailDrawerHeader nested={nested}>
-				<AreaPill size="lg" slug={practice.areaSlug} name={areaName} />
+				<GroupPill size="lg" slug={practice.groupSlug} name={groupName} />
 				<div className="min-w-0 flex-1 space-y-1">
 					<DrawerTitle className="break-words">{practice.name}</DrawerTitle>
 					<DrawerDescription>

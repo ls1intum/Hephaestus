@@ -30,7 +30,7 @@ describe("practice catalog route", () => {
 					},
 				]),
 			),
-			http.get("*/workspaces/:workspaceSlug/practice-areas", () => HttpResponse.json([])),
+			http.get("*/workspaces/:workspaceSlug/practice-groups", () => HttpResponse.json([])),
 			http.get("*/workspaces/:workspaceSlug/practices", () => HttpResponse.json([])),
 			http.get("*/workspaces/:workspaceSlug/practices/definition-options", () =>
 				HttpResponse.json(mockPracticeDefinitionOptions),
@@ -48,7 +48,7 @@ describe("practice catalog route", () => {
 			http.get("*/workspaces/:workspaceSlug/members/me", () =>
 				HttpResponse.json({ role: "ADMIN", userId: 1, userLogin: "ada", userName: "Ada" }),
 			),
-			http.get("*/workspaces/:workspaceSlug/practice-areas", () => HttpResponse.json([])),
+			http.get("*/workspaces/:workspaceSlug/practice-groups", () => HttpResponse.json([])),
 			http.get("*/workspaces/:workspaceSlug/practices", () => HttpResponse.json([])),
 			http.get("*/workspaces/:workspaceSlug/practices/definition-options", () =>
 				HttpResponse.json(mockPracticeDefinitionOptions),

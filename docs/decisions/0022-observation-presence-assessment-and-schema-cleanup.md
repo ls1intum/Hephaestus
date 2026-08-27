@@ -52,9 +52,10 @@ problem?" as `assessment = BAD`.
 removed entirely — no backward compatibility. A developer reacts to the *delivered feedback*, never to a
 private observation. The action stays a closed enum (`ADDRESSED` / `DISPUTED` / `NOT_APPLICABLE`); an open
 verb / event log is rejected (no second producer; it turns the uptake metric into free-text). `DISPUTED`
-requires an explanation. The cross-run `recurrence_key` (former `finding_fingerprint`) is **kept on the
-reaction**: re-nag suppression matches on it, and `thread_key` exists only on *delivered* units, so a
-withheld-but-recurring locus has no other cross-run key.
+requires an explanation. The historical `reaction.recurrence_key` column remains for schema compatibility,
+but current re-nag suppression follows the response through `feedback_observation` and matches the bound
+observation's `recurrence_key`. That keeps the response anchored only to what the developer received while
+using the observation as the authoritative locus.
 
 ### 3. Identity collapses to the minimal correct set
 
@@ -96,7 +97,8 @@ profile and named a storage location rather than how the developer engages — s
 - Direction is no longer a rule column; every former reader of `Practice.kind` recomputes "is this a
   problem?" as `assessment = BAD`.
 - A developer reacts to delivered feedback, never to a private observation: authorization derives the
-  recipient through `feedback`, and re-nag suppression matches on the `recurrence_key` kept on the reaction.
+  recipient through `feedback`, and re-nag suppression follows its observation bindings to the recurrence
+  locus.
 
 ## Evidence
 

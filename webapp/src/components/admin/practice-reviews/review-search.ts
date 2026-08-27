@@ -81,7 +81,7 @@ export const observationsSearchSchema = z
 	.object({
 		...scope,
 		page,
-		areaSlug: multiValue,
+		groupSlug: multiValue,
 		practiceSlug: multiValue,
 		presence: enumValues(statusValues(PRESENCE_DEFS)),
 		assessment: enumValues(statusValues(ASSESSMENT_DEFS)),
@@ -181,7 +181,7 @@ export function observationsQuery(search: ObservationsSearch, size: number) {
 		...scopeQuery(search),
 		page: search.page ?? 0,
 		size,
-		areaSlug: search.areaSlug?.length ? search.areaSlug : undefined,
+		groupSlug: search.groupSlug?.length ? search.groupSlug : undefined,
 		practiceSlug: search.practiceSlug?.length ? search.practiceSlug : undefined,
 		presence: search.presence,
 		assessment: search.assessment,

@@ -13,7 +13,7 @@ final class PracticeDefinitionDigest {
             .add(PracticeAutomatedReviewPolicyDigest.digest(definition.automatedReviewPolicy()))
             .addNullable(definition.whyItMatters())
             .addNullable(definition.whatGoodLooksLike())
-            .addNullable(definition.areaSlug())
+            .addNullable(definition.groupSlug())
             .hex();
     }
 }

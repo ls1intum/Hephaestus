@@ -5,11 +5,11 @@ import type {
 	PracticeAutomatedReviewPolicy,
 } from "@/api/types.gen";
 
-export const UNASSIGNED_AREA_KEY = "__unassigned__";
+export const UNASSIGNED_GROUP_KEY = "__unassigned__";
 
 export interface AutonomyGroup {
 	key: string;
-	areaSlug: string | null;
+	groupSlug: string | null;
 	name: string;
 	autonomy: AutonomyAssignment;
 	counts: Record<string, number>;
@@ -33,41 +33,41 @@ export interface GroupOptions {
 	overridesOnly?: boolean;
 }
 
-export function groupPracticesByArea(
+export function groupPracticesByGroup(
 	rollup: AutonomyRollup,
 	practices: readonly Practice[],
 	{ overridesOnly = false }: GroupOptions = {},
 ): AutonomyGroup[] {
-	const byArea = new Map<string, Practice[]>();
+	const byGroup = new Map<string, Practice[]>();
 	for (const practice of practices) {
-		const key = practice.areaSlug ?? UNASSIGNED_AREA_KEY;
-		const bucket = byArea.get(key);
+		const key = practice.groupSlug ?? UNASSIGNED_GROUP_KEY;
+		const bucket = byGroup.get(key);
 		if (bucket) bucket.push(practice);
-		else byArea.set(key, [practice]);
+		else byGroup.set(key, [practice]);
 	}
 
 	const groups: AutonomyGroup[] = [];
-	for (const area of rollup.areas) {
-		const key = area.areaSlug ?? UNASSIGNED_AREA_KEY;
-		const owned = byArea.get(key) ?? [];
-		byArea.delete(key);
+	for (const group of rollup.groups) {
+		const key = group.groupSlug ?? UNASSIGNED_GROUP_KEY;
+		const owned = byGroup.get(key) ?? [];
+		byGroup.delete(key);
 		groups.push({
 			key,
-			areaSlug: area.areaSlug ?? null,
-			name: area.areaName ?? "Unassigned",
-			autonomy: area.autonomy,
-			counts: area.counts,
-			overriddenCount: area.overriddenCount,
+			groupSlug: group.groupSlug ?? null,
+			name: group.groupName ?? "Unassigned",
+			autonomy: group.autonomy,
+			counts: group.counts,
+			overriddenCount: group.overriddenCount,
 			practices: owned,
 			totalPractices: owned.length,
 		});
 	}
 
-	for (const [key, owned] of byArea) {
+	for (const [key, owned] of byGroup) {
 		groups.push({
 			key,
-			areaSlug: key === UNASSIGNED_AREA_KEY ? null : key,
-			name: key === UNASSIGNED_AREA_KEY ? "Unassigned" : key,
+			groupSlug: key === UNASSIGNED_GROUP_KEY ? null : key,
+			name: key === UNASSIGNED_GROUP_KEY ? "Unassigned" : key,
 			autonomy: rollup.workspaceDefault,
 			counts: countByAutonomy(owned),
 			overriddenCount: owned.filter((practice) => isOverridden(practice.autonomy)).length,
@@ -85,7 +85,7 @@ export function groupPracticesByArea(
 		}))
 		.filter(
 			(group) =>
-				group.practices.length > 0 || (group.areaSlug !== null && isOverridden(group.autonomy)),
+				group.practices.length > 0 || (group.groupSlug !== null && isOverridden(group.autonomy)),
 		);
 }
 
@@ -100,11 +100,11 @@ function countByAutonomy(practices: readonly Practice[]): Record<string, number>
 
 export function countOverrides(rollup: AutonomyRollup): {
 	practices: number;
-	areas: number;
+	groups: number;
 } {
 	return {
-		practices: rollup.areas.reduce((total, area) => total + area.overriddenCount, 0),
-		areas: rollup.areas.filter((area) => area.areaSlug != null && isOverridden(area.autonomy))
+		practices: rollup.groups.reduce((total, group) => total + group.overriddenCount, 0),
+		groups: rollup.groups.filter((group) => group.groupSlug != null && isOverridden(group.autonomy))
 			.length,
 	};
 }

@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.practices.observation.trend;
 
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
-import de.tum.cit.aet.hephaestus.practices.observation.trend.dto.PracticeAreaTrendDTO;
+import de.tum.cit.aet.hephaestus.practices.observation.trend.dto.PracticeGroupTrendDTO;
 import java.time.Clock;
 import java.time.temporal.ChronoUnit;
 import java.util.Collection;
@@ -11,7 +11,6 @@ import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
-/** The application's only producer of longitudinal practice and area trend results. */
 @Service
 @RequiredArgsConstructor
 public class PracticeTrendService {
@@ -28,20 +27,18 @@ public class PracticeTrendService {
         return trends;
     }
 
-    public PracticeTrend calculateArea(
-        String areaSlug,
+    public PracticeTrend calculateGroup(
+        String groupSlug,
         Collection<String> eligiblePracticeSlugs,
-        Collection<PracticeTrend> practiceTrends,
-        Map<String, Double> weights
+        Collection<PracticeTrend> practiceTrends
     ) {
-        return AreaTrendAggregator.aggregate(areaSlug, eligiblePracticeSlugs, practiceTrends, weights, properties);
+        return GroupTrendAggregator.aggregate(groupSlug, eligiblePracticeSlugs, practiceTrends, properties);
     }
 
-    public PracticeAreaTrendDTO detail(
-        String areaSlug,
+    public PracticeGroupTrendDTO detail(
+        String groupSlug,
         Collection<String> eligiblePracticeSlugs,
-        Map<String, List<Observation>> evidenceByPractice,
-        Map<String, Double> weights
+        Map<String, List<Observation>> evidenceByPractice
     ) {
         Map<String, PracticeTrend> all = calculatePractices(evidenceByPractice);
         List<PracticeTrend> practices = eligiblePracticeSlugs
@@ -53,7 +50,7 @@ public class PracticeTrendService {
                 )
             )
             .toList();
-        PracticeTrend area = calculateArea(areaSlug, eligiblePracticeSlugs, practices, weights);
-        return new PracticeAreaTrendDTO(area.toDto(), practices.stream().map(PracticeTrend::toDto).toList());
+        PracticeTrend group = calculateGroup(groupSlug, eligiblePracticeSlugs, practices);
+        return new PracticeGroupTrendDTO(group.toDto(), practices.stream().map(PracticeTrend::toDto).toList());
     }
 }

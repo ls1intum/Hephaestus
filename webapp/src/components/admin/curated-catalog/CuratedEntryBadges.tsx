@@ -6,7 +6,7 @@ const TONE_VARIANT = { neutral: "outline", info: "secondary", attention: "warnin
 
 export interface CuratedEntryBadgesProps {
 	status: CatalogEntryStatus;
-	kind: "practice" | "area";
+	kind: "practice" | "group";
 }
 
 export function CuratedEntryBadges({ status, kind }: CuratedEntryBadgesProps) {

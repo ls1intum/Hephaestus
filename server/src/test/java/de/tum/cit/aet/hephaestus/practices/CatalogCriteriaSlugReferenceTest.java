@@ -81,8 +81,8 @@ class CatalogCriteriaSlugReferenceTest extends BaseUnitTest {
         ObjectMapper mapper = new ObjectMapper();
         JsonNode root = mapper.readTree(readCatalogue());
         Map<String, JsonNode> practices = new LinkedHashMap<>();
-        for (JsonNode area : root.path("areas")) {
-            for (JsonNode practice : area.path("practices")) {
+        for (JsonNode group : root.path("groups")) {
+            for (JsonNode practice : group.path("practices")) {
                 practices.put(practice.path("slug").asText(), practice);
             }
         }

@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.practices.feedback;
 
-/** What the recipient decided to do with a delivered feedback unit. */
+/** What the recipient decided to do with a delivered piece of feedback. */
 public enum FeedbackResolution {
     /** The recipient acted, or intends to act, on the guidance. */
     ADDRESSED,

@@ -3,7 +3,7 @@ import { toast } from "sonner";
 import {
 	autonomyRollupQueryKey,
 	getPracticeReviewSettingsQueryKey,
-	listAreasQueryKey,
+	listGroupsQueryKey,
 	listPracticesQueryKey,
 	updatePracticeReviewSettingsMutation,
 } from "@/api/@tanstack/react-query.gen";
@@ -16,7 +16,7 @@ export type PracticeReviewSettingsField = NonNullable<
 
 /**
  * One place that knows what a write to this resource invalidates, because two screens write it. The
- * workspace default sits at the bottom of the practice → area → workspace chain, so changing it
+ * workspace default sits at the bottom of the practice → group → workspace chain, so changing it
  * changes the autonomy in force on everything holding none of its own — and none of that is in the
  * response.
  */
@@ -58,7 +58,7 @@ export function usePracticeReviewSettingsMutation(
 				queryKey: listPracticesQueryKey({ path: { workspaceSlug } }),
 			});
 			void queryClient.invalidateQueries({
-				queryKey: listAreasQueryKey({ path: { workspaceSlug } }),
+				queryKey: listGroupsQueryKey({ path: { workspaceSlug } }),
 			});
 		},
 	});

@@ -5,6 +5,9 @@ import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
 import de.tum.cit.aet.hephaestus.practices.web.QueryFilterSupport;
 import io.swagger.v3.oas.annotations.Parameter;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.PositiveOrZero;
 import java.util.List;
 import java.util.Objects;
 import org.jspecify.annotations.Nullable;
@@ -23,16 +26,16 @@ import org.springframework.web.bind.annotation.RequestParam;
  */
 public record ObservationFeedFilterParams(
     @Parameter(description = "Filter by practice slug") @RequestParam(required = false) @Nullable String practiceSlug,
-    @Parameter(description = "Filter by the practice area the observed practice belongs to")
+    @Parameter(description = "Filter by the practice group the observed practice belongs to")
     @RequestParam(required = false)
     @Nullable
-    String areaSlug,
+    String groupSlug,
     @Parameter(description = "Filter by presence") @RequestParam(required = false) @Nullable Presence presence,
     /**
      * Bare strings, not {@link ArtifactKind}s — {@link QueryFilterSupport#artifactKind} has the reason,
      * and parses them in {@link #toQuery()}, where a malformed value becomes a 400.
      */
-    @Parameter(description = "Only observations on these artifact kinds, e.g. scm.pull_request (repeatable)")
+    @Parameter(description = "Only observations on these kinds of reviewed work, e.g. scm.pull_request (repeatable)")
     @RequestParam(required = false)
     @Nullable
     List<String> artifactKinds,
@@ -50,14 +53,15 @@ public record ObservationFeedFilterParams(
     @Parameter(description = "Ordering direction: for DATE newest/oldest first, for SEVERITY most/least severe first")
     @RequestParam(required = false)
     Sort.@Nullable Direction direction,
-    @Parameter(description = "Zero-based page; a negative value is read as the first page")
+    @Parameter(description = "Zero-based page") @RequestParam(required = false) @PositiveOrZero @Nullable Integer page,
+    @Parameter(description = "Page size from 1 to 100")
     @RequestParam(required = false)
+    @Min(1)
+    @Max(100)
     @Nullable
-    Integer page,
-    @Parameter(description = "Page size, clamped to 1..100") @RequestParam(required = false) @Nullable Integer size
+    Integer size
 ) {
     private static final int DEFAULT_PAGE_SIZE = 20;
-    private static final int MAX_PAGE_SIZE = 100;
 
     public ObservationFeedFilterParams {
         displayableOnly = displayableOnly != null && displayableOnly;
@@ -72,7 +76,7 @@ public record ObservationFeedFilterParams(
      * would have the database order by two different keys.
      */
     public Pageable pageable() {
-        Pageable page = QueryFilterSupport.pageable(this.page, size, DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE);
+        Pageable page = QueryFilterSupport.pageable(this.page, size, DEFAULT_PAGE_SIZE);
         return sort() == ObservationService.ObservationSort.SEVERITY
             ? page
             : PageRequest.of(
@@ -86,7 +90,7 @@ public record ObservationFeedFilterParams(
     public ObservationFeedQuery toQuery() {
         return new ObservationFeedQuery(
             practiceSlug,
-            areaSlug,
+            groupSlug,
             presence,
             QueryFilterSupport.artifactKinds(artifactKinds),
             severities,

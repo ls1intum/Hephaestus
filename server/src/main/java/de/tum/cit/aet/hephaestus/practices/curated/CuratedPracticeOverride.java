@@ -58,8 +58,8 @@ public class CuratedPracticeOverride {
     @Column(name = "what_good_looks_like", columnDefinition = "TEXT")
     private @Nullable String whatGoodLooksLike;
 
-    @Column(name = "area_slug", length = 64)
-    private @Nullable String areaSlug;
+    @Column(name = "group_slug", length = 64)
+    private @Nullable String groupSlug;
 
     @Column(name = "position")
     private @Nullable Integer position;
@@ -104,7 +104,7 @@ public class CuratedPracticeOverride {
             automatedReviewPolicy,
             whyItMatters,
             whatGoodLooksLike,
-            areaSlug
+            groupSlug
         );
     }
 
@@ -117,7 +117,7 @@ public class CuratedPracticeOverride {
         this.automatedReviewPolicy = definition.automatedReviewPolicy();
         this.whyItMatters = definition.whyItMatters();
         this.whatGoodLooksLike = definition.whatGoodLooksLike();
-        this.areaSlug = definition.areaSlug();
+        this.groupSlug = definition.groupSlug();
         this.acceptedBundledDigest = acceptedBundledDigest;
         this.updatedAt = Objects.requireNonNull(now, "now");
     }
@@ -131,7 +131,7 @@ public class CuratedPracticeOverride {
         this.automatedReviewPolicy = null;
         this.whyItMatters = null;
         this.whatGoodLooksLike = null;
-        this.areaSlug = null;
+        this.groupSlug = null;
         this.acceptedBundledDigest = null;
         this.updatedAt = Objects.requireNonNull(now, "now");
     }

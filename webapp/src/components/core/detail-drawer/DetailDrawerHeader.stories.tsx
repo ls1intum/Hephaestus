@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, screen, userEvent, waitFor } from "storybook/test";
-import { AreaPill } from "@/components/admin/practice-catalog/AreaPill";
+import { GroupPill } from "@/components/admin/practice-catalog/GroupPill";
 import { DetailDrawerStack } from "@/components/core/detail-drawer/DetailDrawerStack";
 import { DrawerBody, DrawerDescription, DrawerTitle } from "@/components/ui/drawer";
 import { withPageBehind } from "@/stories/decorators";
@@ -15,7 +15,7 @@ const meta = {
 	args: {
 		children: (
 			<>
-				<AreaPill size="lg" slug="review-ready-work" name="Review-ready work" />
+				<GroupPill size="lg" slug="review-ready-work" name="Review-ready work" />
 				<div className="min-w-0 flex-1 space-y-0.5">
 					<DrawerTitle>Describe what changed and why</DrawerTitle>
 					<DrawerDescription>Pull request</DrawerDescription>

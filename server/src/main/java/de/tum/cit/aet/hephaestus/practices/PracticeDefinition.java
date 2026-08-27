@@ -21,7 +21,7 @@ public record PracticeDefinition(
     PracticeAutomatedReviewPolicy automatedReviewPolicy,
     @Nullable String whyItMatters,
     @Nullable String whatGoodLooksLike,
-    @Nullable String areaSlug
+    @Nullable String groupSlug
 ) implements CatalogDefinition {
     public static final int MAX_PRECOMPUTE_SCRIPT_LENGTH = 100_000;
 
@@ -60,7 +60,7 @@ public record PracticeDefinition(
             practice.getAutomatedReviewPolicy(),
             practice.getWhyItMatters(),
             practice.getWhatGoodLooksLike(),
-            practice.getArea() == null ? null : practice.getArea().getSlug()
+            practice.getGroup() == null ? null : practice.getGroup().getSlug()
         );
     }
 
@@ -77,7 +77,7 @@ public record PracticeDefinition(
             criteria,
             precomputeScript,
             automatedReviewPolicy,
-            areaSlug
+            groupSlug
         );
     }
 

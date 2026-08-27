@@ -5,7 +5,6 @@ import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
 import de.tum.cit.aet.hephaestus.practices.observation.dto.DeveloperPracticeSummaryDTO;
 import de.tum.cit.aet.hephaestus.practices.observation.dto.ObservationDetailDTO;
 import de.tum.cit.aet.hephaestus.practices.observation.dto.ObservationListDTO;
-import de.tum.cit.aet.hephaestus.practices.observation.dto.ReflectionPracticeDTO;
 import de.tum.cit.aet.hephaestus.practices.spi.EvidenceAuthorization;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceScopedController;
@@ -14,7 +13,6 @@ import io.swagger.v3.oas.annotations.media.ArraySchema;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
-import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -45,7 +43,6 @@ public class ObservationController {
 
     private final ObservationService observationService;
     private final EvidenceAuthorization evidenceAuthorization;
-    private final PracticeReflectionService practiceReflectionService;
 
     @GetMapping
     @Operation(
@@ -53,7 +50,6 @@ public class ObservationController {
         description = "Paginated observations for the authenticated developer with optional filters"
     )
     @ApiResponse(responseCode = "200", description = "Paginated observations returned")
-    @SecurityRequirements
     public ResponseEntity<Page<ObservationListDTO>> listObservations(
         WorkspaceContext workspaceContext,
         @Valid @ParameterObject ObservationFeedFilterParams filter
@@ -76,7 +72,6 @@ public class ObservationController {
         description = "Practice summaries returned",
         content = @Content(array = @ArraySchema(schema = @Schema(implementation = DeveloperPracticeSummaryDTO.class)))
     )
-    @SecurityRequirements
     public ResponseEntity<List<DeveloperPracticeSummaryDTO>> getSummary(WorkspaceContext workspaceContext) {
         List<DeveloperPracticeSummaryDTO> summaries = observationService
             .getSummary(workspaceContext.id())
@@ -84,24 +79,6 @@ public class ObservationController {
             .map(DeveloperPracticeSummaryDTO::from)
             .toList();
         return ResponseEntity.ok(summaries);
-    }
-
-    @GetMapping("/reflection")
-    @Operation(
-        summary = "Reflective dashboard feedback for the current developer",
-        description = "Per-practice cards a developer can READ — why the practice matters, what good looks like, " +
-            "where they stand, the specific feedback to act on, and what they already do well. The third feedback " +
-            "channel alongside in-context SCM notes and the conversational mentor; the same observations " +
-            "reorganised by practice for self-paced reflection, not a scoreboard of counts."
-    )
-    @ApiResponse(
-        responseCode = "200",
-        description = "Per-practice reflection cards returned",
-        content = @Content(array = @ArraySchema(schema = @Schema(implementation = ReflectionPracticeDTO.class)))
-    )
-    @SecurityRequirements
-    public ResponseEntity<List<ReflectionPracticeDTO>> getReflection(WorkspaceContext workspaceContext) {
-        return ResponseEntity.ok(practiceReflectionService.getReflection(workspaceContext.id()));
     }
 
     @GetMapping("/{observationId}")
@@ -116,7 +93,6 @@ public class ObservationController {
         description = "Observation not found or not owned by current user",
         content = @Content(schema = @Schema(hidden = true))
     )
-    @SecurityRequirements
     public ResponseEntity<ObservationDetailDTO> getObservation(
         WorkspaceContext workspaceContext,
         @PathVariable UUID observationId
@@ -146,7 +122,6 @@ public class ObservationController {
         description = "PR observations returned",
         content = @Content(array = @ArraySchema(schema = @Schema(implementation = ObservationListDTO.class)))
     )
-    @SecurityRequirements
     public ResponseEntity<List<ObservationListDTO>> getObservationsForPullRequest(
         WorkspaceContext workspaceContext,
         @PathVariable Long prId

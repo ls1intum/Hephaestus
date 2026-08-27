@@ -38,8 +38,7 @@ class SpringTestContextArchitectureTest extends HephaestusArchitectureTest {
         assignment("integration.core.sync.api.SyncControllerIntegrationTest", "sync-controller-focused"),
         assignment("integration.slack.detection.ConversationThreadDetectionIntegrationTest", "slack-ingest"),
         assignment("integration.slack.SlackConsentLifecycleE2EIntegrationTest", "slack-lifecycle"),
-        assignment("integration.slack.channel.SlackChannelAdminControllerIntegrationTest", "slack-signed"),
-        assignment("practices.PracticeAreaStatusIntegrationTest", "area-guidance-provider")
+        assignment("integration.slack.channel.SlackChannelAdminControllerIntegrationTest", "slack-signed")
     );
 
     private static final Map<String, String> FULL_CONTEXT_JUSTIFICATIONS = Map.ofEntries(
@@ -52,11 +51,7 @@ class SpringTestContextArchitectureTest extends HephaestusArchitectureTest {
         Map.entry("slack-ingest", "enabled Slack ingest wiring with its review-submission spy"),
         Map.entry("slack-lifecycle", "agent submission boundary override"),
         Map.entry("slack-signed", "enabled signed Slack HTTP wiring"),
-        Map.entry("sync-controller-focused", "controlled sync provider and runner behavior"),
-        Map.entry(
-            "area-guidance-provider",
-            "a registered AreaGuidanceProvider bean, which absence cannot be tested against"
-        )
+        Map.entry("sync-controller-focused", "controlled sync provider and runner behavior")
     );
 
     private static final Set<String> SPRING_BOOT_TESTS = names(

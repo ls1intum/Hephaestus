@@ -21,7 +21,7 @@ public record CuratedPracticeDefinitionDTO(
     @NonNull PracticeAutomatedReviewValidation automatedReviewValidation,
     @Nullable String whyItMatters,
     @Nullable String whatGoodLooksLike,
-    @Nullable String areaSlug
+    @Nullable String groupSlug
 ) {
     public static CuratedPracticeDefinitionDTO from(String practiceSlug, PracticeDefinition definition) {
         return new CuratedPracticeDefinitionDTO(
@@ -34,7 +34,7 @@ public record CuratedPracticeDefinitionDTO(
             PracticeAutomatedReviewValidation.authorDeclared(practiceSlug, definition),
             definition.whyItMatters(),
             definition.whatGoodLooksLike(),
-            definition.areaSlug()
+            definition.groupSlug()
         );
     }
 }

@@ -20,7 +20,7 @@ class PracticeTrendCalculatorTest {
     @Test
     void shouldDateAPracticeSpanFromComparedOpportunitiesOnly() {
         // The run in March looked and found nothing to judge. It belongs in the trail — the practice DID see
-        // that work item — but "these comparisons span N days" must not count it, or a quiet stretch would
+        // that piece of reviewed work — but "these comparisons span N days" must not count it, or a quiet stretch would
         // stretch the provenance without adding a comparison.
         PracticeTrend trend = PracticeTrendCalculator.calculatePractice(
             "testing",
@@ -42,7 +42,7 @@ class PracticeTrendCalculatorTest {
 
     @Test
     void shouldReportPracticeScopeWithoutPracticeCounts() {
-        // The two practice counts are an area fact. At practice scope they are absent, and that absence
+        // The two practice counts are a group fact. At practice scope they are absent, and that absence
         // reaches the client — which is why the support factory has two entry points rather than one with
         // optional arguments.
         PracticeTrend trend = PracticeTrendCalculator.calculatePractice(

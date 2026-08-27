@@ -264,7 +264,7 @@ Composition creates immutable feedback units before release authority is applied
 means there was nothing useful to say and creates no feedback row. A policy refusal is instead persisted as
 `SUPPRESSED` with a server-owned reason. These outcomes must not be conflated with a human rejection.
 
-Practice autonomy is resolved as `practice.autonomy ?? area.autonomy ?? workspace default ?? HUMAN_APPROVAL`:
+Practice autonomy is resolved as `practice.autonomy ?? group.autonomy ?? workspace default ?? HUMAN_APPROVAL`:
 
 - `OFF` prevents the review, so no intervention is composed.
 - `HUMAN_APPROVAL` stores in-context feedback as `AWAITING_APPROVAL`. A workspace owner or administrator may

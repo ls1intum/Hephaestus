@@ -28,7 +28,7 @@ public record UpdatePracticeReviewSettingsRequestDTO(
     @Nullable
     WorkspaceReviewScope reviewScope,
     @Schema(
-        description = "How much autonomy the system has over practices and areas that hold no autonomy of " +
+        description = "How much autonomy the system has over practices and groups that hold no autonomy of " +
             "their own. The one decision that moves a whole workspace at once. Null leaves it " +
             "unchanged; name DEFAULT_AUTONOMY in 'reset' to clear it."
     )

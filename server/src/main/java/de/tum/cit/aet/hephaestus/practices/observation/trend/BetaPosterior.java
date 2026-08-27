@@ -2,15 +2,7 @@ package de.tum.cit.aet.hephaestus.practices.observation.trend;
 
 import java.util.Arrays;
 
-/**
- * Deterministic beta-posterior maths for continuously recomputed opportunity-indexed trends.
- *
- * <p>Bayesian because the surface recomputes after every opportunity, and a posterior stays valid under
- * optional stopping where a repeatedly peeked frequentist test would not.
- *
- * <p>Successes are fractional: the shape parameters take a sum of per-opportunity positive shares. That is a
- * weighted quasi-likelihood, not exact updating, and it overstates the variance rather than understating it.
- */
+/** Deterministic beta-posterior approximation for opportunity-indexed trends. */
 final class BetaPosterior {
 
     static final int GRID_SIZE = 256;

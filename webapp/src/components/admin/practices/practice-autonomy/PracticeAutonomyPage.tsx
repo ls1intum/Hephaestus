@@ -50,20 +50,20 @@ import { AutonomyLadder } from "./AutonomyLadder";
 import {
 	type AutonomyGroup,
 	countOverrides,
-	groupPracticesByArea,
+	groupPracticesByGroup,
 	isOverridden,
 	reviewableByHephaestus,
 } from "./practice-autonomy-model";
 
 const DECISION_COLUMN = "sm:w-80";
 
-const AREA_GRID = "sm:grid-cols-[minmax(0,1fr)_20rem]";
+const GROUP_GRID = "sm:grid-cols-[minmax(0,1fr)_20rem]";
 
 const ROW_GRID = "grid-cols-[auto_minmax(0,1fr)] sm:grid-cols-[auto_minmax(0,1fr)_20rem]";
 
 export interface PracticeAutonomyPendingState {
 	workspace: boolean;
-	areaSlugs: ReadonlySet<string>;
+	groupSlugs: ReadonlySet<string>;
 	practiceSlugs: ReadonlySet<string>;
 	bulk: { done: number; total: number } | null;
 }
@@ -78,8 +78,8 @@ export interface PracticeAutonomyPageProps {
 	onOverridesOnlyChange: (next: boolean) => void;
 	onSetWorkspaceDefault: (autonomy: PracticeAutonomy) => void;
 	onClearWorkspaceDefault: () => void;
-	onSetAreaAutonomy: (areaSlug: string, autonomy: PracticeAutonomy) => void;
-	onClearAreaAutonomy: (areaSlug: string) => void;
+	onSetGroupAutonomy: (groupSlug: string, autonomy: PracticeAutonomy) => void;
+	onClearGroupAutonomy: (groupSlug: string) => void;
 	onSetPracticeAutonomy: (practiceSlug: string, autonomy: PracticeAutonomy) => void;
 	onClearPracticeAutonomy: (practiceSlug: string) => void;
 	onBulkSetAutonomy: (practiceSlugs: string[], autonomy: PracticeAutonomy | null) => void;
@@ -95,18 +95,18 @@ export function PracticeAutonomyPage({
 	onOverridesOnlyChange,
 	onSetWorkspaceDefault,
 	onClearWorkspaceDefault,
-	onSetAreaAutonomy,
-	onClearAreaAutonomy,
+	onSetGroupAutonomy,
+	onClearGroupAutonomy,
 	onSetPracticeAutonomy,
 	onClearPracticeAutonomy,
 	onBulkSetAutonomy,
 }: PracticeAutonomyPageProps) {
 	const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
-	const [openAreas, setOpenAreas] = useState<string[]>([]);
+	const [openGroups, setOpenGroups] = useState<string[]>([]);
 
-	const groups = groupPracticesByArea(rollup, practices, { overridesOnly });
+	const groups = groupPracticesByGroup(rollup, practices, { overridesOnly });
 	const overrides = countOverrides(rollup);
-	const openValue = overridesOnly ? groups.map((group) => group.key) : openAreas;
+	const openValue = overridesOnly ? groups.map((group) => group.key) : openGroups;
 
 	const selectableSlugs = new Set(
 		groups.flatMap((group) =>
@@ -163,11 +163,11 @@ export function PracticeAutonomyPage({
 			) : (
 				<Accordion
 					value={openValue}
-					onValueChange={(next) => setOpenAreas(next as string[])}
+					onValueChange={(next) => setOpenGroups(next as string[])}
 					className="space-y-2"
 				>
 					{groups.map((group) => (
-						<AreaGroup
+						<GroupGroup
 							key={group.key}
 							workspaceSlug={workspaceSlug}
 							group={group}
@@ -184,8 +184,8 @@ export function PracticeAutonomyPage({
 									return next;
 								})
 							}
-							onSetAreaAutonomy={onSetAreaAutonomy}
-							onClearAreaAutonomy={onClearAreaAutonomy}
+							onSetGroupAutonomy={onSetGroupAutonomy}
+							onClearGroupAutonomy={onClearGroupAutonomy}
 							onSetPracticeAutonomy={onSetPracticeAutonomy}
 							onClearPracticeAutonomy={onClearPracticeAutonomy}
 						/>
@@ -216,7 +216,7 @@ function WorkspaceDecisionCard({
 					<h2>Workspace default</h2>
 				</CardTitle>
 				<CardDescription>
-					One decision for the whole workspace. Every area and every practice below follows it
+					One decision for the whole workspace. Every group and every practice below follows it
 					unless somebody says otherwise.
 				</CardDescription>
 			</CardHeader>
@@ -255,7 +255,7 @@ function AutonomySummary({
 	overrides,
 }: {
 	counts: Record<string, number>;
-	overrides: { practices: number; areas: number };
+	overrides: { practices: number; groups: number };
 }) {
 	return (
 		<p className="min-w-0 text-muted-foreground text-sm" aria-live="polite" aria-atomic="true">
@@ -264,13 +264,13 @@ function AutonomySummary({
 	);
 }
 
-function byHandSentence(overrides: { practices: number; areas: number }): string {
+function byHandSentence(overrides: { practices: number; groups: number }): string {
 	const parts: string[] = [];
 	if (overrides.practices > 0) {
 		parts.push(`${overrides.practices} ${overrides.practices === 1 ? "practice" : "practices"}`);
 	}
-	if (overrides.areas > 0) {
-		parts.push(`${overrides.areas} ${overrides.areas === 1 ? "area" : "areas"}`);
+	if (overrides.groups > 0) {
+		parts.push(`${overrides.groups} ${overrides.groups === 1 ? "group" : "groups"}`);
 	}
 	return parts.length === 0 ? "" : `${parts.join(" and ")} set by hand.`;
 }
@@ -351,15 +351,15 @@ function BulkActionBar({
 	);
 }
 
-function AreaGroup({
+function GroupGroup({
 	workspaceSlug,
 	group,
 	pending,
 	selected,
 	onToggle,
 	onSelectMany,
-	onSetAreaAutonomy,
-	onClearAreaAutonomy,
+	onSetGroupAutonomy,
+	onClearGroupAutonomy,
 	onSetPracticeAutonomy,
 	onClearPracticeAutonomy,
 }: {
@@ -369,13 +369,13 @@ function AreaGroup({
 	selected: ReadonlySet<string>;
 	onToggle: (slug: string, checked: boolean) => void;
 	onSelectMany: (slugs: string[], checked: boolean) => void;
-	onSetAreaAutonomy: (areaSlug: string, autonomy: PracticeAutonomy) => void;
-	onClearAreaAutonomy: (areaSlug: string) => void;
+	onSetGroupAutonomy: (groupSlug: string, autonomy: PracticeAutonomy) => void;
+	onClearGroupAutonomy: (groupSlug: string) => void;
 	onSetPracticeAutonomy: (practiceSlug: string, autonomy: PracticeAutonomy) => void;
 	onClearPracticeAutonomy: (practiceSlug: string) => void;
 }) {
-	const areaSlug = group.areaSlug;
-	const areaPending = areaSlug !== null && pending.areaSlugs.has(areaSlug);
+	const groupSlug = group.groupSlug;
+	const groupPending = groupSlug !== null && pending.groupSlugs.has(groupSlug);
 	const selectableSlugs = group.practices
 		.filter((practice) => reviewableByHephaestus(practice.automatedReviewPolicy))
 		.map((practice) => practice.slug);
@@ -384,7 +384,7 @@ function AreaGroup({
 
 	return (
 		<AccordionItem value={group.key} className="scroll-mt-24 rounded-lg border bg-card px-3">
-			<div className={cn("grid gap-2 py-1 sm:items-center sm:gap-4", AREA_GRID)}>
+			<div className={cn("grid gap-2 py-1 sm:items-center sm:gap-4", GROUP_GRID)}>
 				<AccordionTrigger>
 					<span className="flex min-w-0 flex-col gap-1">
 						<span className="flex flex-wrap items-center gap-2">
@@ -398,7 +398,7 @@ function AreaGroup({
 						</span>
 					</span>
 				</AccordionTrigger>
-				{areaSlug === null ? (
+				{groupSlug === null ? (
 					<span className={cn("min-w-0 text-muted-foreground text-xs", DECISION_COLUMN)}>
 						Follows the workspace default
 					</span>
@@ -408,14 +408,14 @@ function AreaGroup({
 							label={`How far reviews go in ${group.name}`}
 							value={group.autonomy.effective}
 							muted={!isOverridden(group.autonomy)}
-							disabled={areaPending}
-							onChange={(autonomy) => onSetAreaAutonomy(areaSlug, autonomy)}
+							disabled={groupPending}
+							onChange={(autonomy) => onSetGroupAutonomy(groupSlug, autonomy)}
 						/>
 						<DecisionNote
 							follows={inheritedSentenceOrNull(group.autonomy, WORKSPACE_DEFAULT_SOURCE)}
 							resetLabel={`Use the default for ${group.name}`}
-							disabled={areaPending}
-							onClear={() => onClearAreaAutonomy(areaSlug)}
+							disabled={groupPending}
+							onClear={() => onClearGroupAutonomy(groupSlug)}
 						/>
 					</div>
 				)}
@@ -446,7 +446,7 @@ function AreaGroup({
 									key={practice.slug}
 									workspaceSlug={workspaceSlug}
 									practice={practice}
-									areaName={group.areaSlug === null ? null : group.name}
+									groupName={group.groupSlug === null ? null : group.name}
 									pending={pending.practiceSlugs.has(practice.slug)}
 									selected={selected.has(practice.slug)}
 									onToggle={onToggle}
@@ -465,7 +465,7 @@ function AreaGroup({
 function PracticeAutonomyRow({
 	workspaceSlug,
 	practice,
-	areaName,
+	groupName,
 	pending,
 	selected,
 	onToggle,
@@ -474,7 +474,7 @@ function PracticeAutonomyRow({
 }: {
 	workspaceSlug: string;
 	practice: Practice;
-	areaName: string | null;
+	groupName: string | null;
 	pending: boolean;
 	selected: boolean;
 	onToggle: (slug: string, checked: boolean) => void;
@@ -532,7 +532,7 @@ function PracticeAutonomyRow({
 					<DecisionNote
 						follows={inheritedSentenceOrNull(
 							practice.autonomy,
-							areaName ?? WORKSPACE_DEFAULT_SOURCE,
+							groupName ?? WORKSPACE_DEFAULT_SOURCE,
 						)}
 						resetLabel={`Use the default for ${practice.name}`}
 						disabled={pending}

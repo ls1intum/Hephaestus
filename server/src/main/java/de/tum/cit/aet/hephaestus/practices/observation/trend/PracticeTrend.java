@@ -8,7 +8,7 @@ import java.util.List;
 import java.util.OptionalDouble;
 import org.jspecify.annotations.Nullable;
 
-/** Complete internal trend result; learner DTOs intentionally omit its scalar posterior diagnostics. */
+/** Complete internal trend result; developer-facing DTOs intentionally omit its scalar posterior diagnostics. */
 public final class PracticeTrend {
 
     private final String slug;
@@ -21,7 +21,7 @@ public final class PracticeTrend {
     private final @Nullable OutcomeVector previousOutcomes;
     private final List<EvidenceOpportunity> opportunities;
 
-    /** Absent for INSUFFICIENT_EVIDENCE, and for an area result, which aggregates rather than diffs. */
+    /** Absent for INSUFFICIENT_EVIDENCE, and for a group result, which aggregates rather than diffs. */
     private final BetaPosterior.@Nullable Difference difference;
 
     PracticeTrend(
@@ -67,7 +67,7 @@ public final class PracticeTrend {
      * the window either.
      *
      * <p>Each opportunity contributes its own {@link OutcomeVector#positiveShare()}, not a clean/dirty bit, so
-     * a work item that went half well is counted as half well rather than rounded to a problem.
+     * a piece of reviewed work that went half well is counted as half well rather than rounded to a problem.
      *
      * <p>Weights fall geometrically with age ({@code decay^0, decay^1, …} from the newest), which is what lets
      * one rule do the job two used to: recent evidence dominates, so a fixed habit is acknowledged within a

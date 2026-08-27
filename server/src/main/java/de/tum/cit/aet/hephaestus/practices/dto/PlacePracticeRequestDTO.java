@@ -10,11 +10,11 @@ import org.jspecify.annotations.Nullable;
 @Schema(description = "A practice's position in the catalog")
 public record PlacePracticeRequestDTO(
     @Schema(
-        description = "Destination area slug; omit to place the practice in Unassigned",
+        description = "Destination group slug; omit to place the practice in Unassigned",
         example = "review-ready-work"
     )
     @Nullable
-    String areaSlug,
+    String groupSlug,
 
     @JsonProperty(required = true)
     @NonNull

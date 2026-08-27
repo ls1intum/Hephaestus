@@ -2,16 +2,16 @@ package de.tum.cit.aet.hephaestus.practices.curated;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
-import de.tum.cit.aet.hephaestus.practices.AreaDefinition;
-import de.tum.cit.aet.hephaestus.practices.PracticeAreaRepository;
+import de.tum.cit.aet.hephaestus.practices.GroupDefinition;
 import de.tum.cit.aet.hephaestus.practices.PracticeCatalogInstallation;
 import de.tum.cit.aet.hephaestus.practices.PracticeCatalogInstallationRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
+import de.tum.cit.aet.hephaestus.practices.PracticeGroupRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeRevisionRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeRevisionService;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeArea;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeGroup;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeRevision;
 import java.time.Clock;
 import java.util.List;
@@ -30,7 +30,7 @@ public class CatalogProvenanceBackfill {
 
     private final PracticeCatalogInstallationRepository installationRepository;
     private final PracticeRepository practiceRepository;
-    private final PracticeAreaRepository practiceAreaRepository;
+    private final PracticeGroupRepository practiceGroupRepository;
     private final PracticeRevisionRepository revisionRepository;
     private final PracticeRevisionService revisionService;
     private final CuratedCatalogService curatedCatalogService;
@@ -56,10 +56,10 @@ public class CatalogProvenanceBackfill {
             }
         }
         log.info(
-            "Stamped catalog provenance for {} workspace(s): {} practices, {} areas",
+            "Stamped catalog provenance for {} workspace(s): {} practices, {} groups",
             completed,
             total.practices(),
-            total.areas()
+            total.groups()
         );
         return total;
     }
@@ -83,7 +83,7 @@ public class CatalogProvenanceBackfill {
                                 effective.automatedReviewPolicy(),
                                 managed.getWhyItMatters(),
                                 managed.getWhatGoodLooksLike(),
-                                managed.getArea() == null ? null : managed.getArea().getSlug()
+                                managed.getGroup() == null ? null : managed.getGroup().getSlug()
                             );
                             if (
                                 !aligned
@@ -113,9 +113,9 @@ public class CatalogProvenanceBackfill {
         }
     }
 
-    public record Stamped(int practices, int areas) {
+    public record Stamped(int practices, int groups) {
         Stamped plus(Stamped other) {
-            return other == null ? this : new Stamped(practices + other.practices(), areas + other.areas());
+            return other == null ? this : new Stamped(practices + other.practices(), groups + other.groups());
         }
     }
 
@@ -126,11 +126,11 @@ public class CatalogProvenanceBackfill {
         if (installation == null || installation.getProvenanceLinkedAt() != null) {
             return new Stamped(0, 0);
         }
-        int areas = stampAreas(workspaceId, catalog);
+        int groups = stampGroups(workspaceId, catalog);
         int practices = stampPractices(workspaceId, catalog);
         installation.markProvenanceLinked(clock.instant());
         installationRepository.save(installation);
-        return new Stamped(practices, areas);
+        return new Stamped(practices, groups);
     }
 
     private void fingerprintMigratedRevisions(Long workspaceId) {
@@ -167,26 +167,28 @@ public class CatalogProvenanceBackfill {
         return stamped;
     }
 
-    private int stampAreas(Long workspaceId, EffectiveCatalog catalog) {
+    private int stampGroups(Long workspaceId, EffectiveCatalog catalog) {
         int stamped = 0;
-        for (PracticeArea area : practiceAreaRepository.findByWorkspaceIdOrderByDisplayOrderAscNameAsc(workspaceId)) {
-            if (area.getSourceCuratedSlug() != null) {
+        for (PracticeGroup group : practiceGroupRepository.findByWorkspaceIdOrderByDisplayOrderAscNameAsc(
+            workspaceId
+        )) {
+            if (group.getSourceCuratedSlug() != null) {
                 continue;
             }
-            String fingerprint = AreaDefinition.from(area).provenanceFingerprint(area.getSlug());
+            String fingerprint = GroupDefinition.from(group).provenanceFingerprint(group.getSlug());
             boolean matchesCatalog = catalog
-                .areas()
+                .groups()
                 .stream()
-                .filter(entry -> entry.slug().equals(area.getSlug()))
+                .filter(entry -> entry.slug().equals(group.getSlug()))
                 .findFirst()
                 .map(entry -> entry.effective().provenanceFingerprint(entry.slug()).equals(fingerprint))
                 .orElse(false);
             if (!matchesCatalog) {
                 continue;
             }
-            area.setSourceCuratedSlug(area.getSlug());
-            area.setSourceCuratedFingerprint(fingerprint);
-            practiceAreaRepository.save(area);
+            group.setSourceCuratedSlug(group.getSlug());
+            group.setSourceCuratedFingerprint(fingerprint);
+            practiceGroupRepository.save(group);
             stamped++;
         }
         return stamped;

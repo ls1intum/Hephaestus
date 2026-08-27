@@ -65,7 +65,22 @@ Entries exist only for releases that need operator action. Everything else is in
 
 ### v0.75.0
 
-#### 🔴 The feedback reaction and rating endpoints are replaced by one response endpoint
+#### 🔴 Practice area API names are replaced by practice group names
+
+**Affected**: anything calling the application API directly. The generated Hephaestus web client is
+updated in this release.
+
+The product concept previously exposed as a *practice area* is now consistently named a **practice
+group**. All `/practice-areas` routes move to `/practice-groups`; request and response fields such as
+`areaSlug` and `areaName` become `groupSlug` and `groupName`; catalog collections named `areas` become `groups`. Generated schema
+names likewise use `PracticeGroup` instead of `PracticeArea`. The developer-facing practice projection
+moves from `/practices/learner` to `/practices/reviewed` and is named `ReviewedPractice`. The old routes
+and field names are removed rather than aliased. This rename does not change which practices belong together.
+
+**Action**: regenerate API clients and replace direct uses of the retired routes, schema names, and
+fields. No operator configuration changes are required; the database migration runs automatically.
+
+#### 🔴 The feedback reaction endpoint is replaced by a response endpoint
 
 **Affected**: anything calling the application API directly. The Hephaestus web app is unaffected —
 it never used these endpoints outside its generated client, which ships regenerated in this release.
@@ -73,32 +88,30 @@ it never used these endpoints outside its generated client, which ships regenera
 Removed:
 
 ```
-POST /workspaces/{workspaceSlug}/practices/observations/{id}/reactions   (submitReaction)
-GET  /workspaces/{workspaceSlug}/practices/observations/{id}/reactions   (getLatestReaction)
+POST /workspaces/{workspaceSlug}/practices/feedback/{feedbackId}/reactions   (submitReaction)
+GET  /workspaces/{workspaceSlug}/practices/feedback/{feedbackId}/reactions   (getLatestReaction)
 ```
 
-**Before**: a developer answered two questions about one piece of delivered feedback through two
-separate mechanisms — a reaction saying what they would do about it, and a rating saying whether it
-helped. The two disagreed about their own history: reactions accumulated, ratings were overwritten.
+**Before**: a developer submitted an `action` (`ADDRESSED`, `DISPUTED`, or `NOT_APPLICABLE`) and an
+optional `explanation`. Submissions were append-only and the GET returned the latest reaction.
 
-**After**: one endpoint per feedback unit, carrying both answers, either of them, or neither:
+**After**: the response endpoint renames `action` to `resolution` and `explanation` to `comment`. It
+also accepts an independent, optional `usefulness` answer:
 
 ```
-POST /workspaces/{workspaceSlug}/practices/feedback/{feedbackId}/response
-GET  /workspaces/{workspaceSlug}/practices/feedback/{feedbackId}/response
-GET  /workspaces/{workspaceSlug}/practices/feedback/engagement
+PUT    /workspaces/{workspaceSlug}/practices/feedback/{feedbackId}/response
+GET    /workspaces/{workspaceSlug}/practices/feedback/{feedbackId}/response
+DELETE /workspaces/{workspaceSlug}/practices/feedback/{feedbackId}/response
+GET    /workspaces/{workspaceSlug}/practices/feedback/resolution-counts
 ```
 
-The request body carries `usefulness` (`HELPFUL` / `UNHELPFUL`), `resolution` (`ADDRESSED` /
-`DISPUTED` / `NOT_APPLICABLE`), an optional `comment` — required when disputing — and `withdraw`,
-which takes the whole answer back. Every submit appends; the GET returns the answer as it currently
-stands, which is the newest value of each question independently.
+PUT replaces the complete response with `usefulness` (`HELPFUL` / `UNHELPFUL`), `resolution`
+(`ADDRESSED` / `DISPUTED` / `NOT_APPLICABLE`), or both, plus an optional `comment` that is required
+when disputing. Omitted fields are cleared. Repeating the same PUT has no effect. DELETE removes the
+complete response and is safe to repeat. GET returns the response that currently stands.
 
-Note the anchor moved: a response is filed against the delivered **feedback unit**, not against the
-internal observation behind it, because the feedback unit is what the developer was actually shown.
-
-**Action**: repoint any direct API caller at the new endpoint. Stored reactions are untouched and
-keep answering; nothing needs migrating and no data is lost.
+**Action**: repoint any direct API caller at the new endpoint. Existing response history is preserved and
+participates in current-response reads; no operator data migration is required.
 
 ### v0.74.0
 
@@ -359,7 +372,7 @@ Update clients in the same deployment as the server and webapp. The old names ha
 | `evidenceRequirements` | `automatedReviewPolicy` |
 | `evidenceSupport` | `evidenceSufficiency` |
 | practice `active` and `/active` | `reviewTier` and `/review-tier` (see below) |
-| practice-area `active` | `visibleInPracticeDashboards` |
+| practice-group `active` | `visibleInPracticeDashboards` |
 | observation `artifactType` | `artifactKind` |
 | observation `title` | `summary` |
 | observation `reasoning` | `evidenceRationale` |
@@ -387,8 +400,8 @@ reviews becomes `DELIVER`, one that was not becomes `OFF`, and the migration run
 and every observation is still recorded, and nothing is sent to anyone. All three values are settable
 at every level; a practice only lands on `PROPOSE` because somebody put it there.
 
-Omitting `reviewTier`, or sending it as `null`, clears the setting so the practice follows its area,
-and the area follows the workspace default.
+Omitting `reviewTier`, or sending it as `null`, clears the setting so the practice follows its group,
+and the group follows the workspace default.
 
 #### 🟢 A workspace can restrict review to some branches and repositories
 

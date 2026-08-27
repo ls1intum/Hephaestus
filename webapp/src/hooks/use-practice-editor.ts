@@ -16,8 +16,12 @@ import {
 } from "./practice-catalog-cache";
 
 export interface PracticeEditor {
-	create: (data: CreatePracticeRequest, areaSlug: string | null) => Promise<Practice>;
-	update: (slug: string, data: UpdatePracticeRequest, areaSlug: string | null) => Promise<Practice>;
+	create: (data: CreatePracticeRequest, groupSlug: string | null) => Promise<Practice>;
+	update: (
+		slug: string,
+		data: UpdatePracticeRequest,
+		groupSlug: string | null,
+	) => Promise<Practice>;
 	isPending: boolean;
 }
 
@@ -50,8 +54,8 @@ export function usePracticeEditor(workspaceSlug: string): PracticeEditor {
 
 	return {
 		isPending: update.isPending || create.isPending,
-		update: async (slug, data, areaSlug) => {
-			const request = { ...data, area: { areaSlug } };
+		update: async (slug, data, groupSlug) => {
+			const request = { ...data, group: { groupSlug } };
 			const detailQueryKey = getPracticeQueryKey({ path: { workspaceSlug, practiceSlug: slug } });
 			await Promise.all([
 				queryClient.cancelQueries({ queryKey: detailQueryKey }),
@@ -72,11 +76,11 @@ export function usePracticeEditor(workspaceSlug: string): PracticeEditor {
 			toast.success("Practice saved");
 			return updated;
 		},
-		create: async (data, areaSlug) => {
+		create: async (data, groupSlug) => {
 			await queryClient.cancelQueries({ queryKey: listQueryKey });
 			const created = await create.mutateAsync({
 				path: { workspaceSlug },
-				body: { ...data, areaSlug },
+				body: { ...data, groupSlug },
 			});
 			queryClient.setQueryData<Practice[]>(listQueryKey, (practices) =>
 				practices ? upsertPractice(practices, created) : practices,

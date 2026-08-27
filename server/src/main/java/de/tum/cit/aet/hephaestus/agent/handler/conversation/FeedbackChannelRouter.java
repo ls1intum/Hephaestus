@@ -117,7 +117,7 @@ public class FeedbackChannelRouter {
                 row.getObservationId(),
                 AutonomyResolver.resolvePractice(
                     row.getPracticeAutonomy(),
-                    row.getAreaAutonomy(),
+                    row.getGroupAutonomy(),
                     workspaceDefault
                 ).autonomy()
             );

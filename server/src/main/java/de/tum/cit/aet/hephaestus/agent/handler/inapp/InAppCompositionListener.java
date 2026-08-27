@@ -263,7 +263,7 @@ public class InAppCompositionListener {
     }
 
     /**
-     * The practice's effective autonomy, resolved through the practice → area → workspace chain from a
+     * The practice's effective autonomy, resolved through the practice → group → workspace chain from a
      * projection rather than by walking associations — the same reason {@code FeedbackChannelRouter}
      * projects it: the routing rule must not depend on whether the caller holds a session.
      */
@@ -279,7 +279,7 @@ public class InAppCompositionListener {
             .map(row ->
                 AutonomyResolver.resolvePractice(
                     row.getPracticeAutonomy(),
-                    row.getAreaAutonomy(),
+                    row.getGroupAutonomy(),
                     workspaceDefault
                 ).autonomy()
             )

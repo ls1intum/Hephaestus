@@ -21,20 +21,9 @@ public class ObservationVisibilityPolicy {
     }
 
     /**
-     * The ids of the observations a caller may show or quote, out of the ones it hands in.
-     *
-     * <p>Two conjuncts in this order: the claim must have been measured against the practice's current
-     * review rules, and the evidence behind it must still be authorized for this purpose. Currentness is
-     * decided first and per observation, so a stale claim costs no authorization read at all.
-     *
-     * <p>Every observation that clears currentness is authorized in one round trip rather than one each.
-     * The surfaces that ask this ask it about a whole page — a reflection dashboard authorizes every
-     * observation a developer has in the window — so a per-observation form made the round trips a
-     * function of how much work the developer did.
-     *
-     * <p>An id absent from the returned set is not permitted, whatever the reason. Callers never have to
-     * tell "refused" from "not asked about", and an unpersisted observation, having no id, is never
-     * permitted.
+     * Returns observations measured against current review rules whose evidence remains authorized for the
+     * requested use. Currentness is checked first so stale claims do not trigger authorization reads; the
+     * remaining observations are authorized in one batch.
      */
     public Set<UUID> permitsAll(long workspaceId, Collection<Observation> observations, SourceUsePurpose purpose) {
         List<Observation> current = new ArrayList<>(observations.size());

@@ -3,12 +3,12 @@ import { useRef, useState } from "react";
 import { toast } from "sonner";
 import {
 	autonomyRollupQueryKey,
-	listAreasQueryKey,
+	listGroupsQueryKey,
 	listPracticesQueryKey,
-	setAreaAutonomyMutation,
 	setAutonomyMutation,
+	setGroupAutonomyMutation,
 } from "@/api/@tanstack/react-query.gen";
-import type { PracticeArea } from "@/api/types.gen";
+import type { PracticeGroup } from "@/api/types.gen";
 import { filedUnder, pathString, usePendingMutationIds } from "@/hooks/use-pending-mutation-ids";
 import type { PracticeAutonomy } from "@/lib/practice-autonomy";
 import { problemDetailOf } from "@/lib/problem-detail";
@@ -20,9 +20,9 @@ export interface BulkProgress {
 
 /**
  * Every write here invalidates the rollup and the practice list rather than patching them: the
- * inheritance chain is resolved server-side, and a client predicting what an area autonomy does to the
- * practices inheriting it would be a second implementation of that chain. The area response carries
- * the area and nothing else.
+ * inheritance chain is resolved server-side, and a client predicting what a group autonomy does to the
+ * practices inheriting it would be a second implementation of that chain. The group response carries
+ * the group and nothing else.
  */
 export function usePracticeAutonomyMutations(workspaceSlug: string) {
 	const queryClient = useQueryClient();
@@ -30,7 +30,7 @@ export function usePracticeAutonomyMutations(workspaceSlug: string) {
 	// A ref rather than the state above: the mutation's callbacks close over the render that created
 	// them and would keep reading `null` for the whole run.
 	const bulkRunning = useRef(false);
-	const areaMutationKey = ["practice-autonomy", workspaceSlug, "areas"] as const;
+	const groupMutationKey = ["practice-autonomy", workspaceSlug, "groups"] as const;
 	const practiceMutationKey = ["practice-autonomy", workspaceSlug, "practices"] as const;
 
 	const invalidateResolved = () => {
@@ -42,23 +42,23 @@ export function usePracticeAutonomyMutations(workspaceSlug: string) {
 		});
 	};
 
-	const setAreaAutonomy = useMutation({
-		...filedUnder(areaMutationKey, setAreaAutonomyMutation()),
+	const setGroupAutonomy = useMutation({
+		...filedUnder(groupMutationKey, setGroupAutonomyMutation()),
 		onSuccess: (updated) => {
-			queryClient.setQueryData<PracticeArea[]>(
-				listAreasQueryKey({ path: { workspaceSlug } }),
-				(areas) =>
-					areas?.map((area) =>
-						area.slug === updated.slug ? { ...area, autonomy: updated.autonomy } : area,
+			queryClient.setQueryData<PracticeGroup[]>(
+				listGroupsQueryKey({ path: { workspaceSlug } }),
+				(groups) =>
+					groups?.map((group) =>
+						group.slug === updated.slug ? { ...group, autonomy: updated.autonomy } : group,
 					),
 			);
 		},
 		onError: (error) =>
-			toast.error("Couldn't change the area", { description: problemDetailOf(error) }),
+			toast.error("Couldn't change the group", { description: problemDetailOf(error) }),
 		onSettled: () => {
-			if (queryClient.isMutating({ mutationKey: areaMutationKey }) === 1) {
+			if (queryClient.isMutating({ mutationKey: groupMutationKey }) === 1) {
 				void queryClient.invalidateQueries({
-					queryKey: listAreasQueryKey({ path: { workspaceSlug } }),
+					queryKey: listGroupsQueryKey({ path: { workspaceSlug } }),
 				});
 				invalidateResolved();
 			}
@@ -76,14 +76,6 @@ export function usePracticeAutonomyMutations(workspaceSlug: string) {
 		},
 	});
 
-	/**
-	 * One request per practice, in order: there is no bulk endpoint, and each write takes the same
-	 * workspace lock, so firing them in parallel queues on the server anyway while making the failures
-	 * arrive interleaved and unattributable.
-	 *
-	 * Partial failure is reported, not rolled back — the practices that did change stay changed, which
-	 * is what a refetch will show either way.
-	 */
 	const setManyPracticeAutonomies = async (
 		practiceSlugs: readonly string[],
 		autonomy: PracticeAutonomy | null,
@@ -92,25 +84,20 @@ export function usePracticeAutonomyMutations(workspaceSlug: string) {
 		let failed = 0;
 		bulkRunning.current = true;
 		setBulk({ done: 0, total: practiceSlugs.length });
-		try {
-			for (const [index, practiceSlug] of practiceSlugs.entries()) {
-				try {
-					await setPracticeAutonomy.mutateAsync({
-						path: { workspaceSlug, practiceSlug },
-						// Omitted, not null: the generated request types the field as optional, and the server
-						// reads an absent field as "hold no autonomy here and inherit".
-						body: autonomy === null ? {} : { autonomy: autonomy },
-					});
-				} catch {
-					failed += 1;
-				}
-				setBulk({ done: index + 1, total: practiceSlugs.length });
+		for (const [index, practiceSlug] of practiceSlugs.entries()) {
+			try {
+				await setPracticeAutonomy.mutateAsync({
+					path: { workspaceSlug, practiceSlug },
+					body: autonomy === null ? {} : { autonomy },
+				});
+			} catch {
+				failed += 1;
 			}
-		} finally {
-			bulkRunning.current = false;
-			setBulk(null);
-			invalidateResolved();
+			setBulk({ done: index + 1, total: practiceSlugs.length });
 		}
+		bulkRunning.current = false;
+		setBulk(null);
+		invalidateResolved();
 
 		const changed = practiceSlugs.length - failed;
 		if (failed === 0) {
@@ -124,8 +111,8 @@ export function usePracticeAutonomyMutations(workspaceSlug: string) {
 		}
 	};
 
-	const pendingAreaSlugs = usePendingMutationIds(areaMutationKey, (variables) =>
-		pathString(variables, "areaSlug"),
+	const pendingGroupSlugs = usePendingMutationIds(groupMutationKey, (variables) =>
+		pathString(variables, "groupSlug"),
 	);
 	const pendingPracticeSlugs = usePendingMutationIds(practiceMutationKey, (variables) =>
 		pathString(variables, "practiceSlug"),
@@ -133,9 +120,9 @@ export function usePracticeAutonomyMutations(workspaceSlug: string) {
 
 	return {
 		bulk,
-		pendingAreaSlugs,
+		pendingGroupSlugs,
 		pendingPracticeSlugs,
-		setAreaAutonomy,
+		setGroupAutonomy,
 		setPracticeAutonomy,
 		setManyPracticeAutonomies,
 	};

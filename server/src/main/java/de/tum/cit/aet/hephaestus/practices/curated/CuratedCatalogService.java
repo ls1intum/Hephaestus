@@ -6,7 +6,7 @@ import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntityType;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntry;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditPort;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
-import de.tum.cit.aet.hephaestus.practices.AreaDefinition;
+import de.tum.cit.aet.hephaestus.practices.GroupDefinition;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinitionValidator;
 import java.time.Clock;
@@ -25,12 +25,12 @@ import org.springframework.transaction.annotation.Transactional;
 public class CuratedCatalogService {
 
     private static final String CATALOG_PRACTICE = "Catalog practice";
-    private static final String CATALOG_AREA = "Catalog area";
+    private static final String CATALOG_GROUP = "Catalog group";
 
     private final BundledPracticeCatalogLoader loader;
     private final CuratedCatalogLock catalogLock;
     private final CuratedPracticeOverrideRepository practiceOverrides;
-    private final CuratedAreaOverrideRepository areaOverrides;
+    private final CuratedGroupOverrideRepository groupOverrides;
     private final ConfigAuditPort configAudit;
     private final Clock clock;
     private final PracticeDefinitionValidator definitionValidator;
@@ -41,7 +41,7 @@ public class CuratedCatalogService {
     }
 
     private EffectiveCatalog loadCatalog() {
-        return CuratedCatalogModel.compose(loader.catalog(), areaOverrides.findAll(), practiceOverrides.findAll());
+        return CuratedCatalogModel.compose(loader.catalog(), groupOverrides.findAll(), practiceOverrides.findAll());
     }
 
     @Transactional(readOnly = true)
@@ -56,10 +56,10 @@ public class CuratedCatalogService {
     }
 
     @Transactional(readOnly = true)
-    public CatalogEntry<AreaDefinition> area(String slug) {
+    public CatalogEntry<GroupDefinition> group(String slug) {
         return loadCatalog()
-            .area(slug)
-            .orElseThrow(() -> new EntityNotFoundException(CATALOG_AREA, slug));
+            .group(slug)
+            .orElseThrow(() -> new EntityNotFoundException(CATALOG_GROUP, slug));
     }
 
     @Transactional
@@ -70,7 +70,7 @@ public class CuratedCatalogService {
     ) {
         lockCatalog();
         EffectiveCatalog before = loadCatalog();
-        CuratedCatalogModel.validatePracticeArea(before, definition);
+        CuratedCatalogModel.validatePracticeGroup(before, definition);
         definitionValidator.validate(definition);
         CatalogEntry<PracticeDefinition> entry = CuratedCatalogModel.requireEntry(
             before.practice(slug),
@@ -97,7 +97,7 @@ public class CuratedCatalogService {
     public CatalogEntry<PracticeDefinition> createPractice(String slug, PracticeDefinition definition) {
         lockCatalog();
         EffectiveCatalog before = loadCatalog();
-        CuratedCatalogModel.validatePracticeArea(before, definition);
+        CuratedCatalogModel.validatePracticeGroup(before, definition);
         definitionValidator.validate(definition);
         if (before.practice(slug).isPresent()) {
             throw new CuratedCatalogConflictException("A practice with slug '" + slug + "' already exists.");
@@ -192,105 +192,105 @@ public class CuratedCatalogService {
     }
 
     @Transactional
-    public CatalogEntry<AreaDefinition> writeArea(
+    public CatalogEntry<GroupDefinition> writeGroup(
         String slug,
         @Nullable EntityTagPrecondition precondition,
-        AreaDefinition definition
+        GroupDefinition definition
     ) {
         lockCatalog();
-        CatalogEntry<AreaDefinition> entry = CuratedCatalogModel.requireEntry(
-            loadCatalog().area(slug),
-            CATALOG_AREA,
+        CatalogEntry<GroupDefinition> entry = CuratedCatalogModel.requireEntry(
+            loadCatalog().group(slug),
+            CATALOG_GROUP,
             slug,
             precondition
         );
         if (entry.overridden() != null && definition.equals(entry.shipped())) {
-            clearAreaDefinition(slug);
-            return recordArea(slug, entry);
+            clearGroupDefinition(slug);
+            return recordGroup(slug, entry);
         }
         if (entry.effective().equals(definition)) {
             return entry;
         }
-        CuratedAreaOverride override = areaOverrides
+        CuratedGroupOverride override = groupOverrides
             .findBySlug(slug)
-            .orElseGet(() -> new CuratedAreaOverride(slug, clock.instant()));
+            .orElseGet(() -> new CuratedGroupOverride(slug, clock.instant()));
         override.write(definition, CuratedCatalogModel.digestOf(entry.shipped(), slug), clock.instant());
-        areaOverrides.save(override);
-        return recordArea(slug, entry);
+        groupOverrides.save(override);
+        return recordGroup(slug, entry);
     }
 
     @Transactional
-    public CatalogEntry<AreaDefinition> createArea(String slug, AreaDefinition definition) {
+    public CatalogEntry<GroupDefinition> createGroup(String slug, GroupDefinition definition) {
         lockCatalog();
         EffectiveCatalog before = loadCatalog();
-        if (before.area(slug).isPresent()) {
-            throw new CuratedCatalogConflictException("An area with slug '" + slug + "' already exists.");
+        if (before.group(slug).isPresent()) {
+            throw new CuratedCatalogConflictException("A group with slug '" + slug + "' already exists.");
         }
         Instant now = clock.instant();
-        CuratedAreaOverride override = new CuratedAreaOverride(slug, now);
+        CuratedGroupOverride override = new CuratedGroupOverride(slug, now);
         override.write(definition, null, now);
-        areaOverrides.save(override);
-        CatalogEntry<AreaDefinition> created = loadCatalog()
-            .area(slug)
-            .orElseThrow(() -> new EntityNotFoundException(CATALOG_AREA, slug));
+        groupOverrides.save(override);
+        CatalogEntry<GroupDefinition> created = loadCatalog()
+            .group(slug)
+            .orElseThrow(() -> new EntityNotFoundException(CATALOG_GROUP, slug));
         configAudit.record(
             ConfigAuditEntry.instanceCreated(
-                ConfigAuditEntityType.CURATED_PRACTICE_AREA,
+                ConfigAuditEntityType.CURATED_PRACTICE_GROUP,
                 created.slug(),
-                CuratedAreaSnapshot.of(created)
+                CuratedGroupSnapshot.of(created)
             )
         );
         return created;
     }
 
     @Transactional
-    public CatalogEntry<AreaDefinition> resetArea(String slug, @Nullable EntityTagPrecondition precondition) {
+    public CatalogEntry<GroupDefinition> resetGroup(String slug, @Nullable EntityTagPrecondition precondition) {
         lockCatalog();
-        CatalogEntry<AreaDefinition> entry = CuratedCatalogModel.requireEntry(
-            loadCatalog().area(slug),
-            CATALOG_AREA,
+        CatalogEntry<GroupDefinition> entry = CuratedCatalogModel.requireEntry(
+            loadCatalog().group(slug),
+            CATALOG_GROUP,
             slug,
             precondition
         );
         if (entry.shipped() == null) {
             throw new CuratedCatalogConflictException("Hephaestus ships no definition for '" + slug + "'.");
         }
-        areaOverrides
+        groupOverrides
             .findBySlug(slug)
             .ifPresent(override -> {
                 override.clearDefinition(clock.instant());
                 if (override.isEmpty()) {
-                    areaOverrides.delete(override);
+                    groupOverrides.delete(override);
                 } else {
-                    areaOverrides.save(override);
+                    groupOverrides.save(override);
                 }
             });
-        return recordArea(slug, entry);
+        return recordGroup(slug, entry);
     }
 
     @Transactional
-    public CatalogEntry<AreaDefinition> keepArea(String slug, @Nullable EntityTagPrecondition precondition) {
+    public CatalogEntry<GroupDefinition> keepGroup(String slug, @Nullable EntityTagPrecondition precondition) {
         lockCatalog();
-        CatalogEntry<AreaDefinition> entry = CuratedCatalogModel.requireEntry(
-            loadCatalog().area(slug),
-            CATALOG_AREA,
+        CatalogEntry<GroupDefinition> entry = CuratedCatalogModel.requireEntry(
+            loadCatalog().group(slug),
+            CATALOG_GROUP,
             slug,
             precondition
         );
         if (entry.overridden() == null) {
             return entry;
         }
-        areaOverrides
+        groupOverrides
             .findBySlug(slug)
             .ifPresent(override -> {
                 override.acknowledge(CuratedCatalogModel.digestOf(entry.shipped(), slug), clock.instant());
-                areaOverrides.save(override);
+                groupOverrides.save(override);
             });
-        return recordArea(slug, entry);
+        return recordGroup(slug, entry);
     }
 
     @Transactional
-    public EffectiveCatalog setAreaStatus(
+    public EffectiveCatalog setGroupStatus(
         String slug,
         @Nullable EntityTagPrecondition precondition,
         CuratedStatus status
@@ -298,43 +298,43 @@ public class CuratedCatalogService {
         lockCatalog();
         EffectiveCatalog before = loadCatalog();
         CuratedCatalogModel.requireCatalog(before, precondition);
-        CatalogEntry<AreaDefinition> entry = before
-            .area(slug)
-            .orElseThrow(() -> new EntityNotFoundException(CATALOG_AREA, slug));
+        CatalogEntry<GroupDefinition> entry = before
+            .group(slug)
+            .orElseThrow(() -> new EntityNotFoundException(CATALOG_GROUP, slug));
         if (entry.retired() == (status == CuratedStatus.RETIRED)) {
             return before;
         }
-        CuratedAreaOverride override = areaOverrides
+        CuratedGroupOverride override = groupOverrides
             .findBySlug(slug)
-            .orElseGet(() -> new CuratedAreaOverride(slug, clock.instant()));
+            .orElseGet(() -> new CuratedGroupOverride(slug, clock.instant()));
         override.setStatus(status, clock.instant());
         if (override.isEmpty()) {
-            areaOverrides.delete(override);
+            groupOverrides.delete(override);
         } else {
-            areaOverrides.save(override);
+            groupOverrides.save(override);
         }
-        recordArea(slug, entry);
+        recordGroup(slug, entry);
         return loadCatalog();
     }
 
     @Transactional
-    public EffectiveCatalog reorderAreas(@Nullable EntityTagPrecondition precondition, List<String> orderedSlugs) {
+    public EffectiveCatalog reorderGroups(@Nullable EntityTagPrecondition precondition, List<String> orderedSlugs) {
         lockCatalog();
         EffectiveCatalog before = loadCatalog();
         CuratedCatalogModel.requireCatalog(before, precondition);
         CuratedCatalogModel.validateCompleteOrder(
-            before.areas().stream().map(CatalogEntry::slug).toList(),
+            before.groups().stream().map(CatalogEntry::slug).toList(),
             orderedSlugs,
-            CATALOG_AREA
+            CATALOG_GROUP
         );
-        if (before.areas().stream().map(CatalogEntry::slug).toList().equals(orderedSlugs)) {
+        if (before.groups().stream().map(CatalogEntry::slug).toList().equals(orderedSlugs)) {
             return before;
         }
         Instant now = clock.instant();
         for (int position = 0; position < orderedSlugs.size(); position++) {
-            CuratedAreaOverride override = areaOverride(orderedSlugs.get(position), now);
+            CuratedGroupOverride override = groupOverride(orderedSlugs.get(position), now);
             override.setPosition(position, now);
-            areaOverrides.save(override);
+            groupOverrides.save(override);
         }
         return loadCatalog();
     }
@@ -342,16 +342,16 @@ public class CuratedCatalogService {
     @Transactional
     public EffectiveCatalog reorderPractices(
         @Nullable EntityTagPrecondition precondition,
-        @Nullable String areaSlug,
+        @Nullable String groupSlug,
         List<String> orderedSlugs
     ) {
         lockCatalog();
         EffectiveCatalog before = loadCatalog();
         CuratedCatalogModel.requireCatalog(before, precondition);
-        if (areaSlug != null && before.area(areaSlug).isEmpty()) {
-            throw new EntityNotFoundException(CATALOG_AREA, areaSlug);
+        if (groupSlug != null && before.group(groupSlug).isEmpty()) {
+            throw new EntityNotFoundException(CATALOG_GROUP, groupSlug);
         }
-        List<String> existing = CuratedCatalogModel.practicesIn(before, areaSlug)
+        List<String> existing = CuratedCatalogModel.practicesIn(before, groupSlug)
             .stream()
             .map(CatalogEntry::slug)
             .toList();
@@ -384,16 +384,16 @@ public class CuratedCatalogService {
                     practiceOverrides.save(override);
                 }
             });
-        areaOverrides
+        groupOverrides
             .findAll()
             .stream()
             .filter(override -> override.getPosition() != null)
             .forEach(override -> {
                 override.clearPosition(now);
                 if (override.isEmpty()) {
-                    areaOverrides.delete(override);
+                    groupOverrides.delete(override);
                 } else {
-                    areaOverrides.save(override);
+                    groupOverrides.save(override);
                 }
             });
         return loadCatalog();
@@ -403,7 +403,7 @@ public class CuratedCatalogService {
     public EffectiveCatalog placePractice(
         String slug,
         @Nullable EntityTagPrecondition precondition,
-        @Nullable String areaSlug,
+        @Nullable String groupSlug,
         int position
     ) {
         lockCatalog();
@@ -412,19 +412,19 @@ public class CuratedCatalogService {
         CatalogEntry<PracticeDefinition> entry = before
             .practice(slug)
             .orElseThrow(() -> new EntityNotFoundException(CATALOG_PRACTICE, slug));
-        if (areaSlug != null && before.area(areaSlug).isEmpty()) {
-            throw new EntityNotFoundException(CATALOG_AREA, areaSlug);
+        if (groupSlug != null && before.group(groupSlug).isEmpty()) {
+            throw new EntityNotFoundException(CATALOG_GROUP, groupSlug);
         }
-        String sourceAreaSlug = entry.effective().areaSlug();
-        if (Objects.equals(sourceAreaSlug, areaSlug)) {
-            throw new IllegalArgumentException("Use the reorder endpoint to move a practice within its area");
+        String sourceGroupSlug = entry.effective().groupSlug();
+        if (Objects.equals(sourceGroupSlug, groupSlug)) {
+            throw new IllegalArgumentException("Use the reorder endpoint to move a practice within its group");
         }
-        List<String> source = CuratedCatalogModel.practicesIn(before, sourceAreaSlug)
+        List<String> source = CuratedCatalogModel.practicesIn(before, sourceGroupSlug)
             .stream()
             .map(CatalogEntry::slug)
             .filter(candidate -> !candidate.equals(slug))
             .collect(java.util.stream.Collectors.toCollection(ArrayList::new));
-        List<String> target = CuratedCatalogModel.practicesIn(before, areaSlug)
+        List<String> target = CuratedCatalogModel.practicesIn(before, groupSlug)
             .stream()
             .map(CatalogEntry::slug)
             .collect(java.util.stream.Collectors.toCollection(ArrayList::new));
@@ -443,7 +443,7 @@ public class CuratedCatalogService {
             definition.automatedReviewPolicy(),
             definition.whyItMatters(),
             definition.whatGoodLooksLike(),
-            areaSlug
+            groupSlug
         );
         CuratedPracticeOverride override = practiceOverride(slug, now);
         override.write(moved, CuratedCatalogModel.digestOf(entry.shipped(), slug), now);
@@ -467,16 +467,16 @@ public class CuratedCatalogService {
         return after;
     }
 
-    private CatalogEntry<AreaDefinition> recordArea(String slug, CatalogEntry<AreaDefinition> before) {
-        CatalogEntry<AreaDefinition> after = loadCatalog()
-            .area(slug)
-            .orElseThrow(() -> new EntityNotFoundException(CATALOG_AREA, slug));
+    private CatalogEntry<GroupDefinition> recordGroup(String slug, CatalogEntry<GroupDefinition> before) {
+        CatalogEntry<GroupDefinition> after = loadCatalog()
+            .group(slug)
+            .orElseThrow(() -> new EntityNotFoundException(CATALOG_GROUP, slug));
         configAudit.record(
             ConfigAuditEntry.instanceUpdated(
-                ConfigAuditEntityType.CURATED_PRACTICE_AREA,
+                ConfigAuditEntityType.CURATED_PRACTICE_GROUP,
                 slug,
-                CuratedAreaSnapshot.of(before),
-                CuratedAreaSnapshot.of(after)
+                CuratedGroupSnapshot.of(before),
+                CuratedGroupSnapshot.of(after)
             )
         );
         return after;
@@ -490,8 +490,8 @@ public class CuratedCatalogService {
         return practiceOverrides.findBySlug(slug).orElseGet(() -> new CuratedPracticeOverride(slug, now));
     }
 
-    private CuratedAreaOverride areaOverride(String slug, Instant now) {
-        return areaOverrides.findBySlug(slug).orElseGet(() -> new CuratedAreaOverride(slug, now));
+    private CuratedGroupOverride groupOverride(String slug, Instant now) {
+        return groupOverrides.findBySlug(slug).orElseGet(() -> new CuratedGroupOverride(slug, now));
     }
 
     private void resequencePractices(List<String> orderedSlugs, Instant now) {
@@ -515,15 +515,15 @@ public class CuratedCatalogService {
             });
     }
 
-    private void clearAreaDefinition(String slug) {
-        areaOverrides
+    private void clearGroupDefinition(String slug) {
+        groupOverrides
             .findBySlug(slug)
             .ifPresent(override -> {
                 override.clearDefinition(clock.instant());
                 if (override.isEmpty()) {
-                    areaOverrides.delete(override);
+                    groupOverrides.delete(override);
                 } else {
-                    areaOverrides.save(override);
+                    groupOverrides.save(override);
                 }
             });
     }

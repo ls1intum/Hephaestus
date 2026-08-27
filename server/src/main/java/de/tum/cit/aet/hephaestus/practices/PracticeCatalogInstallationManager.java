@@ -29,9 +29,9 @@ class PracticeCatalogInstallationManager {
     private static final Logger log = LoggerFactory.getLogger(PracticeCatalogInstallationManager.class);
 
     private final boolean enabled;
-    private final PracticeAreaService areaService;
+    private final PracticeGroupService groupService;
     private final PracticeService practiceService;
-    private final PracticeAreaRepository areaRepository;
+    private final PracticeGroupRepository groupRepository;
     private final PracticeRepository practiceRepository;
     private final CuratedCatalogService catalogService;
     private final CuratedCatalogLock catalogLock;
@@ -42,9 +42,9 @@ class PracticeCatalogInstallationManager {
 
     PracticeCatalogInstallationManager(
         @Value("${hephaestus.practices.seed-default-catalog:true}") boolean enabled,
-        PracticeAreaService areaService,
+        PracticeGroupService groupService,
         PracticeService practiceService,
-        PracticeAreaRepository areaRepository,
+        PracticeGroupRepository groupRepository,
         PracticeRepository practiceRepository,
         CuratedCatalogService catalogService,
         CuratedCatalogLock catalogLock,
@@ -54,9 +54,9 @@ class PracticeCatalogInstallationManager {
         Clock clock
     ) {
         this.enabled = enabled;
-        this.areaService = areaService;
+        this.groupService = groupService;
         this.practiceService = practiceService;
-        this.areaRepository = areaRepository;
+        this.groupRepository = groupRepository;
         this.practiceRepository = practiceRepository;
         this.catalogService = catalogService;
         this.catalogLock = catalogLock;
@@ -112,12 +112,12 @@ class PracticeCatalogInstallationManager {
         }
         WorkspaceContext context = WorkspaceContext.fromWorkspace(lockedWorkspace, Set.of(), null);
         EffectiveCatalog catalog = catalogService.catalog();
-        List<CatalogEntry<AreaDefinition>> areas = catalog.installableAreas();
-        int seededAreas = 0;
-        for (CatalogEntry<AreaDefinition> area : areas) {
-            if (!areaRepository.existsByWorkspaceIdAndSlug(context.id(), area.slug())) {
-                areaService.createAreaFromCatalog(context, area.slug(), area.effective(), area.position());
-                seededAreas++;
+        List<CatalogEntry<GroupDefinition>> groups = catalog.installableGroups();
+        int seededGroups = 0;
+        for (CatalogEntry<GroupDefinition> group : groups) {
+            if (!groupRepository.existsByWorkspaceIdAndSlug(context.id(), group.slug())) {
+                groupService.createGroupFromCatalog(context, group.slug(), group.effective(), group.position());
+                seededGroups++;
             }
         }
         int seededPractices = 0;
@@ -131,8 +131,8 @@ class PracticeCatalogInstallationManager {
         installationRepository.save(new PracticeCatalogInstallation(lockedWorkspace.getId(), now, now));
         if (seededPractices > 0) {
             log.info(
-                "Seeded practice catalog: {} areas, {} practices into workspace {}",
-                seededAreas,
+                "Seeded practice catalog: {} groups, {} practices into workspace {}",
+                seededGroups,
                 seededPractices,
                 lockedWorkspace.getId()
             );

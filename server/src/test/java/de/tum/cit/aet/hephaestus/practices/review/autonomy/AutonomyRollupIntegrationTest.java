@@ -5,15 +5,15 @@ import static org.assertj.core.api.Assertions.entry;
 
 import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
-import de.tum.cit.aet.hephaestus.practices.PracticeAreaRepository;
+import de.tum.cit.aet.hephaestus.practices.PracticeGroupRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
-import de.tum.cit.aet.hephaestus.practices.dto.AreaAutonomyRollupDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.AutonomyRollupDTO;
+import de.tum.cit.aet.hephaestus.practices.dto.GroupAutonomyRollupDTO;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeArea;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeGroup;
 import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
 import de.tum.cit.aet.hephaestus.testconfig.WithAdminUser;
 import de.tum.cit.aet.hephaestus.testconfig.WithMentorUser;
@@ -43,7 +43,7 @@ class AutonomyRollupIntegrationTest extends AbstractWorkspaceIntegrationTest {
     private PracticeRepository practiceRepository;
 
     @Autowired
-    private PracticeAreaRepository areaRepository;
+    private PracticeGroupRepository groupRepository;
 
     @Autowired
     private WorkspaceRepository workspaceRepository;
@@ -56,17 +56,17 @@ class AutonomyRollupIntegrationTest extends AbstractWorkspaceIntegrationTest {
         workspace = createWorkspace("rollup-ws", "Rollup WS", "rollup-org", AccountType.ORG, owner);
     }
 
-    private PracticeArea persistArea(String slug, int displayOrder, @Nullable PracticeAutonomy autonomy) {
-        PracticeArea area = new PracticeArea();
-        area.setWorkspace(workspace);
-        area.setSlug(slug);
-        area.setName("Area " + slug);
-        area.setDisplayOrder(displayOrder);
-        area.setAutonomy(autonomy);
-        return areaRepository.save(area);
+    private PracticeGroup persistGroup(String slug, int displayOrder, @Nullable PracticeAutonomy autonomy) {
+        PracticeGroup group = new PracticeGroup();
+        group.setWorkspace(workspace);
+        group.setSlug(slug);
+        group.setName("Group " + slug);
+        group.setDisplayOrder(displayOrder);
+        group.setAutonomy(autonomy);
+        return groupRepository.save(group);
     }
 
-    private Practice persistPractice(String slug, @Nullable PracticeArea area, @Nullable PracticeAutonomy autonomy) {
+    private Practice persistPractice(String slug, @Nullable PracticeGroup group, @Nullable PracticeAutonomy autonomy) {
         Practice practice = new Practice();
         practice.setWorkspace(workspace);
         practice.setSlug(slug);
@@ -74,7 +74,7 @@ class AutonomyRollupIntegrationTest extends AbstractWorkspaceIntegrationTest {
         practice.setBindings(PracticeTestEvidence.bindings(ScmSignals.PULL_REQUEST_OPENED));
         practice.setCriteria("Detect prompt for " + slug);
         practice.setAutomatedReviewPolicy(PracticeTestEvidence.forArtifact(ArtifactKinds.PULL_REQUEST));
-        practice.setArea(area);
+        practice.setGroup(group);
         practice.setAutonomy(autonomy);
         return practiceRepository.save(practice);
     }
@@ -100,13 +100,13 @@ class AutonomyRollupIntegrationTest extends AbstractWorkspaceIntegrationTest {
         return rollup;
     }
 
-    private static AreaAutonomyRollupDTO areaNamed(AutonomyRollupDTO rollup, @Nullable String slug) {
+    private static GroupAutonomyRollupDTO groupNamed(AutonomyRollupDTO rollup, @Nullable String slug) {
         return rollup
-            .areas()
+            .groups()
             .stream()
-            .filter(area -> Objects.equals(area.areaSlug(), slug))
+            .filter(group -> Objects.equals(group.groupSlug(), slug))
             .findFirst()
-            .orElseThrow(() -> new AssertionError("no area group for slug " + slug + " in " + rollup.areas()));
+            .orElseThrow(() -> new AssertionError("no group group for slug " + slug + " in " + rollup.groups()));
     }
 
     @Nested
@@ -118,14 +118,14 @@ class AutonomyRollupIntegrationTest extends AbstractWorkspaceIntegrationTest {
             ensureAdminMembership(workspace);
             workspaceDefaultsTo(PracticeAutonomy.HUMAN_APPROVAL);
 
-            PracticeArea alpha = persistArea("alpha", 0, PracticeAutonomy.OFF);
+            PracticeGroup alpha = persistGroup("alpha", 0, PracticeAutonomy.OFF);
             persistPractice("alpha-inherits", alpha, null);
             persistPractice("alpha-decides", alpha, PracticeAutonomy.AUTOMATIC);
 
-            PracticeArea beta = persistArea("beta", 1, null);
+            PracticeGroup beta = persistGroup("beta", 1, null);
             persistPractice("beta-inherits", beta, null);
 
-            persistArea("gamma", 2, null);
+            persistGroup("gamma", 2, null);
 
             persistPractice("unfiled", null, null);
         }
@@ -138,9 +138,9 @@ class AutonomyRollupIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
             assertThat(rollup.counts()).containsOnlyKeys(PracticeAutonomy.values());
             assertThat(rollup.counts()).containsEntry(PracticeAutonomy.OFF, 1);
-            assertThat(rollup.areas())
+            assertThat(rollup.groups())
                 .isNotEmpty()
-                .allSatisfy(area -> assertThat(area.counts()).containsOnlyKeys(PracticeAutonomy.values()));
+                .allSatisfy(group -> assertThat(group.counts()).containsOnlyKeys(PracticeAutonomy.values()));
         }
 
         @Test
@@ -166,16 +166,16 @@ class AutonomyRollupIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
         @Test
         @WithAdminUser
-        @DisplayName("an area counts its own practices at their effective autonomy")
-        void areaCountsFollowTheSameChain() {
+        @DisplayName("a group counts its own practices at their effective autonomy")
+        void groupCountsFollowTheSameChain() {
             AutonomyRollupDTO rollup = fetchRollup();
 
-            assertThat(areaNamed(rollup, "alpha").counts()).containsOnly(
+            assertThat(groupNamed(rollup, "alpha").counts()).containsOnly(
                 entry(PracticeAutonomy.OFF, 1),
                 entry(PracticeAutonomy.HUMAN_APPROVAL, 0),
                 entry(PracticeAutonomy.AUTOMATIC, 1)
             );
-            assertThat(areaNamed(rollup, "beta").counts()).containsEntry(PracticeAutonomy.HUMAN_APPROVAL, 1);
+            assertThat(groupNamed(rollup, "beta").counts()).containsEntry(PracticeAutonomy.HUMAN_APPROVAL, 1);
         }
 
         @Test
@@ -184,19 +184,19 @@ class AutonomyRollupIntegrationTest extends AbstractWorkspaceIntegrationTest {
         void overriddenCountCountsSelfDecidedPracticesOnly() {
             AutonomyRollupDTO rollup = fetchRollup();
 
-            assertThat(areaNamed(rollup, "alpha").overriddenCount()).isEqualTo(1);
-            assertThat(areaNamed(rollup, "beta").overriddenCount()).isZero();
-            assertThat(areaNamed(rollup, "gamma").overriddenCount()).isZero();
-            assertThat(areaNamed(rollup, null).overriddenCount()).isZero();
+            assertThat(groupNamed(rollup, "alpha").overriddenCount()).isEqualTo(1);
+            assertThat(groupNamed(rollup, "beta").overriddenCount()).isZero();
+            assertThat(groupNamed(rollup, "gamma").overriddenCount()).isZero();
+            assertThat(groupNamed(rollup, null).overriddenCount()).isZero();
         }
 
         @Test
         @WithAdminUser
-        @DisplayName("an area with no practices is reported at all zeroes rather than omitted")
-        void anEmptyAreaIsStillReported() {
+        @DisplayName("a group with no practices is reported at all zeroes rather than omitted")
+        void anEmptyGroupIsStillReported() {
             AutonomyRollupDTO rollup = fetchRollup();
 
-            AreaAutonomyRollupDTO gamma = areaNamed(rollup, "gamma");
+            GroupAutonomyRollupDTO gamma = groupNamed(rollup, "gamma");
             assertThat(gamma.counts().values()).containsOnly(0);
             assertThat(gamma.autonomy().effective()).isEqualTo(PracticeAutonomy.HUMAN_APPROVAL);
             assertThat(gamma.autonomy().source()).isEqualTo(AutonomySource.WORKSPACE);
@@ -204,14 +204,14 @@ class AutonomyRollupIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
         @Test
         @WithAdminUser
-        @DisplayName("the no-area group sorts last, is named by two nulls, and can hold no decision")
-        void theNoAreaGroupSortsLastAndHoldsNoDecision() {
+        @DisplayName("the no-group group sorts last, is named by two nulls, and can hold no decision")
+        void theNoGroupGroupSortsLastAndHoldsNoDecision() {
             AutonomyRollupDTO rollup = fetchRollup();
 
-            AreaAutonomyRollupDTO ungrouped = rollup.areas().getLast();
-            assertThat(ungrouped.areaSlug()).isNull();
-            assertThat(ungrouped.areaName()).isNull();
-            assertThat(rollup.areas().stream().map(AreaAutonomyRollupDTO::areaSlug)).containsExactly(
+            GroupAutonomyRollupDTO ungrouped = rollup.groups().getLast();
+            assertThat(ungrouped.groupSlug()).isNull();
+            assertThat(ungrouped.groupName()).isNull();
+            assertThat(rollup.groups().stream().map(GroupAutonomyRollupDTO::groupSlug)).containsExactly(
                 "alpha",
                 "beta",
                 "gamma",
@@ -227,17 +227,17 @@ class AutonomyRollupIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
         @Test
         @WithAdminUser
-        @DisplayName("each area reports whether the autonomy is its own or the workspace's")
-        void eachAreaReportsWhoDecided() {
+        @DisplayName("each group reports whether the autonomy is its own or the workspace's")
+        void eachGroupReportsWhoDecided() {
             AutonomyRollupDTO rollup = fetchRollup();
 
-            AreaAutonomyRollupDTO alpha = areaNamed(rollup, "alpha");
+            GroupAutonomyRollupDTO alpha = groupNamed(rollup, "alpha");
             assertThat(alpha.autonomy().effective()).isEqualTo(PracticeAutonomy.OFF);
             assertThat(alpha.autonomy().override()).isEqualTo(PracticeAutonomy.OFF);
-            assertThat(alpha.autonomy().source()).isEqualTo(AutonomySource.AREA);
+            assertThat(alpha.autonomy().source()).isEqualTo(AutonomySource.GROUP);
             assertThat(alpha.autonomy().inherited()).isFalse();
 
-            AreaAutonomyRollupDTO beta = areaNamed(rollup, "beta");
+            GroupAutonomyRollupDTO beta = groupNamed(rollup, "beta");
             assertThat(beta.autonomy().effective()).isEqualTo(PracticeAutonomy.HUMAN_APPROVAL);
             assertThat(beta.autonomy().override()).isNull();
             assertThat(beta.autonomy().source()).isEqualTo(AutonomySource.WORKSPACE);
@@ -314,7 +314,7 @@ class AutonomyRollupIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
             assertThat(rollup.counts()).containsOnlyKeys(PracticeAutonomy.values());
             assertThat(rollup.counts().values()).containsOnly(0);
-            assertThat(rollup.areas()).isEmpty();
+            assertThat(rollup.groups()).isEmpty();
         }
     }
 

@@ -142,15 +142,15 @@ class CodeQualityTest extends HephaestusArchitectureTest {
                 "AuthEventRepository.findForAdmin",
                 // Atomic JPQL terminal transition; Spring Data query parameters must remain individually bound.
                 "SyncJobRepository.completeActiveJob",
-                // Learner observation feed: every optional facet needs its own @Param for the
+                // Developer observation feed: every optional facet needs its own @Param for the
                 // (:hasX = FALSE OR col IN (:xs)) empty-list guard — an IN () is invalid SQL, and Spring Data
                 // cannot bind a parameter object's components to named placeholders.
                 "ObservationRepository.findByAboutUserAndWorkspace",
                 "ObservationRepository.findByAboutUserAndWorkspaceSeverityFirst",
-                // Review-history pagination at the run grain: same per-facet @Param binding, plus the
+                // Review-run pagination at the run grain: same per-facet @Param binding, plus the
                 // native run projection whose GROUP BY cannot be expressed through a derived query.
-                "ObservationRepository.findReviewHistoryRuns",
-                "ObservationRepository.findReviewHistoryObservationsByJobs"
+                "ObservationRepository.findPracticeGroupReviewRuns",
+                "ObservationRepository.findPracticeGroupReviewRunObservations"
             );
 
             ArchCondition<JavaClass> haveMethodsWithLimitedParams = new ArchCondition<>(

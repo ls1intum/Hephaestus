@@ -9,17 +9,17 @@ import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.practices.PracticeEvidenceDefaults;
 import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
-import de.tum.cit.aet.hephaestus.practices.curated.dto.CreateCuratedAreaRequestDTO;
+import de.tum.cit.aet.hephaestus.practices.curated.dto.CreateCuratedGroupRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.curated.dto.CreateCuratedPracticeRequestDTO;
-import de.tum.cit.aet.hephaestus.practices.curated.dto.CuratedAreaDTO;
-import de.tum.cit.aet.hephaestus.practices.curated.dto.CuratedAreaRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.curated.dto.CuratedCatalogDTO;
+import de.tum.cit.aet.hephaestus.practices.curated.dto.CuratedGroupDTO;
+import de.tum.cit.aet.hephaestus.practices.curated.dto.CuratedGroupRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.curated.dto.CuratedPracticeDTO;
 import de.tum.cit.aet.hephaestus.practices.curated.dto.CuratedPracticeRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.curated.dto.CuratedPracticeSummaryDTO;
 import de.tum.cit.aet.hephaestus.practices.curated.dto.UpdateCuratedStatusRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.PlacePracticeRequestDTO;
-import de.tum.cit.aet.hephaestus.practices.dto.ReorderPracticeAreasRequestDTO;
+import de.tum.cit.aet.hephaestus.practices.dto.ReorderPracticeGroupsRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.ReorderPracticesRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
@@ -48,7 +48,7 @@ class CuratedCatalogAdminControllerIntegrationTest extends AbstractWorkspaceInte
     private static final String MENTOR_TOKEN = "mock-jwt-token-for-mentor-user";
     private static final String CATALOG = "/admin/practice-catalog";
     private static final String PRACTICE = "describe-what-and-why";
-    private static final String AREA = "review-ready-work";
+    private static final String GROUP = "review-ready-work";
 
     @Autowired
     private WebTestClient webTestClient;
@@ -150,7 +150,7 @@ class CuratedCatalogAdminControllerIntegrationTest extends AbstractWorkspaceInte
             before.definition().automatedReviewPolicy(),
             "Our own words about why this matters.",
             before.definition().whatGoodLooksLike(),
-            before.definition().areaSlug()
+            before.definition().groupSlug()
         );
         webTestClient
             .put()
@@ -270,7 +270,7 @@ class CuratedCatalogAdminControllerIntegrationTest extends AbstractWorkspaceInte
         CuratedCatalogDTO catalog = getCatalog();
         webTestClient
             .patch()
-            .uri(CATALOG + "/areas/" + AREA + "/status")
+            .uri(CATALOG + "/groups/" + GROUP + "/status")
             .headers(headers -> {
                 headers.setBearerAuth(ADMIN_TOKEN);
                 headers.set(HttpHeaders.IF_MATCH, quote(catalog.etag()));
@@ -293,10 +293,10 @@ class CuratedCatalogAdminControllerIntegrationTest extends AbstractWorkspaceInte
             .isOk();
         webTestClient
             .put()
-            .uri(CATALOG + "/areas/" + AREA + "/override/acknowledgement")
+            .uri(CATALOG + "/groups/" + GROUP + "/override/acknowledgement")
             .headers(headers -> {
                 headers.setBearerAuth(ADMIN_TOKEN);
-                headers.set(HttpHeaders.IF_MATCH, etagOf(getArea(AREA)));
+                headers.set(HttpHeaders.IF_MATCH, etagOf(getGroup(GROUP)));
             })
             .exchange()
             .expectStatus()
@@ -311,26 +311,26 @@ class CuratedCatalogAdminControllerIntegrationTest extends AbstractWorkspaceInte
         ).isOne();
         assertThat(
             jdbcTemplate.queryForObject(
-                "SELECT count(*) FROM curated_area_override WHERE slug = ? AND based_on_digest IS NULL",
+                "SELECT count(*) FROM curated_group_override WHERE slug = ? AND based_on_digest IS NULL",
                 Long.class,
-                AREA
+                GROUP
             )
         ).isOne();
     }
 
     @Test
-    void reordersAreasWithoutTurningTheirDefinitionsIntoEdits() {
+    void reordersGroupsWithoutTurningTheirDefinitionsIntoEdits() {
         CuratedCatalogDTO before = getCatalog();
-        List<String> original = before.areas().stream().map(CuratedAreaDTO::slug).toList();
+        List<String> original = before.groups().stream().map(CuratedGroupDTO::slug).toList();
         CuratedCatalogDTO unchanged = webTestClient
             .patch()
-            .uri(CATALOG + "/areas/reorder")
+            .uri(CATALOG + "/groups/reorder")
             .headers(headers -> {
                 headers.setBearerAuth(ADMIN_TOKEN);
                 headers.set(HttpHeaders.IF_MATCH, quote(before.etag()));
             })
             .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(new ReorderPracticeAreasRequestDTO(original))
+            .bodyValue(new ReorderPracticeGroupsRequestDTO(original))
             .exchange()
             .expectStatus()
             .isOk()
@@ -342,21 +342,21 @@ class CuratedCatalogAdminControllerIntegrationTest extends AbstractWorkspaceInte
         assertThat(overrideRows()).isZero();
 
         List<String> reversed = before
-            .areas()
+            .groups()
             .stream()
-            .map(CuratedAreaDTO::slug)
+            .map(CuratedGroupDTO::slug)
             .collect(java.util.stream.Collectors.toCollection(java.util.ArrayList::new));
         java.util.Collections.reverse(reversed);
 
         CuratedCatalogDTO after = webTestClient
             .patch()
-            .uri(CATALOG + "/areas/reorder")
+            .uri(CATALOG + "/groups/reorder")
             .headers(headers -> {
                 headers.setBearerAuth(ADMIN_TOKEN);
                 headers.set(HttpHeaders.IF_MATCH, quote(before.etag()));
             })
             .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(new ReorderPracticeAreasRequestDTO(reversed))
+            .bodyValue(new ReorderPracticeGroupsRequestDTO(reversed))
             .exchange()
             .expectStatus()
             .isOk()
@@ -366,27 +366,27 @@ class CuratedCatalogAdminControllerIntegrationTest extends AbstractWorkspaceInte
 
         assertThat(after).isNotNull();
         assertThat(after.customOrder()).isTrue();
-        assertThat(after.areas()).extracting(CuratedAreaDTO::slug).containsExactlyElementsOf(reversed);
-        assertThat(after.areas()).allSatisfy(area ->
-            assertThat(area.status().state()).isEqualTo(CatalogEntryState.FROM_HEPHAESTUS)
+        assertThat(after.groups()).extracting(CuratedGroupDTO::slug).containsExactlyElementsOf(reversed);
+        assertThat(after.groups()).allSatisfy(group ->
+            assertThat(group.status().state()).isEqualTo(CatalogEntryState.FROM_HEPHAESTUS)
         );
         assertThat(after.etag()).isNotEqualTo(before.etag());
         assertThat(
             jdbcTemplate.queryForObject(
-                "SELECT count(*) FROM config_audit_event WHERE entity_type IN ('CURATED_PRACTICE', 'CURATED_PRACTICE_AREA')",
+                "SELECT count(*) FROM config_audit_event WHERE entity_type IN ('CURATED_PRACTICE', 'CURATED_PRACTICE_GROUP')",
                 Long.class
             )
         ).isZero();
 
         webTestClient
             .patch()
-            .uri(CATALOG + "/areas/reorder")
+            .uri(CATALOG + "/groups/reorder")
             .headers(headers -> {
                 headers.setBearerAuth(ADMIN_TOKEN);
                 headers.set(HttpHeaders.IF_MATCH, quote(before.etag()));
             })
             .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(new ReorderPracticeAreasRequestDTO(reversed))
+            .bodyValue(new ReorderPracticeGroupsRequestDTO(reversed))
             .exchange()
             .expectStatus()
             .isEqualTo(412)
@@ -396,13 +396,13 @@ class CuratedCatalogAdminControllerIntegrationTest extends AbstractWorkspaceInte
 
         CuratedCatalogDTO ownedDefaultOrder = webTestClient
             .patch()
-            .uri(CATALOG + "/areas/reorder")
+            .uri(CATALOG + "/groups/reorder")
             .headers(headers -> {
                 headers.setBearerAuth(ADMIN_TOKEN);
                 headers.set(HttpHeaders.IF_MATCH, quote(after.etag()));
             })
             .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(new ReorderPracticeAreasRequestDTO(original))
+            .bodyValue(new ReorderPracticeGroupsRequestDTO(original))
             .exchange()
             .expectStatus()
             .isOk()
@@ -411,7 +411,7 @@ class CuratedCatalogAdminControllerIntegrationTest extends AbstractWorkspaceInte
             .getResponseBody();
         assertThat(ownedDefaultOrder).isNotNull();
         assertThat(ownedDefaultOrder.customOrder()).isTrue();
-        assertThat(ownedDefaultOrder.areas()).extracting(CuratedAreaDTO::slug).containsExactlyElementsOf(original);
+        assertThat(ownedDefaultOrder.groups()).extracting(CuratedGroupDTO::slug).containsExactlyElementsOf(original);
 
         CuratedCatalogDTO reset = webTestClient
             .delete()
@@ -429,12 +429,12 @@ class CuratedCatalogAdminControllerIntegrationTest extends AbstractWorkspaceInte
         assertThat(reset).isNotNull();
         assertThat(reset.customOrder()).isFalse();
         assertThat(reset.etag()).isNotEqualTo(ownedDefaultOrder.etag());
-        assertThat(reset.areas())
-            .extracting(CuratedAreaDTO::slug)
-            .containsExactlyElementsOf(before.areas().stream().map(CuratedAreaDTO::slug).toList());
+        assertThat(reset.groups())
+            .extracting(CuratedGroupDTO::slug)
+            .containsExactlyElementsOf(before.groups().stream().map(CuratedGroupDTO::slug).toList());
         assertThat(
             jdbcTemplate.queryForObject(
-                "SELECT count(*) FROM curated_area_override WHERE position IS NOT NULL",
+                "SELECT count(*) FROM curated_group_override WHERE position IS NOT NULL",
                 Long.class
             )
         ).isZero();
@@ -443,11 +443,11 @@ class CuratedCatalogAdminControllerIntegrationTest extends AbstractWorkspaceInte
     @Test
     void reordersAndMovesPracticesWithOneStructuralPrecondition() {
         CuratedCatalogDTO before = getCatalog();
-        String sourceArea = before.practices().getFirst().areaSlug();
+        String sourceGroup = before.practices().getFirst().groupSlug();
         List<String> bucket = before
             .practices()
             .stream()
-            .filter(practice -> java.util.Objects.equals(practice.areaSlug(), sourceArea))
+            .filter(practice -> java.util.Objects.equals(practice.groupSlug(), sourceGroup))
             .map(practice -> practice.slug())
             .collect(java.util.stream.Collectors.toCollection(java.util.ArrayList::new));
         assertThat(bucket).hasSizeGreaterThan(1);
@@ -461,7 +461,7 @@ class CuratedCatalogAdminControllerIntegrationTest extends AbstractWorkspaceInte
                 headers.set(HttpHeaders.IF_MATCH, quote(before.etag()));
             })
             .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(new ReorderPracticesRequestDTO(sourceArea, bucket))
+            .bodyValue(new ReorderPracticesRequestDTO(sourceGroup, bucket))
             .exchange()
             .expectStatus()
             .isOk()
@@ -470,16 +470,16 @@ class CuratedCatalogAdminControllerIntegrationTest extends AbstractWorkspaceInte
             .getResponseBody();
         assertThat(reordered).isNotNull();
         assertThat(reordered.practices())
-            .filteredOn(practice -> java.util.Objects.equals(practice.areaSlug(), sourceArea))
+            .filteredOn(practice -> java.util.Objects.equals(practice.groupSlug(), sourceGroup))
             .extracting(practice -> practice.slug())
             .containsExactlyElementsOf(bucket);
 
         String movedSlug = bucket.getFirst();
-        String destinationArea = reordered
-            .areas()
+        String destinationGroup = reordered
+            .groups()
             .stream()
-            .map(CuratedAreaDTO::slug)
-            .filter(slug -> !slug.equals(sourceArea))
+            .map(CuratedGroupDTO::slug)
+            .filter(slug -> !slug.equals(sourceGroup))
             .findFirst()
             .orElseThrow();
         CuratedCatalogDTO moved = webTestClient
@@ -490,7 +490,7 @@ class CuratedCatalogAdminControllerIntegrationTest extends AbstractWorkspaceInte
                 headers.set(HttpHeaders.IF_MATCH, quote(reordered.etag()));
             })
             .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(new PlacePracticeRequestDTO(destinationArea, 0))
+            .bodyValue(new PlacePracticeRequestDTO(destinationGroup, 0))
             .exchange()
             .expectStatus()
             .isOk()
@@ -502,7 +502,7 @@ class CuratedCatalogAdminControllerIntegrationTest extends AbstractWorkspaceInte
             .filteredOn(practice -> practice.slug().equals(movedSlug))
             .singleElement()
             .satisfies(practice -> {
-                assertThat(practice.areaSlug()).isEqualTo(destinationArea);
+                assertThat(practice.groupSlug()).isEqualTo(destinationGroup);
                 assertThat(practice.position()).isZero();
                 assertThat(practice.status().state()).isEqualTo(CatalogEntryState.EDITED_HERE);
             });
@@ -510,12 +510,12 @@ class CuratedCatalogAdminControllerIntegrationTest extends AbstractWorkspaceInte
 
     @Test
     @WithAdminUser
-    void notOfferingAnAreaWithholdsThePracticesFiledUnderIt() {
+    void notOfferingAnGroupWithholdsThePracticesFiledUnderIt() {
         ensureAdminMembership(workspace);
         String catalogTag = tag(CATALOG);
         var result = webTestClient
             .patch()
-            .uri(CATALOG + "/areas/" + AREA + "/status")
+            .uri(CATALOG + "/groups/" + GROUP + "/status")
             .headers(headers -> {
                 headers.setBearerAuth(ADMIN_TOKEN);
                 headers.set(HttpHeaders.IF_MATCH, catalogTag);
@@ -551,9 +551,9 @@ class CuratedCatalogAdminControllerIntegrationTest extends AbstractWorkspaceInte
             .isEqualTo(false);
         int unavailableEntries = Math.toIntExact(
             catalog
-                    .areas()
+                    .groups()
                     .stream()
-                    .filter(areaEntry -> !areaEntry.status().offered())
+                    .filter(groupEntry -> !groupEntry.status().offered())
                     .count() +
                 catalog
                     .practices()
@@ -577,14 +577,14 @@ class CuratedCatalogAdminControllerIntegrationTest extends AbstractWorkspaceInte
     }
 
     @Test
-    void rejectsAnAreaStatusDecisionBasedOnStalePracticeMembership() {
+    void rejectsAnGroupStatusDecisionBasedOnStalePracticeMembership() {
         CuratedCatalogDTO before = getCatalog();
         String staleTag = quote(before.etag());
-        String destinationArea = before
-            .areas()
+        String destinationGroup = before
+            .groups()
             .stream()
-            .map(CuratedAreaDTO::slug)
-            .filter(slug -> !slug.equals(AREA))
+            .map(CuratedGroupDTO::slug)
+            .filter(slug -> !slug.equals(GROUP))
             .findFirst()
             .orElseThrow();
 
@@ -596,14 +596,14 @@ class CuratedCatalogAdminControllerIntegrationTest extends AbstractWorkspaceInte
                 headers.set(HttpHeaders.IF_MATCH, staleTag);
             })
             .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(new PlacePracticeRequestDTO(destinationArea, 0))
+            .bodyValue(new PlacePracticeRequestDTO(destinationGroup, 0))
             .exchange()
             .expectStatus()
             .isOk();
 
         webTestClient
             .patch()
-            .uri(CATALOG + "/areas/" + AREA + "/status")
+            .uri(CATALOG + "/groups/" + GROUP + "/status")
             .headers(headers -> {
                 headers.setBearerAuth(ADMIN_TOKEN);
                 headers.set(HttpHeaders.IF_MATCH, staleTag);
@@ -616,16 +616,16 @@ class CuratedCatalogAdminControllerIntegrationTest extends AbstractWorkspaceInte
     }
 
     @Test
-    void anAreaTheInstanceWritesBehavesLikeAShippedOne() {
-        CuratedAreaDTO created = webTestClient
+    void anGroupTheInstanceWritesBehavesLikeAShippedOne() {
+        CuratedGroupDTO created = webTestClient
             .post()
-            .uri(CATALOG + "/areas")
+            .uri(CATALOG + "/groups")
             .headers(headers -> headers.setBearerAuth(ADMIN_TOKEN))
             .contentType(MediaType.APPLICATION_JSON)
             .bodyValue(
-                new CreateCuratedAreaRequestDTO(
+                new CreateCuratedGroupRequestDTO(
                     "house-rules",
-                    new CuratedAreaRequestDTO("House rules", "Ours alone", "Scale", "amber")
+                    new CuratedGroupRequestDTO("House rules", "Ours alone", "Scale", "amber")
                 )
             )
             .exchange()
@@ -633,7 +633,7 @@ class CuratedCatalogAdminControllerIntegrationTest extends AbstractWorkspaceInte
             .isCreated()
             .expectHeader()
             .exists(HttpHeaders.ETAG)
-            .expectBody(CuratedAreaDTO.class)
+            .expectBody(CuratedGroupDTO.class)
             .returnResult()
             .getResponseBody();
 
@@ -654,7 +654,7 @@ class CuratedCatalogAdminControllerIntegrationTest extends AbstractWorkspaceInte
             null,
             source.whyItMatters(),
             source.whatGoodLooksLike(),
-            source.areaSlug()
+            source.groupSlug()
         );
 
         CuratedPracticeDTO created = webTestClient
@@ -690,16 +690,16 @@ class CuratedCatalogAdminControllerIntegrationTest extends AbstractWorkspaceInte
             .expectStatus()
             .isCreated();
 
-        String areaSlug = "removed-area";
+        String groupSlug = "removed-group";
         webTestClient
             .post()
-            .uri(CATALOG + "/areas")
+            .uri(CATALOG + "/groups")
             .headers(headers -> headers.setBearerAuth(ADMIN_TOKEN))
             .contentType(MediaType.APPLICATION_JSON)
             .bodyValue(
-                new CreateCuratedAreaRequestDTO(
-                    areaSlug,
-                    new CuratedAreaRequestDTO("Removed area", "Saved description", "Folder", "slate")
+                new CreateCuratedGroupRequestDTO(
+                    groupSlug,
+                    new CuratedGroupRequestDTO("Removed group", "Saved description", "Folder", "slate")
                 )
             )
             .exchange()
@@ -711,14 +711,14 @@ class CuratedCatalogAdminControllerIntegrationTest extends AbstractWorkspaceInte
             practiceSlug
         );
         jdbcTemplate.update(
-            "UPDATE curated_area_override SET based_on_digest = repeat('a', 64) WHERE slug = ?",
-            areaSlug
+            "UPDATE curated_group_override SET based_on_digest = repeat('a', 64) WHERE slug = ?",
+            groupSlug
         );
 
         CuratedPracticeDTO removedPractice = getPractice(practiceSlug);
-        CuratedAreaDTO removedArea = getArea(areaSlug);
+        CuratedGroupDTO removedGroup = getGroup(groupSlug);
         assertThat(removedPractice.status().state()).isEqualTo(CatalogEntryState.NO_LONGER_SHIPPED);
-        assertThat(removedArea.status().state()).isEqualTo(CatalogEntryState.NO_LONGER_SHIPPED);
+        assertThat(removedGroup.status().state()).isEqualTo(CatalogEntryState.NO_LONGER_SHIPPED);
 
         webTestClient
             .put()
@@ -747,10 +747,10 @@ class CuratedCatalogAdminControllerIntegrationTest extends AbstractWorkspaceInte
 
         webTestClient
             .put()
-            .uri(CATALOG + "/areas/" + areaSlug + "/override/acknowledgement")
+            .uri(CATALOG + "/groups/" + groupSlug + "/override/acknowledgement")
             .headers(headers -> {
                 headers.setBearerAuth(ADMIN_TOKEN);
-                headers.set(HttpHeaders.IF_MATCH, etagOf(removedArea));
+                headers.set(HttpHeaders.IF_MATCH, etagOf(removedGroup));
             })
             .exchange()
             .expectStatus()
@@ -768,59 +768,62 @@ class CuratedCatalogAdminControllerIntegrationTest extends AbstractWorkspaceInte
         ).isOne();
         assertThat(
             jdbcTemplate.queryForObject(
-                "SELECT count(*) FROM curated_area_override WHERE slug = ? AND based_on_digest IS NULL",
+                "SELECT count(*) FROM curated_group_override WHERE slug = ? AND based_on_digest IS NULL",
                 Long.class,
-                areaSlug
+                groupSlug
             )
         ).isOne();
         assertThat(auditValues("CURATED_PRACTICE", practiceSlug)).anySatisfy(value ->
             assertThat(value).contains("YOURS")
         );
-        assertThat(auditValues("CURATED_PRACTICE_AREA", areaSlug)).anySatisfy(value ->
+        assertThat(auditValues("CURATED_PRACTICE_GROUP", groupSlug)).anySatisfy(value ->
             assertThat(value).contains("YOURS")
         );
     }
 
     @Test
     void customEntriesAppendWithoutTakingOwnershipOfTheShippedOrder() {
-        CuratedCatalogDTO beforeArea = getCatalog();
+        CuratedCatalogDTO beforeGroup = getCatalog();
         webTestClient
             .post()
-            .uri(CATALOG + "/areas")
+            .uri(CATALOG + "/groups")
             .headers(headers -> headers.setBearerAuth(ADMIN_TOKEN))
             .contentType(MediaType.APPLICATION_JSON)
             .bodyValue(
-                new CreateCuratedAreaRequestDTO(
+                new CreateCuratedGroupRequestDTO(
                     "house-rules",
-                    new CuratedAreaRequestDTO("House rules", "Ours alone", "Scale", "amber")
+                    new CuratedGroupRequestDTO("House rules", "Ours alone", "Scale", "amber")
                 )
             )
             .exchange()
             .expectStatus()
             .isCreated();
 
-        CuratedCatalogDTO afterArea = getCatalog();
-        assertThat(afterArea.areas())
-            .extracting(CuratedAreaDTO::slug)
+        CuratedCatalogDTO afterGroup = getCatalog();
+        assertThat(afterGroup.groups())
+            .extracting(CuratedGroupDTO::slug)
             .containsExactlyElementsOf(
-                Stream.concat(beforeArea.areas().stream().map(CuratedAreaDTO::slug), Stream.of("house-rules")).toList()
+                Stream.concat(
+                    beforeGroup.groups().stream().map(CuratedGroupDTO::slug),
+                    Stream.of("house-rules")
+                ).toList()
             );
-        assertThat(afterArea.areas())
-            .extracting(CuratedAreaDTO::position)
-            .containsExactlyElementsOf(IntStream.range(0, afterArea.areas().size()).boxed().toList());
-        assertThat(afterArea.customOrder()).isFalse();
+        assertThat(afterGroup.groups())
+            .extracting(CuratedGroupDTO::position)
+            .containsExactlyElementsOf(IntStream.range(0, afterGroup.groups().size()).boxed().toList());
+        assertThat(afterGroup.customOrder()).isFalse();
         assertThat(
             jdbcTemplate.queryForObject(
-                "SELECT count(*) FROM curated_area_override WHERE position IS NOT NULL",
+                "SELECT count(*) FROM curated_group_override WHERE position IS NOT NULL",
                 Long.class
             )
         ).isZero();
 
         CuratedPracticeDTO template = getPractice();
-        List<String> beforePractices = afterArea
+        List<String> beforePractices = afterGroup
             .practices()
             .stream()
-            .filter(practice -> java.util.Objects.equals(practice.areaSlug(), template.definition().areaSlug()))
+            .filter(practice -> java.util.Objects.equals(practice.groupSlug(), template.definition().groupSlug()))
             .map(practice -> practice.slug())
             .toList();
         webTestClient
@@ -836,7 +839,7 @@ class CuratedCatalogAdminControllerIntegrationTest extends AbstractWorkspaceInte
         List<CuratedPracticeSummaryDTO> afterPractices = getCatalog()
             .practices()
             .stream()
-            .filter(practice -> java.util.Objects.equals(practice.areaSlug(), template.definition().areaSlug()))
+            .filter(practice -> java.util.Objects.equals(practice.groupSlug(), template.definition().groupSlug()))
             .toList();
         assertThat(afterPractices)
             .extracting(CuratedPracticeSummaryDTO::slug)
@@ -873,7 +876,7 @@ class CuratedCatalogAdminControllerIntegrationTest extends AbstractWorkspaceInte
 
         webTestClient
             .get()
-            .uri("/workspaces/{workspaceSlug}/practice-areas", workspace.getWorkspaceSlug())
+            .uri("/workspaces/{workspaceSlug}/practice-groups", workspace.getWorkspaceSlug())
             .headers(TestAuthUtils.withCurrentUser())
             .exchange()
             .expectStatus()
@@ -934,7 +937,7 @@ class CuratedCatalogAdminControllerIntegrationTest extends AbstractWorkspaceInte
             edited.definition().automatedReviewPolicy(),
             "Updated guidance",
             edited.definition().whatGoodLooksLike(),
-            edited.definition().areaSlug()
+            edited.definition().groupSlug()
         );
         webTestClient
             .put()
@@ -980,7 +983,7 @@ class CuratedCatalogAdminControllerIntegrationTest extends AbstractWorkspaceInte
             practice.definition().automatedReviewPolicy(),
             practice.definition().whyItMatters(),
             practice.definition().whatGoodLooksLike(),
-            practice.definition().areaSlug()
+            practice.definition().groupSlug()
         );
     }
 
@@ -1022,20 +1025,20 @@ class CuratedCatalogAdminControllerIntegrationTest extends AbstractWorkspaceInte
         return '"' + etag + '"';
     }
 
-    private CuratedAreaDTO getArea() {
-        return getArea(AREA);
+    private CuratedGroupDTO getGroup() {
+        return getGroup(GROUP);
     }
 
-    private CuratedAreaDTO getArea(String slug) {
+    private CuratedGroupDTO getGroup(String slug) {
         return required(
             webTestClient
                 .get()
-                .uri(CATALOG + "/areas/" + slug)
+                .uri(CATALOG + "/groups/" + slug)
                 .headers(headers -> headers.setBearerAuth(ADMIN_TOKEN))
                 .exchange()
                 .expectStatus()
                 .isOk()
-                .expectBody(CuratedAreaDTO.class)
+                .expectBody(CuratedGroupDTO.class)
                 .returnResult()
                 .getResponseBody()
         );
@@ -1045,8 +1048,8 @@ class CuratedCatalogAdminControllerIntegrationTest extends AbstractWorkspaceInte
         return tag(CATALOG + "/practices/" + practice.slug());
     }
 
-    private String etagOf(CuratedAreaDTO area) {
-        return tag(CATALOG + "/areas/" + area.slug());
+    private String etagOf(CuratedGroupDTO group) {
+        return tag(CATALOG + "/groups/" + group.slug());
     }
 
     private String tag(String uri) {
@@ -1067,7 +1070,7 @@ class CuratedCatalogAdminControllerIntegrationTest extends AbstractWorkspaceInte
 
     private long overrideRows() {
         Long rows = jdbcTemplate.queryForObject(
-            "SELECT (SELECT count(*) FROM curated_practice_override) + (SELECT count(*) FROM curated_area_override)",
+            "SELECT (SELECT count(*) FROM curated_practice_override) + (SELECT count(*) FROM curated_group_override)",
             Long.class
         );
         assertNotNull(rows);

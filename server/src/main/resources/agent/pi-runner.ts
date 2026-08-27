@@ -88,7 +88,7 @@ function listOrEmpty<T>(items: T[] | undefined): T[] {
 /** One practice this run may report on, as inputs/practices/index.json describes it. */
 interface PracticeIndexEntry {
 	slug: string;
-	area?: string;
+	group?: string;
 	readsSources: string[];
 	exhaustiveSources: string[];
 }
@@ -249,7 +249,8 @@ function readPracticeIndex(): PracticeIndexEntry[] {
 		}
 		return {
 			slug: practice.slug,
-			area: typeof practice.area === "string" && practice.area !== "" ? practice.area : undefined,
+			group:
+				typeof practice.group === "string" && practice.group !== "" ? practice.group : undefined,
 			readsSources: jsonArray(practice.readsSources).filter(
 				(kind): kind is string => typeof kind === "string",
 			),

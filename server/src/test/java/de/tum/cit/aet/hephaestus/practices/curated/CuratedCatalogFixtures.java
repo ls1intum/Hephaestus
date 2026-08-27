@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.practices.curated;
 
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
-import de.tum.cit.aet.hephaestus.practices.AreaDefinition;
+import de.tum.cit.aet.hephaestus.practices.GroupDefinition;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
 import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
@@ -24,7 +24,7 @@ final class CuratedCatalogFixtures {
         );
     }
 
-    static AreaDefinition area(String name, String description) {
-        return new AreaDefinition(name, description, "Target", "sky");
+    static GroupDefinition group(String name, String description) {
+        return new GroupDefinition(name, description, "Target", "sky");
     }
 }

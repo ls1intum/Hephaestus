@@ -26,7 +26,7 @@ public interface PracticeRepository extends JpaRepository<Practice, Long> {
      * Every practice of the workspace, at any autonomy — including {@code OFF}, so the detection gate can tell
      * "nothing is bound to this signal" apart from "something is bound and turned off".
      */
-    @EntityGraph(attributePaths = { "area", "currentRevision" })
+    @EntityGraph(attributePaths = { "group", "currentRevision" })
     List<Practice> findByWorkspaceId(Long workspaceId);
 
     /**
@@ -35,42 +35,42 @@ public interface PracticeRepository extends JpaRepository<Practice, Long> {
      * {@code NULL <> 'OFF'} is UNKNOWN and an inheriting practice would silently vanish from the query.
      * Autonomy is resolved in the JVM by {@link de.tum.cit.aet.hephaestus.practices.review.autonomy.AutonomyResolver}.
      */
-    @EntityGraph(attributePaths = { "area", "currentRevision" })
+    @EntityGraph(attributePaths = { "group", "currentRevision" })
     List<Practice> findByWorkspaceIdAndArtifactKind(Long workspaceId, ArtifactKind artifactKind);
 
     /**
-     * The raw autonomy columns of every practice in a workspace, with its area's, for callers that only need to
+     * The raw autonomy columns of every practice in a workspace, with its group's, for callers that only need to
      * count or test autonomy states without hydrating the whole catalogue.
      */
     @Query(
         """
-        SELECT p.autonomy AS practiceAutonomy, a.autonomy AS areaAutonomy,
-               a.id AS areaId, p.artifactKind AS artifactKind
+        SELECT p.autonomy AS practiceAutonomy, a.autonomy AS groupAutonomy,
+               a.id AS groupId, p.artifactKind AS artifactKind
         FROM Practice p
-        LEFT JOIN p.area a
+        LEFT JOIN p.group a
         WHERE p.workspace.id = :workspaceId
         """
     )
     List<PracticeAutonomyRow> findAutonomyRows(@Param("workspaceId") Long workspaceId);
 
-    /** One practice's autonomy and its area's, without hydrating either entity. */
+    /** One practice's autonomy and its group's, without hydrating either entity. */
     interface PracticeAutonomyRow {
         @Nullable
         PracticeAutonomy getPracticeAutonomy();
 
         @Nullable
-        PracticeAutonomy getAreaAutonomy();
+        PracticeAutonomy getGroupAutonomy();
 
         @Nullable
-        Long getAreaId();
+        Long getGroupId();
 
         ArtifactKind getArtifactKind();
     }
 
-    @EntityGraph(attributePaths = { "area", "currentRevision" })
+    @EntityGraph(attributePaths = { "group", "currentRevision" })
     Optional<Practice> findByWorkspaceIdAndSlug(Long workspaceId, String slug);
 
-    @EntityGraph(attributePaths = { "area" })
+    @EntityGraph(attributePaths = { "group" })
     @Query(
         """
         SELECT DISTINCT fo.observation.practice FROM FeedbackObservation fo
@@ -83,17 +83,17 @@ public interface PracticeRepository extends JpaRepository<Practice, Long> {
         @Param("feedbackId") java.util.UUID feedbackId
     );
 
-    List<Practice> findByWorkspaceIdAndAreaIdOrderByDisplayOrderAscNameAsc(Long workspaceId, Long areaId);
+    List<Practice> findByWorkspaceIdAndGroupIdOrderByDisplayOrderAscNameAsc(Long workspaceId, Long groupId);
 
     @Query(
         """
         SELECT COALESCE(MAX(p.displayOrder), -1)
         FROM Practice p
         WHERE p.workspace.id = :workspaceId
-        AND ((:areaId IS NULL AND p.area IS NULL) OR p.area.id = :areaId)
+        AND ((:groupId IS NULL AND p.group IS NULL) OR p.group.id = :groupId)
         """
     )
-    int findMaxDisplayOrder(@Param("workspaceId") Long workspaceId, @Param("areaId") @Nullable Long areaId);
+    int findMaxDisplayOrder(@Param("workspaceId") Long workspaceId, @Param("groupId") @Nullable Long groupId);
 
     /**
      * Row-level write lock ({@code SELECT ... FOR UPDATE}) held for the read-max-then-insert that appends a
@@ -119,15 +119,15 @@ public interface PracticeRepository extends JpaRepository<Practice, Long> {
     List<Long> findSourceAlignedV1PracticeIds();
 
     /**
-     * Every practice of a workspace in the order the admin catalogue shows them, areas first. No autonomy
+     * Every practice of a workspace in the order the admin catalogue shows them, groups first. No autonomy
      * predicate: filtering to an autonomy means filtering to an <em>effective</em> autonomy, which is not a column
      * on this row — the caller resolves, then filters.
      */
-    @EntityGraph(attributePaths = { "area", "currentRevision" })
+    @EntityGraph(attributePaths = { "group", "currentRevision" })
     @Query(
         """
         SELECT p FROM Practice p
-        LEFT JOIN FETCH p.area a
+        LEFT JOIN FETCH p.group a
         WHERE p.workspace.id = :workspaceId
         ORDER BY a.displayOrder ASC NULLS LAST, p.displayOrder ASC, p.name ASC
         """

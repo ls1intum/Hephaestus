@@ -19,7 +19,9 @@ public record ReviewBoundObservationDTO(
     @NonNull @Schema(description = "Render order within the feedback (lower renders earlier)") Integer ordinal,
     @NonNull String practiceSlug,
     @NonNull String practiceName,
-    @Schema(description = "Practice area; null when the practice is Unassigned") @Nullable ReviewPracticeAreaDTO area,
+    @Schema(description = "Practice group; null when the practice is Unassigned")
+    @Nullable
+    ReviewPracticeGroupDTO group,
     @NonNull String summary,
     @NonNull Presence presence,
     @Schema(description = "Assessment: GOOD or BAD (null when NOT_APPLICABLE)") @Nullable Assessment assessment,
@@ -34,7 +36,12 @@ public record ReviewBoundObservationDTO(
             row.getOrdinal(),
             row.getPracticeSlug(),
             row.getPracticeName(),
-            ReviewPracticeAreaDTO.from(row.getAreaSlug(), row.getAreaName(), row.getAreaIcon(), row.getAreaColor()),
+            ReviewPracticeGroupDTO.from(
+                row.getGroupSlug(),
+                row.getGroupName(),
+                row.getGroupIcon(),
+                row.getGroupColor()
+            ),
             row.getSummary(),
             row.getPresence(),
             row.getAssessment(),

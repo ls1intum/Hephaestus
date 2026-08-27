@@ -6,7 +6,7 @@ import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
-import de.tum.cit.aet.hephaestus.practices.PracticeAreaRepository;
+import de.tum.cit.aet.hephaestus.practices.PracticeGroupRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeRevisionRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
@@ -18,8 +18,8 @@ import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSource;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeArea;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeGroup;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeRevision;
 import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
 import de.tum.cit.aet.hephaestus.testconfig.WithUser;
@@ -61,7 +61,7 @@ class ObservationControllerIntegrationTest extends AbstractWorkspaceIntegrationT
     private PracticeRevisionRepository practiceRevisionRepository;
 
     @Autowired
-    private PracticeAreaRepository areaRepository;
+    private PracticeGroupRepository groupRepository;
 
     @Autowired
     private AgentJobRepository agentJobRepository;
@@ -249,24 +249,24 @@ class ObservationControllerIntegrationTest extends AbstractWorkspaceIntegrationT
 
         @Test
         @WithUser
-        @DisplayName("filters by the practice area the observed practice belongs to")
-        void shouldFilterByAreaSlug() {
-            PracticeArea area = new PracticeArea();
-            area.setWorkspace(workspace);
-            area.setSlug("review-communication");
-            area.setName("Review Communication");
-            area = areaRepository.save(area);
-            practiceA.setArea(area);
+        @DisplayName("filters by the practice group the observed practice belongs to")
+        void shouldFilterByGroupSlug() {
+            PracticeGroup group = new PracticeGroup();
+            group.setWorkspace(workspace);
+            group.setSlug("review-communication");
+            group.setName("Review Communication");
+            group = groupRepository.save(group);
+            practiceA.setGroup(group);
             practiceRepository.save(practiceA);
 
             Instant now = Instant.now();
-            insertFinding(practiceA, developer, "In area", "PRESENT", "INFO", 0.9f, "scm.pull_request", 1L, now);
-            // practiceB has NO area — the LEFT JOIN must keep it visible when no filter is set.
-            insertFinding(practiceB, developer, "No area", "ABSENT", "MAJOR", 0.8f, "scm.pull_request", 2L, now);
+            insertFinding(practiceA, developer, "In group", "PRESENT", "INFO", 0.9f, "scm.pull_request", 1L, now);
+            // practiceB has NO group — the LEFT JOIN must keep it visible when no filter is set.
+            insertFinding(practiceB, developer, "No group", "ABSENT", "MAJOR", 0.8f, "scm.pull_request", 2L, now);
 
             webTestClient
                 .get()
-                .uri(BASE_URI + "?areaSlug={areaSlug}", workspace.getWorkspaceSlug(), "review-communication")
+                .uri(BASE_URI + "?groupSlug={groupSlug}", workspace.getWorkspaceSlug(), "review-communication")
                 .headers(TestAuthUtils.withCurrentUser())
                 .exchange()
                 .expectStatus()
@@ -275,7 +275,7 @@ class ObservationControllerIntegrationTest extends AbstractWorkspaceIntegrationT
                 .jsonPath("$.content.length()")
                 .isEqualTo(1)
                 .jsonPath("$.content[0].summary")
-                .isEqualTo("In area");
+                .isEqualTo("In group");
 
             webTestClient
                 .get()
@@ -558,61 +558,27 @@ class ObservationControllerIntegrationTest extends AbstractWorkspaceIntegrationT
 
         @Test
         @WithUser
-        void shouldCapPageSize() {
-            insertFinding(
-                practiceA,
-                developer,
-                "Single",
-                "PRESENT",
-                "INFO",
-                0.9f,
-                "scm.pull_request",
-                1L,
-                Instant.now()
-            );
-
+        void shouldRejectPageSizeAboveLimit() {
             webTestClient
                 .get()
                 .uri(BASE_URI + "?size=999", workspace.getWorkspaceSlug())
                 .headers(TestAuthUtils.withCurrentUser())
                 .exchange()
                 .expectStatus()
-                .isOk()
-                .expectBody()
-                .jsonPath("$.size")
-                .isEqualTo(100);
+                .isBadRequest();
         }
 
         @Test
         @WithUser
-        @DisplayName("normalizes negative page to 0 and zero/negative size to 1")
-        void shouldNormalizeBoundaryPaginationValues() {
-            insertFinding(
-                practiceA,
-                developer,
-                "Boundary",
-                "PRESENT",
-                "INFO",
-                0.9f,
-                "scm.pull_request",
-                1L,
-                Instant.now()
-            );
-
+        @DisplayName("rejects a negative page and a zero page size")
+        void shouldRejectInvalidPagination() {
             webTestClient
                 .get()
                 .uri(BASE_URI + "?page=-1&size=0", workspace.getWorkspaceSlug())
                 .headers(TestAuthUtils.withCurrentUser())
                 .exchange()
                 .expectStatus()
-                .isOk()
-                .expectBody()
-                .jsonPath("$.number")
-                .isEqualTo(0)
-                .jsonPath("$.size")
-                .isEqualTo(1)
-                .jsonPath("$.content.length()")
-                .isEqualTo(1);
+                .isBadRequest();
         }
 
         @Test
@@ -1359,15 +1325,15 @@ class ObservationControllerIntegrationTest extends AbstractWorkspaceIntegrationT
         }
     }
 
-    // GET /practices/observations/reflection
+    // GET /practices/standings
 
     @Nested
-    class GetReflection {
+    class GetStandings {
 
         @Test
         @WithUser
-        @DisplayName("returns per-practice reflection cards with the standing/toWorkOn/strengths shape")
-        void shouldReturnReflectionCards() {
+        @DisplayName("returns per-practice practice standings with the standing/toWorkOn/strengths shape")
+        void shouldReturnPracticeStandings() {
             Instant now = Instant.now();
             insertFinding(
                 practiceA,
@@ -1394,7 +1360,7 @@ class ObservationControllerIntegrationTest extends AbstractWorkspaceIntegrationT
 
             webTestClient
                 .get()
-                .uri(BASE_URI + "/reflection", workspace.getWorkspaceSlug())
+                .uri("/workspaces/{workspaceSlug}/practices/standings", workspace.getWorkspaceSlug())
                 .headers(TestAuthUtils.withCurrentUser())
                 .exchange()
                 .expectStatus()
@@ -1426,11 +1392,6 @@ class ObservationControllerIntegrationTest extends AbstractWorkspaceIntegrationT
         @WithUser
         @DisplayName("a watched practice with nothing to say appears, and says which silence it is")
         void shouldReportWhyAWatchedPracticeHasNothingToSay() {
-            // A practice the workspace reviews but that has never produced an observation about this
-            // developer. Leaving it off the surface would make "we are watching this and it has not come up"
-            // indistinguishable from "this is not being looked at", which is precisely what the learner needs
-            // to tell apart. It carries no items and no trajectory: a direction over nothing is a claim
-            // about nothing.
             insertFinding(
                 practiceA,
                 developer,
@@ -1445,7 +1406,7 @@ class ObservationControllerIntegrationTest extends AbstractWorkspaceIntegrationT
 
             webTestClient
                 .get()
-                .uri(BASE_URI + "/reflection", workspace.getWorkspaceSlug())
+                .uri("/workspaces/{workspaceSlug}/practices/standings", workspace.getWorkspaceSlug())
                 .headers(TestAuthUtils.withCurrentUser())
                 .exchange()
                 .expectStatus()
@@ -1453,7 +1414,6 @@ class ObservationControllerIntegrationTest extends AbstractWorkspaceIntegrationT
                 .expectBody()
                 .jsonPath("$.length()")
                 .isEqualTo(2)
-                // Verdicts lead, silences sort last — the order is what a learner can act on.
                 .jsonPath("$[0].slug")
                 .isEqualTo(practiceA.getSlug())
                 .jsonPath("$[0].standing")
@@ -1466,7 +1426,7 @@ class ObservationControllerIntegrationTest extends AbstractWorkspaceIntegrationT
                 .isEqualTo(0)
                 .jsonPath("$[1].strengths.length()")
                 .isEqualTo(0)
-                .jsonPath("$[1].trajectory")
+                .jsonPath("$[1].direction")
                 .doesNotExist();
         }
 
@@ -1474,7 +1434,7 @@ class ObservationControllerIntegrationTest extends AbstractWorkspaceIntegrationT
         void shouldReturn401ForUnauthenticated() {
             webTestClient
                 .get()
-                .uri(BASE_URI + "/reflection", workspace.getWorkspaceSlug())
+                .uri("/workspaces/{workspaceSlug}/practices/standings", workspace.getWorkspaceSlug())
                 .exchange()
                 .expectStatus()
                 .isUnauthorized();

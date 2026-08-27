@@ -35,7 +35,7 @@ public class JobTypeHandlerConfiguration {
     private final PracticeReviewProperties reviewProperties;
     private final WorkspaceContextBuilder workspaceContextBuilder;
     private final TaskEnvelopeWriter taskEnvelopeWriter;
-    private final ReactionSuppressionFilter reactionSuppressionFilter;
+    private final FeedbackResponseSuppressionFilter feedbackResponseSuppressionFilter;
 
     JobTypeHandlerConfiguration(
         JsonMapper objectMapper,
@@ -43,14 +43,14 @@ public class JobTypeHandlerConfiguration {
         PracticeReviewProperties reviewProperties,
         WorkspaceContextBuilder workspaceContextBuilder,
         TaskEnvelopeWriter taskEnvelopeWriter,
-        ReactionSuppressionFilter reactionSuppressionFilter
+        FeedbackResponseSuppressionFilter feedbackResponseSuppressionFilter
     ) {
         this.objectMapper = objectMapper;
         this.contentAddressedStore = contentAddressedStore;
         this.reviewProperties = reviewProperties;
         this.workspaceContextBuilder = workspaceContextBuilder;
         this.taskEnvelopeWriter = taskEnvelopeWriter;
-        this.reactionSuppressionFilter = reactionSuppressionFilter;
+        this.feedbackResponseSuppressionFilter = feedbackResponseSuppressionFilter;
     }
 
     @Bean
@@ -127,7 +127,7 @@ public class JobTypeHandlerConfiguration {
             deliveryService,
             feedbackService,
             secretDiffScanner,
-            reactionSuppressionFilter,
+            feedbackResponseSuppressionFilter,
             inContextDeliveryGate,
             observationRepository
         );

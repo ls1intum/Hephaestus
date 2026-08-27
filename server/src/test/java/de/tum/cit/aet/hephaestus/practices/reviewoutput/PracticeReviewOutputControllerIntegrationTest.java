@@ -8,7 +8,7 @@ import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
-import de.tum.cit.aet.hephaestus.practices.PracticeAreaRepository;
+import de.tum.cit.aet.hephaestus.practices.PracticeGroupRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
@@ -25,8 +25,8 @@ import de.tum.cit.aet.hephaestus.practices.feedback.PlacementAnchorSide;
 import de.tum.cit.aet.hephaestus.practices.feedback.PlacementType;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeArea;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeGroup;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
 import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
 import de.tum.cit.aet.hephaestus.testconfig.WithAdminUser;
@@ -68,7 +68,7 @@ class PracticeReviewOutputControllerIntegrationTest extends AbstractWorkspaceInt
     private PracticeRepository practiceRepository;
 
     @Autowired
-    private PracticeAreaRepository practiceAreaRepository;
+    private PracticeGroupRepository practiceGroupRepository;
 
     @Autowired
     private AgentJobRepository agentJobRepository;
@@ -129,14 +129,14 @@ class PracticeReviewOutputControllerIntegrationTest extends AbstractWorkspaceInt
         return practiceRepository.save(practice);
     }
 
-    private PracticeArea persistArea(Workspace ws, String slug, String name) {
-        PracticeArea area = new PracticeArea();
-        area.setWorkspace(ws);
-        area.setSlug(slug);
-        area.setName(name);
-        area.setIcon("MessageSquareText");
-        area.setColor("blue");
-        return practiceAreaRepository.save(area);
+    private PracticeGroup persistGroup(Workspace ws, String slug, String name) {
+        PracticeGroup group = new PracticeGroup();
+        group.setWorkspace(ws);
+        group.setSlug(slug);
+        group.setName(name);
+        group.setIcon("MessageSquareText");
+        group.setColor("blue");
+        return practiceGroupRepository.save(group);
     }
 
     private AgentJob persistJob(Workspace ws) {
@@ -389,29 +389,29 @@ class PracticeReviewOutputControllerIntegrationTest extends AbstractWorkspaceInt
 
         @Test
         @WithAdminUser
-        void filtersByAreaAndReturnsItsMetadata() {
-            PracticeArea area = persistArea(workspace, "communication", "Communication");
-            practiceA.setArea(area);
+        void filtersByGroupAndReturnsItsMetadata() {
+            PracticeGroup group = persistGroup(workspace, "communication", "Communication");
+            practiceA.setGroup(group);
             practiceRepository.save(practiceA);
-            UUID observationId = insertProblem(practiceA, job, alice, "In area", "MAJOR");
+            UUID observationId = insertProblem(practiceA, job, alice, "In group", "MAJOR");
             insertProblem(practiceB, job, bob, "Ungrouped", "MAJOR");
 
-            getOk(OBSERVATIONS + "?areaSlug=communication", workspace.getWorkspaceSlug())
+            getOk(OBSERVATIONS + "?groupSlug=communication", workspace.getWorkspaceSlug())
                 .jsonPath("$.page.totalElements")
                 .isEqualTo(1)
                 .jsonPath("$.content[0].summary")
-                .isEqualTo("In area")
-                .jsonPath("$.content[0].area.slug")
+                .isEqualTo("In group")
+                .jsonPath("$.content[0].group.slug")
                 .isEqualTo("communication")
-                .jsonPath("$.content[0].area.name")
+                .jsonPath("$.content[0].group.name")
                 .isEqualTo("Communication")
-                .jsonPath("$.content[0].area.icon")
+                .jsonPath("$.content[0].group.icon")
                 .isEqualTo("MessageSquareText")
-                .jsonPath("$.content[0].area.color")
+                .jsonPath("$.content[0].group.color")
                 .isEqualTo("blue");
 
             getOk(OBSERVATIONS + "/{id}", workspace.getWorkspaceSlug(), observationId)
-                .jsonPath("$.area.slug")
+                .jsonPath("$.group.slug")
                 .isEqualTo("communication");
         }
 
@@ -1142,8 +1142,8 @@ class PracticeReviewOutputControllerIntegrationTest extends AbstractWorkspaceInt
         @Test
         @WithAdminUser
         void detailOfAWithheldUnitCarriesTheComposedBody() {
-            PracticeArea area = persistArea(workspace, "communication", "Communication");
-            practiceA.setArea(area);
+            PracticeGroup group = persistGroup(workspace, "communication", "Communication");
+            practiceA.setGroup(group);
             practiceRepository.save(practiceA);
             UUID observationId = insertProblem(practiceA, job, alice, "Would have flagged", "MAJOR");
             Feedback unit = persistUnit(
@@ -1174,7 +1174,7 @@ class PracticeReviewOutputControllerIntegrationTest extends AbstractWorkspaceInt
                 .isEqualTo("Would have flagged")
                 .jsonPath("$.observations[0].practiceSlug")
                 .isEqualTo("pr-description-quality")
-                .jsonPath("$.observations[0].area.slug")
+                .jsonPath("$.observations[0].group.slug")
                 .isEqualTo("communication")
                 .jsonPath("$.recipient.login")
                 .isEqualTo("alice");

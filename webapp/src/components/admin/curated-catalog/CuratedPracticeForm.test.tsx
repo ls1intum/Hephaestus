@@ -59,7 +59,7 @@ function renderForm(
 		<CuratedPracticeForm
 			mode="edit"
 			cancel={cancel}
-			areas={[]}
+			groups={[]}
 			definitionOptions={mockPracticeDefinitionOptions}
 			initialData={{ ...initialData, ...overrides }}
 			isPending={false}
@@ -89,7 +89,7 @@ describe("CuratedPracticeForm", () => {
 			<CuratedPracticeForm
 				mode="create"
 				cancel={cancel}
-				areas={[]}
+				groups={[]}
 				definitionOptions={mockPracticeDefinitionOptions}
 				isPending={false}
 				onSubmit={vi.fn()}
@@ -111,7 +111,7 @@ describe("CuratedPracticeForm", () => {
 			<CuratedPracticeForm
 				mode="create"
 				cancel={cancel}
-				areas={[]}
+				groups={[]}
 				definitionOptions={mockPracticeDefinitionOptions}
 				isPending={false}
 				onSubmit={vi.fn()}
@@ -135,7 +135,7 @@ describe("CuratedPracticeForm", () => {
 			<CuratedPracticeForm
 				mode="create"
 				cancel={cancel}
-				areas={[]}
+				groups={[]}
 				definitionOptions={mockPracticeDefinitionOptions}
 				isPending={false}
 				onSubmit={vi.fn()}
@@ -168,7 +168,7 @@ describe("CuratedPracticeForm", () => {
 			<CuratedPracticeForm
 				mode="create"
 				cancel={cancel}
-				areas={[]}
+				groups={[]}
 				definitionOptions={mockPracticeDefinitionOptions}
 				isPending={false}
 				onSubmit={vi.fn()}
@@ -193,7 +193,7 @@ describe("CuratedPracticeForm", () => {
 			<CuratedPracticeForm
 				mode="edit"
 				cancel={cancel}
-				areas={[]}
+				groups={[]}
 				definitionOptions={mockPracticeDefinitionOptions}
 				initialData={initialData}
 				isPending={false}

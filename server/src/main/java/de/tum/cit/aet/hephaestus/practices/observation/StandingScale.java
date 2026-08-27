@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.practices.observation;
 
-import de.tum.cit.aet.hephaestus.practices.observation.dto.ReflectionPracticeDTO;
+import de.tum.cit.aet.hephaestus.practices.observation.dto.PracticeStandingDTO;
 
 /**
  * The one scale both a practice standing and the group standing above it are read off.
@@ -24,7 +24,7 @@ final class StandingScale {
      * Positive share AT or above which the subject still reads as mixed rather than developing.
      *
      * <p>Placed between ONE setback and a PATTERN of them. Under the standing's recency weights a single
-     * problem on the newest work item scores {@code 0.384} and two in a row score {@code 0.138}; a boundary at
+     * problem on the newest piece of reviewed work scores {@code 0.384} and two in a row score {@code 0.138}; a boundary at
      * one half put both on the same side, so one slip after a clean run read as "needs attention".
      */
     static final double MIXED_SHARE = 0.37;
@@ -35,13 +35,13 @@ final class StandingScale {
      * Classifies a positive share in {@code [0,1]}. The caller must know there is evidence at all: this scale
      * cannot tell "half of it went badly" from "we know nothing", so 0.0 must never stand in for the latter.
      */
-    static ReflectionPracticeDTO.Standing classify(double positiveShare) {
+    static PracticeStandingDTO.Standing classify(double positiveShare) {
         if (positiveShare > STRENGTH_SHARE) {
-            return ReflectionPracticeDTO.Standing.STRENGTH;
+            return PracticeStandingDTO.Standing.STRENGTH;
         }
         if (positiveShare >= MIXED_SHARE) {
-            return ReflectionPracticeDTO.Standing.MIXED;
+            return PracticeStandingDTO.Standing.MIXED;
         }
-        return ReflectionPracticeDTO.Standing.DEVELOPING;
+        return PracticeStandingDTO.Standing.DEVELOPING;
     }
 }

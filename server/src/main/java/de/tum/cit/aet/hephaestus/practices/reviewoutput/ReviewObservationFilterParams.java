@@ -20,7 +20,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 public record ReviewObservationFilterParams(
     @RequestParam(required = false) @Nullable List<String> practiceSlug,
-    @RequestParam(required = false) @Nullable List<String> areaSlug,
+    @RequestParam(required = false) @Nullable List<String> groupSlug,
     @RequestParam(required = false) @Nullable List<Presence> presence,
     @RequestParam(required = false) @Nullable List<Assessment> assessment,
     @RequestParam(required = false) @Nullable List<Severity> severity,
@@ -69,7 +69,7 @@ public record ReviewObservationFilterParams(
         }
         return new ObservationQueryFilter(
             practiceSlug,
-            areaSlug,
+            groupSlug,
             presence,
             assessment,
             severity,

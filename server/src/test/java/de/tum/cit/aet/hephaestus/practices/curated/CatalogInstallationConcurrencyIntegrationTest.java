@@ -52,7 +52,7 @@ class CatalogInstallationConcurrencyIntegrationTest extends AbstractWorkspaceInt
             definition.automatedReviewPolicy(),
             definition.whyItMatters(),
             definition.whatGoodLooksLike(),
-            definition.areaSlug()
+            definition.groupSlug()
         );
         CountDownLatch writeReady = new CountDownLatch(1);
         CountDownLatch allowCommit = new CountDownLatch(1);

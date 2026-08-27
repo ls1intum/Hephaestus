@@ -39,8 +39,8 @@ For how the words fit together at runtime — the four stages, and the refusal v
 | **Source-use purpose**              | Why Hephaestus processes evidence, such as automated review or feedback delivery.                                                                                                                                                          | audience, recipient                                               |
 | **Audience / recipient**            | Who may receive or inspect evidence.                                                                                                                                                                                                       | purpose                                                           |
 | **Review readiness**                | For one review, Hephaestus supports the configured mode, the declared evidence is sufficient, and every required source passes its checks.                                                                                                 | validation, activation                                            |
-| **Practice autonomy**               | Who may authorize feedback for one practice: nobody (`OFF`), a workspace owner or administrator (`HUMAN_APPROVAL`), or the system (`AUTOMATIC`). Nullable at practice and area levels, where null means “inherit”.                         | review tier, loudness tier, shadow mode, enabled                  |
-| **Effective autonomy**              | The autonomy in force after resolving practice → area → workspace. Always server-resolved and reported with its source.                                                                                                                    | autonomy override                                                 |
+| **Practice autonomy**               | Who may authorize feedback for one practice: nobody (`OFF`), a workspace owner or administrator (`HUMAN_APPROVAL`), or the system (`AUTOMATIC`). Nullable at practice and group levels, where null means “inherit”.                         | review tier, loudness tier, shadow mode, enabled                  |
+| **Effective autonomy**              | The autonomy in force after resolving practice → group → workspace. Always server-resolved and reported with its source.                                                                                                                    | autonomy override                                                 |
 | **Review scope**                    | Which of a workspace's work is reviewed at all, ANDed onto every binding. Two exact-match lists: target branches and repositories.                                                                                                         | filter, path filter, include pattern                              |
 
 A practice author defines requirements. That definition is not proof that the evidence is sufficient or that a
@@ -138,18 +138,18 @@ rollback because measurement continues while release returns to human control.
 Autonomy is resolved server-side through one nullable override chain:
 
 ```text
-effective autonomy = practice.autonomy ?? area.autonomy ?? workspace default ?? HUMAN_APPROVAL
+effective autonomy = practice.autonomy ?? group.autonomy ?? workspace default ?? HUMAN_APPROVAL
 ```
 
 Null means “this level has not decided,” not `OFF`. Every API projection therefore carries the effective
-autonomy, the raw override, its `AutonomySource` (`PRACTICE`, `AREA`, or `WORKSPACE`), and whether it was
-inherited. New unset chains fail safe at `HUMAN_APPROVAL`; an explicit `AUTOMATIC` is required before the
+autonomy, the raw override, its `AutonomySource` (`PRACTICE`, `GROUP`, or `WORKSPACE`), and whether it
+was inherited. New unset chains fail safe at `HUMAN_APPROVAL`; an explicit `AUTOMATIC` is required before the
 system may release feedback without a person.
 
 Set or clear an override with:
 
 - `PATCH /workspaces/{workspaceSlug}/practices/{practiceSlug}/autonomy`
-- `PATCH /workspaces/{workspaceSlug}/practice-areas/{areaSlug}/autonomy`
+- `PATCH /workspaces/{workspaceSlug}/practice-groups/{groupSlug}/autonomy`
 
 The body is `{"autonomy":"HUMAN_APPROVAL"}` or `{"autonomy":null}` to inherit. The catalogue filter is
 `?autonomy=<VALUE>`, and autonomy rollups are returned by
@@ -305,7 +305,7 @@ delta can say. A strength that simply was not re-observed is not `RESOLVED`.
 | Source-use purpose           | `purpose`                          | `SourceUsePurpose`                         | source-use decisions                                                          |
 | Source absence state         | `supportedAbsenceStates`           | `SourceAbsenceState`                       | source catalog                                                                |
 | Materialization              | `artifacts`                        | `SourceArtifact`                           | manifest and content-addressed storage metadata                               |
-| Practice autonomy            | `autonomy`                         | `PracticeAutonomy`                         | `practice.autonomy`, `practice_area.autonomy` (both nullable)                 |
+| Practice autonomy            | `autonomy`                         | `PracticeAutonomy`                         | `practice.autonomy`, `practice_group.autonomy` (both nullable)                 |
 | Effective autonomy           | `autonomy.effective`               | `EffectiveAutonomy`                        | resolved, never stored                                                        |
 | Autonomy source              | `autonomy.source`                  | `AutonomySource`                           | resolved, never stored                                                        |
 | Workspace default autonomy   | `defaultAutonomy`                  | `PracticeAutonomy`                         | `workspace.practice_default_autonomy`                                         |
@@ -320,7 +320,7 @@ delta can say. A strength that simply was not re-observed is not `RESOLVED`.
 | What a message follows       | not on the HTTP API                | —                                          | `feedback.replaces_id`                                                        |
 | Locus movement               | inside `inputs/history/delta.json` | `ObservationDelta.Status`                  | derived, never stored                                                         |
 | Signal refusal reason        | —                                  | `SignalStateReason`                        | `artifact_signal.state_reason`                                                |
-| Area dashboard visibility    | `visibleInPracticeDashboards`      | `PracticeArea.visibleInPracticeDashboards` | `visible_in_practice_dashboards`                                              |
+| Group dashboard visibility    | `visibleInPracticeDashboards`      | `PracticeGroup.visibleInPracticeDashboards` | `visible_in_practice_dashboards`                                              |
 | Claim currentness            | `claimCurrentness`                 | `ReviewClaimCurrentness`                   | derived API value                                                             |
 | Review-rule fingerprint      | `reviewRuleFingerprint`            | `ReviewRuleFingerprint`                    | `review_rule_fingerprint`                                                     |
 
@@ -362,7 +362,7 @@ server admission.
 3. Only AI-supported mentoring can be reviewed. The other choices force the practice autonomy to `OFF` and never start an automated review.
 4. An instance operator authorizes each source and product use through a reviewed governance decision.
 5. A workspace integration makes authorized sources available.
-6. A workspace administrator sets the workspace default autonomy, then overrides per area or per practice only where the default is wrong. Optionally they also set the workspace review scope.
+6. A workspace administrator sets the workspace default autonomy, then overrides per group or per practice only where the default is wrong. Optionally they also set the workspace review scope.
 7. Each review captures evidence and records explicit source states.
 8. Source readiness checks decide whether every required source meets its requirements.
 9. Hephaestus reviews the work or records that the practice was skipped.

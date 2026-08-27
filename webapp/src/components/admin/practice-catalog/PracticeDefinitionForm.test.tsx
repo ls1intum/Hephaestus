@@ -13,7 +13,7 @@ function renderCreateForm(onSubmit: (value: PracticeDefinitionValue) => void | P
 	return renderWithRouter(
 		<PracticeDefinitionForm
 			mode="create"
-			areas={[]}
+			groups={[]}
 			definitionOptions={mockPracticeDefinitionOptions}
 			isPending={false}
 			cancelAction={<Link to="/">Cancel</Link>}

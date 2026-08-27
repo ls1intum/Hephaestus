@@ -7,11 +7,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
-/**
- * Guards the presence × assessment matrix, which is now read from exactly one place. Every consumer — the
- * reflection card's two lists, the trend's outcome vector, the census — derives its answer from this mapping,
- * so a wrong cell here is wrong everywhere at once.
- */
 @Tag("unit")
 class ObservationOutcomeTest {
 
@@ -33,7 +28,6 @@ class ObservationOutcomeTest {
     @Test
     @DisplayName("collapses both no-verdict presences onto NOT_APPLICABLE")
     void shouldCollapseBothNoVerdictPresences() {
-        // Different facts for a reader, but neither is an outcome, so neither may move a trend or a standing.
         assertThat(ObservationOutcome.of(Presence.NOT_APPLICABLE, null)).isEqualTo(ObservationOutcome.NOT_APPLICABLE);
         assertThat(ObservationOutcome.of(Presence.INCONCLUSIVE, null)).isEqualTo(ObservationOutcome.NOT_APPLICABLE);
     }
@@ -59,7 +53,6 @@ class ObservationOutcomeTest {
         assertThat(ObservationOutcome.SAFE_AVOIDANCE.isPositive()).isTrue();
         assertThat(ObservationOutcome.COMMISSION_PROBLEM.isNegative()).isTrue();
         assertThat(ObservationOutcome.OMISSION_GAP.isNegative()).isTrue();
-        // The no-verdict outcome is neither, and is the only inapplicable one.
         assertThat(ObservationOutcome.NOT_APPLICABLE.isPositive()).isFalse();
         assertThat(ObservationOutcome.NOT_APPLICABLE.isNegative()).isFalse();
         assertThat(ObservationOutcome.NOT_APPLICABLE.isApplicable()).isFalse();
@@ -69,8 +62,6 @@ class ObservationOutcomeTest {
     @Test
     @DisplayName("denies a defect detector the demonstrated strength that would be its own defect")
     void shouldDenyDefectDetectorAnIncoherentStrength() {
-        // What would be "present" for a detector practice is the harmful behaviour it hunts, so claiming that
-        // as a strength would invert the finding. Its safe avoidance is the opposite case and stands.
         assertThat(ObservationOutcome.DEMONSTRATED_STRENGTH.isCoherentStrengthFor(true)).isFalse();
         assertThat(ObservationOutcome.SAFE_AVOIDANCE.isCoherentStrengthFor(true)).isTrue();
 

@@ -1,8 +1,8 @@
 package de.tum.cit.aet.hephaestus.practices.review.autonomy;
 
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeArea;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeGroup;
 import org.jspecify.annotations.Nullable;
 
 public final class AutonomyResolver {
@@ -13,33 +13,33 @@ public final class AutonomyResolver {
         return workspaceOverride != null ? workspaceOverride : PracticeAutonomy.DEFAULT;
     }
 
-    public static EffectiveAutonomy resolveArea(
-        @Nullable PracticeAutonomy areaAutonomy,
+    public static EffectiveAutonomy resolveGroup(
+        @Nullable PracticeAutonomy groupAutonomy,
         PracticeAutonomy workspaceDefault
     ) {
-        return areaAutonomy != null
-            ? new EffectiveAutonomy(areaAutonomy, AutonomySource.AREA)
+        return groupAutonomy != null
+            ? new EffectiveAutonomy(groupAutonomy, AutonomySource.GROUP)
             : new EffectiveAutonomy(workspaceDefault, AutonomySource.WORKSPACE);
     }
 
-    public static EffectiveAutonomy resolveArea(@Nullable PracticeArea area, PracticeAutonomy workspaceDefault) {
-        return resolveArea(area == null ? null : area.getAutonomy(), workspaceDefault);
+    public static EffectiveAutonomy resolveGroup(@Nullable PracticeGroup group, PracticeAutonomy workspaceDefault) {
+        return resolveGroup(group == null ? null : group.getAutonomy(), workspaceDefault);
     }
 
     public static EffectiveAutonomy resolvePractice(
         @Nullable PracticeAutonomy practiceAutonomy,
-        @Nullable PracticeAutonomy areaAutonomy,
+        @Nullable PracticeAutonomy groupAutonomy,
         PracticeAutonomy workspaceDefault
     ) {
         if (practiceAutonomy != null) {
             return new EffectiveAutonomy(practiceAutonomy, AutonomySource.PRACTICE);
         }
-        return resolveArea(areaAutonomy, workspaceDefault);
+        return resolveGroup(groupAutonomy, workspaceDefault);
     }
 
     public static EffectiveAutonomy resolvePractice(Practice practice, PracticeAutonomy workspaceDefault) {
-        PracticeArea area = practice.getArea();
-        return resolvePractice(practice.getAutonomy(), area == null ? null : area.getAutonomy(), workspaceDefault);
+        PracticeGroup group = practice.getGroup();
+        return resolvePractice(practice.getAutonomy(), group == null ? null : group.getAutonomy(), workspaceDefault);
     }
 
     public static PracticeAutonomy effectiveAutonomyOf(Practice practice, PracticeAutonomy workspaceDefault) {

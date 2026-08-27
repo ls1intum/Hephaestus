@@ -66,9 +66,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { useUnsavedChanges } from "@/hooks/use-unsaved-changes";
 import { artifactKindLabel } from "@/lib/artifact-kinds";
 
-const NO_AREA = "__none__";
+const NO_GROUP = "__none__";
 
-export interface PracticeDefinitionAreaOption {
+export interface PracticeDefinitionGroupOption {
 	slug: string;
 	name: string;
 }
@@ -76,7 +76,7 @@ export interface PracticeDefinitionAreaOption {
 export interface PracticeDefinitionValue {
 	slug: string;
 	name: string;
-	areaSlug?: string;
+	groupSlug?: string;
 	/**
 	 * The one occasion this practice is reviewed on, in the list shape the wire carries. The kind of
 	 * work is read off its signals; it is not carried separately.
@@ -90,7 +90,7 @@ export interface PracticeDefinitionValue {
 }
 
 interface PracticeDefinitionFormBaseProps {
-	areas: readonly PracticeDefinitionAreaOption[];
+	groups: readonly PracticeDefinitionGroupOption[];
 	isPending: boolean;
 	disabled?: boolean;
 	isSubmitDisabled?: boolean;
@@ -125,7 +125,7 @@ export type PracticeDefinitionFormProps =
 interface FormState {
 	name: string;
 	slug: string;
-	areaSlug: string;
+	groupSlug: string;
 	/**
 	 * Held rather than read off the bindings: the occasion's signals are what the author is editing,
 	 * and unticking the last of them would otherwise take the kind of work — and with it the editor
@@ -155,7 +155,7 @@ function initialState(
 	return {
 		name: initialData?.name ?? "",
 		slug: initialData?.slug ?? "",
-		areaSlug: initialData?.areaSlug ?? NO_AREA,
+		groupSlug: initialData?.groupSlug ?? NO_GROUP,
 		artifactKind:
 			artifactKindOfBindings(initialData?.bindings ?? []) ?? fallback?.artifactKind ?? "",
 		bindings: [
@@ -214,7 +214,7 @@ function recommendedPolicyWithCurrentSupport(
 export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 	const {
 		mode,
-		areas,
+		groups,
 		isPending,
 		disabled = false,
 		isSubmitDisabled,
@@ -232,9 +232,9 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 	const [refusals, setRefusals] = useState(0);
 	const [showAdvanced, setShowAdvanced] = useState(() => Boolean(initialData?.precomputeScript));
 	const workTypes = orderedWorkTypes(definitionOptions);
-	const areaItems = [
-		{ value: NO_AREA, label: "Unassigned" },
-		...areas.map((area) => ({ value: area.slug, label: area.name })),
+	const groupItems = [
+		{ value: NO_GROUP, label: "Unassigned" },
+		...groups.map((group) => ({ value: group.slug, label: group.name })),
 	];
 	const artifactKind = form.artifactKind;
 	const selectedWorkType = workTypeOptionsFor(definitionOptions, artifactKind);
@@ -398,7 +398,7 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 			name: form.name.trim(),
 			bindings: [normalizeBinding(form.bindings[0])],
 			criteria: form.criteria.trim(),
-			...(form.areaSlug === NO_AREA ? {} : { areaSlug: form.areaSlug }),
+			...(form.groupSlug === NO_GROUP ? {} : { groupSlug: form.groupSlug }),
 			...(form.whyItMatters.trim() ? { whyItMatters: form.whyItMatters.trim() } : {}),
 			...(form.whatGoodLooksLike.trim()
 				? { whatGoodLooksLike: form.whatGoodLooksLike.trim() }
@@ -457,28 +457,31 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 								</Field>
 
 								<Field>
-									<FieldLabel id="practice-area-label" htmlFor="practice-area">
+									<FieldLabel id="practice-group-label" htmlFor="practice-group">
 										Practice group
 									</FieldLabel>
 									<Select
-										items={areaItems}
-										value={form.areaSlug}
+										items={groupItems}
+										value={form.groupSlug}
 										onValueChange={(value) =>
-											setForm((previous) => ({ ...previous, areaSlug: value ?? NO_AREA }))
+											setForm((previous) => ({ ...previous, groupSlug: value ?? NO_GROUP }))
 										}
 									>
-										<SelectTrigger id="practice-area" aria-describedby="practice-area-description">
+										<SelectTrigger
+											id="practice-group"
+											aria-describedby="practice-group-description"
+										>
 											<SelectValue />
 										</SelectTrigger>
-										<SelectContent aria-labelledby="practice-area-label">
-											{areaItems.map((item) => (
+										<SelectContent aria-labelledby="practice-group-label">
+											{groupItems.map((item) => (
 												<SelectItem key={item.value} value={item.value}>
 													{item.label}
 												</SelectItem>
 											))}
 										</SelectContent>
 									</Select>
-									<FieldDescription id="practice-area-description">
+									<FieldDescription id="practice-group-description">
 										Put this practice in a group.
 									</FieldDescription>
 								</Field>

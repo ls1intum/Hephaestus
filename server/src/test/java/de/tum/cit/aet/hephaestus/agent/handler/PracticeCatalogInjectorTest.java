@@ -253,7 +253,7 @@ class PracticeCatalogInjectorTest extends BaseUnitTest {
 
         injector.inject(files, job(null), ArtifactKinds.PULL_REQUEST);
 
-        // index.json lists both practices (area falls back to the slug when ungrouped).
+        // index.json lists both practices (group falls back to the slug when ungrouped).
         String index = new String(files.get(SandboxLayout.PRACTICES_PREFIX + "index.json"), StandardCharsets.UTF_8);
         assertThat(index).contains("authoring").contains("retrospective");
         // A pointer to where this practice's author expects the answer — not a fence. What may be cited

@@ -5,13 +5,13 @@ import type { FacetSource } from "@/components/common/FacetMultiSelect";
 import { withStandardPage, withWidePage } from "@/stories/decorators";
 import { StatefulPatch } from "@/stories/stateful";
 import { expectNoPageOverflow } from "@/test/reflow";
-import { areaFacetOptions, practiceFacetOptions } from "./ObservationFilters";
+import { groupFacetOptions, practiceFacetOptions } from "./ObservationFilters";
 import { ObservationsListPage } from "./ObservationsListPage";
 import type { ReviewPeople } from "./ReviewPersonFacet";
 import { type ObservationsSearch, observationsQuery, REVIEW_PAGE_SIZE } from "./review-search";
 import {
 	manyObservations,
-	practiceAreas,
+	practiceGroups,
 	reviewObservations,
 	workspaceMembers,
 	workspacePractices,
@@ -30,12 +30,12 @@ const PEOPLE: ReviewPeople = {
 	isError: false,
 };
 const AREAS: FacetSource = {
-	options: areaFacetOptions(practiceAreas),
+	options: groupFacetOptions(practiceGroups),
 	isLoading: false,
 	isError: false,
 };
 const PRACTICES: FacetSource = {
-	options: practiceFacetOptions(workspacePractices, practiceAreas),
+	options: practiceFacetOptions(workspacePractices, practiceGroups),
 	isLoading: false,
 	isError: false,
 };
@@ -74,7 +74,7 @@ function observationPage(
 		(row) =>
 			(!query.from || row.observedAt >= new Date(query.from)) &&
 			(!query.to || row.observedAt < new Date(query.to)) &&
-			selects(query.areaSlug, row.area?.slug) &&
+			selects(query.groupSlug, row.group?.slug) &&
 			selects(query.practiceSlug, row.practiceSlug) &&
 			selects(query.presence, row.presence) &&
 			selects(query.assessment, row.assessment) &&
@@ -122,7 +122,7 @@ const meta = {
 		isLoading: false,
 		error: undefined,
 		onRetry: fn(),
-		areas: AREAS,
+		groups: AREAS,
 		practices: PRACTICES,
 		// The facet needs a label per slug; the hover card on a row's practice name needs the record.
 		practiceRecords: workspacePractices,
@@ -171,7 +171,7 @@ async function pickFacet(
 export const Default: Story = {
 	play: async ({ canvas }) => {
 		await canvas.findByText("12 observations.");
-		for (const name of ["Area", "Practice", "Result", "Severity", "Practice status"]) {
+		for (const name of ["Group", "Practice", "Result", "Severity", "Practice status"]) {
 			canvas.getByRole("combobox", { name });
 		}
 		canvas.getByRole("combobox", { name: "Developer" });
@@ -211,7 +211,7 @@ export const FilteredToNothing: Story = {
 	play: async ({ canvas, userEvent }) => {
 		await canvas.findByText("12 observations.");
 		await pickFacet(canvas, userEvent, "Severity", /Critical/);
-		await pickFacet(canvas, userEvent, "Area", /Testing/);
+		await pickFacet(canvas, userEvent, "Group", /Testing/);
 		await canvas.findByText("No observations match these filters");
 		canvas.getByRole("button", { name: "Reset" });
 		await userEvent.click(canvas.getByRole("button", { name: "Clear all filters" }));

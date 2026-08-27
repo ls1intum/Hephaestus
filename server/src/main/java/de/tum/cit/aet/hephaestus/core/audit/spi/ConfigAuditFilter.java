@@ -24,7 +24,22 @@ public record ConfigAuditFilter(
     @Nullable Instant to
 ) {
     public String@Nullable [] entityTypeNames() {
-        return names(entityTypes);
+        if (entityTypes == null || entityTypes.isEmpty()) {
+            return null;
+        }
+        return entityTypes
+            .stream()
+            .flatMap(value ->
+                switch (value) {
+                    case PRACTICE_GROUP -> java.util.stream.Stream.of("PRACTICE_GROUP", "PRACTICE_AREA");
+                    case CURATED_PRACTICE_GROUP -> java.util.stream.Stream.of(
+                        "CURATED_PRACTICE_GROUP",
+                        "CURATED_PRACTICE_AREA"
+                    );
+                    default -> java.util.stream.Stream.of(value.name());
+                }
+            )
+            .toArray(String[]::new);
     }
 
     public String@Nullable [] actionNames() {

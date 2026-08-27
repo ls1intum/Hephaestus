@@ -57,7 +57,7 @@ Each of these reports success and leaves you with the wrong result.
 spec if Maven does not produce a new one. Never stop another service to free a port; override:
 
 ```bash
-pnpm run generate:api:application-server:specs -- -Dopenapi.server.port=38111 -Dopenapi.jmx.port=9031
+pnpm run generate:api:application-server:specs -Dopenapi.server.port=38111 -Dopenapi.jmx.port=9031
 pnpm run generate:api:application-server:client
 ```
 

@@ -83,9 +83,9 @@ class CatalogOriginTest extends BaseUnitTest {
     }
 
     @Test
-    void aPracticeUnderARetiredAreaIsNoLongerOffered() {
+    void aPracticeUnderARetiredGroupIsNoLongerOffered() {
         Practice copy = practice("Seed criteria", fingerprintOf("Seed criteria"));
-        AreaDefinition area = new AreaDefinition("Quality", null, null, null);
+        GroupDefinition group = new GroupDefinition("Quality", null, null, null);
         PracticeDefinition practice = new PracticeDefinition(
             "Small PRs",
             PracticeTestEvidence.bindings(ArtifactKinds.PULL_REQUEST),
@@ -97,7 +97,7 @@ class CatalogOriginTest extends BaseUnitTest {
             "quality"
         );
         EffectiveCatalog catalog = new EffectiveCatalog(
-            List.of(new CatalogEntry<>("quality", area, area, null, null, true, 0, null)),
+            List.of(new CatalogEntry<>("quality", group, group, null, null, true, 0, null)),
             List.of(CatalogEntry.shippedOnly(SLUG, practice, 0))
         );
 

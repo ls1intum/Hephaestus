@@ -11,13 +11,17 @@ choice for the writer.
 
 Within a surface already titled **Practice reviews**, shorten **practice feedback** to **feedback**.
 Use the full term when the surrounding context does not establish which kind of feedback is meant.
-Within **Practice setup** or **Practice catalog**, shorten **practice area** to **area**.
+Within **Practice setup** or **Practice catalog**, shorten **practice group** to **group**.
+
+**Practice group is the canonical noun at every layer.** Use `PracticeGroup`, `groupSlug`, and
+`/practice-groups` in Java and HTTP contracts as well as **practice group** in product copy. *Practice
+area*, `PracticeArea`, `areaSlug`, and `/practice-areas` are retired names, not internal synonyms.
 
 | Term                                | Meaning                                                                                                                                                    | Avoid for this concept                                               |
 | ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
 | **Practice**                        | A defined way of working used to review work                                                                                                               | rule, detector                                                       |
-| **Practice area**                   | A group of related practices                                                                                                                               | category, goal, learning objective                                   |
-| **Unassigned**                      | Practices that are not in a practice area                                                                                                                  | ungrouped, unbound                                                   |
+| **Practice group**                   | A named collection of related practices                                                                                                                               | category, goal, learning objective                                   |
+| **Unassigned**                      | Practices that are not in a practice group                                                                                                                  | ungrouped, unbound                                                   |
 | **Observation**                     | One recorded result of reviewing one practice against one piece of reviewed work                                                                           | finding, detection                                                   |
 | **Practice feedback**               | Guidance written from observations and addressed to a developer — both the whole and the countable unit                                                    | message, AI feedback, feedback item, ledger unit                     |
 | **Delivery**                        | Whether one piece of feedback was prepared, delivered, withheld, failed, or replaced                                                                       | placement, surface                                                   |
@@ -29,7 +33,7 @@ Within **Practice setup** or **Practice catalog**, shorten **practice area** to 
 | **Heph**                            | The conversational assistant                                                                                                                               | agent, bot                                                           |
 | **Mentor**                          | The product area for conversations with Heph                                                                                                               |                                                                      |
 | **Hephaestus**                      | The application, named only where the application itself is the subject — installing it, an account linked to it, a release of it                          | agent                                                                |
-| **Hephaestus default**              | A practice or area bundled with the running Hephaestus release                                                                                             | shipped entry                                                        |
+| **Hephaestus default**              | A practice or group bundled with the running Hephaestus release                                                                                             | shipped entry                                                        |
 | **Instance catalog**                | The set of practices a workspace may adopt from                                                                                                                              | curated catalog                                                      |
 | **Workspace practices**             | Independent definitions used for reviews in one workspace                                                                                                  | workspace catalog                                                    |
 | **Review rules**                    | Inputs and criteria that determine review behavior                                                                                                         | detector configuration                                               |
@@ -104,7 +108,7 @@ requires a workspace owner or administrator to approve the exact proposal. **Sen
 feedback proceed without that decision, subject to delivery policy. Do not call this a tier, loudness, reach,
 or shadow mode: those names obscure the human authorization step.
 
-Most practices inherit from their area, and most areas inherit from the workspace. Use **effective autonomy**
+Most practices inherit from their group, and most groups inherit from the workspace. Use **effective autonomy**
 for the resolved value, **override** for a value set at the level being discussed, and **inherited** when a
 parent supplied it.
 

@@ -6,7 +6,7 @@ import lombok.Getter;
 /**
  * Categories of achievements for UI grouping and filtering.
  *
- * <p>Each category represents a distinct area of contribution that users
+ * <p>Each category represents a distinct group of contribution that users
  * can earn achievements in.
  */
 @Getter

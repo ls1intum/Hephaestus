@@ -69,8 +69,14 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
     /** Idempotency guard for the ledger recorder: has this job already recorded this unit? */
     boolean existsByAgentJobIdAndPosition(UUID agentJobId, Integer position);
 
-    /** Workspace-scoped lookup of a single feedback unit (reaction authorization + tenancy isolation). */
     Optional<Feedback> findByIdAndWorkspaceId(UUID id, Long workspaceId);
+
+    Optional<Feedback> findByIdAndWorkspaceIdAndRecipientUserIdAndDeliveryState(
+        UUID id,
+        Long workspaceId,
+        Long recipientUserId,
+        FeedbackDeliveryState deliveryState
+    );
 
     @Query(
         value = """
@@ -100,24 +106,6 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
         Long getSuppressed();
         Long getFailed();
     }
-
-    /**
-     * The {@code recurrence_key} of a feedback unit's earliest {@code PRIMARY}-role observation, denormalized
-     * onto a {@link de.tum.cit.aet.hephaestus.practices.observation.reaction.Reaction} (ADR 0021) so reaction
-     * suppression can follow a reacted locus across re-detections. Null-key rows are filtered out rather than
-     * returned as a false locus.
-     */
-    @Query(
-        """
-        SELECT fo.observation.recurrenceKey FROM FeedbackObservation fo
-        WHERE fo.feedback.id = :feedbackId
-          AND fo.role = de.tum.cit.aet.hephaestus.practices.feedback.EvidenceRole.PRIMARY
-          AND fo.observation.recurrenceKey IS NOT NULL
-        ORDER BY fo.ordinal ASC
-        LIMIT 1
-        """
-    )
-    Optional<String> findHeadlineRecurrenceKey(@Param("feedbackId") UUID feedbackId);
 
     /** Delivered summary and inline-only feedback for a recipient, newest first. */
     @Query(
@@ -302,7 +290,7 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
      * {@link de.tum.cit.aet.hephaestus.practices.spi.ConversationFeedbackErasure} when a channel's consent is
      * withdrawn.
      *
-     * @return the number of feedback units deleted
+     * @return the number of pieces of feedback deleted
      */
     @Modifying
     @Transactional
@@ -325,10 +313,10 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
     }
 
     /**
-     * Erases every {@code chat.conversation_thread} feedback unit for a workspace, invoked on app-uninstall /
+     * Erases every {@code chat.conversation_thread} piece of feedback for a workspace, invoked on app-uninstall /
      * workspace-purge.
      *
-     * @return the number of feedback units deleted
+     * @return the number of pieces of feedback deleted
      */
     @Modifying
     @Transactional
@@ -349,11 +337,11 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
     }
 
     /**
-     * Erases every {@code scm.pull_request} / {@code scm.issue} feedback unit for a workspace, invoked when
+     * Erases every {@code scm.pull_request} / {@code scm.issue} piece of feedback for a workspace, invoked when
      * the SCM mirror is erased. These units hold mirrored third-party content directly, so they neither
      * cascade with the repository delete nor survive it meaningfully.
      *
-     * @return the number of feedback units deleted
+     * @return the number of pieces of feedback deleted
      */
     @Modifying
     @Transactional
@@ -379,7 +367,7 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
      * {@link de.tum.cit.aet.hephaestus.practices.spi.ConversationFeedbackErasure#eraseConversationFeedbackAboutUser}
      * for a person opt-out / account hard-delete.
      *
-     * @return the number of feedback units deleted
+     * @return the number of pieces of feedback deleted
      */
     @Modifying
     @Transactional
@@ -514,7 +502,7 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
         """;
 
     /**
-     * The operator's page of feedback units.
+     * The operator's page of feedback.
      *
      * <p><b>IN_APP bodies are never returned here.</b> {@code IN_CONTEXT} bodies are already public on
      * the pull request and {@code IN_CHAT} bodies are NULL by construction, so until now "operators
@@ -606,7 +594,7 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
 
     /**
      * How much of what was measured on one artifact actually reached a person, by practice.
-     * {@code COUNT(DISTINCT f.id)} because one feedback unit routinely fuses several observations of the
+     * {@code COUNT(DISTINCT f.id)} because one piece of feedback routinely fuses several observations of the
      * same practice; counting join rows would multiply it.
      */
     @Query(

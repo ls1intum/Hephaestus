@@ -1,7 +1,7 @@
 import { Plus, RotateCcw, Search, Shapes } from "lucide-react";
 import { useState } from "react";
 import type {
-	CuratedArea,
+	CuratedGroup,
 	CuratedPracticeSummary,
 	CuratedCatalogSummary as Summary,
 } from "@/api/types.gen";
@@ -45,19 +45,19 @@ import { CuratedCatalogTree } from "./CuratedCatalogTree";
 import { type CuratedCatalogSearch, curatedPracticeLevel } from "./curated-catalog-search";
 
 export interface CuratedCatalogProps {
-	areas: readonly CuratedArea[];
+	groups: readonly CuratedGroup[];
 	practices: readonly CuratedPracticeSummary[];
 	summary: Summary;
 	search: CuratedCatalogSearch;
 	customOrder: boolean;
 	writePending?: boolean;
 	pendingPracticeSlugs?: ReadonlySet<string>;
-	pendingAreaSlugs?: ReadonlySet<string>;
+	pendingGroupSlugs?: ReadonlySet<string>;
 	onSearchChange: (search: CuratedCatalogSearch) => void;
 	onPracticeStatusChange: (practice: CuratedPracticeSummary, offered: boolean) => void;
-	onAreaStatusChange: (area: CuratedArea, offered: boolean) => void;
-	onReorderAreas: (orderedSlugs: string[]) => void;
-	onPlacePractice: (practiceSlug: string, areaSlug: string | null, position: number) => void;
+	onGroupStatusChange: (group: CuratedGroup, offered: boolean) => void;
+	onReorderGroups: (orderedSlugs: string[]) => void;
+	onPlacePractice: (practiceSlug: string, groupSlug: string | null, position: number) => void;
 	onResetOrder: () => void;
 }
 
@@ -75,36 +75,36 @@ function matches(haystack: (string | undefined)[], needle: string): boolean {
 }
 
 export function CuratedCatalog({
-	areas,
+	groups,
 	practices,
 	summary,
 	search,
 	customOrder,
 	writePending = false,
 	pendingPracticeSlugs = new Set(),
-	pendingAreaSlugs = new Set(),
+	pendingGroupSlugs = new Set(),
 	onSearchChange,
 	onPracticeStatusChange,
-	onAreaStatusChange,
-	onReorderAreas,
+	onGroupStatusChange,
+	onReorderGroups,
 	onPlacePractice,
 	onResetOrder,
 }: CuratedCatalogProps) {
 	const [excludingPractice, setExcludingPractice] = useState<CuratedPracticeSummary | null>(null);
-	const [excludingArea, setExcludingArea] = useState<CuratedArea | null>(null);
+	const [excludingGroup, setExcludingGroup] = useState<CuratedGroup | null>(null);
 	const [resettingOrder, setResettingOrder] = useState(false);
 	const query = search.q ?? "";
 	const status: StatusFilter = search.status ?? "ALL";
 	const artifact: ArtifactFilter = search.artifact ?? "ALL";
 	const reviewOnly = search.review === true;
 	const removedDefaultsToReview =
-		areas.filter((area) => area.status.state === "NO_LONGER_SHIPPED" && area.status.offered)
+		groups.filter((group) => group.status.state === "NO_LONGER_SHIPPED" && group.status.offered)
 			.length +
 		practices.filter(
 			(practice) => practice.status.state === "NO_LONGER_SHIPPED" && practice.effectivelyOffered,
 		).length;
 	const needle = query.trim().toLowerCase();
-	const areaBySlug = new Map(areas.map((area) => [area.slug, area]));
+	const groupBySlug = new Map(groups.map((group) => [group.slug, group]));
 	const matchesStatus = (offered: boolean) =>
 		status === "ALL" || (status === "OFFERED") === offered;
 
@@ -119,38 +119,38 @@ export function CuratedCatalog({
 				[
 					practice.name,
 					practice.slug,
-					practice.areaSlug ?? undefined,
-					practice.areaSlug ? areaBySlug.get(practice.areaSlug)?.definition.name : undefined,
+					practice.groupSlug ?? undefined,
+					practice.groupSlug ? groupBySlug.get(practice.groupSlug)?.definition.name : undefined,
 				],
 				needle,
 			),
 	);
 	const visiblePracticeSlugs = new Set(visiblePractices.map((practice) => practice.slug));
-	const areasHoldingMatches = new Set(
-		visiblePractices.map((practice) => practice.areaSlug).filter((slug): slug is string => !!slug),
+	const groupsHoldingMatches = new Set(
+		visiblePractices.map((practice) => practice.groupSlug).filter((slug): slug is string => !!slug),
 	);
-	const visibleAreas = areas.filter(
-		(area) =>
-			areasHoldingMatches.has(area.slug) ||
+	const visibleGroups = groups.filter(
+		(group) =>
+			groupsHoldingMatches.has(group.slug) ||
 			(artifact === "ALL" &&
 				(!reviewOnly ||
-					area.status.state === "UPDATE_WAITING" ||
-					(area.status.state === "NO_LONGER_SHIPPED" && area.status.offered)) &&
-				matchesStatus(area.status.offered) &&
+					group.status.state === "UPDATE_WAITING" ||
+					(group.status.state === "NO_LONGER_SHIPPED" && group.status.offered)) &&
+				matchesStatus(group.status.offered) &&
 				matches(
-					[area.definition.name, area.slug, area.definition.description ?? undefined],
+					[group.definition.name, group.slug, group.definition.description ?? undefined],
 					needle,
 				)),
 	);
 
-	const visibleAreaSlugs = new Set(visibleAreas.map((area) => area.slug));
+	const visibleGroupSlugs = new Set(visibleGroups.map((group) => group.slug));
 	const canReorder = !needle && status === "ALL" && artifact === "ALL" && !reviewOnly;
-	const forcedOpenAreas = canReorder ? undefined : visibleAreaSlugs;
-	const catalogIsEmpty = areas.length === 0 && practices.length === 0;
-	const nothingMatches = visibleAreas.length === 0 && visiblePractices.length === 0;
-	const practicesExcludedWithArea = excludingArea
+	const forcedOpenGroups = canReorder ? undefined : visibleGroupSlugs;
+	const catalogIsEmpty = groups.length === 0 && practices.length === 0;
+	const nothingMatches = visibleGroups.length === 0 && visiblePractices.length === 0;
+	const practicesExcludedWithGroup = excludingGroup
 		? practices.filter(
-				(practice) => practice.areaSlug === excludingArea.slug && practice.status.offered,
+				(practice) => practice.groupSlug === excludingGroup.slug && practice.status.offered,
 			)
 		: [];
 
@@ -223,20 +223,20 @@ export function CuratedCatalog({
 					</Empty>
 				) : (
 					<CuratedCatalogTree
-						areas={areas}
+						groups={groups}
 						practices={practices}
-						visibleAreaSlugs={visibleAreaSlugs}
+						visibleGroupSlugs={visibleGroupSlugs}
 						visiblePracticeSlugs={visiblePracticeSlugs}
-						forceOpenAreaSlugs={forcedOpenAreas}
+						forceOpenGroupSlugs={forcedOpenGroups}
 						canReorder={canReorder}
 						writePending={writePending}
-						pendingAreaSlugs={pendingAreaSlugs}
+						pendingGroupSlugs={pendingGroupSlugs}
 						pendingPracticeSlugs={pendingPracticeSlugs}
-						onAreaStatusChange={onAreaStatusChange}
+						onGroupStatusChange={onGroupStatusChange}
 						onPracticeStatusChange={onPracticeStatusChange}
-						onExcludeArea={setExcludingArea}
+						onExcludeGroup={setExcludingGroup}
 						onExcludePractice={setExcludingPractice}
-						onReorderAreas={onReorderAreas}
+						onReorderGroups={onReorderGroups}
 						onPlacePractice={onPlacePractice}
 					/>
 				)}
@@ -247,7 +247,7 @@ export function CuratedCatalog({
 					<AlertDialogHeader>
 						<AlertDialogTitle>Use the Hephaestus order?</AlertDialogTitle>
 						<AlertDialogDescription>
-							Areas and practices will return to the order included with this Hephaestus version.
+							Groups and practices will return to the order included with this Hephaestus version.
 							Definitions and inclusion will not change.
 						</AlertDialogDescription>
 					</AlertDialogHeader>
@@ -276,7 +276,7 @@ export function CuratedCatalog({
 						<AlertDialogTitle>Exclude “{excludingPractice?.name}”?</AlertDialogTitle>
 						<AlertDialogDescription>
 							{excludingPractice?.effectivelyOffered === false
-								? "Its area is already not offered. This keeps the practice unavailable if the area is offered again. Existing workspace copies will not change."
+								? "Its group is already not offered. This keeps the practice unavailable if the group is offered again. Existing workspace copies will not change."
 								: "Workspace administrators will no longer be able to add this practice. Existing workspace copies will not change. You can include it again later."}
 						</AlertDialogDescription>
 					</AlertDialogHeader>
@@ -295,28 +295,28 @@ export function CuratedCatalog({
 			</AlertDialog>
 
 			<AlertDialog
-				open={excludingArea !== null}
+				open={excludingGroup !== null}
 				onOpenChange={(open) => {
-					if (!open) setExcludingArea(null);
+					if (!open) setExcludingGroup(null);
 				}}
 			>
 				<AlertDialogContent>
 					<AlertDialogHeader>
-						<AlertDialogTitle>Exclude “{excludingArea?.definition.name}”?</AlertDialogTitle>
+						<AlertDialogTitle>Exclude “{excludingGroup?.definition.name}”?</AlertDialogTitle>
 						<AlertDialogDescription>
-							{practicesExcludedWithArea.length === 0
-								? "Workspace administrators will no longer be able to add this area. No additional practices are affected. Existing workspace copies will not change."
-								: `Workspace administrators will no longer be able to add this area. This also stops offering ${practicesExcludedWithArea.length} currently offered ${
-										practicesExcludedWithArea.length === 1 ? "practice" : "practices"
+							{practicesExcludedWithGroup.length === 0
+								? "Workspace administrators will no longer be able to add this group. No additional practices are affected. Existing workspace copies will not change."
+								: `Workspace administrators will no longer be able to add this group. This also stops offering ${practicesExcludedWithGroup.length} currently offered ${
+										practicesExcludedWithGroup.length === 1 ? "practice" : "practices"
 									}. Existing workspace copies will not change.`}
 						</AlertDialogDescription>
 					</AlertDialogHeader>
-					{practicesExcludedWithArea.length > 0 && (
+					{practicesExcludedWithGroup.length > 0 && (
 						<ul
 							aria-label="Practices this also excludes"
 							className="max-h-40 list-disc overflow-y-auto pl-5 text-muted-foreground text-sm"
 						>
-							{practicesExcludedWithArea.map((practice) => (
+							{practicesExcludedWithGroup.map((practice) => (
 								<li key={practice.slug}>{practice.name}</li>
 							))}
 						</ul>
@@ -325,8 +325,8 @@ export function CuratedCatalog({
 						<AlertDialogCancel>Cancel</AlertDialogCancel>
 						<AlertDialogAction
 							onClick={() => {
-								if (excludingArea) onAreaStatusChange(excludingArea, false);
-								setExcludingArea(null);
+								if (excludingGroup) onGroupStatusChange(excludingGroup, false);
+								setExcludingGroup(null);
 							}}
 						>
 							Stop offering

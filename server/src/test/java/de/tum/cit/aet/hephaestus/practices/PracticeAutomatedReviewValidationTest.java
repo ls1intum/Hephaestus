@@ -32,7 +32,7 @@ class PracticeAutomatedReviewValidationTest extends BaseUnitTest {
     }
 
     @Test
-    void shouldIgnoreLearnerCopyWhenFingerprintingReviewRules() {
+    void shouldIgnoreDeveloperCopyWhenFingerprintingReviewRules() {
         PracticeDefinition original = definition(requirements());
         PracticeDefinition revised = new PracticeDefinition(
             original.name(),
@@ -42,7 +42,7 @@ class PracticeAutomatedReviewValidationTest extends BaseUnitTest {
             original.automatedReviewPolicy(),
             "Reviews reduce integration risk.",
             original.whatGoodLooksLike(),
-            original.areaSlug()
+            original.groupSlug()
         );
 
         assertThat(revised.provenanceFingerprint("focused-review")).isEqualTo(
