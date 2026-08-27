@@ -3322,7 +3322,7 @@ export type PracticeAreaReviewArtifact = {
     number?: number;
     provider?: 'GITHUB' | 'GITLAB' | 'SLACK' | 'OUTLINE';
     repositoryName?: string;
-    title: string;
+    title?: string;
     type: string;
     url?: string;
 };
