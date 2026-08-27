@@ -8,7 +8,7 @@ public final class AgentBindingLimits {
 
     public static final int MIN_TIMEOUT_SECONDS = 30;
 
-    public static final int MAX_TIMEOUT_SECONDS = 3600;
+    public static final int MAX_TIMEOUT_SECONDS = 10800;
 
     private AgentBindingLimits() {}
 }

@@ -89,7 +89,27 @@ class FeedbackCompositionResultParserTest extends BaseUnitTest {
     }
 
     @Test
-    void rejectsCoordinatesOnAnArtifactPlacement() {
+    void shouldReadUnitWhenGroundedInPrimaryAndRelatedPracticeEvidence() {
+        List<ComposedFeedbackUnit> units = parser.parse(
+            output(
+                """
+                { "channel": "IN_APP", "practiceSlug": "ships-tests-with-the-change",
+                  "basedOn": ["obs-0", "obs-1"], "action": "NEW",
+                  "title": "Review readiness breaks across the workflow",
+                  "body": "The change enters review without tests and leaves follow-up work unresolved.",
+                  "nextStep": "Add the test and resolve the linked review thread before requesting review." }
+                """,
+                "[]"
+            )
+        );
+
+        assertThat(units)
+            .singleElement()
+            .satisfies(unit -> assertThat(unit.basedOn()).containsExactly("obs-0", "obs-1"));
+    }
+
+    @Test
+    void shouldRejectUnitWhenArtifactPlacementHasCoordinates() {
         assertThat(
             parser.parse(
                 output(
@@ -106,12 +126,12 @@ class FeedbackCompositionResultParserTest extends BaseUnitTest {
     }
 
     @Test
-    void readsAConversationUnitAsNotesRatherThanAScript() {
+    void shouldReadNotesWhenConversationUnitIsValid() {
         List<ComposedFeedbackUnit> units = parser.parse(
             output(
                 """
                 { "channel": "IN_CHAT", "practiceSlug": "ships-tests-with-the-change",
-                  "basedOn": ["prior:ships-tests-with-the-change"], "action": "NEW",
+                  "basedOn": ["obs-0"], "action": "NEW",
                   "title": "Tests arrive after review",
                   "notes": {
                     "situation": "On !18, !20 and !22 the test landed a push after the review comment.",
@@ -154,13 +174,13 @@ class FeedbackCompositionResultParserTest extends BaseUnitTest {
             """,
         }
     )
-    void refusesAConversationUnitMissingOneOfItsNotes(String notes) {
+    void shouldRejectConversationUnitWhenRequiredNoteIsMissing(String notes) {
         assertThat(
             parser.parse(
                 output(
                     """
                     { "channel": "IN_CHAT", "practiceSlug": "ships-tests-with-the-change",
-                      "basedOn": ["prior:ships-tests-with-the-change"], "action": "NEW",
+                      "basedOn": ["obs-0"], "action": "NEW",
                       "title": "Tests arrive after review",
                       "notes": { %s } }
                     """.formatted(notes),
@@ -178,7 +198,7 @@ class FeedbackCompositionResultParserTest extends BaseUnitTest {
                 output(
                     """
                     { "channel": "IN_CHAT", "practiceSlug": "ships-tests-with-the-change",
-                      "basedOn": ["prior:ships-tests-with-the-change"], "action": "NEW",
+                      "basedOn": ["obs-0"], "action": "NEW",
                       "title": "Tests arrive after review",
                       "notes": {
                         "situation": "Tests repeatedly arrived after review.",
@@ -274,7 +294,7 @@ class FeedbackCompositionResultParserTest extends BaseUnitTest {
     }
 
     @Test
-    void keepsAWithholdWithItsReasonAndDropsOneWithout() {
+    void shouldKeepOnlyWithholdWhenReasonIsPresent() {
         assertThat(
             parser.parse(
                 output(
@@ -307,7 +327,12 @@ class FeedbackCompositionResultParserTest extends BaseUnitTest {
 
     @Test
     void rejectsEvidenceFromAnotherPracticeOrAnUnknownObservation() {
-        for (String reference : List.of("obs-1", "obs-missing", "prior:keeps-the-thread-moving")) {
+        for (String reference : List.of(
+            "obs-1",
+            "obs-missing",
+            "prior:ships-tests-with-the-change",
+            "prior:keeps-the-thread-moving"
+        )) {
             assertThat(
                 parser.parse(
                     output(
@@ -389,6 +414,30 @@ class FeedbackCompositionResultParserTest extends BaseUnitTest {
     }
 
     @Test
+    void shouldKeepAllUnitsWhenEveryLaneUsesItsFullCapacity() {
+        var observations = objectMapper.createArrayNode();
+        var units = objectMapper.createArrayNode();
+        for (int practice = 0; practice < 10; practice++) {
+            String practiceSlug = "practice-" + practice;
+            String observationId = "obs-" + practice;
+            observations.addObject().put("id", observationId).put("practiceSlug", practiceSlug);
+            for (FeedbackChannel channel : FeedbackChannel.values()) {
+                var unit = units.addObject().put("channel", channel.name()).put("practiceSlug", practiceSlug);
+                unit.putArray("basedOn").add(observationId);
+                unit.put("action", "WITHHOLD").put("withholdReason", "ALREADY_SAID");
+            }
+        }
+        var payload = objectMapper.createObjectNode();
+        payload.set("observations", observations);
+        payload.set("preparedTargets", objectMapper.createArrayNode());
+        payload.set("units", units);
+        var output = objectMapper.createObjectNode();
+        output.set("feedback", payload);
+
+        assertThat(parser.parse(output)).hasSize(30);
+    }
+
+    @Test
     void normalisesPracticeSlug() {
         assertThat(
             parser.parse(
@@ -460,7 +509,15 @@ class FeedbackCompositionResultParserTest extends BaseUnitTest {
     private JsonNode outputOf(JsonNode units, String preparedThreadKeysJson) {
         var payload = objectMapper.createObjectNode();
         payload.set("observations", objectMapper.readTree(OBSERVATIONS));
-        payload.set("preparedThreadKeys", objectMapper.readTree(preparedThreadKeysJson));
+        var preparedTargets = objectMapper.createArrayNode();
+        for (JsonNode key : objectMapper.readTree(preparedThreadKeysJson)) {
+            preparedTargets
+                .addObject()
+                .put("threadKey", key.asString())
+                .put("channel", "IN_APP")
+                .put("practiceSlug", "ships-tests-with-the-change");
+        }
+        payload.set("preparedTargets", preparedTargets);
         payload.set("units", units);
         var jobOutput = objectMapper.createObjectNode();
         jobOutput.set("feedback", payload);

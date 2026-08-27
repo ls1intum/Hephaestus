@@ -39,6 +39,8 @@ public final class SandboxLayout {
     public static final String REPO_MOUNT_RELATIVE = sourceMount("scm") + "repo/";
 
     /** Output directory the sandbox collects after the run. */
+    public static final String OUTPUT_PREFIX = "out/";
+
     public static final String OUTPUT_PATH = WORKSPACE_ROOT + "/out";
 
     /** Workspace-relative filename of the task envelope ({@code task.json}). */

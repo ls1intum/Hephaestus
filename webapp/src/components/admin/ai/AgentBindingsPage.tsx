@@ -60,12 +60,12 @@ const PURPOSES: PurposeMeta[] = [
 ];
 
 const MIN_TIMEOUT_SECONDS = 30;
-const MAX_TIMEOUT_SECONDS = 3600;
+const MAX_TIMEOUT_SECONDS = 10800;
 const MIN_CONCURRENT_JOBS = 1;
 
 const TIMEOUT_CEILING = {
 	max: MAX_TIMEOUT_SECONDS,
-	error: `Runs stop after an hour, so enter ${MAX_TIMEOUT_SECONDS} seconds or less.`,
+	error: `Runs stop after three hours, so enter ${MAX_TIMEOUT_SECONDS} seconds or less.`,
 };
 
 function bindingToSelection(binding?: AgentBinding): ModelSelection | null {
@@ -229,7 +229,9 @@ function AgentPurposeCard({
 	const formRef = useRef<HTMLFormElement>(null);
 	const [selection, setSelection] = useState<ModelSelection | null>(bindingToSelection(binding));
 	const [enabled, setEnabled] = useState(binding?.enabled ?? true);
-	const [timeoutSeconds, setTimeoutSeconds] = useState(String(binding?.timeoutSeconds ?? 600));
+	const [timeoutSeconds, setTimeoutSeconds] = useState(
+		String(binding?.timeoutSeconds ?? MAX_TIMEOUT_SECONDS),
+	);
 	const [maxConcurrentJobs, setMaxConcurrentJobs] = useState(
 		String(binding?.maxConcurrentJobs ?? 3),
 	);
@@ -286,9 +288,6 @@ function AgentPurposeCard({
 						<CardDescription>
 							{meta.description}
 							{!featureEnabled &&
-								// Two links rather than one with a ternary destination: the switch that turns
-								// practice reviews on lives in a section of the Review page, which is a search
-								// param, and the workspace one is a route of its own.
 								(meta.purpose === "PRACTICE_REVIEW" ? (
 									<div>
 										<Link

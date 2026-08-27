@@ -17,7 +17,7 @@ public record AgentBindingRequestDTO(
     @Nullable
     @Min(AgentBindingLimits.MIN_TIMEOUT_SECONDS)
     @Max(AgentBindingLimits.MAX_TIMEOUT_SECONDS)
-    @Schema(description = "Per-run timeout in seconds (30–3600; one hour is the longest a single run may take)")
+    @Schema(description = "Per-run timeout in seconds (30–10800; three hours is the longest a single run may take)")
     Integer timeoutSeconds,
     @Nullable @Min(1) @Schema(description = "Maximum concurrent runs for this purpose") Integer maxConcurrentJobs,
     @Nullable @Schema(description = "Whether the sandbox may reach the public internet") Boolean allowInternet,

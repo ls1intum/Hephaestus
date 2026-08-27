@@ -1,19 +1,3 @@
-// pi-mentor-runner.spec.ts — smoke suite for the mentor runner.
-//
-// Runs the runner as a child process in PROTOCOL_ONLY mode (stub Pi SDK) so we can exercise:
-//   1. U+2028/U+2029 framing — the single highest-bang-for-buck test per the audit
-//   2. Hello handshake roundtrip
-//   3. Concurrent prompt rejection (-32001 turn_already_in_flight)
-//
-// Frames are typed against pi-mentor-protocol.ts, the same declarations the runner emits against,
-// so a change to the wire contract that this suite does not follow is a type error rather than an
-// assertion that quietly stops matching anything.
-//
-// Wired into CI via `.github/workflows/ci-quality-gates.yml` (application-server-quality
-// step). Non-zero exit fails the gate, so a regression to framing or concurrent-prompt
-// rejection logic blocks merge. Run locally with:
-//   pnpm run test:agents
-
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { mkdtempSync, rmSync } from "node:fs";
@@ -39,18 +23,11 @@ void test("mentor exposes only read and inline-rendering tools", () => {
 	assert.deepEqual(MENTOR_TOOL_NAMES, ["fetch_context", "link_observation"]);
 });
 
-// Production runner targets /workspace/.sessions, which is unwritable in CI / local node test
-// runs. Spawn each runner with an isolated tmpdir to keep the smoke tests hermetic.
 const SESSIONS_TMPDIR = mkdtempSync(path.join(tmpdir(), "pi-mentor-runner-spec-"));
 process.on("exit", () => {
-	try {
-		rmSync(SESSIONS_TMPDIR, { recursive: true, force: true });
-	} catch {
-		/* best-effort tmpdir cleanup; safe to ignore on shutdown */
-	}
+	rmSync(SESSIONS_TMPDIR, { recursive: true, force: true });
 });
 
-/** The envelope every frame the runner writes shares; the helpers below narrow it further. */
 function isOutboundFrame(value: unknown): value is MentorOutboundFrame {
 	return (
 		typeof value === "object" &&
@@ -60,12 +37,6 @@ function isOutboundFrame(value: unknown): value is MentorOutboundFrame {
 	);
 }
 
-/**
- * The runner writes JSON; this is the one place bytes become values. Everything downstream reads
- * the frame through `MentorOutboundFrame`, so the assertions below are checked against the same
- * declarations the runner produces — and a line that is not a frame at all fails here, by that name,
- * rather than as a missing field several assertions later.
- */
 function parseFrame(line: string): MentorOutboundFrame {
 	const frame: unknown = JSON.parse(line);
 	if (!isOutboundFrame(frame)) {
@@ -86,12 +57,10 @@ function isFailure(frame: MentorOutboundFrame): frame is JsonRpcErrorResponse {
 	return "error" in frame;
 }
 
-/** `params.event.type` for an event frame, or undefined for anything else. */
 function eventType(frame: MentorOutboundFrame): string | undefined {
 	return isEventNotification(frame) ? frame.params.event.type : undefined;
 }
 
-/** `params.threadId` for an event frame, or undefined for anything else. */
 function eventThreadId(frame: MentorOutboundFrame): string | null | undefined {
 	return isEventNotification(frame) ? frame.params.threadId : undefined;
 }
@@ -105,7 +74,6 @@ interface Reader {
 	next: (timeoutMs?: number) => Promise<string>;
 }
 
-// ─── Test-side line splitter mirrors the runner's strict semantics ───────────
 function createReader(): Reader {
 	let buffer: Buffer = Buffer.alloc(0);
 	const queue: string[] = [];
@@ -158,10 +126,6 @@ interface RunnerHandle {
 	send: (request: MentorRequest) => void;
 }
 
-/**
- * `env` overrides are merged over the process env, so a caller only names what it changes.
- * MENTOR_RUNNER_SESSIONS_DIR always points at the hermetic tmpdir.
- */
 function spawnRunner(env: Record<string, string> = {}): RunnerHandle {
 	const child = spawn(process.execPath, [RUNNER], {
 		env: {
@@ -175,7 +139,6 @@ function spawnRunner(env: Record<string, string> = {}): RunnerHandle {
 	});
 	const reader = createReader();
 	child.stdout.on("data", (chunk: Buffer) => reader.push(chunk));
-	// Surface runner stderr to test output for diagnostics; never assert against it.
 	child.stderr.on("data", (chunk: Buffer) =>
 		process.stderr.write(`[runner-stderr] ${chunk.toString("utf8")}`),
 	);
@@ -185,7 +148,6 @@ function spawnRunner(env: Record<string, string> = {}): RunnerHandle {
 	return { child, reader, send };
 }
 
-/** Send `shutdown` and wait for the child to exit — the teardown every test shares. */
 async function shutdown({ child, send }: RunnerHandle): Promise<void> {
 	send({ jsonrpc: "2.0", id: "shut", method: "shutdown", params: {} });
 	await new Promise<void>((resolve) => {
@@ -210,12 +172,6 @@ async function readReady(reader: Reader): Promise<MentorOutboundFrame> {
 	return readUntil(reader, (f) => eventType(f) === "runner_ready");
 }
 
-/**
- * Read the response to `id` and hand back its `result`.
- *
- * A wrong-shaped response throws rather than asserting: the shape is a precondition for the
- * assertions each test then makes, not a claim the test is here to check.
- */
 async function readResult(reader: Reader, id: string): Promise<JsonRpcSuccessResponse["result"]> {
 	const frame = await readUntil(reader, (f) => frameId(f) === id);
 	if (!isSuccess(frame)) {
@@ -224,7 +180,6 @@ async function readResult(reader: Reader, id: string): Promise<JsonRpcSuccessRes
 	return frame.result;
 }
 
-/** Read the response to `id` and hand back its `error`. See `readResult` on why this throws. */
 async function readError(reader: Reader, id: string): Promise<JsonRpcErrorResponse["error"]> {
 	const frame = await readUntil(reader, (f) => frameId(f) === id);
 	if (!isFailure(frame)) {
@@ -233,8 +188,6 @@ async function readError(reader: Reader, id: string): Promise<JsonRpcErrorRespon
 	return frame.error;
 }
 
-// `void`: node:test's own runner owns the promise each test hands back, and awaiting one here
-// would register the next test only after the previous had finished.
 void test("hello handshake returns protocolVersion 1", async () => {
 	const runner = spawnRunner();
 	try {
@@ -249,18 +202,15 @@ void test("hello handshake returns protocolVersion 1", async () => {
 });
 
 void test("U+2028 and U+2029 inside JSON strings do NOT split frames", async () => {
-	// The most insidious bug in the framing layer: many naive line splitters split on
-	// U+2028/U+2029, but JSON.stringify leaves those 3-byte UTF-8 sequences unescaped inside
-	// string values. The runner uses Buffer.indexOf(0x0a) directly to avoid this. Drive a real
-	// prompt frame whose text carries the chars; if the splitter mis-handled the bytes, the
-	// runner would see two malformed halves and we would never match the accept ack.
 	const runner = spawnRunner();
 	try {
 		await readReady(runner.reader);
 		const tid = "11111111-2222-3333-4444-555555555555";
 		runner.send({ jsonrpc: "2.0", id: "o", method: "open_thread", params: { threadId: tid } });
 		await readResult(runner.reader, "o");
-		const tricky = `line1 line2 line3`;
+		const tricky = `line1
+line2
+line3`;
 		runner.send({
 			jsonrpc: "2.0",
 			id: "p",
@@ -276,9 +226,6 @@ void test("U+2028 and U+2029 inside JSON strings do NOT split frames", async () 
 });
 
 void test("path-traversal threadId rejected with -32600", async () => {
-	// The runner is a security boundary: even though Java only ever passes UUIDs, a future
-	// bridge or debug shell that bypasses Java must not be able to coax path.join into
-	// resolving outside SESSIONS_DIR. Reject anything that is not a canonical UUID.
 	const runner = spawnRunner();
 	try {
 		await readReady(runner.reader);
@@ -295,7 +242,6 @@ void test("path-traversal threadId rejected with -32600", async () => {
 });
 
 void test("second concurrent prompt returns -32001 turn_already_in_flight", async () => {
-	// Use a slow stub so the first prompt is still in flight when we fire the second.
 	const runner = spawnRunner({ MENTOR_RUNNER_STUB_DELAY_MS: "150" });
 	const threadId = "22222222-2222-2222-2222-222222222222";
 	try {
@@ -313,7 +259,6 @@ void test("second concurrent prompt returns -32001 turn_already_in_flight", asyn
 		assert.ok("accepted" in accepted, "first prompt must be accepted");
 		assert.equal(accepted.accepted, true);
 
-		// Fire the second prompt immediately — stub delay is 150ms so the first is still streaming.
 		runner.send({
 			jsonrpc: "2.0",
 			id: "p2",
@@ -327,23 +272,121 @@ void test("second concurrent prompt returns -32001 turn_already_in_flight", asyn
 	}
 });
 
+void test("prompt on an unopened thread returns -32000", async () => {
+	const runner = spawnRunner();
+	try {
+		await readReady(runner.reader);
+		runner.send({
+			jsonrpc: "2.0",
+			id: "p",
+			method: "prompt",
+			params: { threadId: "66666666-6666-6666-6666-666666666666", text: "hello" },
+		});
+		const error = await readError(runner.reader, "p");
+		assert.equal(error.code, -32000);
+	} finally {
+		await shutdown(runner);
+	}
+});
+
+void test("abort cancels delayed events and permits the next turn", async () => {
+	const runner = spawnRunner({ MENTOR_RUNNER_STUB_DELAY_MS: "100" });
+	const threadId = "77777777-7777-7777-7777-777777777777";
+	try {
+		await readReady(runner.reader);
+		runner.send({ jsonrpc: "2.0", id: "o", method: "open_thread", params: { threadId } });
+		await readResult(runner.reader, "o");
+		runner.send({
+			jsonrpc: "2.0",
+			id: "p1",
+			method: "prompt",
+			params: { threadId, text: "cancel me" },
+		});
+		await readResult(runner.reader, "p1");
+
+		runner.send({ jsonrpc: "2.0", id: "a", method: "abort", params: { threadId } });
+		let abortAcknowledged = false;
+		let terminalSeen = false;
+		while (!abortAcknowledged || !terminalSeen) {
+			const frame = parseFrame(await runner.reader.next());
+			if (frameId(frame) === "a") {
+				assert.ok(isSuccess(frame));
+				assert.ok("aborted" in frame.result);
+				assert.equal(frame.result.aborted, true);
+				abortAcknowledged = true;
+			}
+			if (eventType(frame) === "agent_end") terminalSeen = true;
+		}
+		await assert.rejects(
+			runner.reader.next(250),
+			/timeout/,
+			"cancelled prompt emitted stale events",
+		);
+
+		runner.send({
+			jsonrpc: "2.0",
+			id: "p2",
+			method: "prompt",
+			params: { threadId, text: "continue" },
+		});
+		const accepted = await readResult(runner.reader, "p2");
+		assert.ok("accepted" in accepted);
+		assert.equal(accepted.accepted, true);
+		await readUntil(runner.reader, (frame) => eventType(frame) === "message_update");
+		await readUntil(runner.reader, (frame) => eventType(frame) === "agent_end");
+	} finally {
+		await shutdown(runner);
+	}
+});
+
+void test("forwards only the final attempt after Pi settles", async () => {
+	const runner = spawnRunner({ MENTOR_RUNNER_STUB_RETRY_DELAY_MS: "150" });
+	const threadId = "55555555-5555-5555-5555-555555555555";
+	try {
+		await readReady(runner.reader);
+		runner.send({ jsonrpc: "2.0", id: "o", method: "open_thread", params: { threadId } });
+		await readResult(runner.reader, "o");
+		runner.send({
+			jsonrpc: "2.0",
+			id: "p",
+			method: "prompt",
+			params: { threadId, text: "retry once" },
+		});
+		await readResult(runner.reader, "p");
+		await readUntil(runner.reader, (frame) => eventType(frame) === "message_update");
+
+		await assert.rejects(runner.reader.next(50), /timeout/, "attempt-level agent_end leaked");
+		const terminal = await readUntil(runner.reader, (frame) => eventType(frame) === "agent_end");
+		assert.equal(eventThreadId(terminal), threadId);
+		assert.ok(isEventNotification(terminal));
+		const event = terminal.params.event;
+		assert.equal(event.type, "agent_end");
+		assert.equal(event.willRetry, false);
+		assert.equal(event.messages.length, 1);
+		const message = event.messages[0];
+		assert.equal(message?.role, "assistant");
+		assert.deepEqual(message.content, [{ type: "text", text: "stub: retry once" }]);
+		await assert.rejects(
+			runner.reader.next(50),
+			/timeout/,
+			"turn emitted more than one terminal event",
+		);
+	} finally {
+		await shutdown(runner);
+	}
+});
+
 void test("batch JSON-RPC request is rejected with -32600 (not silently dropped)", async () => {
-	// JSON-RPC 2.0 §6 permits top-level arrays as batches. Neither end emits batches today;
-	// the runner rejects them loudly so a future Java caller that bundles requests doesn't
-	// see its frames vanish into the runner's log.
 	const runner = spawnRunner();
 	try {
 		await readReady(runner.reader);
 
-		// Send a batch (top-level array) with two requests. `send` takes a single request by
-		// design, so this one frame goes out through stdin directly.
 		const batch: MentorRequest[] = [
 			{ jsonrpc: "2.0", id: "b1", method: "hello", params: {} },
 			{ jsonrpc: "2.0", id: "b2", method: "hello", params: {} },
 		];
 		runner.child.stdin?.write(`${JSON.stringify(batch)}\n`);
 
-		// Expect a single error frame with id:null and code -32600.
 		const frame = await readUntil(runner.reader, (f) => isFailure(f) && f.error.code === -32600);
 		assert.equal(frameId(frame), null, "batch rejection error must carry id:null per JSON-RPC §6");
 	} finally {
@@ -352,33 +395,6 @@ void test("batch JSON-RPC request is rejected with -32600 (not silently dropped)
 });
 
 void test("watchdog cross-thread rebind: no event leakage from concurrently-bound thread", async () => {
-	// Scenario: thread A is mid-prompt (watchdog armed) when ANOTHER thread B opens, which
-	// — via the regular bindThread teardown — flips activeThreadId from A to B and replaces
-	// A's subscription with B's. When A's watchdog later fires (a few ms after), runtime is
-	// bound to B but the rebind needs to install a fresh A subscription AND remove B's
-	// (otherwise the next event broadcast hits both subscribers and emits threadId=B frames
-	// through forwardEvent(state_B, …)).
-	//
-	// The stub's switchSession is a no-op and shares one subscribers Set across sessions, so
-	// a missing cross-thread teardown leaves B_callback in the broadcast list. We force the
-	// window by:
-	//   1. open A — A is active, no watchdog yet
-	//   2. prompt A with a 200 ms slow stub → arms A's watchdog (80 ms budget+grace)
-	//   3. open B — bindThread B fires inside the watchdog window, BEFORE A's watchdog ticks.
-	//      Now activeThreadId=B, A_callback gone, B_callback added. A's ThreadState still
-	//      lives in the `threads` Map; its watchdog timer is still armed.
-	//   4. A's watchdog fires at ~80 ms (post-open-B). With the fix, the rebind sees
-	//      activeThreadId=B ≠ state.threadId=A, tears down B_callback, switches session,
-	//      adds newA_callback, sets activeThreadId=A. Without the fix, B_callback stays and
-	//      activeThreadId remains stale at B.
-	//   5. The first prompt's residue (text_delta at ~100 ms, natural agent_end at ~200 ms)
-	//      broadcasts through whatever subscribers remain. With the fix only newA_callback
-	//      receives them → threadId=A only. Without the fix, B_callback also fires →
-	//      threadId=B leak.
-	//
-	// The legitimate pre-rebind events (the initial agent_start at t=0 fires only through
-	// A_callback because B isn't open yet) are NOT a leak; we demarcate the "leak window"
-	// as everything AFTER the turn_watchdog_fired event.
 	const threadA = "33333333-3333-3333-3333-333333333333";
 	const threadB = "44444444-4444-4444-4444-444444444444";
 	const runner = spawnRunner({
@@ -389,12 +405,9 @@ void test("watchdog cross-thread rebind: no event leakage from concurrently-boun
 	try {
 		await readReady(runner.reader);
 
-		// 1. open A — activeThreadId becomes A; subscribers = {A_callback}
 		runner.send({ jsonrpc: "2.0", id: "oA", method: "open_thread", params: { threadId: threadA } });
 		await readResult(runner.reader, "oA");
 
-		// 2. prompt A — arms watchdog A (80 ms). Stub broadcasts agent_start NOW; A_callback
-		//    is the only subscriber so we observe threadId=A only (legitimate).
 		runner.send({
 			jsonrpc: "2.0",
 			id: "pA1",
@@ -405,14 +418,9 @@ void test("watchdog cross-thread rebind: no event leakage from concurrently-boun
 		assert.ok("accepted" in ack, "prompt A must be accepted");
 		assert.equal(ack.accepted, true);
 
-		// 3. open B — bindThread B tears down A_callback, adds B_callback, activeThreadId=B.
-		//    Must arrive BEFORE the watchdog ticks (80 ms after pA1 was accepted). The stub
-		//    is fast — open_thread is a sync handler, so this races in well under 80 ms.
 		runner.send({ jsonrpc: "2.0", id: "oB", method: "open_thread", params: { threadId: threadB } });
 		await readResult(runner.reader, "oB");
 
-		// 4 + 5. Collect every event frame until the stub's residue setTimeout chain drains,
-		// classified by whether it arrived before or after the turn_watchdog_fired marker.
 		const events: MentorEventNotification[] = [];
 		let watchdogSeenAtIndex = -1;
 		const start = Date.now();
@@ -425,9 +433,6 @@ void test("watchdog cross-thread rebind: no event leakage from concurrently-boun
 			if (eventType(parsed) === "turn_watchdog_fired") {
 				watchdogSeenAtIndex = events.length - 1;
 			}
-			// Stop ≈400 ms after the watchdog fired so the residue text_delta + natural
-			// agent_end from the first prompt's setTimeout chain have time to reach us
-			// (stub is 200 ms total; watchdog fires at 80 ms → residue at 100 ms, 200 ms).
 			if (watchdogSeenAtIndex >= 0 && Date.now() - start > 600) break;
 		}
 
@@ -439,23 +444,6 @@ void test("watchdog cross-thread rebind: no event leakage from concurrently-boun
 			`expected turn_watchdog_fired event during the watchdog window; got events: ${summarise(events)}`,
 		);
 
-		// The watchdog emits three events for thread A in close sequence:
-		//   1. turn_watchdog_fired (direct sendEvent, before abort)
-		//   2. abort-broadcast agent_end (fires through whatever subscriber is active at that
-		//      instant — pre-rebind that's B_callback, so ONE legitimate threadId=B agent_end
-		//      arrives here. Not a leak: the fix's order-of-operations puts the teardown of
-		//      B's subscription AFTER the abort, by design.)
-		//   3. direct sendEvent agent_end (post-rebind, marks "subscribers Set is now in the
-		//      fixed state — only newA_callback".)
-		//
-		// The leak signal is anything broadcast AFTER step 3: the stub's residue setTimeout
-		// chain (text_delta, natural agent_end) fires through whatever subscribers remain.
-		// WITH the fix → only newA_callback → no thread-B events. WITHOUT → also B_callback →
-		// duplicate thread-B events.
-		//
-		// We demarcate "post-rebind" as the FIRST threadId=A agent_end after the watchdog
-		// marker (that is the direct sendEvent in step 3, since the abort-broadcast above
-		// tags threadId=B — A_callback was already removed by bindThread B's teardown).
 		const directRebindIdx = events.findIndex(
 			(f, i) =>
 				i > watchdogSeenAtIndex && eventThreadId(f) === threadA && eventType(f) === "agent_end",
@@ -470,16 +458,9 @@ void test("watchdog cross-thread rebind: no event leakage from concurrently-boun
 		assert.deepEqual(
 			leakedB.map((f) => eventType(f)),
 			[],
-			"thread B's subscription must be torn down by the watchdog rebind — any threadId=B " +
-				"event AFTER the watchdog's direct agent_end indicates a leaked subscription " +
-				"(the first prompt's residue setTimeout chain broadcast through B_callback). " +
-				`post-rebind frames seen: ${summarise(postRebind)}`,
+			`thread B received events after thread A rebound: ${summarise(postRebind)}`,
 		);
 	} finally {
 		await shutdown(runner);
 	}
 });
-
-// Note: fetch_context end-to-end coverage lives Java-side in MentorRunnerClientTest +
-// MentorChatServiceTest. A Node-side smoke test would either assert on stderr text (brittle)
-// or require a real Pi LLM round-trip.

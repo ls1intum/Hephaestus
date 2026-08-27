@@ -287,6 +287,7 @@ class ThreadState {
 	readonly threadId: string;
 	readonly sessionPath: string;
 	inFlight = false;
+	lastAgentEnd: Extract<AgentSessionEvent, { type: "agent_end" }> | null = null;
 	watchdogTimer: ReturnType<typeof setTimeout> | null = null;
 	readonly pendingFetchContexts = new Map<string, PendingFetchContext>();
 	unsubscribe: (() => void) | null = null;
@@ -294,6 +295,10 @@ class ThreadState {
 	constructor(threadId: string, sessionPath: string) {
 		this.threadId = threadId;
 		this.sessionPath = sessionPath;
+	}
+
+	hasTurnInFlight() {
+		return this.inFlight;
 	}
 }
 
@@ -332,15 +337,16 @@ function enqueue(fn: () => unknown): void {
 	})().catch((e: unknown) => log("dispatch queue swallowed:", errorText(e)));
 }
 
-// System prompt is optional in v1 — the Java caller may inject it later. If the resource exists we
-// load it once and hand it to the SDK's resource loader.
 function cacheSystemPrompt() {
-	if (!existsSync(SYSTEM_PROMPT_PATH)) return;
+	if (!existsSync(SYSTEM_PROMPT_PATH)) {
+		if (PROTOCOL_ONLY) return;
+		throw new Error(`mentor system prompt is missing: ${SYSTEM_PROMPT_PATH}`);
+	}
 	try {
 		systemPrompt = readFileSync(SYSTEM_PROMPT_PATH, "utf8");
 		log(`loaded system prompt: ${systemPrompt.length} bytes`);
 	} catch (e) {
-		log("system prompt read failed (continuing without):", e);
+		throw new Error(`mentor system prompt could not be read: ${errorText(e)}`, { cause: e });
 	}
 }
 
@@ -350,40 +356,33 @@ async function createPiRuntime(sdk: PiSdk, agentDir: string): Promise<MentorRunt
 		createAgentSessionFromServices,
 		createAgentSessionServices,
 		SessionManager,
-		AuthStorage,
-		ModelRegistry,
+		ModelRuntime,
 	} = sdk;
 
-	// Custom tools (defined once; same instances reused across thread switches).
 	const fetchContextTool = defineFetchContextTool(sdk);
 	const linkObservationTool = defineLinkObservationTool(sdk);
 
-	// Same race workaround as pi-runner.ts: register the hephaestus provider directly on
-	// the ModelRegistry before createAgentSession. Reused across cwd switches; providers are
-	// cwd-independent. Config comes from the server-written pi-provider.json via the shared
-	// pi-provider.ts helper — kept byte-identical with pi-runner.ts's registration so the two
-	// runners cannot drift.
-	const sharedAuthStorage = AuthStorage.create();
-	const sharedModelRegistry = ModelRegistry.create(sharedAuthStorage);
+	const sharedModelRuntime = await ModelRuntime.create({
+		authPath: `${agentDir}/auth.json`,
+		modelsPath: `${agentDir}/models.json`,
+		allowModelNetwork: false,
+	});
 	const providerConfig = loadProviderConfig(CWD);
-	if (providerConfig && registerHephaestusProvider(sharedModelRegistry, providerConfig)) {
-		log(
-			`registered hephaestus provider: apiProtocol=${providerConfig.apiProtocol} model=${providerConfig.modelId}`,
+	if (!providerConfig?.modelId || !registerHephaestusProvider(sharedModelRuntime, providerConfig)) {
+		throw new Error(
+			"Hephaestus provider is not configured — pi-provider.json and proxy credentials are required",
 		);
-	} else {
-		log("hephaestus provider NOT registered — missing pi-provider.json or proxy env vars");
 	}
+	const model = sharedModelRuntime.getModel("hephaestus", providerConfig.modelId);
+	if (!model) throw new Error(`Hephaestus model was not registered: ${providerConfig.modelId}`);
+	log(
+		`registered hephaestus provider: apiProtocol=${providerConfig.apiProtocol} model=${providerConfig.modelId}`,
+	);
 
-	// The mentor's system prompt has to travel as a resource-loader option, NOT as a prebuilt
-	// loader: createAgentSessionFromServices always uses `services.resourceLoader` and ignores any
-	// loader passed alongside it, so an override installed on a hand-built loader never reaches
-	// the model. createAgentSessionServices constructs the loader from these options and reloads
-	// it, which is the only path an override survives.
-	const resourceLoaderOptions = systemPrompt
-		? { systemPromptOverride: () => systemPrompt ?? undefined }
-		: undefined;
+	const mentorSystemPrompt = systemPrompt;
+	if (mentorSystemPrompt === null) throw new Error("mentor system prompt was not loaded");
+	const resourceLoaderOptions = { systemPromptOverride: () => mentorSystemPrompt };
 
-	// Factory: rebuilds cwd-bound services on every session lifecycle event.
 	const createRuntime: CreateAgentSessionRuntimeFactory = async ({
 		cwd,
 		agentDir: sessionAgentDir,
@@ -393,8 +392,7 @@ async function createPiRuntime(sdk: PiSdk, agentDir: string): Promise<MentorRunt
 		const services = await createAgentSessionServices({
 			cwd,
 			agentDir: sessionAgentDir,
-			authStorage: sharedAuthStorage,
-			modelRegistry: sharedModelRegistry,
+			modelRuntime: sharedModelRuntime,
 			resourceLoaderOptions,
 		});
 		// Least-privilege mentor surface: context is exposed through fetch_context, not
@@ -406,11 +404,11 @@ async function createPiRuntime(sdk: PiSdk, agentDir: string): Promise<MentorRunt
 			sessionStartEvent,
 			customTools: [fetchContextTool, linkObservationTool],
 			tools: [...MENTOR_TOOL_NAMES],
+			model,
 		});
 		return { ...result, services, diagnostics: services.diagnostics };
 	};
 
-	// Start with an in-memory session — the first open_thread will switch to the persistent file.
 	return createAgentSessionRuntime(createRuntime, {
 		cwd: CWD,
 		agentDir,
@@ -428,9 +426,6 @@ async function ensureRuntime(): Promise<MentorRuntime> {
 	runtimeInitPromise = (async () => {
 		mkdirSync(SESSIONS_DIR, { recursive: true });
 		const sdk = PROTOCOL_ONLY ? null : await import("@earendil-works/pi-coding-agent");
-		// `getAgentDir()` is the SDK's canonical default ("~/.pi/agent") and only exists once the
-		// SDK is loaded; protocol-only mode never loads it and falls back to the sandbox layout's
-		// own agent dir, which is what production's PI_CODING_AGENT_DIR points at anyway.
 		const agentDir = AGENT_DIR_OVERRIDE ?? sdk?.getAgentDir() ?? PI_AGENT_DIR;
 		cacheSystemPrompt();
 		const r = sdk === null ? createStubRuntime() : await createPiRuntime(sdk, agentDir);
@@ -450,11 +445,6 @@ async function ensureRuntime(): Promise<MentorRuntime> {
 	}
 }
 
-//
-// When Pi calls this tool, we emit a JSON-RPC request to Java and await a matching response.
-// 10s timeout — on miss, we resolve Pi's tool call with an error result so the agent reasons
-// about the gap rather than crashing the turn.
-
 function defineFetchContextTool(sdk: PiSdk) {
 	const { defineTool } = sdk;
 	return defineTool({
@@ -472,8 +462,6 @@ function defineFetchContextTool(sdk: PiSdk) {
 			},
 		},
 		execute: async (_toolCallId, params): Promise<FetchContextToolResult> => {
-			// NOT `path` — that's the imported `node:path` module; shadowing it here is a
-			// future footgun if anyone adds `path.join(...)`.
 			const contextKey = jsonText(params.path).trim();
 			// Pi treats THROWN errors as the tool's failure signal — a returned `isError:true`
 			// is ignored by the runtime, so throw to flag the call as failed.
@@ -528,14 +516,11 @@ function defineLinkObservationTool(sdk: PiSdk) {
 				observationId: { type: "string", minLength: 1 },
 			},
 		},
-		// Nothing here waits on anything. Pi reads a rejection as the tool's failure, which is what a
-		// missing observationId owes the model.
 		execute: (_toolCallId, params): Promise<AgentToolResult<{ observationId: string }>> => {
 			const observationId = jsonText(params.observationId).trim();
 			if (!observationId) {
 				return Promise.reject(new Error("link_observation: observationId is required"));
 			}
-			// Emit a synthetic event the Java translator maps to a `data-observation` UI chunk.
 			if (activeThreadId) {
 				sendEvent(activeThreadId, { type: "link_observation", observationId });
 			}
@@ -548,12 +533,9 @@ function defineLinkObservationTool(sdk: PiSdk) {
 }
 
 function handleHello(id: JsonRpcId | undefined /*, params */) {
-	// Java validates `protocolVersion` AND `protocolOnly` (MentorChatService#verifyProtocol);
-	// shipping the latter on hello lets Java fail-closed if MENTOR_RUNNER_PROTOCOL_ONLY=1
-	// leaks into a real deploy, instead of every user receiving stubbed answers.
+	// Java validates protocolOnly so a stub runtime cannot answer production traffic.
 	sendResult(id, { protocolVersion: PROTOCOL_VERSION, protocolOnly: PROTOCOL_ONLY });
-	// Prewarm the SDK in the background while Java orchestrates DB load + context build.
-	// Fired AFTER the hello reply because SDK module evaluation is synchronous.
+	// Reply before synchronously evaluating the SDK during background prewarm.
 	if (!PROTOCOL_ONLY) {
 		setImmediate(() => {
 			ensureRuntime().catch((e) => log("prewarm ensureRuntime failed (will retry on demand):", e));
@@ -561,32 +543,15 @@ function handleHello(id: JsonRpcId | undefined /*, params */) {
 	}
 }
 
-/**
- * Inbound `params`, as they arrive: parsed JSON with no guarantees. The declared shapes in
- * pi-mentor-protocol.ts say what Java sends; the handlers below still coerce every field, because
- * this is a trust boundary and `path.join` is downstream of it.
- */
+/** Untrusted JSON-RPC parameters. */
 type MentorParams = Record<string, unknown>;
 
-/**
- * One dispatch entry. Handlers that ignore `params` simply declare fewer parameters, and the ones
- * that settle a request without waiting on the runtime return nothing at all.
- *
- * `id` is `undefined` for a JSON-RPC notification (§4: no response may be sent) and `null` for a
- * request whose id could not be determined (§6), which still gets one.
- */
+/** An undefined id identifies a JSON-RPC notification and receives no response. */
 type MethodHandler = (id: JsonRpcId | undefined, params: MentorParams) => void | Promise<void>;
 
-// Canonical lowercase UUID, the only shape Java ever sends. Validating defensively at the
-// runner boundary means a future caller that bypasses Java (dev bridge, mis-routed message)
-// cannot land an arbitrary path inside `path.join(SESSIONS_DIR, …)` — `path.join` is NOT a
-// security primitive and happily resolves `..` / absolute paths out of the base.
+// Prevent thread IDs from escaping SESSIONS_DIR.
 const THREAD_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
-// Canonicalise the thread id the SAME way for open AND every later lookup. open_thread stores
-// state under this key, so a caller sending an uppercase UUID (the dev-bridge / mis-routed
-// threat model THREAD_ID_PATTERN guards) must be normalised identically on prompt/steer/abort/
-// close or `threads.get()` misses and returns a spurious THREAD_NOT_OPEN.
 function normalizeThreadId(params: MentorParams) {
 	return jsonText(params.threadId).trim().toLowerCase();
 }
@@ -663,17 +628,38 @@ async function bindThread(state: ThreadState): Promise<MentorRuntime> {
 }
 
 function forwardEvent(state: ThreadState, event: AgentSessionEvent) {
-	// Emit session_persisted BEFORE agent_end so TranslatorState captures the bytes before
-	// finalise runs. Watchdog-synthesised agent_end frames bypass this path.
-	if (event.type === "agent_end") {
-		emitSessionPersisted(state);
+	if (process.env.MENTOR_RUNNER_DEBUG_EVENTS === "1") {
+		const detail = event.type === "message_update" ? `/${event.assistantMessageEvent.type}` : "";
+		log(`event: ${event.type}${detail}`);
+		if (event.type === "message_end" && event.message.role === "assistant") {
+			log(`assistant end: ${event.message.stopReason}`);
+		}
 	}
-	sendEvent(state.threadId, event);
+	// agent_end is attempt-level; expose only the final attempt after agent_settled.
 	if (event.type === "agent_end") {
+		state.lastAgentEnd = event;
+		return;
+	}
+
+	if (event.type === "agent_settled") {
+		emitSessionPersisted(state);
+		const finalAgentEnd = state.lastAgentEnd;
+		state.lastAgentEnd = null;
+		if (finalAgentEnd) {
+			sendEvent(state.threadId, finalAgentEnd);
+		} else {
+			sendEvent(state.threadId, {
+				type: "pi_error",
+				message: "Pi settled without an agent_end event",
+			});
+			sendEvent(state.threadId, { type: "agent_end", messages: [], willRetry: false });
+		}
 		clearTurnWatchdog(state);
 		state.inFlight = false;
 		maybePostTurnGc();
+		return;
 	}
+	sendEvent(state.threadId, event);
 }
 
 function emitSessionPersisted(state: ThreadState) {
@@ -681,7 +667,10 @@ function emitSessionPersisted(state: ThreadState) {
 		// Legitimate case: PROTOCOL_ONLY stub never persists. In production this is anomalous —
 		// surface as pi_error so Java logs a warning rather than silently caching stale bytes.
 		if (!PROTOCOL_ONLY) {
-			sendEvent(state.threadId, { type: "pi_error", message: "session file missing on agent_end" });
+			sendEvent(state.threadId, {
+				type: "pi_error",
+				message: "session file missing at settlement",
+			});
 		}
 		return;
 	}
@@ -739,6 +728,7 @@ async function handlePrompt(id: JsonRpcId | undefined, params: MentorParams) {
 	}
 
 	state.inFlight = true;
+	state.lastAgentEnd = null;
 	startTurnWatchdog(state);
 
 	// Accept-and-stream: respond to the prompt RPC immediately; the actual turn is observed
@@ -752,13 +742,9 @@ async function handlePrompt(id: JsonRpcId | undefined, params: MentorParams) {
 		})
 		.catch((e: unknown) => {
 			log(`prompt rejected for thread ${threadId}: ${errorText(e)}`);
-			// Synthesise terminal events so Java unblocks. Guard against double-fire: if the
-			// SDK already emitted a real agent_end before rejecting (rare but observed under
-			// abort+error races), `state.inFlight` is already false and the translator would
-			// see a second Finish.
 			if (!state.inFlight) return;
 			sendEvent(threadId, { type: "pi_error", error: errorText(e) });
-			sendEvent(threadId, { type: "agent_end", messages: [] });
+			sendEvent(threadId, { type: "agent_end", messages: [], willRetry: false });
 			clearTurnWatchdog(state);
 			state.inFlight = false;
 		});
@@ -792,14 +778,13 @@ async function handleAbort(id: JsonRpcId | undefined, params: MentorParams) {
 	if (!state) {
 		return sendError(id, ERR.THREAD_NOT_OPEN, `thread ${threadId} is not open`);
 	}
-	if (!state.inFlight) {
+	if (!state.hasTurnInFlight()) {
 		return sendError(id, ERR.INVALID_STATE, "no turn in flight for this thread");
 	}
 	try {
 		const rt = await bindThread(state);
 		await rt.session.abort();
 		sendResult(id, { aborted: true });
-		// agent_end will arrive naturally; that's where inFlight clears.
 	} catch (e) {
 		sendError(id, ERR.PI_ERROR, `abort failed: ${errorText(e)}`);
 	}
@@ -944,17 +929,9 @@ function handleFetchContextResponse(frame: Record<string, unknown>) {
 	log(`fetch_context response had no matching pending callback: id=${callbackId}`);
 }
 
-// Single watchdog: fires (TURN_BUDGET_MS + TURN_GRACE_MS) after the turn starts. The wider
-// budget covers the worst-case Pi turn; the grace allows Pi to settle if it's close to
-// finishing on its own. On fire we dispose the session, rebind, and surface a synthetic
-// agent_end so Java releases its lock. Java sees `turn_watchdog_fired` for diagnostics.
 function startTurnWatchdog(state: ThreadState) {
 	clearTurnWatchdog(state);
-	// The setTimeout body runs OFF the dispatch queue (it's wall-clock-driven), so the
-	// session-rebinding work — which races user RPCs that also call switchSession — is
-	// funnelled BACK through the queue via `enqueue`. Without this the watchdog could
-	// hit `runtime.switchSession` concurrently with a `prompt` / `close_thread` and
-	// rebind to whichever resolves last, losing every subsequent event.
+	// Serialize rebinding with RPC-driven session switches.
 	state.watchdogTimer = setTimeout(() => {
 		enqueue(() => runWatchdogRebind(state));
 	}, TURN_BUDGET_MS + TURN_GRACE_MS);
@@ -966,14 +943,7 @@ async function runWatchdogRebind(state: ThreadState) {
 		log(`watchdog rebind skipped: thread=${state.threadId} already closed`);
 		return;
 	}
-	// The real `agent_end` raced ahead of us through the queue and cleared `inFlight`. Without
-	// this guard we'd emit a SECOND synthetic `agent_end`, and Java's translator would Finish
-	// the assistant message twice (or worse, finalise on a turn that already finalised).
-	//
-	// Sampled here rather than read once for the whole function: everything below can clear the flag
-	// while this awaits, which is why the finally block asks again.
-	const turnInFlight = state.inFlight;
-	if (!turnInFlight) {
+	if (!state.inFlight) {
 		log(`watchdog rebind skipped: thread=${state.threadId} turn already completed`);
 		return;
 	}
@@ -982,8 +952,7 @@ async function runWatchdogRebind(state: ThreadState) {
 	// Read once: the abort below yields, and every step after it must act on the same runtime.
 	const rt = runtime;
 	try {
-		// Reject pending fetch_context callbacks BEFORE switchSession so the rebound
-		// session can't echo stale callback ids.
+		// Reject callbacks before the rebound session can reuse their ids.
 		for (const [cbId, pending] of state.pendingFetchContexts) {
 			clearTimeout(pending.timer);
 			pending.reject(new Error("fetch_context: turn aborted by watchdog"));
@@ -1000,12 +969,7 @@ async function runWatchdogRebind(state: ThreadState) {
 			}
 			state.unsubscribe = null;
 		}
-		// Rebind to a fresh AgentSession on the same JSONL file (switchSession teardown
-		// invalidates captured extension ctx; listeners are session-scoped per Pi SDK).
-		// If a DIFFERENT thread is currently bound, tear down its subscription first; otherwise
-		// the rebind silently steals the runtime and leaks the prior subscription. After a
-		// successful switchSession the runtime is bound to OUR sessionPath, so activeThreadId
-		// must be updated to match or the invariant goes stale.
+		// A runtime has one active session; remove its prior thread subscription before rebinding.
 		if (rt) {
 			try {
 				if (activeThreadId && activeThreadId !== state.threadId) {
@@ -1028,12 +992,9 @@ async function runWatchdogRebind(state: ThreadState) {
 			}
 		}
 	} finally {
-		// The abort() above can emit a real terminal agent_end through the still-active
-		// subscription (torn down only afterwards), which flows through forwardEvent and clears
-		// inFlight. Guard the synthetic emit on inFlight — mirroring handlePrompt's catch — so the
-		// translator never sees a SECOND agent_end and double-finalises the turn.
-		if (state.inFlight) {
-			sendEvent(state.threadId, { type: "agent_end", messages: [] });
+		if (state.hasTurnInFlight()) {
+			state.lastAgentEnd = null;
+			sendEvent(state.threadId, { type: "agent_end", messages: [], willRetry: false });
 			state.inFlight = false;
 		}
 	}
@@ -1119,21 +1080,11 @@ async function dispatch(frame: unknown) {
 	log("unrecognised frame:", JSON.stringify(frame).slice(0, 200));
 }
 
-//
-// Activated by `MENTOR_RUNNER_PROTOCOL_ONLY=1`. Implements the same `MentorRuntime` contract the
-// real SDK satisfies — nothing more — so the protocol layer above cannot tell the two apart. Each
-// `prompt(text)` synthesises an agent_start + a text_delta + an agent_end so the framing loop has
-// something deterministic to forward, and the events are real `AgentSessionEvent` values so a
-// consumer written against the SDK's union sees the same shapes it would in production. The stub
-// honours `MENTOR_RUNNER_STUB_DELAY_MS` so tests can simulate slow turns / watchdog firing.
-
-/** The SDK's `AssistantMessage`, reached through the event union rather than a second package. */
 type StubAssistantMessage = Extract<
 	Extract<AgentSessionEvent, { type: "message_update" }>["assistantMessageEvent"],
 	{ type: "text_delta" }
 >["partial"];
 
-/** A syntactically complete assistant message, so stub events satisfy the SDK's own event union. */
 function stubAssistantMessage(text: string): StubAssistantMessage {
 	return {
 		role: "assistant",
@@ -1157,6 +1108,7 @@ function stubAssistantMessage(text: string): StubAssistantMessage {
 function createStubRuntime(): MentorRuntime {
 	const subscribers = new Set<(event: AgentSessionEvent) => void>();
 	let isStreaming = false;
+	let attemptGeneration = 0;
 	const emit = (event: AgentSessionEvent) => {
 		for (const s of subscribers) {
 			try {
@@ -1178,11 +1130,13 @@ function createStubRuntime(): MentorRuntime {
 				throw new Error("stub: already streaming (caller should pass streamingBehavior)");
 			}
 			isStreaming = true;
+			const attempt = ++attemptGeneration;
 			const delay = Number(process.env.MENTOR_RUNNER_STUB_DELAY_MS) || 5;
 			emit({ type: "agent_start" });
 			await new Promise((resolve) => {
 				setTimeout(resolve, delay);
 			});
+			if (attempt !== attemptGeneration) return;
 			const delta = `stub: ${text}`;
 			emit({
 				type: "message_update",
@@ -1197,7 +1151,21 @@ function createStubRuntime(): MentorRuntime {
 			await new Promise((resolve) => {
 				setTimeout(resolve, delay);
 			});
-			emit({ type: "agent_end", messages: [] });
+			if (attempt !== attemptGeneration) return;
+			const retryDelay = Number(process.env.MENTOR_RUNNER_STUB_RETRY_DELAY_MS) || 0;
+			if (retryDelay > 0) {
+				emit({
+					type: "agent_end",
+					messages: [stubAssistantMessage("stub: discarded attempt")],
+					willRetry: true,
+				});
+				await new Promise((resolve) => {
+					setTimeout(resolve, retryDelay);
+				});
+				if (attempt !== attemptGeneration) return;
+			}
+			emit({ type: "agent_end", messages: [stubAssistantMessage(delta)], willRetry: false });
+			emit({ type: "agent_settled" });
 			isStreaming = false;
 		},
 		steer() {
@@ -1205,7 +1173,9 @@ function createStubRuntime(): MentorRuntime {
 		},
 		abort() {
 			if (isStreaming) {
-				emit({ type: "agent_end", messages: [] });
+				attemptGeneration++;
+				emit({ type: "agent_end", messages: [], willRetry: false });
+				emit({ type: "agent_settled" });
 				isStreaming = false;
 			}
 			return Promise.resolve();

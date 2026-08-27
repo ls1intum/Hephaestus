@@ -8,6 +8,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
@@ -26,7 +27,7 @@ public class FeedbackCompositionResultParser {
      * A bound on how much composed prose one cycle can offer, before each lane's per-recipient cap
      * applies. Not a policy — a guard against a runaway turn filling the ledger.
      */
-    static final int MAX_UNITS = 24;
+    static final int MAX_UNITS = 30;
 
     private static final int MAX_PRACTICE_SLUG_LENGTH = 128;
 
@@ -46,7 +47,7 @@ public class FeedbackCompositionResultParser {
             return List.of();
         }
         Map<String, StagedObservation> observations = readObservations(payload.get("observations"));
-        Set<String> preparedThreadKeys = readThreadKeys(payload.get("preparedThreadKeys"));
+        Set<PreparedTarget> preparedTargets = readPreparedTargets(payload.get("preparedTargets"));
 
         List<ComposedFeedbackUnit> parsed = new ArrayList<>();
         Set<String> seen = new LinkedHashSet<>();
@@ -55,7 +56,7 @@ public class FeedbackCompositionResultParser {
                 log.warn("Composition stage reported more than {} units; the tail was ignored", MAX_UNITS);
                 break;
             }
-            ComposedFeedbackUnit composed = read(unit, observations, preparedThreadKeys);
+            ComposedFeedbackUnit composed = read(unit, observations, preparedTargets);
             if (composed == null) {
                 continue;
             }
@@ -77,7 +78,7 @@ public class FeedbackCompositionResultParser {
     private static @Nullable ComposedFeedbackUnit read(
         JsonNode unit,
         Map<String, StagedObservation> observations,
-        Set<String> preparedThreadKeys
+        Set<PreparedTarget> preparedTargets
     ) {
         if (unit == null || !unit.isObject()) {
             return null;
@@ -93,16 +94,15 @@ public class FeedbackCompositionResultParser {
             return null;
         }
         String normalizedPracticeSlug = normalizeSlug(practiceSlug);
-        boolean grounded = basedOn
+        boolean grounded = basedOn.stream().allMatch(observations::containsKey);
+        boolean ownsEvidence = basedOn
             .stream()
-            .allMatch(reference -> {
-                if (("prior:" + normalizedPracticeSlug).equals(reference)) return true;
-                StagedObservation observation = observations.get(reference);
-                return observation != null && normalizedPracticeSlug.equals(observation.practiceSlug());
-            });
-        if (!grounded) {
+            .map(observations::get)
+            .filter(Objects::nonNull)
+            .anyMatch(observation -> normalizedPracticeSlug.equals(observation.practiceSlug()));
+        if (!grounded || !ownsEvidence) {
             log.warn(
-                "Composed unit names evidence outside its practice: channel={}, practice={}",
+                "Composed unit is not grounded in admitted evidence for its practice: channel={}, practice={}",
                 channel,
                 practiceSlug
             );
@@ -131,7 +131,10 @@ public class FeedbackCompositionResultParser {
         String supersedesThreadKey = null;
         if (action == ComposedFeedbackUnit.Action.SUPERSEDE) {
             supersedesThreadKey = text(unit, "supersedesThreadKey", ComposedFeedbackUnit.MAX_THREAD_KEY_LENGTH);
-            if (supersedesThreadKey == null || !preparedThreadKeys.contains(supersedesThreadKey)) {
+            if (
+                supersedesThreadKey == null ||
+                !preparedTargets.contains(new PreparedTarget(supersedesThreadKey, channel, normalizedPracticeSlug))
+            ) {
                 log.warn(
                     "Composed unit names a supersession target that was not staged: channel={}, practice={}",
                     channel,
@@ -316,8 +319,18 @@ public class FeedbackCompositionResultParser {
         return observations;
     }
 
-    private static Set<String> readThreadKeys(@Nullable JsonNode node) {
-        return Set.copyOf(strings(node));
+    private static Set<PreparedTarget> readPreparedTargets(@Nullable JsonNode node) {
+        if (node == null || !node.isArray()) return Set.of();
+        Set<PreparedTarget> targets = new LinkedHashSet<>();
+        for (JsonNode entry : node) {
+            String threadKey = text(entry, "threadKey", ComposedFeedbackUnit.MAX_THREAD_KEY_LENGTH);
+            FeedbackChannel channel = channelOf(entry);
+            String practiceSlug = normalizedSlug(text(entry, "practiceSlug", MAX_PRACTICE_SLUG_LENGTH));
+            if (threadKey != null && channel != null && practiceSlug != null) {
+                targets.add(new PreparedTarget(threadKey, channel, practiceSlug));
+            }
+        }
+        return Set.copyOf(targets);
     }
 
     private static List<String> strings(@Nullable JsonNode node) {
@@ -428,6 +441,8 @@ public class FeedbackCompositionResultParser {
         boolean anchorable,
         List<StagedCitation> citations
     ) {}
+
+    private record PreparedTarget(String threadKey, FeedbackChannel channel, String practiceSlug) {}
 
     private record StagedCitation(
         @Nullable String path,

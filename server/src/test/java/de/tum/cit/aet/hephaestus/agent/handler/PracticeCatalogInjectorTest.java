@@ -12,8 +12,10 @@ import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.integration.core.signal.SignalName;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ActorRole;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
 import de.tum.cit.aet.hephaestus.practices.PracticeAutomatedReviewPolicy;
+import de.tum.cit.aet.hephaestus.practices.PracticeBinding;
 import de.tum.cit.aet.hephaestus.practices.PracticeEvidenceLimitation;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
@@ -40,6 +42,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ArrayNode;
+import tools.jackson.databind.node.ObjectNode;
 
 @ExtendWith(MockitoExtension.class)
 class PracticeCatalogInjectorTest extends BaseUnitTest {
@@ -90,6 +93,14 @@ class PracticeCatalogInjectorTest extends BaseUnitTest {
         return j;
     }
 
+    private AgentJob reviewerJob() {
+        AgentJob job = job(ScmSignals.PULL_REQUEST_REVIEWED);
+        var metadata = org.junit.jupiter.api.Assertions.assertInstanceOf(ObjectNode.class, job.getMetadata());
+        metadata.put("about_user_id", 42L);
+        metadata.put("subject_role", ActorRole.REVIEWER.name());
+        return job;
+    }
+
     private static String md(String slug) {
         return SandboxLayout.PRACTICES_PREFIX + slug + ".md";
     }
@@ -111,6 +122,31 @@ class PracticeCatalogInjectorTest extends BaseUnitTest {
         assertThat(files).containsKey(md("retrospective"));
         assertThat(files).doesNotContainKey(md("authoring"));
         assertThat(files).doesNotContainKey(md("reviewer"));
+    }
+
+    @Test
+    void shouldSelectOnlyReviewerPracticesWhenSubmittedReviewNamesReviewer() {
+        Practice author = practice("author-engagement", ScmSignals.PULL_REQUEST_REVIEWED);
+        Practice reviewer = practice("review-comment-quality", ScmSignals.PULL_REQUEST_REVIEWED);
+        reviewer.setBindings(
+            List.of(
+                new PracticeBinding(
+                    List.of(ScmSignals.PULL_REQUEST_REVIEWED),
+                    PracticeTestEvidence.needsFor(ArtifactKinds.PULL_REQUEST),
+                    false,
+                    ActorRole.REVIEWER
+                )
+            )
+        );
+        when(practiceRepository.findByWorkspaceIdAndArtifactKind(1L, ArtifactKinds.PULL_REQUEST)).thenReturn(
+            List.of(author, reviewer)
+        );
+        Map<String, byte[]> files = new HashMap<>();
+
+        injector.inject(files, reviewerJob(), ArtifactKinds.PULL_REQUEST);
+
+        assertThat(files).containsKey(md("review-comment-quality"));
+        assertThat(files).doesNotContainKey(md("author-engagement"));
     }
 
     @Test

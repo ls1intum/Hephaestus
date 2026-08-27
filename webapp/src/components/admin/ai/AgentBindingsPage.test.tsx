@@ -137,19 +137,19 @@ describe("AgentBindingsPage", () => {
 
 		fireEvent.click(card.getByRole("button", { name: /Advanced/ }));
 		const timeout = card.getByLabelText("Timeout (seconds)");
-		fireEvent.change(timeout, { target: { value: "7200" } });
+		fireEvent.change(timeout, { target: { value: "14400" } });
 		fireEvent.click(card.getByRole("button", { name: "Save assignment" }));
 
-		card.getByText("Runs stop after an hour, so enter 3600 seconds or less.");
+		card.getByText("Runs stop after three hours, so enter 10800 seconds or less.");
 		expect(timeout.getAttribute("aria-invalid")).toBe("true");
 		expect(onSave).not.toHaveBeenCalled();
 
-		fireEvent.change(timeout, { target: { value: "3600" } });
+		fireEvent.change(timeout, { target: { value: "10800" } });
 		fireEvent.click(card.getByRole("button", { name: "Save assignment" }));
 
 		expect(onSave).toHaveBeenCalledWith(
 			"PRACTICE_REVIEW",
-			expect.objectContaining({ timeoutSeconds: 3600 }),
+			expect.objectContaining({ timeoutSeconds: 10800 }),
 		);
 	});
 

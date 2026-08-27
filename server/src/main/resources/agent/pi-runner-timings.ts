@@ -1,12 +1,48 @@
-/** Review attempt timing within the detector's budget. */
 export function deriveTimeouts(agentBudgetMs: number, compositionEnabled = false) {
-	const compositionMs = compositionEnabled ? Math.max(30_000, Math.floor(agentBudgetMs * 0.15)) : 0;
+	if (!Number.isFinite(agentBudgetMs) || agentBudgetMs <= 0) {
+		throw new Error(`agentBudgetMs must be a positive number, got: ${agentBudgetMs}`);
+	}
+
+	const compositionMs = compositionEnabled ? Math.floor(agentBudgetMs * 0.15) : 0;
 	const reviewBudgetMs = agentBudgetMs - compositionMs;
-	const initialMs = Math.max(60_000, Math.floor(reviewBudgetMs * 0.85));
+	const initialMs = Math.floor(reviewBudgetMs * 0.85);
 	return {
 		initialMs,
-		retryMs: Math.max(30_000, reviewBudgetMs - initialMs),
-		softNudgeMs: Math.max(45_000, Math.floor(initialMs * 0.5)),
+		retryMs: reviewBudgetMs - initialMs,
 		compositionMs,
 	};
+}
+
+export function deriveTurnTiming(remainingMs: number, remainingTurns: number) {
+	if (!Number.isFinite(remainingMs) || remainingMs < 0) {
+		throw new Error(`remainingMs must be a non-negative number, got: ${remainingMs}`);
+	}
+	if (!Number.isInteger(remainingTurns) || remainingTurns <= 0) {
+		throw new Error(`remainingTurns must be a positive integer, got: ${remainingTurns}`);
+	}
+
+	const fairShareMs = Math.floor(remainingMs / remainingTurns);
+	return {
+		fairShareMs,
+		softNudgeMs: Math.floor(fairShareMs * 0.6),
+	};
+}
+
+export function deriveWorkstreamBudget(
+	remainingMs: number,
+	activeSlots: number,
+	remainingWorkstreams: number,
+) {
+	if (!Number.isFinite(remainingMs) || remainingMs < 0) {
+		throw new Error(`remainingMs must be a non-negative number, got: ${remainingMs}`);
+	}
+	if (!Number.isInteger(activeSlots) || activeSlots <= 0) {
+		throw new Error(`activeSlots must be a positive integer, got: ${activeSlots}`);
+	}
+	if (!Number.isInteger(remainingWorkstreams) || remainingWorkstreams <= 0) {
+		throw new Error(
+			`remainingWorkstreams must be a positive integer, got: ${remainingWorkstreams}`,
+		);
+	}
+	return Math.max(1, Math.floor((remainingMs * activeSlots) / remainingWorkstreams));
 }

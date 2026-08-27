@@ -168,10 +168,6 @@ export interface RunnerReadyEvent {
 	turnGraceMs: number;
 }
 
-/**
- * The thread's session JSONL as of `agent_end`, so Java can persist it back to
- * `chat_thread.session_jsonl` and restore the turn history byte-identically on the next container.
- */
 export interface SessionPersistedEvent {
 	type: "session_persisted";
 	jsonl: string;

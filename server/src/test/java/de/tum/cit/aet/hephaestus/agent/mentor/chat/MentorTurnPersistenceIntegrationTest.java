@@ -605,7 +605,7 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
         Long versionBefore = stale.getVersion();
         assertThat(versionBefore).isNotNull();
 
-        setCreatedAt(assistantId, Instant.now().minus(Duration.ofMinutes(80)));
+        setCreatedAt(assistantId, Instant.now().minus(Duration.ofMinutes(200)));
         reaperWithAnUnsafeWindow().reap();
         ChatMessage afterReaper = chatMessageRepository.findById(assistantId).orElseThrow();
         assertThat(afterReaper.getVersion()).isEqualTo(versionBefore + 1L);
@@ -628,11 +628,11 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
         UUID staleTurn = persistInFlightTurn("stale-turn");
         Instant now = Instant.now();
         setCreatedAt(tenMinuteTurn, now.minus(Duration.ofMinutes(10)));
-        setCreatedAt(maxDurationTurn, now.minus(Duration.ofMinutes(60)));
-        setCreatedAt(staleTurn, now.minus(Duration.ofMinutes(80)));
+        setCreatedAt(maxDurationTurn, now.minus(Duration.ofMinutes(180)));
+        setCreatedAt(staleTurn, now.minus(Duration.ofMinutes(200)));
 
         MentorInFlightReaper sweeper = reaperWithAnUnsafeWindow();
-        assertThat(sweeper.window()).isEqualTo(Duration.ofMinutes(70));
+        assertThat(sweeper.window()).isEqualTo(Duration.ofMinutes(190));
         sweeper.reap();
         sweeper.reap();
 
@@ -656,7 +656,7 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
         UUID crashedTurn = persistInFlightTurn("crashed-turn");
         accumulateProxyCall(crashedTurn, 40_000, 1_000, 250, 5_000);
         accumulateProxyCall(crashedTurn, 60_000, 2_000, 250, 5_000);
-        setCreatedAt(crashedTurn, Instant.now().minus(Duration.ofMinutes(80)));
+        setCreatedAt(crashedTurn, Instant.now().minus(Duration.ofMinutes(200)));
 
         reaperWithAnUnsafeWindow().reap();
 
@@ -682,7 +682,7 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
     @DisplayName("a turn with no recorded call stays unverifiable rather than being priced as free")
     void accountingReaper_keepsATurnWithNoRecordedCallUnverifiable() throws Exception {
         UUID silentTurn = persistInFlightTurn("silent-turn");
-        setCreatedAt(silentTurn, Instant.now().minus(Duration.ofMinutes(80)));
+        setCreatedAt(silentTurn, Instant.now().minus(Duration.ofMinutes(200)));
 
         reaperWithAnUnsafeWindow().reap();
 

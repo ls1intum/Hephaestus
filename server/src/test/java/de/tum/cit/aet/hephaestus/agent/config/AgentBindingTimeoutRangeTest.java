@@ -2,11 +2,13 @@ package de.tum.cit.aet.hephaestus.agent.config;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.tum.cit.aet.hephaestus.agent.sandbox.spi.ResourceLimits;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;
 import jakarta.validation.ValidatorFactory;
+import java.time.Duration;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.jspecify.annotations.Nullable;
@@ -41,6 +43,9 @@ class AgentBindingTimeoutRangeTest extends BaseUnitTest {
     void acceptsTheWholeRange() {
         assertThat(violationsFor(AgentBindingLimits.MIN_TIMEOUT_SECONDS)).isEmpty();
         assertThat(violationsFor(AgentBindingLimits.MAX_TIMEOUT_SECONDS)).isEmpty();
+        assertThat(Duration.ofSeconds(AgentBindingLimits.MAX_TIMEOUT_SECONDS)).isLessThanOrEqualTo(
+            ResourceLimits.MAX_RUNTIME
+        );
     }
 
     @Test

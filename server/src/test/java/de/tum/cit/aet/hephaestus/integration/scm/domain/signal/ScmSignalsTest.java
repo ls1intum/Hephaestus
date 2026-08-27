@@ -227,5 +227,15 @@ class ScmSignalsTest extends BaseUnitTest {
         }
         assertThat(ScmSignals.revisionScheme(ScmSignals.ISSUE_OPENED)).isEqualTo(RevisionScheme.CONTENT_DIGEST);
         assertThat(ScmSignals.revisionScheme(ScmSignals.PULL_REQUEST_READY)).isEqualTo(RevisionScheme.HEAD_COMMIT);
+        assertThat(ScmSignals.revisionScheme(ScmSignals.PULL_REQUEST_REVIEWED)).isEqualTo(RevisionScheme.EVENT_ID);
+    }
+
+    @Test
+    void shouldTreatDistinctSubmittedReviewsAsDistinctOccurrences() {
+        var first = ScmSignals.pullRequestReviewKey(1L, 42L, 100L);
+        var second = ScmSignals.pullRequestReviewKey(1L, 42L, 101L);
+
+        assertThat(first.revision()).isNotEqualTo(second.revision());
+        assertThat(first.revision().scheme()).contains(RevisionScheme.EVENT_ID);
     }
 }
