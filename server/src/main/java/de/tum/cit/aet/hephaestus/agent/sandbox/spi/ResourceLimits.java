@@ -25,8 +25,8 @@ public record ResourceLimits(long memoryBytes, double cpus, int pidsLimit, @Null
     /** Maximum PIDs: 4096 — more than enough for any agent workload. */
     public static final int MAX_PIDS = 4096;
 
-    /** Maximum runtime: 1 hour. */
-    public static final Duration MAX_RUNTIME = Duration.ofHours(1);
+    /** Maximum runtime: 3 hours, matching the longest supported review budget. */
+    public static final Duration MAX_RUNTIME = Duration.ofHours(3);
 
     public ResourceLimits {
         if (memoryBytes <= 0) {
