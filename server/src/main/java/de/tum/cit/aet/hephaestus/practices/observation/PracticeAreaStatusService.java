@@ -153,7 +153,7 @@ public class PracticeAreaStatusService {
             status,
             guidance,
             guidanceSource,
-            signal.trajectory(),
+            signal.direction(),
             signal.trendSupport(),
             hasDisplayableData ? signal.feedbackSpanDays() : null,
             hasDisplayableData ? signal.feedbackSince() : null,
@@ -258,7 +258,7 @@ public class PracticeAreaStatusService {
 
     /** Area-level direction and provenance, all derived from the same learner-visible evidence as its card. */
     private record AreaSignal(
-        @Nullable TrendDirection trajectory,
+        @Nullable TrendDirection direction,
         @Nullable TrendSupportDTO trendSupport,
         @Nullable Integer feedbackSpanDays,
         @Nullable Instant feedbackSince,
@@ -315,7 +315,7 @@ public class PracticeAreaStatusService {
             List<Observation> evidence = entry.getValue();
             Instant oldest = evidence.stream().map(Observation::getObservedAt).min(Instant::compareTo).orElse(null);
             Integer spanDays = oldest == null ? null : inclusiveUtcDaySpan(oldest, now);
-            PracticeTrend trajectory = practiceTrendService.calculateArea(
+            PracticeTrend direction = practiceTrendService.calculateArea(
                 entry.getKey(),
                 eligiblePracticesByArea.getOrDefault(entry.getKey(), List.of()),
                 trendsByArea.getOrDefault(entry.getKey(), List.of()),
@@ -324,8 +324,8 @@ public class PracticeAreaStatusService {
             signals.put(
                 entry.getKey(),
                 new AreaSignal(
-                    trajectory.direction(),
-                    TrendSupportDTO.from(trajectory.support()),
+                    direction.direction(),
+                    TrendSupportDTO.from(direction.support()),
                     spanDays,
                     oldest,
                     sourceCounts(evidence)
@@ -333,7 +333,7 @@ public class PracticeAreaStatusService {
             );
         }
         for (Map.Entry<String, List<String>> entry : eligiblePracticesByArea.entrySet()) {
-            PracticeTrend trajectory = practiceTrendService.calculateArea(
+            PracticeTrend direction = practiceTrendService.calculateArea(
                 entry.getKey(),
                 entry.getValue(),
                 trendsByArea.getOrDefault(entry.getKey(), List.of()),
@@ -341,13 +341,7 @@ public class PracticeAreaStatusService {
             );
             signals.putIfAbsent(
                 entry.getKey(),
-                new AreaSignal(
-                    trajectory.direction(),
-                    TrendSupportDTO.from(trajectory.support()),
-                    null,
-                    null,
-                    List.of()
-                )
+                new AreaSignal(direction.direction(), TrendSupportDTO.from(direction.support()), null, null, List.of())
             );
         }
         return signals;

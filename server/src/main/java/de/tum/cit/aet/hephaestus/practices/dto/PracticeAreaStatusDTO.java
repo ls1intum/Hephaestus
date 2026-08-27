@@ -12,9 +12,9 @@ import org.jspecify.annotations.Nullable;
 /**
  * The current developer's derived standing for one area. The area's reflection feedback
  * aggregated to a single qualitative status, with the supporting items so the status stays traceable
- * to real findings rather than an opaque grade. Like the reflection surface it is a learner-facing
+ * to real observations rather than an opaque grade. Like the reflection surface it is a developer-facing
  * read model, NOT a scoreboard: no raw score, no observation enums, no criteria. The feedback span
- * and trajectory are provenance about the derivation, not scores about the developer.
+ * and direction are provenance about the derivation, not scores about the developer.
  */
 @Schema(description = "A developer's derived qualitative standing for one Area including 1<=n<many practices")
 public record PracticeAreaStatusDTO(
@@ -24,7 +24,7 @@ public record PracticeAreaStatusDTO(
     @Nullable
     @Schema(
         description = "Learner-facing guidance aggregated from the area's feedback (null unless the status is a verdict). " +
-            "The deterministic summary combines standing, next focus, and learner-facing catalog guidance; " +
+            "The deterministic summary combines standing, next focus, and developer-facing catalog guidance; " +
             "the same field carries AI-aggregated guidance when a provider supplies it."
     )
     String guidance,
@@ -55,12 +55,12 @@ public record PracticeAreaStatusDTO(
      *
      * <p>The area is the layer ABOVE the practices and reads nothing but their standings: it averages how
      * positive each practice's recent evidence was and puts the result on the same scale the practices use.
-     * Deriving it from the practice standings rather than from their underlying findings is what keeps the two
+     * Deriving it from the practice standings rather than from their underlying observations is what keeps the two
      * surfaces from contradicting each other — a practice the reflection page shows as a strength can never be
      * counted against its own area.
      *
      * <p>The first three are verdicts. The last two are the reasons there is NO verdict, and they are
-     * deliberately separate: a learner cannot act on an empty state that means "nothing was reviewed" and
+     * deliberately separate: a developer cannot act on an empty state that means "nothing was reviewed" and
      * "your work offered no opportunity" interchangeably. This mirrors the trend surface's split of
      * {@code UNCERTAIN} from {@code INSUFFICIENT_EVIDENCE} — absence of a claim is not the same fact as a
      * claim of absence.

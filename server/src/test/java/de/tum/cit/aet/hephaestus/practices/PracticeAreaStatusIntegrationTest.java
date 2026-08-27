@@ -535,7 +535,7 @@ class PracticeAreaStatusIntegrationTest extends AbstractWorkspaceIntegrationTest
             // An earlier revision withheld this shape — one problem, one artifact — and reported the area as
             // having no verdict. It relied on a detector-reported confidence that was dropped after validation
             // found it carried no signal, so there is nothing left to withhold on: the learner is told what was
-            // found, and how thin the evidence is stays a question for the trajectory, not for suppression.
+            // found, and how thin the evidence is stays a question for the direction, not for suppression.
             insertFinding(agentJob, practice, developer, "Coin-flip hunch", "ABSENT", "MINOR", 1L);
 
             webTestClient

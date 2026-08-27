@@ -1429,7 +1429,7 @@ class ObservationControllerIntegrationTest extends AbstractWorkspaceIntegrationT
             // A practice the workspace reviews but that has never produced an observation about this
             // developer. Leaving it off the surface would make "we are watching this and it has not come up"
             // indistinguishable from "this is not being looked at", which is precisely what the learner needs
-            // to tell apart. It carries no items and no trajectory: a direction over nothing is a claim
+            // to tell apart. It carries no items and no direction: a direction over nothing is a claim
             // about nothing.
             insertFinding(
                 practiceA,
@@ -1466,7 +1466,7 @@ class ObservationControllerIntegrationTest extends AbstractWorkspaceIntegrationT
                 .isEqualTo(0)
                 .jsonPath("$[1].strengths.length()")
                 .isEqualTo(0)
-                .jsonPath("$[1].trajectory")
+                .jsonPath("$[1].direction")
                 .doesNotExist();
         }
 

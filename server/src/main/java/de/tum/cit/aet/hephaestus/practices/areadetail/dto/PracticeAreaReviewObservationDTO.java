@@ -17,12 +17,12 @@ import org.jspecify.annotations.Nullable;
  * @param assessment good or bad for the developer, and null exactly when {@code presence} is
  *     {@code INCONCLUSIVE} — the practice looked, the evidence it needed was there, and it still did not
  *     settle the question either way. This history is the inspectable record of what a review saw rather than
- *     the learner's reflection surface, so an undecided finding belongs in it: dropping it would make a
+ *     the developer's reflection surface, so an undecided observation belongs in it: dropping it would make a
  *     practice that ran and hedged indistinguishable from one that never ran. Render it as undecided rather
  *     than as a verdict — {@code presence} carries the fact, and there is no valence to show.
  */
 @Schema(description = "One concrete, evidence-backed result inside a review moment")
-public record PracticeAreaReviewFindingDTO(
+public record PracticeAreaReviewObservationDTO(
     @NonNull UUID observationId,
     @Nullable UUID feedbackId,
     @Nullable FeedbackUsefulness feedbackUsefulness,
@@ -38,14 +38,14 @@ public record PracticeAreaReviewFindingDTO(
     @Nullable Severity severity,
     @Nullable String recurrenceKey
 ) {
-    public static PracticeAreaReviewFindingDTO from(
+    public static PracticeAreaReviewObservationDTO from(
         Observation observation,
         @Nullable UUID feedbackId,
         @Nullable FeedbackUsefulness feedbackUsefulness,
         @Nullable FeedbackResolution feedbackResolution,
         @Nullable String feedbackResponseComment
     ) {
-        return new PracticeAreaReviewFindingDTO(
+        return new PracticeAreaReviewObservationDTO(
             observation.getId(),
             feedbackId,
             feedbackUsefulness,

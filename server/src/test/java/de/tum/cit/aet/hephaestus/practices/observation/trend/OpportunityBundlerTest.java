@@ -54,6 +54,26 @@ class OpportunityBundlerTest {
     }
 
     @Test
+    void shouldUseStableArtifactOrderWhenTimestampsTie() {
+        Observation first = observation(1, UUID.randomUUID(), "2026-08-11T09:00:00Z", Assessment.GOOD);
+        Observation second = observation(2, UUID.randomUUID(), "2026-08-11T09:00:00Z", Assessment.BAD);
+
+        OpportunityBundler.Bundles forward = OpportunityBundler.bundle(
+            List.of(first, second),
+            Instant.parse("2026-05-01T00:00:00Z"),
+            1
+        );
+        OpportunityBundler.Bundles reversed = OpportunityBundler.bundle(
+            List.of(second, first),
+            Instant.parse("2026-05-01T00:00:00Z"),
+            1
+        );
+
+        assertThat(forward.current().getFirst().artifactId()).isEqualTo(2);
+        assertThat(reversed.current().getFirst().artifactId()).isEqualTo(2);
+    }
+
+    @Test
     void shouldDiscardOpportunitiesOutsideTheHorizon() {
         OpportunityBundler.Bundles result = OpportunityBundler.bundle(
             List.of(

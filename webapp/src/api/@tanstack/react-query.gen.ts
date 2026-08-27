@@ -2830,7 +2830,7 @@ export const getPracticeAreaStatusesQueryKey = (options: Options<GetPracticeArea
 /**
  * Derived practice-area statuses for the current developer
  *
- * Aggregates the authenticated developer's latest-run findings across every active practice area into qualitative statuses, with supporting feedback items attached so each status stays traceable to real feedback. Without a displayable finding the status reports why: NOT_OBSERVED or NO_OPPORTUNITY.
+ * Aggregates the authenticated developer's latest-run observations across every active practice area into qualitative statuses, with supporting feedback attached so each status stays traceable to real feedback. Without a displayable observation the status reports why: NOT_OBSERVED or NO_OPPORTUNITY.
  */
 export const getPracticeAreaStatusesOptions = (options: Options<GetPracticeAreaStatusesData>) => queryOptions<GetPracticeAreaStatusesResponse, DefaultError, GetPracticeAreaStatusesResponse, ReturnType<typeof getPracticeAreaStatusesQueryKey>>({
     queryFn: async ({ queryKey, signal }) => {
@@ -2923,7 +2923,7 @@ export const listPracticeAreaReviewHistoryQueryKey = (options: Options<ListPract
 /**
  * List complete review moments for a practice area
  *
- * Returns complete review runs newest first. Each moment contains the concrete positive and negative findings that explain what the reviewer observed.
+ * Returns complete review runs newest first. Each moment contains the concrete positive and negative observations that explain what the review observed.
  */
 export const listPracticeAreaReviewHistoryOptions = (options: Options<ListPracticeAreaReviewHistoryData>) => queryOptions<ListPracticeAreaReviewHistoryResponse, ListPracticeAreaReviewHistoryError, ListPracticeAreaReviewHistoryResponse, ReturnType<typeof listPracticeAreaReviewHistoryQueryKey>>({
     queryFn: async ({ queryKey, signal }) => {
@@ -2943,7 +2943,7 @@ export const listPracticeAreaReviewHistoryInfiniteQueryKey = (options: Options<L
 /**
  * List complete review moments for a practice area
  *
- * Returns complete review runs newest first. Each moment contains the concrete positive and negative findings that explain what the reviewer observed.
+ * Returns complete review runs newest first. Each moment contains the concrete positive and negative observations that explain what the review observed.
  */
 export const listPracticeAreaReviewHistoryInfiniteOptions = (options: Options<ListPracticeAreaReviewHistoryData>) => infiniteQueryOptions<ListPracticeAreaReviewHistoryResponse, ListPracticeAreaReviewHistoryError, InfiniteData<ListPracticeAreaReviewHistoryResponse>, QueryKey<Options<ListPracticeAreaReviewHistoryData>>, number | Pick<QueryKey<Options<ListPracticeAreaReviewHistoryData>>[0], 'body' | 'headers' | 'path' | 'query'>>(
 // @ts-ignore

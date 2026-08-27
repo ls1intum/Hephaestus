@@ -4107,10 +4107,10 @@ paths:
       - Practice Areas
   /workspaces/{workspaceSlug}/practice-areas/status:
     get:
-      description: "Aggregates the authenticated developer's latest-run findings across\
-        \ every active practice area into qualitative statuses, with supporting feedback\
-        \ items attached so each status stays traceable to real feedback. Without\
-        \ a displayable finding the status reports why: NOT_OBSERVED or NO_OPPORTUNITY."
+      description: "Aggregates the authenticated developer's latest-run observations\
+        \ across every active practice area into qualitative statuses, with supporting\
+        \ feedback attached so each status stays traceable to real feedback. Without\
+        \ a displayable observation the status reports why: NOT_OBSERVED or NO_OPPORTUNITY."
       operationId: getPracticeAreaStatuses
       parameters:
       - description: Workspace slug
@@ -4270,7 +4270,7 @@ paths:
   /workspaces/{workspaceSlug}/practice-areas/{areaSlug}/review-history:
     get:
       description: Returns complete review runs newest first. Each moment contains
-        the concrete positive and negative findings that explain what the reviewer
+        the concrete positive and negative observations that explain what the review
         observed.
       operationId: listPracticeAreaReviewHistory
       parameters:
@@ -4294,7 +4294,7 @@ paths:
       - description: "Only reviews of these artifact kinds, e.g. scm.pull_request\
           \ (repeatable)"
         in: query
-        name: artifactKinds
+        name: workKinds
         required: false
         schema:
           type: array
@@ -11353,37 +11353,28 @@ components:
       - name
       - slug
       - visibleInPracticeDashboards
-    PracticeAreaReviewArtifact:
+    PracticeAreaReviewMoment:
       type: object
-      description: The work artifact assessed in a learner-facing review moment
+      description: A complete review run in a developer's practice-area history
       properties:
-        channelName:
+        observations:
+          type: array
+          items:
+            $ref: "#/components/schemas/PracticeAreaReviewObservation"
+        reviewId:
           type: string
-        id:
-          type: integer
-          format: int64
-        number:
-          type: integer
-          format: int32
-        provider:
+          format: uuid
+        reviewedAt:
           type: string
-          enum:
-          - GITHUB
-          - GITLAB
-          - SLACK
-          - OUTLINE
-        repositoryName:
-          type: string
-        title:
-          type: string
-        type:
-          type: string
-        url:
-          type: string
+          format: date-time
+        reviewedWork:
+          $ref: "#/components/schemas/PracticeAreaReviewedWork"
       required:
-      - id
-      - type
-    PracticeAreaReviewFinding:
+      - observations
+      - reviewId
+      - reviewedAt
+      - reviewedWork
+    PracticeAreaReviewObservation:
       type: object
       description: "One concrete, evidence-backed result inside a review moment"
       properties:
@@ -11441,27 +11432,36 @@ components:
       - practiceSlug
       - presence
       - title
-    PracticeAreaReviewMoment:
+    PracticeAreaReviewedWork:
       type: object
-      description: A complete review run in a learner's practice-area history
+      description: The work assessed in a developer-facing review moment
       properties:
-        artifact:
-          $ref: "#/components/schemas/PracticeAreaReviewArtifact"
-        findings:
-          type: array
-          items:
-            $ref: "#/components/schemas/PracticeAreaReviewFinding"
-        reviewId:
+        channelName:
           type: string
-          format: uuid
-        reviewedAt:
+        id:
+          type: integer
+          format: int64
+        number:
+          type: integer
+          format: int32
+        provider:
           type: string
-          format: date-time
+          enum:
+          - GITHUB
+          - GITLAB
+          - SLACK
+          - OUTLINE
+        repositoryName:
+          type: string
+        title:
+          type: string
+        type:
+          type: string
+        url:
+          type: string
       required:
-      - artifact
-      - findings
-      - reviewId
-      - reviewedAt
+      - id
+      - type
     PracticeAreaStatus:
       type: object
       description: A developer's derived qualitative standing for one Area including
@@ -11496,7 +11496,7 @@ components:
           type: string
           description: "Learner-facing guidance aggregated from the area's feedback\
             \ (null unless the status is a verdict). The deterministic summary combines\
-            \ standing, next focus, and learner-facing catalog guidance; the same\
+            \ standing, next focus, and developer-facing catalog guidance; the same\
             \ field carries AI-aggregated guidance when a provider supplies it."
         guidanceSource:
           type: string
@@ -12610,6 +12610,14 @@ components:
         areaSlug:
           type: string
           description: "Area slug this practice belongs to, if any"
+        direction:
+          type: string
+          description: Opportunity-indexed direction of this practice's recent evidence
+          enum:
+          - IMPROVING
+          - DECLINING
+          - UNCERTAIN
+          - INSUFFICIENT_EVIDENCE
         name:
           type: string
           description: Practice name
@@ -12636,17 +12644,9 @@ components:
           description: Specific feedback to act on (highest-impact first)
           items:
             $ref: "#/components/schemas/ReflectionItem"
-        trajectory:
-          type: string
-          description: Opportunity-indexed direction of this practice's recent evidence
-          enum:
-          - IMPROVING
-          - DECLINING
-          - UNCERTAIN
-          - INSUFFICIENT_EVIDENCE
         trendSupport:
           $ref: "#/components/schemas/TrendSupport"
-          description: Evidence support and provenance for the trajectory
+          description: Evidence support and provenance for the direction
         whatGoodLooksLike:
           type: string
           description: A concrete picture of doing this well
@@ -14341,11 +14341,6 @@ components:
     TrendOpportunity:
       type: object
       properties:
-        artifactId:
-          type: integer
-          format: int64
-        artifactKind:
-          type: string
         bundle:
           type: string
           enum:
@@ -14360,13 +14355,18 @@ components:
           format: date-time
         outcomes:
           $ref: "#/components/schemas/OutcomeVector"
+        reviewedWorkId:
+          type: integer
+          format: int64
+        workKind:
+          type: string
       required:
-      - artifactId
-      - artifactKind
       - bundle
       - index
       - occurredAt
       - outcomes
+      - reviewedWorkId
+      - workKind
     TrendSupport:
       type: object
       properties:

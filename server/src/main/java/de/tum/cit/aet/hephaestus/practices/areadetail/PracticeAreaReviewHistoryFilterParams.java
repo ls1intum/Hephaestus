@@ -10,7 +10,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.web.bind.annotation.RequestParam;
 
 /**
- * Query parameters for the learner-facing practice-area review history.
+ * Query parameters for the developer-facing practice-area review history.
  *
  * <p>Every optional component is a nullable wrapper, and {@link QueryFilterSupport} states why, along
  * with how a raw artifact kind and a raw page become the values this surface reads.
@@ -20,7 +20,7 @@ public record PracticeAreaReviewHistoryFilterParams(
     @Parameter(description = "Only reviews of these artifact kinds, e.g. scm.pull_request (repeatable)")
     @RequestParam(required = false)
     @Nullable
-    List<String> artifactKinds,
+    List<String> workKinds,
     @RequestParam(required = false) @Nullable List<Severity> severities,
     @Parameter(description = "Zero-based page; a negative value is read as the first page")
     @RequestParam(required = false)
@@ -38,6 +38,6 @@ public record PracticeAreaReviewHistoryFilterParams(
 
     /** The requested artifact kinds, parsed; {@code null} means "every kind". */
     public @Nullable List<ArtifactKind> kinds() {
-        return QueryFilterSupport.artifactKinds(artifactKinds);
+        return QueryFilterSupport.artifactKinds(workKinds);
     }
 }

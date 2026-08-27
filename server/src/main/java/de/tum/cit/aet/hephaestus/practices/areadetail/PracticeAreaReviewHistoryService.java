@@ -3,9 +3,9 @@ package de.tum.cit.aet.hephaestus.practices.areadetail;
 import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.practices.PracticeAreaService;
-import de.tum.cit.aet.hephaestus.practices.areadetail.dto.PracticeAreaReviewArtifactDTO;
-import de.tum.cit.aet.hephaestus.practices.areadetail.dto.PracticeAreaReviewFindingDTO;
 import de.tum.cit.aet.hephaestus.practices.areadetail.dto.PracticeAreaReviewMomentDTO;
+import de.tum.cit.aet.hephaestus.practices.areadetail.dto.PracticeAreaReviewObservationDTO;
+import de.tum.cit.aet.hephaestus.practices.areadetail.dto.PracticeAreaReviewedWorkDTO;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository.DeliveredFeedbackBinding;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackResolution;
@@ -36,7 +36,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Builds the learner-facing history at review-run grain instead of leaking raw observation pagination. */
+/** Builds the developer-facing history at review-run grain instead of leaking raw observation pagination. */
 @Service
 @RequiredArgsConstructor
 public class PracticeAreaReviewHistoryService {
@@ -97,15 +97,10 @@ public class PracticeAreaReviewHistoryService {
             jobIds,
             currentDeveloperId.get(),
             workspaceContext.id(),
-            areaSlug,
-            practiceSlug,
-            hasArtifactKinds,
-            artifactFilter,
-            hasSeverities,
-            severityFilter
+            areaSlug
         );
         // The same gate the reflection surface applies, for the same reason and with the same purpose: a
-        // finding may cite a source this caller is not cleared to be shown, and a claim measured against
+        // observation may cite a source this caller is not cleared to be shown, and a claim measured against
         // superseded review rules no longer speaks for the practice. Asked once for the whole page.
         Set<UUID> visible = visibilityPolicy.permitsAll(
             workspaceContext.id(),
@@ -129,15 +124,15 @@ public class PracticeAreaReviewHistoryService {
             jobIds
         );
 
-        // A run whose every finding the gate withheld is not an empty moment to render — it is a moment this
+        // A run whose every observation the gate withheld is not an empty moment to render — it is a moment this
         // caller does not get to see, so it leaves the page rather than showing as a review that found
         // nothing. The total still counts it: the gate answers per observation in Java, after the database
         // has already counted rows, and a total that quietly disagreed with the pages would be the worse lie.
         List<PracticeAreaReviewMomentDTO> moments = new ArrayList<>();
         for (ReviewHistoryRunRow run : runs) {
-            List<Observation> visibleFindings = observationsByJob.getOrDefault(run.getJobId(), List.of());
-            if (!visibleFindings.isEmpty()) {
-                moments.add(toMoment(run, visibleFindings, feedbackByObservation, targets));
+            List<Observation> visibleObservations = observationsByJob.getOrDefault(run.getJobId(), List.of());
+            if (!visibleObservations.isEmpty()) {
+                moments.add(toMoment(run, visibleObservations, feedbackByObservation, targets));
             }
         }
         return new PageImpl<>(moments, pageable, runs.getTotalElements());
@@ -169,15 +164,15 @@ public class PracticeAreaReviewHistoryService {
     ) {
         Observation first = observations.getFirst();
         var target = targets.get(run.getJobId());
-        PracticeAreaReviewArtifactDTO artifact =
+        PracticeAreaReviewedWorkDTO reviewedWork =
             target == null
-                ? PracticeAreaReviewArtifactDTO.fallback(first.getArtifactKind(), first.getArtifactId())
-                : PracticeAreaReviewArtifactDTO.from(target, first.getArtifactId());
-        List<PracticeAreaReviewFindingDTO> findings = observations
+                ? PracticeAreaReviewedWorkDTO.fallback(first.getArtifactKind(), first.getArtifactId())
+                : PracticeAreaReviewedWorkDTO.from(target, first.getArtifactId());
+        List<PracticeAreaReviewObservationDTO> reviewObservations = observations
             .stream()
             .map(observation -> {
                 DeliveredFeedbackBinding binding = feedbackByObservation.get(observation.getId());
-                return PracticeAreaReviewFindingDTO.from(
+                return PracticeAreaReviewObservationDTO.from(
                     observation,
                     binding == null ? null : binding.getFeedbackId(),
                     usefulness(binding),
@@ -186,7 +181,7 @@ public class PracticeAreaReviewHistoryService {
                 );
             })
             .toList();
-        return new PracticeAreaReviewMomentDTO(run.getJobId(), run.getReviewedAt(), artifact, findings);
+        return new PracticeAreaReviewMomentDTO(run.getJobId(), run.getReviewedAt(), reviewedWork, reviewObservations);
     }
 
     private @Nullable FeedbackUsefulness usefulness(@Nullable DeliveredFeedbackBinding binding) {

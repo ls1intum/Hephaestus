@@ -7,8 +7,8 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
-@Schema(description = "The work artifact assessed in a learner-facing review moment")
-public record PracticeAreaReviewArtifactDTO(
+@Schema(description = "The work assessed in a developer-facing review moment")
+public record PracticeAreaReviewedWorkDTO(
     @NonNull ArtifactKind type,
     @NonNull Long id,
     @Nullable IntegrationKind provider,
@@ -18,8 +18,8 @@ public record PracticeAreaReviewArtifactDTO(
     @Nullable String channelName,
     @Nullable String url
 ) {
-    public static PracticeAreaReviewArtifactDTO from(Target target, Long fallbackId) {
-        return new PracticeAreaReviewArtifactDTO(
+    public static PracticeAreaReviewedWorkDTO from(Target target, Long fallbackId) {
+        return new PracticeAreaReviewedWorkDTO(
             target.type(),
             target.id() == null ? fallbackId : target.id(),
             target.provider(),
@@ -32,11 +32,11 @@ public record PracticeAreaReviewArtifactDTO(
     }
 
     /**
-     * The artifact of a run whose job row is gone. Only its identity survives, so every descriptive field is
+     * The reviewed work of a run whose job row is gone. Only its identity survives, so every descriptive field is
      * absent rather than invented: a null title says the title is unknown, where "Pull request" would claim
      * that is what the work is called.
      */
-    public static PracticeAreaReviewArtifactDTO fallback(ArtifactKind type, Long id) {
-        return new PracticeAreaReviewArtifactDTO(type, id, null, null, null, null, null, null);
+    public static PracticeAreaReviewedWorkDTO fallback(ArtifactKind type, Long id) {
+        return new PracticeAreaReviewedWorkDTO(type, id, null, null, null, null, null, null);
     }
 }

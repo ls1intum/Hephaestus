@@ -7,7 +7,7 @@ import jakarta.validation.constraints.Size;
 import org.jspecify.annotations.Nullable;
 
 /**
- * What the recipient is saying about one delivered feedback unit right now.
+ * What the recipient is saying about one delivered piece of feedback right now.
  *
  * <p>Answer either question or both; whatever is left out keeps whatever was said before. Withdrawing is the
  * one way to say nothing, and it is a flag rather than an empty body so that a client which lost its state

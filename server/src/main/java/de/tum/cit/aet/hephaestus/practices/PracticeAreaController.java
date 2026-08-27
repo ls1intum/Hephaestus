@@ -101,9 +101,9 @@ public class PracticeAreaController {
     @GetMapping("/status")
     @Operation(
         summary = "Derived practice-area statuses for the current developer",
-        description = "Aggregates the authenticated developer's latest-run findings across every active practice " +
-            "area into qualitative statuses, with supporting feedback items attached so each status stays " +
-            "traceable to real feedback. Without a displayable finding the status reports why: NOT_OBSERVED " +
+        description = "Aggregates the authenticated developer's latest-run observations across every active practice " +
+            "area into qualitative statuses, with supporting feedback attached so each status stays " +
+            "traceable to real feedback. Without a displayable observation the status reports why: NOT_OBSERVED " +
             "or NO_OPPORTUNITY."
     )
     @ApiResponse(

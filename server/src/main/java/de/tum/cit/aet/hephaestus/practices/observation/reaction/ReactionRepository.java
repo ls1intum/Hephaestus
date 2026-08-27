@@ -28,7 +28,7 @@ import org.springframework.stereotype.Repository;
 public interface ReactionRepository extends JpaRepository<Reaction, UUID> {
     /**
      * Restricts {@code r} to the rows that still speak for its reactor: those newer than their most recent
-     * withdrawal of that same feedback unit, or all of them when they never withdrew.
+     * withdrawal of that same piece of feedback, or all of them when they never withdrew.
      *
      * <p>A withdrawal is a row with neither dimension set, so the condition reads "no withdrawal is newer than
      * this row". Ordering on {@code (created_at, id)} rather than {@code created_at} alone matters because two
@@ -49,7 +49,7 @@ public interface ReactionRepository extends JpaRepository<Reaction, UUID> {
         """;
 
     /**
-     * The recipient's current answer to one feedback unit, folded across rows.
+     * The recipient's current answer to one piece of feedback, folded across rows.
      *
      * <p>Two independent lookups rather than one row: someone who rated a unit helpful and later disputed it
      * said both things, and the newest row alone would report only the second. Returns no row at all when
@@ -95,7 +95,7 @@ public interface ReactionRepository extends JpaRepository<Reaction, UUID> {
     );
 
     /**
-     * The current answer to one feedback unit. Every component is null when the recipient has said nothing
+     * The current answer to one piece of feedback. Every component is null when the recipient has said nothing
      * that still stands, which is how the caller tells "no response" from "a response with one dimension".
      */
     interface CurrentResponseProjection {
@@ -159,7 +159,7 @@ public interface ReactionRepository extends JpaRepository<Reaction, UUID> {
     }
 
     /**
-     * Engagement statistics: how many feedback units the developer currently resolves each way, scoped to a
+     * Engagement statistics: how many piece of feedbacks the developer currently resolves each way, scoped to a
      * workspace through the feedback → workspace relationship.
      *
      * <p>Counts units, not rows. A developer who changed their mind appended a second row, and counting both

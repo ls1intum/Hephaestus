@@ -55,7 +55,7 @@ import org.jspecify.annotations.Nullable;
  * (cross-run re-nag suppression), which reads DISPUTED / NOT_APPLICABLE reactions but never feeds reaction
  * content into the detector prompt.
  *
- * @see Feedback for the delivered feedback unit being reacted to
+ * @see Feedback for the delivered piece of feedback being reacted to
  * @see FeedbackResolution for the resolution taxonomy
  */
 @Entity
@@ -108,7 +108,7 @@ public class Reaction {
 
     /**
      * Denormalized copy of the reacted feedback's headline {@code Observation.recurrenceKey}, captured at
-     * reaction-write time. Stored, not joined: the reacted feedback unit is per-run, so its FK alone cannot
+     * reaction-write time. Stored, not joined: the reacted piece of feedback is per-run, so its FK alone cannot
      * locate this reaction on a later run, but the {@code recurrence_key} is the stable (practice, target,
      * subject, file) locus that DOES recur. Re-nag suppression matches on it to find a prior DISPUTED /
      * NOT_APPLICABLE reaction against a re-detected locus — the cross-run grain, distinct from the per-occurrence

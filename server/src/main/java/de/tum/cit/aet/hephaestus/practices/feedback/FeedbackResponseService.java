@@ -1,6 +1,5 @@
 package de.tum.cit.aet.hephaestus.practices.feedback;
 
-import de.tum.cit.aet.hephaestus.core.exception.AccessForbiddenException;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.practices.feedback.dto.FeedbackEngagementDTO;
 import de.tum.cit.aet.hephaestus.practices.feedback.dto.FeedbackResponseDTO;
@@ -49,9 +48,8 @@ public class FeedbackResponseService {
         UUID feedbackId,
         FeedbackResponseRequestDTO request
     ) {
-        Feedback feedback = requireDeliveredFeedback(workspaceContext.id(), feedbackId);
         long recipientId = currentDeveloperLookup.currentDeveloperIdElseThrow();
-        requireRecipient(feedback, recipientId);
+        Feedback feedback = requireDeliveredFeedback(workspaceContext.id(), feedbackId, recipientId);
         validate(request);
 
         boolean withdrawing = Boolean.TRUE.equals(request.withdraw());
@@ -85,13 +83,12 @@ public class FeedbackResponseService {
      */
     @Transactional(readOnly = true)
     public Optional<FeedbackResponseDTO> getLatestResponse(WorkspaceContext workspaceContext, UUID feedbackId) {
-        Feedback feedback = requireDeliveredFeedback(workspaceContext.id(), feedbackId);
         Optional<Long> recipient = currentDeveloperLookup.currentDeveloperId();
         if (recipient.isEmpty()) {
             return Optional.empty();
         }
         long recipientId = recipient.get();
-        requireRecipient(feedback, recipientId);
+        requireDeliveredFeedback(workspaceContext.id(), feedbackId, recipientId);
         return currentResponse(feedbackId, recipientId);
     }
 
@@ -123,20 +120,15 @@ public class FeedbackResponseService {
             .map(current -> FeedbackResponseDTO.from(feedbackId, current));
     }
 
-    private Feedback requireDeliveredFeedback(long workspaceId, UUID feedbackId) {
-        Feedback feedback = feedbackRepository
-            .findByIdAndWorkspaceId(feedbackId, workspaceId)
+    private Feedback requireDeliveredFeedback(long workspaceId, UUID feedbackId, long recipientId) {
+        return feedbackRepository
+            .findByIdAndWorkspaceIdAndRecipientUserIdAndDeliveryState(
+                feedbackId,
+                workspaceId,
+                recipientId,
+                FeedbackDeliveryState.DELIVERED
+            )
             .orElseThrow(() -> new EntityNotFoundException("Feedback", feedbackId.toString()));
-        if (feedback.getDeliveryState() != FeedbackDeliveryState.DELIVERED) {
-            throw new IllegalArgumentException("Only delivered feedback can receive a response");
-        }
-        return feedback;
-    }
-
-    private void requireRecipient(Feedback feedback, long currentUserId) {
-        if (feedback.getRecipientUserId() != currentUserId) {
-            throw new AccessForbiddenException("Only the feedback recipient can respond to it");
-        }
     }
 
     private void validate(FeedbackResponseRequestDTO request) {

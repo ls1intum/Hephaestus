@@ -10,7 +10,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-/** Converts raw findings into opportunity-indexed, non-overlapping comparison bundles. */
+/** Converts raw observations into opportunity-indexed, non-overlapping comparison bundles. */
 final class OpportunityBundler {
 
     private OpportunityBundler() {}
@@ -33,7 +33,12 @@ final class OpportunityBundler {
             .entrySet()
             .stream()
             .map(entry -> latestRunOpportunity(entry.getKey(), entry.getValue()))
-            .sorted(Comparator.comparing(EvidenceOpportunity::occurredAt).reversed())
+            .sorted(
+                Comparator.comparing(EvidenceOpportunity::occurredAt)
+                    .thenComparing(opportunity -> opportunity.artifactKind().value())
+                    .thenComparingLong(EvidenceOpportunity::artifactId)
+                    .reversed()
+            )
             .toList();
         List<EvidenceOpportunity> applicable = all.stream().filter(EvidenceOpportunity::applicable).toList();
         List<EvidenceOpportunity> current = tagged(applicable.stream().limit(bundleSize).toList(), TrendBundle.CURRENT);
@@ -66,7 +71,7 @@ final class OpportunityBundler {
             )
             .entrySet()
             .stream()
-            .max(Map.Entry.comparingByValue())
+            .max(Map.Entry.<UUID, Instant>comparingByValue().thenComparing(Map.Entry::getKey))
             .orElseThrow()
             .getKey();
         List<Observation> latest = observations

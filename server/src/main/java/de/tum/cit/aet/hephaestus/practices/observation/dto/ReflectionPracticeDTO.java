@@ -42,8 +42,8 @@ public record ReflectionPracticeDTO(
         description = "Opportunity-indexed direction of this practice's recent evidence",
         allowableValues = { "IMPROVING", "DECLINING", "UNCERTAIN", "INSUFFICIENT_EVIDENCE" }
     )
-    TrendDirection trajectory,
-    @Nullable @Schema(description = "Evidence support and provenance for the trajectory") TrendSupportDTO trendSupport
+    TrendDirection direction,
+    @Nullable @Schema(description = "Evidence support and provenance for the direction") TrendSupportDTO trendSupport
 ) {
     /**
      * Coarse, human standing derived from the developer's most recent evidence for this practice.

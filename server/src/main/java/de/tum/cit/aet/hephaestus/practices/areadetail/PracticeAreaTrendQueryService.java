@@ -15,7 +15,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Assembles the caller-scoped detail trend from the same learner-safe snapshot as the profile cards. */
+/** Assembles the caller-scoped detail trend from the same developer-safe snapshot as the profile cards. */
 @Service
 @RequiredArgsConstructor
 public class PracticeAreaTrendQueryService {

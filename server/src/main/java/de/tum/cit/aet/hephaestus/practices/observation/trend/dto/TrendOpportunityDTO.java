@@ -9,8 +9,8 @@ import org.jspecify.annotations.NonNull;
 public record TrendOpportunityDTO(
     @Schema(requiredMode = Schema.RequiredMode.REQUIRED) int index,
     @NonNull Instant occurredAt,
-    @NonNull ArtifactKind artifactKind,
-    @Schema(requiredMode = Schema.RequiredMode.REQUIRED) long artifactId,
+    @NonNull ArtifactKind workKind,
+    @Schema(requiredMode = Schema.RequiredMode.REQUIRED) long reviewedWorkId,
     @NonNull OutcomeVectorDTO outcomes,
     @NonNull TrendBundle bundle
 ) {}

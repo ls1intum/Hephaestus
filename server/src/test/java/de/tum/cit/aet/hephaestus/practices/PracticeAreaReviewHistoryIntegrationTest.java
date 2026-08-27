@@ -26,11 +26,11 @@ import org.springframework.test.web.reactive.server.WebTestClient;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * Functional coverage for {@code GET /practice-areas/{areaSlug}/review-history} — the learner-facing record of
+ * Functional coverage for {@code GET /practice-areas/{areaSlug}/review-history} — the developer-facing record of
  * what each review run saw.
  *
  * <p>The grain is the point: a run is returned whole or not at all, so the two queries behind it (which runs,
- * then their findings) must agree. And an undecided finding has to survive to the payload — this surface is
+ * then their observations) must agree. And an undecided observation has to survive to the payload — this surface is
  * the inspectable record, so a practice that ran and hedged must not read like one that never ran.
  */
 class PracticeAreaReviewHistoryIntegrationTest extends AbstractWorkspaceIntegrationTest {
@@ -160,7 +160,7 @@ class PracticeAreaReviewHistoryIntegrationTest extends AbstractWorkspaceIntegrat
 
     @Test
     @WithUser
-    @DisplayName("returns a review run whole, with every finding that explains it")
+    @DisplayName("returns a review run whole, with every observation that explains it")
     void shouldReturnCompleteRun() {
         insertFinding("Motivation is clear", "PRESENT", "GOOD", null, ArtifactKinds.PULL_REQUEST.value(), 1L);
         insertFinding("No testing notes", "ABSENT", "BAD", "MAJOR", ArtifactKinds.PULL_REQUEST.value(), 1L);
@@ -171,13 +171,13 @@ class PracticeAreaReviewHistoryIntegrationTest extends AbstractWorkspaceIntegrat
             .jsonPath("$.content[0].reviewId")
             .isEqualTo(agentJob.getId().toString())
             // One run, both sides of it — the grain the surface promises.
-            .jsonPath("$.content[0].findings.length()")
+            .jsonPath("$.content[0].observations.length()")
             .isEqualTo(2);
     }
 
     @Test
     @WithUser
-    @DisplayName("carries an undecided finding with a null assessment rather than dropping it")
+    @DisplayName("carries an undecided observation with a null assessment rather than dropping it")
     void shouldCarryInconclusiveFindingWithoutAnAssessment() {
         // The presence/assessment coherence rule forbids an assessment here, so the payload has to admit the
         // absence. Marking the field required made the wire contract promise something the data cannot hold.
@@ -186,11 +186,11 @@ class PracticeAreaReviewHistoryIntegrationTest extends AbstractWorkspaceIntegrat
         getHistory()
             .jsonPath("$.content.length()")
             .isEqualTo(1)
-            .jsonPath("$.content[0].findings.length()")
+            .jsonPath("$.content[0].observations.length()")
             .isEqualTo(1)
-            .jsonPath("$.content[0].findings[0].presence")
+            .jsonPath("$.content[0].observations[0].presence")
             .isEqualTo("INCONCLUSIVE")
-            .jsonPath("$.content[0].findings[0].assessment")
+            .jsonPath("$.content[0].observations[0].assessment")
             .doesNotExist();
     }
 
@@ -199,7 +199,7 @@ class PracticeAreaReviewHistoryIntegrationTest extends AbstractWorkspaceIntegrat
     @DisplayName("an unfiltered request is not silently narrowed to pull requests")
     void shouldNotDefaultToPullRequestsWhenNoKindFilterIsGiven() {
         // The placeholder passed for an absent artifact-kind filter is a real kind, so a broken flag would
-        // narrow the history to pull requests without failing anywhere. A finding on another kind surviving is
+        // narrow the history to pull requests without failing anywhere. A observation on another kind surviving is
         // what proves the predicate stays disabled. The moment's `artifact.type` is deliberately not asserted:
         // it comes from the run's target rather than from the observation, so it would test the job fixture.
         insertFinding("Issue lacks acceptance criteria", "ABSENT", "BAD", "MINOR", ArtifactKinds.ISSUE.value(), 7L);
@@ -207,9 +207,9 @@ class PracticeAreaReviewHistoryIntegrationTest extends AbstractWorkspaceIntegrat
         getHistory()
             .jsonPath("$.content.length()")
             .isEqualTo(1)
-            .jsonPath("$.content[0].findings.length()")
+            .jsonPath("$.content[0].observations.length()")
             .isEqualTo(1)
-            .jsonPath("$.content[0].findings[0].title")
+            .jsonPath("$.content[0].observations[0].title")
             .isEqualTo("Issue lacks acceptance criteria");
     }
 
@@ -224,10 +224,10 @@ class PracticeAreaReviewHistoryIntegrationTest extends AbstractWorkspaceIntegrat
 
     @Test
     @WithUser
-    @DisplayName("a run whose findings the visibility gate withholds leaves the page entirely")
+    @DisplayName("a run whose observations the visibility gate withholds leaves the page entirely")
     void shouldWithholdARunMeasuredAgainstSupersededReviewRules() {
         // What this pins is that the gate runs here at all, not how it decides. Superseded review rules are
-        // the half of it an integration test can stage without a second module: the finding was measured
+        // the half of it an integration test can stage without a second module: the observation was measured
         // against revision 1, and publishing different criteria as revision 2 makes it speak for a rule the
         // practice no longer has. The reflection surface has always dropped such a claim; this one used to
         // show it.
@@ -238,7 +238,7 @@ class PracticeAreaReviewHistoryIntegrationTest extends AbstractWorkspaceIntegrat
         practice.setCurrentRevision(practiceRevisionRepository.save(new PracticeRevision(practice, 2)));
         practiceRepository.saveAndFlush(practice);
 
-        // Not an empty moment with a review id and no findings — the run is gone.
+        // Not an empty moment with a review id and no observations — the run is gone.
         getHistory().jsonPath("$.content.length()").isEqualTo(0);
     }
 }

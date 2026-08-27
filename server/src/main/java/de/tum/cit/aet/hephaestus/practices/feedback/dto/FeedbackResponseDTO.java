@@ -10,7 +10,7 @@ import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
 /**
- * The recipient's response to one delivered feedback unit, as it currently stands.
+ * The recipient's response to one delivered piece of feedback, as it currently stands.
  *
  * <p>Not one stored row: the two dimensions are answered independently and may have been said at different
  * times, so this is the fold across everything the recipient has said and not withdrawn. {@code respondedAt}

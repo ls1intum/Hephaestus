@@ -315,7 +315,7 @@ class FeedbackResponseControllerIntegrationTest extends AbstractWorkspaceIntegra
 
         @Test
         @WithMentorUser
-        void nonRecipientReturns403() {
+        void nonRecipientReturns404() {
             // "mentor" user exists in DB and has workspace membership, but is NOT the feedback's recipient
             User mentorUser = persistUser("mentor");
             ensureWorkspaceMembership(workspace, mentorUser, WorkspaceMembership.WorkspaceRole.MEMBER);
@@ -330,12 +330,12 @@ class FeedbackResponseControllerIntegrationTest extends AbstractWorkspaceIntegra
                 .bodyValue(request)
                 .exchange()
                 .expectStatus()
-                .isForbidden();
+                .isNotFound();
         }
 
         @Test
         @WithMentorUser
-        void subjectButNotRecipientReturns403() {
+        void subjectButNotRecipientReturns404() {
             // Reviewer-side firewall: the gate is the RECIPIENT (who was delivered to), not the SUBJECT
             // (who the feedback is ABOUT). Build a unit delivered to the admin but ABOUT the mentor, then
             // authenticate as the mentor (the subject, a workspace member) — the subject must NOT be able
@@ -371,7 +371,7 @@ class FeedbackResponseControllerIntegrationTest extends AbstractWorkspaceIntegra
                 .bodyValue(request)
                 .exchange()
                 .expectStatus()
-                .isForbidden();
+                .isNotFound();
         }
 
         @Test
@@ -387,7 +387,7 @@ class FeedbackResponseControllerIntegrationTest extends AbstractWorkspaceIntegra
                 .bodyValue(request)
                 .exchange()
                 .expectStatus()
-                .isForbidden();
+                .isNotFound();
         }
     }
 

@@ -60,7 +60,7 @@ public class PracticeAreaDetailController {
         operationId = "listPracticeAreaReviewHistory",
         summary = "List complete review moments for a practice area",
         description = "Returns complete review runs newest first. Each moment contains the concrete positive and " +
-            "negative findings that explain what the reviewer observed."
+            "negative observations that explain what the review observed."
     )
     @ApiResponse(responseCode = "200", description = "Paginated review moments returned")
     @ApiResponse(

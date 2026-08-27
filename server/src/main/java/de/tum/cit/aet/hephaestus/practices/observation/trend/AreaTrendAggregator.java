@@ -13,13 +13,9 @@ import org.jspecify.annotations.Nullable;
 /**
  * Combines a practice area's per-practice trends into one direction.
  *
- * <p>A different estimator from the practice level, deliberately. A practice compares two bundles of raw
- * opportunities, so its difference is computed exactly on {@link BetaPosterior}'s grid. An area has no
- * opportunities of its own — it has a handful of already-computed differences — so it combines them by
- * inverse-variance weighting, the standard fixed-effect meta-analysis: each practice counts in proportion to
- * how precisely its own change was measured, scaled by the weight the area gives it. The result is treated as
- * normal, which the sum of several independent differences approaches; at the practice level that
- * approximation would be wrong, which is why the exact grid stays there.
+ * <p>An area combines already-computed practice differences using inverse-variance weights. Because practices
+ * can share reviewed work, the pooled variance uses the conservative perfect-correlation bound rather than
+ * pretending the estimates are independent.
  *
  * <p>A practice with weight zero is excluded rather than down-weighted, so an area can be composed without
  * one of its practices moving it at all.
@@ -44,7 +40,12 @@ final class AreaTrendAggregator {
         if (comparable.isEmpty()) {
             int current = distinctOpportunityCount(practiceTrends, TrendBundle.CURRENT);
             int previous = distinctOpportunityCount(practiceTrends, TrendBundle.PREVIOUS);
-            int missing = Math.max(0, properties.getMinBundleSize() - previous);
+            int missing = practiceTrends
+                .stream()
+                .filter(trend -> weightFor(trend.slug(), weights) > 0.0)
+                .mapToInt(trend -> trend.support().opportunitiesUntilComparable())
+                .min()
+                .orElse(properties.getMinBundleSize());
             return new PracticeTrend(
                 areaSlug,
                 TrendScope.AREA,
@@ -100,7 +101,7 @@ final class AreaTrendAggregator {
     private static Pooled pool(List<PracticeTrend> comparable, Map<String, Double> weights) {
         double weightedMean = 0.0;
         double totalPrecision = 0.0;
-        double varianceNumerator = 0.0;
+        double correlatedStandardDeviation = 0.0;
         for (PracticeTrend trend : comparable) {
             // `comparable` was filtered on difference() != null above; the nullness analysis
             // does not carry that across the stream boundary.
@@ -109,13 +110,12 @@ final class AreaTrendAggregator {
             double precision = weight / difference.variance();
             weightedMean += precision * difference.mean();
             totalPrecision += precision;
-            // Var(Σ pᵢmᵢ / Σ pᵢ) = Σ(pᵢ²·vᵢ) / (Σ pᵢ)², and pᵢ²·vᵢ collapses to wᵢ²/vᵢ = wᵢ·pᵢ.
-            // Only when every weight is 1 does that reduce to the familiar 1/Σ pᵢ, so the
-            // numerator has to be carried separately — a weight of 2 would otherwise report
-            // half the variance it has and turn an UNCERTAIN area into a confident verdict.
-            varianceNumerator += weight * precision;
+            // Practices are often reviewed on the same work. Treating their estimates as independent would
+            // manufacture confidence, so use the conservative perfect-positive-correlation bound.
+            correlatedStandardDeviation += precision * Math.sqrt(difference.variance());
         }
-        return new Pooled(weightedMean / totalPrecision, varianceNumerator / (totalPrecision * totalPrecision));
+        double standardDeviation = correlatedStandardDeviation / totalPrecision;
+        return new Pooled(weightedMean / totalPrecision, standardDeviation * standardDeviation);
     }
 
     /**

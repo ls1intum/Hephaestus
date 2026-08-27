@@ -1434,12 +1434,12 @@ export type TrendSupport = {
 };
 
 export type TrendOpportunity = {
-    artifactId: number;
-    artifactKind: string;
     bundle: 'PREVIOUS' | 'CURRENT' | 'OLDER';
     index: number;
     occurredAt: Date;
     outcomes: OutcomeVector;
+    reviewedWorkId: number;
+    workKind: string;
 };
 
 export type OutcomeVector = {
@@ -2558,6 +2558,10 @@ export type ReflectionPractice = {
      */
     areaSlug?: string;
     /**
+     * Opportunity-indexed direction of this practice's recent evidence
+     */
+    direction?: 'IMPROVING' | 'DECLINING' | 'UNCERTAIN' | 'INSUFFICIENT_EVIDENCE';
+    /**
      * Practice name
      */
     name: string;
@@ -2578,11 +2582,7 @@ export type ReflectionPractice = {
      */
     toWorkOn: Array<ReflectionItem>;
     /**
-     * Opportunity-indexed direction of this practice's recent evidence
-     */
-    trajectory?: 'IMPROVING' | 'DECLINING' | 'UNCERTAIN' | 'INSUFFICIENT_EVIDENCE';
-    /**
-     * Evidence support and provenance for the trajectory
+     * Evidence support and provenance for the direction
      */
     trendSupport?: TrendSupport;
     /**
@@ -3243,7 +3243,7 @@ export type PracticeAreaStatus = {
      */
     feedbackSpanDays?: number;
     /**
-     * Learner-facing guidance aggregated from the area's feedback (null unless the status is a verdict). The deterministic summary combines standing, next focus, and learner-facing catalog guidance; the same field carries AI-aggregated guidance when a provider supplies it.
+     * Learner-facing guidance aggregated from the area's feedback (null unless the status is a verdict). The deterministic summary combines standing, next focus, and developer-facing catalog guidance; the same field carries AI-aggregated guidance when a provider supplies it.
      */
     guidance?: string;
     /**
@@ -3283,19 +3283,23 @@ export type FeedbackSourceCount = {
 };
 
 /**
- * A complete review run in a learner's practice-area history
+ * The work assessed in a developer-facing review moment
  */
-export type PracticeAreaReviewMoment = {
-    artifact: PracticeAreaReviewArtifact;
-    findings: Array<PracticeAreaReviewFinding>;
-    reviewId: string;
-    reviewedAt: Date;
+export type PracticeAreaReviewedWork = {
+    channelName?: string;
+    id: number;
+    number?: number;
+    provider?: 'GITHUB' | 'GITLAB' | 'SLACK' | 'OUTLINE';
+    repositoryName?: string;
+    title?: string;
+    type: string;
+    url?: string;
 };
 
 /**
  * One concrete, evidence-backed result inside a review moment
  */
-export type PracticeAreaReviewFinding = {
+export type PracticeAreaReviewObservation = {
     /**
      * Good or bad for the developer; null when the review could not decide (INCONCLUSIVE)
      */
@@ -3314,17 +3318,13 @@ export type PracticeAreaReviewFinding = {
 };
 
 /**
- * The work artifact assessed in a learner-facing review moment
+ * A complete review run in a developer's practice-area history
  */
-export type PracticeAreaReviewArtifact = {
-    channelName?: string;
-    id: number;
-    number?: number;
-    provider?: 'GITHUB' | 'GITLAB' | 'SLACK' | 'OUTLINE';
-    repositoryName?: string;
-    title?: string;
-    type: string;
-    url?: string;
+export type PracticeAreaReviewMoment = {
+    observations: Array<PracticeAreaReviewObservation>;
+    reviewId: string;
+    reviewedAt: Date;
+    reviewedWork: PracticeAreaReviewedWork;
 };
 
 /**
@@ -9365,7 +9365,7 @@ export type ListPracticeAreaReviewHistoryData = {
         /**
          * Only reviews of these artifact kinds, e.g. scm.pull_request (repeatable)
          */
-        artifactKinds?: Array<string>;
+        workKinds?: Array<string>;
         severities?: Array<'CRITICAL' | 'MAJOR' | 'MINOR' | 'INFO'>;
         /**
          * Zero-based page; a negative value is read as the first page

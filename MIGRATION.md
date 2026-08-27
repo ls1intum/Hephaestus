@@ -81,7 +81,7 @@ GET  /workspaces/{workspaceSlug}/practices/observations/{id}/reactions   (getLat
 separate mechanisms — a reaction saying what they would do about it, and a rating saying whether it
 helped. The two disagreed about their own history: reactions accumulated, ratings were overwritten.
 
-**After**: one endpoint per feedback unit, carrying both answers, either of them, or neither:
+**After**: one endpoint per piece of feedback, carrying both answers, either of them, or neither:
 
 ```
 POST /workspaces/{workspaceSlug}/practices/feedback/{feedbackId}/response
@@ -94,8 +94,8 @@ The request body carries `usefulness` (`HELPFUL` / `UNHELPFUL`), `resolution` (`
 which takes the whole answer back. Every submit appends; the GET returns the answer as it currently
 stands, which is the newest value of each question independently.
 
-Note the anchor moved: a response is filed against the delivered **feedback unit**, not against the
-internal observation behind it, because the feedback unit is what the developer was actually shown.
+Note the anchor moved: a response is filed against the delivered **piece of feedback**, not against the
+internal observation behind it, because the piece of feedback is what the developer was actually shown.
 
 **Action**: repoint any direct API caller at the new endpoint. Stored reactions are untouched and
 keep answering; nothing needs migrating and no data is lost.

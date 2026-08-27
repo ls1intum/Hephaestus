@@ -42,7 +42,11 @@
         </addColumn>
         <sql>
             ALTER TABLE practice
-            ADD CONSTRAINT chk_practice_area_weight CHECK (area_weight &gt;= 0);
+            ADD CONSTRAINT chk_practice_area_weight CHECK (
+                area_weight &gt;= 0
+                AND area_weight &lt; 'Infinity'::double precision
+                AND area_weight &lt;&gt; 'NaN'::double precision
+            );
         </sql>
         <rollback>
             <dropColumn tableName="practice" columnName="area_weight"/>

@@ -1579,7 +1579,7 @@ export const reorderAreas = <ThrowOnError extends boolean = false>(options: Opti
 /**
  * Derived practice-area statuses for the current developer
  *
- * Aggregates the authenticated developer's latest-run findings across every active practice area into qualitative statuses, with supporting feedback items attached so each status stays traceable to real feedback. Without a displayable finding the status reports why: NOT_OBSERVED or NO_OPPORTUNITY.
+ * Aggregates the authenticated developer's latest-run observations across every active practice area into qualitative statuses, with supporting feedback attached so each status stays traceable to real feedback. Without a displayable observation the status reports why: NOT_OBSERVED or NO_OPPORTUNITY.
  */
 export const getPracticeAreaStatuses = <ThrowOnError extends boolean = false>(options: Options<GetPracticeAreaStatusesData, ThrowOnError>) => (options.client ?? client).get<GetPracticeAreaStatusesResponses, unknown, ThrowOnError>({
     responseTransformer: getPracticeAreaStatusesResponseTransformer,
@@ -1640,7 +1640,7 @@ export const setAreaAutonomy = <ThrowOnError extends boolean = false>(options: O
 /**
  * List complete review moments for a practice area
  *
- * Returns complete review runs newest first. Each moment contains the concrete positive and negative findings that explain what the reviewer observed.
+ * Returns complete review runs newest first. Each moment contains the concrete positive and negative observations that explain what the review observed.
  */
 export const listPracticeAreaReviewHistory = <ThrowOnError extends boolean = false>(options: Options<ListPracticeAreaReviewHistoryData, ThrowOnError>) => (options.client ?? client).get<ListPracticeAreaReviewHistoryResponses, ListPracticeAreaReviewHistoryErrors, ThrowOnError>({
     responseTransformer: listPracticeAreaReviewHistoryResponseTransformer,

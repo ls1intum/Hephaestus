@@ -133,7 +133,7 @@ public interface FeedbackObservationRepository extends JpaRepository<FeedbackObs
         String getBody();
     }
 
-    /** Newest delivered feedback unit that actually carried each observation to this learner. */
+    /** Newest delivered piece of feedback that actually carried each observation to this learner. */
     @Query(
         value = """
                     SELECT DISTINCT ON (fo.observation_id)
@@ -193,7 +193,7 @@ public interface FeedbackObservationRepository extends JpaRepository<FeedbackObs
     // --- conversational feedback delivery loop ---
 
     /**
-     * The id(s) of the PREPARED IN_CHAT feedback unit(s) for this recipient/workspace bound (as PRIMARY) to the
+     * The id(s) of the PREPARED IN_CHAT piece of feedback(s) for this recipient/workspace bound (as PRIMARY) to the
      * given observation. Maps a mentor {@code link_observation} id back to the unit to flip to DELIVERED.
      * Ordered newest-first so a caller can take the first; the reconciler's CAS makes any duplicate flip a no-op.
      */

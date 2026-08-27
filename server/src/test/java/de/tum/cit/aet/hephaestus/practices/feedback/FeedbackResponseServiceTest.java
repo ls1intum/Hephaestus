@@ -6,7 +6,6 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.core.exception.AccessForbiddenException;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.practices.feedback.dto.FeedbackEngagementDTO;
 import de.tum.cit.aet.hephaestus.practices.feedback.dto.FeedbackResponseDTO;
@@ -135,9 +134,14 @@ class FeedbackResponseServiceTest extends BaseUnitTest {
         @Test
         void shouldRecordUsefulnessAndResolutionTogether() {
             Feedback feedback = createFeedback(CONTRIBUTOR_ID);
-            when(feedbackRepository.findByIdAndWorkspaceId(FEEDBACK_ID, WORKSPACE_ID)).thenReturn(
-                Optional.of(feedback)
-            );
+            when(
+                feedbackRepository.findByIdAndWorkspaceIdAndRecipientUserIdAndDeliveryState(
+                    FEEDBACK_ID,
+                    WORKSPACE_ID,
+                    CONTRIBUTOR_ID,
+                    FeedbackDeliveryState.DELIVERED
+                )
+            ).thenReturn(Optional.of(feedback));
             var request = new FeedbackResponseRequestDTO(
                 FeedbackUsefulness.HELPFUL,
                 FeedbackResolution.ADDRESSED,
@@ -158,9 +162,14 @@ class FeedbackResponseServiceTest extends BaseUnitTest {
         @Test
         void shouldRejectEmptyResponse() {
             Feedback feedback = createFeedback(CONTRIBUTOR_ID);
-            when(feedbackRepository.findByIdAndWorkspaceId(FEEDBACK_ID, WORKSPACE_ID)).thenReturn(
-                Optional.of(feedback)
-            );
+            when(
+                feedbackRepository.findByIdAndWorkspaceIdAndRecipientUserIdAndDeliveryState(
+                    FEEDBACK_ID,
+                    WORKSPACE_ID,
+                    CONTRIBUTOR_ID,
+                    FeedbackDeliveryState.DELIVERED
+                )
+            ).thenReturn(Optional.of(feedback));
 
             assertThatThrownBy(() ->
                 service.submitResponse(
@@ -176,9 +185,14 @@ class FeedbackResponseServiceTest extends BaseUnitTest {
         @Test
         void addressedFeedbackSaves() {
             Feedback feedback = createFeedback(CONTRIBUTOR_ID);
-            when(feedbackRepository.findByIdAndWorkspaceId(FEEDBACK_ID, WORKSPACE_ID)).thenReturn(
-                Optional.of(feedback)
-            );
+            when(
+                feedbackRepository.findByIdAndWorkspaceIdAndRecipientUserIdAndDeliveryState(
+                    FEEDBACK_ID,
+                    WORKSPACE_ID,
+                    CONTRIBUTOR_ID,
+                    FeedbackDeliveryState.DELIVERED
+                )
+            ).thenReturn(Optional.of(feedback));
             when(feedbackRepository.findHeadlineRecurrenceKey(FEEDBACK_ID)).thenReturn(Optional.of("ck-abc123"));
 
             var request = new FeedbackResponseRequestDTO(null, FeedbackResolution.ADDRESSED, null, null);
@@ -198,28 +212,32 @@ class FeedbackResponseServiceTest extends BaseUnitTest {
 
         @Test
         void nonDeliveredFeedbackThrows() {
-            Feedback feedback = Feedback.builder()
-                .id(FEEDBACK_ID)
-                .recipientUserId(CONTRIBUTOR_ID)
-                .workspaceId(WORKSPACE_ID)
-                .deliveryState(FeedbackDeliveryState.SUPPRESSED)
-                .build();
-            when(feedbackRepository.findByIdAndWorkspaceId(FEEDBACK_ID, WORKSPACE_ID)).thenReturn(
-                Optional.of(feedback)
-            );
+            when(
+                feedbackRepository.findByIdAndWorkspaceIdAndRecipientUserIdAndDeliveryState(
+                    FEEDBACK_ID,
+                    WORKSPACE_ID,
+                    CONTRIBUTOR_ID,
+                    FeedbackDeliveryState.DELIVERED
+                )
+            ).thenReturn(Optional.empty());
 
             var request = new FeedbackResponseRequestDTO(null, FeedbackResolution.ADDRESSED, null, null);
-            assertThatThrownBy(() -> service.submitResponse(workspaceContext, FEEDBACK_ID, request))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("delivered");
+            assertThatThrownBy(() -> service.submitResponse(workspaceContext, FEEDBACK_ID, request)).isInstanceOf(
+                EntityNotFoundException.class
+            );
         }
 
         @Test
         void disputedWithExplanationSaves() {
             Feedback feedback = createFeedback(CONTRIBUTOR_ID);
-            when(feedbackRepository.findByIdAndWorkspaceId(FEEDBACK_ID, WORKSPACE_ID)).thenReturn(
-                Optional.of(feedback)
-            );
+            when(
+                feedbackRepository.findByIdAndWorkspaceIdAndRecipientUserIdAndDeliveryState(
+                    FEEDBACK_ID,
+                    WORKSPACE_ID,
+                    CONTRIBUTOR_ID,
+                    FeedbackDeliveryState.DELIVERED
+                )
+            ).thenReturn(Optional.of(feedback));
 
             var request = new FeedbackResponseRequestDTO(
                 null,
@@ -236,9 +254,14 @@ class FeedbackResponseServiceTest extends BaseUnitTest {
         @Test
         void notApplicableSaves() {
             Feedback feedback = createFeedback(CONTRIBUTOR_ID);
-            when(feedbackRepository.findByIdAndWorkspaceId(FEEDBACK_ID, WORKSPACE_ID)).thenReturn(
-                Optional.of(feedback)
-            );
+            when(
+                feedbackRepository.findByIdAndWorkspaceIdAndRecipientUserIdAndDeliveryState(
+                    FEEDBACK_ID,
+                    WORKSPACE_ID,
+                    CONTRIBUTOR_ID,
+                    FeedbackDeliveryState.DELIVERED
+                )
+            ).thenReturn(Optional.of(feedback));
 
             var request = new FeedbackResponseRequestDTO(
                 null,
@@ -254,9 +277,14 @@ class FeedbackResponseServiceTest extends BaseUnitTest {
         @Test
         void disputedWithoutExplanationThrows() {
             Feedback feedback = createFeedback(CONTRIBUTOR_ID);
-            when(feedbackRepository.findByIdAndWorkspaceId(FEEDBACK_ID, WORKSPACE_ID)).thenReturn(
-                Optional.of(feedback)
-            );
+            when(
+                feedbackRepository.findByIdAndWorkspaceIdAndRecipientUserIdAndDeliveryState(
+                    FEEDBACK_ID,
+                    WORKSPACE_ID,
+                    CONTRIBUTOR_ID,
+                    FeedbackDeliveryState.DELIVERED
+                )
+            ).thenReturn(Optional.of(feedback));
 
             var request = new FeedbackResponseRequestDTO(null, FeedbackResolution.DISPUTED, null, null);
             assertThatThrownBy(() -> service.submitResponse(workspaceContext, FEEDBACK_ID, request))
@@ -267,9 +295,14 @@ class FeedbackResponseServiceTest extends BaseUnitTest {
         @Test
         void disputedWithBlankExplanationThrows() {
             Feedback feedback = createFeedback(CONTRIBUTOR_ID);
-            when(feedbackRepository.findByIdAndWorkspaceId(FEEDBACK_ID, WORKSPACE_ID)).thenReturn(
-                Optional.of(feedback)
-            );
+            when(
+                feedbackRepository.findByIdAndWorkspaceIdAndRecipientUserIdAndDeliveryState(
+                    FEEDBACK_ID,
+                    WORKSPACE_ID,
+                    CONTRIBUTOR_ID,
+                    FeedbackDeliveryState.DELIVERED
+                )
+            ).thenReturn(Optional.of(feedback));
 
             var request = new FeedbackResponseRequestDTO(null, FeedbackResolution.DISPUTED, "   ", null);
             assertThatThrownBy(() -> service.submitResponse(workspaceContext, FEEDBACK_ID, request))
@@ -279,21 +312,32 @@ class FeedbackResponseServiceTest extends BaseUnitTest {
 
         @Test
         void nonRecipientThrows() {
-            Feedback feedback = createFeedback(CONTRIBUTOR_ID);
-            when(feedbackRepository.findByIdAndWorkspaceId(FEEDBACK_ID, WORKSPACE_ID)).thenReturn(
-                Optional.of(feedback)
-            );
             when(currentDeveloperLookup.currentDeveloperIdElseThrow()).thenReturn(OTHER_USER_ID);
+            when(
+                feedbackRepository.findByIdAndWorkspaceIdAndRecipientUserIdAndDeliveryState(
+                    FEEDBACK_ID,
+                    WORKSPACE_ID,
+                    OTHER_USER_ID,
+                    FeedbackDeliveryState.DELIVERED
+                )
+            ).thenReturn(Optional.empty());
 
             var request = new FeedbackResponseRequestDTO(null, FeedbackResolution.ADDRESSED, null, null);
-            assertThatThrownBy(() -> service.submitResponse(workspaceContext, FEEDBACK_ID, request))
-                .isInstanceOf(AccessForbiddenException.class)
-                .hasMessageContaining("recipient");
+            assertThatThrownBy(() -> service.submitResponse(workspaceContext, FEEDBACK_ID, request)).isInstanceOf(
+                EntityNotFoundException.class
+            );
         }
 
         @Test
         void feedbackNotFoundThrows() {
-            when(feedbackRepository.findByIdAndWorkspaceId(FEEDBACK_ID, WORKSPACE_ID)).thenReturn(Optional.empty());
+            when(
+                feedbackRepository.findByIdAndWorkspaceIdAndRecipientUserIdAndDeliveryState(
+                    FEEDBACK_ID,
+                    WORKSPACE_ID,
+                    CONTRIBUTOR_ID,
+                    FeedbackDeliveryState.DELIVERED
+                )
+            ).thenReturn(Optional.empty());
 
             var request = new FeedbackResponseRequestDTO(null, FeedbackResolution.ADDRESSED, null, null);
             assertThatThrownBy(() -> service.submitResponse(workspaceContext, FEEDBACK_ID, request)).isInstanceOf(
@@ -308,9 +352,14 @@ class FeedbackResponseServiceTest extends BaseUnitTest {
         @Test
         void returnsLatestWhenPresent() {
             Feedback feedback = createFeedback(CONTRIBUTOR_ID);
-            when(feedbackRepository.findByIdAndWorkspaceId(FEEDBACK_ID, WORKSPACE_ID)).thenReturn(
-                Optional.of(feedback)
-            );
+            when(
+                feedbackRepository.findByIdAndWorkspaceIdAndRecipientUserIdAndDeliveryState(
+                    FEEDBACK_ID,
+                    WORKSPACE_ID,
+                    CONTRIBUTOR_ID,
+                    FeedbackDeliveryState.DELIVERED
+                )
+            ).thenReturn(Optional.of(feedback));
 
             appended.add(
                 Reaction.builder()
@@ -333,9 +382,14 @@ class FeedbackResponseServiceTest extends BaseUnitTest {
         @Test
         void returnsEmptyWhenNone() {
             Feedback feedback = createFeedback(CONTRIBUTOR_ID);
-            when(feedbackRepository.findByIdAndWorkspaceId(FEEDBACK_ID, WORKSPACE_ID)).thenReturn(
-                Optional.of(feedback)
-            );
+            when(
+                feedbackRepository.findByIdAndWorkspaceIdAndRecipientUserIdAndDeliveryState(
+                    FEEDBACK_ID,
+                    WORKSPACE_ID,
+                    CONTRIBUTOR_ID,
+                    FeedbackDeliveryState.DELIVERED
+                )
+            ).thenReturn(Optional.of(feedback));
 
             Optional<FeedbackResponseDTO> result = service.getLatestResponse(workspaceContext, FEEDBACK_ID);
 
@@ -347,9 +401,6 @@ class FeedbackResponseServiceTest extends BaseUnitTest {
         void returnsEmptyForACallerWhoIsNotASyncedDeveloper() {
             // A read answers absence with absence — the contract CurrentDeveloperLookup states, and the one
             // the reflection and review-history surfaces already keep.
-            when(feedbackRepository.findByIdAndWorkspaceId(FEEDBACK_ID, WORKSPACE_ID)).thenReturn(
-                Optional.of(createFeedback(CONTRIBUTOR_ID))
-            );
             when(currentDeveloperLookup.currentDeveloperId()).thenReturn(Optional.empty());
 
             assertThat(service.getLatestResponse(workspaceContext, FEEDBACK_ID)).isEmpty();
@@ -357,7 +408,14 @@ class FeedbackResponseServiceTest extends BaseUnitTest {
 
         @Test
         void throwsWhenFeedbackNotInWorkspace() {
-            when(feedbackRepository.findByIdAndWorkspaceId(FEEDBACK_ID, WORKSPACE_ID)).thenReturn(Optional.empty());
+            when(
+                feedbackRepository.findByIdAndWorkspaceIdAndRecipientUserIdAndDeliveryState(
+                    FEEDBACK_ID,
+                    WORKSPACE_ID,
+                    CONTRIBUTOR_ID,
+                    FeedbackDeliveryState.DELIVERED
+                )
+            ).thenReturn(Optional.empty());
 
             assertThatThrownBy(() -> service.getLatestResponse(workspaceContext, FEEDBACK_ID)).isInstanceOf(
                 EntityNotFoundException.class

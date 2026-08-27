@@ -427,7 +427,7 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
     /**
      * Review-history page at the run grain. Paging observations directly can split one review across pages,
      * which leaves the learner with an incomplete explanation of what the reviewer saw. This projection first
-     * selects complete agent-job runs; {@link #findReviewHistoryObservationsByJobs} loads their findings next.
+     * selects complete agent-job runs; {@link #findReviewHistoryObservationsByJobs} loads their observations next.
      *
      * <p>Carries {@link #HIDDEN_REPOSITORY_GUARD}, which is what keeps a hidden repository out of the whole
      * surface: the second query reads only the job ids this one returns, and an agent job reviews one
@@ -484,7 +484,8 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
     );
 
     /**
-     * The findings of the runs {@link #findReviewHistoryRuns} returned.
+     * Every observation in the area for the runs {@link #findReviewHistoryRuns} returned. Filters select
+     * matching runs; they do not truncate a selected review moment.
      *
      * <p>Fetches both revisions because every row is handed straight to {@code ObservationVisibilityPolicy},
      * which reads the evaluated revision and the practice's current one to decide whether the claim still
@@ -500,9 +501,6 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
           AND o.aboutUserId = :aboutUserId
           AND p.workspace.id = :workspaceId
           AND a.slug = :areaSlug
-          AND (:practiceSlug IS NULL OR p.slug = :practiceSlug)
-          AND (:hasArtifactKinds = FALSE OR o.artifactKind IN :artifactKinds)
-          AND (:hasSeverities = FALSE OR o.severity IS NULL OR o.severity IN :severities)
           AND o.presence <> de.tum.cit.aet.hephaestus.practices.model.Presence.NOT_APPLICABLE
         ORDER BY o.observedAt DESC, o.id ASC
         """
@@ -511,12 +509,7 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
         @Param("jobIds") Collection<UUID> jobIds,
         @Param("aboutUserId") Long aboutUserId,
         @Param("workspaceId") Long workspaceId,
-        @Param("areaSlug") @Nullable String areaSlug,
-        @Param("practiceSlug") @Nullable String practiceSlug,
-        @Param("hasArtifactKinds") boolean hasArtifactKinds,
-        @Param("artifactKinds") Collection<ArtifactKind> artifactKinds,
-        @Param("hasSeverities") boolean hasSeverities,
-        @Param("severities") Collection<Severity> severities
+        @Param("areaSlug") @Nullable String areaSlug
     );
 
     interface ReviewHistoryRunRow {
