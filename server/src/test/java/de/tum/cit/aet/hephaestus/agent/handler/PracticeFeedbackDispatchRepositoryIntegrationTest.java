@@ -142,8 +142,14 @@ class PracticeFeedbackDispatchRepositoryIntegrationTest extends AbstractWorkspac
         UUID otherDispatch = insertDispatch(other.getId(), otherJob, "other-tenant-survivor");
         UUID otherEvaluation = seedEvaluation(other, otherJob, DeliveryPolicySurface.ARTIFACT);
 
-        assertThat(dispatchRepository.deleteScmArtifactDispatches(workspace.getId())).isEqualTo(1);
-        assertThat(evaluationRepository.deleteScmArtifactEvaluations(workspace.getId())).isEqualTo(1);
+        Integer deletedDispatches = transactions.execute(status ->
+            dispatchRepository.deleteScmArtifactDispatches(workspace.getId())
+        );
+        Integer deletedEvaluations = transactions.execute(status ->
+            evaluationRepository.deleteScmArtifactEvaluations(workspace.getId())
+        );
+        assertThat(deletedDispatches).isEqualTo(1);
+        assertThat(deletedEvaluations).isEqualTo(1);
 
         assertThat(dispatchRepository.findById(scmDispatch)).isEmpty();
         assertThat(dispatchRepository.findById(conversationDispatch)).isPresent();
@@ -174,15 +180,8 @@ class PracticeFeedbackDispatchRepositoryIntegrationTest extends AbstractWorkspac
             dispatchId
         );
 
-        assertThat(
-            dispatchRepository.claimProjection(
-                dispatchId,
-                workspace.getId(),
-                "projector",
-                Instant.now().plusSeconds(60)
-            )
-        ).isEqualTo(1);
-        assertThat(dispatchRepository.markProjected(dispatchId, workspace.getId(), "projector")).isEqualTo(1);
+        assertThat(claimProjection(dispatchId, "projector")).isEqualTo(1);
+        assertThat(markProjected(dispatchId, "projector")).isEqualTo(1);
 
         assertThat(dispatchRepository.findById(dispatchId)).hasValueSatisfying(dispatch -> {
             assertThat(dispatch.getBody()).isEmpty();
@@ -197,15 +196,8 @@ class PracticeFeedbackDispatchRepositoryIntegrationTest extends AbstractWorkspac
         UUID dispatchId = insertDispatch(workspace.getId(), jobId, "failed-payload");
         jdbcTemplate.update("UPDATE feedback_dispatch SET state = 'FAILED' WHERE id = ?", dispatchId);
 
-        assertThat(
-            dispatchRepository.claimProjection(
-                dispatchId,
-                workspace.getId(),
-                "projector",
-                Instant.now().plusSeconds(60)
-            )
-        ).isEqualTo(1);
-        assertThat(dispatchRepository.markProjected(dispatchId, workspace.getId(), "projector")).isEqualTo(1);
+        assertThat(claimProjection(dispatchId, "projector")).isEqualTo(1);
+        assertThat(markProjected(dispatchId, "projector")).isEqualTo(1);
 
         assertThat(dispatchRepository.findById(dispatchId)).hasValueSatisfying(dispatch -> {
             assertThat(dispatch.getBody()).isEqualTo("body");
@@ -353,6 +345,16 @@ class PracticeFeedbackDispatchRepositoryIntegrationTest extends AbstractWorkspac
 
     private int beginWrite(UUID dispatchId, String owner) {
         return transactions.execute(status -> dispatchRepository.beginWrite(dispatchId, workspace.getId(), owner));
+    }
+
+    private int claimProjection(UUID dispatchId, String owner) {
+        return transactions.execute(status ->
+            dispatchRepository.claimProjection(dispatchId, workspace.getId(), owner, Instant.now().plusSeconds(60))
+        );
+    }
+
+    private int markProjected(UUID dispatchId, String owner) {
+        return transactions.execute(status -> dispatchRepository.markProjected(dispatchId, workspace.getId(), owner));
     }
 
     private UUID insertDispatch(long workspaceId, UUID owningJobId, String key) {
