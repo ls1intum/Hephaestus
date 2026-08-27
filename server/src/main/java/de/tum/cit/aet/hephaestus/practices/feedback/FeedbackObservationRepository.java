@@ -162,7 +162,7 @@ public interface FeedbackObservationRepository extends JpaRepository<FeedbackObs
                               ORDER BY r.created_at DESC, r.id DESC LIMIT 1) AS action,
                             (SELECT r.explanation FROM reaction r
                               WHERE r.feedback_id = f.id AND r.reactor_user_id = :recipientUserId
-                                AND r.action IS NOT NULL
+                                AND r.explanation IS NOT NULL
             """ +
             ReactionRepository.STILL_SPEAKS +
             """

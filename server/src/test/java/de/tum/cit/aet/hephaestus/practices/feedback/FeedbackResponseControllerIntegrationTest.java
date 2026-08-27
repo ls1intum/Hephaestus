@@ -483,6 +483,24 @@ class FeedbackResponseControllerIntegrationTest extends AbstractWorkspaceIntegra
 
         @Test
         @WithAdminUser
+        @DisplayName("a comment written alongside usefulness alone is still readable")
+        void keepsACommentThatCameWithoutAResolution() {
+            // The request permits saying "unhelpful, and here is why" without touching the resolution, so the
+            // comment has to be found by its own presence. Looking for the newest row that carries a resolution
+            // instead would store this text and then never return it — the recipient explains themselves into
+            // nothing, and a later resolution would overwrite the reading with its own empty comment.
+            submit(new FeedbackResponseRequestDTO(FeedbackUsefulness.UNHELPFUL, null, "Missed the point", null));
+
+            FeedbackResponseDTO response = current();
+
+            assertThat(response).isNotNull();
+            assertThat(response.usefulness()).isEqualTo(FeedbackUsefulness.UNHELPFUL);
+            assertThat(response.resolution()).isNull();
+            assertThat(response.comment()).isEqualTo("Missed the point");
+        }
+
+        @Test
+        @WithAdminUser
         @DisplayName("withdrawing leaves no answer, and a later one starts clean")
         void withdrawalEndsEverythingBeforeIt() {
             // Without this an append-only table could only accumulate, and a mis-click would be permanent.

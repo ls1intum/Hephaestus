@@ -87,7 +87,9 @@ public class PracticeAreaReviewHistoryService {
             pageable
         );
         if (runs.isEmpty()) {
-            return Page.empty(pageable);
+            // Empty content, but the count the database made: a page read past the last one still has to say
+            // how many runs there are, or a stale deep link reads as "this area was never reviewed".
+            return new PageImpl<>(List.of(), pageable, runs.getTotalElements());
         }
 
         List<UUID> jobIds = runs.stream().map(ReviewHistoryRunRow::getJobId).toList();
@@ -170,7 +172,7 @@ public class PracticeAreaReviewHistoryService {
         PracticeAreaReviewArtifactDTO artifact =
             target == null
                 ? PracticeAreaReviewArtifactDTO.fallback(first.getArtifactKind(), first.getArtifactId())
-                : PracticeAreaReviewArtifactDTO.from(target, first.getArtifactKind(), first.getArtifactId());
+                : PracticeAreaReviewArtifactDTO.from(target, first.getArtifactId());
         List<PracticeAreaReviewFindingDTO> findings = observations
             .stream()
             .map(observation -> {

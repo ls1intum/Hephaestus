@@ -120,16 +120,18 @@ class GraphQlOperationDocumentValidationTest extends BaseUnitTest {
      * selects {@code name} on both {@code User} ({@code String}) and {@code Team} ({@code String!}) inside one
      * union selection, and the affected documents run fine against api.github.com. graphql-java does enforce it,
      * so this carve-out is scoped to that exact conflict — any other {@code FieldsConflict} still fails the build.
+     *
+     * <p>The scoping reads the two field paths and never the prose around them: graphql-java localises validation
+     * messages, so matching on the English wording passed on an English JVM and failed on any other — the build
+     * went red on a German workstation while CI stayed green. The paths are part of the query, not of the
+     * translation, so they say the same thing in every locale.
      */
     private static boolean isAcceptedByTheVendor(ValidationError error) {
         if (error.getValidationErrorType() != ValidationErrorType.FieldsConflict) {
             return false;
         }
         String message = error.getMessage();
-        return (
-            message.endsWith("fields have different nullability shapes") &&
-            (message.contains("/reviewers/nodes/name'") || message.contains("/requestedReviewer/name'"))
-        );
+        return message.contains("/reviewers/nodes/name'") || message.contains("/requestedReviewer/name'");
     }
 
     @Test

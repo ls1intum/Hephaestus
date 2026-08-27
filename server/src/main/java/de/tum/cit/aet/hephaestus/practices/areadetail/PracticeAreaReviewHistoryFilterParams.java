@@ -2,31 +2,21 @@ package de.tum.cit.aet.hephaestus.practices.areadetail;
 
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
+import de.tum.cit.aet.hephaestus.practices.web.QueryFilterSupport;
 import io.swagger.v3.oas.annotations.Parameter;
 import java.util.List;
-import java.util.Objects;
 import org.jspecify.annotations.Nullable;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.server.ResponseStatusException;
 
 /**
  * Query parameters for the learner-facing practice-area review history.
  *
- * <p>Optional components are nullable wrappers defaulted in the compact constructor: a
- * {@code defaultValue} on {@code @RequestParam} does not reach a record bound as a
- * {@code @ParameterObject}, so a primitive component would receive {@code null} and answer 400 to a
- * request that named no filter at all.
+ * <p>Every optional component is a nullable wrapper, and {@link QueryFilterSupport} states why, along
+ * with how a raw artifact kind and a raw page become the values this surface reads.
  */
 public record PracticeAreaReviewHistoryFilterParams(
     @RequestParam(required = false) @Nullable String practiceSlug,
-    /**
-     * Bare strings, not {@link ArtifactKind}s: springdoc publishes a typed parameter as
-     * {@code artifactKinds.value}, so a generated client would send a query key no caller writes. The
-     * grammar is enforced in {@link #kinds()}, where a malformed value becomes a 400.
-     */
     @Parameter(description = "Only reviews of these artifact kinds, e.g. scm.pull_request (repeatable)")
     @RequestParam(required = false)
     @Nullable
@@ -38,31 +28,16 @@ public record PracticeAreaReviewHistoryFilterParams(
     Integer page,
     @Parameter(description = "Page size, clamped to 1..50") @RequestParam(required = false) @Nullable Integer size
 ) {
-    public PracticeAreaReviewHistoryFilterParams {
-        page = page == null || page < 0 ? 0 : page;
-        size = size == null ? 10 : Math.clamp(size, 1, 50);
-    }
+    private static final int DEFAULT_PAGE_SIZE = 10;
+    private static final int MAX_PAGE_SIZE = 50;
 
-    /**
-     * The page to read, already normalised.
-     *
-     * <p>The compact constructor above defaults a missing or negative page to the first one and clamps the
-     * size, so neither component is null by the time anything reads it. Returning the {@link Pageable} here
-     * rather than the two numbers keeps that normalisation in one place and out of the controller.
-     */
+    /** The page to read, already normalised. */
     public Pageable pageable() {
-        return PageRequest.of(Objects.requireNonNull(page), Objects.requireNonNull(size));
+        return QueryFilterSupport.pageable(page, size, DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE);
     }
 
     /** The requested artifact kinds, parsed; {@code null} means "every kind". */
     public @Nullable List<ArtifactKind> kinds() {
-        if (artifactKinds == null) {
-            return null;
-        }
-        try {
-            return artifactKinds.stream().map(ArtifactKind::of).toList();
-        } catch (IllegalArgumentException invalid) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, invalid.getMessage(), invalid);
-        }
+        return QueryFilterSupport.artifactKinds(artifactKinds);
     }
 }

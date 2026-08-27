@@ -58,6 +58,32 @@ class AreaTrendAggregatorTest {
     }
 
     @Test
+    void shouldNotGainConfidenceWhenEveryWeightIsScaledAlike() {
+        // Scaling every practice's weight by the same factor says nothing new about the area, so the pooled
+        // variance has to come out unchanged. It only does when the numerator carries Σ(w²/v) — the shorthand
+        // 1/Σ(w/v) holds for unit weights alone and would shrink the variance by the factor instead, turning
+        // this borderline case into a confident verdict on the strength of an admin setting.
+        BetaPosterior.Difference difference = BetaPosterior.from(4, 4).differenceFrom(BetaPosterior.from(4, 2));
+
+        TrendDirection unweighted = AreaTrendAggregator.aggregate(
+            "quality",
+            List.of("testing"),
+            List.of(trend("testing", difference)),
+            Map.of(),
+            properties
+        ).direction();
+        TrendDirection doubled = AreaTrendAggregator.aggregate(
+            "quality",
+            List.of("testing"),
+            List.of(trend("testing", difference)),
+            Map.of("testing", 2.0),
+            properties
+        ).direction();
+
+        assertThat(doubled).isEqualTo(unweighted);
+    }
+
+    @Test
     void shouldDateAnAreaSpanFromComparedOpportunitiesOnly() {
         // The merged trail carries every practice's opportunities by artifact, so a verdictless one from a
         // sibling practice could otherwise date the whole area.

@@ -11382,7 +11382,6 @@ components:
           type: string
       required:
       - id
-      - title
       - type
     PracticeAreaReviewFinding:
       type: object

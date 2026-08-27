@@ -483,6 +483,14 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
         Pageable pageable
     );
 
+    /**
+     * The findings of the runs {@link #findReviewHistoryRuns} returned.
+     *
+     * <p>Fetches both revisions because every row is handed straight to {@code ObservationVisibilityPolicy},
+     * which reads the evaluated revision and the practice's current one to decide whether the claim still
+     * speaks for the practice — lazily, that is one round trip per practice and revision on the page.
+     */
+    @EntityGraph(attributePaths = { "practice.currentRevision", "practiceRevision" })
     @Query(
         """
         SELECT o FROM Observation o

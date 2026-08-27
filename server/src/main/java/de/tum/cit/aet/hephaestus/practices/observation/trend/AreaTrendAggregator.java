@@ -100,15 +100,22 @@ final class AreaTrendAggregator {
     private static Pooled pool(List<PracticeTrend> comparable, Map<String, Double> weights) {
         double weightedMean = 0.0;
         double totalPrecision = 0.0;
+        double varianceNumerator = 0.0;
         for (PracticeTrend trend : comparable) {
             // `comparable` was filtered on difference() != null above; the nullness analysis
             // does not carry that across the stream boundary.
             BetaPosterior.Difference difference = Objects.requireNonNull(trend.difference());
-            double precision = weightFor(trend.slug(), weights) / difference.variance();
+            double weight = weightFor(trend.slug(), weights);
+            double precision = weight / difference.variance();
             weightedMean += precision * difference.mean();
             totalPrecision += precision;
+            // Var(Σ pᵢmᵢ / Σ pᵢ) = Σ(pᵢ²·vᵢ) / (Σ pᵢ)², and pᵢ²·vᵢ collapses to wᵢ²/vᵢ = wᵢ·pᵢ.
+            // Only when every weight is 1 does that reduce to the familiar 1/Σ pᵢ, so the
+            // numerator has to be carried separately — a weight of 2 would otherwise report
+            // half the variance it has and turn an UNCERTAIN area into a confident verdict.
+            varianceNumerator += weight * precision;
         }
-        return new Pooled(weightedMean / totalPrecision, 1.0 / totalPrecision);
+        return new Pooled(weightedMean / totalPrecision, varianceNumerator / (totalPrecision * totalPrecision));
     }
 
     /**

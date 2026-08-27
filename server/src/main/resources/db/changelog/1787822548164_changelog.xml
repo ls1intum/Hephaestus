@@ -5,7 +5,7 @@
         xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
         http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
 
-    <changeSet author="practice-feedback-response" id="1786939608194-1">
+    <changeSet author="practice-feedback-response" id="1787822548164-1">
         <preConditions onFail="MARK_RAN" onFailMessage="reaction.usefulness already exists">
             <not><columnExists tableName="reaction" columnName="usefulness"/></not>
         </preConditions>
@@ -30,7 +30,7 @@
             <dropColumn tableName="reaction" columnName="usefulness"/>
         </rollback>
     </changeSet>
-    <changeSet author="practice-area-weight" id="1786939608194-2">
+    <changeSet author="practice-area-weight" id="1787822548164-2">
         <preConditions onFail="MARK_RAN" onFailMessage="practice.area_weight already exists">
             <not><columnExists tableName="practice" columnName="area_weight"/></not>
         </preConditions>
@@ -48,7 +48,7 @@
             <dropColumn tableName="practice" columnName="area_weight"/>
         </rollback>
     </changeSet>
-    <changeSet author="practice-feedback-response" id="1786939608194-3">
+    <changeSet author="practice-feedback-response" id="1787822548164-3">
         <preConditions onFail="MARK_RAN" onFailMessage="chk_reaction_response_present already dropped">
             <sqlCheck expectedResult="1">
                 SELECT COUNT(*) FROM pg_constraint WHERE conname = 'chk_reaction_response_present'

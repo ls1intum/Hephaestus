@@ -74,7 +74,7 @@ public interface ReactionRepository extends JpaRepository<Reaction, UUID> {
                   ORDER BY r.created_at DESC, r.id DESC LIMIT 1) AS "resolution",
                 (SELECT r.explanation FROM reaction r
                   WHERE r.feedback_id = :feedbackId AND r.reactor_user_id = :reactorUserId
-                    AND r.action IS NOT NULL
+                    AND r.explanation IS NOT NULL
             """ +
             STILL_SPEAKS +
             """

@@ -5,6 +5,7 @@ import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackQueryFilter;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
+import de.tum.cit.aet.hephaestus.practices.web.QueryFilterSupport;
 import io.swagger.v3.oas.annotations.Parameter;
 import jakarta.validation.constraints.Positive;
 import java.time.Instant;
@@ -22,9 +23,8 @@ public record ReviewFeedbackFilterParams(
     @RequestParam(required = false) @Nullable List<FeedbackChannel> channel,
     @RequestParam(required = false) @Nullable UUID agentJobId,
     /**
-     * A bare string, not an {@link ArtifactKind}: springdoc walks into the record and publishes a typed
-     * parameter as {@code artifactKind.value}, so a generated client would send a query key no caller
-     * writes. The grammar is enforced below instead, where a malformed value becomes a 400.
+     * A bare string, not an {@link ArtifactKind} — {@link QueryFilterSupport#artifactKind} has the reason,
+     * and parses it in {@link #toFilter()}, where a malformed value becomes a 400.
      */
     @Parameter(description = "Kind of reviewed work, e.g. scm.pull_request")
     @RequestParam(required = false)
@@ -51,7 +51,7 @@ public record ReviewFeedbackFilterParams(
         if (artifactId != null && artifactKind == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "artifactId requires artifactKind");
         }
-        ArtifactKind kind = parseArtifactKind();
+        ArtifactKind kind = QueryFilterSupport.artifactKind(artifactKind);
         if (from != null && to != null && from.isAfter(to)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "from must not be after to");
         }
@@ -66,16 +66,5 @@ public record ReviewFeedbackFilterParams(
             from,
             to
         );
-    }
-
-    private @Nullable ArtifactKind parseArtifactKind() {
-        if (artifactKind == null) {
-            return null;
-        }
-        try {
-            return ArtifactKind.of(artifactKind);
-        } catch (IllegalArgumentException malformed) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, malformed.getMessage(), malformed);
-        }
     }
 }
