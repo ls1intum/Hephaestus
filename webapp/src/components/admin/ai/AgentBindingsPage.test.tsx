@@ -137,7 +137,7 @@ describe("AgentBindingsPage", () => {
 
 		fireEvent.click(card.getByRole("button", { name: /Advanced/ }));
 		const timeout = card.getByLabelText("Timeout (seconds)");
-		fireEvent.change(timeout, { target: { value: "7200" } });
+		fireEvent.change(timeout, { target: { value: "14400" } });
 		fireEvent.click(card.getByRole("button", { name: "Save assignment" }));
 
 		card.getByText("Runs stop after three hours, so enter 10800 seconds or less.");
