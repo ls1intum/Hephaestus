@@ -72,7 +72,7 @@ describe("PracticeTrendPanel", () => {
 		screen.getByRole("heading", { name: "Recent direction" });
 		screen.getByText("More positive recently");
 		screen.getByRole("img", {
-			name: /Latest 4 reviews: 6 strengths, 2 to work on.*Earlier 4 reviews: 2 strengths, 5 to work on/,
+			name: /Earlier 4 reviews: 2 strengths, 5 to work on.*Latest 4 reviews: 6 strengths, 2 to work on/,
 		});
 		screen.getByText(
 			"Compared your latest 4 reviewed work items with the 4 before them, spanning 9 days.",

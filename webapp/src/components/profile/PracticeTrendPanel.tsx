@@ -144,14 +144,10 @@ export function PracticeTrendPanel({ trend, className }: PracticeTrendPanelProps
 	const comparisonLabel =
 		trend.currentOutcomes && trend.previousOutcomes
 			? `${outcomeSummary(
-					"Latest",
-					trend.support.currentOpportunities,
-					trend.currentOutcomes,
-				)} ${outcomeSummary(
 					"Earlier",
 					trend.support.previousOpportunities,
 					trend.previousOutcomes,
-				)}`
+				)} ${outcomeSummary("Latest", trend.support.currentOpportunities, trend.currentOutcomes)}`
 			: undefined;
 
 	return (

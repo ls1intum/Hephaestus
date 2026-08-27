@@ -222,11 +222,14 @@ function UserProfile() {
 							groups: practiceGroups,
 							standings: groupStandings,
 							practicesByGroup,
-							isLoading: groupsQuery.isPending || groupStandingsQuery.isPending,
-							error: groupsQuery.error ?? groupStandingsQuery.error ?? undefined,
+							isLoading:
+								groupsQuery.isPending || groupStandingsQuery.isPending || standingsQuery.isPending,
+							error:
+								groupsQuery.error ?? groupStandingsQuery.error ?? standingsQuery.error ?? undefined,
 							onRetry: () => {
 								if (groupsQuery.isError) void groupsQuery.refetch();
 								if (groupStandingsQuery.isError) void groupStandingsQuery.refetch();
+								if (standingsQuery.isError) void standingsQuery.refetch();
 							},
 							onOpenDetails: (group) => {
 								void navigate({

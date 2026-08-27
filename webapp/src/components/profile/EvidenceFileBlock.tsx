@@ -1,5 +1,5 @@
 import { ChevronDownIcon, FileCodeIcon } from "lucide-react";
-import { useState } from "react";
+import { useId, useState } from "react";
 import { cn } from "@/lib/utils";
 import { type EvidenceLocation, evidenceLineRangeLabel, splitPath } from "./evidence";
 
@@ -10,12 +10,13 @@ interface EvidenceFileBlockProps {
 
 export function EvidenceFileBlock({ location, defaultOpen = true }: EvidenceFileBlockProps) {
 	const [isOpen, setIsOpen] = useState(defaultOpen);
+	const instanceId = useId();
 	const { directory, fileName } = splitPath(location.path);
 	const rangeLabel = evidenceLineRangeLabel(location);
 	const lines = location.snippet?.split("\n") ?? [];
 	const firstLineNumber = location.startLine;
 	const hasSnippet = lines.length > 0;
-	const bodyId = `evidence-${location.path.replace(/[^\w-]/g, "-")}-${firstLineNumber}`;
+	const bodyId = `evidence-${location.path.replace(/[^\w-]/g, "-")}-${firstLineNumber}-${instanceId}`;
 
 	return (
 		<figure className="min-w-0 overflow-hidden rounded-md border">
