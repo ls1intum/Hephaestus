@@ -104,7 +104,7 @@ public final class DocsSignals {
             case TERMINAL_STATE -> Optional.of(SignalRevision.ofTerminalState(lastSegmentOf(signal)));
             // Neither scheme can produce an identity for a document: it has no commits, and no document
             // signal is raised by hand. Inventing a revision would key every occurrence alike.
-            case HEAD_COMMIT, RUN_ID -> Optional.empty();
+            case HEAD_COMMIT, RUN_ID, EVENT_ID -> Optional.empty();
         };
     }
 

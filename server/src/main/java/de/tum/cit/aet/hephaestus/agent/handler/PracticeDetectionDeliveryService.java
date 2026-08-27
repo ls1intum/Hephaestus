@@ -19,6 +19,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreview.PullRequestReviewRepository;
 import de.tum.cit.aet.hephaestus.practices.EvidenceStance;
 import de.tum.cit.aet.hephaestus.practices.PracticeBinding;
 import de.tum.cit.aet.hephaestus.practices.PracticeRevisionRepository;
@@ -60,6 +61,7 @@ public class PracticeDetectionDeliveryService {
     private final PracticeRevisionRepository practiceRevisionRepository;
     private final ObservationRepository observationRepository;
     private final PullRequestRepository pullRequestRepository;
+    private final PullRequestReviewRepository pullRequestReviewRepository;
     private final IssueRepository issueRepository;
     private final ConversationSourceLiveness conversationSourceLiveness;
     private final DocumentProjection documentProjection;
@@ -72,6 +74,7 @@ public class PracticeDetectionDeliveryService {
         PracticeRevisionRepository practiceRevisionRepository,
         ObservationRepository observationRepository,
         PullRequestRepository pullRequestRepository,
+        PullRequestReviewRepository pullRequestReviewRepository,
         IssueRepository issueRepository,
         ConversationSourceLiveness conversationSourceLiveness,
         DocumentProjection documentProjection,
@@ -83,6 +86,7 @@ public class PracticeDetectionDeliveryService {
         this.practiceRevisionRepository = practiceRevisionRepository;
         this.observationRepository = observationRepository;
         this.pullRequestRepository = pullRequestRepository;
+        this.pullRequestReviewRepository = pullRequestReviewRepository;
         this.issueRepository = issueRepository;
         this.conversationSourceLiveness = conversationSourceLiveness;
         this.documentProjection = documentProjection;
@@ -345,16 +349,22 @@ public class PracticeDetectionDeliveryService {
             revision.getBindings(),
             PracticeCatalogInjector.signalOf(job)
         );
-        if (subject != ActorRole.AUTHOR) {
-            throw new JobDeliveryException(
-                "Observation is about a " +
-                    subject +
-                    " this review cannot name, so it has nobody to be filed against: slug=" +
-                    observation.practiceSlug() +
-                    ", jobId=" +
-                    job.getId()
-            );
+        JsonNode metadata = job.getMetadata();
+        boolean reviewerRun =
+            metadata != null &&
+            metadata.path("about_user_id").isNumber() &&
+            "REVIEWER".equals(metadata.path("subject_role").asString());
+        if ((subject == ActorRole.AUTHOR && !reviewerRun) || (subject == ActorRole.REVIEWER && reviewerRun)) {
+            return;
         }
+        throw new JobDeliveryException(
+            "Observation is about a " +
+                subject +
+                " this review cannot name, so it has nobody to be filed against: slug=" +
+                observation.practiceSlug() +
+                ", jobId=" +
+                job.getId()
+        );
     }
 
     private void enforceEvidenceBoundary(
@@ -1020,6 +1030,26 @@ public class PracticeDetectionDeliveryService {
             );
         }
         requireMatchingArtifact(pullRequest, metadata, "pr_number", job);
+        if ("REVIEWER".equals(metadata.path("subject_role").asString())) {
+            long reviewId = metadata.path("review_id").asLong(-1);
+            long aboutUserId = metadata.path("about_user_id").asLong(-1);
+            boolean matches = pullRequestReviewRepository
+                .findById(reviewId)
+                .filter(
+                    review -> review.getPullRequest() != null && review.getPullRequest().getId().equals(pullRequestId)
+                )
+                .filter(review -> review.getAuthor() != null && review.getAuthor().getId().equals(aboutUserId))
+                .isPresent();
+            if (!matches) {
+                throw new JobDeliveryException(
+                    "Submitted review no longer matches its PR and reviewer: reviewId=" +
+                        reviewId +
+                        ", jobId=" +
+                        job.getId()
+                );
+            }
+            return new Target(ArtifactKinds.PULL_REQUEST, pullRequestId, aboutUserId);
+        }
         return new Target(ArtifactKinds.PULL_REQUEST, pullRequestId, pullRequest.getAuthor().getId());
     }
 

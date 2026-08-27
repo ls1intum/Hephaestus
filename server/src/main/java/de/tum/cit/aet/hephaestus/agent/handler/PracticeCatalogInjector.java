@@ -255,7 +255,15 @@ class PracticeCatalogInjector {
      */
     private boolean attributable(Practice practice, @Nullable SignalName signal, AgentJob job) {
         ActorRole subject = PracticeBinding.subjectRoleOf(practice.getBindings(), signal);
+        JsonNode metadata = job.getMetadata();
+        boolean reviewerRun =
+            metadata != null &&
+            metadata.path("about_user_id").isNumber() &&
+            "REVIEWER".equals(metadata.path("subject_role").asString());
         if (subject == ActorRole.AUTHOR) {
+            return !reviewerRun;
+        }
+        if (subject == ActorRole.REVIEWER && reviewerRun) {
             return true;
         }
         log.debug(

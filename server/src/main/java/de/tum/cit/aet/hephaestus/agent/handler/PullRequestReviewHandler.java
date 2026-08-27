@@ -171,6 +171,11 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         if (submissionRequest.triggerSignal() != null) {
             metadata.put(PracticeCatalogInjector.SIGNAL_METADATA_KEY, submissionRequest.triggerSignal().value());
         }
+        if (submissionRequest.reviewId() != null && submissionRequest.aboutUserId() != null) {
+            metadata.put("review_id", submissionRequest.reviewId());
+            metadata.put("about_user_id", submissionRequest.aboutUserId());
+            metadata.put("subject_role", "REVIEWER");
+        }
 
         // The occasion is part of the key: an authoring review, a push re-scan, a reviewer pass and a
         // retrospective of the SAME head SHA are DIFFERENT reviews over different practice sets, so a
@@ -185,7 +190,9 @@ public class PullRequestReviewHandler implements JobTypeHandler {
             ":" +
             phase +
             ":" +
-            submissionRequest.headRefOid();
+            (submissionRequest.reviewId() != null
+                ? "review-" + submissionRequest.reviewId()
+                : submissionRequest.headRefOid());
 
         return new JobSubmission(metadata, idempotencyKey);
     }

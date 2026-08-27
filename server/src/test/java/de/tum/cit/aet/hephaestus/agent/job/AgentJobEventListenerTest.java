@@ -543,6 +543,8 @@ class AgentJobEventListenerTest extends BaseUnitTest {
             assertThat(request.pullRequest().number()).isEqualTo(PR_NUMBER);
             assertThat(request.pullRequest().repository().nameWithOwner()).isEqualTo("owner/repo");
             assertThat(request.headRefOid()).isEqualTo("abc123");
+            assertThat(request.reviewId()).isEqualTo(100L);
+            assertThat(request.aboutUserId()).isEqualTo(200L);
         }
 
         @Test

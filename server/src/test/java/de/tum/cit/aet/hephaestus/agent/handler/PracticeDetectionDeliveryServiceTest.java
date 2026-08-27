@@ -25,6 +25,8 @@ import de.tum.cit.aet.hephaestus.integration.core.fabric.ContentAddressedStore;
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreview.PullRequestReview;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreview.PullRequestReviewRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.practices.EvidenceStance;
@@ -86,6 +88,9 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
     private ApplicationEventPublisher eventPublisher;
 
     @Mock
+    private PullRequestReviewRepository pullRequestReviewRepository;
+
+    @Mock
     private ContentAddressedStore cas;
 
     @Mock
@@ -107,6 +112,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
             practiceRevisionRepository,
             observationRepository,
             pullRequestRepository,
+            pullRequestReviewRepository,
             issueRepository,
             conversationSourceLiveness,
             documentProjection,
@@ -179,6 +185,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
         ReflectionTestUtils.setField(testAuthor, "id", 789L);
         testAuthor.setLogin("developer");
         testPr = new PullRequest();
+        ReflectionTestUtils.setField(testPr, "id", 456L);
         testPr.setNumber(42);
         testPr.setAuthor(testAuthor);
         Repository repository = new Repository();
@@ -928,6 +935,48 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
 
     @Nested
     class TargetResolution {
+
+        @Test
+        void shouldResolveReviewerWhenSubmittedReviewMatchesArtifactAndSubject() {
+            User reviewer = new User();
+            ReflectionTestUtils.setField(reviewer, "id", 789L);
+            PullRequestReview review = new PullRequestReview();
+            ReflectionTestUtils.setField(review, "id", 77L);
+            review.setPullRequest(testPr);
+            review.setAuthor(reviewer);
+            when(pullRequestReviewRepository.findById(77L)).thenReturn(Optional.of(review));
+            ObjectNode metadata = org.junit.jupiter.api.Assertions.assertInstanceOf(
+                ObjectNode.class,
+                testJob.getMetadata()
+            );
+            metadata.put("review_id", 77L);
+            metadata.put("about_user_id", 789L);
+            metadata.put("subject_role", "REVIEWER");
+
+            Object target = ReflectionTestUtils.invokeMethod(service, "resolveTarget", testJob, metadata);
+
+            assertThat(target).hasFieldOrPropertyWithValue("aboutUserId", 789L);
+        }
+
+        @Test
+        void shouldRejectReviewerWhenSubmittedReviewDoesNotMatchSubject() {
+            PullRequestReview review = new PullRequestReview();
+            ReflectionTestUtils.setField(review, "id", 77L);
+            review.setPullRequest(testPr);
+            review.setAuthor(testAuthor);
+            when(pullRequestReviewRepository.findById(77L)).thenReturn(Optional.of(review));
+            ObjectNode metadata = org.junit.jupiter.api.Assertions.assertInstanceOf(
+                ObjectNode.class,
+                testJob.getMetadata()
+            );
+            metadata.put("review_id", 77L);
+            metadata.put("about_user_id", 999L);
+            metadata.put("subject_role", "REVIEWER");
+
+            assertThatThrownBy(() -> ReflectionTestUtils.invokeMethod(service, "resolveTarget", testJob, metadata))
+                .isInstanceOf(JobDeliveryException.class)
+                .hasMessageContaining("no longer matches");
+        }
 
         @Test
         @DisplayName("throws when pull request not found")

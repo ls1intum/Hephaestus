@@ -21,6 +21,7 @@ import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewDetectionGate;
 import de.tum.cit.aet.hephaestus.practices.review.TriggerMode;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceResolver;
+import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -103,7 +104,7 @@ public class AgentJobEventListener {
     public void onPullRequestMerged(ScmDomainEvent.PullRequestMerged event) {
         // Deliberately without the closed/merged short-circuit: here the terminal state IS the
         // trigger's reason to run.
-        dispatch(event.pullRequest(), event.context(), TriggerEventNames.PULL_REQUEST_MERGED);
+        dispatch(event.pullRequest(), event.context(), TriggerEventNames.PULL_REQUEST_MERGED, null);
     }
 
     /**
@@ -118,7 +119,7 @@ public class AgentJobEventListener {
         if (event.wasMerged()) {
             return;
         }
-        dispatch(event.pullRequest(), event.context(), TriggerEventNames.PULL_REQUEST_CLOSED);
+        dispatch(event.pullRequest(), event.context(), TriggerEventNames.PULL_REQUEST_CLOSED, null);
     }
 
     // PR event handling
@@ -131,7 +132,7 @@ public class AgentJobEventListener {
         if (isClosedOrMerged(prData.state(), prData.isMerged())) {
             return;
         }
-        dispatch(prData, context, triggerEventName);
+        dispatch(prData, context, triggerEventName, null);
     }
 
     /**
@@ -141,9 +142,14 @@ public class AgentJobEventListener {
      * there first is told to act, and the rest stop here. That is what makes deduplication outlast the
      * job, so a webhook redelivered after the review completed no longer re-runs it.
      */
-    private void dispatch(ScmEventPayload.PullRequestData prData, EventContext context, String triggerEventName) {
+    private void dispatch(
+        ScmEventPayload.PullRequestData prData,
+        EventContext context,
+        String triggerEventName,
+        ScmEventPayload.@Nullable ReviewData reviewData
+    ) {
         try {
-            SignalKey key = signalKeyFor(prData, triggerEventName);
+            SignalKey key = signalKeyFor(prData, triggerEventName, reviewData);
             if (key == null) {
                 return;
             }
@@ -191,7 +197,7 @@ public class AgentJobEventListener {
                     );
                     signalRecorder.markRefused(key, skip.resolvedSignalReason());
                 }
-                case GateDecision.Detect detect -> submitJob(prData, pr, detect, key);
+                case GateDecision.Detect detect -> submitJob(prData, pr, detect, key, reviewData);
             }
         } catch (Exception e) {
             log.error(
@@ -224,7 +230,11 @@ public class AgentJobEventListener {
                 return;
             }
 
-            dispatch(ScmEventPayload.PullRequestData.from(pr), context, TriggerEventNames.REVIEW_SUBMITTED);
+            if (reviewData.authorId() == null) {
+                log.warn("Cannot submit agent job for review without an author: reviewId={}", reviewData.id());
+                return;
+            }
+            dispatch(ScmEventPayload.PullRequestData.from(pr), context, TriggerEventNames.REVIEW_SUBMITTED, reviewData);
         } catch (Exception e) {
             log.error(
                 "Failed to process review event: reviewId={}, pullRequestId={}",
@@ -243,7 +253,11 @@ public class AgentJobEventListener {
      * <p>Reads the head commit through a single-column projection rather than the gate's fetch graph:
      * a reconciliation pass records without ever needing the rest of it.
      */
-    private @Nullable SignalKey signalKeyFor(ScmEventPayload.PullRequestData prData, String triggerEventName) {
+    private @Nullable SignalKey signalKeyFor(
+        ScmEventPayload.PullRequestData prData,
+        String triggerEventName,
+        ScmEventPayload.@Nullable ReviewData reviewData
+    ) {
         // The mirror can hold a pull request whose repository row is gone; that reads as "not ours"
         // rather than as an error, matching the gate.
         String repositoryName = repositoryNameOf(prData);
@@ -256,6 +270,11 @@ public class AgentJobEventListener {
         if (signal == null) {
             log.debug("No signal declared for trigger event, nothing to record: event={}", triggerEventName);
             return null;
+        }
+        if (signal.equals(ScmSignals.PULL_REQUEST_REVIEWED)) {
+            return reviewData == null
+                ? null
+                : ScmSignals.pullRequestReviewKey(workspace.getId(), prData.id(), reviewData.id());
         }
         return ScmSignals.pullRequestKey(
             workspace.getId(),
@@ -293,20 +312,32 @@ public class AgentJobEventListener {
         ScmEventPayload.PullRequestData prData,
         PullRequest pr,
         GateDecision.Detect detect,
-        SignalKey signalKey
+        SignalKey signalKey,
+        ScmEventPayload.@Nullable ReviewData reviewData
     ) {
         String headRefOid = pr.getHeadRefOid();
         if (headRefOid == null) {
             log.warn("Cannot submit agent job: missing head commit, prId={}", pr.getId());
             return;
         }
-        PullRequestReviewSubmissionRequest request = new PullRequestReviewSubmissionRequest(
-            prData,
-            pr.getHeadRefName(),
-            headRefOid,
-            pr.getBaseRefName(),
-            signalKey.signalName()
-        );
+        PullRequestReviewSubmissionRequest request =
+            reviewData == null
+                ? new PullRequestReviewSubmissionRequest(
+                      prData,
+                      pr.getHeadRefName(),
+                      headRefOid,
+                      pr.getBaseRefName(),
+                      signalKey.signalName()
+                  )
+                : PullRequestReviewSubmissionRequest.forSubmittedReview(
+                      prData,
+                      pr.getHeadRefName(),
+                      headRefOid,
+                      pr.getBaseRefName(),
+                      signalKey.signalName(),
+                      reviewData.id(),
+                      Objects.requireNonNull(reviewData.authorId())
+                  );
 
         try {
             agentJobService

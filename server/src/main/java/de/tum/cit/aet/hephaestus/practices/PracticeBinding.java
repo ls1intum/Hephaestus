@@ -39,9 +39,8 @@ import org.jspecify.annotations.Nullable;
  * @param subject  whose conduct a review occasioned this way judges. Defaults to {@link ActorRole#AUTHOR},
  *                 which is what almost every practice is about; a practice about reviewing names
  *                 {@link ActorRole#REVIEWER}. Declared on the occasion rather than on the signal because
- *                 one signal occasions both kinds: {@code scm.pull_request.reviewed} starts
- *                 {@code engaging-with-inline-review-comments} (about the author) and
- *                 {@code leaves-useful-specific-review-comments} (about the reviewer) in the same run.
+ *                 one signal may describe practices about different roles; the submitted-review path
+ *                 uses the triggering reviewer as its assessed subject and withholds author practices.
  */
 @Schema(description = "An occasion that starts a review, and the evidence that review reads")
 public record PracticeBinding(

@@ -94,6 +94,14 @@ public record SignalRevision(String value) {
         return new SignalRevision(RevisionScheme.RUN_ID.prefix() + runId);
     }
 
+    /** For a domain event with a stable mirror identity, such as one submitted review. */
+    public static SignalRevision ofEventId(long eventId) {
+        if (eventId <= 0) {
+            throw new IllegalArgumentException("eventId must be positive");
+        }
+        return new SignalRevision(RevisionScheme.EVENT_ID.prefix() + eventId);
+    }
+
     /** The scheme that produced this revision, read back off its prefix. */
     public Optional<RevisionScheme> scheme() {
         for (RevisionScheme scheme : RevisionScheme.values()) {

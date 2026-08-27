@@ -24,6 +24,112 @@ const practices: ReviewPractice[] = [
 ];
 
 describe("buildReviewTree", () => {
+	const scenarioContracts: Array<{
+		name: string;
+		practices: ReviewPractice[];
+		expected: Array<[string, string[], string[]]>;
+	}> = [
+		{
+			name: "a submitted-review occasion reads review comments without fanning out to code",
+			practices: [
+				{
+					slug: "specific-review-comments",
+					readsSources: ["scm.pull-request.core", "scm.pull-request.comments"],
+				},
+			],
+			expected: [
+				[
+					"review-1",
+					["specific-review-comments"],
+					["scm.pull-request.comments", "scm.pull-request.core"],
+				],
+			],
+		},
+		{
+			name: "an author-uptake occasion reads review threads without fanning out to code",
+			practices: [
+				{
+					slug: "engages-with-review-feedback",
+					readsSources: ["scm.pull-request.core", "scm.review-threads"],
+				},
+			],
+			expected: [
+				[
+					"review-1",
+					["engages-with-review-feedback"],
+					["scm.pull-request.core", "scm.review-threads"],
+				],
+			],
+		},
+		{
+			name: "a change occasion keeps code exploration local to code practices",
+			practices: [
+				{
+					slug: "tests-behavior-changes",
+					readsSources: ["scm.pull-request.diff", "scm.repository.tree"],
+				},
+			],
+			expected: [
+				["code-1", ["tests-behavior-changes"], ["scm.pull-request.diff", "scm.repository.tree"]],
+			],
+		},
+		{
+			name: "a linked-work occasion does not require diff exploration",
+			practices: [
+				{
+					slug: "meets-linked-acceptance-criteria",
+					readsSources: ["scm.pull-request.core", "scm.linked-work-items"],
+				},
+			],
+			expected: [
+				[
+					"linked-work-1",
+					["meets-linked-acceptance-criteria"],
+					["scm.linked-work-items", "scm.pull-request.core"],
+				],
+			],
+		},
+		{
+			name: "a core-only occasion stays in the pull-request lane",
+			practices: [
+				{ slug: "clear-pull-request-description", readsSources: ["scm.pull-request.core"] },
+			],
+			expected: [["pull-request-1", ["clear-pull-request-description"], ["scm.pull-request.core"]]],
+		},
+	];
+
+	for (const scenario of scenarioContracts) {
+		test(scenario.name, () => {
+			const tree = buildReviewTree(scenario.practices, 4);
+
+			expect(tree.practiceCount).toBe(scenario.practices.length);
+			expect(
+				tree.groups.map((group) => [group.id, group.practiceSlugs, group.evidenceSources]),
+			).toEqual(scenario.expected);
+		});
+	}
+
+	test("keeps mixed-scenario evidence lanes deterministic and isolated", () => {
+		const mixed: ReviewPractice[] = scenarioContracts.flatMap((scenario) => scenario.practices);
+		const expected = [
+			["pull-request-1", ["clear-pull-request-description"]],
+			["linked-work-1", ["meets-linked-acceptance-criteria"]],
+			["review-1", ["engages-with-review-feedback", "specific-review-comments"]],
+			["code-1", ["tests-behavior-changes"]],
+		];
+
+		expect(
+			buildReviewTree(mixed, 4).groups.map((group) => [group.id, group.practiceSlugs]),
+		).toEqual(expected);
+		expect(
+			buildReviewTree(mixed.toReversed(), 4).groups.map((group) => [group.id, group.practiceSlugs]),
+		).toEqual(expected);
+	});
+
+	test("returns no work for an occasion with no eligible practices", () => {
+		expect(buildReviewTree([], 4)).toEqual({ practiceCount: 0, groups: [] });
+	});
+
 	test("orders evidence-local groups from cheap context to code exploration", () => {
 		const tree = buildReviewTree(practices, 2);
 

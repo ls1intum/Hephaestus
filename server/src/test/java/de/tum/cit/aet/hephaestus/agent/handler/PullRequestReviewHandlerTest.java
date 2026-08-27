@@ -287,6 +287,27 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
         }
 
         @Test
+        void preservesSubmittedReviewSubjectAndIdentity() {
+            var base = sampleRequest();
+            var request = PullRequestReviewSubmissionRequest.forSubmittedReview(
+                base.pullRequest(),
+                base.headRefName(),
+                base.headRefOid(),
+                base.baseRefName(),
+                de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals.PULL_REQUEST_REVIEWED,
+                100L,
+                200L
+            );
+
+            JobSubmission submission = handler.createSubmission(request);
+
+            assertThat(submission.metadata().path("review_id").asLong()).isEqualTo(100L);
+            assertThat(submission.metadata().path("about_user_id").asLong()).isEqualTo(200L);
+            assertThat(submission.metadata().path("subject_role").asString()).isEqualTo("REVIEWER");
+            assertThat(submission.idempotencyKey()).endsWith(":review-100");
+        }
+
+        @Test
         void rejectsWrongRequestType() {
             JobSubmissionRequest wrongType = new JobSubmissionRequest() {};
             assertThatThrownBy(() -> handler.createSubmission(wrongType))

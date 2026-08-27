@@ -80,7 +80,7 @@ public final class ScmSignals {
         Map.entry(PULL_REQUEST_OPENED, RevisionScheme.HEAD_COMMIT),
         Map.entry(PULL_REQUEST_READY, RevisionScheme.HEAD_COMMIT),
         Map.entry(PULL_REQUEST_SYNCHRONIZED, RevisionScheme.HEAD_COMMIT),
-        Map.entry(PULL_REQUEST_REVIEWED, RevisionScheme.HEAD_COMMIT),
+        Map.entry(PULL_REQUEST_REVIEWED, RevisionScheme.EVENT_ID),
         Map.entry(PULL_REQUEST_MERGED, RevisionScheme.TERMINAL_STATE),
         Map.entry(PULL_REQUEST_CLOSED, RevisionScheme.TERMINAL_STATE),
         Map.entry(PULL_REQUEST_MANUAL_REVIEW, RevisionScheme.RUN_ID),
@@ -172,6 +172,11 @@ public final class ScmSignals {
         return new SignalKey(workspaceId, artifactId, signal, SignalRevision.ofRunId(runId));
     }
 
+    /** One submitted review is one occurrence, even when several reviews concern the same head commit. */
+    public static SignalKey pullRequestReviewKey(long workspaceId, long pullRequestId, long reviewId) {
+        return new SignalKey(workspaceId, pullRequestId, PULL_REQUEST_REVIEWED, SignalRevision.ofEventId(reviewId));
+    }
+
     private static Optional<SignalRevision> revisionFor(
         SignalName signal,
         @Nullable String headRefOid,
@@ -187,6 +192,8 @@ public final class ScmSignals {
             case TERMINAL_STATE -> Optional.of(SignalRevision.ofTerminalState(lastSegmentOf(signal)));
             // A requested run carries its own identity; no domain event raises one.
             case RUN_ID -> Optional.empty();
+            // Review events use pullRequestReviewKey because their identity is not a property of PR prose.
+            case EVENT_ID -> Optional.empty();
         };
     }
 

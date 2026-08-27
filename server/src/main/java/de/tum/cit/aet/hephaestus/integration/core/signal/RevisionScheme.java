@@ -16,7 +16,10 @@ public enum RevisionScheme {
     TERMINAL_STATE("state~"),
 
     /** The identity of one explicit request to review. Two asks are two revisions, by construction. */
-    RUN_ID("run~");
+    RUN_ID("run~"),
+
+    /** The provider-independent identity of one mirrored domain event. */
+    EVENT_ID("event~");
 
     private final String prefix;
 
