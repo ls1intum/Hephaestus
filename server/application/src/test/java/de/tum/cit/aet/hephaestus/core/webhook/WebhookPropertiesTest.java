@@ -25,21 +25,22 @@ class WebhookPropertiesTest extends BaseUnitTest {
     @Test
     void refusesAStreamTooSmallToHoldWhatTheReceiverAccepts() {
         assertThat(violations(streamOf(DataSize.ofBytes(3 * MAX_PAYLOAD), Map.of())))
-            .as("below four maximum payloads the stream rejects deliveries the filter already admitted")
-            .singleElement()
-            .satisfies(message -> assertThat(message).contains("max-bytes"));
+                .as("below four maximum payloads the stream rejects deliveries the filter already admitted")
+                .singleElement()
+                .satisfies(message -> assertThat(message).contains("max-bytes"));
     }
 
     @Test
     void refusesAPerStreamOverrideTooSmallToHoldWhatTheReceiverAccepts() {
         assertThat(violations(streamOf(gibibytes(1), Map.of("github", DataSize.ofBytes(MAX_PAYLOAD)))))
-            .as("an override is the value the stream actually runs with, so it is bound by the same floor")
-            .hasSize(1);
+                .as("an override is the value the stream actually runs with, so it is bound by the same floor")
+                .hasSize(1);
     }
 
     @Test
     void acceptsAStreamExactlyAtTheFloor() {
-        assertThat(violations(streamOf(DataSize.ofBytes(4 * MAX_PAYLOAD), Map.of("github", gibibytes(8))))).isEmpty();
+        assertThat(violations(streamOf(DataSize.ofBytes(4 * MAX_PAYLOAD), Map.of("github", gibibytes(8)))))
+                .isEmpty();
     }
 
     @Test
@@ -50,15 +51,15 @@ class WebhookPropertiesTest extends BaseUnitTest {
     @Test
     void refusesADedupWindowShorterThanAVendorsReplayTolerance() {
         assertThatThrownBy(() -> stream(Duration.ofMinutes(2), gibibytes(1), Map.of()))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("max vendor replay tolerance");
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("max vendor replay tolerance");
     }
 
     @Test
     void refusesAStreamBoundOfZeroBytes() {
         assertThatThrownBy(() -> stream(Duration.ofMinutes(10), DataSize.ofBytes(0), Map.of()))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("stream.maxBytes must be at least 1 byte");
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("stream.maxBytes must be at least 1 byte");
     }
 
     private static WebhookProperties streamOf(DataSize maxBytes, Map<String, DataSize> byStream) {
@@ -66,31 +67,25 @@ class WebhookPropertiesTest extends BaseUnitTest {
     }
 
     private static WebhookProperties.Stream stream(
-        Duration duplicateWindow,
-        DataSize maxBytes,
-        Map<String, DataSize> byStream
-    ) {
+            Duration duplicateWindow, DataSize maxBytes, Map<String, DataSize> byStream) {
         return new WebhookProperties.Stream(
-            duplicateWindow,
-            Duration.ofDays(180),
-            Map.of(),
-            maxBytes,
-            byStream,
-            gibibytes(64),
-            false,
-            Duration.ofMinutes(5),
-            Duration.ofSeconds(60)
-        );
+                duplicateWindow,
+                Duration.ofDays(180),
+                Map.of(),
+                maxBytes,
+                byStream,
+                gibibytes(64),
+                false,
+                Duration.ofMinutes(5),
+                Duration.ofSeconds(60));
     }
 
     private static java.util.List<String> violations(WebhookProperties properties) {
         try (ValidatorFactory factory = Validation.buildDefaultValidatorFactory()) {
             Validator validator = factory.getValidator();
-            return validator
-                .validate(properties)
-                .stream()
-                .map(v -> v.getMessage())
-                .toList();
+            return validator.validate(properties).stream()
+                    .map(v -> v.getMessage())
+                    .toList();
         }
     }
 }

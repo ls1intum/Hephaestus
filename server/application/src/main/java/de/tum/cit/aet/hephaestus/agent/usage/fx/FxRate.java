@@ -25,7 +25,12 @@ import lombok.ToString;
  * usage ledger.
  */
 @Entity
-@Table(name = "fx_rate", uniqueConstraints = @UniqueConstraint(name = "ux_fx_rate_date", columnNames = { "rate_date" }))
+@Table(
+        name = "fx_rate",
+        uniqueConstraints =
+                @UniqueConstraint(
+                        name = "ux_fx_rate_date",
+                        columnNames = {"rate_date"}))
 @Getter
 @Setter
 @NoArgsConstructor

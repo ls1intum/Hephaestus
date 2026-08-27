@@ -15,120 +15,10 @@ import org.junit.jupiter.params.provider.ValueSource;
 class PiPlanSpecValidationTest extends BaseUnitTest {
 
     private static final PiRunnerProfile PROFILE = new PracticeRunnerProfile();
-    private static final byte[] BYTES = new byte[] { 0x01 };
+    private static final byte[] BYTES = new byte[] {0x01};
 
     private static PiPlanSpec specWith(Map<String, byte[]> extraInputs) {
         return new PiPlanSpec(
-            "openai-completions",
-            "gpt-5.4-mini",
-            null,
-            null,
-            false,
-            "job-token",
-            true,
-            600,
-            PROFILE,
-            extraInputs,
-            ""
-        );
-    }
-
-    @ParameterizedTest
-    @ValueSource(
-        strings = {
-            "inputs/context/diff.patch", // CONTEXT_PREFIX
-            "agent/mentor/system.md", // MENTOR_SYSTEM_PROMPT_PATH
-            ".sessions/abc-123.jsonl", // SESSIONS_DIR_PREFIX
-        }
-    )
-    void allowlistedPathsAccepted(String path) {
-        assertThatNoException().isThrownBy(() -> specWith(Map.of(path, BYTES)));
-    }
-
-    @Test
-    void undeclaredPathRejected() {
-        assertThatThrownBy(() -> specWith(Map.of("evil/../etc/passwd", BYTES)))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("evil/../etc/passwd")
-            .hasMessageContaining("allowedExtraInputPaths");
-    }
-
-    @Test
-    void jobTokenIsAlwaysRequired() {
-        assertThatThrownBy(() ->
-            new PiPlanSpec(
-                "openai-completions",
-                "gpt-5.4-mini",
-                null,
-                null,
-                false,
-                null,
-                false,
-                600,
-                PROFILE,
-                Map.of(),
-                ""
-            )
-        )
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("jobToken");
-    }
-
-    @Test
-    void blankJobTokenRejected() {
-        assertThatThrownBy(() ->
-            new PiPlanSpec(
-                "openai-completions",
-                "gpt-5.4-mini",
-                null,
-                null,
-                false,
-                "  ",
-                false,
-                600,
-                PROFILE,
-                Map.of(),
-                ""
-            )
-        )
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("jobToken");
-    }
-
-    @Test
-    void blankApiProtocolRejected() {
-        assertThatThrownBy(() ->
-            new PiPlanSpec("", "gpt-5.4-mini", null, null, false, "job-token", false, 600, PROFILE, Map.of(), "")
-        )
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("apiProtocol");
-    }
-
-    @Test
-    void blankUpstreamModelIdRejected() {
-        assertThatThrownBy(() ->
-            new PiPlanSpec(
-                "openai-completions",
-                "  ",
-                null,
-                null,
-                false,
-                "job-token",
-                false,
-                600,
-                PROFILE,
-                Map.of(),
-                ""
-            )
-        )
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("upstreamModelId");
-    }
-
-    @Test
-    void timeoutMustExceedBuffer() {
-        assertThatThrownBy(() ->
-            new PiPlanSpec(
                 "openai-completions",
                 "gpt-5.4-mini",
                 null,
@@ -136,14 +26,99 @@ class PiPlanSpecValidationTest extends BaseUnitTest {
                 false,
                 "job-token",
                 true,
-                PiRuntimeFactory.TIMEOUT_BUFFER_SECONDS,
+                600,
                 PROFILE,
-                Map.of(),
-                ""
-            )
-        )
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("TIMEOUT_BUFFER_SECONDS");
+                extraInputs,
+                "");
+    }
+
+    @ParameterizedTest
+    @ValueSource(
+            strings = {
+                "inputs/context/diff.patch", // CONTEXT_PREFIX
+                "agent/mentor/system.md", // MENTOR_SYSTEM_PROMPT_PATH
+                ".sessions/abc-123.jsonl", // SESSIONS_DIR_PREFIX
+            })
+    void allowlistedPathsAccepted(String path) {
+        assertThatNoException().isThrownBy(() -> specWith(Map.of(path, BYTES)));
+    }
+
+    @Test
+    void undeclaredPathRejected() {
+        assertThatThrownBy(() -> specWith(Map.of("evil/../etc/passwd", BYTES)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("evil/../etc/passwd")
+                .hasMessageContaining("allowedExtraInputPaths");
+    }
+
+    @Test
+    void jobTokenIsAlwaysRequired() {
+        assertThatThrownBy(() -> new PiPlanSpec(
+                        "openai-completions",
+                        "gpt-5.4-mini",
+                        null,
+                        null,
+                        false,
+                        null,
+                        false,
+                        600,
+                        PROFILE,
+                        Map.of(),
+                        ""))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("jobToken");
+    }
+
+    @Test
+    void blankJobTokenRejected() {
+        assertThatThrownBy(() -> new PiPlanSpec(
+                        "openai-completions",
+                        "gpt-5.4-mini",
+                        null,
+                        null,
+                        false,
+                        "  ",
+                        false,
+                        600,
+                        PROFILE,
+                        Map.of(),
+                        ""))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("jobToken");
+    }
+
+    @Test
+    void blankApiProtocolRejected() {
+        assertThatThrownBy(() -> new PiPlanSpec(
+                        "", "gpt-5.4-mini", null, null, false, "job-token", false, 600, PROFILE, Map.of(), ""))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("apiProtocol");
+    }
+
+    @Test
+    void blankUpstreamModelIdRejected() {
+        assertThatThrownBy(() -> new PiPlanSpec(
+                        "openai-completions", "  ", null, null, false, "job-token", false, 600, PROFILE, Map.of(), ""))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("upstreamModelId");
+    }
+
+    @Test
+    void timeoutMustExceedBuffer() {
+        assertThatThrownBy(() -> new PiPlanSpec(
+                        "openai-completions",
+                        "gpt-5.4-mini",
+                        null,
+                        null,
+                        false,
+                        "job-token",
+                        true,
+                        PiRuntimeFactory.TIMEOUT_BUFFER_SECONDS,
+                        PROFILE,
+                        Map.of(),
+                        ""))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("TIMEOUT_BUFFER_SECONDS");
     }
 
     /** A profile whose runner script is blank — the runnerScript() guard must reject it. */
@@ -166,8 +141,25 @@ class PiPlanSpecValidationTest extends BaseUnitTest {
 
     @Test
     void blankRunnerScriptRejected() {
-        assertThatThrownBy(() ->
-            new PiPlanSpec(
+        assertThatThrownBy(() -> new PiPlanSpec(
+                        "openai-completions",
+                        "gpt-5.4-mini",
+                        null,
+                        null,
+                        false,
+                        "job-token",
+                        true,
+                        600,
+                        BLANK_SCRIPT_PROFILE,
+                        Map.of(),
+                        ""))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("runnerScript");
+    }
+
+    @Test
+    void nullPrecomputeStepNormalizesToEmptyString() {
+        PiPlanSpec spec = new PiPlanSpec(
                 "openai-completions",
                 "gpt-5.4-mini",
                 null,
@@ -176,30 +168,9 @@ class PiPlanSpecValidationTest extends BaseUnitTest {
                 "job-token",
                 true,
                 600,
-                BLANK_SCRIPT_PROFILE,
+                PROFILE,
                 Map.of(),
-                ""
-            )
-        )
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("runnerScript");
-    }
-
-    @Test
-    void nullPrecomputeStepNormalizesToEmptyString() {
-        PiPlanSpec spec = new PiPlanSpec(
-            "openai-completions",
-            "gpt-5.4-mini",
-            null,
-            null,
-            false,
-            "job-token",
-            true,
-            600,
-            PROFILE,
-            Map.of(),
-            null
-        );
+                null);
 
         // The null-coalesce protects PiRuntimeFactory's string concat from an NPE downstream.
         assertThat(spec.precomputeStep()).isEmpty();
@@ -207,21 +178,19 @@ class PiPlanSpecValidationTest extends BaseUnitTest {
 
     @Test
     void azureProtocolWithTokenConstructs() {
-        assertThatNoException().isThrownBy(() ->
-            new PiPlanSpec(
-                "azure-openai-responses",
-                "gpt-5.4-mini",
-                null,
-                null,
-                false,
-                "job-token",
-                false,
-                600,
-                PROFILE,
-                Map.of(),
-                ""
-            )
-        );
+        assertThatNoException()
+                .isThrownBy(() -> new PiPlanSpec(
+                        "azure-openai-responses",
+                        "gpt-5.4-mini",
+                        null,
+                        null,
+                        false,
+                        "job-token",
+                        false,
+                        600,
+                        PROFILE,
+                        Map.of(),
+                        ""));
     }
 
     @Test

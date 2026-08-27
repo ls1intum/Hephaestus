@@ -14,9 +14,8 @@ class SlackInteractivityHttpConfiguration {
 
     @Bean
     FilterRegistrationBean<SlackInteractivityRawBodyFilter> slackInteractivityRawBodyFilter() {
-        FilterRegistrationBean<SlackInteractivityRawBodyFilter> registration = new FilterRegistrationBean<>(
-            new SlackInteractivityRawBodyFilter()
-        );
+        FilterRegistrationBean<SlackInteractivityRawBodyFilter> registration =
+                new FilterRegistrationBean<>(new SlackInteractivityRawBodyFilter());
         registration.addUrlPatterns("/webhooks/slack/interactivity");
         registration.setOrder(Ordered.HIGHEST_PRECEDENCE + 1);
         return registration;

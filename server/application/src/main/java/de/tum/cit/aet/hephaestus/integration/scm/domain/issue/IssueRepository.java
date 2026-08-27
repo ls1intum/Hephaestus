@@ -30,8 +30,7 @@ public interface IssueRepository extends JpaRepository<Issue, Long> {
      * @param number the issue number within the repository
      * @return the issue if found
      */
-    @Query(
-        """
+    @Query("""
         SELECT i
         FROM Issue i
         LEFT JOIN FETCH i.labels
@@ -40,18 +39,15 @@ public interface IssueRepository extends JpaRepository<Issue, Long> {
         LEFT JOIN FETCH i.repository
         LEFT JOIN FETCH i.milestone
         WHERE TYPE(i) = Issue AND i.repository.id = :repositoryId AND i.number = :number
-        """
-    )
+        """)
     Optional<Issue> findByRepositoryIdAndNumber(@Param("repositoryId") long repositoryId, @Param("number") int number);
 
     /** Fetches an issue with its repository eagerly — used to build an issue-detection job submission. */
     @Query("SELECT i FROM Issue i LEFT JOIN FETCH i.repository WHERE TYPE(i) = Issue AND i.id = :id")
     Optional<Issue> findByIdWithRepository(@Param("id") long id);
 
-    @Query(
-        "SELECT i FROM Issue i LEFT JOIN FETCH i.author LEFT JOIN FETCH i.repository " +
-            "WHERE TYPE(i) = Issue AND i.id = :id"
-    )
+    @Query("SELECT i FROM Issue i LEFT JOIN FETCH i.author LEFT JOIN FETCH i.repository "
+            + "WHERE TYPE(i) = Issue AND i.id = :id")
     Optional<Issue> findByIdWithAuthorAndRepository(@Param("id") long id);
 
     /**
@@ -65,10 +61,8 @@ public interface IssueRepository extends JpaRepository<Issue, Long> {
      * without the fetch that question is answered by a {@code LazyInitializationException} — or, worse
      * under a future session, by a null that refuses an issue's own author a review of their own work.
      */
-    @Query(
-        "SELECT i FROM Issue i LEFT JOIN FETCH i.repository LEFT JOIN FETCH i.author LEFT JOIN FETCH i.assignees " +
-            "WHERE TYPE(i) = Issue AND i.id = :id"
-    )
+    @Query("SELECT i FROM Issue i LEFT JOIN FETCH i.repository LEFT JOIN FETCH i.author LEFT JOIN FETCH i.assignees "
+            + "WHERE TYPE(i) = Issue AND i.id = :id")
     Optional<Issue> findByIdWithRepositoryAndAssignees(@Param("id") long id);
 
     /**
@@ -107,24 +101,18 @@ public interface IssueRepository extends JpaRepository<Issue, Long> {
      * @param repositoryIds the repository IDs to count for
      * @return one projection row per repository that has at least one live issue
      */
-    @Query(
-        "SELECT i.repository.id AS repositoryId, COUNT(i) AS itemCount FROM Issue i " +
-            "WHERE TYPE(i) = Issue AND i.deletedAt IS NULL AND i.repository.id IN :repositoryIds " +
-            "GROUP BY i.repository.id"
-    )
+    @Query("SELECT i.repository.id AS repositoryId, COUNT(i) AS itemCount FROM Issue i "
+            + "WHERE TYPE(i) = Issue AND i.deletedAt IS NULL AND i.repository.id IN :repositoryIds "
+            + "GROUP BY i.repository.id")
     List<RepositoryItemCountProjection> countIssuesGroupedByRepositoryIds(
-        @Param("repositoryIds") Collection<Long> repositoryIds
-    );
+            @Param("repositoryIds") Collection<Long> repositoryIds);
 
     /** Per-repository count of live pull/merge requests. Counterpart to {@link #countIssuesGroupedByRepositoryIds}. */
-    @Query(
-        "SELECT i.repository.id AS repositoryId, COUNT(i) AS itemCount FROM Issue i " +
-            "WHERE TYPE(i) = PullRequest AND i.deletedAt IS NULL AND i.repository.id IN :repositoryIds " +
-            "GROUP BY i.repository.id"
-    )
+    @Query("SELECT i.repository.id AS repositoryId, COUNT(i) AS itemCount FROM Issue i "
+            + "WHERE TYPE(i) = PullRequest AND i.deletedAt IS NULL AND i.repository.id IN :repositoryIds "
+            + "GROUP BY i.repository.id")
     List<RepositoryItemCountProjection> countPullRequestsGroupedByRepositoryIds(
-        @Param("repositoryIds") Collection<Long> repositoryIds
-    );
+            @Param("repositoryIds") Collection<Long> repositoryIds);
 
     /**
      * Live (non-tombstoned) issue numbers for one repository — the local half of the deletion
@@ -135,14 +123,12 @@ public interface IssueRepository extends JpaRepository<Issue, Long> {
      * with 50k issues would otherwise hydrate 50k entity graphs to compare integers.
      */
     @Query(
-        "SELECT i.number FROM Issue i WHERE TYPE(i) = Issue AND i.deletedAt IS NULL AND i.repository.id = :repositoryId"
-    )
+            "SELECT i.number FROM Issue i WHERE TYPE(i) = Issue AND i.deletedAt IS NULL AND i.repository.id = :repositoryId")
     List<Integer> findLiveIssueNumbersByRepositoryId(@Param("repositoryId") Long repositoryId);
 
     /** Live pull-request numbers for one repository. Counterpart to {@link #findLiveIssueNumbersByRepositoryId}. */
     @Query(
-        "SELECT i.number FROM Issue i WHERE TYPE(i) = PullRequest AND i.deletedAt IS NULL AND i.repository.id = :repositoryId"
-    )
+            "SELECT i.number FROM Issue i WHERE TYPE(i) = PullRequest AND i.deletedAt IS NULL AND i.repository.id = :repositoryId")
     List<Integer> findLivePullRequestNumbersByRepositoryId(@Param("repositoryId") Long repositoryId);
 
     /**
@@ -163,15 +149,12 @@ public interface IssueRepository extends JpaRepository<Issue, Long> {
      */
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Transactional
-    @Query(
-        "UPDATE Issue i SET i.deletedAt = :deletedAt WHERE TYPE(i) = Issue AND i.repository.id = :repositoryId " +
-            "AND i.number IN :numbers AND i.deletedAt IS NULL"
-    )
+    @Query("UPDATE Issue i SET i.deletedAt = :deletedAt WHERE TYPE(i) = Issue AND i.repository.id = :repositoryId "
+            + "AND i.number IN :numbers AND i.deletedAt IS NULL")
     int tombstoneIssuesByRepositoryIdAndNumbers(
-        @Param("repositoryId") Long repositoryId,
-        @Param("numbers") Collection<Integer> numbers,
-        @Param("deletedAt") Instant deletedAt
-    );
+            @Param("repositoryId") Long repositoryId,
+            @Param("numbers") Collection<Integer> numbers,
+            @Param("deletedAt") Instant deletedAt);
 
     /**
      * Tombstones the given <em>pull-request / merge-request</em> numbers of one repository in a single
@@ -183,14 +166,12 @@ public interface IssueRepository extends JpaRepository<Issue, Long> {
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Transactional
     @Query(
-        "UPDATE Issue i SET i.deletedAt = :deletedAt WHERE TYPE(i) = PullRequest AND i.repository.id = :repositoryId " +
-            "AND i.number IN :numbers AND i.deletedAt IS NULL"
-    )
+            "UPDATE Issue i SET i.deletedAt = :deletedAt WHERE TYPE(i) = PullRequest AND i.repository.id = :repositoryId "
+                    + "AND i.number IN :numbers AND i.deletedAt IS NULL")
     int tombstonePullRequestsByRepositoryIdAndNumbers(
-        @Param("repositoryId") Long repositoryId,
-        @Param("numbers") Collection<Integer> numbers,
-        @Param("deletedAt") Instant deletedAt
-    );
+            @Param("repositoryId") Long repositoryId,
+            @Param("numbers") Collection<Integer> numbers,
+            @Param("deletedAt") Instant deletedAt);
 
     /**
      * Repository-wide issue inventory (pure issues, PullRequest subclass rows excluded) ordered
@@ -202,10 +183,8 @@ public interface IssueRepository extends JpaRepository<Issue, Long> {
      * @param pageable the cap (newest N) — caller supplies {@code PageRequest.of(0, cap)}
      * @return newest-first issues for the repository
      */
-    @Query(
-        "SELECT i FROM Issue i LEFT JOIN FETCH i.author LEFT JOIN FETCH i.milestone " +
-            "WHERE TYPE(i) = Issue AND i.repository.id = :repositoryId ORDER BY i.number DESC"
-    )
+    @Query("SELECT i FROM Issue i LEFT JOIN FETCH i.author LEFT JOIN FETCH i.milestone "
+            + "WHERE TYPE(i) = Issue AND i.repository.id = :repositoryId ORDER BY i.number DESC")
     List<Issue> findIssueInventoryByRepositoryId(@Param("repositoryId") long repositoryId, Pageable pageable);
 
     /**
@@ -235,14 +214,12 @@ public interface IssueRepository extends JpaRepository<Issue, Long> {
      * @param id the issue ID
      * @return the issue with blockedBy eagerly loaded, if found
      */
-    @Query(
-        """
+    @Query("""
         SELECT i
         FROM Issue i
         LEFT JOIN FETCH i.blockedBy
         WHERE i.id = :id
-        """
-    )
+        """)
     Optional<Issue> findByIdWithBlockedBy(@Param("id") Long id);
 
     /**
@@ -254,22 +231,19 @@ public interface IssueRepository extends JpaRepository<Issue, Long> {
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Transactional
     @Query(
-        value = "UPDATE issue SET issue_type = :newType, " +
-            "is_draft = COALESCE(is_draft, false), " +
-            "is_merged = COALESCE(is_merged, false), " +
-            "commits = COALESCE(commits, 0), " +
-            "additions = COALESCE(additions, 0), " +
-            "deletions = COALESCE(deletions, 0), " +
-            "changed_files = COALESCE(changed_files, 0) " +
-            "WHERE repository_id = :repositoryId AND number = :number AND issue_type = :currentType",
-        nativeQuery = true
-    )
+            value = "UPDATE issue SET issue_type = :newType, " + "is_draft = COALESCE(is_draft, false), "
+                    + "is_merged = COALESCE(is_merged, false), "
+                    + "commits = COALESCE(commits, 0), "
+                    + "additions = COALESCE(additions, 0), "
+                    + "deletions = COALESCE(deletions, 0), "
+                    + "changed_files = COALESCE(changed_files, 0) "
+                    + "WHERE repository_id = :repositoryId AND number = :number AND issue_type = :currentType",
+            nativeQuery = true)
     int correctDiscriminator(
-        @Param("repositoryId") long repositoryId,
-        @Param("number") int number,
-        @Param("currentType") String currentType,
-        @Param("newType") String newType
-    );
+            @Param("repositoryId") long repositoryId,
+            @Param("number") int number,
+            @Param("currentType") String currentType,
+            @Param("newType") String newType);
 
     /**
      * Atomically inserts or updates an issue's core fields (race-condition safe).
@@ -285,8 +259,7 @@ public interface IssueRepository extends JpaRepository<Issue, Long> {
      */
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Transactional
-    @Query(
-        value = """
+    @Query(value = """
         INSERT INTO issue (
             native_id, provider_id, number, title, body, state, state_reason, html_url, is_locked,
             closed_at, comments_count, last_sync_at, created_at, updated_at,
@@ -327,31 +300,28 @@ public interface IssueRepository extends JpaRepository<Issue, Long> {
             -- a quoted range it never finds the end of, and the whole ApplicationContext fails to
             -- start. NativeQueryCommentArchTest enforces this.
             deleted_at = NULL
-        """,
-        nativeQuery = true
-    )
+        """, nativeQuery = true)
     int upsertCore(
-        @Param("nativeId") Long nativeId,
-        @Param("providerId") Long providerId,
-        @Param("number") int number,
-        @Param("title") String title,
-        @Param("body") @Nullable String body,
-        @Param("state") String state,
-        @Param("stateReason") @Nullable String stateReason,
-        @Param("htmlUrl") @Nullable String htmlUrl,
-        @Param("isLocked") @Nullable Boolean isLocked,
-        @Param("closedAt") @Nullable Instant closedAt,
-        @Param("commentsCount") @Nullable Integer commentsCount,
-        @Param("lastSyncAt") Instant lastSyncAt,
-        @Param("createdAt") @Nullable Instant createdAt,
-        @Param("updatedAt") @Nullable Instant updatedAt,
-        @Param("authorId") @Nullable Long authorId,
-        @Param("repositoryId") Long repositoryId,
-        @Param("milestoneId") @Nullable Long milestoneId,
-        @Param("issueTypeId") @Nullable String issueTypeId,
-        @Param("parentIssueId") @Nullable Long parentIssueId,
-        @Param("subIssuesTotal") @Nullable Integer subIssuesTotal,
-        @Param("subIssuesCompleted") @Nullable Integer subIssuesCompleted,
-        @Param("subIssuesPercentCompleted") @Nullable Integer subIssuesPercentCompleted
-    );
+            @Param("nativeId") Long nativeId,
+            @Param("providerId") Long providerId,
+            @Param("number") int number,
+            @Param("title") String title,
+            @Param("body") @Nullable String body,
+            @Param("state") String state,
+            @Param("stateReason") @Nullable String stateReason,
+            @Param("htmlUrl") @Nullable String htmlUrl,
+            @Param("isLocked") @Nullable Boolean isLocked,
+            @Param("closedAt") @Nullable Instant closedAt,
+            @Param("commentsCount") @Nullable Integer commentsCount,
+            @Param("lastSyncAt") Instant lastSyncAt,
+            @Param("createdAt") @Nullable Instant createdAt,
+            @Param("updatedAt") @Nullable Instant updatedAt,
+            @Param("authorId") @Nullable Long authorId,
+            @Param("repositoryId") Long repositoryId,
+            @Param("milestoneId") @Nullable Long milestoneId,
+            @Param("issueTypeId") @Nullable String issueTypeId,
+            @Param("parentIssueId") @Nullable Long parentIssueId,
+            @Param("subIssuesTotal") @Nullable Integer subIssuesTotal,
+            @Param("subIssuesCompleted") @Nullable Integer subIssuesCompleted,
+            @Param("subIssuesPercentCompleted") @Nullable Integer subIssuesPercentCompleted);
 }

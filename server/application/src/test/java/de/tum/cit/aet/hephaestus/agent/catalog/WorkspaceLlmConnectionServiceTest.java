@@ -68,15 +68,7 @@ class WorkspaceLlmConnectionServiceTest extends BaseUnitTest {
         workspace.setId(1L);
         workspace.setWorkspaceSlug("test-workspace");
         workspaceContext = new WorkspaceContext(
-            1L,
-            "test-workspace",
-            "Test Workspace",
-            AccountType.ORG,
-            null,
-            false,
-            false,
-            Set.of()
-        );
+                1L, "test-workspace", "Test Workspace", AccountType.ORG, null, false, false, Set.of());
     }
 
     private void byoEnabled(boolean enabled) {
@@ -87,14 +79,13 @@ class WorkspaceLlmConnectionServiceTest extends BaseUnitTest {
 
     private CreateWorkspaceLlmConnectionRequestDTO createRequest() {
         return new CreateWorkspaceLlmConnectionRequestDTO(
-            "openai-prod",
-            "OpenAI",
-            "https://api.openai.com",
-            "openai-completions",
-            LlmAuthMode.BEARER,
-            "sk-abc",
-            null
-        );
+                "openai-prod",
+                "OpenAI",
+                "https://api.openai.com",
+                "openai-completions",
+                LlmAuthMode.BEARER,
+                "sk-abc",
+                null);
     }
 
     @Nested
@@ -104,9 +95,8 @@ class WorkspaceLlmConnectionServiceTest extends BaseUnitTest {
         void createIsRejectedWhenWorkspaceConnectionsAreDisabled() {
             byoEnabled(false);
 
-            assertThatThrownBy(() -> connectionService.create(workspaceContext, createRequest())).isInstanceOf(
-                AccessForbiddenException.class
-            );
+            assertThatThrownBy(() -> connectionService.create(workspaceContext, createRequest()))
+                    .isInstanceOf(AccessForbiddenException.class);
             verify(connectionRepository, never()).save(any());
         }
 
@@ -128,27 +118,26 @@ class WorkspaceLlmConnectionServiceTest extends BaseUnitTest {
         @Test
         void rejectsDuplicateSlugInTheSameWorkspace() {
             byoEnabled(true);
-            when(connectionRepository.findByWorkspaceIdAndSlug(1L, "openai-prod")).thenReturn(
-                Optional.of(new WorkspaceLlmConnection())
-            );
+            when(connectionRepository.findByWorkspaceIdAndSlug(1L, "openai-prod"))
+                    .thenReturn(Optional.of(new WorkspaceLlmConnection()));
 
-            assertThatThrownBy(() -> connectionService.create(workspaceContext, createRequest())).isInstanceOf(
-                LlmConnectionSlugConflictException.class
-            );
+            assertThatThrownBy(() -> connectionService.create(workspaceContext, createRequest()))
+                    .isInstanceOf(LlmConnectionSlugConflictException.class);
             verify(connectionRepository, never()).save(any());
         }
 
         @Test
         void doesNotCreateAConnectionWhoseBaseUrlTheEgressPolicyRejects() {
             byoEnabled(true);
-            when(connectionRepository.findByWorkspaceIdAndSlug(1L, "openai-prod")).thenReturn(Optional.empty());
+            when(connectionRepository.findByWorkspaceIdAndSlug(1L, "openai-prod"))
+                    .thenReturn(Optional.empty());
             doThrow(new IllegalArgumentException("Base URL must be a public https:// address"))
-                .when(egressPolicy)
-                .validate("https://api.openai.com");
+                    .when(egressPolicy)
+                    .validate("https://api.openai.com");
 
             assertThatThrownBy(() -> connectionService.create(workspaceContext, createRequest()))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("public https");
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("public https");
 
             verify(connectionRepository, never()).save(any());
             verifyNoInteractions(configAudit);
@@ -157,7 +146,8 @@ class WorkspaceLlmConnectionServiceTest extends BaseUnitTest {
         @Test
         void createdConnectionIsScopedToTheCallingWorkspace() {
             byoEnabled(true);
-            when(connectionRepository.findByWorkspaceIdAndSlug(1L, "openai-prod")).thenReturn(Optional.empty());
+            when(connectionRepository.findByWorkspaceIdAndSlug(1L, "openai-prod"))
+                    .thenReturn(Optional.empty());
             when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
             when(connectionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
@@ -170,7 +160,8 @@ class WorkspaceLlmConnectionServiceTest extends BaseUnitTest {
         @Test
         void createdConnectionIsRecordedOnTheWorkspaceConfigAuditTrailWithoutTheApiKey() {
             byoEnabled(true);
-            when(connectionRepository.findByWorkspaceIdAndSlug(1L, "openai-prod")).thenReturn(Optional.empty());
+            when(connectionRepository.findByWorkspaceIdAndSlug(1L, "openai-prod"))
+                    .thenReturn(Optional.empty());
             when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
             when(connectionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
@@ -181,7 +172,10 @@ class WorkspaceLlmConnectionServiceTest extends BaseUnitTest {
             assertThat(entry.getValue().entityType()).isEqualTo(ConfigAuditEntityType.WORKSPACE_LLM_CONNECTION);
             assertThat(entry.getValue().workspaceId()).isEqualTo(1L);
             assertThat(entry.getValue().action()).isEqualTo(ConfigAuditAction.CREATED);
-            assertThat(entry.getValue().after()).asString().contains("openai-prod").doesNotContain("sk-abc");
+            assertThat(entry.getValue().after())
+                    .asString()
+                    .contains("openai-prod")
+                    .doesNotContain("sk-abc");
         }
     }
 
@@ -203,10 +197,7 @@ class WorkspaceLlmConnectionServiceTest extends BaseUnitTest {
             when(connectionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
             WorkspaceLlmConnection result = connectionService.update(
-                workspaceContext,
-                5L,
-                new UpdateWorkspaceLlmConnectionRequestDTO(null, null, true, null)
-            );
+                    workspaceContext, 5L, new UpdateWorkspaceLlmConnectionRequestDTO(null, null, true, null));
 
             assertThat(result.getApiKey()).isNull();
             verify(connectionRepository).findByIdAndWorkspaceIdForUpdate(5L, 1L);
@@ -217,13 +208,11 @@ class WorkspaceLlmConnectionServiceTest extends BaseUnitTest {
         void throwsNotFoundWhenTheConnectionBelongsToAnotherWorkspace() {
             when(connectionRepository.findByIdAndWorkspaceIdForUpdate(5L, 1L)).thenReturn(Optional.empty());
 
-            assertThatThrownBy(() ->
-                connectionService.update(
-                    workspaceContext,
-                    5L,
-                    new UpdateWorkspaceLlmConnectionRequestDTO("Renamed", null, null, null)
-                )
-            ).isInstanceOf(EntityNotFoundException.class);
+            assertThatThrownBy(() -> connectionService.update(
+                            workspaceContext,
+                            5L,
+                            new UpdateWorkspaceLlmConnectionRequestDTO("Renamed", null, null, null)))
+                    .isInstanceOf(EntityNotFoundException.class);
         }
     }
 
@@ -238,9 +227,8 @@ class WorkspaceLlmConnectionServiceTest extends BaseUnitTest {
             when(connectionRepository.findByIdAndWorkspaceId(5L, 1L)).thenReturn(Optional.of(connection));
             when(modelRepository.existsByConnectionIdAndWorkspaceId(5L, 1L)).thenReturn(true);
 
-            assertThatThrownBy(() -> connectionService.delete(workspaceContext, 5L)).isInstanceOf(
-                LlmConnectionInUseException.class
-            );
+            assertThatThrownBy(() -> connectionService.delete(workspaceContext, 5L))
+                    .isInstanceOf(LlmConnectionInUseException.class);
             verify(connectionRepository, never()).delete(any());
         }
 
@@ -270,9 +258,8 @@ class WorkspaceLlmConnectionServiceTest extends BaseUnitTest {
         void throwsNotFoundForAConnectionOwnedByAnotherWorkspace() {
             when(connectionRepository.findByIdAndWorkspaceId(5L, 1L)).thenReturn(Optional.empty());
 
-            assertThatThrownBy(() -> connectionService.get(workspaceContext, 5L)).isInstanceOf(
-                EntityNotFoundException.class
-            );
+            assertThatThrownBy(() -> connectionService.get(workspaceContext, 5L))
+                    .isInstanceOf(EntityNotFoundException.class);
         }
     }
 
@@ -284,12 +271,11 @@ class WorkspaceLlmConnectionServiceTest extends BaseUnitTest {
             byoEnabled(true);
             // A projection, not the entity: the probe runs outside any transaction, so it must not
             // depend on a managed entity still being attached.
-            when(connectionRepository.findProbeTargetByIdAndWorkspaceId(5L, 1L)).thenReturn(
-                Optional.of(new LlmProbeTarget("https://api.openai.com", LlmAuthMode.BEARER, "sk-abc"))
-            );
-            when(probeService.probeCredential("https://api.openai.com", LlmAuthMode.BEARER, "sk-abc")).thenReturn(
-                LlmProbeResultDTO.reachable(List.of("gpt-5", "gpt-5-mini"), 200)
-            );
+            when(connectionRepository.findProbeTargetByIdAndWorkspaceId(5L, 1L))
+                    .thenReturn(
+                            Optional.of(new LlmProbeTarget("https://api.openai.com", LlmAuthMode.BEARER, "sk-abc")));
+            when(probeService.probeCredential("https://api.openai.com", LlmAuthMode.BEARER, "sk-abc"))
+                    .thenReturn(LlmProbeResultDTO.reachable(List.of("gpt-5", "gpt-5-mini"), 200));
 
             WorkspaceLlmProbeResultDTO result = connectionService.probe(workspaceContext, 5L);
 
@@ -300,12 +286,10 @@ class WorkspaceLlmConnectionServiceTest extends BaseUnitTest {
         @Test
         void unreachableProbeCarriesTheAdvisoryMessage() {
             byoEnabled(true);
-            when(connectionRepository.findProbeTargetByIdAndWorkspaceId(5L, 1L)).thenReturn(
-                Optional.of(new LlmProbeTarget("https://api.openai.com", LlmAuthMode.BEARER, null))
-            );
-            when(probeService.probeCredential(any(), any(), any())).thenReturn(
-                LlmProbeResultDTO.unreachable(503, "Provider returned HTTP 503")
-            );
+            when(connectionRepository.findProbeTargetByIdAndWorkspaceId(5L, 1L))
+                    .thenReturn(Optional.of(new LlmProbeTarget("https://api.openai.com", LlmAuthMode.BEARER, null)));
+            when(probeService.probeCredential(any(), any(), any()))
+                    .thenReturn(LlmProbeResultDTO.unreachable(503, "Provider returned HTTP 503"));
 
             WorkspaceLlmProbeResultDTO result = connectionService.probe(workspaceContext, 5L);
 
@@ -321,16 +305,16 @@ class WorkspaceLlmConnectionServiceTest extends BaseUnitTest {
         @Test
         void doesNotProbeAStoredConnectionWhoseBaseUrlTheEgressPolicyNowRejects() {
             byoEnabled(true);
-            when(connectionRepository.findProbeTargetByIdAndWorkspaceId(5L, 1L)).thenReturn(
-                Optional.of(new LlmProbeTarget("https://api.openai.com", LlmAuthMode.BEARER, "sk-abc"))
-            );
+            when(connectionRepository.findProbeTargetByIdAndWorkspaceId(5L, 1L))
+                    .thenReturn(
+                            Optional.of(new LlmProbeTarget("https://api.openai.com", LlmAuthMode.BEARER, "sk-abc")));
             doThrow(new IllegalArgumentException("Base URL must be a public https:// address"))
-                .when(egressPolicy)
-                .validate("https://api.openai.com");
+                    .when(egressPolicy)
+                    .validate("https://api.openai.com");
 
             assertThatThrownBy(() -> connectionService.probe(workspaceContext, 5L))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("public https");
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("public https");
 
             verifyNoInteractions(probeService);
         }

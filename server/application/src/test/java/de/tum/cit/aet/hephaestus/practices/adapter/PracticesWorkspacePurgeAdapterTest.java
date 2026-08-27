@@ -33,11 +33,7 @@ class PracticesWorkspacePurgeAdapterTest extends BaseUnitTest {
     @BeforeEach
     void setUp() {
         adapter = new PracticesWorkspacePurgeAdapter(
-            feedbackRepository,
-            observationRepository,
-            practiceRepository,
-            practiceGroupRepository
-        );
+                feedbackRepository, observationRepository, practiceRepository, practiceGroupRepository);
     }
 
     @Test
@@ -49,12 +45,8 @@ class PracticesWorkspacePurgeAdapterTest extends BaseUnitTest {
         // The FK-driven dependency order is load-bearing (feedback has a RESTRICT FK; practices clear the
         // practice -> practice_group references before groups are removed). Assert the ORDER, not just the
         // calls, so a reordering refactor fails the unit test instead of only failing on a real DB.
-        InOrder inOrder = inOrder(
-            feedbackRepository,
-            observationRepository,
-            practiceRepository,
-            practiceGroupRepository
-        );
+        InOrder inOrder =
+                inOrder(feedbackRepository, observationRepository, practiceRepository, practiceGroupRepository);
         inOrder.verify(feedbackRepository).deleteAllByWorkspaceId(workspaceId);
         inOrder.verify(observationRepository).deleteAllByPracticeWorkspaceId(workspaceId);
         inOrder.verify(practiceRepository).deleteAllByWorkspaceId(workspaceId);

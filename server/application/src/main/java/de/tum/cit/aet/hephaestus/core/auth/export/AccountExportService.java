@@ -46,11 +46,10 @@ public class AccountExportService {
     private final Clock clock;
 
     public AccountExportService(
-        AccountExportRepository accountExportRepository,
-        ExportGenerationWorker generationWorker,
-        AuthEventLogger authEventLogger,
-        Clock clock
-    ) {
+            AccountExportRepository accountExportRepository,
+            ExportGenerationWorker generationWorker,
+            AuthEventLogger authEventLogger,
+            Clock clock) {
         this.accountExportRepository = accountExportRepository;
         this.generationWorker = generationWorker;
         this.authEventLogger = authEventLogger;
@@ -58,10 +57,8 @@ public class AccountExportService {
     }
 
     /** Statuses that count as "in flight" for the one-export-per-account cap. */
-    private static final List<AccountExport.Status> IN_FLIGHT = List.of(
-        AccountExport.Status.PENDING,
-        AccountExport.Status.PROCESSING
-    );
+    private static final List<AccountExport.Status> IN_FLIGHT =
+            List.of(AccountExport.Status.PENDING, AccountExport.Status.PROCESSING);
 
     private static ResponseStatusException inFlightConflict() {
         return inFlightConflict(null);
@@ -69,10 +66,7 @@ public class AccountExportService {
 
     private static ResponseStatusException inFlightConflict(@Nullable Throwable cause) {
         return new ResponseStatusException(
-            HttpStatus.CONFLICT,
-            "An export is already in progress for this account.",
-            cause
-        );
+                HttpStatus.CONFLICT, "An export is already in progress for this account.", cause);
     }
 
     /**
@@ -97,10 +91,10 @@ public class AccountExportService {
             throw inFlightConflict(e);
         }
         authEventLogger
-            .event(AuthEvent.EventType.EXPORT_REQUESTED, AuthEvent.Result.SUCCESS)
-            .account(accountId)
-            .details("{\"exportId\":" + export.getId() + "}")
-            .record();
+                .event(AuthEvent.EventType.EXPORT_REQUESTED, AuthEvent.Result.SUCCESS)
+                .account(accountId)
+                .details("{\"exportId\":" + export.getId() + "}")
+                .record();
         // Hand off after the PENDING row commits so the worker's own transaction can read it.
         // The worker is @Async on a separate bean → real proxy hop (no inline self-invocation).
         Long exportId = export.getId();
@@ -122,11 +116,11 @@ public class AccountExportService {
     @Transactional(readOnly = true)
     public Optional<byte[]> downloadPayload(Long exportId, Long accountId) {
         return accountExportRepository
-            .findByIdAndAccountId(exportId, accountId)
-            .filter(e -> e.getStatus() == AccountExport.Status.READY)
-            .filter(e -> e.getExpiresAt() == null || e.getExpiresAt().isAfter(Instant.now(clock)))
-            .flatMap(export -> Optional.<byte[]>ofNullable(export.getPayload()))
-            .filter(payload -> payload.length > 0);
+                .findByIdAndAccountId(exportId, accountId)
+                .filter(e -> e.getStatus() == AccountExport.Status.READY)
+                .filter(e -> e.getExpiresAt() == null || e.getExpiresAt().isAfter(Instant.now(clock)))
+                .flatMap(export -> Optional.<byte[]>ofNullable(export.getPayload()))
+                .filter(payload -> payload.length > 0);
     }
 
     /**
@@ -147,11 +141,10 @@ public class AccountExportService {
 
     private ExportStatusDTO toStatus(AccountExport e) {
         return new ExportStatusDTO(
-            Objects.requireNonNull(e.getId()),
-            e.getStatus().name(),
-            Objects.requireNonNull(e.getRequestedAt()),
-            e.getCompletedAt(),
-            e.getExpiresAt()
-        );
+                Objects.requireNonNull(e.getId()),
+                e.getStatus().name(),
+                Objects.requireNonNull(e.getRequestedAt()),
+                e.getCompletedAt(),
+                e.getExpiresAt());
     }
 }

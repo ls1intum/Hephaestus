@@ -28,18 +28,16 @@ class SandboxLayoutPathsTest extends HephaestusArchitectureTest {
         assertThat(agentResources).isDirectory();
 
         try (Stream<Path> stream = Files.walk(agentResources)) {
-            stream
-                .filter(Files::isRegularFile)
-                .forEach(p -> {
-                    try {
-                        String body = Files.readString(p, StandardCharsets.UTF_8);
-                        assertThat(LEGACY_CONTEXT_PREFIX.matcher(body).find())
+            stream.filter(Files::isRegularFile).forEach(p -> {
+                try {
+                    String body = Files.readString(p, StandardCharsets.UTF_8);
+                    assertThat(LEGACY_CONTEXT_PREFIX.matcher(body).find())
                             .as("Legacy '.context/' prefix found in %s", p)
                             .isFalse();
-                    } catch (IOException e) {
-                        throw new RuntimeException(e);
-                    }
-                });
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
+            });
         }
     }
 

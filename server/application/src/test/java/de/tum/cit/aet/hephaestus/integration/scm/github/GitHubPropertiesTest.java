@@ -24,10 +24,8 @@ class GitHubPropertiesTest {
     static class TestConfiguration {}
 
     private ApplicationContextRunner contextRunner() {
-        return new ApplicationContextRunner().withUserConfiguration(
-            TestConfiguration.class,
-            ValidationAutoConfiguration.class
-        );
+        return new ApplicationContextRunner()
+                .withUserConfiguration(TestConfiguration.class, ValidationAutoConfiguration.class);
     }
 
     @Nested
@@ -52,40 +50,39 @@ class GitHubPropertiesTest {
         @DisplayName("should bind GitHub App configuration when provided")
         void appConfig_boundCorrectly() {
             contextRunner()
-                .withPropertyValues(
-                    "hephaestus.integration.github.app.id=123456",
-                    "hephaestus.integration.github.app.private-key=-----BEGIN RSA PRIVATE KEY-----"
-                )
-                .run(context -> {
-                    GitHubProperties props = context.getBean(GitHubProperties.class);
+                    .withPropertyValues(
+                            "hephaestus.integration.github.app.id=123456",
+                            "hephaestus.integration.github.app.private-key=-----BEGIN RSA PRIVATE KEY-----")
+                    .run(context -> {
+                        GitHubProperties props = context.getBean(GitHubProperties.class);
 
-                    assertThat(props.app().id()).isEqualTo(123456L);
-                    assertThat(props.app().privateKey()).isEqualTo("-----BEGIN RSA PRIVATE KEY-----");
-                });
+                        assertThat(props.app().id()).isEqualTo(123456L);
+                        assertThat(props.app().privateKey()).isEqualTo("-----BEGIN RSA PRIVATE KEY-----");
+                    });
         }
 
         @Test
         @DisplayName("should bind meta auth token when provided")
         void metaConfig_boundCorrectly() {
             contextRunner()
-                .withPropertyValues("hephaestus.integration.github.meta.auth-token=ghp_test_token_12345")
-                .run(context -> {
-                    GitHubProperties props = context.getBean(GitHubProperties.class);
+                    .withPropertyValues("hephaestus.integration.github.meta.auth-token=ghp_test_token_12345")
+                    .run(context -> {
+                        GitHubProperties props = context.getBean(GitHubProperties.class);
 
-                    assertThat(props.meta().authToken()).isEqualTo("ghp_test_token_12345");
-                });
+                        assertThat(props.meta().authToken()).isEqualTo("ghp_test_token_12345");
+                    });
         }
 
         @Test
         void nullPrivateKey_allowed() {
             contextRunner()
-                .withPropertyValues("hephaestus.integration.github.app.id=0")
-                .run(context -> {
-                    assertThat(context).hasNotFailed();
-                    GitHubProperties props = context.getBean(GitHubProperties.class);
-                    assertThat(props.app().privateKey()).isNull();
-                    assertThat(props.app().privateKeyLocation()).isNull();
-                });
+                    .withPropertyValues("hephaestus.integration.github.app.id=0")
+                    .run(context -> {
+                        assertThat(context).hasNotFailed();
+                        GitHubProperties props = context.getBean(GitHubProperties.class);
+                        assertThat(props.app().privateKey()).isNull();
+                        assertThat(props.app().privateKeyLocation()).isNull();
+                    });
         }
     }
 
@@ -93,19 +90,19 @@ class GitHubPropertiesTest {
     class Validation {
 
         @ParameterizedTest
-        @ValueSource(longs = { 0, 1, 12345, 999999999 })
+        @ValueSource(longs = {0, 1, 12345, 999999999})
         void validAppId_passes(long appId) {
             contextRunner()
-                .withPropertyValues("hephaestus.integration.github.app.id=" + appId)
-                .run(context -> assertThat(context).hasNotFailed());
+                    .withPropertyValues("hephaestus.integration.github.app.id=" + appId)
+                    .run(context -> assertThat(context).hasNotFailed());
         }
 
         @ParameterizedTest
-        @ValueSource(longs = { -1, -100, -999999 })
+        @ValueSource(longs = {-1, -100, -999999})
         void negativeAppId_validationFails(long appId) {
             contextRunner()
-                .withPropertyValues("hephaestus.integration.github.app.id=" + appId)
-                .run(context -> assertThat(context).hasFailed());
+                    .withPropertyValues("hephaestus.integration.github.app.id=" + appId)
+                    .run(context -> assertThat(context).hasFailed());
         }
     }
 

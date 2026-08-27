@@ -38,36 +38,33 @@ final class ContextMapWriter {
         }
         Set<String> tree = treePaths(files);
         StringBuilder map = new StringBuilder("# Context map\n\n");
-        map
-            .append("Where to look for the code the change depends on. Paths are workspace-relative.\n")
-            .append(
-                "Observations still quote `inputs/context/diff.patch`; this is for judging what you read there.\n\n"
-            )
-            .append("## The change\n\n- `")
-            .append(SandboxLayout.CONTEXT_PREFIX)
-            .append("diff.patch` — ")
-            .append(changed.size())
-            .append(changed.size() == 1 ? " changed file\n" : " changed files\n");
+        map.append("Where to look for the code the change depends on. Paths are workspace-relative.\n")
+                .append(
+                        "Observations still quote `inputs/context/diff.patch`; this is for judging what you read there.\n\n")
+                .append("## The change\n\n- `")
+                .append(SandboxLayout.CONTEXT_PREFIX)
+                .append("diff.patch` — ")
+                .append(changed.size())
+                .append(changed.size() == 1 ? " changed file\n" : " changed files\n");
         for (String path : changed) {
             map.append("  - `").append(path).append("`\n");
         }
         if (tree.isEmpty()) {
             map.append(
-                "\n## The repository\n\nNot staged for this review. The diff and the context files are all the code evidence there is.\n"
-            );
+                    "\n## The repository\n\nNot staged for this review. The diff and the context files are all the code evidence there is.\n");
         } else {
             appendRepository(map, changed, tree);
         }
-        files.put(SandboxLayout.CONTEXT_PREFIX + "context-map.md", map.toString().getBytes(StandardCharsets.UTF_8));
+        files.put(
+                SandboxLayout.CONTEXT_PREFIX + "context-map.md", map.toString().getBytes(StandardCharsets.UTF_8));
     }
 
     private static void appendRepository(StringBuilder map, List<String> changed, Set<String> tree) {
-        map
-            .append("\n## The repository at the reviewed commit\n\n`")
-            .append(SandboxLayout.REPO_MOUNT_RELATIVE)
-            .append("` — ")
-            .append(tree.size())
-            .append(" files.\n");
+        map.append("\n## The repository at the reviewed commit\n\n`")
+                .append(SandboxLayout.REPO_MOUNT_RELATIVE)
+                .append("` — ")
+                .append(tree.size())
+                .append(" files.\n");
         for (String path : changed) {
             List<String> neighbours = neighbours(path, tree);
             List<String> counterparts = testCounterparts(path, tree);
@@ -80,12 +77,13 @@ final class ContextMapWriter {
                 map.append("- Alongside it: ").append(joinCode(neighbours)).append("\n");
             }
             map.append(
-                counterparts.isEmpty()
-                    ? "- No test named after it. If this practice is about tests, that absence is the evidence.\n"
-                    : "- Named like a test for it: " + joinCode(counterparts) + "\n"
-            );
+                    counterparts.isEmpty()
+                            ? "- No test named after it. If this practice is about tests, that absence is the evidence.\n"
+                            : "- Named like a test for it: " + joinCode(counterparts) + "\n");
             if (!references.isEmpty()) {
-                map.append("- Mentions it elsewhere: ").append(joinCode(references)).append("\n");
+                map.append("- Mentions it elsewhere: ")
+                        .append(joinCode(references))
+                        .append("\n");
             }
         }
     }
@@ -95,11 +93,9 @@ final class ContextMapWriter {
         String directory = changedPath.contains("/") ? changedPath.substring(0, changedPath.lastIndexOf('/') + 1) : "";
         List<String> siblings = new ArrayList<>();
         for (String candidate : tree) {
-            if (
-                candidate.startsWith(directory) &&
-                !candidate.equals(changedPath) &&
-                candidate.indexOf('/', directory.length()) < 0
-            ) {
+            if (candidate.startsWith(directory)
+                    && !candidate.equals(changedPath)
+                    && candidate.indexOf('/', directory.length()) < 0) {
                 siblings.add(candidate);
             }
             if (siblings.size() > MAX_NEIGHBOURS) {
@@ -123,11 +119,9 @@ final class ContextMapWriter {
         }
         List<String> matches = new ArrayList<>();
         for (String candidate : tree) {
-            if (
-                !candidate.equals(changedPath) &&
-                TEST_NAME.matcher(candidate).find() &&
-                fileName(candidate).contains(stem)
-            ) {
+            if (!candidate.equals(changedPath)
+                    && TEST_NAME.matcher(candidate).find()
+                    && fileName(candidate).contains(stem)) {
                 matches.add(candidate);
             }
             if (matches.size() >= MAX_REFERENCES) {
@@ -189,10 +183,9 @@ final class ContextMapWriter {
     }
 
     private static String joinCode(List<String> paths) {
-        return paths
-            .stream()
-            .map(path -> "…".equals(path) ? "…" : "`" + path + "`")
-            .reduce((a, b) -> a + ", " + b)
-            .orElse("");
+        return paths.stream()
+                .map(path -> "…".equals(path) ? "…" : "`" + path + "`")
+                .reduce((a, b) -> a + ", " + b)
+                .orElse("");
     }
 }

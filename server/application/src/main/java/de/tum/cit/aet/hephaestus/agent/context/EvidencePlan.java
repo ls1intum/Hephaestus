@@ -29,13 +29,10 @@ public record EvidencePlan(SourceContractVersion contractVersion, ArtifactKind a
         ArtifactKind artifactKind = practices.getFirst().getArtifactKind();
         for (Practice practice : practices) {
             PracticeAutomatedReviewPolicy requirements = requireRequirements(practice);
-            if (
-                !first.sourceContractVersion().equals(requirements.sourceContractVersion()) ||
-                !artifactKind.equals(practice.getArtifactKind())
-            ) {
+            if (!first.sourceContractVersion().equals(requirements.sourceContractVersion())
+                    || !artifactKind.equals(practice.getArtifactKind())) {
                 throw new JobPreparationException(
-                    "Practices sharing one invocation must use the same source contract and artifact kind"
-                );
+                        "Practices sharing one invocation must use the same source contract and artifact kind");
             }
         }
         return new EvidencePlan(first.sourceContractVersion(), artifactKind);

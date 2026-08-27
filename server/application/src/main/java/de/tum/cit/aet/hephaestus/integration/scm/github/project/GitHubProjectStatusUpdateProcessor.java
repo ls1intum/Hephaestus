@@ -30,23 +30,18 @@ public class GitHubProjectStatusUpdateProcessor {
 
     @Transactional
     public @Nullable ProjectStatusUpdate process(
-        GitHubProjectStatusUpdateDTO dto,
-        Project project,
-        ProcessingContext context
-    ) {
+            GitHubProjectStatusUpdateDTO dto, Project project, ProcessingContext context) {
         if (dto == null) {
             log.warn(
-                "Skipped status update processing: reason=nullDto, projectId={}",
-                project != null ? project.getId() : null
-            );
+                    "Skipped status update processing: reason=nullDto, projectId={}",
+                    project != null ? project.getId() : null);
             return null;
         }
 
         if (dto.nodeId() == null || dto.nodeId().isBlank()) {
             log.warn(
-                "Skipped status update processing: reason=missingNodeId, projectId={}",
-                project != null ? project.getId() : null
-            );
+                    "Skipped status update processing: reason=missingNodeId, projectId={}",
+                    project != null ? project.getId() : null);
             return null;
         }
 
@@ -70,51 +65,40 @@ public class GitHubProjectStatusUpdateProcessor {
 
         // Atomic upsert
         statusUpdateRepository.upsertCore(
-            dbId,
-            Objects.requireNonNull(context.providerId()),
-            dto.nodeId(),
-            project.getId(),
-            sanitize(dto.body()),
-            sanitize(dto.bodyHtml()),
-            dto.startDate(),
-            dto.targetDate(),
-            status != null ? status.name() : null,
-            creatorId,
-            dto.createdAt() != null ? dto.createdAt() : Instant.now(),
-            dto.updatedAt() != null ? dto.updatedAt() : Instant.now()
-        );
+                dbId,
+                Objects.requireNonNull(context.providerId()),
+                dto.nodeId(),
+                project.getId(),
+                sanitize(dto.body()),
+                sanitize(dto.bodyHtml()),
+                dto.startDate(),
+                dto.targetDate(),
+                status != null ? status.name() : null,
+                creatorId,
+                dto.createdAt() != null ? dto.createdAt() : Instant.now(),
+                dto.updatedAt() != null ? dto.updatedAt() : Instant.now());
 
         // Fetch the entity
         ProjectStatusUpdate statusUpdate = statusUpdateRepository
-            .findByNodeId(dto.nodeId())
-            .orElseThrow(() ->
-                new IllegalStateException("ProjectStatusUpdate not found after upsert: nodeId=" + dto.nodeId())
-            );
+                .findByNodeId(dto.nodeId())
+                .orElseThrow(() -> new IllegalStateException(
+                        "ProjectStatusUpdate not found after upsert: nodeId=" + dto.nodeId()));
 
         // Publish events
         EventContext eventContext = EventContext.from(context);
-        GitHubProjectEventPayload.ProjectStatusUpdateData data = GitHubProjectEventPayload.ProjectStatusUpdateData.from(
-            statusUpdate
-        );
+        GitHubProjectEventPayload.ProjectStatusUpdateData data =
+                GitHubProjectEventPayload.ProjectStatusUpdateData.from(statusUpdate);
 
         if (isNew) {
             eventPublisher.publishEvent(
-                new GitHubProjectEvent.ProjectStatusUpdateCreated(data, project.getId(), eventContext)
-            );
+                    new GitHubProjectEvent.ProjectStatusUpdateCreated(data, project.getId(), eventContext));
             log.debug(
-                "Created project status update: id={}, nodeId={}",
-                statusUpdate.getId(),
-                statusUpdate.getNodeId()
-            );
+                    "Created project status update: id={}, nodeId={}", statusUpdate.getId(), statusUpdate.getNodeId());
         } else {
             eventPublisher.publishEvent(
-                new GitHubProjectEvent.ProjectStatusUpdateUpdated(data, project.getId(), eventContext)
-            );
+                    new GitHubProjectEvent.ProjectStatusUpdateUpdated(data, project.getId(), eventContext));
             log.debug(
-                "Updated project status update: id={}, nodeId={}",
-                statusUpdate.getId(),
-                statusUpdate.getNodeId()
-            );
+                    "Updated project status update: id={}, nodeId={}", statusUpdate.getId(), statusUpdate.getNodeId());
         }
 
         return statusUpdate;
@@ -126,16 +110,13 @@ public class GitHubProjectStatusUpdateProcessor {
             return;
         }
 
-        statusUpdateRepository
-            .findByNodeId(nodeId)
-            .ifPresent(statusUpdate -> {
-                Long id = statusUpdate.getId();
-                statusUpdateRepository.delete(statusUpdate);
-                eventPublisher.publishEvent(
-                    new GitHubProjectEvent.ProjectStatusUpdateDeleted(id, projectId, EventContext.from(context))
-                );
-                log.info("Deleted project status update: id={}, nodeId={}", id, nodeId);
-            });
+        statusUpdateRepository.findByNodeId(nodeId).ifPresent(statusUpdate -> {
+            Long id = statusUpdate.getId();
+            statusUpdateRepository.delete(statusUpdate);
+            eventPublisher.publishEvent(
+                    new GitHubProjectEvent.ProjectStatusUpdateDeleted(id, projectId, EventContext.from(context)));
+            log.info("Deleted project status update: id={}, nodeId={}", id, nodeId);
+        });
     }
 
     @Transactional

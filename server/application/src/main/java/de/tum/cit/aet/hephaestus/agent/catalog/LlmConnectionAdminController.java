@@ -48,21 +48,20 @@ public class LlmConnectionAdminController {
     @GetMapping
     @Operation(summary = "List LLM connections", operationId = "adminListLlmConnections")
     public ResponseEntity<List<LlmConnectionDTO>> list() {
-        return ResponseEntity.ok(connectionService.list().stream().map(LlmConnectionDTO::from).toList());
+        return ResponseEntity.ok(
+                connectionService.list().stream().map(LlmConnectionDTO::from).toList());
     }
 
     @GetMapping("/{id}")
     @Operation(summary = "Get an LLM connection", operationId = "adminGetLlmConnection")
     @ApiResponse(
-        responseCode = "200",
-        description = "OK",
-        content = @Content(schema = @Schema(implementation = LlmConnectionDTO.class))
-    )
+            responseCode = "200",
+            description = "OK",
+            content = @Content(schema = @Schema(implementation = LlmConnectionDTO.class)))
     @ApiResponse(
-        responseCode = "404",
-        description = "LLM connection not found",
-        content = @Content(schema = @Schema(hidden = true))
-    )
+            responseCode = "404",
+            description = "LLM connection not found",
+            content = @Content(schema = @Schema(hidden = true)))
     public ResponseEntity<LlmConnectionDTO> get(@PathVariable Long id) {
         return ResponseEntity.ok(LlmConnectionDTO.from(connectionService.get(id)));
     }
@@ -71,37 +70,32 @@ public class LlmConnectionAdminController {
     @Operation(summary = "Create an LLM connection", operationId = "adminCreateLlmConnection")
     @ApiResponse(responseCode = "201", description = "Connection created; URL in the Location header")
     @ApiResponse(
-        responseCode = "409",
-        description = "An LLM connection with this slug already exists",
-        content = @Content(schema = @Schema(hidden = true))
-    )
+            responseCode = "409",
+            description = "An LLM connection with this slug already exists",
+            content = @Content(schema = @Schema(hidden = true)))
     @Audited(ledger = AuditLedger.AUTH_EVENT, type = "LLM_CONNECTION_CREATED")
     public ResponseEntity<LlmConnectionDTO> create(@Valid @RequestBody CreateLlmConnectionRequestDTO request) {
         LlmConnection created = connectionService.create(request);
         URI location = ServletUriComponentsBuilder.fromCurrentRequest()
-            .path("/{id}")
-            .buildAndExpand(created.getId())
-            .toUri();
+                .path("/{id}")
+                .buildAndExpand(created.getId())
+                .toUri();
         return ResponseEntity.created(location).body(LlmConnectionDTO.from(created));
     }
 
     @PatchMapping("/{id}")
     @Operation(summary = "Update an LLM connection", operationId = "adminUpdateLlmConnection")
     @ApiResponse(
-        responseCode = "200",
-        description = "OK",
-        content = @Content(schema = @Schema(implementation = LlmConnectionDTO.class))
-    )
+            responseCode = "200",
+            description = "OK",
+            content = @Content(schema = @Schema(implementation = LlmConnectionDTO.class)))
     @ApiResponse(
-        responseCode = "404",
-        description = "LLM connection not found",
-        content = @Content(schema = @Schema(hidden = true))
-    )
+            responseCode = "404",
+            description = "LLM connection not found",
+            content = @Content(schema = @Schema(hidden = true)))
     @Audited(ledger = AuditLedger.AUTH_EVENT, type = "LLM_CONNECTION_UPDATED")
     public ResponseEntity<LlmConnectionDTO> update(
-        @PathVariable Long id,
-        @Valid @RequestBody UpdateLlmConnectionRequestDTO request
-    ) {
+            @PathVariable Long id, @Valid @RequestBody UpdateLlmConnectionRequestDTO request) {
         return ResponseEntity.ok(LlmConnectionDTO.from(connectionService.update(id, request)));
     }
 
@@ -109,15 +103,13 @@ public class LlmConnectionAdminController {
     @Operation(summary = "Delete an LLM connection", operationId = "adminDeleteLlmConnection")
     @ApiResponse(responseCode = "204", description = "Connection deleted")
     @ApiResponse(
-        responseCode = "404",
-        description = "LLM connection not found",
-        content = @Content(schema = @Schema(hidden = true))
-    )
+            responseCode = "404",
+            description = "LLM connection not found",
+            content = @Content(schema = @Schema(hidden = true)))
     @ApiResponse(
-        responseCode = "409",
-        description = "Cannot delete a connection still referenced by one or more models",
-        content = @Content(schema = @Schema(hidden = true))
-    )
+            responseCode = "409",
+            description = "Cannot delete a connection still referenced by one or more models",
+            content = @Content(schema = @Schema(hidden = true)))
     @Audited(ledger = AuditLedger.AUTH_EVENT, type = "LLM_CONNECTION_DELETED")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         connectionService.delete(id);

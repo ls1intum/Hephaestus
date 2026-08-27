@@ -6,4 +6,5 @@ import jakarta.validation.constraints.NotNull;
 import org.jspecify.annotations.NonNull;
 
 @Schema(description = "Whether new workspaces receive this catalog entry")
-public record UpdateCuratedStatusRequestDTO(@NonNull @NotNull(message = "Status is required") CuratedStatus status) {}
+public record UpdateCuratedStatusRequestDTO(
+        @NonNull @NotNull(message = "Status is required") CuratedStatus status) {}

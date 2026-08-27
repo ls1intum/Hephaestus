@@ -32,9 +32,7 @@ public class PracticeReviewSettingsService {
 
     @Transactional
     public PracticeReviewSettingsDTO updatePracticeReview(
-        WorkspaceContext workspaceContext,
-        UpdatePracticeReviewSettingsRequestDTO req
-    ) {
+            WorkspaceContext workspaceContext, UpdatePracticeReviewSettingsRequestDTO req) {
         Workspace workspace = requireWorkspaceForUpdate(workspaceContext);
         PracticeReviewSettings settings = workspace.getReviewSettings();
         PracticeReviewSnapshot before = PracticeReviewSnapshot.of(settings);
@@ -42,23 +40,21 @@ public class PracticeReviewSettingsService {
         settings.reset(req.reset());
         settings.applyPatch(req.deliverToMerged(), req.cooldownMinutes());
         settings.applyScope(req.reviewScope());
-        settings.applyDefaultAutonomy(req.defaultAutonomy() == null ? null : req.defaultAutonomy().name());
-        configAudit.record(
-            ConfigAuditEntry.updated(
+        settings.applyDefaultAutonomy(
+                req.defaultAutonomy() == null ? null : req.defaultAutonomy().name());
+        configAudit.record(ConfigAuditEntry.updated(
                 ConfigAuditEntityType.PRACTICE_REVIEW_SETTINGS,
                 workspaceContext.id(),
                 workspaceContext.id(),
                 before,
-                PracticeReviewSnapshot.of(settings)
-            )
-        );
+                PracticeReviewSnapshot.of(settings)));
         return toView(workspaceRepository.save(workspace));
     }
 
     private Workspace requireWorkspace(WorkspaceContext workspaceContext) {
         return workspaceRepository
-            .findById(workspaceContext.id())
-            .orElseThrow(() -> new EntityNotFoundException("Workspace", workspaceContext.slug()));
+                .findById(workspaceContext.id())
+                .orElseThrow(() -> new EntityNotFoundException("Workspace", workspaceContext.slug()));
     }
 
     /**
@@ -67,21 +63,20 @@ public class PracticeReviewSettingsService {
      */
     private Workspace requireWorkspaceForUpdate(WorkspaceContext workspaceContext) {
         return workspaceRepository
-            .findByIdForUpdate(workspaceContext.id())
-            .orElseThrow(() -> new EntityNotFoundException("Workspace", workspaceContext.slug()));
+                .findByIdForUpdate(workspaceContext.id())
+                .orElseThrow(() -> new EntityNotFoundException("Workspace", workspaceContext.slug()));
     }
 
     private PracticeReviewSettingsDTO toView(Workspace workspace) {
         PracticeReviewSettings s = workspace.getReviewSettings();
         WorkspaceReviewDefaults defaults = WorkspaceReviewDefaults.of(s);
         return new PracticeReviewSettingsDTO(
-            s.resolveDeliverToMerged(reviewProperties.deliverToMerged()),
-            s.resolveCooldownMinutes(reviewProperties.cooldownMinutes()),
-            s.getDeliverToMerged(),
-            s.getCooldownMinutes(),
-            s.resolveReviewScope(),
-            defaults.defaultAutonomy(),
-            s.getDefaultAutonomy() == null ? null : PracticeAutonomy.valueOf(s.getDefaultAutonomy())
-        );
+                s.resolveDeliverToMerged(reviewProperties.deliverToMerged()),
+                s.resolveCooldownMinutes(reviewProperties.cooldownMinutes()),
+                s.getDeliverToMerged(),
+                s.getCooldownMinutes(),
+                s.resolveReviewScope(),
+                defaults.defaultAutonomy(),
+                s.getDefaultAutonomy() == null ? null : PracticeAutonomy.valueOf(s.getDefaultAutonomy()));
     }
 }

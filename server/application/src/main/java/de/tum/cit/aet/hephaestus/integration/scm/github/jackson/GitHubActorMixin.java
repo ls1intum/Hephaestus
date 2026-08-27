@@ -19,19 +19,16 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHUser;
  * the common case where only User inline fragments are used in GraphQL queries.
  */
 @JsonTypeInfo(
-    use = JsonTypeInfo.Id.NAME,
-    include = JsonTypeInfo.As.PROPERTY,
-    property = "__typename",
-    visible = true,
-    defaultImpl = GHUser.class
-)
-@JsonSubTypes(
-    {
-        @JsonSubTypes.Type(value = GHUser.class, name = "User"),
-        @JsonSubTypes.Type(value = GHBot.class, name = "Bot"),
-        @JsonSubTypes.Type(value = GHOrganization.class, name = "Organization"),
-        @JsonSubTypes.Type(value = GHMannequin.class, name = "Mannequin"),
-        @JsonSubTypes.Type(value = GHEnterpriseUserAccount.class, name = "EnterpriseUserAccount"),
-    }
-)
+        use = JsonTypeInfo.Id.NAME,
+        include = JsonTypeInfo.As.PROPERTY,
+        property = "__typename",
+        visible = true,
+        defaultImpl = GHUser.class)
+@JsonSubTypes({
+    @JsonSubTypes.Type(value = GHUser.class, name = "User"),
+    @JsonSubTypes.Type(value = GHBot.class, name = "Bot"),
+    @JsonSubTypes.Type(value = GHOrganization.class, name = "Organization"),
+    @JsonSubTypes.Type(value = GHMannequin.class, name = "Mannequin"),
+    @JsonSubTypes.Type(value = GHEnterpriseUserAccount.class, name = "EnterpriseUserAccount"),
+})
 public abstract class GitHubActorMixin {}

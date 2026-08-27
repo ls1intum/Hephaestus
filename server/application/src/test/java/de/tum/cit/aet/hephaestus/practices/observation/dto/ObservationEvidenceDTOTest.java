@@ -13,65 +13,47 @@ class ObservationEvidenceDTOTest extends BaseUnitTest {
 
     @Test
     void mapsCanonicalRedactedCitation() {
-        var evidence = ObservationEvidenceDTO.from(
-            MAPPER.readTree(
-                """
+        var evidence = ObservationEvidenceDTO.from(MAPPER.readTree("""
                 {"detector":"secret-scan","citations":[{"sourceKind":"scm.repository.tree",\
                 "artifactPath":"inputs/sources/scm/repo","path":"config.env","startLine":3,\
                 "endLine":3,"quoteRedacted":true}]}
-                """
-            )
-        );
+                """));
 
         assertThat(evidence).isNotNull();
         assertThat(evidence.detector()).isEqualTo("secret-scan");
-        assertThat(evidence.citations())
-            .singleElement()
-            .satisfies(citation -> {
-                assertThat(citation.path()).isEqualTo("config.env");
-                assertThat(citation.quote()).isNull();
-                assertThat(citation.quoteRedacted()).isTrue();
-            });
+        assertThat(evidence.citations()).singleElement().satisfies(citation -> {
+            assertThat(citation.path()).isEqualTo("config.env");
+            assertThat(citation.quote()).isNull();
+            assertThat(citation.quoteRedacted()).isTrue();
+        });
     }
 
     @Test
     void rejectsMalformedCitationMember() {
-        assertThatThrownBy(() ->
-            ObservationEvidenceDTO.from(MAPPER.readTree("{\"citations\":[\"invalid\"]}"))
-        ).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> ObservationEvidenceDTO.from(MAPPER.readTree("{\"citations\":[\"invalid\"]}")))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
     void rejectsEmptyCitations() {
-        assertThatThrownBy(() -> ObservationEvidenceDTO.from(MAPPER.readTree("{\"citations\":[]}"))).isInstanceOf(
-            IllegalArgumentException.class
-        );
+        assertThatThrownBy(() -> ObservationEvidenceDTO.from(MAPPER.readTree("{\"citations\":[]}")))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
     void requiresSideExactlyForDiffCitations() {
-        assertThatThrownBy(() ->
-            ObservationEvidenceDTO.from(
-                MAPPER.readTree(
-                    """
+        assertThatThrownBy(() -> ObservationEvidenceDTO.from(MAPPER.readTree("""
                     {"citations":[{"sourceKind":"scm.pull-request.diff",\
                     "artifactPath":"inputs/context/diff.patch","path":"src/Auth.java",\
                     "startLine":10,"endLine":10,"quote":"+ insecure();"}]}
-                    """
-                )
-            )
-        ).isInstanceOf(IllegalArgumentException.class);
+                    """)))
+                .isInstanceOf(IllegalArgumentException.class);
 
-        assertThatThrownBy(() ->
-            ObservationEvidenceDTO.from(
-                MAPPER.readTree(
-                    """
+        assertThatThrownBy(() -> ObservationEvidenceDTO.from(MAPPER.readTree("""
                     {"citations":[{"sourceKind":"scm.pull-request.core",\
                     "artifactPath":"inputs/context/pull_request.json","path":"pull_request.json",\
                     "side":"NEW","startLine":1,"endLine":1,"quote":"{}"}]}
-                    """
-                )
-            )
-        ).isInstanceOf(IllegalArgumentException.class);
+                    """)))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 }

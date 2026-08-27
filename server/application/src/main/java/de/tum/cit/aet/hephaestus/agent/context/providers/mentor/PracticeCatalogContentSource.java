@@ -75,8 +75,8 @@ public class PracticeCatalogContentSource implements ContentSource {
         Cache cache = cacheManager.getCache(CACHE_NAME);
         // Atomic compute-if-absent closes the get/build/put race on invalidation events.
         ObjectNode payload = (cache != null)
-            ? cache.get(key, () -> buildPayload(req.workspaceId()))
-            : buildPayload(req.workspaceId());
+                ? cache.get(key, () -> buildPayload(req.workspaceId()))
+                : buildPayload(req.workspaceId());
         try {
             files.put(OUTPUT_KEY, objectMapper.writeValueAsBytes(payload));
         } catch (JacksonException e) {
@@ -87,25 +87,20 @@ public class PracticeCatalogContentSource implements ContentSource {
     /** Pure function of (workspaceId). Callers cache through {@link CacheManager}. */
     public ObjectNode buildPayload(Long workspaceId) {
         Workspace workspace = workspaceRepository
-            .findById(workspaceId)
-            .orElseThrow(() -> new EntityNotFoundException("Workspace", workspaceId.toString()));
+                .findById(workspaceId)
+                .orElseThrow(() -> new EntityNotFoundException("Workspace", workspaceId.toString()));
 
         // Only the practices this workspace may actually raise in a conversation. A HUMAN_APPROVAL practice is
         // deliberately silent everywhere, so putting it in the mentor's catalogue would hand the mentor a
         // subject it is not allowed to raise, and an OFF practice is not reviewed at all. Autonomy is the
         // effective one, resolved through the practice -> group -> workspace chain.
         WorkspaceReviewDefaults defaults = WorkspaceReviewDefaults.of(workspace);
-        List<Practice> practices = practiceRepository
-            .findByWorkspaceId(workspaceId)
-            .stream()
-            .filter(p ->
-                PracticeAutonomyPolicy.delivers(
-                    ObservationOrigin.LIVE,
-                    AutonomyResolver.effectiveAutonomyOf(p, defaults.defaultAutonomy()),
-                    FeedbackChannel.IN_CHAT
-                )
-            )
-            .toList();
+        List<Practice> practices = practiceRepository.findByWorkspaceId(workspaceId).stream()
+                .filter(p -> PracticeAutonomyPolicy.delivers(
+                        ObservationOrigin.LIVE,
+                        AutonomyResolver.effectiveAutonomyOf(p, defaults.defaultAutonomy()),
+                        FeedbackChannel.IN_CHAT))
+                .toList();
 
         ObjectNode root = objectMapper.createObjectNode();
         root.putObject("workspace").put("slug", workspace.getWorkspaceSlug());

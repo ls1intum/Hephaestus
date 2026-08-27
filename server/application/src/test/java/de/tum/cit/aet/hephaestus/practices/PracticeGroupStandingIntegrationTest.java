@@ -3,9 +3,7 @@ package de.tum.cit.aet.hephaestus.practices;
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
-import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
-import de.tum.cit.aet.hephaestus.practices.dto.PracticeGroupStandingDTO;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState;
@@ -25,7 +23,6 @@ import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembership;
 import java.time.Instant;
-import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
@@ -43,9 +40,9 @@ class PracticeGroupStandingIntegrationTest extends AbstractWorkspaceIntegrationT
     private static final String STANDINGS_URI = "/workspaces/{workspaceSlug}/practice-groups/standings";
 
     private static final String DIFF_EVIDENCE_JSON =
-        "{\"citations\":[{\"sourceKind\":\"scm.pull-request.diff\",\"artifactPath\":\"inputs/context/diff.patch\"," +
-        "\"path\":\"src/Main.java\",\"side\":\"NEW\",\"startLine\":42,\"endLine\":42,\"quote\":\"example\"," +
-        "\"quoteRedacted\":false}]}";
+            "{\"citations\":[{\"sourceKind\":\"scm.pull-request.diff\",\"artifactPath\":\"inputs/context/diff.patch\","
+                    + "\"path\":\"src/Main.java\",\"side\":\"NEW\",\"startLine\":42,\"endLine\":42,\"quote\":\"example\","
+                    + "\"quoteRedacted\":false}]}";
 
     @Autowired
     private WebTestClient webTestClient;
@@ -80,13 +77,8 @@ class PracticeGroupStandingIntegrationTest extends AbstractWorkspaceIntegrationT
     @BeforeEach
     void setUpWorkspace() {
         User owner = persistUser("group-standing-owner");
-        workspace = createWorkspace(
-            "group-standing-ws",
-            "Group Standing WS",
-            "group-standing-org",
-            AccountType.ORG,
-            owner
-        );
+        workspace =
+                createWorkspace("group-standing-ws", "Group Standing WS", "group-standing-org", AccountType.ORG, owner);
 
         developer = persistUser("testuser");
         ensureWorkspaceMembership(workspace, developer, WorkspaceMembership.WorkspaceRole.MEMBER);
@@ -143,100 +135,93 @@ class PracticeGroupStandingIntegrationTest extends AbstractWorkspaceIntegrationT
     }
 
     private UUID insertObservation(
-        AgentJob job,
-        Practice targetPractice,
-        User user,
-        String title,
-        String presence,
-        @Nullable String severity,
-        Long artifactId
-    ) {
+            AgentJob job,
+            Practice targetPractice,
+            User user,
+            String title,
+            String presence,
+            @Nullable String severity,
+            Long artifactId) {
         return insertObservation(job, targetPractice, user, title, presence, severity, artifactId, Instant.now());
     }
 
     private UUID insertObservation(
-        AgentJob job,
-        Practice targetPractice,
-        User user,
-        String title,
-        String presence,
-        @Nullable String severity,
-        Long artifactId,
-        Instant observedAt
-    ) {
+            AgentJob job,
+            Practice targetPractice,
+            User user,
+            String title,
+            String presence,
+            @Nullable String severity,
+            Long artifactId,
+            Instant observedAt) {
         return insertObservation(
-            job,
-            targetPractice,
-            user,
-            title,
-            presence,
-            severity,
-            artifactId,
-            observedAt,
-            ArtifactKinds.PULL_REQUEST.value()
-        );
+                job,
+                targetPractice,
+                user,
+                title,
+                presence,
+                severity,
+                artifactId,
+                observedAt,
+                ArtifactKinds.PULL_REQUEST.value());
     }
 
     private UUID insertObservation(
-        AgentJob job,
-        Practice targetPractice,
-        User user,
-        String title,
-        String presence,
-        @Nullable String severity,
-        Long artifactId,
-        Instant observedAt,
-        String artifactKind
-    ) {
+            AgentJob job,
+            Practice targetPractice,
+            User user,
+            String title,
+            String presence,
+            @Nullable String severity,
+            Long artifactId,
+            Instant observedAt,
+            String artifactKind) {
         UUID id = UUID.randomUUID();
         observationRepository.insertIfAbsent(
-            id,
-            "key-" + id,
-            job.getId(),
-            targetPractice.getId(),
-            targetPractice.getCurrentRevision().getId(),
-            artifactKind,
-            artifactId,
-            user.getId(),
-            title,
-            presence,
-            "PRESENT".equals(presence) ? "GOOD" : "BAD",
-            severity,
-            DIFF_EVIDENCE_JSON,
-            "Test reasoning for " + title,
-            null,
-            observedAt,
-            "LIVE"
-        );
+                id,
+                "key-" + id,
+                job.getId(),
+                targetPractice.getId(),
+                targetPractice.getCurrentRevision().getId(),
+                artifactKind,
+                artifactId,
+                user.getId(),
+                title,
+                presence,
+                "PRESENT".equals(presence) ? "GOOD" : "BAD",
+                severity,
+                DIFF_EVIDENCE_JSON,
+                "Test reasoning for " + title,
+                null,
+                observedAt,
+                "LIVE");
         return id;
     }
 
     private void insertInapplicableObservation(Practice targetPractice, String presence, Long artifactId) {
         UUID id = UUID.randomUUID();
         observationRepository.insertIfAbsent(
-            id,
-            "key-" + id,
-            agentJob.getId(),
-            targetPractice.getId(),
-            targetPractice.getCurrentRevision().getId(),
-            ArtifactKinds.PULL_REQUEST.value(),
-            artifactId,
-            developer.getId(),
-            "Nothing to judge here",
-            presence,
-            null,
-            null,
-            DIFF_EVIDENCE_JSON,
-            "Test reasoning for an inapplicable run",
-            null,
-            Instant.now(),
-            "LIVE"
-        );
+                id,
+                "key-" + id,
+                agentJob.getId(),
+                targetPractice.getId(),
+                targetPractice.getCurrentRevision().getId(),
+                ArtifactKinds.PULL_REQUEST.value(),
+                artifactId,
+                developer.getId(),
+                "Nothing to judge here",
+                presence,
+                null,
+                null,
+                DIFF_EVIDENCE_JSON,
+                "Test reasoning for an inapplicable run",
+                null,
+                Instant.now(),
+                "LIVE");
     }
 
     private void deliverFeedbackFor(UUID observationId, String body) {
-        Feedback feedback = feedbackRepository.save(
-            Feedback.builder()
+        Feedback feedback = feedbackRepository.save(Feedback.builder()
                 .agentJobId(agentJob.getId())
                 .workspaceId(workspace.getId())
                 .artifactKind(ArtifactKinds.PULL_REQUEST)
@@ -249,8 +234,7 @@ class PracticeGroupStandingIntegrationTest extends AbstractWorkspaceIntegrationT
                 .body(body)
                 .source(FeedbackSource.AGENT)
                 .createdAt(Instant.now())
-                .build()
-        );
+                .build());
         feedbackObservationRepository.insertIfAbsent(feedback.getId(), observationId, "PRIMARY", 0);
     }
 
@@ -262,55 +246,49 @@ class PracticeGroupStandingIntegrationTest extends AbstractWorkspaceIntegrationT
         @WithUser
         @DisplayName("derives DEVELOPING from a confident problem and carries the delivered feedback")
         void shouldReturnDevelopingWithEvidence() {
-            UUID observationId = insertObservation(
-                agentJob,
-                practice,
-                developer,
-                "Missing rollout plan",
-                "ABSENT",
-                "MAJOR",
-                1L
-            );
+            UUID observationId =
+                    insertObservation(agentJob, practice, developer, "Missing rollout plan", "ABSENT", "MAJOR", 1L);
             deliverFeedbackFor(observationId, "Add a rollout section describing how the change ships.");
 
             webTestClient
-                .get()
-                .uri(STANDINGS_URI, workspace.getWorkspaceSlug())
-                .headers(TestAuthUtils.withCurrentUser())
-                .exchange()
-                .expectStatus()
-                .isOk()
-                .expectBody()
-                .jsonPath("$[0].groupSlug")
-                .isEqualTo("code-quality")
-                .jsonPath("$[0].groupName")
-                .isEqualTo("Code Quality")
-                .jsonPath("$[0].standing")
-                .isEqualTo("DEVELOPING")
-                .jsonPath("$[0].guidance")
-                .isEqualTo("Your recent feedback points to “PR Description Quality” as the next practice to focus on.")
-                .jsonPath("$[0].guidanceSource")
-                .isEqualTo("RULE_BASED")
-                .jsonPath("$[0].direction")
-                .isEqualTo("INSUFFICIENT_EVIDENCE")
-                .jsonPath("$[0].feedbackSpanDays")
-                .isEqualTo(1)
-                .jsonPath("$[0].feedbackSince")
-                .exists()
-                .jsonPath("$[0].observations.length()")
-                .isEqualTo(1)
-                .jsonPath("$[0].observations[0].title")
-                .isEqualTo("Missing rollout plan")
-                .jsonPath("$[0].observations[0].deliveredFeedback")
-                .isEqualTo("Add a rollout section describing how the change ships.")
-                .jsonPath("$[0].observations[0].observationId")
-                .isEqualTo(observationId.toString())
-                .jsonPath("$[0].sources.length()")
-                .isEqualTo(1)
-                .jsonPath("$[0].sources[0].workKind")
-                .isEqualTo(ArtifactKinds.PULL_REQUEST.value())
-                .jsonPath("$[0].sources[0].count")
-                .isEqualTo(1);
+                    .get()
+                    .uri(STANDINGS_URI, workspace.getWorkspaceSlug())
+                    .headers(TestAuthUtils.withCurrentUser())
+                    .exchange()
+                    .expectStatus()
+                    .isOk()
+                    .expectBody()
+                    .jsonPath("$[0].groupSlug")
+                    .isEqualTo("code-quality")
+                    .jsonPath("$[0].groupName")
+                    .isEqualTo("Code Quality")
+                    .jsonPath("$[0].standing")
+                    .isEqualTo("DEVELOPING")
+                    .jsonPath("$[0].guidance")
+                    .isEqualTo(
+                            "Your recent feedback points to “PR Description Quality” as the next practice to focus on.")
+                    .jsonPath("$[0].guidanceSource")
+                    .isEqualTo("RULE_BASED")
+                    .jsonPath("$[0].direction")
+                    .isEqualTo("INSUFFICIENT_EVIDENCE")
+                    .jsonPath("$[0].feedbackSpanDays")
+                    .isEqualTo(1)
+                    .jsonPath("$[0].feedbackSince")
+                    .exists()
+                    .jsonPath("$[0].observations.length()")
+                    .isEqualTo(1)
+                    .jsonPath("$[0].observations[0].title")
+                    .isEqualTo("Missing rollout plan")
+                    .jsonPath("$[0].observations[0].deliveredFeedback")
+                    .isEqualTo("Add a rollout section describing how the change ships.")
+                    .jsonPath("$[0].observations[0].observationId")
+                    .isEqualTo(observationId.toString())
+                    .jsonPath("$[0].sources.length()")
+                    .isEqualTo(1)
+                    .jsonPath("$[0].sources[0].workKind")
+                    .isEqualTo(ArtifactKinds.PULL_REQUEST.value())
+                    .jsonPath("$[0].sources[0].count")
+                    .isEqualTo(1);
         }
 
         @Test
@@ -321,35 +299,34 @@ class PracticeGroupStandingIntegrationTest extends AbstractWorkspaceIntegrationT
             insertObservation(agentJob, practice, developer, "Second gap on PR one", "ABSENT", "MINOR", 1L);
             insertObservation(agentJob, practice, developer, "Gap on PR two", "ABSENT", "MAJOR", 2L);
             insertObservation(
-                agentJob,
-                practice,
-                developer,
-                "Vague issue description",
-                "ABSENT",
-                "MINOR",
-                7L,
-                Instant.now(),
-                ArtifactKinds.ISSUE.value()
-            );
+                    agentJob,
+                    practice,
+                    developer,
+                    "Vague issue description",
+                    "ABSENT",
+                    "MINOR",
+                    7L,
+                    Instant.now(),
+                    ArtifactKinds.ISSUE.value());
 
             webTestClient
-                .get()
-                .uri(STANDINGS_URI, workspace.getWorkspaceSlug())
-                .headers(TestAuthUtils.withCurrentUser())
-                .exchange()
-                .expectStatus()
-                .isOk()
-                .expectBody()
-                .jsonPath("$[0].sources.length()")
-                .isEqualTo(2)
-                .jsonPath("$[0].sources[0].workKind")
-                .isEqualTo(ArtifactKinds.ISSUE.value())
-                .jsonPath("$[0].sources[0].count")
-                .isEqualTo(1)
-                .jsonPath("$[0].sources[1].workKind")
-                .isEqualTo(ArtifactKinds.PULL_REQUEST.value())
-                .jsonPath("$[0].sources[1].count")
-                .isEqualTo(2);
+                    .get()
+                    .uri(STANDINGS_URI, workspace.getWorkspaceSlug())
+                    .headers(TestAuthUtils.withCurrentUser())
+                    .exchange()
+                    .expectStatus()
+                    .isOk()
+                    .expectBody()
+                    .jsonPath("$[0].sources.length()")
+                    .isEqualTo(2)
+                    .jsonPath("$[0].sources[0].workKind")
+                    .isEqualTo(ArtifactKinds.ISSUE.value())
+                    .jsonPath("$[0].sources[0].count")
+                    .isEqualTo(1)
+                    .jsonPath("$[0].sources[1].workKind")
+                    .isEqualTo(ArtifactKinds.PULL_REQUEST.value())
+                    .jsonPath("$[0].sources[1].count")
+                    .isEqualTo(2);
         }
 
         @Test
@@ -359,23 +336,24 @@ class PracticeGroupStandingIntegrationTest extends AbstractWorkspaceIntegrationT
             insertObservation(agentJob, practice, developer, "Clear motivation section", "PRESENT", null, 1L);
 
             webTestClient
-                .get()
-                .uri(STANDINGS_URI, workspace.getWorkspaceSlug())
-                .headers(TestAuthUtils.withCurrentUser())
-                .exchange()
-                .expectStatus()
-                .isOk()
-                .expectBody()
-                .jsonPath("$[0].standing")
-                .isEqualTo("STRENGTH")
-                .jsonPath("$[0].guidance")
-                .isEqualTo("Your recent feedback shows a strength in “PR Description Quality”. Keep building on it.")
-                .jsonPath("$[0].direction")
-                .isEqualTo("INSUFFICIENT_EVIDENCE")
-                .jsonPath("$[0].observations.length()")
-                .isEqualTo(1)
-                .jsonPath("$[0].observations[0].title")
-                .isEqualTo("Clear motivation section");
+                    .get()
+                    .uri(STANDINGS_URI, workspace.getWorkspaceSlug())
+                    .headers(TestAuthUtils.withCurrentUser())
+                    .exchange()
+                    .expectStatus()
+                    .isOk()
+                    .expectBody()
+                    .jsonPath("$[0].standing")
+                    .isEqualTo("STRENGTH")
+                    .jsonPath("$[0].guidance")
+                    .isEqualTo(
+                            "Your recent feedback shows a strength in “PR Description Quality”. Keep building on it.")
+                    .jsonPath("$[0].direction")
+                    .isEqualTo("INSUFFICIENT_EVIDENCE")
+                    .jsonPath("$[0].observations.length()")
+                    .isEqualTo(1)
+                    .jsonPath("$[0].observations[0].title")
+                    .isEqualTo("Clear motivation section");
         }
 
         @Test
@@ -383,31 +361,31 @@ class PracticeGroupStandingIntegrationTest extends AbstractWorkspaceIntegrationT
         @DisplayName("returns NOT_OBSERVED when the group has no observations at all")
         void shouldReturnNotObservedWithoutObservations() {
             webTestClient
-                .get()
-                .uri(STANDINGS_URI, workspace.getWorkspaceSlug())
-                .headers(TestAuthUtils.withCurrentUser())
-                .exchange()
-                .expectStatus()
-                .isOk()
-                .expectBody()
-                .jsonPath("$[0].groupSlug")
-                .isEqualTo("code-quality")
-                .jsonPath("$[0].groupName")
-                .isEqualTo("Code Quality")
-                .jsonPath("$[0].standing")
-                .isEqualTo("NOT_OBSERVED")
-                .jsonPath("$[0].guidance")
-                .doesNotExist()
-                .jsonPath("$[0].guidanceSource")
-                .doesNotExist()
-                .jsonPath("$[0].direction")
-                .isEqualTo("INSUFFICIENT_EVIDENCE")
-                .jsonPath("$[0].feedbackSpanDays")
-                .doesNotExist()
-                .jsonPath("$[0].feedbackSince")
-                .doesNotExist()
-                .jsonPath("$[0].observations.length()")
-                .isEqualTo(0);
+                    .get()
+                    .uri(STANDINGS_URI, workspace.getWorkspaceSlug())
+                    .headers(TestAuthUtils.withCurrentUser())
+                    .exchange()
+                    .expectStatus()
+                    .isOk()
+                    .expectBody()
+                    .jsonPath("$[0].groupSlug")
+                    .isEqualTo("code-quality")
+                    .jsonPath("$[0].groupName")
+                    .isEqualTo("Code Quality")
+                    .jsonPath("$[0].standing")
+                    .isEqualTo("NOT_OBSERVED")
+                    .jsonPath("$[0].guidance")
+                    .doesNotExist()
+                    .jsonPath("$[0].guidanceSource")
+                    .doesNotExist()
+                    .jsonPath("$[0].direction")
+                    .isEqualTo("INSUFFICIENT_EVIDENCE")
+                    .jsonPath("$[0].feedbackSpanDays")
+                    .doesNotExist()
+                    .jsonPath("$[0].feedbackSince")
+                    .doesNotExist()
+                    .jsonPath("$[0].observations.length()")
+                    .isEqualTo(0);
         }
 
         @Test
@@ -417,21 +395,21 @@ class PracticeGroupStandingIntegrationTest extends AbstractWorkspaceIntegrationT
             insertInapplicableObservation(practice, "NOT_APPLICABLE", 1L);
 
             webTestClient
-                .get()
-                .uri(STANDINGS_URI, workspace.getWorkspaceSlug())
-                .headers(TestAuthUtils.withCurrentUser())
-                .exchange()
-                .expectStatus()
-                .isOk()
-                .expectBody()
-                .jsonPath("$[0].groupSlug")
-                .isEqualTo("code-quality")
-                .jsonPath("$[0].standing")
-                .isEqualTo("NO_OPPORTUNITY")
-                .jsonPath("$[0].guidance")
-                .doesNotExist()
-                .jsonPath("$[0].observations.length()")
-                .isEqualTo(0);
+                    .get()
+                    .uri(STANDINGS_URI, workspace.getWorkspaceSlug())
+                    .headers(TestAuthUtils.withCurrentUser())
+                    .exchange()
+                    .expectStatus()
+                    .isOk()
+                    .expectBody()
+                    .jsonPath("$[0].groupSlug")
+                    .isEqualTo("code-quality")
+                    .jsonPath("$[0].standing")
+                    .isEqualTo("NO_OPPORTUNITY")
+                    .jsonPath("$[0].guidance")
+                    .doesNotExist()
+                    .jsonPath("$[0].observations.length()")
+                    .isEqualTo(0);
         }
 
         @Test
@@ -441,15 +419,15 @@ class PracticeGroupStandingIntegrationTest extends AbstractWorkspaceIntegrationT
             insertInapplicableObservation(practice, "INCONCLUSIVE", 2L);
 
             webTestClient
-                .get()
-                .uri(STANDINGS_URI, workspace.getWorkspaceSlug())
-                .headers(TestAuthUtils.withCurrentUser())
-                .exchange()
-                .expectStatus()
-                .isOk()
-                .expectBody()
-                .jsonPath("$[0].standing")
-                .isEqualTo("NO_OPPORTUNITY");
+                    .get()
+                    .uri(STANDINGS_URI, workspace.getWorkspaceSlug())
+                    .headers(TestAuthUtils.withCurrentUser())
+                    .exchange()
+                    .expectStatus()
+                    .isOk()
+                    .expectBody()
+                    .jsonPath("$[0].standing")
+                    .isEqualTo("NO_OPPORTUNITY");
         }
 
         @Test
@@ -460,17 +438,17 @@ class PracticeGroupStandingIntegrationTest extends AbstractWorkspaceIntegrationT
             insertInapplicableObservation(practice, "NOT_APPLICABLE", 2L);
 
             webTestClient
-                .get()
-                .uri(STANDINGS_URI, workspace.getWorkspaceSlug())
-                .headers(TestAuthUtils.withCurrentUser())
-                .exchange()
-                .expectStatus()
-                .isOk()
-                .expectBody()
-                .jsonPath("$[0].standing")
-                .isEqualTo("DEVELOPING")
-                .jsonPath("$[0].observations.length()")
-                .isEqualTo(1);
+                    .get()
+                    .uri(STANDINGS_URI, workspace.getWorkspaceSlug())
+                    .headers(TestAuthUtils.withCurrentUser())
+                    .exchange()
+                    .expectStatus()
+                    .isOk()
+                    .expectBody()
+                    .jsonPath("$[0].standing")
+                    .isEqualTo("DEVELOPING")
+                    .jsonPath("$[0].observations.length()")
+                    .isEqualTo(1);
         }
 
         @Test
@@ -480,53 +458,47 @@ class PracticeGroupStandingIntegrationTest extends AbstractWorkspaceIntegrationT
             insertObservation(agentJob, practice, developer, "Coin-flip hunch", "ABSENT", "MINOR", 1L);
 
             webTestClient
-                .get()
-                .uri(STANDINGS_URI, workspace.getWorkspaceSlug())
-                .headers(TestAuthUtils.withCurrentUser())
-                .exchange()
-                .expectStatus()
-                .isOk()
-                .expectBody()
-                .jsonPath("$[0].standing")
-                .isEqualTo("DEVELOPING")
-                .jsonPath("$[0].observations.length()")
-                .isEqualTo(1);
+                    .get()
+                    .uri(STANDINGS_URI, workspace.getWorkspaceSlug())
+                    .headers(TestAuthUtils.withCurrentUser())
+                    .exchange()
+                    .expectStatus()
+                    .isOk()
+                    .expectBody()
+                    .jsonPath("$[0].standing")
+                    .isEqualTo("DEVELOPING")
+                    .jsonPath("$[0].observations.length()")
+                    .isEqualTo(1);
         }
 
         @Test
         @WithUser
         @DisplayName("derives MIXED across two practices and names both sides in the guidance")
         void shouldComposeMixedGuidanceAcrossPractices() {
-            Practice reviewPractice = persistPractice(
-                workspace,
-                group,
-                "review-comments",
-                "Actionable Review Comments"
-            );
+            Practice reviewPractice =
+                    persistPractice(workspace, group, "review-comments", "Actionable Review Comments");
             insertObservation(agentJob, practice, developer, "Missing rollout plan", "ABSENT", "MAJOR", 1L);
             insertObservation(agentJob, reviewPractice, developer, "Concrete line references", "PRESENT", null, 1L);
 
             webTestClient
-                .get()
-                .uri(STANDINGS_URI, workspace.getWorkspaceSlug())
-                .headers(TestAuthUtils.withCurrentUser())
-                .exchange()
-                .expectStatus()
-                .isOk()
-                .expectBody()
-                .jsonPath("$[0].standing")
-                .isEqualTo("MIXED")
-                .jsonPath("$[0].guidance")
-                .isEqualTo(
-                    "Your recent feedback shows a strength in “Actionable Review Comments”. " +
-                        "Next, focus on “PR Description Quality”."
-                )
-                .jsonPath("$[0].observations.length()")
-                .isEqualTo(2)
-                .jsonPath("$[0].observations[0].title")
-                .isEqualTo("Missing rollout plan")
-                .jsonPath("$[0].observations[1].title")
-                .isEqualTo("Concrete line references");
+                    .get()
+                    .uri(STANDINGS_URI, workspace.getWorkspaceSlug())
+                    .headers(TestAuthUtils.withCurrentUser())
+                    .exchange()
+                    .expectStatus()
+                    .isOk()
+                    .expectBody()
+                    .jsonPath("$[0].standing")
+                    .isEqualTo("MIXED")
+                    .jsonPath("$[0].guidance")
+                    .isEqualTo("Your recent feedback shows a strength in “Actionable Review Comments”. "
+                            + "Next, focus on “PR Description Quality”.")
+                    .jsonPath("$[0].observations.length()")
+                    .isEqualTo(2)
+                    .jsonPath("$[0].observations[0].title")
+                    .isEqualTo("Missing rollout plan")
+                    .jsonPath("$[0].observations[1].title")
+                    .isEqualTo("Concrete line references");
         }
 
         @Test
@@ -540,15 +512,15 @@ class PracticeGroupStandingIntegrationTest extends AbstractWorkspaceIntegrationT
             persistMixedPractice("documentation", "Documentation", 5L);
 
             webTestClient
-                .get()
-                .uri(STANDINGS_URI, workspace.getWorkspaceSlug())
-                .headers(TestAuthUtils.withCurrentUser())
-                .exchange()
-                .expectStatus()
-                .isOk()
-                .expectBody()
-                .jsonPath("$[0].standing")
-                .isEqualTo("STRENGTH");
+                    .get()
+                    .uri(STANDINGS_URI, workspace.getWorkspaceSlug())
+                    .headers(TestAuthUtils.withCurrentUser())
+                    .exchange()
+                    .expectStatus()
+                    .isOk()
+                    .expectBody()
+                    .jsonPath("$[0].standing")
+                    .isEqualTo("STRENGTH");
         }
 
         @Test
@@ -562,15 +534,15 @@ class PracticeGroupStandingIntegrationTest extends AbstractWorkspaceIntegrationT
             persistDevelopingPractice("documentation", "Documentation", 5L);
 
             webTestClient
-                .get()
-                .uri(STANDINGS_URI, workspace.getWorkspaceSlug())
-                .headers(TestAuthUtils.withCurrentUser())
-                .exchange()
-                .expectStatus()
-                .isOk()
-                .expectBody()
-                .jsonPath("$[0].standing")
-                .isEqualTo("MIXED");
+                    .get()
+                    .uri(STANDINGS_URI, workspace.getWorkspaceSlug())
+                    .headers(TestAuthUtils.withCurrentUser())
+                    .exchange()
+                    .expectStatus()
+                    .isOk()
+                    .expectBody()
+                    .jsonPath("$[0].standing")
+                    .isEqualTo("MIXED");
         }
 
         @Test
@@ -581,19 +553,19 @@ class PracticeGroupStandingIntegrationTest extends AbstractWorkspaceIntegrationT
             persistMixedPractice("review-comments", "Actionable Review Comments", 2L);
 
             webTestClient
-                .get()
-                .uri(STANDINGS_URI, workspace.getWorkspaceSlug())
-                .headers(TestAuthUtils.withCurrentUser())
-                .exchange()
-                .expectStatus()
-                .isOk()
-                .expectBody()
-                .jsonPath("$[0].standing")
-                .isEqualTo("MIXED")
-                .jsonPath("$[0].guidance")
-                .value(String.class, org.hamcrest.Matchers.startsWith("Your recent feedback is mixed in "))
-                .jsonPath("$[0].guidance")
-                .value(String.class, org.hamcrest.Matchers.containsString("with both strengths and room to grow."));
+                    .get()
+                    .uri(STANDINGS_URI, workspace.getWorkspaceSlug())
+                    .headers(TestAuthUtils.withCurrentUser())
+                    .exchange()
+                    .expectStatus()
+                    .isOk()
+                    .expectBody()
+                    .jsonPath("$[0].standing")
+                    .isEqualTo("MIXED")
+                    .jsonPath("$[0].guidance")
+                    .value(String.class, org.hamcrest.Matchers.startsWith("Your recent feedback is mixed in "))
+                    .jsonPath("$[0].guidance")
+                    .value(String.class, org.hamcrest.Matchers.containsString("with both strengths and room to grow."));
         }
 
         @Test
@@ -607,15 +579,15 @@ class PracticeGroupStandingIntegrationTest extends AbstractWorkspaceIntegrationT
             persistDevelopingPractice("documentation", "Documentation", 5L);
 
             webTestClient
-                .get()
-                .uri(STANDINGS_URI, workspace.getWorkspaceSlug())
-                .headers(TestAuthUtils.withCurrentUser())
-                .exchange()
-                .expectStatus()
-                .isOk()
-                .expectBody()
-                .jsonPath("$[0].standing")
-                .isEqualTo("MIXED");
+                    .get()
+                    .uri(STANDINGS_URI, workspace.getWorkspaceSlug())
+                    .headers(TestAuthUtils.withCurrentUser())
+                    .exchange()
+                    .expectStatus()
+                    .isOk()
+                    .expectBody()
+                    .jsonPath("$[0].standing")
+                    .isEqualTo("MIXED");
         }
 
         @Test
@@ -629,15 +601,15 @@ class PracticeGroupStandingIntegrationTest extends AbstractWorkspaceIntegrationT
             persistDevelopingPractice("documentation", "Documentation", 5L);
 
             webTestClient
-                .get()
-                .uri(STANDINGS_URI, workspace.getWorkspaceSlug())
-                .headers(TestAuthUtils.withCurrentUser())
-                .exchange()
-                .expectStatus()
-                .isOk()
-                .expectBody()
-                .jsonPath("$[0].standing")
-                .isEqualTo("DEVELOPING");
+                    .get()
+                    .uri(STANDINGS_URI, workspace.getWorkspaceSlug())
+                    .headers(TestAuthUtils.withCurrentUser())
+                    .exchange()
+                    .expectStatus()
+                    .isOk()
+                    .expectBody()
+                    .jsonPath("$[0].standing")
+                    .isEqualTo("DEVELOPING");
         }
 
         @Test
@@ -651,48 +623,44 @@ class PracticeGroupStandingIntegrationTest extends AbstractWorkspaceIntegrationT
             insertObservation(agentJob, retired, developer, "Gap in Test Coverage", "ABSENT", "MAJOR", 2L);
 
             webTestClient
-                .get()
-                .uri(STANDINGS_URI, workspace.getWorkspaceSlug())
-                .headers(TestAuthUtils.withCurrentUser())
-                .exchange()
-                .expectStatus()
-                .isOk()
-                .expectBody()
-                .jsonPath("$[0].trendSupport.currentOpportunities")
-                .isEqualTo(1)
-                .jsonPath("$[0].observations.length()")
-                .isEqualTo(2);
+                    .get()
+                    .uri(STANDINGS_URI, workspace.getWorkspaceSlug())
+                    .headers(TestAuthUtils.withCurrentUser())
+                    .exchange()
+                    .expectStatus()
+                    .isOk()
+                    .expectBody()
+                    .jsonPath("$[0].trendSupport.currentOpportunities")
+                    .isEqualTo(1)
+                    .jsonPath("$[0].observations.length()")
+                    .isEqualTo(2);
         }
 
         @Test
         @WithUser
         @DisplayName("keeps evidence from both sides when a mixed group reaches the item cap")
         void shouldKeepStrengthEvidenceWhenMixedGroupReachesItemCap() {
-            Practice reviewPractice = persistPractice(
-                workspace,
-                group,
-                "review-comments",
-                "Actionable Review Comments"
-            );
+            Practice reviewPractice =
+                    persistPractice(workspace, group, "review-comments", "Actionable Review Comments");
             for (long artifactId = 1; artifactId <= 5; artifactId++) {
                 insertObservation(agentJob, practice, developer, "Gap " + artifactId, "ABSENT", "MAJOR", artifactId);
             }
             insertObservation(agentJob, reviewPractice, developer, "Concrete line references", "PRESENT", null, 6L);
 
             webTestClient
-                .get()
-                .uri(STANDINGS_URI, workspace.getWorkspaceSlug())
-                .headers(TestAuthUtils.withCurrentUser())
-                .exchange()
-                .expectStatus()
-                .isOk()
-                .expectBody()
-                .jsonPath("$[0].standing")
-                .isEqualTo("MIXED")
-                .jsonPath("$[0].observations.length()")
-                .isEqualTo(5)
-                .jsonPath("$[0].observations[4].title")
-                .isEqualTo("Concrete line references");
+                    .get()
+                    .uri(STANDINGS_URI, workspace.getWorkspaceSlug())
+                    .headers(TestAuthUtils.withCurrentUser())
+                    .exchange()
+                    .expectStatus()
+                    .isOk()
+                    .expectBody()
+                    .jsonPath("$[0].standing")
+                    .isEqualTo("MIXED")
+                    .jsonPath("$[0].observations.length()")
+                    .isEqualTo(5)
+                    .jsonPath("$[0].observations[4].title")
+                    .isEqualTo("Concrete line references");
         }
 
         @Test
@@ -704,21 +672,21 @@ class PracticeGroupStandingIntegrationTest extends AbstractWorkspaceIntegrationT
             insertObservation(agentJob, practice, developer, "Clear motivation section", "PRESENT", null, 2L);
 
             webTestClient
-                .get()
-                .uri(STANDINGS_URI, workspace.getWorkspaceSlug())
-                .headers(TestAuthUtils.withCurrentUser())
-                .exchange()
-                .expectStatus()
-                .isOk()
-                .expectBody()
-                .jsonPath("$[0].standing")
-                .isEqualTo("MIXED")
-                .jsonPath("$[0].direction")
-                .isEqualTo("INSUFFICIENT_EVIDENCE")
-                .jsonPath("$[0].trendSupport.opportunitiesUntilComparable")
-                .isEqualTo(4)
-                .jsonPath("$[0].observations.length()")
-                .isEqualTo(2);
+                    .get()
+                    .uri(STANDINGS_URI, workspace.getWorkspaceSlug())
+                    .headers(TestAuthUtils.withCurrentUser())
+                    .exchange()
+                    .expectStatus()
+                    .isOk()
+                    .expectBody()
+                    .jsonPath("$[0].standing")
+                    .isEqualTo("MIXED")
+                    .jsonPath("$[0].direction")
+                    .isEqualTo("INSUFFICIENT_EVIDENCE")
+                    .jsonPath("$[0].trendSupport.opportunitiesUntilComparable")
+                    .isEqualTo(4)
+                    .jsonPath("$[0].observations.length()")
+                    .isEqualTo(2);
         }
 
         @Test
@@ -728,42 +696,34 @@ class PracticeGroupStandingIntegrationTest extends AbstractWorkspaceIntegrationT
             Instant previousDay = Instant.now().minus(1, java.time.temporal.ChronoUnit.DAYS);
             for (long artifactId = 1; artifactId <= 4; artifactId++) {
                 insertObservation(
-                    agentJob,
-                    practice,
-                    developer,
-                    "Previous gap " + artifactId,
-                    "ABSENT",
-                    "MAJOR",
-                    artifactId,
-                    previousDay
-                );
+                        agentJob,
+                        practice,
+                        developer,
+                        "Previous gap " + artifactId,
+                        "ABSENT",
+                        "MAJOR",
+                        artifactId,
+                        previousDay);
             }
             for (long artifactId = 5; artifactId <= 8; artifactId++) {
                 insertObservation(
-                    agentJob,
-                    practice,
-                    developer,
-                    "Current strength " + artifactId,
-                    "PRESENT",
-                    null,
-                    artifactId
-                );
+                        agentJob, practice, developer, "Current strength " + artifactId, "PRESENT", null, artifactId);
             }
 
             webTestClient
-                .get()
-                .uri(STANDINGS_URI, workspace.getWorkspaceSlug())
-                .headers(TestAuthUtils.withCurrentUser())
-                .exchange()
-                .expectStatus()
-                .isOk()
-                .expectBody()
-                .jsonPath("$[0].standing")
-                .isEqualTo("STRENGTH")
-                .jsonPath("$[0].direction")
-                .isEqualTo("IMPROVING")
-                .jsonPath("$[0].feedbackSpanDays")
-                .isEqualTo(2);
+                    .get()
+                    .uri(STANDINGS_URI, workspace.getWorkspaceSlug())
+                    .headers(TestAuthUtils.withCurrentUser())
+                    .exchange()
+                    .expectStatus()
+                    .isOk()
+                    .expectBody()
+                    .jsonPath("$[0].standing")
+                    .isEqualTo("STRENGTH")
+                    .jsonPath("$[0].direction")
+                    .isEqualTo("IMPROVING")
+                    .jsonPath("$[0].feedbackSpanDays")
+                    .isEqualTo(2);
         }
 
         @Test
@@ -773,90 +733,62 @@ class PracticeGroupStandingIntegrationTest extends AbstractWorkspaceIntegrationT
             Instant previousDay = Instant.now().minus(1, java.time.temporal.ChronoUnit.DAYS);
             for (long artifactId = 1; artifactId <= 4; artifactId++) {
                 insertObservation(
-                    agentJob,
-                    practice,
-                    developer,
-                    "Previous strength " + artifactId,
-                    "PRESENT",
-                    null,
-                    artifactId,
-                    previousDay
-                );
+                        agentJob,
+                        practice,
+                        developer,
+                        "Previous strength " + artifactId,
+                        "PRESENT",
+                        null,
+                        artifactId,
+                        previousDay);
             }
             for (long artifactId = 5; artifactId <= 8; artifactId++) {
                 insertObservation(
-                    agentJob,
-                    practice,
-                    developer,
-                    "Current gap " + artifactId,
-                    "ABSENT",
-                    "MAJOR",
-                    artifactId
-                );
+                        agentJob, practice, developer, "Current gap " + artifactId, "ABSENT", "MAJOR", artifactId);
             }
 
             webTestClient
-                .get()
-                .uri(STANDINGS_URI, workspace.getWorkspaceSlug())
-                .headers(TestAuthUtils.withCurrentUser())
-                .exchange()
-                .expectStatus()
-                .isOk()
-                .expectBody()
-                .jsonPath("$[0].standing")
-                .isEqualTo("DEVELOPING")
-                .jsonPath("$[0].direction")
-                .isEqualTo("DECLINING");
+                    .get()
+                    .uri(STANDINGS_URI, workspace.getWorkspaceSlug())
+                    .headers(TestAuthUtils.withCurrentUser())
+                    .exchange()
+                    .expectStatus()
+                    .isOk()
+                    .expectBody()
+                    .jsonPath("$[0].standing")
+                    .isEqualTo("DEVELOPING")
+                    .jsonPath("$[0].direction")
+                    .isEqualTo("DECLINING");
         }
 
         @Test
         @WithUser
         @DisplayName("a later run that did not cover a practice does not erase what an earlier one found")
         void shouldKeepObservationsARunNeverRevisited() {
-            Practice reviewPractice = persistPractice(
-                workspace,
-                group,
-                "review-comments",
-                "Actionable Review Comments"
-            );
+            Practice reviewPractice =
+                    persistPractice(workspace, group, "review-comments", "Actionable Review Comments");
             Instant previousDay = Instant.now().minus(1, java.time.temporal.ChronoUnit.DAYS);
             insertObservation(
-                agentJob,
-                practice,
-                developer,
-                "Missing rollout plan",
-                "ABSENT",
-                "MAJOR",
-                1L,
-                previousDay
-            );
+                    agentJob, practice, developer, "Missing rollout plan", "ABSENT", "MAJOR", 1L, previousDay);
             insertObservation(
-                agentJob,
-                reviewPractice,
-                developer,
-                "Concrete line references",
-                "PRESENT",
-                null,
-                1L,
-                previousDay
-            );
+                    agentJob, reviewPractice, developer, "Concrete line references", "PRESENT", null, 1L, previousDay);
             AgentJob laterJob = persistAgentJob(workspace);
             insertObservation(laterJob, reviewPractice, developer, "Still concrete", "PRESENT", null, 1L);
 
             webTestClient
-                .get()
-                .uri(STANDINGS_URI, workspace.getWorkspaceSlug())
-                .headers(TestAuthUtils.withCurrentUser())
-                .exchange()
-                .expectStatus()
-                .isOk()
-                .expectBody()
-                .jsonPath("$[0].standing")
-                .isEqualTo("MIXED")
-                .jsonPath("$[0].observations.length()")
-                .isEqualTo(2)
-                .jsonPath("$[0].observations[0].title")
-                .isEqualTo("Missing rollout plan");
+                    .get()
+                    .uri(STANDINGS_URI, workspace.getWorkspaceSlug())
+                    .headers(TestAuthUtils.withCurrentUser())
+                    .exchange()
+                    .expectStatus()
+                    .isOk()
+                    .expectBody()
+                    .jsonPath("$[0].standing")
+                    .isEqualTo("MIXED")
+                    .jsonPath("$[0].observations.length()")
+                    .isEqualTo(2)
+                    .jsonPath("$[0].observations[0].title")
+                    .isEqualTo("Missing rollout plan");
         }
 
         @Test
@@ -865,32 +797,24 @@ class PracticeGroupStandingIntegrationTest extends AbstractWorkspaceIntegrationT
         void shouldSupersedeObservationsTheLaterRunRevisited() {
             Instant previousDay = Instant.now().minus(1, java.time.temporal.ChronoUnit.DAYS);
             insertObservation(
-                agentJob,
-                practice,
-                developer,
-                "Missing rollout plan",
-                "ABSENT",
-                "MAJOR",
-                1L,
-                previousDay
-            );
+                    agentJob, practice, developer, "Missing rollout plan", "ABSENT", "MAJOR", 1L, previousDay);
             AgentJob laterJob = persistAgentJob(workspace);
             insertObservation(laterJob, practice, developer, "Rollout plan added", "PRESENT", null, 1L);
 
             webTestClient
-                .get()
-                .uri(STANDINGS_URI, workspace.getWorkspaceSlug())
-                .headers(TestAuthUtils.withCurrentUser())
-                .exchange()
-                .expectStatus()
-                .isOk()
-                .expectBody()
-                .jsonPath("$[0].standing")
-                .isEqualTo("STRENGTH")
-                .jsonPath("$[0].observations.length()")
-                .isEqualTo(1)
-                .jsonPath("$[0].observations[0].title")
-                .isEqualTo("Rollout plan added");
+                    .get()
+                    .uri(STANDINGS_URI, workspace.getWorkspaceSlug())
+                    .headers(TestAuthUtils.withCurrentUser())
+                    .exchange()
+                    .expectStatus()
+                    .isOk()
+                    .expectBody()
+                    .jsonPath("$[0].standing")
+                    .isEqualTo("STRENGTH")
+                    .jsonPath("$[0].observations.length()")
+                    .isEqualTo(1)
+                    .jsonPath("$[0].observations[0].title")
+                    .isEqualTo("Rollout plan added");
         }
 
         @Test
@@ -899,33 +823,25 @@ class PracticeGroupStandingIntegrationTest extends AbstractWorkspaceIntegrationT
         void shouldKeepObservationsWhenTheLaterRunWasAboutAnotherDeveloper() {
             Instant previousDay = Instant.now().minus(1, java.time.temporal.ChronoUnit.DAYS);
             insertObservation(
-                agentJob,
-                practice,
-                developer,
-                "Missing rollout plan",
-                "ABSENT",
-                "MAJOR",
-                1L,
-                previousDay
-            );
+                    agentJob, practice, developer, "Missing rollout plan", "ABSENT", "MAJOR", 1L, previousDay);
             User otherContributor = persistUser("other-contributor");
             AgentJob laterJob = persistAgentJob(workspace);
             insertObservation(laterJob, practice, otherContributor, "Someone else's gap", "ABSENT", "MAJOR", 1L);
 
             webTestClient
-                .get()
-                .uri(STANDINGS_URI, workspace.getWorkspaceSlug())
-                .headers(TestAuthUtils.withCurrentUser())
-                .exchange()
-                .expectStatus()
-                .isOk()
-                .expectBody()
-                .jsonPath("$[0].standing")
-                .isEqualTo("DEVELOPING")
-                .jsonPath("$[0].observations.length()")
-                .isEqualTo(1)
-                .jsonPath("$[0].observations[0].title")
-                .isEqualTo("Missing rollout plan");
+                    .get()
+                    .uri(STANDINGS_URI, workspace.getWorkspaceSlug())
+                    .headers(TestAuthUtils.withCurrentUser())
+                    .exchange()
+                    .expectStatus()
+                    .isOk()
+                    .expectBody()
+                    .jsonPath("$[0].standing")
+                    .isEqualTo("DEVELOPING")
+                    .jsonPath("$[0].observations.length()")
+                    .isEqualTo(1)
+                    .jsonPath("$[0].observations[0].title")
+                    .isEqualTo("Missing rollout plan");
         }
 
         @Test
@@ -936,35 +852,26 @@ class PracticeGroupStandingIntegrationTest extends AbstractWorkspaceIntegrationT
             insertObservation(agentJob, practice, otherUser, "Someone else's gap", "ABSENT", "MAJOR", 2L);
 
             User otherOwner = persistUser("other-ws-owner");
-            Workspace otherWorkspace = createWorkspace(
-                "other-standing-ws",
-                "Other WS",
-                "other-standing-org",
-                AccountType.ORG,
-                otherOwner
-            );
+            Workspace otherWorkspace =
+                    createWorkspace("other-standing-ws", "Other WS", "other-standing-org", AccountType.ORG, otherOwner);
             PracticeGroup otherGroup = persistGroup(otherWorkspace, "code-quality", "Code Quality");
-            Practice otherPractice = persistPractice(
-                otherWorkspace,
-                otherGroup,
-                "pr-description-quality",
-                "PR Quality"
-            );
+            Practice otherPractice =
+                    persistPractice(otherWorkspace, otherGroup, "pr-description-quality", "PR Quality");
             AgentJob otherJob = persistAgentJob(otherWorkspace);
             insertObservation(otherJob, otherPractice, developer, "Cross-workspace gap", "ABSENT", "MAJOR", 3L);
 
             webTestClient
-                .get()
-                .uri(STANDINGS_URI, workspace.getWorkspaceSlug())
-                .headers(TestAuthUtils.withCurrentUser())
-                .exchange()
-                .expectStatus()
-                .isOk()
-                .expectBody()
-                .jsonPath("$[0].standing")
-                .isEqualTo("NOT_OBSERVED")
-                .jsonPath("$[0].observations.length()")
-                .isEqualTo(0);
+                    .get()
+                    .uri(STANDINGS_URI, workspace.getWorkspaceSlug())
+                    .headers(TestAuthUtils.withCurrentUser())
+                    .exchange()
+                    .expectStatus()
+                    .isOk()
+                    .expectBody()
+                    .jsonPath("$[0].standing")
+                    .isEqualTo("NOT_OBSERVED")
+                    .jsonPath("$[0].observations.length()")
+                    .isEqualTo(0);
         }
 
         @Test
@@ -975,26 +882,26 @@ class PracticeGroupStandingIntegrationTest extends AbstractWorkspaceIntegrationT
             groupRepository.saveAndFlush(group);
 
             webTestClient
-                .get()
-                .uri(STANDINGS_URI, workspace.getWorkspaceSlug())
-                .headers(TestAuthUtils.withCurrentUser())
-                .exchange()
-                .expectStatus()
-                .isOk()
-                .expectBody()
-                .jsonPath("$.length()")
-                .isEqualTo(0);
+                    .get()
+                    .uri(STANDINGS_URI, workspace.getWorkspaceSlug())
+                    .headers(TestAuthUtils.withCurrentUser())
+                    .exchange()
+                    .expectStatus()
+                    .isOk()
+                    .expectBody()
+                    .jsonPath("$.length()")
+                    .isEqualTo(0);
         }
 
         @Test
         @DisplayName("returns 401 when not logged in")
         void shouldReturnUnauthorized() {
             webTestClient
-                .get()
-                .uri(STANDINGS_URI, workspace.getWorkspaceSlug())
-                .exchange()
-                .expectStatus()
-                .isUnauthorized();
+                    .get()
+                    .uri(STANDINGS_URI, workspace.getWorkspaceSlug())
+                    .exchange()
+                    .expectStatus()
+                    .isUnauthorized();
         }
     }
 }

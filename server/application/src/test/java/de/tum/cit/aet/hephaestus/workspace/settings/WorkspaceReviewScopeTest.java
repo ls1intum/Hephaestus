@@ -63,10 +63,8 @@ class WorkspaceReviewScopeTest extends BaseUnitTest {
 
         @Test
         void blanksAndDuplicatesAreDroppedAndEntriesTrimmed() {
-            WorkspaceReviewScope scope = new WorkspaceReviewScope(
-                Arrays.asList("  main  ", "", "   ", "main", "develop", null),
-                null
-            );
+            WorkspaceReviewScope scope =
+                    new WorkspaceReviewScope(Arrays.asList("  main  ", "", "   ", "main", "develop", null), null);
 
             assertThat(scope.targetBranches()).containsExactly("main", "develop");
             assertThat(scope.repositories()).isEmpty();
@@ -74,7 +72,8 @@ class WorkspaceReviewScopeTest extends BaseUnitTest {
 
         @Test
         void aScopeThatNormalisesToNothingIsUnrestricted() {
-            assertThat(new WorkspaceReviewScope(List.of("  "), null).isUnrestricted()).isTrue();
+            assertThat(new WorkspaceReviewScope(List.of("  "), null).isUnrestricted())
+                    .isTrue();
         }
     }
 

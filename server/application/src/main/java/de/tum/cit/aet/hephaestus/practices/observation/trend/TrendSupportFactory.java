@@ -21,81 +21,72 @@ final class TrendSupportFactory {
 
     /** Support for one practice's own comparison — no practice counts, because it is the practice. */
     static TrendSupport forPractice(
-        TrendProperties properties,
-        int currentOpportunities,
-        int previousOpportunities,
-        int opportunitiesUntilComparable,
-        List<EvidenceOpportunity> trail
-    ) {
+            TrendProperties properties,
+            int currentOpportunities,
+            int previousOpportunities,
+            int opportunitiesUntilComparable,
+            List<EvidenceOpportunity> trail) {
         return build(
-            properties,
-            currentOpportunities,
-            previousOpportunities,
-            opportunitiesUntilComparable,
-            null,
-            null,
-            trail
-        );
+                properties,
+                currentOpportunities,
+                previousOpportunities,
+                opportunitiesUntilComparable,
+                null,
+                null,
+                trail);
     }
 
     /** Support for an aggregate — additionally says how many of the group's practices could be compared. */
     static TrendSupport forGroup(
-        TrendProperties properties,
-        int currentOpportunities,
-        int previousOpportunities,
-        int opportunitiesUntilComparable,
-        int comparablePractices,
-        int eligiblePractices,
-        List<EvidenceOpportunity> trail
-    ) {
+            TrendProperties properties,
+            int currentOpportunities,
+            int previousOpportunities,
+            int opportunitiesUntilComparable,
+            int comparablePractices,
+            int eligiblePractices,
+            List<EvidenceOpportunity> trail) {
         return build(
-            properties,
-            currentOpportunities,
-            previousOpportunities,
-            opportunitiesUntilComparable,
-            comparablePractices,
-            eligiblePractices,
-            trail
-        );
+                properties,
+                currentOpportunities,
+                previousOpportunities,
+                opportunitiesUntilComparable,
+                comparablePractices,
+                eligiblePractices,
+                trail);
     }
 
     private static TrendSupport build(
-        TrendProperties properties,
-        int currentOpportunities,
-        int previousOpportunities,
-        int opportunitiesUntilComparable,
-        @Nullable Integer comparablePractices,
-        @Nullable Integer eligiblePractices,
-        List<EvidenceOpportunity> trail
-    ) {
+            TrendProperties properties,
+            int currentOpportunities,
+            int previousOpportunities,
+            int opportunitiesUntilComparable,
+            @Nullable Integer comparablePractices,
+            @Nullable Integer eligiblePractices,
+            List<EvidenceOpportunity> trail) {
         // The comparison span excludes work that offered no opportunity to apply the practice.
-        List<Instant> dated = trail
-            .stream()
-            .filter(EvidenceOpportunity::applicable)
-            .map(EvidenceOpportunity::occurredAt)
-            .toList();
+        List<Instant> dated = trail.stream()
+                .filter(EvidenceOpportunity::applicable)
+                .map(EvidenceOpportunity::occurredAt)
+                .toList();
         Instant first = dated.stream().min(Instant::compareTo).orElse(null);
         Instant last = dated.stream().max(Instant::compareTo).orElse(null);
-        Integer span =
-            first == null || last == null
+        Integer span = first == null || last == null
                 ? null
                 : (int) ChronoUnit.DAYS.between(
-                      first.atZone(ZoneOffset.UTC).toLocalDate(),
-                      last.atZone(ZoneOffset.UTC).toLocalDate()
-                  ) +
-                  1;
+                                first.atZone(ZoneOffset.UTC).toLocalDate(),
+                                last.atZone(ZoneOffset.UTC).toLocalDate())
+                        + 1;
         return new TrendSupport(
-            currentOpportunities,
-            previousOpportunities,
-            opportunitiesUntilComparable,
-            comparablePractices,
-            eligiblePractices,
-            first,
-            last,
-            span,
-            properties.getBundleSize(),
-            properties.getRopeHalfWidth(),
-            properties.getCredibilityThreshold()
-        );
+                currentOpportunities,
+                previousOpportunities,
+                opportunitiesUntilComparable,
+                comparablePractices,
+                eligiblePractices,
+                first,
+                last,
+                span,
+                properties.getBundleSize(),
+                properties.getRopeHalfWidth(),
+                properties.getCredibilityThreshold());
     }
 }

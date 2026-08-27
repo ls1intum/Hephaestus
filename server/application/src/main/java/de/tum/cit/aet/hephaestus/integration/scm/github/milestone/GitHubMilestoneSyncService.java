@@ -65,14 +65,13 @@ public class GitHubMilestoneSyncService {
     private static final int MAX_RETRY_ATTEMPTS = 3;
 
     public GitHubMilestoneSyncService(
-        MilestoneRepository milestoneRepository,
-        RepositoryRepository repositoryRepository,
-        GitHubGraphQlClientProvider graphQlClientProvider,
-        GitHubMilestoneProcessor milestoneProcessor,
-        GitHubSyncProperties syncProperties,
-        GitHubExceptionClassifier exceptionClassifier,
-        GitHubGraphQlSyncCoordinator graphQlSyncHelper
-    ) {
+            MilestoneRepository milestoneRepository,
+            RepositoryRepository repositoryRepository,
+            GitHubGraphQlClientProvider graphQlClientProvider,
+            GitHubMilestoneProcessor milestoneProcessor,
+            GitHubSyncProperties syncProperties,
+            GitHubExceptionClassifier exceptionClassifier,
+            GitHubGraphQlSyncCoordinator graphQlSyncHelper) {
         this.milestoneRepository = milestoneRepository;
         this.repositoryRepository = repositoryRepository;
         this.graphQlClientProvider = graphQlClientProvider;
@@ -97,10 +96,8 @@ public class GitHubMilestoneSyncService {
             return 0;
         }
 
-        String safeNameWithOwner = Objects.requireNonNullElse(
-            sanitizeForLog(repository.getNameWithOwner()),
-            "<unknown>"
-        );
+        String safeNameWithOwner =
+                Objects.requireNonNullElse(sanitizeForLog(repository.getNameWithOwner()), "<unknown>");
         Optional<RepositoryOwnerAndName> parsedName = GitHubRepositoryNameParser.parse(repository.getNameWithOwner());
         if (parsedName.isEmpty()) {
             log.warn("Skipped milestone sync: reason=invalidRepoNameFormat, repoName={}", safeNameWithOwner);
@@ -126,70 +123,55 @@ public class GitHubMilestoneSyncService {
                 pageCount++;
                 if (pageCount >= MAX_PAGINATION_PAGES) {
                     log.warn(
-                        "Reached maximum pagination limit for milestones: repoName={}, limit={}",
-                        safeNameWithOwner,
-                        MAX_PAGINATION_PAGES
-                    );
+                            "Reached maximum pagination limit for milestones: repoName={}, limit={}",
+                            safeNameWithOwner,
+                            MAX_PAGINATION_PAGES);
                     break;
                 }
 
                 final String currentCursor = cursor;
                 final int currentPage = pageCount;
-                ClientGraphQlResponse graphQlResponse = Mono.defer(() ->
-                    client
-                        .documentName(GET_MILESTONES_DOCUMENT)
-                        .variable("owner", owner)
-                        .variable("name", name)
-                        .variable(
-                            "first",
-                            adaptPageSize(LARGE_PAGE_SIZE, graphQlClientProvider.getRateLimitRemaining(scopeId))
-                        )
-                        .variable("after", currentCursor)
-                        .execute()
-                )
-                    .retryWhen(
-                        Retry.backoff(TRANSPORT_MAX_RETRIES, TRANSPORT_INITIAL_BACKOFF)
-                            .maxBackoff(TRANSPORT_MAX_BACKOFF)
-                            .jitter(JITTER_FACTOR)
-                            .filter(ScmTransportErrors::isTransportError)
-                            .doBeforeRetry(signal ->
-                                log.warn(
-                                    "Retrying milestone sync after transport error: repoName={}, page={}, attempt={}, error={}",
-                                    safeNameWithOwner,
-                                    currentPage,
-                                    signal.totalRetries() + 1,
-                                    signal.failure().getMessage()
-                                )
-                            )
-                    )
-                    .block(syncProperties.graphqlTimeout());
+                ClientGraphQlResponse graphQlResponse = Mono.defer(() -> client.documentName(GET_MILESTONES_DOCUMENT)
+                                .variable("owner", owner)
+                                .variable("name", name)
+                                .variable(
+                                        "first",
+                                        adaptPageSize(
+                                                LARGE_PAGE_SIZE, graphQlClientProvider.getRateLimitRemaining(scopeId)))
+                                .variable("after", currentCursor)
+                                .execute())
+                        .retryWhen(Retry.backoff(TRANSPORT_MAX_RETRIES, TRANSPORT_INITIAL_BACKOFF)
+                                .maxBackoff(TRANSPORT_MAX_BACKOFF)
+                                .jitter(JITTER_FACTOR)
+                                .filter(ScmTransportErrors::isTransportError)
+                                .doBeforeRetry(signal -> log.warn(
+                                        "Retrying milestone sync after transport error: repoName={}, page={}, attempt={}, error={}",
+                                        safeNameWithOwner,
+                                        currentPage,
+                                        signal.totalRetries() + 1,
+                                        signal.failure().getMessage())))
+                        .block(syncProperties.graphqlTimeout());
 
                 if (graphQlResponse == null || !graphQlResponse.isValid()) {
                     ClassificationResult classification = graphQlSyncHelper.classifyGraphQlErrors(graphQlResponse);
                     if (classification != null) {
-                        if (
-                            graphQlSyncHelper.handleGraphQlClassification(
-                                new GraphQlClassificationContext(
-                                    classification,
-                                    retryAttempt,
-                                    MAX_RETRY_ATTEMPTS,
-                                    "milestone sync",
-                                    "repoName",
-                                    safeNameWithOwner,
-                                    log
-                                )
-                            )
-                        ) {
+                        if (graphQlSyncHelper.handleGraphQlClassification(new GraphQlClassificationContext(
+                                classification,
+                                retryAttempt,
+                                MAX_RETRY_ATTEMPTS,
+                                "milestone sync",
+                                "repoName",
+                                safeNameWithOwner,
+                                log))) {
                             retryAttempt++;
                             continue;
                         }
                         break;
                     }
                     log.warn(
-                        "Received invalid GraphQL response: repoName={}, errors={}",
-                        safeNameWithOwner,
-                        graphQlResponse != null ? graphQlResponse.getErrors() : "null"
-                    );
+                            "Received invalid GraphQL response: repoName={}, errors={}",
+                            safeNameWithOwner,
+                            graphQlResponse != null ? graphQlResponse.getErrors() : "null");
                     break;
                 }
 
@@ -198,22 +180,14 @@ public class GitHubMilestoneSyncService {
 
                 // Check if we should pause due to rate limiting
                 if (graphQlClientProvider.isRateLimitCritical(scopeId)) {
-                    if (
-                        !graphQlSyncHelper.waitForRateLimitIfNeeded(
-                            scopeId,
-                            "milestone sync",
-                            "repoName",
-                            safeNameWithOwner,
-                            log
-                        )
-                    ) {
+                    if (!graphQlSyncHelper.waitForRateLimitIfNeeded(
+                            scopeId, "milestone sync", "repoName", safeNameWithOwner, log)) {
                         break;
                     }
                 }
 
-                GHMilestoneConnection response = graphQlResponse
-                    .field("repository.milestones")
-                    .toEntity(GHMilestoneConnection.class);
+                GHMilestoneConnection response =
+                        graphQlResponse.field("repository.milestones").toEntity(GHMilestoneConnection.class);
 
                 if (response == null || response.getNodes() == null) {
                     break;
@@ -246,12 +220,11 @@ public class GitHubMilestoneSyncService {
             // Raw nodes received vs milestones.totalCount (totalSynced is post-filter).
             if (reportedTotalCount >= 0) {
                 GraphQlConnectionOverflowDetector.checkPaginated(
-                    "milestones",
-                    milestonesReceived,
-                    reportedTotalCount,
-                    !syncCompletedNormally,
-                    safeNameWithOwner
-                );
+                        "milestones",
+                        milestonesReceived,
+                        reportedTotalCount,
+                        !syncCompletedNormally,
+                        safeNameWithOwner);
             }
 
             // CRITICAL: Only remove stale milestones if sync completed fully.
@@ -261,38 +234,25 @@ public class GitHubMilestoneSyncService {
                 removeDeletedMilestones(repository.getId(), syncedNumbers, context);
             } else {
                 log.warn(
-                    "Skipped stale milestone removal: reason=incompleteSync, repoName={}, pagesProcessed={}",
-                    safeNameWithOwner,
-                    pageCount
-                );
+                        "Skipped stale milestone removal: reason=incompleteSync, repoName={}, pagesProcessed={}",
+                        safeNameWithOwner,
+                        pageCount);
             }
 
             log.info(
-                "Completed milestone sync: repoName={}, milestoneCount={}, complete={}, scopeId={}",
-                safeNameWithOwner,
-                totalSynced,
-                syncCompletedNormally,
-                scopeId
-            );
+                    "Completed milestone sync: repoName={}, milestoneCount={}, complete={}, scopeId={}",
+                    safeNameWithOwner,
+                    totalSynced,
+                    syncCompletedNormally,
+                    scopeId);
             return totalSynced;
         } catch (InstallationNotFoundException e) {
             // Re-throw to abort the entire sync operation
             throw e;
         } catch (Exception e) {
             ClassificationResult classification = exceptionClassifier.classifyWithDetails(e);
-            if (
-                !graphQlSyncHelper.handleGraphQlClassification(
-                    new GraphQlClassificationContext(
-                        classification,
-                        0,
-                        MAX_RETRY_ATTEMPTS,
-                        "milestone sync",
-                        "repoName",
-                        safeNameWithOwner,
-                        log
-                    )
-                )
-            ) {
+            if (!graphQlSyncHelper.handleGraphQlClassification(new GraphQlClassificationContext(
+                    classification, 0, MAX_RETRY_ATTEMPTS, "milestone sync", "repoName", safeNameWithOwner, log))) {
                 return 0;
             }
             return 0;

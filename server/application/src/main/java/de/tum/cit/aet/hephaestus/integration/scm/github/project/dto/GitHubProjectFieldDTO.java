@@ -27,13 +27,12 @@ import tools.jackson.databind.json.JsonMapper;
 @JsonIgnoreProperties(ignoreUnknown = true)
 @Slf4j
 public record GitHubProjectFieldDTO(
-    @JsonProperty("id") String id,
-    @JsonProperty("name") String name,
-    @JsonProperty("data_type") @Nullable String dataType,
-    @JsonProperty("options") @Nullable List<Option> options,
-    @JsonProperty("created_at") @Nullable Instant createdAt,
-    @JsonProperty("updated_at") @Nullable Instant updatedAt
-) {
+        @JsonProperty("id") String id,
+        @JsonProperty("name") String name,
+        @JsonProperty("data_type") @Nullable String dataType,
+        @JsonProperty("options") @Nullable List<Option> options,
+        @JsonProperty("created_at") @Nullable Instant createdAt,
+        @JsonProperty("updated_at") @Nullable Instant updatedAt) {
     // Trivial serialization (List<Option> → JSON string column); no global mapper config needed.
     private static final ObjectMapper objectMapper = JsonMapper.builder().build();
 
@@ -42,11 +41,10 @@ public record GitHubProjectFieldDTO(
      */
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record Option(
-        @JsonProperty("id") String id,
-        @JsonProperty("name") String name,
-        @JsonProperty("color") @Nullable String color,
-        @JsonProperty("description") @Nullable String description
-    ) {}
+            @JsonProperty("id") String id,
+            @JsonProperty("name") String name,
+            @JsonProperty("color") @Nullable String color,
+            @JsonProperty("description") @Nullable String description) {}
 
     /**
      * Get the data type as an enum.
@@ -129,58 +127,47 @@ public record GitHubProjectFieldDTO(
     private static GitHubProjectFieldDTO fromBasicField(GHProjectV2Field field) {
         String dataType = field.getDataType() != null ? field.getDataType().name() : "TEXT";
         return new GitHubProjectFieldDTO(
-            field.getId(),
-            field.getName(),
-            dataType,
-            Collections.emptyList(),
-            toInstant(field.getCreatedAt()),
-            toInstant(field.getUpdatedAt())
-        );
+                field.getId(),
+                field.getName(),
+                dataType,
+                Collections.emptyList(),
+                toInstant(field.getCreatedAt()),
+                toInstant(field.getUpdatedAt()));
     }
 
     private static GitHubProjectFieldDTO fromSingleSelectField(GHProjectV2SingleSelectField field) {
         List<Option> options = Collections.emptyList();
         if (field.getOptions() != null) {
-            options = field
-                .getOptions()
-                .stream()
-                .map(opt ->
-                    new Option(
-                        opt.getId(),
-                        opt.getName(),
-                        opt.getColor() != null ? opt.getColor().name() : null,
-                        opt.getDescription()
-                    )
-                )
-                .toList();
+            options = field.getOptions().stream()
+                    .map(opt -> new Option(
+                            opt.getId(),
+                            opt.getName(),
+                            opt.getColor() != null ? opt.getColor().name() : null,
+                            opt.getDescription()))
+                    .toList();
         }
         return new GitHubProjectFieldDTO(
-            field.getId(),
-            field.getName(),
-            "SINGLE_SELECT",
-            options,
-            toInstant(field.getCreatedAt()),
-            toInstant(field.getUpdatedAt())
-        );
+                field.getId(),
+                field.getName(),
+                "SINGLE_SELECT",
+                options,
+                toInstant(field.getCreatedAt()),
+                toInstant(field.getUpdatedAt()));
     }
 
     private static GitHubProjectFieldDTO fromIterationField(GHProjectV2IterationField field) {
         List<Option> options = Collections.emptyList();
         if (field.getConfiguration() != null && field.getConfiguration().getIterations() != null) {
-            options = field
-                .getConfiguration()
-                .getIterations()
-                .stream()
-                .map(iter -> new Option(iter.getId(), iter.getTitle(), null, null))
-                .toList();
+            options = field.getConfiguration().getIterations().stream()
+                    .map(iter -> new Option(iter.getId(), iter.getTitle(), null, null))
+                    .toList();
         }
         return new GitHubProjectFieldDTO(
-            field.getId(),
-            field.getName(),
-            "ITERATION",
-            options,
-            toInstant(field.getCreatedAt()),
-            toInstant(field.getUpdatedAt())
-        );
+                field.getId(),
+                field.getName(),
+                "ITERATION",
+                options,
+                toInstant(field.getCreatedAt()),
+                toInstant(field.getUpdatedAt()));
     }
 }

@@ -103,11 +103,10 @@ class OutlineDocumentSyncIntegrationTest extends BaseIntegrationTest {
         workspaceId = workspace.getId();
 
         Connection connection = new Connection(
-            workspace,
-            IntegrationKind.OUTLINE,
-            "team-1",
-            new ConnectionConfig.OutlineConfig(SERVER_URL, null, null, Set.of())
-        );
+                workspace,
+                IntegrationKind.OUTLINE,
+                "team-1",
+                new ConnectionConfig.OutlineConfig(SERVER_URL, null, null, Set.of()));
         connection.setCredentials(new BearerToken("outline-token", null), credentialConverter);
         connection.setState(IntegrationState.ACTIVE);
         connectionId = connectionRepository.save(connection).getId();
@@ -122,41 +121,41 @@ class OutlineDocumentSyncIntegrationTest extends BaseIntegrationTest {
 
         // The registered collection is visible to the token unless a test says otherwise.
         lenient()
-            .when(outlineApiClient.listCollections(anyString(), anyString()))
-            .thenReturn(
-                List.of(OutlineClientModels.collection(COLLECTION_ID, "Design", "col1", null, null, "Design docs"))
-            );
-        lenient().when(outlineApiClient.exportDocument(anyString(), anyString(), eq(DOC_ONE))).thenReturn("# Alpha");
-        lenient().when(outlineApiClient.exportDocument(anyString(), anyString(), eq(DOC_TWO))).thenReturn("# Beta");
+                .when(outlineApiClient.listCollections(anyString(), anyString()))
+                .thenReturn(List.of(
+                        OutlineClientModels.collection(COLLECTION_ID, "Design", "col1", null, null, "Design docs")));
+        lenient()
+                .when(outlineApiClient.exportDocument(anyString(), anyString(), eq(DOC_ONE)))
+                .thenReturn("# Alpha");
+        lenient()
+                .when(outlineApiClient.exportDocument(anyString(), anyString(), eq(DOC_TWO)))
+                .thenReturn("# Beta");
     }
 
     private void stubCollection(List<String> docIds, Instant docOneUpdatedAt, Instant docTwoUpdatedAt) {
-        List<OutlineNavigationNode> tree = docIds
-            .stream()
-            .map(id -> OutlineClientModels.node(id, id.toUpperCase(java.util.Locale.ROOT), "/doc/" + id, List.of()))
-            .toList();
-        when(outlineApiClient.listCollectionDocuments(anyString(), anyString(), eq(COLLECTION_ID))).thenReturn(tree);
+        List<OutlineNavigationNode> tree = docIds.stream()
+                .map(id -> OutlineClientModels.node(id, id.toUpperCase(java.util.Locale.ROOT), "/doc/" + id, List.of()))
+                .toList();
+        when(outlineApiClient.listCollectionDocuments(anyString(), anyString(), eq(COLLECTION_ID)))
+                .thenReturn(tree);
 
-        List<OutlineDocumentModel> metas = docIds
-            .stream()
-            .map(id ->
-                OutlineClientModels.document(
-                    id,
-                    "/doc/" + id,
-                    id,
-                    T0,
-                    id.equals(DOC_ONE) ? docOneUpdatedAt : docTwoUpdatedAt,
-                    id,
-                    null,
-                    COLLECTION_ID,
-                    AUTHOR,
-                    AUTHOR,
-                    List.of("user-1", "user-2"),
-                    null
-                )
-            )
-            .toList();
-        when(outlineApiClient.listDocuments(anyString(), anyString(), eq(COLLECTION_ID))).thenReturn(metas);
+        List<OutlineDocumentModel> metas = docIds.stream()
+                .map(id -> OutlineClientModels.document(
+                        id,
+                        "/doc/" + id,
+                        id,
+                        T0,
+                        id.equals(DOC_ONE) ? docOneUpdatedAt : docTwoUpdatedAt,
+                        id,
+                        null,
+                        COLLECTION_ID,
+                        AUTHOR,
+                        AUTHOR,
+                        List.of("user-1", "user-2"),
+                        null))
+                .toList();
+        when(outlineApiClient.listDocuments(anyString(), anyString(), eq(COLLECTION_ID)))
+                .thenReturn(metas);
     }
 
     @Test
@@ -201,7 +200,8 @@ class OutlineDocumentSyncIntegrationTest extends BaseIntegrationTest {
 
         // doc-2's updatedAt moves; doc-1 stays put.
         stubCollection(List.of(DOC_ONE, DOC_TWO), T1, T2);
-        when(outlineApiClient.exportDocument(anyString(), anyString(), eq(DOC_TWO))).thenReturn("# Beta v2");
+        when(outlineApiClient.exportDocument(anyString(), anyString(), eq(DOC_TWO)))
+                .thenReturn("# Beta v2");
 
         scheduler.syncAllNow();
 
@@ -248,24 +248,20 @@ class OutlineDocumentSyncIntegrationTest extends BaseIntegrationTest {
         // listArchivedDocuments — the second per-collection call the reconcile makes.
         stubCollection(List.of(DOC_ONE), T1, T1);
         Instant archivedAt = Instant.parse("2026-03-01T00:00:00Z");
-        when(outlineApiClient.listArchivedDocuments(anyString(), anyString(), eq(COLLECTION_ID))).thenReturn(
-            List.of(
-                OutlineClientModels.document(
-                    DOC_TWO,
-                    "/doc/" + DOC_TWO,
-                    DOC_TWO.toUpperCase(java.util.Locale.ROOT),
-                    T0,
-                    T1,
-                    DOC_TWO,
-                    null,
-                    COLLECTION_ID,
-                    AUTHOR,
-                    AUTHOR,
-                    List.of("user-1"),
-                    archivedAt
-                )
-            )
-        );
+        when(outlineApiClient.listArchivedDocuments(anyString(), anyString(), eq(COLLECTION_ID)))
+                .thenReturn(List.of(OutlineClientModels.document(
+                        DOC_TWO,
+                        "/doc/" + DOC_TWO,
+                        DOC_TWO.toUpperCase(java.util.Locale.ROOT),
+                        T0,
+                        T1,
+                        DOC_TWO,
+                        null,
+                        COLLECTION_ID,
+                        AUTHOR,
+                        AUTHOR,
+                        List.of("user-1"),
+                        archivedAt)));
 
         scheduler.syncAllNow();
 
@@ -307,7 +303,8 @@ class OutlineDocumentSyncIntegrationTest extends BaseIntegrationTest {
 
         // Upstream change → re-export brings the body back and clears the eviction marker.
         stubCollection(List.of(DOC_ONE), T2, T2);
-        when(outlineApiClient.exportDocument(anyString(), anyString(), eq(DOC_ONE))).thenReturn("# Alpha v2");
+        when(outlineApiClient.exportDocument(anyString(), anyString(), eq(DOC_ONE)))
+                .thenReturn("# Alpha v2");
         scheduler.syncAllNow();
 
         OutlineDocument reExported = documentById(DOC_ONE);
@@ -348,7 +345,8 @@ class OutlineDocumentSyncIntegrationTest extends BaseIntegrationTest {
 
         // A real re-export (upstream updatedAt moves) is a full-column save — the version must advance.
         stubCollection(List.of(DOC_ONE), T2, T2);
-        when(outlineApiClient.exportDocument(anyString(), anyString(), eq(DOC_ONE))).thenReturn("# Alpha v2");
+        when(outlineApiClient.exportDocument(anyString(), anyString(), eq(DOC_ONE)))
+                .thenReturn("# Alpha v2");
         scheduler.syncAllNow();
         assertThat(documentById(DOC_ONE).getVersion()).isGreaterThan(0L);
 
@@ -363,9 +361,8 @@ class OutlineDocumentSyncIntegrationTest extends BaseIntegrationTest {
         documentRepository.saveAndFlush(winner);
 
         staleSnapshot.setTitle("stale writer's title");
-        assertThatThrownBy(() -> documentRepository.saveAndFlush(staleSnapshot)).isInstanceOf(
-            ObjectOptimisticLockingFailureException.class
-        );
+        assertThatThrownBy(() -> documentRepository.saveAndFlush(staleSnapshot))
+                .isInstanceOf(ObjectOptimisticLockingFailureException.class);
 
         // The winner's write survived; the stale write was rejected, not silently merged.
         assertThat(documentById(DOC_ONE).getBodyMarkdown()).isEqualTo("# concurrent winner");
@@ -378,19 +375,16 @@ class OutlineDocumentSyncIntegrationTest extends BaseIntegrationTest {
     }
 
     private OutlineDocument documentById(String documentId) {
-        return mirroredRows()
-            .stream()
-            .filter(d -> d.getDocumentId().equals(documentId))
-            .findFirst()
-            .orElseThrow(() -> new AssertionError("No mirrored row for " + documentId));
+        return mirroredRows().stream()
+                .filter(d -> d.getDocumentId().equals(documentId))
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("No mirrored row for " + documentId));
     }
 
     /** This install's mirrored rows, bodies included — the full-entity read the assertions need. */
     private List<OutlineDocument> mirroredRows() {
-        return documentRepository
-            .findAll()
-            .stream()
-            .filter(d -> d.getWorkspaceId() == workspaceId && d.getConnectionId() == connectionId)
-            .toList();
+        return documentRepository.findAll().stream()
+                .filter(d -> d.getWorkspaceId() == workspaceId && d.getConnectionId() == connectionId)
+                .toList();
     }
 }

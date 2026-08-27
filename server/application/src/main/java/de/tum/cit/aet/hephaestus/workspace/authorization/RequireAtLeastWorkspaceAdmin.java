@@ -17,7 +17,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
  *  public ResponseEntity<Void> someAdminEndpoint() { ... }
  * </pre>
  */
-@Target({ ElementType.METHOD, ElementType.TYPE })
+@Target({ElementType.METHOD, ElementType.TYPE})
 @Retention(RetentionPolicy.RUNTIME)
 @Documented
 @PreAuthorize("@workspaceSecure.isAdmin()")

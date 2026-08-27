@@ -91,20 +91,19 @@ class GitLabMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
         @Test
         void shouldCreateNewMilestone() {
             GitLabMilestoneDTO dto = new GitLabMilestoneDTO(
-                18066L,
-                2,
-                "v2.0.0",
-                "Second major release",
-                "active",
-                "2026-06-01",
-                "/hephaestustest/demo-repository/-/milestones/2",
-                null,
-                false,
-                3,
-                10,
-                "2026-01-31T18:27:14Z",
-                "2026-01-31T18:27:14Z"
-            );
+                    18066L,
+                    2,
+                    "v2.0.0",
+                    "Second major release",
+                    "active",
+                    "2026-06-01",
+                    "/hephaestustest/demo-repository/-/milestones/2",
+                    null,
+                    false,
+                    3,
+                    10,
+                    "2026-01-31T18:27:14Z",
+                    "2026-01-31T18:27:14Z");
 
             Milestone result = milestoneProcessor.process(dto, testRepository, testContext());
 
@@ -114,17 +113,20 @@ class GitLabMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
             assertThat(result.getTitle()).isEqualTo("v2.0.0");
             assertThat(result.getDescription()).isEqualTo("Second major release");
             assertThat(result.getState()).isEqualTo(Milestone.State.OPEN);
-            assertThat(result.getDueOn()).isEqualTo(LocalDate.of(2026, 6, 1).atStartOfDay(ZoneOffset.UTC).toInstant());
-            assertThat(result.getHtmlUrl()).isEqualTo(
-                "https://gitlab.lrz.de/hephaestustest/demo-repository/-/milestones/2"
-            );
+            assertThat(result.getDueOn())
+                    .isEqualTo(LocalDate.of(2026, 6, 1)
+                            .atStartOfDay(ZoneOffset.UTC)
+                            .toInstant());
+            assertThat(result.getHtmlUrl())
+                    .isEqualTo("https://gitlab.lrz.de/hephaestustest/demo-repository/-/milestones/2");
             assertThat(result.getOpenIssuesCount()).isEqualTo(7);
             assertThat(result.getClosedIssuesCount()).isEqualTo(3);
             assertThat(result.getCreatedAt()).isNotNull();
             assertThat(result.getUpdatedAt()).isNotNull();
             assertThat(result.getLastSyncAt()).isNotNull();
 
-            assertThat(eventListener.ofType(ScmDomainEvent.MilestoneCreated.class)).hasSize(1);
+            assertThat(eventListener.ofType(ScmDomainEvent.MilestoneCreated.class))
+                    .hasSize(1);
         }
 
         @Test
@@ -140,20 +142,19 @@ class GitLabMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
         @Test
         void shouldMapClosedStateToClosed() {
             GitLabMilestoneDTO dto = new GitLabMilestoneDTO(
-                18066L,
-                2,
-                "v2.0.0",
-                null,
-                "closed",
-                null,
-                null,
-                null,
-                false,
-                null,
-                null,
-                "2026-01-31T18:27:14Z",
-                "2026-01-31T18:27:16Z"
-            );
+                    18066L,
+                    2,
+                    "v2.0.0",
+                    null,
+                    "closed",
+                    null,
+                    null,
+                    null,
+                    false,
+                    null,
+                    null,
+                    "2026-01-31T18:27:14Z",
+                    "2026-01-31T18:27:16Z");
 
             Milestone result = milestoneProcessor.process(dto, testRepository, testContext());
 
@@ -167,38 +168,36 @@ class GitLabMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
         void shouldClearClosedAtOnReopen() {
             // Create as closed
             GitLabMilestoneDTO closedDto = new GitLabMilestoneDTO(
-                18066L,
-                2,
-                "v2.0.0",
-                null,
-                "closed",
-                null,
-                null,
-                null,
-                false,
-                null,
-                null,
-                "2026-01-31T18:27:14Z",
-                "2026-01-31T18:27:16Z"
-            );
+                    18066L,
+                    2,
+                    "v2.0.0",
+                    null,
+                    "closed",
+                    null,
+                    null,
+                    null,
+                    false,
+                    null,
+                    null,
+                    "2026-01-31T18:27:14Z",
+                    "2026-01-31T18:27:16Z");
             milestoneProcessor.process(closedDto, testRepository, testContext());
 
             // Reopen
             GitLabMilestoneDTO reopenDto = new GitLabMilestoneDTO(
-                18066L,
-                2,
-                "v2.0.0",
-                null,
-                "active",
-                null,
-                null,
-                null,
-                false,
-                null,
-                null,
-                "2026-01-31T18:27:14Z",
-                "2026-01-31T18:27:19Z"
-            );
+                    18066L,
+                    2,
+                    "v2.0.0",
+                    null,
+                    "active",
+                    null,
+                    null,
+                    null,
+                    false,
+                    null,
+                    null,
+                    "2026-01-31T18:27:14Z",
+                    "2026-01-31T18:27:19Z");
             Milestone result = milestoneProcessor.process(reopenDto, testRepository, testContext());
 
             assertThat(result).isNotNull();
@@ -215,31 +214,33 @@ class GitLabMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
 
             // Update
             GitLabMilestoneDTO updateDto = new GitLabMilestoneDTO(
-                18066L,
-                2,
-                "v2.0.0 - Updated",
-                "Updated description",
-                "active",
-                "2026-12-31",
-                null,
-                null,
-                false,
-                null,
-                null,
-                "2026-01-31T18:27:14Z",
-                "2026-02-15T10:00:00Z"
-            );
+                    18066L,
+                    2,
+                    "v2.0.0 - Updated",
+                    "Updated description",
+                    "active",
+                    "2026-12-31",
+                    null,
+                    null,
+                    false,
+                    null,
+                    null,
+                    "2026-01-31T18:27:14Z",
+                    "2026-02-15T10:00:00Z");
             Milestone result = milestoneProcessor.process(updateDto, testRepository, testContext());
 
             assertThat(result).isNotNull();
             assertThat(result.getTitle()).isEqualTo("v2.0.0 - Updated");
             assertThat(result.getDescription()).isEqualTo("Updated description");
-            assertThat(result.getDueOn()).isEqualTo(
-                LocalDate.of(2026, 12, 31).atStartOfDay(ZoneOffset.UTC).toInstant()
-            );
+            assertThat(result.getDueOn())
+                    .isEqualTo(LocalDate.of(2026, 12, 31)
+                            .atStartOfDay(ZoneOffset.UTC)
+                            .toInstant());
 
-            assertThat(eventListener.ofType(ScmDomainEvent.MilestoneUpdated.class)).hasSize(1);
-            assertThat(milestoneRepository.findAllByRepository_Id(testRepository.getId())).hasSize(1);
+            assertThat(eventListener.ofType(ScmDomainEvent.MilestoneUpdated.class))
+                    .hasSize(1);
+            assertThat(milestoneRepository.findAllByRepository_Id(testRepository.getId()))
+                    .hasSize(1);
         }
 
         @Test
@@ -250,26 +251,26 @@ class GitLabMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
             milestoneProcessor.process(dto, testRepository, testContext());
             milestoneProcessor.process(dto, testRepository, testContext());
 
-            assertThat(milestoneRepository.findAllByRepository_Id(testRepository.getId())).hasSize(1);
+            assertThat(milestoneRepository.findAllByRepository_Id(testRepository.getId()))
+                    .hasSize(1);
         }
 
         @Test
         void shouldUseDeterministicIdForGroupMilestone() {
             GitLabMilestoneDTO dto = new GitLabMilestoneDTO(
-                99999L,
-                5,
-                "Group Milestone",
-                "Inherited",
-                "active",
-                null,
-                null,
-                null,
-                true,
-                null,
-                null,
-                null,
-                null
-            );
+                    99999L,
+                    5,
+                    "Group Milestone",
+                    "Inherited",
+                    "active",
+                    null,
+                    null,
+                    null,
+                    true,
+                    null,
+                    null,
+                    null,
+                    null);
 
             Milestone result = milestoneProcessor.process(dto, testRepository, testContext());
 
@@ -281,77 +282,63 @@ class GitLabMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
         @Test
         void shouldConstructHtmlUrlFromWebPath() {
             GitLabMilestoneDTO dto = new GitLabMilestoneDTO(
-                18066L,
-                2,
-                "v2.0.0",
-                null,
-                "active",
-                null,
-                "/hephaestustest/demo-repository/-/milestones/2",
-                null,
-                false,
-                null,
-                null,
-                null,
-                null
-            );
+                    18066L,
+                    2,
+                    "v2.0.0",
+                    null,
+                    "active",
+                    null,
+                    "/hephaestustest/demo-repository/-/milestones/2",
+                    null,
+                    false,
+                    null,
+                    null,
+                    null,
+                    null);
 
             Milestone result = milestoneProcessor.process(dto, testRepository, testContext());
 
             assertThat(result).isNotNull();
-            assertThat(result.getHtmlUrl()).isEqualTo(
-                "https://gitlab.lrz.de/hephaestustest/demo-repository/-/milestones/2"
-            );
+            assertThat(result.getHtmlUrl())
+                    .isEqualTo("https://gitlab.lrz.de/hephaestustest/demo-repository/-/milestones/2");
         }
 
         @Test
         void shouldConstructHtmlUrlFromProjectWebUrl() {
             GitLabMilestoneDTO dto = new GitLabMilestoneDTO(
-                18066L,
-                2,
-                "v2.0.0",
-                null,
-                "active",
-                null,
-                null,
-                "https://gitlab.lrz.de/hephaestustest/demo-repository",
-                false,
-                null,
-                null,
-                null,
-                null
-            );
+                    18066L,
+                    2,
+                    "v2.0.0",
+                    null,
+                    "active",
+                    null,
+                    null,
+                    "https://gitlab.lrz.de/hephaestustest/demo-repository",
+                    false,
+                    null,
+                    null,
+                    null,
+                    null);
 
             Milestone result = milestoneProcessor.process(dto, testRepository, testContext());
 
             assertThat(result).isNotNull();
-            assertThat(result.getHtmlUrl()).isEqualTo(
-                "https://gitlab.lrz.de/hephaestustest/demo-repository/-/milestones/2"
-            );
+            assertThat(result.getHtmlUrl())
+                    .isEqualTo("https://gitlab.lrz.de/hephaestustest/demo-repository/-/milestones/2");
         }
 
         @Test
         void shouldParseDueDate() {
             GitLabMilestoneDTO dto = new GitLabMilestoneDTO(
-                18066L,
-                2,
-                "v2.0.0",
-                null,
-                "active",
-                "2026-06-01",
-                null,
-                null,
-                false,
-                null,
-                null,
-                null,
-                null
-            );
+                    18066L, 2, "v2.0.0", null, "active", "2026-06-01", null, null, false, null, null, null, null);
 
             Milestone result = milestoneProcessor.process(dto, testRepository, testContext());
 
             assertThat(result).isNotNull();
-            assertThat(result.getDueOn()).isEqualTo(LocalDate.of(2026, 6, 1).atStartOfDay(ZoneOffset.UTC).toInstant());
+            assertThat(result.getDueOn())
+                    .isEqualTo(LocalDate.of(2026, 6, 1)
+                            .atStartOfDay(ZoneOffset.UTC)
+                            .toInstant());
         }
 
         @Test
@@ -367,20 +354,7 @@ class GitLabMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
         @Test
         void shouldHandleNullDueDate() {
             GitLabMilestoneDTO dto = new GitLabMilestoneDTO(
-                18066L,
-                2,
-                "v2.0.0",
-                null,
-                "active",
-                null,
-                null,
-                null,
-                false,
-                null,
-                null,
-                null,
-                null
-            );
+                    18066L, 2, "v2.0.0", null, "active", null, null, null, false, null, null, null, null);
 
             Milestone result = milestoneProcessor.process(dto, testRepository, testContext());
 
@@ -393,26 +367,14 @@ class GitLabMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
             Milestone result = milestoneProcessor.process(null, testRepository, testContext());
 
             assertThat(result).isNull();
-            assertThat(eventListener.ofType(ScmDomainEvent.MilestoneCreated.class)).isEmpty();
+            assertThat(eventListener.ofType(ScmDomainEvent.MilestoneCreated.class))
+                    .isEmpty();
         }
 
         @Test
         void shouldReturnNullForInvalidIid() {
             GitLabMilestoneDTO dto = new GitLabMilestoneDTO(
-                18066L,
-                0,
-                "Invalid",
-                null,
-                "active",
-                null,
-                null,
-                null,
-                false,
-                null,
-                null,
-                null,
-                null
-            );
+                    18066L, 0, "Invalid", null, "active", null, null, null, false, null, null, null, null);
 
             Milestone result = milestoneProcessor.process(dto, testRepository, testContext());
 
@@ -422,20 +384,7 @@ class GitLabMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
         @Test
         void shouldDefaultToOpenForNullState() {
             GitLabMilestoneDTO dto = new GitLabMilestoneDTO(
-                18066L,
-                2,
-                "v2.0.0",
-                null,
-                null,
-                null,
-                null,
-                null,
-                false,
-                null,
-                null,
-                null,
-                null
-            );
+                    18066L, 2, "v2.0.0", null, null, null, null, null, false, null, null, null, null);
 
             Milestone result = milestoneProcessor.process(dto, testRepository, testContext());
 
@@ -449,72 +398,60 @@ class GitLabMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
 
         @Test
         void shouldFanOutGroupMilestoneToEveryRepoWhenProcessingOncePerRepo() {
-            Repository secondRepo = createRepository(
-                246766L,
-                "other-repository",
-                FIXTURE_ORG_LOGIN + "/other-repository"
-            );
+            Repository secondRepo =
+                    createRepository(246766L, "other-repository", FIXTURE_ORG_LOGIN + "/other-repository");
 
             GitLabMilestoneDTO groupDto = new GitLabMilestoneDTO(
-                42_000L,
-                7,
-                "Sprint 7",
-                "Group-wide sprint",
-                "active",
-                "2026-06-30",
-                "/hephaestustest/-/milestones/7",
-                null,
-                true,
-                0,
-                0,
-                "2026-01-10T10:00:00Z",
-                "2026-01-10T10:00:00Z"
-            );
+                    42_000L,
+                    7,
+                    "Sprint 7",
+                    "Group-wide sprint",
+                    "active",
+                    "2026-06-30",
+                    "/hephaestustest/-/milestones/7",
+                    null,
+                    true,
+                    0,
+                    0,
+                    "2026-01-10T10:00:00Z",
+                    "2026-01-10T10:00:00Z");
 
             Milestone first = milestoneProcessor.process(groupDto, testRepository, testContext());
             Milestone second = milestoneProcessor.process(
-                groupDto,
-                secondRepo,
-                ProcessingContext.forSync(testWorkspace.getId(), secondRepo)
-            );
+                    groupDto, secondRepo, ProcessingContext.forSync(testWorkspace.getId(), secondRepo));
 
             assertThat(first).isNotNull();
             assertThat(second).isNotNull();
             assertThat(first.getId()).isNotEqualTo(second.getId());
-            assertThat(milestoneRepository.findAllByRepository_Id(testRepository.getId())).hasSize(1);
-            assertThat(milestoneRepository.findAllByRepository_Id(secondRepo.getId())).hasSize(1);
+            assertThat(milestoneRepository.findAllByRepository_Id(testRepository.getId()))
+                    .hasSize(1);
+            assertThat(milestoneRepository.findAllByRepository_Id(secondRepo.getId()))
+                    .hasSize(1);
         }
 
         @Test
         void shouldUseDistinctNegativeNativeIdsWhenFanningOutSameGroupMilestone() {
-            Repository secondRepo = createRepository(
-                246767L,
-                "third-repository",
-                FIXTURE_ORG_LOGIN + "/third-repository"
-            );
+            Repository secondRepo =
+                    createRepository(246767L, "third-repository", FIXTURE_ORG_LOGIN + "/third-repository");
 
             GitLabMilestoneDTO groupDto = new GitLabMilestoneDTO(
-                42_001L,
-                8,
-                "Sprint 8",
-                null,
-                "active",
-                null,
-                null,
-                null,
-                true,
-                null,
-                null,
-                "2026-02-01T10:00:00Z",
-                "2026-02-01T10:00:00Z"
-            );
+                    42_001L,
+                    8,
+                    "Sprint 8",
+                    null,
+                    "active",
+                    null,
+                    null,
+                    null,
+                    true,
+                    null,
+                    null,
+                    "2026-02-01T10:00:00Z",
+                    "2026-02-01T10:00:00Z");
 
             Milestone first = milestoneProcessor.process(groupDto, testRepository, testContext());
             Milestone second = milestoneProcessor.process(
-                groupDto,
-                secondRepo,
-                ProcessingContext.forSync(testWorkspace.getId(), secondRepo)
-            );
+                    groupDto, secondRepo, ProcessingContext.forSync(testWorkspace.getId(), secondRepo));
 
             // Both rows must carry the shared iid …
             assertNotNull(first);
@@ -532,26 +469,28 @@ class GitLabMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
             // Gap 4 notes that description, due_on, and closed_at were NULL on most rows.
             // Verify all three survive the fan-out path.
             GitLabMilestoneDTO groupDto = new GitLabMilestoneDTO(
-                42_002L,
-                9,
-                "Sprint 9",
-                "End-of-quarter milestone",
-                "closed",
-                "2026-03-31",
-                "/hephaestustest/-/milestones/9",
-                null,
-                true,
-                5,
-                5,
-                "2026-03-01T10:00:00Z",
-                "2026-03-30T23:59:59Z"
-            );
+                    42_002L,
+                    9,
+                    "Sprint 9",
+                    "End-of-quarter milestone",
+                    "closed",
+                    "2026-03-31",
+                    "/hephaestustest/-/milestones/9",
+                    null,
+                    true,
+                    5,
+                    5,
+                    "2026-03-01T10:00:00Z",
+                    "2026-03-30T23:59:59Z");
 
             Milestone result = milestoneProcessor.process(groupDto, testRepository, testContext());
 
             assertThat(result).isNotNull();
             assertThat(result.getDescription()).isEqualTo("End-of-quarter milestone");
-            assertThat(result.getDueOn()).isEqualTo(LocalDate.of(2026, 3, 31).atStartOfDay(ZoneOffset.UTC).toInstant());
+            assertThat(result.getDueOn())
+                    .isEqualTo(LocalDate.of(2026, 3, 31)
+                            .atStartOfDay(ZoneOffset.UTC)
+                            .toInstant());
             assertThat(result.getState()).isEqualTo(Milestone.State.CLOSED);
             // closed_at is approximated from updatedAt on first transition to CLOSED — must not be null.
             assertThat(result.getClosedAt()).isNotNull();
@@ -559,8 +498,8 @@ class GitLabMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
 
         private Repository createRepository(long nativeId, String name, String fullName) {
             Organization org = organizationRepository
-                .findByLoginIgnoreCaseAndProvider_Type(FIXTURE_ORG_LOGIN, IdentityProviderType.GITLAB)
-                .orElseThrow(() -> new IllegalStateException("Test org not found"));
+                    .findByLoginIgnoreCaseAndProvider_Type(FIXTURE_ORG_LOGIN, IdentityProviderType.GITLAB)
+                    .orElseThrow(() -> new IllegalStateException("Test org not found"));
 
             Repository repo = new Repository();
             repo.setNativeId(nativeId);
@@ -592,7 +531,8 @@ class GitLabMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
             milestoneProcessor.delete(milestone.getId(), testContext());
 
             assertThat(milestoneRepository.findById(milestone.getId())).isEmpty();
-            assertThat(eventListener.ofType(ScmDomainEvent.MilestoneDeleted.class)).hasSize(1);
+            assertThat(eventListener.ofType(ScmDomainEvent.MilestoneDeleted.class))
+                    .hasSize(1);
         }
 
         @Test
@@ -603,7 +543,8 @@ class GitLabMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
         @Test
         void shouldHandleNonExistentMilestone() {
             milestoneProcessor.delete(-999L, testContext());
-            assertThat(eventListener.ofType(ScmDomainEvent.MilestoneDeleted.class)).isEmpty();
+            assertThat(eventListener.ofType(ScmDomainEvent.MilestoneDeleted.class))
+                    .isEmpty();
         }
     }
 
@@ -611,30 +552,16 @@ class GitLabMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
 
     private GitLabMilestoneDTO createDto(int iid, String state) {
         return new GitLabMilestoneDTO(
-            18066L,
-            iid,
-            "v2.0.0",
-            null,
-            state,
-            null,
-            null,
-            null,
-            false,
-            null,
-            null,
-            null,
-            null
-        );
+                18066L, iid, "v2.0.0", null, state, null, null, null, false, null, null, null, null);
     }
 
     // Test Data Setup
 
     private void setupTestData() {
         gitlabProvider = gitProviderRepository
-            .findByTypeAndServerUrl(IdentityProviderType.GITLAB, "https://gitlab.lrz.de")
-            .orElseGet(() ->
-                gitProviderRepository.save(new IdentityProvider(IdentityProviderType.GITLAB, "https://gitlab.lrz.de"))
-            );
+                .findByTypeAndServerUrl(IdentityProviderType.GITLAB, "https://gitlab.lrz.de")
+                .orElseGet(() -> gitProviderRepository.save(
+                        new IdentityProvider(IdentityProviderType.GITLAB, "https://gitlab.lrz.de")));
 
         Organization org = new Organization();
         org.setNativeId(1L);

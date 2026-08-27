@@ -69,13 +69,12 @@ public final class MentorRunnerClient implements AutoCloseable {
     private Disposable subscription;
 
     public MentorRunnerClient(
-        AttachedSandbox sandbox,
-        ObjectMapper objectMapper,
-        Consumer<JsonNode> onEvent,
-        Function<FetchContextRequest, JsonNode> fetchContextHandler,
-        ScheduledExecutorService timeoutScheduler,
-        UUID boundThreadId
-    ) {
+            AttachedSandbox sandbox,
+            ObjectMapper objectMapper,
+            Consumer<JsonNode> onEvent,
+            Function<FetchContextRequest, JsonNode> fetchContextHandler,
+            ScheduledExecutorService timeoutScheduler,
+            UUID boundThreadId) {
         this.sandbox = Objects.requireNonNull(sandbox, "sandbox");
         this.objectMapper = Objects.requireNonNull(objectMapper, "objectMapper");
         this.onEvent = Objects.requireNonNull(onEvent, "onEvent");
@@ -152,17 +151,15 @@ public final class MentorRunnerClient implements AutoCloseable {
         long id = idGen.incrementAndGet();
         CompletableFuture<JsonNode> future = new CompletableFuture<>();
         ScheduledFuture<?> timeoutTask = timeoutScheduler.schedule(
-            () -> {
-                PendingCall removed = pending.remove(id);
-                if (removed != null) {
-                    removed.future.completeExceptionally(
-                        new MentorRunnerTimeoutException("Runner did not respond to " + method + " within " + timeout)
-                    );
-                }
-            },
-            timeout.toMillis(),
-            TimeUnit.MILLISECONDS
-        );
+                () -> {
+                    PendingCall removed = pending.remove(id);
+                    if (removed != null) {
+                        removed.future.completeExceptionally(new MentorRunnerTimeoutException(
+                                "Runner did not respond to " + method + " within " + timeout));
+                    }
+                },
+                timeout.toMillis(),
+                TimeUnit.MILLISECONDS);
         pending.put(id, new PendingCall(future, timeoutTask, method));
 
         ObjectNode frame = objectMapper.createObjectNode();

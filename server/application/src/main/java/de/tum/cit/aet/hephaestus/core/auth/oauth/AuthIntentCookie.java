@@ -68,12 +68,11 @@ public class AuthIntentCookie {
      * existed deserializes with {@code issuedAt == 0L} and is rejected as stale.
      */
     public record Intent(
-        @Nullable String workspaceSlug,
-        @Nullable String returnTo,
-        Mode mode,
-        @Nullable Long linkingAccountId,
-        long issuedAt
-    ) {
+            @Nullable String workspaceSlug,
+            @Nullable String returnTo,
+            Mode mode,
+            @Nullable Long linkingAccountId,
+            long issuedAt) {
         public enum Mode {
             /** Fresh login — JIT-create Account on first IdP subject we've never seen. */
             LOGIN,

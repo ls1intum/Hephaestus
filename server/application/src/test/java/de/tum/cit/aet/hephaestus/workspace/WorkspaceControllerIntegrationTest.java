@@ -68,24 +68,24 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
         var request = new CreateWorkspaceRequestDTO("INVALID SLUG", "", "", null, null, null, null, null);
 
         ProblemDetail problem = webTestClient
-            .post()
-            .uri("/workspaces")
-            .headers(TestAuthUtils.withCurrentUser())
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(request)
-            .exchange()
-            .expectStatus()
-            .isBadRequest()
-            .expectBody(ProblemDetail.class)
-            .returnResult()
-            .getResponseBody();
+                .post()
+                .uri("/workspaces")
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(request)
+                .exchange()
+                .expectStatus()
+                .isBadRequest()
+                .expectBody(ProblemDetail.class)
+                .returnResult()
+                .getResponseBody();
 
         assertThat(problem).isNotNull();
         assertThat(problem.getTitle()).isEqualTo("Validation failed");
         assertNotNull(problem.getProperties());
         assertThat(problem.getProperties().get("errors"))
-            .asInstanceOf(InstanceOfAssertFactories.map(String.class, Object.class))
-            .containsKeys("workspaceSlug", "displayName", "accountLogin", "accountType");
+                .asInstanceOf(InstanceOfAssertFactories.map(String.class, Object.class))
+                .containsKeys("workspaceSlug", "displayName", "accountLogin", "accountType");
     }
 
     @Test
@@ -93,27 +93,26 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
         User owner = persistUser("unauthenticated-owner");
 
         var request = new CreateWorkspaceRequestDTO(
-            "unauthenticated",
-            "Unauthenticated",
-            "unauthenticated",
-            AccountType.ORG,
-            owner.getId(),
-            null,
-            null,
-            null
-        );
+                "unauthenticated",
+                "Unauthenticated",
+                "unauthenticated",
+                AccountType.ORG,
+                owner.getId(),
+                null,
+                null,
+                null);
 
         // Anonymous state-changing request: the double-submit CSRF gate (ADR 0017) rejects it 403
         // before authentication runs (no X-XSRF-TOKEN). The mutation is still blocked for anonymous
         // callers; dedicated CSRF + cookie-auth coverage lives in CsrfProtectionIntegrationTest.
         webTestClient
-            .post()
-            .uri("/workspaces")
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(request)
-            .exchange()
-            .expectStatus()
-            .isForbidden();
+                .post()
+                .uri("/workspaces")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(request)
+                .exchange()
+                .expectStatus()
+                .isForbidden();
 
         assertThat(workspaceRepository.count()).isZero();
     }
@@ -124,25 +123,24 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
         User owner = persistUser("mentor");
 
         var request = new CreateWorkspaceRequestDTO(
-            "mentor-space",
-            "Mentor Space",
-            "mentor-org",
-            AccountType.ORG,
-            owner.getId(),
-            IntegrationKind.GITHUB,
-            "ghp_dummy_token_for_test",
-            null
-        );
+                "mentor-space",
+                "Mentor Space",
+                "mentor-org",
+                AccountType.ORG,
+                owner.getId(),
+                IntegrationKind.GITHUB,
+                "ghp_dummy_token_for_test",
+                null);
 
         webTestClient
-            .post()
-            .uri("/workspaces")
-            .headers(TestAuthUtils.withCurrentUser())
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(request)
-            .exchange()
-            .expectStatus()
-            .isCreated();
+                .post()
+                .uri("/workspaces")
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(request)
+                .exchange()
+                .expectStatus()
+                .isCreated();
 
         assertThat(workspaceRepository.count()).isEqualTo(1);
     }
@@ -153,28 +151,27 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
         User owner = persistUser("mentor");
 
         var request = new CreateWorkspaceRequestDTO(
-            "controller-space",
-            "Controller Space",
-            "controller",
-            AccountType.ORG,
-            owner.getId(),
-            IntegrationKind.GITHUB,
-            "ghp_dummy_token_for_test",
-            null
-        );
+                "controller-space",
+                "Controller Space",
+                "controller",
+                AccountType.ORG,
+                owner.getId(),
+                IntegrationKind.GITHUB,
+                "ghp_dummy_token_for_test",
+                null);
 
         WorkspaceDTO created = webTestClient
-            .post()
-            .uri("/workspaces")
-            .headers(TestAuthUtils.withCurrentUser())
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(request)
-            .exchange()
-            .expectStatus()
-            .isCreated()
-            .expectBody(WorkspaceDTO.class)
-            .returnResult()
-            .getResponseBody();
+                .post()
+                .uri("/workspaces")
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(request)
+                .exchange()
+                .expectStatus()
+                .isCreated()
+                .expectBody(WorkspaceDTO.class)
+                .returnResult()
+                .getResponseBody();
 
         WorkspaceDTO workspace = Objects.requireNonNull(created, "Workspace creation response was null");
         assertThat(workspace.workspaceSlug()).isEqualTo("controller-space");
@@ -182,39 +179,40 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
         assertThat(workspace.providerType()).isEqualTo(IdentityProviderType.GITHUB);
         assertThat(workspace.serverUrl()).isNull();
 
-        Workspace persistedWorkspace = workspaceRepository.findById(workspace.id()).orElseThrow();
+        Workspace persistedWorkspace =
+                workspaceRepository.findById(workspace.id()).orElseThrow();
         ensureAdminMembership(persistedWorkspace);
 
         WorkspaceDTO fetched = webTestClient
-            .get()
-            .uri("/workspaces/{workspaceSlug}", workspace.workspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody(WorkspaceDTO.class)
-            .returnResult()
-            .getResponseBody();
+                .get()
+                .uri("/workspaces/{workspaceSlug}", workspace.workspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody(WorkspaceDTO.class)
+                .returnResult()
+                .getResponseBody();
         assertThat(fetched).isNotNull();
         assertThat(fetched.workspaceSlug()).isEqualTo(workspace.workspaceSlug());
 
         List<WorkspaceListItemDTO> workspaces = webTestClient
-            .get()
-            .uri("/workspaces")
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBodyList(WorkspaceListItemDTO.class)
-            .returnResult()
-            .getResponseBody();
+                .get()
+                .uri("/workspaces")
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBodyList(WorkspaceListItemDTO.class)
+                .returnResult()
+                .getResponseBody();
         assertThat(workspaces).isNotNull();
         assertThat(workspaces).extracting(WorkspaceListItemDTO::workspaceSlug).contains(workspace.workspaceSlug());
         assertThat(workspaces).extracting(WorkspaceListItemDTO::providerType).containsOnly(IdentityProviderType.GITHUB);
 
         var membership = workspaceMembershipRepository
-            .findByWorkspace_IdAndUser_Id(workspace.id(), owner.getId())
-            .orElseThrow(() -> new AssertionError("Owner membership not created"));
+                .findByWorkspace_IdAndUser_Id(workspace.id(), owner.getId())
+                .orElseThrow(() -> new AssertionError("Owner membership not created"));
         assertThat(membership.getRole()).isEqualTo(WorkspaceMembership.WorkspaceRole.OWNER);
     }
 
@@ -225,50 +223,34 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
         User ownerZulu = persistUser("sorted-zulu-owner");
         User ownerBravo = persistUser("sorted-bravo-owner");
 
-        Workspace workspaceZulu = createWorkspace(
-            "sorted-zulu",
-            "Zulu Workspace",
-            "sorted-zulu",
-            AccountType.ORG,
-            ownerZulu
-        );
-        Workspace workspaceAlpha = createWorkspace(
-            "sorted-alpha",
-            "Alpha Workspace",
-            "sorted-alpha",
-            AccountType.ORG,
-            ownerAlpha
-        );
-        Workspace workspaceBravo = createWorkspace(
-            "sorted-bravo",
-            "Bravo Workspace",
-            "sorted-bravo",
-            AccountType.ORG,
-            ownerBravo
-        );
+        Workspace workspaceZulu =
+                createWorkspace("sorted-zulu", "Zulu Workspace", "sorted-zulu", AccountType.ORG, ownerZulu);
+        Workspace workspaceAlpha =
+                createWorkspace("sorted-alpha", "Alpha Workspace", "sorted-alpha", AccountType.ORG, ownerAlpha);
+        Workspace workspaceBravo =
+                createWorkspace("sorted-bravo", "Bravo Workspace", "sorted-bravo", AccountType.ORG, ownerBravo);
 
         ensureAdminMembership(workspaceZulu);
         ensureAdminMembership(workspaceAlpha);
         ensureAdminMembership(workspaceBravo);
 
         List<WorkspaceListItemDTO> workspaces = webTestClient
-            .get()
-            .uri("/workspaces")
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBodyList(WorkspaceListItemDTO.class)
-            .returnResult()
-            .getResponseBody();
+                .get()
+                .uri("/workspaces")
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBodyList(WorkspaceListItemDTO.class)
+                .returnResult()
+                .getResponseBody();
 
         assertThat(workspaces)
-            .isNotNull()
-            .filteredOn(workspace ->
-                List.of("sorted-zulu", "sorted-alpha", "sorted-bravo").contains(workspace.workspaceSlug())
-            )
-            .extracting(WorkspaceListItemDTO::workspaceSlug)
-            .containsExactly("sorted-alpha", "sorted-bravo", "sorted-zulu");
+                .isNotNull()
+                .filteredOn(workspace ->
+                        List.of("sorted-zulu", "sorted-alpha", "sorted-bravo").contains(workspace.workspaceSlug()))
+                .extracting(WorkspaceListItemDTO::workspaceSlug)
+                .containsExactly("sorted-alpha", "sorted-bravo", "sorted-zulu");
     }
 
     @Test
@@ -291,58 +273,57 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
         workspaceRepository.save(workspaceAlpha);
 
         String[] alphaRepositories = webTestClient
-            .get()
-            .uri("/workspaces/{workspaceSlug}/repositories", workspaceAlpha.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody(String[].class)
-            .returnResult()
-            .getResponseBody();
+                .get()
+                .uri("/workspaces/{workspaceSlug}/repositories", workspaceAlpha.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody(String[].class)
+                .returnResult()
+                .getResponseBody();
         assertThat(alphaRepositories).isNotNull();
         assertThat(alphaRepositories).containsExactly("acme/demo-repo");
 
         String[] betaRepositories = webTestClient
-            .get()
-            .uri("/workspaces/{workspaceSlug}/repositories", workspaceBeta.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody(String[].class)
-            .returnResult()
-            .getResponseBody();
+                .get()
+                .uri("/workspaces/{workspaceSlug}/repositories", workspaceBeta.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody(String[].class)
+                .returnResult()
+                .getResponseBody();
         assertThat(betaRepositories).isNotNull();
         assertThat(betaRepositories).isEmpty();
 
         webTestClient
-            .delete()
-            .uri(
-                "/workspaces/{workspaceSlug}/repositories?nameWithOwner={nameWithOwner}",
-                workspaceBeta.getWorkspaceSlug(),
-                "acme/demo-repo"
-            )
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isNotFound();
+                .delete()
+                .uri(
+                        "/workspaces/{workspaceSlug}/repositories?nameWithOwner={nameWithOwner}",
+                        workspaceBeta.getWorkspaceSlug(),
+                        "acme/demo-repo")
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isNotFound();
 
         webTestClient
-            .delete()
-            .uri(
-                "/workspaces/{workspaceSlug}/repositories?nameWithOwner={nameWithOwner}",
-                workspaceAlpha.getWorkspaceSlug(),
-                "acme/demo-repo"
-            )
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isNoContent();
+                .delete()
+                .uri(
+                        "/workspaces/{workspaceSlug}/repositories?nameWithOwner={nameWithOwner}",
+                        workspaceAlpha.getWorkspaceSlug(),
+                        "acme/demo-repo")
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isNoContent();
 
         assertThat(repositoryToMonitorRepository.findById(repository.getId())).isEmpty();
 
-        Workspace refreshedAlpha = workspaceRepository.findById(workspaceAlpha.getId()).orElseThrow();
+        Workspace refreshedAlpha =
+                workspaceRepository.findById(workspaceAlpha.getId()).orElseThrow();
         assertThat(refreshedAlpha.getRepositoriesToMonitor()).isEmpty();
     }
 
@@ -356,31 +337,31 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
         ensureAdminMembership(workspace);
 
         ProblemDetail missingWorkspace = webTestClient
-            .put()
-            .uri("/workspaces/{workspaceSlug}/league/reset", "unknown-space")
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isNotFound()
-            .expectBody(ProblemDetail.class)
-            .returnResult()
-            .getResponseBody();
+                .put()
+                .uri("/workspaces/{workspaceSlug}/league/reset", "unknown-space")
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isNotFound()
+                .expectBody(ProblemDetail.class)
+                .returnResult()
+                .getResponseBody();
 
         assertThat(missingWorkspace).isNotNull();
         assertThat(missingWorkspace.getTitle()).isEqualTo("Resource not found");
         assertThat(missingWorkspace.getDetail()).contains("unknown-space");
 
         webTestClient
-            .put()
-            .uri("/workspaces/{workspaceSlug}/league/reset", workspace.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isOk();
+                .put()
+                .uri("/workspaces/{workspaceSlug}/league/reset", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk();
 
         var membership = workspaceMembershipRepository
-            .findByWorkspace_IdAndUser_Id(workspace.getId(), user.getId())
-            .orElseThrow();
+                .findByWorkspace_IdAndUser_Id(workspace.getId(), user.getId())
+                .orElseThrow();
         assertThat(membership.getLeaguePoints()).isEqualTo(POINTS_DEFAULT);
     }
 
@@ -388,13 +369,8 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
     @WithAdminUser
     void updateNotificationsEndpointValidatesSlackChannelPattern() {
         User owner = persistUser("notifications-owner");
-        Workspace workspace = createWorkspace(
-            "notifications-space",
-            "Notifications",
-            "notifications",
-            AccountType.ORG,
-            owner
-        );
+        Workspace workspace =
+                createWorkspace("notifications-space", "Notifications", "notifications", AccountType.ORG, owner);
         ensureAdminMembership(workspace);
 
         // Slack target + credentials live on the Connection registry now. Seed an
@@ -403,57 +379,55 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
         seedSlackConnection(workspace);
 
         webTestClient
-            .patch()
-            .uri("/workspaces/{workspaceSlug}/notifications", workspace.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(new UpdateWorkspaceNotificationsRequestDTO(true, "core-team", "invalid"))
-            .exchange()
-            .expectStatus()
-            .isBadRequest()
-            .expectHeader()
-            .contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON)
-            .expectBody(ProblemDetail.class)
-            .value(problem -> {
-                assertThat(problem.getTitle()).isEqualTo("Validation failed");
-                assertNotNull(problem.getProperties());
-                assertThat(problem.getProperties()).containsKey("errors");
-                assertThat(problem.getProperties().get("errors"))
-                    .asInstanceOf(InstanceOfAssertFactories.map(String.class, Object.class))
-                    .containsKey("channelId");
-            });
+                .patch()
+                .uri("/workspaces/{workspaceSlug}/notifications", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(new UpdateWorkspaceNotificationsRequestDTO(true, "core-team", "invalid"))
+                .exchange()
+                .expectStatus()
+                .isBadRequest()
+                .expectHeader()
+                .contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON)
+                .expectBody(ProblemDetail.class)
+                .value(problem -> {
+                    assertThat(problem.getTitle()).isEqualTo("Validation failed");
+                    assertNotNull(problem.getProperties());
+                    assertThat(problem.getProperties()).containsKey("errors");
+                    assertThat(problem.getProperties().get("errors"))
+                            .asInstanceOf(InstanceOfAssertFactories.map(String.class, Object.class))
+                            .containsKey("channelId");
+                });
 
         webTestClient
-            .patch()
-            .uri("/workspaces/{workspaceSlug}/notifications", workspace.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(new UpdateWorkspaceNotificationsRequestDTO(true, "core-team", "C12345678"))
-            .exchange()
-            .expectStatus()
-            .isOk();
+                .patch()
+                .uri("/workspaces/{workspaceSlug}/notifications", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(new UpdateWorkspaceNotificationsRequestDTO(true, "core-team", "C12345678"))
+                .exchange()
+                .expectStatus()
+                .isOk();
 
         Workspace updated = workspaceRepository.findById(workspace.getId()).orElseThrow();
         assertThat(updated.getLeaderboardNotificationEnabled()).isTrue();
 
         ConnectionConfig.SlackConfig slackConfig = connectionService
-            .findSlackNotificationConfig(workspace.getId())
-            .orElseThrow(() ->
-                new AssertionError("Expected ACTIVE Slack Connection on workspace " + workspace.getId())
-            );
+                .findSlackNotificationConfig(workspace.getId())
+                .orElseThrow(
+                        () -> new AssertionError("Expected ACTIVE Slack Connection on workspace " + workspace.getId()));
         assertThat(slackConfig.teamLabel()).isEqualTo("core-team");
         assertThat(slackConfig.notificationChannelId()).isEqualTo("C12345678");
     }
 
     private void seedSlackConnection(Workspace workspace) {
         ConnectionConfig.SlackConfig cfg = new ConnectionConfig.SlackConfig(
-            /* teamId */ "T00000000",
-            /* teamName */ "Initial Team",
-            /* notificationChannelId */ null,
-            /* teamLabel */ null,
-            /* retentionDays */ null,
-            Set.of()
-        );
+                /* teamId */ "T00000000",
+                /* teamName */ "Initial Team",
+                /* notificationChannelId */ null,
+                /* teamLabel */ null,
+                /* retentionDays */ null,
+                Set.of());
         Connection connection = new Connection(workspace, IntegrationKind.SLACK, "T00000000", cfg);
         connection.setDisplayName("Slack");
         ReflectionTestUtils.setField(connection, "state", IntegrationState.ACTIVE);
@@ -468,36 +442,36 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
         ensureAdminMembership(workspace);
 
         ProblemDetail invalid = webTestClient
-            .patch()
-            .uri("/workspaces/{workspaceSlug}/schedule", workspace.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(new UpdateWorkspaceScheduleRequestDTO(9, "99:00"))
-            .exchange()
-            .expectStatus()
-            .isBadRequest()
-            .expectBody(ProblemDetail.class)
-            .returnResult()
-            .getResponseBody();
+                .patch()
+                .uri("/workspaces/{workspaceSlug}/schedule", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(new UpdateWorkspaceScheduleRequestDTO(9, "99:00"))
+                .exchange()
+                .expectStatus()
+                .isBadRequest()
+                .expectBody(ProblemDetail.class)
+                .returnResult()
+                .getResponseBody();
 
         assertThat(invalid).isNotNull();
         assertNotNull(invalid.getProperties());
         assertThat(invalid.getProperties().get("errors"))
-            .asInstanceOf(InstanceOfAssertFactories.map(String.class, Object.class))
-            .containsKeys("day", "time");
+                .asInstanceOf(InstanceOfAssertFactories.map(String.class, Object.class))
+                .containsKeys("day", "time");
 
         WorkspaceDTO updated = webTestClient
-            .patch()
-            .uri("/workspaces/{workspaceSlug}/schedule", workspace.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(new UpdateWorkspaceScheduleRequestDTO(3, "08:30"))
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody(WorkspaceDTO.class)
-            .returnResult()
-            .getResponseBody();
+                .patch()
+                .uri("/workspaces/{workspaceSlug}/schedule", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(new UpdateWorkspaceScheduleRequestDTO(3, "08:30"))
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody(WorkspaceDTO.class)
+                .returnResult()
+                .getResponseBody();
 
         assertThat(updated).isNotNull();
         assertThat(updated.leaderboardScheduleDay()).isEqualTo(3);
@@ -516,37 +490,37 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
         ensureAdminMembership(workspace);
 
         ProblemDetail invalid = webTestClient
-            .patch()
-            .uri("/workspaces/{workspaceSlug}/leaderboard-digest", workspace.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(new UpdateLeaderboardDigestRequestDTO(9, "99:00", true, null, null))
-            .exchange()
-            .expectStatus()
-            .isBadRequest()
-            .expectBody(ProblemDetail.class)
-            .returnResult()
-            .getResponseBody();
+                .patch()
+                .uri("/workspaces/{workspaceSlug}/leaderboard-digest", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(new UpdateLeaderboardDigestRequestDTO(9, "99:00", true, null, null))
+                .exchange()
+                .expectStatus()
+                .isBadRequest()
+                .expectBody(ProblemDetail.class)
+                .returnResult()
+                .getResponseBody();
 
         assertThat(invalid).isNotNull();
         assertNotNull(invalid.getProperties());
         assertThat(invalid.getProperties().get("errors"))
-            .asInstanceOf(InstanceOfAssertFactories.map(String.class, Object.class))
-            .containsKeys("day", "time");
+                .asInstanceOf(InstanceOfAssertFactories.map(String.class, Object.class))
+                .containsKeys("day", "time");
 
         // Schedule + enabled are workspace-level (no Slack connection required) — one atomic call.
         WorkspaceDTO updated = webTestClient
-            .patch()
-            .uri("/workspaces/{workspaceSlug}/leaderboard-digest", workspace.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(new UpdateLeaderboardDigestRequestDTO(5, "17:30", true, null, null))
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody(WorkspaceDTO.class)
-            .returnResult()
-            .getResponseBody();
+                .patch()
+                .uri("/workspaces/{workspaceSlug}/leaderboard-digest", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(new UpdateLeaderboardDigestRequestDTO(5, "17:30", true, null, null))
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody(WorkspaceDTO.class)
+                .returnResult()
+                .getResponseBody();
 
         assertThat(updated).isNotNull();
         assertThat(updated.leaderboardScheduleDay()).isEqualTo(5);
@@ -563,17 +537,17 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
     @WithAdminUser
     void unknownWorkspaceReturnsProblemDetail() {
         ProblemDetail problem = webTestClient
-            .get()
-            .uri("/workspaces/{workspaceSlug}", "missing-space")
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isNotFound()
-            .expectHeader()
-            .contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON)
-            .expectBody(ProblemDetail.class)
-            .returnResult()
-            .getResponseBody();
+                .get()
+                .uri("/workspaces/{workspaceSlug}", "missing-space")
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isNotFound()
+                .expectHeader()
+                .contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON)
+                .expectBody(ProblemDetail.class)
+                .returnResult()
+                .getResponseBody();
 
         assertThat(problem).isNotNull();
         assertThat(problem.getTitle()).isEqualTo("Resource not found");
@@ -587,30 +561,29 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
         createWorkspace("duplicate-space", "Duplicate", "duplicate", AccountType.ORG, owner);
 
         var request = new CreateWorkspaceRequestDTO(
-            "duplicate-space",
-            "Duplicate",
-            "duplicate",
-            AccountType.ORG,
-            owner.getId(),
-            IntegrationKind.GITHUB,
-            "ghp_dummy_token_for_test",
-            null
-        );
+                "duplicate-space",
+                "Duplicate",
+                "duplicate",
+                AccountType.ORG,
+                owner.getId(),
+                IntegrationKind.GITHUB,
+                "ghp_dummy_token_for_test",
+                null);
 
         ProblemDetail problem = webTestClient
-            .post()
-            .uri("/workspaces")
-            .headers(TestAuthUtils.withCurrentUser())
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(request)
-            .exchange()
-            .expectStatus()
-            .isEqualTo(HttpStatus.CONFLICT)
-            .expectHeader()
-            .contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON)
-            .expectBody(ProblemDetail.class)
-            .returnResult()
-            .getResponseBody();
+                .post()
+                .uri("/workspaces")
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(request)
+                .exchange()
+                .expectStatus()
+                .isEqualTo(HttpStatus.CONFLICT)
+                .expectHeader()
+                .contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON)
+                .expectBody(ProblemDetail.class)
+                .returnResult()
+                .getResponseBody();
 
         assertThat(problem).isNotNull();
         assertThat(problem.getTitle()).isEqualTo("Workspace slug conflict");
@@ -626,58 +599,48 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
         User ownerBeta = persistUser("beta-users-owner");
         User contributor = persistUser("workspace-contributor");
 
-        Workspace workspaceAlpha = createWorkspace(
-            "alpha-users",
-            "Alpha Users",
-            "alpha-users",
-            AccountType.ORG,
-            ownerAlpha
-        );
+        Workspace workspaceAlpha =
+                createWorkspace("alpha-users", "Alpha Users", "alpha-users", AccountType.ORG, ownerAlpha);
         Workspace workspaceBeta = createWorkspace("beta-users", "Beta Users", "beta-users", AccountType.ORG, ownerBeta);
 
         ensureAdminMembership(workspaceAlpha);
         ensureAdminMembership(workspaceBeta);
 
         workspaceMembershipService.createMembership(
-            workspaceAlpha,
-            contributor.getId(),
-            WorkspaceMembership.WorkspaceRole.MEMBER
-        );
+                workspaceAlpha, contributor.getId(), WorkspaceMembership.WorkspaceRole.MEMBER);
 
         List<UserTeamsDTO> alphaUsers = webTestClient
-            .get()
-            .uri("/workspaces/{workspaceSlug}/users", workspaceAlpha.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBodyList(UserTeamsDTO.class)
-            .returnResult()
-            .getResponseBody();
+                .get()
+                .uri("/workspaces/{workspaceSlug}/users", workspaceAlpha.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBodyList(UserTeamsDTO.class)
+                .returnResult()
+                .getResponseBody();
         assertThat(alphaUsers).isNotNull();
-        List<String> alphaLogins = alphaUsers
-            .stream()
-            .map(UserTeamsDTO::login)
-            .filter(login -> !"admin".equals(login))
-            .toList();
+        List<String> alphaLogins = alphaUsers.stream()
+                .map(UserTeamsDTO::login)
+                .filter(login -> !"admin".equals(login))
+                .toList();
         assertThat(alphaLogins).containsExactlyInAnyOrder(ownerAlpha.getLogin(), contributor.getLogin());
 
         List<UserTeamsDTO> betaUsers = webTestClient
-            .get()
-            .uri("/workspaces/{workspaceSlug}/users", workspaceBeta.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBodyList(UserTeamsDTO.class)
-            .returnResult()
-            .getResponseBody();
+                .get()
+                .uri("/workspaces/{workspaceSlug}/users", workspaceBeta.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBodyList(UserTeamsDTO.class)
+                .returnResult()
+                .getResponseBody();
         assertThat(betaUsers).isNotNull();
-        List<String> betaLogins = betaUsers
-            .stream()
-            .map(UserTeamsDTO::login)
-            .filter(login -> !"admin".equals(login))
-            .toList();
+        List<String> betaLogins = betaUsers.stream()
+                .map(UserTeamsDTO::login)
+                .filter(login -> !"admin".equals(login))
+                .toList();
         assertThat(betaLogins).containsExactly(ownerBeta.getLogin());
     }
 
@@ -685,13 +648,8 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
     @WithAdminUser
     void repositoryAlreadyMonitoredReturnsProblemDetail() {
         User owner = persistUser("repo-conflict-owner");
-        Workspace workspace = createWorkspace(
-            "repo-conflict",
-            "Repo Conflict",
-            "repo-conflict",
-            AccountType.ORG,
-            owner
-        );
+        Workspace workspace =
+                createWorkspace("repo-conflict", "Repo Conflict", "repo-conflict", AccountType.ORG, owner);
         ensureAdminMembership(workspace);
 
         RepositoryToMonitor repository = new RepositoryToMonitor();
@@ -702,21 +660,20 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
         workspaceRepository.save(workspace);
 
         ProblemDetail problem = webTestClient
-            .post()
-            .uri(
-                "/workspaces/{workspaceSlug}/repositories?nameWithOwner={nameWithOwner}",
-                workspace.getWorkspaceSlug(),
-                "acme/test-repo"
-            )
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isEqualTo(HttpStatus.CONFLICT)
-            .expectHeader()
-            .contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON)
-            .expectBody(ProblemDetail.class)
-            .returnResult()
-            .getResponseBody();
+                .post()
+                .uri(
+                        "/workspaces/{workspaceSlug}/repositories?nameWithOwner={nameWithOwner}",
+                        workspace.getWorkspaceSlug(),
+                        "acme/test-repo")
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isEqualTo(HttpStatus.CONFLICT)
+                .expectHeader()
+                .contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON)
+                .expectBody(ProblemDetail.class)
+                .returnResult()
+                .getResponseBody();
 
         assertThat(problem).isNotNull();
         assertThat(problem.getTitle()).isEqualTo("Repository already monitored");
@@ -732,19 +689,19 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
         workspaceLifecycleService.purgeWorkspace(workspace.getWorkspaceSlug());
 
         ProblemDetail problem = webTestClient
-            .patch()
-            .uri("/workspaces/{workspaceSlug}/status", workspace.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(new UpdateWorkspaceStatusRequestDTO(Workspace.WorkspaceStatus.ACTIVE))
-            .exchange()
-            .expectStatus()
-            .isEqualTo(HttpStatus.CONFLICT)
-            .expectHeader()
-            .contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON)
-            .expectBody(ProblemDetail.class)
-            .returnResult()
-            .getResponseBody();
+                .patch()
+                .uri("/workspaces/{workspaceSlug}/status", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(new UpdateWorkspaceStatusRequestDTO(Workspace.WorkspaceStatus.ACTIVE))
+                .exchange()
+                .expectStatus()
+                .isEqualTo(HttpStatus.CONFLICT)
+                .expectHeader()
+                .contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON)
+                .expectBody(ProblemDetail.class)
+                .returnResult()
+                .getResponseBody();
 
         assertThat(problem).isNotNull();
         assertThat(problem.getTitle()).isEqualTo("Workspace lifecycle violation");
@@ -759,19 +716,19 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
         ensureAdminMembership(workspace);
 
         ProblemDetail problem = webTestClient
-            .patch()
-            .uri("/workspaces/{workspaceSlug}/status", workspace.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(new UpdateWorkspaceStatusRequestDTO(Workspace.WorkspaceStatus.PURGED))
-            .exchange()
-            .expectStatus()
-            .isEqualTo(HttpStatus.CONFLICT)
-            .expectHeader()
-            .contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON)
-            .expectBody(ProblemDetail.class)
-            .returnResult()
-            .getResponseBody();
+                .patch()
+                .uri("/workspaces/{workspaceSlug}/status", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(new UpdateWorkspaceStatusRequestDTO(Workspace.WorkspaceStatus.PURGED))
+                .exchange()
+                .expectStatus()
+                .isEqualTo(HttpStatus.CONFLICT)
+                .expectHeader()
+                .contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON)
+                .expectBody(ProblemDetail.class)
+                .returnResult()
+                .getResponseBody();
 
         assertThat(problem).isNotNull();
         assertThat(problem.getTitle()).isEqualTo("Workspace lifecycle violation");
@@ -789,41 +746,43 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
         ensureAdminMembership(workspace);
 
         WorkspaceDTO suspended = webTestClient
-            .patch()
-            .uri("/workspaces/{workspaceSlug}/status", workspace.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(new UpdateWorkspaceStatusRequestDTO(Workspace.WorkspaceStatus.SUSPENDED))
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody(WorkspaceDTO.class)
-            .returnResult()
-            .getResponseBody();
+                .patch()
+                .uri("/workspaces/{workspaceSlug}/status", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(new UpdateWorkspaceStatusRequestDTO(Workspace.WorkspaceStatus.SUSPENDED))
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody(WorkspaceDTO.class)
+                .returnResult()
+                .getResponseBody();
 
         assertThat(suspended).isNotNull();
         assertThat(suspended.status()).isEqualTo(Workspace.WorkspaceStatus.SUSPENDED.name());
 
-        Workspace suspendedEntity = workspaceRepository.findById(workspace.getId()).orElseThrow();
+        Workspace suspendedEntity =
+                workspaceRepository.findById(workspace.getId()).orElseThrow();
         assertThat(suspendedEntity.getStatus()).isEqualTo(Workspace.WorkspaceStatus.SUSPENDED);
 
         WorkspaceDTO resumed = webTestClient
-            .patch()
-            .uri("/workspaces/{workspaceSlug}/status", workspace.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(new UpdateWorkspaceStatusRequestDTO(Workspace.WorkspaceStatus.ACTIVE))
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody(WorkspaceDTO.class)
-            .returnResult()
-            .getResponseBody();
+                .patch()
+                .uri("/workspaces/{workspaceSlug}/status", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(new UpdateWorkspaceStatusRequestDTO(Workspace.WorkspaceStatus.ACTIVE))
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody(WorkspaceDTO.class)
+                .returnResult()
+                .getResponseBody();
 
         assertThat(resumed).isNotNull();
         assertThat(resumed.status()).isEqualTo(Workspace.WorkspaceStatus.ACTIVE.name());
 
-        Workspace resumedEntity = workspaceRepository.findById(workspace.getId()).orElseThrow();
+        Workspace resumedEntity =
+                workspaceRepository.findById(workspace.getId()).orElseThrow();
         assertThat(resumedEntity.getStatus()).isEqualTo(Workspace.WorkspaceStatus.ACTIVE);
     }
 
@@ -836,50 +795,51 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
         workspaceLifecycleService.suspendWorkspace(workspace.getWorkspaceSlug());
 
         ProblemDetail hidden = webTestClient
-            .get()
-            .uri("/workspaces/{workspaceSlug}/repositories", workspace.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isNotFound()
-            .expectBody(ProblemDetail.class)
-            .returnResult()
-            .getResponseBody();
+                .get()
+                .uri("/workspaces/{workspaceSlug}/repositories", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isNotFound()
+                .expectBody(ProblemDetail.class)
+                .returnResult()
+                .getResponseBody();
 
         assertThat(hidden).isNotNull();
         assertThat(hidden.getTitle()).isEqualTo("Resource not found");
 
         WorkspaceDTO suspended = webTestClient
-            .get()
-            .uri("/workspaces/{workspaceSlug}", workspace.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody(WorkspaceDTO.class)
-            .returnResult()
-            .getResponseBody();
+                .get()
+                .uri("/workspaces/{workspaceSlug}", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody(WorkspaceDTO.class)
+                .returnResult()
+                .getResponseBody();
 
         assertThat(suspended).isNotNull();
         assertThat(suspended.status()).isEqualTo(Workspace.WorkspaceStatus.SUSPENDED.name());
 
         WorkspaceDTO resumed = webTestClient
-            .patch()
-            .uri("/workspaces/{workspaceSlug}/status", workspace.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(new UpdateWorkspaceStatusRequestDTO(Workspace.WorkspaceStatus.ACTIVE))
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody(WorkspaceDTO.class)
-            .returnResult()
-            .getResponseBody();
+                .patch()
+                .uri("/workspaces/{workspaceSlug}/status", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(new UpdateWorkspaceStatusRequestDTO(Workspace.WorkspaceStatus.ACTIVE))
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody(WorkspaceDTO.class)
+                .returnResult()
+                .getResponseBody();
 
         assertThat(resumed).isNotNull();
         assertThat(resumed.status()).isEqualTo(Workspace.WorkspaceStatus.ACTIVE.name());
 
-        Workspace resumedEntity = workspaceRepository.findById(workspace.getId()).orElseThrow();
+        Workspace resumedEntity =
+                workspaceRepository.findById(workspace.getId()).orElseThrow();
         assertThat(resumedEntity.getStatus()).isEqualTo(Workspace.WorkspaceStatus.ACTIVE);
     }
 
@@ -887,24 +847,19 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
     @WithAdminUser
     void suspendedWorkspaceCanBePurgedViaDeleteEndpoint() {
         User owner = persistUser("purge-suspended-owner");
-        Workspace workspace = createWorkspace(
-            "purge-suspended",
-            "Purge Suspended",
-            "purge-suspended",
-            AccountType.ORG,
-            owner
-        );
+        Workspace workspace =
+                createWorkspace("purge-suspended", "Purge Suspended", "purge-suspended", AccountType.ORG, owner);
         // Delete requires OWNER role, not just ADMIN
         ensureOwnerMembership(workspace);
         workspaceLifecycleService.suspendWorkspace(workspace.getWorkspaceSlug());
 
         webTestClient
-            .delete()
-            .uri("/workspaces/{workspaceSlug}", workspace.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isNoContent();
+                .delete()
+                .uri("/workspaces/{workspaceSlug}", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isNoContent();
 
         Workspace purged = workspaceRepository.findById(workspace.getId()).orElseThrow();
         assertThat(purged.getStatus()).isEqualTo(Workspace.WorkspaceStatus.PURGED);
@@ -914,24 +869,24 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
     @WithAdminUser
     void invalidWorkspaceSlugPathVariableReturnsConstraintViolationProblemDetail() {
         ProblemDetail problem = webTestClient
-            .get()
-            .uri("/workspaces/{workspaceSlug}", "INVALID SLUG")
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isBadRequest()
-            .expectHeader()
-            .contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON)
-            .expectBody(ProblemDetail.class)
-            .returnResult()
-            .getResponseBody();
+                .get()
+                .uri("/workspaces/{workspaceSlug}", "INVALID SLUG")
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isBadRequest()
+                .expectHeader()
+                .contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON)
+                .expectBody(ProblemDetail.class)
+                .returnResult()
+                .getResponseBody();
 
         assertThat(problem).isNotNull();
         assertThat(problem.getTitle()).isEqualTo("Validation failed");
         assertNotNull(problem.getProperties());
         assertThat(problem.getProperties().get("errors"))
-            .asInstanceOf(InstanceOfAssertFactories.map(String.class, Object.class))
-            .containsKey("workspaceSlug");
+                .asInstanceOf(InstanceOfAssertFactories.map(String.class, Object.class))
+                .containsKey("workspaceSlug");
     }
 
     // Feature Flags
@@ -944,15 +899,15 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
         ensureAdminMembership(workspace);
 
         WorkspaceDTO dto = webTestClient
-            .get()
-            .uri("/workspaces/{workspaceSlug}", workspace.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody(WorkspaceDTO.class)
-            .returnResult()
-            .getResponseBody();
+                .get()
+                .uri("/workspaces/{workspaceSlug}", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody(WorkspaceDTO.class)
+                .returnResult()
+                .getResponseBody();
 
         assertThat(dto).isNotNull();
         assertThat(dto.practicesEnabled()).isFalse();
@@ -972,17 +927,17 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
 
         // PATCH to enable all flags — verify response body
         WorkspaceDTO patchResponse = webTestClient
-            .patch()
-            .uri("/workspaces/{workspaceSlug}/features", workspace.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(new UpdateWorkspaceFeaturesRequestDTO(true, null, true, true, true, true, null, null))
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody(WorkspaceDTO.class)
-            .returnResult()
-            .getResponseBody();
+                .patch()
+                .uri("/workspaces/{workspaceSlug}/features", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(new UpdateWorkspaceFeaturesRequestDTO(true, null, true, true, true, true, null, null))
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody(WorkspaceDTO.class)
+                .returnResult()
+                .getResponseBody();
 
         assertThat(patchResponse).isNotNull();
         assertThat(patchResponse.practicesEnabled()).isTrue();
@@ -992,15 +947,15 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
 
         // Verify via GET (true round-trip through the read path)
         WorkspaceDTO getResponse = webTestClient
-            .get()
-            .uri("/workspaces/{workspaceSlug}", workspace.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody(WorkspaceDTO.class)
-            .returnResult()
-            .getResponseBody();
+                .get()
+                .uri("/workspaces/{workspaceSlug}", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody(WorkspaceDTO.class)
+                .returnResult()
+                .getResponseBody();
 
         assertThat(getResponse).isNotNull();
         assertThat(getResponse.practicesEnabled()).isTrue();
@@ -1018,17 +973,17 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
 
         // Enable leaderboard only — verify response body
         WorkspaceDTO afterFirst = webTestClient
-            .patch()
-            .uri("/workspaces/{workspaceSlug}/features", workspace.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(new UpdateWorkspaceFeaturesRequestDTO(null, null, null, true, null, null, null, null))
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody(WorkspaceDTO.class)
-            .returnResult()
-            .getResponseBody();
+                .patch()
+                .uri("/workspaces/{workspaceSlug}/features", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(new UpdateWorkspaceFeaturesRequestDTO(null, null, null, true, null, null, null, null))
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody(WorkspaceDTO.class)
+                .returnResult()
+                .getResponseBody();
 
         assertThat(afterFirst).isNotNull();
         assertThat(afterFirst.leaderboardEnabled()).isTrue();
@@ -1038,17 +993,17 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
 
         // Now enable practices — leaderboard should remain true
         WorkspaceDTO afterSecond = webTestClient
-            .patch()
-            .uri("/workspaces/{workspaceSlug}/features", workspace.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(new UpdateWorkspaceFeaturesRequestDTO(true, null, null, null, null, null, null, null))
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody(WorkspaceDTO.class)
-            .returnResult()
-            .getResponseBody();
+                .patch()
+                .uri("/workspaces/{workspaceSlug}/features", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(new UpdateWorkspaceFeaturesRequestDTO(true, null, null, null, null, null, null, null))
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody(WorkspaceDTO.class)
+                .returnResult()
+                .getResponseBody();
 
         assertThat(afterSecond).isNotNull();
         assertThat(afterSecond.practicesEnabled()).isTrue();
@@ -1066,28 +1021,28 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
 
         // Enable all flags first
         webTestClient
-            .patch()
-            .uri("/workspaces/{workspaceSlug}/features", workspace.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(new UpdateWorkspaceFeaturesRequestDTO(true, null, true, true, true, true, null, null))
-            .exchange()
-            .expectStatus()
-            .isOk();
+                .patch()
+                .uri("/workspaces/{workspaceSlug}/features", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(new UpdateWorkspaceFeaturesRequestDTO(true, null, true, true, true, true, null, null))
+                .exchange()
+                .expectStatus()
+                .isOk();
 
         // Explicitly disable achievements — others should remain true
         WorkspaceDTO afterDisable = webTestClient
-            .patch()
-            .uri("/workspaces/{workspaceSlug}/features", workspace.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(new UpdateWorkspaceFeaturesRequestDTO(null, null, false, null, null, null, null, null))
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody(WorkspaceDTO.class)
-            .returnResult()
-            .getResponseBody();
+                .patch()
+                .uri("/workspaces/{workspaceSlug}/features", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(new UpdateWorkspaceFeaturesRequestDTO(null, null, false, null, null, null, null, null))
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody(WorkspaceDTO.class)
+                .returnResult()
+                .getResponseBody();
 
         assertThat(afterDisable).isNotNull();
         assertThat(afterDisable.practicesEnabled()).isTrue();
@@ -1100,28 +1055,23 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
     @WithAdminUser
     void updateFeaturesTriggerModesRoundTrip() {
         User owner = persistUser("trigger-roundtrip-owner");
-        Workspace workspace = createWorkspace(
-            "trigger-roundtrip",
-            "Trigger Roundtrip",
-            "trigger-roundtrip",
-            AccountType.ORG,
-            owner
-        );
+        Workspace workspace =
+                createWorkspace("trigger-roundtrip", "Trigger Roundtrip", "trigger-roundtrip", AccountType.ORG, owner);
         ensureAdminMembership(workspace);
 
         // Defaults: auto=true, manual=true — disable auto only
         WorkspaceDTO afterDisableAuto = webTestClient
-            .patch()
-            .uri("/workspaces/{workspaceSlug}/features", workspace.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(new UpdateWorkspaceFeaturesRequestDTO(null, null, null, null, null, null, false, null))
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody(WorkspaceDTO.class)
-            .returnResult()
-            .getResponseBody();
+                .patch()
+                .uri("/workspaces/{workspaceSlug}/features", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(new UpdateWorkspaceFeaturesRequestDTO(null, null, null, null, null, null, false, null))
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody(WorkspaceDTO.class)
+                .returnResult()
+                .getResponseBody();
 
         assertThat(afterDisableAuto).isNotNull();
         assertThat(afterDisableAuto.practiceReviewAutoTriggerEnabled()).isFalse();
@@ -1129,17 +1079,17 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
 
         // Disable manual, re-enable auto
         WorkspaceDTO afterToggle = webTestClient
-            .patch()
-            .uri("/workspaces/{workspaceSlug}/features", workspace.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(new UpdateWorkspaceFeaturesRequestDTO(null, null, null, null, null, null, true, false))
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody(WorkspaceDTO.class)
-            .returnResult()
-            .getResponseBody();
+                .patch()
+                .uri("/workspaces/{workspaceSlug}/features", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(new UpdateWorkspaceFeaturesRequestDTO(null, null, null, null, null, null, true, false))
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody(WorkspaceDTO.class)
+                .returnResult()
+                .getResponseBody();
 
         assertThat(afterToggle).isNotNull();
         assertThat(afterToggle.practiceReviewAutoTriggerEnabled()).isTrue();
@@ -1147,15 +1097,15 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
 
         // Verify via GET
         WorkspaceDTO getResponse = webTestClient
-            .get()
-            .uri("/workspaces/{workspaceSlug}", workspace.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody(WorkspaceDTO.class)
-            .returnResult()
-            .getResponseBody();
+                .get()
+                .uri("/workspaces/{workspaceSlug}", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody(WorkspaceDTO.class)
+                .returnResult()
+                .getResponseBody();
 
         assertThat(getResponse).isNotNull();
         assertThat(getResponse.practiceReviewAutoTriggerEnabled()).isTrue();
@@ -1173,14 +1123,14 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
         // Mentor is intentionally NOT added as a workspace member
 
         webTestClient
-            .patch()
-            .uri("/workspaces/{workspaceSlug}/features", workspace.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(new UpdateWorkspaceFeaturesRequestDTO(true, null, true, true, true, true, null, null))
-            .exchange()
-            .expectStatus()
-            .isForbidden();
+                .patch()
+                .uri("/workspaces/{workspaceSlug}/features", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(new UpdateWorkspaceFeaturesRequestDTO(true, null, true, true, true, true, null, null))
+                .exchange()
+                .expectStatus()
+                .isForbidden();
     }
 
     @Test
@@ -1192,33 +1142,32 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
 
         // Enable some features
         webTestClient
-            .patch()
-            .uri("/workspaces/{workspaceSlug}/features", workspace.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(new UpdateWorkspaceFeaturesRequestDTO(true, null, false, true, false, false, null, null))
-            .exchange()
-            .expectStatus()
-            .isOk();
+                .patch()
+                .uri("/workspaces/{workspaceSlug}/features", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(new UpdateWorkspaceFeaturesRequestDTO(true, null, false, true, false, false, null, null))
+                .exchange()
+                .expectStatus()
+                .isOk();
 
         // Verify list endpoint includes feature flags
         List<WorkspaceListItemDTO> workspaces = webTestClient
-            .get()
-            .uri("/workspaces")
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBodyList(WorkspaceListItemDTO.class)
-            .returnResult()
-            .getResponseBody();
+                .get()
+                .uri("/workspaces")
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBodyList(WorkspaceListItemDTO.class)
+                .returnResult()
+                .getResponseBody();
 
         assertThat(workspaces).isNotNull();
-        WorkspaceListItemDTO item = workspaces
-            .stream()
-            .filter(ws -> "feature-list".equals(ws.workspaceSlug()))
-            .findFirst()
-            .orElseThrow();
+        WorkspaceListItemDTO item = workspaces.stream()
+                .filter(ws -> "feature-list".equals(ws.workspaceSlug()))
+                .findFirst()
+                .orElseThrow();
 
         assertThat(item.practicesEnabled()).isTrue();
         assertThat(item.achievementsEnabled()).isFalse();

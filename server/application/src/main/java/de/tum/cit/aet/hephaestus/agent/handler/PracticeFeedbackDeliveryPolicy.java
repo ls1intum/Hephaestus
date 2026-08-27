@@ -32,14 +32,13 @@ class PracticeFeedbackDeliveryPolicy {
     private final SilentModeQuery silentModeQuery;
 
     PracticeFeedbackDeliveryPolicy(
-        IssueRepository issueRepository,
-        PullRequestRepository pullRequestRepository,
-        RepositoryToMonitorRepository repositoryToMonitorRepository,
-        WorkspaceRepository workspaceRepository,
-        AccountPreferencesQuery accountPreferencesQuery,
-        PracticeReviewProperties reviewProperties,
-        SilentModeQuery silentModeQuery
-    ) {
+            IssueRepository issueRepository,
+            PullRequestRepository pullRequestRepository,
+            RepositoryToMonitorRepository repositoryToMonitorRepository,
+            WorkspaceRepository workspaceRepository,
+            AccountPreferencesQuery accountPreferencesQuery,
+            PracticeReviewProperties reviewProperties,
+            SilentModeQuery silentModeQuery) {
         this.issueRepository = issueRepository;
         this.pullRequestRepository = pullRequestRepository;
         this.repositoryToMonitorRepository = repositoryToMonitorRepository;
@@ -61,14 +60,15 @@ class PracticeFeedbackDeliveryPolicy {
         }
         JsonNode metadata = job.getMetadata();
         Issue issue = integralId(metadata, "issue_id")
-            .flatMap(issueRepository::findByIdWithAuthorAndRepository)
-            .orElse(null);
+                .flatMap(issueRepository::findByIdWithAuthorAndRepository)
+                .orElse(null);
         if (!isEligibleTarget(issue, metadata, "issue_number", workspaceId)) {
             return Decision.suppressed(FeedbackSuppressionReason.ARTIFACT_GONE);
         }
         Issue eligibleIssue = Objects.requireNonNull(issue);
         if (eligibleIssue.getAuthor() == null) return Decision.suppressed(FeedbackSuppressionReason.ARTIFACT_GONE);
-        boolean closedWhenQueued = metadata != null && "closed".equalsIgnoreCase(metadata.path("state").asString(""));
+        boolean closedWhenQueued = metadata != null
+                && "closed".equalsIgnoreCase(metadata.path("state").asString(""));
         if (closedWhenQueued || eligibleIssue.getState() == Issue.State.CLOSED) {
             return Decision.suppressed(FeedbackSuppressionReason.ARTIFACT_CLOSED);
         }
@@ -90,8 +90,8 @@ class PracticeFeedbackDeliveryPolicy {
         }
         JsonNode metadata = job.getMetadata();
         PullRequest pullRequest = integralId(metadata, "pull_request_id")
-            .flatMap(pullRequestRepository::findByIdWithAuthorAndRepository)
-            .orElse(null);
+                .flatMap(pullRequestRepository::findByIdWithAuthorAndRepository)
+                .orElse(null);
         if (!isEligibleTarget(pullRequest, metadata, "pr_number", workspaceId)) {
             return Decision.suppressed(FeedbackSuppressionReason.ARTIFACT_GONE);
         }
@@ -104,10 +104,8 @@ class PracticeFeedbackDeliveryPolicy {
         }
 
         PracticeReviewSettings settings = workspace.getReviewSettings();
-        if (
-            eligiblePullRequest.getState() == Issue.State.MERGED &&
-            !settings.resolveDeliverToMerged(reviewProperties.deliverToMerged())
-        ) {
+        if (eligiblePullRequest.getState() == Issue.State.MERGED
+                && !settings.resolveDeliverToMerged(reviewProperties.deliverToMerged())) {
             return Decision.suppressed(FeedbackSuppressionReason.ARTIFACT_MERGED);
         }
         if (!recipientAllowsDelivery(eligiblePullRequest)) {
@@ -117,35 +115,28 @@ class PracticeFeedbackDeliveryPolicy {
     }
 
     static boolean matchesArtifact(Issue artifact, @Nullable JsonNode metadata, String numberKey) {
-        return (
-            artifact.getDeletedAt() == null &&
-            artifact.getRepository() != null &&
-            artifact.getRepository().getId() != null &&
-            metadata != null &&
-            metadata.path("repository_id").isIntegralNumber() &&
-            metadata.path("repository_id").asLong() == artifact.getRepository().getId() &&
-            metadata.path("repository_full_name").isString() &&
-            metadata.path("repository_full_name").asString().equals(artifact.getRepository().getNameWithOwner()) &&
-            metadata.path(numberKey).isIntegralNumber() &&
-            metadata.path(numberKey).asInt() == artifact.getNumber()
-        );
+        return (artifact.getDeletedAt() == null
+                && artifact.getRepository() != null
+                && artifact.getRepository().getId() != null
+                && metadata != null
+                && metadata.path("repository_id").isIntegralNumber()
+                && metadata.path("repository_id").asLong()
+                        == artifact.getRepository().getId()
+                && metadata.path("repository_full_name").isString()
+                && metadata.path("repository_full_name")
+                        .asString()
+                        .equals(artifact.getRepository().getNameWithOwner())
+                && metadata.path(numberKey).isIntegralNumber()
+                && metadata.path(numberKey).asInt() == artifact.getNumber());
     }
 
     private boolean isEligibleTarget(
-        @Nullable Issue artifact,
-        @Nullable JsonNode metadata,
-        String numberKey,
-        long workspaceId
-    ) {
-        return (
-            artifact != null &&
-            artifact.getRepository() != null &&
-            matchesArtifact(artifact, metadata, numberKey) &&
-            repositoryToMonitorRepository.existsByWorkspaceIdAndNameWithOwner(
-                workspaceId,
-                artifact.getRepository().getNameWithOwner()
-            )
-        );
+            @Nullable Issue artifact, @Nullable JsonNode metadata, String numberKey, long workspaceId) {
+        return (artifact != null
+                && artifact.getRepository() != null
+                && matchesArtifact(artifact, metadata, numberKey)
+                && repositoryToMonitorRepository.existsByWorkspaceIdAndNameWithOwner(
+                        workspaceId, artifact.getRepository().getNameWithOwner()));
     }
 
     private boolean recipientAllowsDelivery(Issue artifact) {
@@ -153,17 +144,17 @@ class PracticeFeedbackDeliveryPolicy {
             return false;
         }
         return accountPreferencesQuery
-            .preferencesForUserId(artifact.getAuthor().getId())
-            .map(AccountPreferencesQuery.PreferencesView::practiceFeedbackDeliveryEnabled)
-            .orElse(false);
+                .preferencesForUserId(artifact.getAuthor().getId())
+                .map(AccountPreferencesQuery.PreferencesView::practiceFeedbackDeliveryEnabled)
+                .orElse(false);
     }
 
     private @Nullable Workspace activePracticeWorkspace(long workspaceId) {
         return workspaceRepository
-            .findById(workspaceId)
-            .filter(workspace -> workspace.getStatus() == Workspace.WorkspaceStatus.ACTIVE)
-            .filter(workspace -> Boolean.TRUE.equals(workspace.getFeatures().getPracticesEnabled()))
-            .orElse(null);
+                .findById(workspaceId)
+                .filter(workspace -> workspace.getStatus() == Workspace.WorkspaceStatus.ACTIVE)
+                .filter(workspace -> Boolean.TRUE.equals(workspace.getFeatures().getPracticesEnabled()))
+                .orElse(null);
     }
 
     private static java.util.Optional<Long> integralId(@Nullable JsonNode metadata, String key) {
@@ -180,7 +171,8 @@ class PracticeFeedbackDeliveryPolicy {
         return job.getWorkspace().getId();
     }
 
-    record Decision<T extends Issue>(@Nullable T artifact, @Nullable FeedbackSuppressionReason suppressionReason) {
+    record Decision<T extends Issue>(
+            @Nullable T artifact, @Nullable FeedbackSuppressionReason suppressionReason) {
         static <T extends Issue> Decision<T> allowed(T artifact) {
             return new Decision<>(artifact, null);
         }

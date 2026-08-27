@@ -143,22 +143,21 @@ public class GitHubPullRequestSyncService {
     private record PullRequestWithProjectItemCursor(Long pullRequestId, String nodeId, String projectItemCursor) {}
 
     public GitHubPullRequestSyncService(
-        RepositoryRepository repositoryRepository,
-        PullRequestRepository pullRequestRepository,
-        GitHubGraphQlClientProvider graphQlClientProvider,
-        GitHubPullRequestProcessor pullRequestProcessor,
-        GitHubPullRequestReviewSyncService reviewSyncService,
-        GitHubPullRequestReviewCommentSyncService reviewCommentSyncService,
-        GitHubIssueCommentProcessor issueCommentProcessor,
-        GitHubIssueCommentSyncService issueCommentSyncService,
-        GitHubProjectItemSyncService projectItemSyncService,
-        BackfillStateProvider backfillStateProvider,
-        TransactionTemplate transactionTemplate,
-        GitHubSyncProperties syncProperties,
-        SyncSchedulerProperties syncSchedulerProperties,
-        GitHubExceptionClassifier exceptionClassifier,
-        GitHubGraphQlSyncCoordinator graphQlSyncHelper
-    ) {
+            RepositoryRepository repositoryRepository,
+            PullRequestRepository pullRequestRepository,
+            GitHubGraphQlClientProvider graphQlClientProvider,
+            GitHubPullRequestProcessor pullRequestProcessor,
+            GitHubPullRequestReviewSyncService reviewSyncService,
+            GitHubPullRequestReviewCommentSyncService reviewCommentSyncService,
+            GitHubIssueCommentProcessor issueCommentProcessor,
+            GitHubIssueCommentSyncService issueCommentSyncService,
+            GitHubProjectItemSyncService projectItemSyncService,
+            BackfillStateProvider backfillStateProvider,
+            TransactionTemplate transactionTemplate,
+            GitHubSyncProperties syncProperties,
+            SyncSchedulerProperties syncSchedulerProperties,
+            GitHubExceptionClassifier exceptionClassifier,
+            GitHubGraphQlSyncCoordinator graphQlSyncHelper) {
         this.repositoryRepository = repositoryRepository;
         this.pullRequestRepository = pullRequestRepository;
         this.graphQlClientProvider = graphQlClientProvider;
@@ -215,11 +214,7 @@ public class GitHubPullRequestSyncService {
      * @return sync result containing status and count of pull requests synced
      */
     public SyncResult syncForRepository(
-        Long scopeId,
-        Long repositoryId,
-        @Nullable Long syncTargetId,
-        @Nullable String initialCursor
-    ) {
+            Long scopeId, Long repositoryId, @Nullable Long syncTargetId, @Nullable String initialCursor) {
         return syncForRepository(scopeId, repositoryId, syncTargetId, initialCursor, null);
     }
 
@@ -244,12 +239,11 @@ public class GitHubPullRequestSyncService {
      * @return sync result containing status and count of pull requests synced
      */
     public SyncResult syncForRepository(
-        Long scopeId,
-        Long repositoryId,
-        @Nullable Long syncTargetId,
-        @Nullable String initialCursor,
-        @Nullable Instant lastSyncTimestamp
-    ) {
+            Long scopeId,
+            Long repositoryId,
+            @Nullable Long syncTargetId,
+            @Nullable String initialCursor,
+            @Nullable Instant lastSyncTimestamp) {
         return syncForRepositoryWithStates(scopeId, repositoryId, syncTargetId, initialCursor, lastSyncTimestamp, null);
     }
 
@@ -262,17 +256,15 @@ public class GitHubPullRequestSyncService {
      * retries automatically by splitting into per-state queries (OPEN, CLOSED, MERGED).
      */
     private SyncResult syncForRepositoryWithStates(
-        Long scopeId,
-        Long repositoryId,
-        @Nullable Long syncTargetId,
-        @Nullable String initialCursor,
-        @Nullable Instant lastSyncTimestamp,
-        @Nullable List<String> states
-    ) {
+            Long scopeId,
+            Long repositoryId,
+            @Nullable Long syncTargetId,
+            @Nullable String initialCursor,
+            @Nullable Instant lastSyncTimestamp,
+            @Nullable List<String> states) {
         // Fetch repository outside of transaction to avoid holding locks during API calls
         Optional<Repository> repositoryResult = Objects.requireNonNull(
-            transactionTemplate.execute(status -> repositoryRepository.findById(repositoryId))
-        );
+                transactionTemplate.execute(status -> repositoryRepository.findById(repositoryId)));
         Repository repository = repositoryResult.orElse(null);
         if (repository == null) {
             log.debug("Skipped pull request sync: reason=repositoryNotFound, repoId={}", repositoryId);
@@ -301,22 +293,20 @@ public class GitHubPullRequestSyncService {
                 // Subtract buffer to ensure items updated just before recorded timestamp are still fetched
                 effectiveSyncTimestamp = lastSyncTimestamp.minus(syncProperties.incrementalSyncBuffer());
                 log.info(
-                    "Starting incremental PR sync: repoName={}, since={}, buffer={}",
-                    safeNameWithOwner,
-                    effectiveSyncTimestamp,
-                    syncProperties.incrementalSyncBuffer()
-                );
+                        "Starting incremental PR sync: repoName={}, since={}, buffer={}",
+                        safeNameWithOwner,
+                        effectiveSyncTimestamp,
+                        syncProperties.incrementalSyncBuffer());
             } else {
                 // First sync - use configured timeframe as fallback to limit initial data fetch
                 effectiveSyncTimestamp = OffsetDateTime.now(ZoneOffset.UTC)
-                    .minusDays(syncSchedulerProperties.timeframeDays())
-                    .toInstant();
+                        .minusDays(syncSchedulerProperties.timeframeDays())
+                        .toInstant();
                 log.info(
-                    "Starting first PR sync with timeframe fallback: repoName={}, timeframeDays={}, since={}",
-                    safeNameWithOwner,
-                    syncSchedulerProperties.timeframeDays(),
-                    effectiveSyncTimestamp
-                );
+                        "Starting first PR sync with timeframe fallback: repoName={}, timeframeDays={}, since={}",
+                        safeNameWithOwner,
+                        syncSchedulerProperties.timeframeDays(),
+                        effectiveSyncTimestamp);
             }
             isIncrementalSync = true;
         }
@@ -326,14 +316,12 @@ public class GitHubPullRequestSyncService {
         // start-from-scratch case: a state-split retry observes a different population, and a
         // resumed cursor means we already know there is work left to page through.
         if (isIncrementalSync && effectiveSyncTimestamp != null && initialCursor == null && states == null) {
-            if (
-                !hasPullRequestsUpdatedSince(client, ownerAndName, effectiveSyncTimestamp, timeout, safeNameWithOwner)
-            ) {
+            if (!hasPullRequestsUpdatedSince(
+                    client, ownerAndName, effectiveSyncTimestamp, timeout, safeNameWithOwner)) {
                 log.info(
-                    "Skipped PR sync: reason=noUpdatedPullRequests, repoName={}, since={}",
-                    safeNameWithOwner,
-                    effectiveSyncTimestamp
-                );
+                        "Skipped PR sync: reason=noUpdatedPullRequests, repoName={}, since={}",
+                        safeNameWithOwner,
+                        effectiveSyncTimestamp);
                 return SyncResult.completed(0);
             }
         }
@@ -359,20 +347,18 @@ public class GitHubPullRequestSyncService {
 
         if (initialCursor != null) {
             log.info(
-                "Resuming pull request sync from checkpoint: repoName={}, cursor={}",
-                safeNameWithOwner,
-                initialCursor.substring(0, Math.min(20, initialCursor.length())) + "..."
-            );
+                    "Resuming pull request sync from checkpoint: repoName={}, cursor={}",
+                    safeNameWithOwner,
+                    initialCursor.substring(0, Math.min(20, initialCursor.length())) + "...");
         }
 
         while (hasMore) {
             pageCount++;
             if (pageCount >= MAX_PAGINATION_PAGES) {
                 log.warn(
-                    "Reached maximum pagination limit for pull requests: repoName={}, limit={}",
-                    safeNameWithOwner,
-                    MAX_PAGINATION_PAGES
-                );
+                        "Reached maximum pagination limit for pull requests: repoName={}, limit={}",
+                        safeNameWithOwner,
+                        MAX_PAGINATION_PAGES);
                 break;
             }
 
@@ -382,66 +368,52 @@ public class GitHubPullRequestSyncService {
                 // not body consumption, and PrematureCloseException occurs during body streaming.
                 final String currentCursor = cursor;
                 final int currentPage = pageCount;
-                ClientGraphQlResponse response = Mono.defer(() ->
-                    client
-                        .documentName(QUERY_DOCUMENT)
-                        .variable("owner", ownerAndName.owner())
-                        .variable("name", ownerAndName.name())
-                        .variable(
-                            "first",
-                            adaptPageSize(PR_SYNC_PAGE_SIZE, graphQlClientProvider.getRateLimitRemaining(scopeId))
-                        )
-                        .variable("after", currentCursor)
-                        .variable("states", states)
-                        .execute()
-                )
-                    .retryWhen(
-                        Retry.backoff(TRANSPORT_MAX_RETRIES, TRANSPORT_INITIAL_BACKOFF)
-                            .maxBackoff(TRANSPORT_MAX_BACKOFF)
-                            .jitter(JITTER_FACTOR)
-                            .filter(ScmTransportErrors::isTransportError)
-                            .doBeforeRetry(signal ->
-                                log.warn(
-                                    "Retrying PR sync after transport error: repoName={}, page={}, attempt={}, error={}",
-                                    safeNameWithOwner,
-                                    currentPage,
-                                    signal.totalRetries() + 1,
-                                    signal.failure().getMessage()
-                                )
-                            )
-                    )
-                    .block(timeout);
+                ClientGraphQlResponse response = Mono.defer(() -> client.documentName(QUERY_DOCUMENT)
+                                .variable("owner", ownerAndName.owner())
+                                .variable("name", ownerAndName.name())
+                                .variable(
+                                        "first",
+                                        adaptPageSize(
+                                                PR_SYNC_PAGE_SIZE,
+                                                graphQlClientProvider.getRateLimitRemaining(scopeId)))
+                                .variable("after", currentCursor)
+                                .variable("states", states)
+                                .execute())
+                        .retryWhen(Retry.backoff(TRANSPORT_MAX_RETRIES, TRANSPORT_INITIAL_BACKOFF)
+                                .maxBackoff(TRANSPORT_MAX_BACKOFF)
+                                .jitter(JITTER_FACTOR)
+                                .filter(ScmTransportErrors::isTransportError)
+                                .doBeforeRetry(signal -> log.warn(
+                                        "Retrying PR sync after transport error: repoName={}, page={}, attempt={}, error={}",
+                                        safeNameWithOwner,
+                                        currentPage,
+                                        signal.totalRetries() + 1,
+                                        signal.failure().getMessage())))
+                        .block(timeout);
 
                 if (response == null || !response.isValid()) {
                     ClassificationResult classification = graphQlSyncHelper.classifyGraphQlErrors(response);
                     if (classification != null) {
-                        if (
-                            graphQlSyncHelper.handleGraphQlClassification(
-                                new GraphQlClassificationContext(
-                                    classification,
-                                    retryAttempt,
-                                    MAX_RETRY_ATTEMPTS,
-                                    "pull request sync",
-                                    "repoName",
-                                    safeNameWithOwner,
-                                    log
-                                )
-                            )
-                        ) {
+                        if (graphQlSyncHelper.handleGraphQlClassification(new GraphQlClassificationContext(
+                                classification,
+                                retryAttempt,
+                                MAX_RETRY_ATTEMPTS,
+                                "pull request sync",
+                                "repoName",
+                                safeNameWithOwner,
+                                log))) {
                             retryAttempt++;
                             continue;
                         }
-                        abortReason =
-                            classification.category() == Category.RATE_LIMITED
+                        abortReason = classification.category() == Category.RATE_LIMITED
                                 ? SyncResult.Status.ABORTED_RATE_LIMIT
                                 : SyncResult.Status.ABORTED_ERROR;
                         break;
                     }
                     log.warn(
-                        "Invalid GraphQL response for pull requests: repoName={}, errors={}",
-                        safeNameWithOwner,
-                        response != null ? response.getErrors() : "null"
-                    );
+                            "Invalid GraphQL response for pull requests: repoName={}, errors={}",
+                            safeNameWithOwner,
+                            response != null ? response.getErrors() : "null");
                     abortReason = SyncResult.Status.ABORTED_ERROR;
                     break;
                 }
@@ -449,25 +421,19 @@ public class GitHubPullRequestSyncService {
                 graphQlClientProvider.trackRateLimit(scopeId, response);
 
                 if (graphQlClientProvider.isRateLimitCritical(scopeId)) {
-                    if (
-                        !graphQlSyncHelper.waitForRateLimitIfNeeded(
-                            scopeId,
-                            "pull request sync",
-                            "repoName",
-                            safeNameWithOwner,
-                            log
-                        )
-                    ) {
+                    if (!graphQlSyncHelper.waitForRateLimitIfNeeded(
+                            scopeId, "pull request sync", "repoName", safeNameWithOwner, log)) {
                         abortReason = SyncResult.Status.ABORTED_RATE_LIMIT;
                         break;
                     }
                 }
 
-                GHPullRequestConnection connection = response
-                    .field("repository.pullRequests")
-                    .toEntity(GHPullRequestConnection.class);
+                GHPullRequestConnection connection =
+                        response.field("repository.pullRequests").toEntity(GHPullRequestConnection.class);
 
-                if (connection == null || connection.getNodes() == null || connection.getNodes().isEmpty()) {
+                if (connection == null
+                        || connection.getNodes() == null
+                        || connection.getNodes().isEmpty()) {
                     break;
                 }
 
@@ -488,14 +454,13 @@ public class GitHubPullRequestSyncService {
                     org.hibernate.Hibernate.initialize(repo.getProvider());
                     ProcessingContext context = ProcessingContext.forSync(scopeId, repo);
                     return processPullRequestPage(
-                        connection,
-                        context,
-                        scopeId,
-                        prsNeedingReviewPagination,
-                        prsNeedingThreadPagination,
-                        prsNeedingCommentPagination,
-                        prsNeedingProjectItemPagination
-                    );
+                            connection,
+                            context,
+                            scopeId,
+                            prsNeedingReviewPagination,
+                            prsNeedingThreadPagination,
+                            prsNeedingCommentPagination,
+                            prsNeedingProjectItemPagination);
                 });
 
                 if (pageResult != null) {
@@ -517,11 +482,10 @@ public class GitHubPullRequestSyncService {
                 // out cleanly.
                 if (!hasMore && cursor != null && reportedTotalCount > 0 && totalPRsSynced < reportedTotalCount) {
                     log.info(
-                        "Forcing pagination past hasNextPage=false (GitHub GraphQL ~500-node bug): fetched={}, totalCount={}, repo={}",
-                        totalPRsSynced,
-                        reportedTotalCount,
-                        safeNameWithOwner
-                    );
+                            "Forcing pagination past hasNextPage=false (GitHub GraphQL ~500-node bug): fetched={}, totalCount={}, repo={}",
+                            totalPRsSynced,
+                            reportedTotalCount,
+                            safeNameWithOwner);
                     hasMore = true;
                 }
 
@@ -532,12 +496,12 @@ public class GitHubPullRequestSyncService {
                     if (!nodes.isEmpty()) {
                         var oldestPr = nodes.get(nodes.size() - 1);
                         OffsetDateTime oldestUpdatedAt = oldestPr.getUpdatedAt();
-                        if (oldestUpdatedAt != null && oldestUpdatedAt.toInstant().isBefore(effectiveSyncTimestamp)) {
+                        if (oldestUpdatedAt != null
+                                && oldestUpdatedAt.toInstant().isBefore(effectiveSyncTimestamp)) {
                             log.debug(
-                                "Stopping incremental PR sync: oldestUpdatedAt={} is before effectiveSyncTimestamp={}",
-                                oldestUpdatedAt,
-                                effectiveSyncTimestamp
-                            );
+                                    "Stopping incremental PR sync: oldestUpdatedAt={} is before effectiveSyncTimestamp={}",
+                                    oldestUpdatedAt,
+                                    effectiveSyncTimestamp);
                             hasMore = false;
                             stoppedByIncrementalSync = true;
                         }
@@ -574,11 +538,10 @@ public class GitHubPullRequestSyncService {
                         if (retryAttempt < MAX_RETRY_ATTEMPTS) {
                             retryAttempt++;
                             log.warn(
-                                "Retrying PR sync after transient error: repoName={}, attempt={}, error={}",
-                                safeNameWithOwner,
-                                retryAttempt,
-                                classification.message()
-                            );
+                                    "Retrying PR sync after transient error: repoName={}, attempt={}, error={}",
+                                    safeNameWithOwner,
+                                    retryAttempt,
+                                    classification.message());
                             try {
                                 ExponentialBackoff.sleep(retryAttempt);
                             } catch (InterruptedException ie) {
@@ -590,11 +553,10 @@ public class GitHubPullRequestSyncService {
                             continue; // Retry the same page
                         }
                         log.error(
-                            "Failed to sync PRs after {} retries: repoName={}, error={}",
-                            MAX_RETRY_ATTEMPTS,
-                            safeNameWithOwner,
-                            classification.message()
-                        );
+                                "Failed to sync PRs after {} retries: repoName={}, error={}",
+                                MAX_RETRY_ATTEMPTS,
+                                safeNameWithOwner,
+                                classification.message());
                         abortReason = SyncResult.Status.ABORTED_ERROR;
                         break;
                     }
@@ -602,15 +564,13 @@ public class GitHubPullRequestSyncService {
                         if (retryAttempt < MAX_RETRY_ATTEMPTS && classification.suggestedWait() != null) {
                             retryAttempt++;
                             long waitMs = Math.min(
-                                classification.suggestedWait().toMillis(),
-                                300_000 // Cap at 5 minutes
-                            );
+                                    classification.suggestedWait().toMillis(), 300_000 // Cap at 5 minutes
+                                    );
                             log.warn(
-                                "Rate limited during PR sync, waiting: repoName={}, waitMs={}, attempt={}",
-                                safeNameWithOwner,
-                                waitMs,
-                                retryAttempt
-                            );
+                                    "Rate limited during PR sync, waiting: repoName={}, waitMs={}, attempt={}",
+                                    safeNameWithOwner,
+                                    waitMs,
+                                    retryAttempt);
                             try {
                                 Thread.sleep(waitMs);
                             } catch (InterruptedException ie) {
@@ -622,47 +582,42 @@ public class GitHubPullRequestSyncService {
                             continue; // Retry the same page
                         }
                         log.error(
-                            "Aborting PR sync due to rate limiting: repoName={}, error={}",
-                            safeNameWithOwner,
-                            classification.message()
-                        );
+                                "Aborting PR sync due to rate limiting: repoName={}, error={}",
+                                safeNameWithOwner,
+                                classification.message());
                         abortReason = SyncResult.Status.ABORTED_RATE_LIMIT;
                         break;
                     }
                     case NOT_FOUND -> {
                         log.warn(
-                            "Resource not found during PR sync, skipping: repoName={}, error={}",
-                            safeNameWithOwner,
-                            classification.message()
-                        );
+                                "Resource not found during PR sync, skipping: repoName={}, error={}",
+                                safeNameWithOwner,
+                                classification.message());
                         abortReason = SyncResult.Status.ABORTED_ERROR;
                         break;
                     }
                     case AUTH_ERROR -> {
                         log.error(
-                            "Aborting PR sync due to auth error: repoName={}, error={}",
-                            safeNameWithOwner,
-                            classification.message()
-                        );
+                                "Aborting PR sync due to auth error: repoName={}, error={}",
+                                safeNameWithOwner,
+                                classification.message());
                         abortReason = SyncResult.Status.ABORTED_ERROR;
                         break;
                     }
                     case CLIENT_ERROR -> {
                         log.error(
-                            "Aborting PR sync due to client error: repoName={}, error={}",
-                            safeNameWithOwner,
-                            classification.message()
-                        );
+                                "Aborting PR sync due to client error: repoName={}, error={}",
+                                safeNameWithOwner,
+                                classification.message());
                         abortReason = SyncResult.Status.ABORTED_ERROR;
                         break;
                     }
                     default -> {
                         log.error(
-                            "Aborting PR sync due to unknown error: repoName={}, error={}",
-                            safeNameWithOwner,
-                            classification.message(),
-                            e
-                        );
+                                "Aborting PR sync due to unknown error: repoName={}, error={}",
+                                safeNameWithOwner,
+                                classification.message(),
+                                e);
                         abortReason = SyncResult.Status.ABORTED_ERROR;
                         break;
                     }
@@ -680,103 +635,88 @@ public class GitHubPullRequestSyncService {
             // true only on a real early-stop gap (empty page after force-pagination), not on the
             // benign case where GitHub's totalCount over-reports.
             boolean overflowDetected = GraphQlConnectionOverflowDetector.checkPaginated(
-                "pullRequests",
-                totalPRsSynced,
-                reportedTotalCount,
-                abortReason != null || hasMore,
-                safeNameWithOwner
-            );
-            if (overflowDetected && states == null && !stoppedByIncrementalSync) {
-                log.info(
-                    "PR connection overflow persists after force-pagination (fetched={}, total={}), " +
-                        "falling back to state splitting: repo={}",
+                    "pullRequests",
                     totalPRsSynced,
                     reportedTotalCount,
-                    safeNameWithOwner
-                );
+                    abortReason != null || hasMore,
+                    safeNameWithOwner);
+            if (overflowDetected && states == null && !stoppedByIncrementalSync) {
+                log.info(
+                        "PR connection overflow persists after force-pagination (fetched={}, total={}), "
+                                + "falling back to state splitting: repo={}",
+                        totalPRsSynced,
+                        reportedTotalCount,
+                        safeNameWithOwner);
                 // Clear stale cursor from the truncated run before retrying
                 if (syncTargetId != null) {
                     clearCursorCheckpoint(syncTargetId);
                 }
                 SyncResult[] stateResults = Stream.of("OPEN", "CLOSED", "MERGED")
-                    .map(state -> {
-                        log.info("State-split sync: repo={}, state={}", safeNameWithOwner, state);
-                        return syncForRepositoryWithStates(
-                            scopeId,
-                            repositoryId,
-                            null, // no cursor persistence for state-split retries
-                            null, // start fresh
-                            lastSyncTimestamp,
-                            List.of(state)
-                        );
-                    })
-                    .toArray(SyncResult[]::new);
+                        .map(state -> {
+                            log.info("State-split sync: repo={}, state={}", safeNameWithOwner, state);
+                            return syncForRepositoryWithStates(
+                                    scopeId,
+                                    repositoryId,
+                                    null, // no cursor persistence for state-split retries
+                                    null, // start fresh
+                                    lastSyncTimestamp,
+                                    List.of(state));
+                        })
+                        .toArray(SyncResult[]::new);
                 return SyncResult.merge(stateResults);
             }
             if (overflowDetected && states != null) {
                 log.error(
-                    "PR sync data loss: state={} still has more PRs than GitHub GraphQL can return. " +
-                        "fetched={}, totalCount={}, repo={}. No further recovery possible.",
-                    states,
-                    totalPRsSynced,
-                    reportedTotalCount,
-                    safeNameWithOwner
-                );
+                        "PR sync data loss: state={} still has more PRs than GitHub GraphQL can return. "
+                                + "fetched={}, totalCount={}, repo={}. No further recovery possible.",
+                        states,
+                        totalPRsSynced,
+                        reportedTotalCount,
+                        safeNameWithOwner);
             }
         }
 
         if (!prsNeedingReviewPagination.isEmpty()) {
             log.debug(
-                "Starting additional review fetch for PRs with pagination: repoName={}, prCount={}",
-                safeNameWithOwner,
-                prsNeedingReviewPagination.size()
-            );
+                    "Starting additional review fetch for PRs with pagination: repoName={}, prCount={}",
+                    safeNameWithOwner,
+                    prsNeedingReviewPagination.size());
             for (PullRequestWithReviewCursor prWithCursor : prsNeedingReviewPagination) {
                 // Pagination runs in a new transaction, so reload the repository eagerly.
                 PullRequest pr = pullRequestRepository
-                    .findByIdWithRepository(prWithCursor.pullRequestId())
-                    .orElse(null);
+                        .findByIdWithRepository(prWithCursor.pullRequestId())
+                        .orElse(null);
                 if (pr == null) {
                     log.debug(
-                        "Skipped review pagination: reason=prNotFound (likely transaction rollback), prId={}",
-                        prWithCursor.pullRequestId()
-                    );
+                            "Skipped review pagination: reason=prNotFound (likely transaction rollback), prId={}",
+                            prWithCursor.pullRequestId());
                     continue;
                 }
                 int additionalReviews = reviewSyncService.syncRemainingReviews(
-                    scopeId,
-                    pr,
-                    prWithCursor.reviewCursor(),
-                    prWithCursor.inlineCount()
-                );
+                        scopeId, pr, prWithCursor.reviewCursor(), prWithCursor.inlineCount());
                 totalReviewsSynced += additionalReviews;
             }
         }
 
         if (!prsNeedingThreadPagination.isEmpty()) {
             log.debug(
-                "Starting additional review thread fetch for PRs with pagination: repoName={}, prCount={}",
-                safeNameWithOwner,
-                prsNeedingThreadPagination.size()
-            );
+                    "Starting additional review thread fetch for PRs with pagination: repoName={}, prCount={}",
+                    safeNameWithOwner,
+                    prsNeedingThreadPagination.size());
             for (PullRequestWithThreadCursor prWithCursor : prsNeedingThreadPagination) {
                 // Re-fetch with repository eagerly loaded to avoid LazyInitializationException in
                 // the new transaction; skip if the creating transaction was rolled back.
                 PullRequest pr = pullRequestRepository
-                    .findByIdWithRepository(prWithCursor.pullRequestId())
-                    .orElse(null);
+                        .findByIdWithRepository(prWithCursor.pullRequestId())
+                        .orElse(null);
                 if (pr == null) {
                     log.debug(
-                        "Skipped thread pagination: reason=prNotFound (likely transaction rollback), prId={}",
-                        prWithCursor.pullRequestId()
-                    );
+                            "Skipped thread pagination: reason=prNotFound (likely transaction rollback), prId={}",
+                            prWithCursor.pullRequestId());
                     continue;
                 }
-                int additionalComments = reviewCommentSyncService.syncRemainingThreads(
-                    scopeId,
-                    pr,
-                    prWithCursor.threadCursor()
-                );
+                int additionalComments =
+                        reviewCommentSyncService.syncRemainingThreads(scopeId, pr, prWithCursor.threadCursor());
                 totalReviewCommentsSynced += additionalComments;
             }
         }
@@ -785,58 +725,50 @@ public class GitHubPullRequestSyncService {
         // and that service routes on the parent's concrete type.
         if (!prsNeedingCommentPagination.isEmpty()) {
             log.debug(
-                "Starting additional conversation comment fetch for PRs with pagination: repoName={}, prCount={}",
-                safeNameWithOwner,
-                prsNeedingCommentPagination.size()
-            );
+                    "Starting additional conversation comment fetch for PRs with pagination: repoName={}, prCount={}",
+                    safeNameWithOwner,
+                    prsNeedingCommentPagination.size());
             for (PullRequestWithCommentCursor prWithCursor : prsNeedingCommentPagination) {
                 // Pagination runs in a new transaction, so reload the repository eagerly.
                 PullRequest pr = pullRequestRepository
-                    .findByIdWithRepository(prWithCursor.pullRequestId())
-                    .orElse(null);
+                        .findByIdWithRepository(prWithCursor.pullRequestId())
+                        .orElse(null);
                 if (pr == null) {
                     log.debug(
-                        "Skipped comment pagination: reason=prNotFound (likely transaction rollback), prId={}",
-                        prWithCursor.pullRequestId()
-                    );
+                            "Skipped comment pagination: reason=prNotFound (likely transaction rollback), prId={}",
+                            prWithCursor.pullRequestId());
                     continue;
                 }
-                int additionalComments = issueCommentSyncService.syncRemainingComments(
-                    scopeId,
-                    pr,
-                    prWithCursor.commentCursor()
-                );
+                int additionalComments =
+                        issueCommentSyncService.syncRemainingComments(scopeId, pr, prWithCursor.commentCursor());
                 totalCommentsSynced += additionalComments;
             }
         }
 
         if (!prsNeedingProjectItemPagination.isEmpty()) {
             log.debug(
-                "Starting additional project item fetch for PRs with pagination: repoName={}, prCount={}",
-                safeNameWithOwner,
-                prsNeedingProjectItemPagination.size()
-            );
+                    "Starting additional project item fetch for PRs with pagination: repoName={}, prCount={}",
+                    safeNameWithOwner,
+                    prsNeedingProjectItemPagination.size());
             for (PullRequestWithProjectItemCursor prWithCursor : prsNeedingProjectItemPagination) {
                 // Re-fetch with repository eagerly loaded to avoid LazyInitializationException in
                 // the new transaction; skip if the creating transaction was rolled back.
                 PullRequest pr = pullRequestRepository
-                    .findByIdWithRepository(prWithCursor.pullRequestId())
-                    .orElse(null);
+                        .findByIdWithRepository(prWithCursor.pullRequestId())
+                        .orElse(null);
                 if (pr == null) {
                     log.debug(
-                        "Skipped project item pagination: reason=prNotFound (likely transaction rollback), prId={}",
-                        prWithCursor.pullRequestId()
-                    );
+                            "Skipped project item pagination: reason=prNotFound (likely transaction rollback), prId={}",
+                            prWithCursor.pullRequestId());
                     continue;
                 }
                 int additionalItems = projectItemSyncService.syncRemainingProjectItems(
-                    scopeId,
-                    prWithCursor.nodeId(),
-                    true, // This is a pull request
-                    pr.requireRepository(),
-                    prWithCursor.projectItemCursor(),
-                    pr.getId()
-                );
+                        scopeId,
+                        prWithCursor.nodeId(),
+                        true, // This is a pull request
+                        pr.requireRepository(),
+                        prWithCursor.projectItemCursor(),
+                        pr.getId());
                 totalProjectItemsSynced += additionalItems;
             }
         }
@@ -848,46 +780,39 @@ public class GitHubPullRequestSyncService {
         SyncResult.Status finalStatus = abortReason != null ? abortReason : SyncResult.Status.COMPLETED;
 
         log.info(
-            "Completed pull request sync: repoName={}, prCount={}, reviewCount={}, reviewCommentCount={}, commentCount={}, projectItemCount={}, prsWithReviewPagination={}, prsWithThreadPagination={}, prsWithCommentPagination={}, prsWithProjectItemPagination={}, resumed={}, incremental={}, stoppedByIncremental={}, status={}",
-            safeNameWithOwner,
-            totalPRsSynced,
-            totalReviewsSynced,
-            totalReviewCommentsSynced,
-            totalCommentsSynced,
-            totalProjectItemsSynced,
-            prsNeedingReviewPagination.size(),
-            prsNeedingThreadPagination.size(),
-            prsNeedingCommentPagination.size(),
-            prsNeedingProjectItemPagination.size(),
-            resuming,
-            incrementalSync,
-            stoppedByIncrementalSync,
-            finalStatus
-        );
+                "Completed pull request sync: repoName={}, prCount={}, reviewCount={}, reviewCommentCount={}, commentCount={}, projectItemCount={}, prsWithReviewPagination={}, prsWithThreadPagination={}, prsWithCommentPagination={}, prsWithProjectItemPagination={}, resumed={}, incremental={}, stoppedByIncremental={}, status={}",
+                safeNameWithOwner,
+                totalPRsSynced,
+                totalReviewsSynced,
+                totalReviewCommentsSynced,
+                totalCommentsSynced,
+                totalProjectItemsSynced,
+                prsNeedingReviewPagination.size(),
+                prsNeedingThreadPagination.size(),
+                prsNeedingCommentPagination.size(),
+                prsNeedingProjectItemPagination.size(),
+                resuming,
+                incrementalSync,
+                stoppedByIncrementalSync,
+                finalStatus);
         return new SyncResult(finalStatus, totalPRsSynced);
     }
 
     private record PageSyncResult(
-        int prsSynced,
-        int reviewsSynced,
-        int reviewCommentsSynced,
-        int commentsSynced,
-        int projectItemsSynced
-    ) {}
+            int prsSynced, int reviewsSynced, int reviewCommentsSynced, int commentsSynced, int projectItemsSynced) {}
 
     /**
      * Processes a page of pull requests with their embedded conversation comments, reviews,
      * review threads, and project items.
      */
     private PageSyncResult processPullRequestPage(
-        GHPullRequestConnection connection,
-        ProcessingContext context,
-        Long scopeId,
-        List<PullRequestWithReviewCursor> prsNeedingReviewPagination,
-        List<PullRequestWithThreadCursor> prsNeedingThreadPagination,
-        List<PullRequestWithCommentCursor> prsNeedingCommentPagination,
-        List<PullRequestWithProjectItemCursor> prsNeedingProjectItemPagination
-    ) {
+            GHPullRequestConnection connection,
+            ProcessingContext context,
+            Long scopeId,
+            List<PullRequestWithReviewCursor> prsNeedingReviewPagination,
+            List<PullRequestWithThreadCursor> prsNeedingThreadPagination,
+            List<PullRequestWithCommentCursor> prsNeedingCommentPagination,
+            List<PullRequestWithProjectItemCursor> prsNeedingProjectItemPagination) {
         int prsSynced = 0;
         int reviewsSynced = 0;
         int reviewCommentsSynced = 0;
@@ -895,9 +820,8 @@ public class GitHubPullRequestSyncService {
         int projectItemsSynced = 0;
 
         for (var graphQlPullRequest : connection.getNodes()) {
-            PullRequestWithReviewThreads prWithReviews = PullRequestWithReviewThreads.fromPullRequest(
-                graphQlPullRequest
-            );
+            PullRequestWithReviewThreads prWithReviews =
+                    PullRequestWithReviewThreads.fromPullRequest(graphQlPullRequest);
             if (prWithReviews == null || prWithReviews.pullRequest() == null) {
                 continue;
             }
@@ -919,12 +843,8 @@ public class GitHubPullRequestSyncService {
             }
 
             if (embeddedComments.needsPagination()) {
-                prsNeedingCommentPagination.add(
-                    new PullRequestWithCommentCursor(
-                        entity.getId(),
-                        Objects.requireNonNull(embeddedComments.endCursor())
-                    )
-                );
+                prsNeedingCommentPagination.add(new PullRequestWithCommentCursor(
+                        entity.getId(), Objects.requireNonNull(embeddedComments.endCursor())));
             }
 
             // context enables activity event creation for inline reviews
@@ -936,13 +856,10 @@ public class GitHubPullRequestSyncService {
             }
 
             if (embeddedReviews.needsPagination()) {
-                prsNeedingReviewPagination.add(
-                    new PullRequestWithReviewCursor(
+                prsNeedingReviewPagination.add(new PullRequestWithReviewCursor(
                         entity.getId(),
                         Objects.requireNonNull(embeddedReviews.endCursor()),
-                        embeddedReviews.reviews().size()
-                    )
-                );
+                        embeddedReviews.reviews().size()));
             }
 
             EmbeddedReviewThreadsDTO embeddedThreads = prWithReviews.embeddedReviewThreads();
@@ -951,26 +868,19 @@ public class GitHubPullRequestSyncService {
             }
 
             if (embeddedThreads.needsPagination()) {
-                prsNeedingThreadPagination.add(
-                    new PullRequestWithThreadCursor(entity.getId(), Objects.requireNonNull(embeddedThreads.endCursor()))
-                );
+                prsNeedingThreadPagination.add(new PullRequestWithThreadCursor(
+                        entity.getId(), Objects.requireNonNull(embeddedThreads.endCursor())));
             }
 
             EmbeddedProjectItemsDTO embeddedProjectItems = prWithReviews.embeddedProjectItems();
-            projectItemsSynced += projectItemSyncService.processEmbeddedItems(
-                embeddedProjectItems,
-                context,
-                entity.getId()
-            );
+            projectItemsSynced +=
+                    projectItemSyncService.processEmbeddedItems(embeddedProjectItems, context, entity.getId());
 
             if (embeddedProjectItems.needsPagination()) {
-                prsNeedingProjectItemPagination.add(
-                    new PullRequestWithProjectItemCursor(
+                prsNeedingProjectItemPagination.add(new PullRequestWithProjectItemCursor(
                         entity.getId(),
                         prWithReviews.pullRequest().nodeId(),
-                        Objects.requireNonNull(embeddedProjectItems.endCursor())
-                    )
-                );
+                        Objects.requireNonNull(embeddedProjectItems.endCursor())));
             }
         }
 
@@ -997,41 +907,32 @@ public class GitHubPullRequestSyncService {
      * @return {@code false} only when the probe positively proves nothing changed
      */
     private boolean hasPullRequestsUpdatedSince(
-        HttpGraphQlClient client,
-        RepositoryOwnerAndName ownerAndName,
-        Instant since,
-        Duration timeout,
-        String safeNameWithOwner
-    ) {
+            HttpGraphQlClient client,
+            RepositoryOwnerAndName ownerAndName,
+            Instant since,
+            Duration timeout,
+            String safeNameWithOwner) {
         try {
-            ClientGraphQlResponse response = Mono.defer(() ->
-                client
-                    .documentName("GetRepositoryPullRequestLatestUpdate")
-                    .variable("owner", ownerAndName.owner())
-                    .variable("name", ownerAndName.name())
-                    .execute()
-            )
-                .retryWhen(
-                    Retry.backoff(TRANSPORT_MAX_RETRIES, TRANSPORT_INITIAL_BACKOFF)
-                        .maxBackoff(TRANSPORT_MAX_BACKOFF)
-                        .jitter(JITTER_FACTOR)
-                        .filter(ScmTransportErrors::isTransportError)
-                        .doBeforeRetry(signal ->
-                            log.warn(
-                                "Retrying after transport error: context=pullRequestUpdateProbe, repoName={}, attempt={}, error={}",
-                                safeNameWithOwner,
-                                signal.totalRetries() + 1,
-                                signal.failure().getMessage()
-                            )
-                        )
-                )
-                .block(timeout);
+            ClientGraphQlResponse response = Mono.defer(
+                            () -> client.documentName("GetRepositoryPullRequestLatestUpdate")
+                                    .variable("owner", ownerAndName.owner())
+                                    .variable("name", ownerAndName.name())
+                                    .execute())
+                    .retryWhen(Retry.backoff(TRANSPORT_MAX_RETRIES, TRANSPORT_INITIAL_BACKOFF)
+                            .maxBackoff(TRANSPORT_MAX_BACKOFF)
+                            .jitter(JITTER_FACTOR)
+                            .filter(ScmTransportErrors::isTransportError)
+                            .doBeforeRetry(signal -> log.warn(
+                                    "Retrying after transport error: context=pullRequestUpdateProbe, repoName={}, attempt={}, error={}",
+                                    safeNameWithOwner,
+                                    signal.totalRetries() + 1,
+                                    signal.failure().getMessage())))
+                    .block(timeout);
 
             if (response == null || !response.isValid()) {
                 log.warn(
-                    "PR update probe returned invalid response, falling back to full sync: repoName={}",
-                    safeNameWithOwner
-                );
+                        "PR update probe returned invalid response, falling back to full sync: repoName={}",
+                        safeNameWithOwner);
                 return true;
             }
 
@@ -1044,21 +945,20 @@ public class GitHubPullRequestSyncService {
             Object rawUpdatedAt = nodes.get(0).get("updatedAt");
             if (rawUpdatedAt == null) {
                 log.warn(
-                    "PR update probe returned null updatedAt, falling back to full sync: repoName={}",
-                    safeNameWithOwner
-                );
+                        "PR update probe returned null updatedAt, falling back to full sync: repoName={}",
+                        safeNameWithOwner);
                 return true;
             }
 
-            Instant newestUpdatedAt = OffsetDateTime.parse(rawUpdatedAt.toString()).toInstant();
+            Instant newestUpdatedAt =
+                    OffsetDateTime.parse(rawUpdatedAt.toString()).toInstant();
             return !newestUpdatedAt.isBefore(since);
         } catch (Exception e) {
             // Fail-open: if the probe itself fails, proceed with the full sync
             log.warn(
-                "PR update probe failed, falling back to full sync: repoName={}, error={}",
-                safeNameWithOwner,
-                e.getMessage()
-            );
+                    "PR update probe failed, falling back to full sync: repoName={}, error={}",
+                    safeNameWithOwner,
+                    e.getMessage());
             return true;
         }
     }
@@ -1071,9 +971,8 @@ public class GitHubPullRequestSyncService {
      * to avoid Spring proxy issues with self-invocation.
      */
     private void persistCursorCheckpoint(Long syncTargetId, String cursor) {
-        TransactionTemplate requiresNewTemplate = new TransactionTemplate(
-            Objects.requireNonNull(transactionTemplate.getTransactionManager())
-        );
+        TransactionTemplate requiresNewTemplate =
+                new TransactionTemplate(Objects.requireNonNull(transactionTemplate.getTransactionManager()));
         requiresNewTemplate.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
         requiresNewTemplate.executeWithoutResult(status -> {
             backfillStateProvider.updateSyncCursor(syncTargetId, SyncCursorKind.PULL_REQUEST, cursor);
@@ -1089,9 +988,8 @@ public class GitHubPullRequestSyncService {
      * to avoid Spring proxy issues with self-invocation.
      */
     private void clearCursorCheckpoint(Long syncTargetId) {
-        TransactionTemplate requiresNewTemplate = new TransactionTemplate(
-            Objects.requireNonNull(transactionTemplate.getTransactionManager())
-        );
+        TransactionTemplate requiresNewTemplate =
+                new TransactionTemplate(Objects.requireNonNull(transactionTemplate.getTransactionManager()));
         requiresNewTemplate.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
         requiresNewTemplate.executeWithoutResult(status -> {
             backfillStateProvider.updateSyncCursor(syncTargetId, SyncCursorKind.PULL_REQUEST, null);

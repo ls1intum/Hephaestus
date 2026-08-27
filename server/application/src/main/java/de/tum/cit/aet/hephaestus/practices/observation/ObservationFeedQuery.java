@@ -18,12 +18,11 @@ import org.jspecify.annotations.Nullable;
  *     direction on the {@code Pageable} instead
  */
 public record ObservationFeedQuery(
-    @Nullable String practiceSlug,
-    @Nullable String groupSlug,
-    @Nullable Presence presence,
-    @Nullable List<ArtifactKind> artifactKinds,
-    @Nullable List<Severity> severities,
-    boolean displayableOnly,
-    ObservationService.ObservationSort sort,
-    boolean mostSevereFirst
-) {}
+        @Nullable String practiceSlug,
+        @Nullable String groupSlug,
+        @Nullable Presence presence,
+        @Nullable List<ArtifactKind> artifactKinds,
+        @Nullable List<Severity> severities,
+        boolean displayableOnly,
+        ObservationService.ObservationSort sort,
+        boolean mostSevereFirst) {}

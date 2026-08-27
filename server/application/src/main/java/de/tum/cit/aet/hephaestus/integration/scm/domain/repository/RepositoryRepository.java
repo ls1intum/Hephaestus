@@ -59,8 +59,7 @@ public interface RepositoryRepository extends JpaRepository<Repository, Long> {
      * Finds a repository by its full name with the organization eagerly fetched.
      */
     @Query(
-        "SELECT r FROM Repository r LEFT JOIN FETCH r.organization LEFT JOIN FETCH r.provider WHERE r.nameWithOwner = :nameWithOwner"
-    )
+            "SELECT r FROM Repository r LEFT JOIN FETCH r.organization LEFT JOIN FETCH r.provider WHERE r.nameWithOwner = :nameWithOwner")
     Optional<Repository> findByNameWithOwnerWithOrganization(@Param("nameWithOwner") String nameWithOwner);
 
     /**
@@ -110,21 +109,18 @@ public interface RepositoryRepository extends JpaRepository<Repository, Long> {
      * <p>Ordered because callers scan a CAPPED prefix of the result into agent context: an arbitrary plan
      * order would vary which repositories the detector sees between runs over identical work.
      */
-    @Query(
-        """
+    @Query("""
         SELECT r FROM Repository r LEFT JOIN FETCH r.provider
         WHERE r.nameWithOwner IN (
             SELECT m.nameWithOwner FROM RepositoryToMonitor m WHERE m.workspace.id = :workspaceId
         )
         ORDER BY r.nameWithOwner
-        """
-    )
+        """)
     List<Repository> findAllByWorkspaceMonitors(@Param("workspaceId") Long workspaceId);
 
     @Transactional
     @Modifying
-    @Query(
-        value = """
+    @Query(value = """
         INSERT INTO repository (native_id, provider_id, name_with_owner, name, is_private, html_url,
                                 visibility, default_branch, pushed_at, is_archived, is_disabled,
                                 has_discussions_enabled, organization_id)
@@ -137,15 +133,12 @@ public interface RepositoryRepository extends JpaRepository<Repository, Long> {
             is_private = EXCLUDED.is_private,
             visibility = EXCLUDED.visibility,
             organization_id = COALESCE(repository.organization_id, EXCLUDED.organization_id)
-        """,
-        nativeQuery = true
-    )
+        """, nativeQuery = true)
     void upsertFromSnapshot(
-        @Param("nativeId") long nativeId,
-        @Param("providerId") long providerId,
-        @Param("nameWithOwner") String nameWithOwner,
-        @Param("name") String name,
-        @Param("isPrivate") boolean isPrivate,
-        @Param("organizationId") @Nullable Long organizationId
-    );
+            @Param("nativeId") long nativeId,
+            @Param("providerId") long providerId,
+            @Param("nameWithOwner") String nameWithOwner,
+            @Param("name") String name,
+            @Param("isPrivate") boolean isPrivate,
+            @Param("organizationId") @Nullable Long organizationId);
 }

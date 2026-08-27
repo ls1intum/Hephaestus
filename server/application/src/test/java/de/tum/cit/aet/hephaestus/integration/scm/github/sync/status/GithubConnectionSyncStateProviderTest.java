@@ -80,47 +80,40 @@ class GithubConnectionSyncStateProviderTest extends BaseUnitTest {
 
     private GithubConnectionSyncStateProvider provider(SyncSchedulerProperties properties) {
         return new GithubConnectionSyncStateProvider(
-            connectionRepository,
-            rateLimitTracker,
-            suspensionTracker,
-            properties,
-            repositoryToMonitorRepository,
-            repositoryRepository,
-            countReader
-        );
+                connectionRepository,
+                rateLimitTracker,
+                suspensionTracker,
+                properties,
+                repositoryToMonitorRepository,
+                repositoryRepository,
+                countReader);
     }
 
     private static SyncSchedulerProperties schedulerProperties(boolean backfillEnabled) {
         return new SyncSchedulerProperties(
-            true,
-            7,
-            "0 0 3 * * *",
-            15,
-            new BackfillProperties(backfillEnabled, 50, 100, 60),
-            new FilterProperties(Set.of(), Set.of(), Set.of()),
-            null,
-            null
-        );
+                true,
+                7,
+                "0 0 3 * * *",
+                15,
+                new BackfillProperties(backfillEnabled, 50, 100, 60),
+                new FilterProperties(Set.of(), Set.of(), Set.of()),
+                null,
+                null);
     }
 
     private Connection githubAppConnection() {
         Connection connection = new Connection(
-            workspace,
-            IntegrationKind.GITHUB,
-            String.valueOf(INSTALLATION_ID),
-            new ConnectionConfig.GitHubAppConfig(INSTALLATION_ID, "acme", null, Set.of())
-        );
+                workspace,
+                IntegrationKind.GITHUB,
+                String.valueOf(INSTALLATION_ID),
+                new ConnectionConfig.GitHubAppConfig(INSTALLATION_ID, "acme", null, Set.of()));
         ReflectionTestUtils.setField(connection, "id", CONNECTION_ID);
         return connection;
     }
 
     private Connection githubPatConnection() {
         Connection connection = new Connection(
-            workspace,
-            IntegrationKind.GITHUB,
-            "pat",
-            new ConnectionConfig.GitHubPatConfig("acme", null, Set.of())
-        );
+                workspace, IntegrationKind.GITHUB, "pat", new ConnectionConfig.GitHubPatConfig("acme", null, Set.of()));
         ReflectionTestUtils.setField(connection, "id", CONNECTION_ID);
         return connection;
     }
@@ -131,7 +124,8 @@ class GithubConnectionSyncStateProviderTest extends BaseUnitTest {
         @Test
         void appInstallationNotSuspended_webhookRegisteredTrueAndHealthy() {
             when(connectionRepository.findById(CONNECTION_ID)).thenReturn(Optional.of(githubAppConnection()));
-            when(suspensionTracker.isInstallationMarkedSuspended(INSTALLATION_ID)).thenReturn(false);
+            when(suspensionTracker.isInstallationMarkedSuspended(INSTALLATION_ID))
+                    .thenReturn(false);
 
             ConnectionSyncDetails details = provider(schedulerProperties(false)).describe(ref, CONNECTION_ID);
 
@@ -142,7 +136,8 @@ class GithubConnectionSyncStateProviderTest extends BaseUnitTest {
         @Test
         void appInstallationSuspended_vendorHealthDegraded() {
             when(connectionRepository.findById(CONNECTION_ID)).thenReturn(Optional.of(githubAppConnection()));
-            when(suspensionTracker.isInstallationMarkedSuspended(INSTALLATION_ID)).thenReturn(true);
+            when(suspensionTracker.isInstallationMarkedSuspended(INSTALLATION_ID))
+                    .thenReturn(true);
 
             ConnectionSyncDetails details = provider(schedulerProperties(false)).describe(ref, CONNECTION_ID);
 
@@ -162,13 +157,8 @@ class GithubConnectionSyncStateProviderTest extends BaseUnitTest {
         @Test
         void rateLimitSnapshot_passedThroughFromTracker() {
             when(connectionRepository.findById(CONNECTION_ID)).thenReturn(Optional.of(githubAppConnection()));
-            RateLimitSnapshot snapshot = new RateLimitSnapshot(
-                5000,
-                4200,
-                Instant.now().plusSeconds(1800),
-                Instant.now(),
-                null
-            );
+            RateLimitSnapshot snapshot =
+                    new RateLimitSnapshot(5000, 4200, Instant.now().plusSeconds(1800), Instant.now(), null);
             when(rateLimitTracker.snapshot(WORKSPACE_ID)).thenReturn(snapshot);
 
             ConnectionSyncDetails details = provider(schedulerProperties(false)).describe(ref, CONNECTION_ID);
@@ -220,17 +210,17 @@ class GithubConnectionSyncStateProviderTest extends BaseUnitTest {
         void nextScheduledSyncAt_invalidCron_isNull() {
             when(connectionRepository.findById(CONNECTION_ID)).thenReturn(Optional.of(githubAppConnection()));
             SyncSchedulerProperties broken = new SyncSchedulerProperties(
-                true,
-                7,
-                "not a cron",
-                15,
-                new BackfillProperties(false, 50, 100, 60),
-                new FilterProperties(Set.of(), Set.of(), Set.of()),
-                null,
-                null
-            );
+                    true,
+                    7,
+                    "not a cron",
+                    15,
+                    new BackfillProperties(false, 50, 100, 60),
+                    new FilterProperties(Set.of(), Set.of(), Set.of()),
+                    null,
+                    null);
 
-            assertThat(provider(broken).describe(ref, CONNECTION_ID).nextScheduledSyncAt()).isNull();
+            assertThat(provider(broken).describe(ref, CONNECTION_ID).nextScheduledSyncAt())
+                    .isNull();
         }
 
         @Test
@@ -298,7 +288,8 @@ class GithubConnectionSyncStateProviderTest extends BaseUnitTest {
         void noMonitoredRepositories_returnsEmptyList() {
             when(repositoryToMonitorRepository.findByWorkspaceId(WORKSPACE_ID)).thenReturn(List.of());
 
-            List<SyncResourceState> resources = provider(schedulerProperties(false)).resources(ref, CONNECTION_ID);
+            List<SyncResourceState> resources =
+                    provider(schedulerProperties(false)).resources(ref, CONNECTION_ID);
 
             assertThat(resources).isEmpty();
         }
@@ -319,11 +310,11 @@ class GithubConnectionSyncStateProviderTest extends BaseUnitTest {
             when(repositoryRepository.findAllByWorkspaceMonitors(WORKSPACE_ID)).thenReturn(List.of(repository));
 
             // Headline itemCount is issues + pull requests: 30 + 12 = 42.
-            when(countReader.countsByRepositoryId(anyCollection())).thenReturn(
-                Map.of(900L, new ScmResourceCounts(30, 12, 0, 0, 0, 0))
-            );
+            when(countReader.countsByRepositoryId(anyCollection()))
+                    .thenReturn(Map.of(900L, new ScmResourceCounts(30, 12, 0, 0, 0, 0)));
 
-            List<SyncResourceState> resources = provider(schedulerProperties(false)).resources(ref, CONNECTION_ID);
+            List<SyncResourceState> resources =
+                    provider(schedulerProperties(false)).resources(ref, CONNECTION_ID);
 
             assertThat(resources).hasSize(1);
             SyncResourceState resource = resources.get(0);
@@ -344,7 +335,8 @@ class GithubConnectionSyncStateProviderTest extends BaseUnitTest {
             when(repositoryToMonitorRepository.findByWorkspaceId(WORKSPACE_ID)).thenReturn(List.of(rtm));
             when(repositoryRepository.findAllByWorkspaceMonitors(WORKSPACE_ID)).thenReturn(List.of());
 
-            List<SyncResourceState> resources = provider(schedulerProperties(false)).resources(ref, CONNECTION_ID);
+            List<SyncResourceState> resources =
+                    provider(schedulerProperties(false)).resources(ref, CONNECTION_ID);
 
             assertThat(resources).hasSize(1);
             assertThat(resources.get(0).state()).isEqualTo("PENDING");
@@ -364,23 +356,22 @@ class GithubConnectionSyncStateProviderTest extends BaseUnitTest {
             repository.setId(900L);
             repository.setNameWithOwner("acme/repo-a");
             when(repositoryRepository.findAllByWorkspaceMonitors(WORKSPACE_ID)).thenReturn(List.of(repository));
-            when(countReader.countsByRepositoryId(anyCollection())).thenReturn(
-                Map.of(900L, new ScmResourceCounts(30, 12, 13, 14, 15, 16))
-            );
+            when(countReader.countsByRepositoryId(anyCollection()))
+                    .thenReturn(Map.of(900L, new ScmResourceCounts(30, 12, 13, 14, 15, 16)));
 
-            List<SyncResourceState> resources = provider(schedulerProperties(false)).resources(ref, CONNECTION_ID);
+            List<SyncResourceState> resources =
+                    provider(schedulerProperties(false)).resources(ref, CONNECTION_ID);
 
             SyncResourceState resource = resources.get(0);
             assertThat(resource.counts())
-                .extracting(SyncResourceCount::key, SyncResourceCount::count)
-                .containsExactly(
-                    tuple("issues", 30L),
-                    tuple("pullRequests", 12L),
-                    tuple("issueComments", 13L),
-                    tuple("reviews", 14L),
-                    tuple("reviewComments", 15L),
-                    tuple("commits", 16L)
-                );
+                    .extracting(SyncResourceCount::key, SyncResourceCount::count)
+                    .containsExactly(
+                            tuple("issues", 30L),
+                            tuple("pullRequests", 12L),
+                            tuple("issueComments", 13L),
+                            tuple("reviews", 14L),
+                            tuple("reviewComments", 15L),
+                            tuple("commits", 16L));
             // The headline must stay the rollup of only the classes the sync calls "items" — the
             // comment/review/commit counts are much larger and would visibly inflate it if included.
             assertThat(resource.itemCount()).isEqualTo(42L);
@@ -400,23 +391,21 @@ class GithubConnectionSyncStateProviderTest extends BaseUnitTest {
             repository.setId(900L);
             repository.setNameWithOwner("acme/repo-a");
             when(repositoryRepository.findAllByWorkspaceMonitors(WORKSPACE_ID)).thenReturn(List.of(repository));
-            when(countReader.countsByRepositoryId(anyCollection())).thenReturn(
-                Map.of(900L, new ScmResourceCounts(30, 12, 0, 0, 0, 0))
-            );
+            when(countReader.countsByRepositoryId(anyCollection()))
+                    .thenReturn(Map.of(900L, new ScmResourceCounts(30, 12, 0, 0, 0, 0)));
 
-            List<SyncResourceState> resources = provider(schedulerProperties(false)).resources(ref, CONNECTION_ID);
+            List<SyncResourceState> resources =
+                    provider(schedulerProperties(false)).resources(ref, CONNECTION_ID);
 
             List<SyncResourceCount> counts = resources.get(0).counts();
-            SyncResourceCount issues = counts
-                .stream()
-                .filter(c -> c.key().equals("issues"))
-                .findFirst()
-                .orElseThrow();
-            SyncResourceCount pullRequests = counts
-                .stream()
-                .filter(c -> c.key().equals("pullRequests"))
-                .findFirst()
-                .orElseThrow();
+            SyncResourceCount issues = counts.stream()
+                    .filter(c -> c.key().equals("issues"))
+                    .findFirst()
+                    .orElseThrow();
+            SyncResourceCount pullRequests = counts.stream()
+                    .filter(c -> c.key().equals("pullRequests"))
+                    .findFirst()
+                    .orElseThrow();
 
             // This is the point of the breakdown: issues stopped four days ago while PRs kept syncing.
             // The row-level lastSyncedAt collapses both to the newest (latestNonNull) and shows green —
@@ -434,7 +423,8 @@ class GithubConnectionSyncStateProviderTest extends BaseUnitTest {
             when(repositoryToMonitorRepository.findByWorkspaceId(WORKSPACE_ID)).thenReturn(List.of(rtm));
             when(repositoryRepository.findAllByWorkspaceMonitors(WORKSPACE_ID)).thenReturn(List.of());
 
-            List<SyncResourceState> resources = provider(schedulerProperties(false)).resources(ref, CONNECTION_ID);
+            List<SyncResourceState> resources =
+                    provider(schedulerProperties(false)).resources(ref, CONNECTION_ID);
 
             // Never-synced must stay distinct from synced-zero: six zero rows would assert we looked and
             // found nothing, when in fact we never looked.
@@ -455,7 +445,8 @@ class GithubConnectionSyncStateProviderTest extends BaseUnitTest {
             when(repositoryToMonitorRepository.findByWorkspaceId(WORKSPACE_ID)).thenReturn(List.of(rtm));
             when(repositoryRepository.findAllByWorkspaceMonitors(WORKSPACE_ID)).thenReturn(List.of());
 
-            List<SyncResourceState> resources = provider(schedulerProperties(false)).resources(ref, CONNECTION_ID);
+            List<SyncResourceState> resources =
+                    provider(schedulerProperties(false)).resources(ref, CONNECTION_ID);
 
             assertThat(resources).hasSize(1);
             assertThat(resources.get(0).backfillPercent()).isEqualTo(75);

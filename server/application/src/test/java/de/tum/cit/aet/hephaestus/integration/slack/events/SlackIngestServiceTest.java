@@ -61,16 +61,15 @@ class SlackIngestServiceTest extends BaseUnitTest {
     /** Construct the service with the channel-ingest capability flag in the given state. */
     private SlackIngestService serviceWithFlag(boolean conversationIngestEnabled) {
         return new SlackIngestService(
-            workspaceResolver,
-            monitoredChannelRepository,
-            consentGate,
-            participantConsentGate,
-            messageRepository,
-            threadRepository,
-            identityResolver,
-            conversationFeedbackErasure,
-            conversationIngestEnabled
-        );
+                workspaceResolver,
+                monitoredChannelRepository,
+                consentGate,
+                participantConsentGate,
+                messageRepository,
+                threadRepository,
+                identityResolver,
+                conversationFeedbackErasure,
+                conversationIngestEnabled);
     }
 
     @BeforeEach
@@ -91,14 +90,13 @@ class SlackIngestServiceTest extends BaseUnitTest {
         disabled.ingestChannelMessage("T1", "C1", "100.1", "99.0", "U1", "hi");
 
         verifyNoInteractions(
-            workspaceResolver,
-            monitoredChannelRepository,
-            consentGate,
-            participantConsentGate,
-            messageRepository,
-            threadRepository,
-            identityResolver
-        );
+                workspaceResolver,
+                monitoredChannelRepository,
+                consentGate,
+                participantConsentGate,
+                messageRepository,
+                threadRepository,
+                identityResolver);
     }
 
     @Test
@@ -107,16 +105,8 @@ class SlackIngestServiceTest extends BaseUnitTest {
 
         service.ingestChannelMessage("T1", "C1", "100.1", null, "U1", "hi");
 
-        verify(messageRepository, never()).insertIfAbsent(
-            ArgumentMatchers.anyLong(),
-            any(),
-            any(),
-            any(),
-            any(),
-            any(),
-            any(),
-            any()
-        );
+        verify(messageRepository, never())
+                .insertIfAbsent(ArgumentMatchers.anyLong(), any(), any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -127,16 +117,8 @@ class SlackIngestServiceTest extends BaseUnitTest {
         service.ingestChannelMessage("T1", "C1", "100.1", null, "U1", "hi");
 
         // The message and thread are NOT persisted until consent is ACTIVE.
-        verify(messageRepository, never()).insertIfAbsent(
-            ArgumentMatchers.anyLong(),
-            any(),
-            any(),
-            any(),
-            any(),
-            any(),
-            any(),
-            any()
-        );
+        verify(messageRepository, never())
+                .insertIfAbsent(ArgumentMatchers.anyLong(), any(), any(), any(), any(), any(), any(), any());
         verify(threadRepository, never()).upsertOnMessage(ArgumentMatchers.anyLong(), any(), any(), any(), any());
     }
 
@@ -152,16 +134,8 @@ class SlackIngestServiceTest extends BaseUnitTest {
         service.ingestChannelMessage("T1", "C1", "100.1", "99.0", "U1", "hi");
 
         // The store does not happen; the identity resolver is never even consulted.
-        verify(messageRepository, never()).insertIfAbsent(
-            ArgumentMatchers.anyLong(),
-            any(),
-            any(),
-            any(),
-            any(),
-            any(),
-            any(),
-            any()
-        );
+        verify(messageRepository, never())
+                .insertIfAbsent(ArgumentMatchers.anyLong(), any(), any(), any(), any(), any(), any(), any());
         verify(threadRepository, never()).upsertOnMessage(ArgumentMatchers.anyLong(), any(), any(), any(), any());
     }
 
@@ -173,23 +147,14 @@ class SlackIngestServiceTest extends BaseUnitTest {
         when(workspaceResolver.resolveWorkspaceId("T1")).thenReturn(Optional.of(7L));
         when(consentGate.ingestAllowed(7L, "C1")).thenReturn(true);
         // Announcement is AFTER the message ts (100.1) → the message predates consent and must not enter.
-        when(monitoredChannelRepository.findConsentAnnouncedAt(7L, "C1")).thenReturn(
-            Optional.of(Instant.ofEpochSecond(200))
-        );
+        when(monitoredChannelRepository.findConsentAnnouncedAt(7L, "C1"))
+                .thenReturn(Optional.of(Instant.ofEpochSecond(200)));
 
         service.ingestChannelMessage("T1", "C1", "100.1", null, "U1", "old");
 
         verifyNoInteractions(participantConsentGate);
-        verify(messageRepository, never()).insertIfAbsent(
-            ArgumentMatchers.anyLong(),
-            any(),
-            any(),
-            any(),
-            any(),
-            any(),
-            any(),
-            any()
-        );
+        verify(messageRepository, never())
+                .insertIfAbsent(ArgumentMatchers.anyLong(), any(), any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -199,23 +164,14 @@ class SlackIngestServiceTest extends BaseUnitTest {
         when(workspaceResolver.resolveWorkspaceId("T1")).thenReturn(Optional.of(7L));
         when(consentGate.ingestAllowed(7L, "C1")).thenReturn(true);
         // Announcement stamped at epoch-second 100; the message ts "100.0" parses to the same fractional epoch.
-        when(monitoredChannelRepository.findConsentAnnouncedAt(7L, "C1")).thenReturn(
-            Optional.of(Instant.ofEpochSecond(100))
-        );
+        when(monitoredChannelRepository.findConsentAnnouncedAt(7L, "C1"))
+                .thenReturn(Optional.of(Instant.ofEpochSecond(100)));
 
         service.ingestChannelMessage("T1", "C1", "100.0", null, "U1", "at the announcement instant");
 
         verifyNoInteractions(participantConsentGate);
-        verify(messageRepository, never()).insertIfAbsent(
-            ArgumentMatchers.anyLong(),
-            any(),
-            any(),
-            any(),
-            any(),
-            any(),
-            any(),
-            any()
-        );
+        verify(messageRepository, never())
+                .insertIfAbsent(ArgumentMatchers.anyLong(), any(), any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -229,16 +185,8 @@ class SlackIngestServiceTest extends BaseUnitTest {
         service.ingestChannelMessage("T1", "C1", "100.1", null, "U1", "hi");
 
         verifyNoInteractions(participantConsentGate);
-        verify(messageRepository, never()).insertIfAbsent(
-            ArgumentMatchers.anyLong(),
-            any(),
-            any(),
-            any(),
-            any(),
-            any(),
-            any(),
-            any()
-        );
+        verify(messageRepository, never())
+                .insertIfAbsent(ArgumentMatchers.anyLong(), any(), any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -248,7 +196,8 @@ class SlackIngestServiceTest extends BaseUnitTest {
         when(monitoredChannelRepository.findConsentAnnouncedAt(7L, "C1")).thenReturn(Optional.of(ANNOUNCED_BEFORE));
         when(participantConsentGate.ingestionAllowed(7L, "U1")).thenReturn(true);
         when(identityResolver.resolveMemberId(7L, "T1", "U1")).thenReturn(Optional.of(42L));
-        when(messageRepository.insertIfAbsent(7L, "T1", "C1", "100.1", "99.0", "U1", 42L, "hi")).thenReturn(1);
+        when(messageRepository.insertIfAbsent(7L, "T1", "C1", "100.1", "99.0", "U1", 42L, "hi"))
+                .thenReturn(1);
 
         service.ingestChannelMessage("T1", "C1", "100.1", "99.0", "U1", "hi");
 
@@ -264,18 +213,9 @@ class SlackIngestServiceTest extends BaseUnitTest {
         when(monitoredChannelRepository.findConsentAnnouncedAt(7L, "C1")).thenReturn(Optional.of(ANNOUNCED_BEFORE));
         when(participantConsentGate.ingestionAllowed(7L, "U1")).thenReturn(true);
         when(identityResolver.resolveMemberId(7L, "T1", "U1")).thenReturn(Optional.empty());
-        when(
-            messageRepository.insertIfAbsent(
-                eq(7L),
-                eq("T1"),
-                eq("C1"),
-                eq("100.1"),
-                isNull(),
-                eq("U1"),
-                isNull(),
-                eq("hi")
-            )
-        ).thenReturn(1);
+        when(messageRepository.insertIfAbsent(
+                        eq(7L), eq("T1"), eq("C1"), eq("100.1"), isNull(), eq("U1"), isNull(), eq("hi")))
+                .thenReturn(1);
 
         service.ingestChannelMessage("T1", "C1", "100.1", null, "U1", "hi");
 
@@ -307,7 +247,8 @@ class SlackIngestServiceTest extends BaseUnitTest {
         when(monitoredChannelRepository.findConsentAnnouncedAt(7L, "C1")).thenReturn(Optional.of(ANNOUNCED_BEFORE));
         when(participantConsentGate.ingestionAllowed(7L, "U1")).thenReturn(true);
         when(identityResolver.resolveMemberId(7L, "T1", "U1")).thenReturn(Optional.of(42L));
-        when(messageRepository.insertIfAbsent(7L, "T1", "C1", "100.1", null, "U1", 42L, "hi")).thenReturn(0);
+        when(messageRepository.insertIfAbsent(7L, "T1", "C1", "100.1", null, "U1", 42L, "hi"))
+                .thenReturn(0);
 
         service.ingestChannelMessage("T1", "C1", "100.1", null, "U1", "hi");
 

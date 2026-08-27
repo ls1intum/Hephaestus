@@ -40,10 +40,9 @@ public class ProcessingContextFactory {
     private final RepositoryScopeFilter repositoryScopeFilter;
 
     public ProcessingContextFactory(
-        RepositoryRepository repositoryRepository,
-        ScopeIdResolver scopeIdResolver,
-        RepositoryScopeFilter repositoryScopeFilter
-    ) {
+            RepositoryRepository repositoryRepository,
+            ScopeIdResolver scopeIdResolver,
+            RepositoryScopeFilter repositoryScopeFilter) {
         this.repositoryRepository = repositoryRepository;
         this.scopeIdResolver = scopeIdResolver;
         this.repositoryScopeFilter = repositoryScopeFilter;
@@ -69,21 +68,21 @@ public class ProcessingContextFactory {
         // Check filter BEFORE database lookup to avoid unnecessary queries
         if (!repositoryScopeFilter.isRepositoryAllowed(repoFullName)) {
             log.debug(
-                "Skipped webhook event: reason=repositoryFiltered, repoName={}, action={}",
-                sanitizeForLog(repoFullName),
-                event.action()
-            );
+                    "Skipped webhook event: reason=repositoryFiltered, repoName={}, action={}",
+                    sanitizeForLog(repoFullName),
+                    event.action());
             return Optional.empty();
         }
 
-        Repository repository = repositoryRepository.findByNameWithOwnerWithOrganization(repoFullName).orElse(null);
+        Repository repository = repositoryRepository
+                .findByNameWithOwnerWithOrganization(repoFullName)
+                .orElse(null);
 
         if (repository == null) {
             log.debug(
-                "Skipped webhook event: reason=repositoryNotFound, repoName={}, action={}",
-                sanitizeForLog(repoFullName),
-                event.action()
-            );
+                    "Skipped webhook event: reason=repositoryNotFound, repoName={}, action={}",
+                    sanitizeForLog(repoFullName),
+                    event.action());
             return Optional.empty();
         }
 
@@ -128,14 +127,15 @@ public class ProcessingContextFactory {
             }
             // Organization lookup failed - fall through to repository-based lookup
             log.debug(
-                "Organization lookup failed for repo, trying repository-based lookup: repo={}, org={}",
-                sanitizeForLog(repository.getNameWithOwner()),
-                sanitizeForLog(orgLogin)
-            );
+                    "Organization lookup failed for repo, trying repository-based lookup: repo={}, org={}",
+                    sanitizeForLog(repository.getNameWithOwner()),
+                    sanitizeForLog(orgLogin));
         }
 
         // Personal repo or fallback: lookup by repository nameWithOwner
         // This finds the workspace that has this repository in its monitored list
-        return scopeIdResolver.findScopeIdByRepositoryName(repository.getNameWithOwner()).orElse(null);
+        return scopeIdResolver
+                .findScopeIdByRepositoryName(repository.getNameWithOwner())
+                .orElse(null);
     }
 }

@@ -40,14 +40,16 @@ class FeedbackCompositionInputsTest extends BaseUnitTest {
      */
     @Test
     void aLaneThisOccasionCannotReachIsNamedAndDisabledRatherThanOmitted() {
-        JsonNode channels = stage(
-            ObservationOrigin.LIVE,
-            EnumSet.of(FeedbackChannel.IN_APP, FeedbackChannel.IN_CHAT)
-        ).get("channels");
+        JsonNode channels = stage(ObservationOrigin.LIVE, EnumSet.of(FeedbackChannel.IN_APP, FeedbackChannel.IN_CHAT))
+                .get("channels");
 
         assertThat(channels.get(FeedbackChannel.IN_CONTEXT.name())).isNotNull();
-        assertThat(channels.get(FeedbackChannel.IN_CONTEXT.name()).get("enabled").asBoolean()).isFalse();
-        assertThat(channels.get(FeedbackChannel.IN_APP.name()).get("enabled").asBoolean()).isTrue();
+        assertThat(channels.get(FeedbackChannel.IN_CONTEXT.name())
+                        .get("enabled")
+                        .asBoolean())
+                .isFalse();
+        assertThat(channels.get(FeedbackChannel.IN_APP.name()).get("enabled").asBoolean())
+                .isTrue();
     }
 
     /**

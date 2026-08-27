@@ -47,14 +47,13 @@ public class GithubConnectionSyncStateProvider implements ConnectionSyncStatePro
     private final ScmResourceCountReader countReader;
 
     public GithubConnectionSyncStateProvider(
-        ConnectionRepository connectionRepository,
-        ScopedRateLimitTracker rateLimitTracker,
-        GitHubInstallationSuspensionTracker suspensionTracker,
-        SyncSchedulerProperties syncSchedulerProperties,
-        RepositoryToMonitorRepository repositoryToMonitorRepository,
-        RepositoryRepository repositoryRepository,
-        ScmResourceCountReader countReader
-    ) {
+            ConnectionRepository connectionRepository,
+            ScopedRateLimitTracker rateLimitTracker,
+            GitHubInstallationSuspensionTracker suspensionTracker,
+            SyncSchedulerProperties syncSchedulerProperties,
+            RepositoryToMonitorRepository repositoryToMonitorRepository,
+            RepositoryRepository repositoryRepository,
+            ScmResourceCountReader countReader) {
         this.connectionRepository = connectionRepository;
         this.rateLimitTracker = rateLimitTracker;
         this.suspensionTracker = suspensionTracker;
@@ -85,23 +84,19 @@ public class GithubConnectionSyncStateProvider implements ConnectionSyncStatePro
         }
 
         boolean vendorHealthDegraded =
-            installationId != null && suspensionTracker.isInstallationMarkedSuspended(installationId);
+                installationId != null && suspensionTracker.isInstallationMarkedSuspended(installationId);
 
         return new ConnectionSyncDetails(
-            webhookRegistered,
-            CronSchedules.nextRun(syncSchedulerProperties.cron()),
-            CronSchedules.interval(syncSchedulerProperties.cron()),
-            rateLimitTracker.snapshot(workspaceId),
-            ScmBackfillRollup.summarize(
-                syncSchedulerProperties.backfill().enabled(),
-                repositoryToMonitorRepository
-                    .findByWorkspaceId(workspaceId)
-                    .stream()
-                    .map(GithubConnectionSyncStateProvider::toBackfillProgress)
-                    .toList()
-            ),
-            vendorHealthDegraded
-        );
+                webhookRegistered,
+                CronSchedules.nextRun(syncSchedulerProperties.cron()),
+                CronSchedules.interval(syncSchedulerProperties.cron()),
+                rateLimitTracker.snapshot(workspaceId),
+                ScmBackfillRollup.summarize(
+                        syncSchedulerProperties.backfill().enabled(),
+                        repositoryToMonitorRepository.findByWorkspaceId(workspaceId).stream()
+                                .map(GithubConnectionSyncStateProvider::toBackfillProgress)
+                                .toList()),
+                vendorHealthDegraded);
     }
 
     @Override
@@ -114,26 +109,21 @@ public class GithubConnectionSyncStateProvider implements ConnectionSyncStatePro
 
         // Batch-resolve nameWithOwner -> local Repository id in one query, then one fixed set of
         // grouped per-entity-class count queries — avoids an N+1 per monitored repository.
-        Map<String, Long> repositoryIdByName = repositoryRepository
-            .findAllByWorkspaceMonitors(workspaceId)
-            .stream()
-            .collect(Collectors.toMap(Repository::getNameWithOwner, Repository::getId, (a, b) -> a));
+        Map<String, Long> repositoryIdByName = repositoryRepository.findAllByWorkspaceMonitors(workspaceId).stream()
+                .collect(Collectors.toMap(Repository::getNameWithOwner, Repository::getId, (a, b) -> a));
 
-        Map<Long, ScmResourceCounts> countsByRepositoryId = countReader.countsByRepositoryId(
-            repositoryIdByName.values()
-        );
+        Map<Long, ScmResourceCounts> countsByRepositoryId =
+                countReader.countsByRepositoryId(repositoryIdByName.values());
 
-        return monitors
-            .stream()
-            .map(monitor -> toResourceState(monitor, repositoryIdByName, countsByRepositoryId))
-            .toList();
+        return monitors.stream()
+                .map(monitor -> toResourceState(monitor, repositoryIdByName, countsByRepositoryId))
+                .toList();
     }
 
     private SyncResourceState toResourceState(
-        RepositoryToMonitor monitor,
-        Map<String, Long> repositoryIdByName,
-        Map<Long, ScmResourceCounts> countsByRepositoryId
-    ) {
+            RepositoryToMonitor monitor,
+            Map<String, Long> repositoryIdByName,
+            Map<Long, ScmResourceCounts> countsByRepositoryId) {
         Long repositoryId = repositoryIdByName.get(monitor.getNameWithOwner());
         // A monitor with no local Repository row has never synced anything — distinct from one that
         // synced zero items, so the headline stays null (unknown) rather than claiming 0.
@@ -141,48 +131,42 @@ public class GithubConnectionSyncStateProvider implements ConnectionSyncStatePro
         Long itemCount = counts == null ? null : counts.headlineItemCount();
 
         Instant lastSyncedAt = latestNonNull(
-            monitor.getIssuesSyncedAt(),
-            monitor.getPullRequestsSyncedAt(),
-            monitor.getRepositorySyncedAt()
-        );
-        String state =
-            monitor.getIssuesSyncedAt() == null || monitor.getPullRequestsSyncedAt() == null
+                monitor.getIssuesSyncedAt(), monitor.getPullRequestsSyncedAt(), monitor.getRepositorySyncedAt());
+        String state = monitor.getIssuesSyncedAt() == null || monitor.getPullRequestsSyncedAt() == null
                 ? SyncResourceState.STATE_PENDING
                 : SyncResourceState.STATE_SYNCED;
 
         int backfillTotal =
-            (monitor.getIssueBackfillHighWaterMark() != null ? monitor.getIssueBackfillHighWaterMark() : 0) +
-            (monitor.getPullRequestBackfillHighWaterMark() != null ? monitor.getPullRequestBackfillHighWaterMark() : 0);
+                (monitor.getIssueBackfillHighWaterMark() != null ? monitor.getIssueBackfillHighWaterMark() : 0)
+                        + (monitor.getPullRequestBackfillHighWaterMark() != null
+                                ? monitor.getPullRequestBackfillHighWaterMark()
+                                : 0);
         Integer backfillPercent = BackfillProgress.percentComplete(
-            monitor.isBackfillInitialized(),
-            monitor.getBackfillRemaining(),
-            backfillTotal
-        );
+                monitor.isBackfillInitialized(), monitor.getBackfillRemaining(), backfillTotal);
 
         return new SyncResourceState(
-            monitor.getId(),
-            monitor.getNameWithOwner(),
-            monitor.getNameWithOwner(),
-            SyncResourceState.Type.REPOSITORY,
-            state,
-            lastSyncedAt,
-            itemCount,
-            // Per-class breakdown (issues, pull requests), each carrying its own watermark, rather than
-            // collapsed into lastSyncedAt above — collapsing would hide "pull requests are fresh but
-            // issues stopped four days ago" since the newest sibling wins.
-            counts == null
-                ? List.of()
-                : counts.toSyncResourceCounts(monitor.getIssuesSyncedAt(), monitor.getPullRequestsSyncedAt()),
-            // upstreamCount: would require a live vendor call — the SPI forbids that in resources().
-            null,
-            // Per-resource errors are not persisted yet.
-            null,
-            // backfillCompletedThrough: GitHub's backfill horizon is issue/PR-NUMBER based
-            // (highWaterMark/checkpoint), not date-based — no per-item timestamp to report here
-            // without an extra vendor call.
-            null,
-            backfillPercent
-        );
+                monitor.getId(),
+                monitor.getNameWithOwner(),
+                monitor.getNameWithOwner(),
+                SyncResourceState.Type.REPOSITORY,
+                state,
+                lastSyncedAt,
+                itemCount,
+                // Per-class breakdown (issues, pull requests), each carrying its own watermark, rather than
+                // collapsed into lastSyncedAt above — collapsing would hide "pull requests are fresh but
+                // issues stopped four days ago" since the newest sibling wins.
+                counts == null
+                        ? List.of()
+                        : counts.toSyncResourceCounts(monitor.getIssuesSyncedAt(), monitor.getPullRequestsSyncedAt()),
+                // upstreamCount: would require a live vendor call — the SPI forbids that in resources().
+                null,
+                // Per-resource errors are not persisted yet.
+                null,
+                // backfillCompletedThrough: GitHub's backfill horizon is issue/PR-NUMBER based
+                // (highWaterMark/checkpoint), not date-based — no per-item timestamp to report here
+                // without an extra vendor call.
+                null,
+                backfillPercent);
     }
 
     @Nullable
@@ -199,11 +183,10 @@ public class GithubConnectionSyncStateProvider implements ConnectionSyncStatePro
     /** Projects a monitored-repository row into {@link ScmBackfillRollup}'s vendor-neutral input. */
     private static RepoBackfillProgress toBackfillProgress(RepositoryToMonitor monitor) {
         return new RepoBackfillProgress(
-            monitor.isBackfillInitialized(),
-            monitor.isBackfillComplete(),
-            monitor.getIssueBackfillHighWaterMark(),
-            monitor.getPullRequestBackfillHighWaterMark(),
-            monitor.getBackfillRemaining()
-        );
+                monitor.isBackfillInitialized(),
+                monitor.isBackfillComplete(),
+                monitor.getIssueBackfillHighWaterMark(),
+                monitor.getPullRequestBackfillHighWaterMark(),
+                monitor.getBackfillRemaining());
     }
 }

@@ -58,41 +58,26 @@ class ConversationThreadTriggerSchedulerTest extends BaseUnitTest {
 
         @SuppressWarnings("unchecked")
         Fixture() {
-            when(transactionTemplate.execute(any())).thenAnswer(invocation ->
-                ((TransactionCallback<Object>) invocation.getArgument(0)).doInTransaction(mock(TransactionStatus.class))
-            );
+            when(transactionTemplate.execute(any()))
+                    .thenAnswer(invocation -> ((TransactionCallback<Object>) invocation.getArgument(0))
+                            .doInTransaction(mock(TransactionStatus.class)));
         }
 
         void givenOneReadyThread() {
             Instant now = Instant.now();
             lastTs = (now.getEpochSecond() - Duration.ofMinutes(20).toSeconds()) + ".000200";
-            when(candidateSource.settledCandidates(anyInt())).thenReturn(
-                List.of(
-                    new ConversationThreadCandidate(
-                        WORKSPACE_ID,
-                        THREAD_ID,
-                        "C1",
-                        "#design",
-                        THREAD_TS,
-                        lastTs,
-                        null,
-                        new long[] { 5L }
-                    )
-                )
-            );
+            when(candidateSource.settledCandidates(anyInt()))
+                    .thenReturn(List.of(new ConversationThreadCandidate(
+                            WORKSPACE_ID, THREAD_ID, "C1", "#design", THREAD_TS, lastTs, null, new long[] {5L})));
             when(candidateSource.liveTurnCount(anyLong(), any(), any())).thenReturn(8L);
-            when(candidateSource.liveTurnCountSince(anyLong(), any(), any(), any())).thenReturn(4L);
+            when(candidateSource.liveTurnCountSince(anyLong(), any(), any(), any()))
+                    .thenReturn(4L);
             lenient().when(submitter.submitAndSettle(any(), any())).thenReturn(1L);
         }
 
         ConversationThreadTriggerScheduler scheduler() {
             return new ConversationThreadTriggerScheduler(
-                candidateSource,
-                submitter,
-                signalRecorder,
-                transactionTemplate,
-                true
-            );
+                    candidateSource, submitter, signalRecorder, transactionTemplate, true);
         }
     }
 
@@ -102,45 +87,35 @@ class ConversationThreadTriggerSchedulerTest extends BaseUnitTest {
     }
 
     @ParameterizedTest
-    @CsvSource(
-        {
-            // ageMin, turns, growthSinceWatermark, expectedPass
-            "2, 8, 5, false", // still inside the 10-minute quiescence window
-            "15, 8, 5, true", // settled + deep + grown
-            "15, 3, 3, false", // too few turns even when settled and grown
-            "15, 8, 1, false", // no growth past the watermark (late-reply / re-sweep) does not re-fire
-            "15, 8, 2, true", // exactly enough growth
-        }
-    )
+    @CsvSource({
+        // ageMin, turns, growthSinceWatermark, expectedPass
+        "2, 8, 5, false", // still inside the 10-minute quiescence window
+        "15, 8, 5, true", // settled + deep + grown
+        "15, 3, 3, false", // too few turns even when settled and grown
+        "15, 8, 1, false", // no growth past the watermark (late-reply / re-sweep) does not re-fire
+        "15, 8, 2, true", // exactly enough growth
+    })
     void passesGatesEvaluatesQuiescenceDepthAndGrowth(int ageMin, int turns, int growth, boolean expected) {
         Instant now = Instant.now();
         String lastTs = tsAgedBy(now, Duration.ofMinutes(ageMin).toSeconds());
-        assertThat(
-            ConversationThreadTriggerScheduler.passesGates(
-                now,
-                lastTs,
-                turns,
-                growth,
-                QUIESCENCE_MIN,
-                MIN_TURNS,
-                MIN_GROWTH
-            )
-        ).isEqualTo(expected);
+        assertThat(ConversationThreadTriggerScheduler.passesGates(
+                        now, lastTs, turns, growth, QUIESCENCE_MIN, MIN_TURNS, MIN_GROWTH))
+                .isEqualTo(expected);
     }
 
     @Test
     void unparseableOrNullLastTsIsRejected() {
         Instant now = Instant.now();
-        assertThat(
-            ConversationThreadTriggerScheduler.passesGates(now, null, 8, 5, QUIESCENCE_MIN, MIN_TURNS, MIN_GROWTH)
-        ).isFalse();
-        assertThat(
-            ConversationThreadTriggerScheduler.passesGates(now, "not-a-ts", 8, 5, QUIESCENCE_MIN, MIN_TURNS, MIN_GROWTH)
-        ).isFalse();
+        assertThat(ConversationThreadTriggerScheduler.passesGates(
+                        now, null, 8, 5, QUIESCENCE_MIN, MIN_TURNS, MIN_GROWTH))
+                .isFalse();
+        assertThat(ConversationThreadTriggerScheduler.passesGates(
+                        now, "not-a-ts", 8, 5, QUIESCENCE_MIN, MIN_TURNS, MIN_GROWTH))
+                .isFalse();
     }
 
     @ParameterizedTest
-    @ValueSource(strings = { "1700000000.123456", "1700000000" })
+    @ValueSource(strings = {"1700000000.123456", "1700000000"})
     void slackTsEpochSecondsParsesSecondsPart(String ts) {
         assertThat(ConversationThreadTriggerScheduler.slackTsEpochSeconds(ts)).isEqualTo(1700000000L);
     }
@@ -149,7 +124,8 @@ class ConversationThreadTriggerSchedulerTest extends BaseUnitTest {
     void slackTsEpochSecondsReturnsNullForNullBlankOrGarbage() {
         assertThat(ConversationThreadTriggerScheduler.slackTsEpochSeconds(null)).isNull();
         assertThat(ConversationThreadTriggerScheduler.slackTsEpochSeconds("  ")).isNull();
-        assertThat(ConversationThreadTriggerScheduler.slackTsEpochSeconds("abc.def")).isNull();
+        assertThat(ConversationThreadTriggerScheduler.slackTsEpochSeconds("abc.def"))
+                .isNull();
     }
 
     /**
@@ -180,9 +156,8 @@ class ConversationThreadTriggerSchedulerTest extends BaseUnitTest {
 
         ArgumentCaptor<SignalKey> captor = ArgumentCaptor.forClass(SignalKey.class);
         verify(f.signalRecorder).record(captor.capture(), any(), eq(DiscoveredVia.SYNC));
-        assertThat(captor.getValue()).isEqualTo(
-            ChatSignals.threadSettledKey(WORKSPACE_ID, THREAD_ID, THREAD_TS, f.lastTs, 8)
-        );
+        assertThat(captor.getValue())
+                .isEqualTo(ChatSignals.threadSettledKey(WORKSPACE_ID, THREAD_ID, THREAD_TS, f.lastTs, 8));
     }
 
     /**
@@ -222,12 +197,7 @@ class ConversationThreadTriggerSchedulerTest extends BaseUnitTest {
         ConversationReviewSubmitter submitter = mock(ConversationReviewSubmitter.class);
         SignalRecorder signalRecorder = mock(SignalRecorder.class);
         var disabled = new ConversationThreadTriggerScheduler(
-            candidateSource,
-            submitter,
-            signalRecorder,
-            mock(TransactionTemplate.class),
-            false
-        );
+                candidateSource, submitter, signalRecorder, mock(TransactionTemplate.class), false);
 
         // Kill-switch driven explicitly OFF: the sweep no-ops without even running the candidate scan. Remove the
         // flag gate and this fails — settledCandidates() would be queried through the SPI. Nothing reaches the
@@ -243,12 +213,7 @@ class ConversationThreadTriggerSchedulerTest extends BaseUnitTest {
         SignalRecorder signalRecorder = mock(SignalRecorder.class);
         when(candidateSource.settledCandidates(anyInt())).thenReturn(List.of());
         var enabled = new ConversationThreadTriggerScheduler(
-            candidateSource,
-            submitter,
-            signalRecorder,
-            mock(TransactionTemplate.class),
-            true
-        );
+                candidateSource, submitter, signalRecorder, mock(TransactionTemplate.class), true);
 
         // With the capability enabled the gate opens: the candidate scan runs through the SPI. The mock yields no
         // candidates, so nothing is enqueued (0) — but the scan itself did execute.

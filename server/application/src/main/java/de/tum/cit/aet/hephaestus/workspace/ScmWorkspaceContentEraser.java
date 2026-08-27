@@ -46,15 +46,14 @@ public class ScmWorkspaceContentEraser {
     private final ApplicationEventPublisher eventPublisher;
 
     public ScmWorkspaceContentEraser(
-        WorkspaceRepository workspaceRepository,
-        RepositoryToMonitorRepository repositoryToMonitorRepository,
-        WorkspaceRepositoryMonitorService repositoryMonitorService,
-        TeamRepository teamRepository,
-        OrganizationMembershipRepository organizationMembershipRepository,
-        NatsConnectionProperties natsProperties,
-        ObjectProvider<IntegrationNatsConsumer> natsConsumerService,
-        ApplicationEventPublisher eventPublisher
-    ) {
+            WorkspaceRepository workspaceRepository,
+            RepositoryToMonitorRepository repositoryToMonitorRepository,
+            WorkspaceRepositoryMonitorService repositoryMonitorService,
+            TeamRepository teamRepository,
+            OrganizationMembershipRepository organizationMembershipRepository,
+            NatsConnectionProperties natsProperties,
+            ObjectProvider<IntegrationNatsConsumer> natsConsumerService,
+            ApplicationEventPublisher eventPublisher) {
         this.workspaceRepository = workspaceRepository;
         this.repositoryToMonitorRepository = repositoryToMonitorRepository;
         this.repositoryMonitorService = repositoryMonitorService;
@@ -82,13 +81,11 @@ public class ScmWorkspaceContentEraser {
         // Derived rows must be removed before the artifacts they reference.
         eventPublisher.publishEvent(new ScmMirrorErasedEvent(workspaceId));
 
-        List<String> monitoredNames = repositoryToMonitorRepository
-            .findByWorkspaceId(workspaceId)
-            .stream()
-            .map(RepositoryToMonitor::getNameWithOwner)
-            .filter(StringUtils::isNotBlank)
-            .distinct()
-            .toList();
+        List<String> monitoredNames = repositoryToMonitorRepository.findByWorkspaceId(workspaceId).stream()
+                .map(RepositoryToMonitor::getNameWithOwner)
+                .filter(StringUtils::isNotBlank)
+                .distinct()
+                .toList();
 
         // Flush monitor removals before checking whether their repositories became orphaned.
         workspace.getRepositoriesToMonitor().clear();
@@ -113,13 +110,12 @@ public class ScmWorkspaceContentEraser {
         }
 
         log.info(
-            "scm.audit: revoke erase — actor={}, workspaceId={}, erasedRepositories={}, sharedRepositoriesSkipped={}, erasedTeams={}",
-            LoggingUtils.sanitizeForLog(SecurityUtils.getCurrentUserLogin().orElse("system")),
-            workspaceId,
-            erased,
-            shared,
-            teamsErased
-        );
+                "scm.audit: revoke erase — actor={}, workspaceId={}, erasedRepositories={}, sharedRepositoriesSkipped={}, erasedTeams={}",
+                LoggingUtils.sanitizeForLog(SecurityUtils.getCurrentUserLogin().orElse("system")),
+                workspaceId,
+                erased,
+                shared,
+                teamsErased);
     }
 
     /** Erases org-tier mirrors only after the workspace releases its organization binding. */
@@ -132,27 +128,25 @@ public class ScmWorkspaceContentEraser {
         workspace.setOrganization(null);
         workspaceRepository.saveAndFlush(workspace);
 
-        long otherTenants = workspaceRepository.countOtherActiveWorkspacesForOrganization(
-            organization.getId(),
-            workspace.getId()
-        );
+        long otherTenants =
+                workspaceRepository.countOtherActiveWorkspacesForOrganization(organization.getId(), workspace.getId());
         if (otherTenants > 0) {
             log.debug(
-                "Skipped org-tier SCM erase: reason=organizationStillBound, organizationId={}, otherWorkspaces={}",
-                organization.getId(),
-                otherTenants
-            );
+                    "Skipped org-tier SCM erase: reason=organizationStillBound, organizationId={}, otherWorkspaces={}",
+                    organization.getId(),
+                    otherTenants);
             return 0;
         }
 
-        Long providerId = organization.getProvider() == null ? null : organization.getProvider().getId();
+        Long providerId = organization.getProvider() == null
+                ? null
+                : organization.getProvider().getId();
         if (providerId == null) {
             return 0;
         }
 
         Set<Team> teams = new LinkedHashSet<>(
-            teamRepository.findByOrganizationIgnoreCaseAndProviderId(organization.getLogin(), providerId)
-        );
+                teamRepository.findByOrganizationIgnoreCaseAndProviderId(organization.getLogin(), providerId));
         teamRepository.deleteAll(new ArrayList<>(teams));
         organizationMembershipRepository.deleteByOrganizationId(organization.getId());
         return teams.size();

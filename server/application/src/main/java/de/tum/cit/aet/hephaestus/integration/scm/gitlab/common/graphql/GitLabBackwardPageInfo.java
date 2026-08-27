@@ -11,4 +11,5 @@ import org.jspecify.annotations.Nullable;
  *                    backwards (null when the connection is empty)
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
-public record GitLabBackwardPageInfo(boolean hasPreviousPage, @Nullable String startCursor) {}
+public record GitLabBackwardPageInfo(
+        boolean hasPreviousPage, @Nullable String startCursor) {}

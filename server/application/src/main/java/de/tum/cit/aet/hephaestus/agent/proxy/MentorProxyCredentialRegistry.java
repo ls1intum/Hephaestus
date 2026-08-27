@@ -64,48 +64,46 @@ public class MentorProxyCredentialRegistry {
 
     MentorProxyCredentialRegistry(Ticker ticker) {
         this.byTokenHash = Caffeine.newBuilder()
-            .maximumSize(MAX_ENTRIES)
-            .expireAfterWrite(TTL)
-            .ticker(ticker)
-            // evictionListener, not removalListener: synchronous, so the reverse index can never
-            // outlive the token it points at. The removes are value-matching so a re-mint for the same
-            // session is left alone when the stale entry is finally evicted.
-            .<String, Entry>evictionListener((hash, entry, cause) -> {
-                if (entry != null) {
-                    tokenHashBySession.remove(entry.sessionId(), hash);
-                    MentorTurnMeter bound = entry.currentTurn().getAndSet(null);
-                    if (bound != null) {
-                        meterByTurn.remove(bound.turnId(), bound);
+                .maximumSize(MAX_ENTRIES)
+                .expireAfterWrite(TTL)
+                .ticker(ticker)
+                // evictionListener, not removalListener: synchronous, so the reverse index can never
+                // outlive the token it points at. The removes are value-matching so a re-mint for the same
+                // session is left alone when the stale entry is finally evicted.
+                .<String, Entry>evictionListener((hash, entry, cause) -> {
+                    if (entry != null) {
+                        tokenHashBySession.remove(entry.sessionId(), hash);
+                        MentorTurnMeter bound = entry.currentTurn().getAndSet(null);
+                        if (bound != null) {
+                            meterByTurn.remove(bound.turnId(), bound);
+                        }
                     }
-                }
-            })
-            .build();
+                })
+                .build();
     }
 
     /** Non-secret catalog route granted to one mentor sandbox. */
     public record Route(
-        String apiProtocol,
-        String baseUrl,
-        @Nullable FundingSource connectionScope,
-        @Nullable Long connectionId,
-        @Nullable Long modelId,
-        @Nullable Long workspaceId
-    ) {}
+            String apiProtocol,
+            String baseUrl,
+            @Nullable FundingSource connectionScope,
+            @Nullable Long connectionId,
+            @Nullable Long modelId,
+            @Nullable Long workspaceId) {}
 
     /**
      * @param currentTurn the meter calls on this token are billed to right now; {@code null} between
      *     turns. Mutable because the routing is fixed for the session's life while the turn is not.
      */
     private record Entry(
-        UUID sessionId,
-        String apiProtocol,
-        String baseUrl,
-        @Nullable FundingSource connectionScope,
-        @Nullable Long connectionId,
-        @Nullable Long modelId,
-        @Nullable Long workspaceId,
-        AtomicReference<@Nullable MentorTurnMeter> currentTurn
-    ) {}
+            UUID sessionId,
+            String apiProtocol,
+            String baseUrl,
+            @Nullable FundingSource connectionScope,
+            @Nullable Long connectionId,
+            @Nullable Long modelId,
+            @Nullable Long workspaceId,
+            AtomicReference<@Nullable MentorTurnMeter> currentTurn) {}
 
     /**
      * @param sessionId the sandbox's {@code InteractiveSandboxSpec#sessionId}, which {@link
@@ -115,18 +113,16 @@ public class MentorProxyCredentialRegistry {
         String token = AgentJob.generateJobToken();
         String hash = AgentJob.computeTokenHash(token);
         byTokenHash.put(
-            hash,
-            new Entry(
-                sessionId,
-                route.apiProtocol(),
-                route.baseUrl(),
-                route.connectionScope(),
-                route.connectionId(),
-                route.modelId(),
-                route.workspaceId(),
-                new AtomicReference<>()
-            )
-        );
+                hash,
+                new Entry(
+                        sessionId,
+                        route.apiProtocol(),
+                        route.baseUrl(),
+                        route.connectionScope(),
+                        route.connectionId(),
+                        route.modelId(),
+                        route.workspaceId(),
+                        new AtomicReference<>()));
         // Drop the orphaned token now rather than leaving two live credentials for one sandbox.
         String previous = tokenHashBySession.put(sessionId, hash);
         if (previous != null && !previous.equals(hash)) {
@@ -147,8 +143,7 @@ public class MentorProxyCredentialRegistry {
             return Optional.empty();
         }
         MentorTurnMeter turn = entry.currentTurn().get();
-        return Optional.of(
-            new ProxyRouting(
+        return Optional.of(new ProxyRouting(
                 "mentor-session",
                 entry.apiProtocol(),
                 entry.baseUrl(),
@@ -157,16 +152,13 @@ public class MentorProxyCredentialRegistry {
                 entry.modelId(),
                 entry.workspaceId(),
                 turn == null
-                    ? null
-                    : new ProxyRouting.BilledAttempt(
-                          LlmUsageSourceType.MENTOR_TURN,
-                          turn.turnId(),
-                          // A turn never retries, so there is only ever attempt 0 of a given turn id.
-                          0,
-                          turn.spentUsd()
-                      )
-            )
-        );
+                        ? null
+                        : new ProxyRouting.BilledAttempt(
+                                LlmUsageSourceType.MENTOR_TURN,
+                                turn.turnId(),
+                                // A turn never retries, so there is only ever attempt 0 of a given turn id.
+                                0,
+                                turn.spentUsd())));
     }
 
     /**
@@ -188,12 +180,11 @@ public class MentorProxyCredentialRegistry {
         if (displaced != null && displaced != meter) {
             meterByTurn.remove(displaced.turnId(), displaced);
             log.warn(
-                "Mentor turn {} was still bound to sandbox session {} when turn {} started — " +
-                    "its later calls will go unbilled rather than being charged to the new turn",
-                displaced.turnId(),
-                sessionId,
-                meter.turnId()
-            );
+                    "Mentor turn {} was still bound to sandbox session {} when turn {} started — "
+                            + "its later calls will go unbilled rather than being charged to the new turn",
+                    displaced.turnId(),
+                    sessionId,
+                    meter.turnId());
         }
         return true;
     }

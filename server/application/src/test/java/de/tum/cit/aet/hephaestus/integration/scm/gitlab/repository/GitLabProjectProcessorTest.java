@@ -52,32 +52,30 @@ class GitLabProjectProcessorTest extends BaseUnitTest {
         @BeforeEach
         void stubSave() {
             // Lenient: null/invalid input tests return early before reaching save()
-            lenient()
-                .when(repositoryRepository.save(any(Repository.class)))
-                .thenAnswer(inv -> inv.getArgument(0));
+            lenient().when(repositoryRepository.save(any(Repository.class))).thenAnswer(inv -> inv.getArgument(0));
         }
 
         @Test
         void validProject_mapsAllFields() {
             var repoInfo = new GitLabProjectResponse.RepositoryInfo("develop");
             var project = new GitLabProjectResponse(
-                "gid://gitlab/Project/123",
-                "my-org/my-project",
-                "my-project",
-                "https://gitlab.com/my-org/my-project",
-                "A cool project",
-                "public",
-                false,
-                "2024-01-15T10:30:00Z",
-                "2024-06-20T14:00:00Z",
-                null,
-                repoInfo
-            );
+                    "gid://gitlab/Project/123",
+                    "my-org/my-project",
+                    "my-project",
+                    "https://gitlab.com/my-org/my-project",
+                    "A cool project",
+                    "public",
+                    false,
+                    "2024-01-15T10:30:00Z",
+                    "2024-06-20T14:00:00Z",
+                    null,
+                    repoInfo);
 
             Organization org = new Organization();
             org.setId(42L);
 
-            when(repositoryRepository.findByNativeIdAndProviderId(123L, PROVIDER_ID)).thenReturn(Optional.empty());
+            when(repositoryRepository.findByNativeIdAndProviderId(123L, PROVIDER_ID))
+                    .thenReturn(Optional.empty());
 
             Repository result = processor.processGraphQlResponse(project, org, gitLabProvider);
 
@@ -110,7 +108,8 @@ class GitLabProjectProcessorTest extends BaseUnitTest {
         @Test
         void privateVisibility_setsIsPrivateTrue() {
             var project = createMinimalProject("private");
-            when(repositoryRepository.findByNativeIdAndProviderId(123L, PROVIDER_ID)).thenReturn(Optional.empty());
+            when(repositoryRepository.findByNativeIdAndProviderId(123L, PROVIDER_ID))
+                    .thenReturn(Optional.empty());
 
             Repository result = processor.processGraphQlResponse(project, null, gitLabProvider);
 
@@ -122,7 +121,8 @@ class GitLabProjectProcessorTest extends BaseUnitTest {
         @Test
         void internalVisibility_mapsCorrectly() {
             var project = createMinimalProject("internal");
-            when(repositoryRepository.findByNativeIdAndProviderId(123L, PROVIDER_ID)).thenReturn(Optional.empty());
+            when(repositoryRepository.findByNativeIdAndProviderId(123L, PROVIDER_ID))
+                    .thenReturn(Optional.empty());
 
             Repository result = processor.processGraphQlResponse(project, null, gitLabProvider);
 
@@ -134,19 +134,20 @@ class GitLabProjectProcessorTest extends BaseUnitTest {
         @Test
         void nullRootRef_fallsBackToMain() {
             var project = new GitLabProjectResponse(
-                "gid://gitlab/Project/123",
-                "org/project",
-                "project",
-                "https://gitlab.com/org/project",
-                null,
-                "public",
-                false,
-                null,
-                null,
-                null,
-                null // no repository info
-            );
-            when(repositoryRepository.findByNativeIdAndProviderId(123L, PROVIDER_ID)).thenReturn(Optional.empty());
+                    "gid://gitlab/Project/123",
+                    "org/project",
+                    "project",
+                    "https://gitlab.com/org/project",
+                    null,
+                    "public",
+                    false,
+                    null,
+                    null,
+                    null,
+                    null // no repository info
+                    );
+            when(repositoryRepository.findByNativeIdAndProviderId(123L, PROVIDER_ID))
+                    .thenReturn(Optional.empty());
 
             Repository result = processor.processGraphQlResponse(project, null, gitLabProvider);
 
@@ -157,19 +158,19 @@ class GitLabProjectProcessorTest extends BaseUnitTest {
         @Test
         void archivedProject_setsFlag() {
             var project = new GitLabProjectResponse(
-                "gid://gitlab/Project/123",
-                "org/project",
-                "project",
-                "https://gitlab.com/org/project",
-                null,
-                "public",
-                true, // archived
-                null,
-                null,
-                null,
-                null
-            );
-            when(repositoryRepository.findByNativeIdAndProviderId(123L, PROVIDER_ID)).thenReturn(Optional.empty());
+                    "gid://gitlab/Project/123",
+                    "org/project",
+                    "project",
+                    "https://gitlab.com/org/project",
+                    null,
+                    "public",
+                    true, // archived
+                    null,
+                    null,
+                    null,
+                    null);
+            when(repositoryRepository.findByNativeIdAndProviderId(123L, PROVIDER_ID))
+                    .thenReturn(Optional.empty());
 
             Repository result = processor.processGraphQlResponse(project, null, gitLabProvider);
 
@@ -183,7 +184,8 @@ class GitLabProjectProcessorTest extends BaseUnitTest {
             Repository existing = new Repository();
             existing.setNativeId(123L);
             existing.setName("old-name");
-            when(repositoryRepository.findByNativeIdAndProviderId(123L, PROVIDER_ID)).thenReturn(Optional.of(existing));
+            when(repositoryRepository.findByNativeIdAndProviderId(123L, PROVIDER_ID))
+                    .thenReturn(Optional.of(existing));
 
             Repository result = processor.processGraphQlResponse(project, null, gitLabProvider);
 
@@ -197,50 +199,51 @@ class GitLabProjectProcessorTest extends BaseUnitTest {
 
         @Test
         void nullResponse_returnsNull() {
-            assertThat(processor.processGraphQlResponse(null, null, gitLabProvider)).isNull();
+            assertThat(processor.processGraphQlResponse(null, null, gitLabProvider))
+                    .isNull();
             verify(repositoryRepository, never()).save(any());
         }
 
         @Test
         void nullWebUrl_returnsNull() {
             var project = new GitLabProjectResponse(
-                "gid://gitlab/Project/123",
-                "org/project",
-                "project",
-                null, // null webUrl
-                null,
-                "public",
-                false,
-                null,
-                null,
-                null,
-                null
-            );
-            assertThat(processor.processGraphQlResponse(project, null, gitLabProvider)).isNull();
+                    "gid://gitlab/Project/123",
+                    "org/project",
+                    "project",
+                    null, // null webUrl
+                    null,
+                    "public",
+                    false,
+                    null,
+                    null,
+                    null,
+                    null);
+            assertThat(processor.processGraphQlResponse(project, null, gitLabProvider))
+                    .isNull();
             verify(repositoryRepository, never()).save(any());
         }
 
         @Test
         void malformedCreatedAt_doesNotOverwriteExisting() {
             var project = new GitLabProjectResponse(
-                "gid://gitlab/Project/123",
-                "org/project",
-                "project",
-                "https://gitlab.com/org/project",
-                null,
-                "public",
-                false,
-                "not-a-date", // malformed
-                "2024-06-01T10:00:00Z",
-                null,
-                new GitLabProjectResponse.RepositoryInfo("main")
-            );
+                    "gid://gitlab/Project/123",
+                    "org/project",
+                    "project",
+                    "https://gitlab.com/org/project",
+                    null,
+                    "public",
+                    false,
+                    "not-a-date", // malformed
+                    "2024-06-01T10:00:00Z",
+                    null,
+                    new GitLabProjectResponse.RepositoryInfo("main"));
 
             Instant existingCreatedAt = Instant.parse("2024-01-01T00:00:00Z");
             Repository existing = new Repository();
             existing.setNativeId(123L);
             existing.setCreatedAt(existingCreatedAt);
-            when(repositoryRepository.findByNativeIdAndProviderId(123L, PROVIDER_ID)).thenReturn(Optional.of(existing));
+            when(repositoryRepository.findByNativeIdAndProviderId(123L, PROVIDER_ID))
+                    .thenReturn(Optional.of(existing));
 
             Repository result = processor.processGraphQlResponse(project, null, gitLabProvider);
 
@@ -252,55 +255,54 @@ class GitLabProjectProcessorTest extends BaseUnitTest {
         @Test
         void nullFullPath_returnsNull() {
             var project = new GitLabProjectResponse(
-                "gid://gitlab/Project/123",
-                null,
-                "project",
-                "https://gitlab.com/org/project",
-                null,
-                "public",
-                false,
-                null,
-                null,
-                null,
-                null
-            );
-            assertThat(processor.processGraphQlResponse(project, null, gitLabProvider)).isNull();
+                    "gid://gitlab/Project/123",
+                    null,
+                    "project",
+                    "https://gitlab.com/org/project",
+                    null,
+                    "public",
+                    false,
+                    null,
+                    null,
+                    null,
+                    null);
+            assertThat(processor.processGraphQlResponse(project, null, gitLabProvider))
+                    .isNull();
             verify(repositoryRepository, never()).save(any());
         }
 
         @Test
         void invalidGid_returnsNull() {
             var project = new GitLabProjectResponse(
-                "not-a-valid-gid",
-                "org/project",
-                "project",
-                "https://gitlab.com/org/project",
-                null,
-                "public",
-                false,
-                null,
-                null,
-                null,
-                null
-            );
-            assertThat(processor.processGraphQlResponse(project, null, gitLabProvider)).isNull();
+                    "not-a-valid-gid",
+                    "org/project",
+                    "project",
+                    "https://gitlab.com/org/project",
+                    null,
+                    "public",
+                    false,
+                    null,
+                    null,
+                    null,
+                    null);
+            assertThat(processor.processGraphQlResponse(project, null, gitLabProvider))
+                    .isNull();
             verify(repositoryRepository, never()).save(any());
         }
 
         private GitLabProjectResponse createMinimalProject(String visibility) {
             return new GitLabProjectResponse(
-                "gid://gitlab/Project/123",
-                "org/project",
-                "project",
-                "https://gitlab.com/org/project",
-                null,
-                visibility,
-                false,
-                null,
-                null,
-                null,
-                new GitLabProjectResponse.RepositoryInfo("main")
-            );
+                    "gid://gitlab/Project/123",
+                    "org/project",
+                    "project",
+                    "https://gitlab.com/org/project",
+                    null,
+                    visibility,
+                    false,
+                    null,
+                    null,
+                    null,
+                    new GitLabProjectResponse.RepositoryInfo("main"));
         }
     }
 
@@ -310,25 +312,24 @@ class GitLabProjectProcessorTest extends BaseUnitTest {
         @BeforeEach
         void stubSave() {
             // Lenient: null/invalid input tests return early before reaching save()
-            lenient()
-                .when(repositoryRepository.save(any(Repository.class)))
-                .thenAnswer(inv -> inv.getArgument(0));
+            lenient().when(repositoryRepository.save(any(Repository.class))).thenAnswer(inv -> inv.getArgument(0));
         }
 
         @Test
         void validPushEvent_createsRepository() {
             var projectInfo = new GitLabPushEventDTO.ProjectInfo(
-                246765L,
-                "demo-repository",
-                "Demo repo",
-                "https://gitlab.lrz.de/hephaestustest/demo-repository",
-                "HephaestusTest",
-                "hephaestustest/demo-repository",
-                "main",
-                0 // private
-            );
+                    246765L,
+                    "demo-repository",
+                    "Demo repo",
+                    "https://gitlab.lrz.de/hephaestustest/demo-repository",
+                    "HephaestusTest",
+                    "hephaestustest/demo-repository",
+                    "main",
+                    0 // private
+                    );
 
-            when(repositoryRepository.findByNativeIdAndProviderId(246765L, PROVIDER_ID)).thenReturn(Optional.empty());
+            when(repositoryRepository.findByNativeIdAndProviderId(246765L, PROVIDER_ID))
+                    .thenReturn(Optional.empty());
 
             Repository result = processor.processPushEvent(projectInfo, gitLabProvider);
 
@@ -348,16 +349,9 @@ class GitLabProjectProcessorTest extends BaseUnitTest {
         @Test
         void publicVisibilityLevel_mapsCorrectly() {
             var projectInfo = new GitLabPushEventDTO.ProjectInfo(
-                1L,
-                "proj",
-                null,
-                "https://gitlab.com/org/proj",
-                null,
-                "org/proj",
-                "main",
-                20
-            );
-            when(repositoryRepository.findByNativeIdAndProviderId(1L, PROVIDER_ID)).thenReturn(Optional.empty());
+                    1L, "proj", null, "https://gitlab.com/org/proj", null, "org/proj", "main", 20);
+            when(repositoryRepository.findByNativeIdAndProviderId(1L, PROVIDER_ID))
+                    .thenReturn(Optional.empty());
 
             Repository result = processor.processPushEvent(projectInfo, gitLabProvider);
 
@@ -382,15 +376,7 @@ class GitLabProjectProcessorTest extends BaseUnitTest {
         @Test
         void nullId_returnsNull() {
             var projectInfo = new GitLabPushEventDTO.ProjectInfo(
-                null,
-                "proj",
-                null,
-                "https://gitlab.com/org/proj",
-                null,
-                "org/proj",
-                "main",
-                0
-            );
+                    null, "proj", null, "https://gitlab.com/org/proj", null, "org/proj", "main", 0);
             assertThat(processor.processPushEvent(projectInfo, gitLabProvider)).isNull();
             verify(repositoryRepository, never()).save(any());
         }
@@ -398,15 +384,7 @@ class GitLabProjectProcessorTest extends BaseUnitTest {
         @Test
         void nullPathWithNamespace_returnsNull() {
             var projectInfo = new GitLabPushEventDTO.ProjectInfo(
-                1L,
-                "proj",
-                null,
-                "https://gitlab.com/org/proj",
-                null,
-                null,
-                "main",
-                0
-            );
+                    1L, "proj", null, "https://gitlab.com/org/proj", null, null, "main", 0);
             assertThat(processor.processPushEvent(projectInfo, gitLabProvider)).isNull();
             verify(repositoryRepository, never()).save(any());
         }
@@ -414,20 +392,13 @@ class GitLabProjectProcessorTest extends BaseUnitTest {
         @Test
         void existingRepository_isUpdated() {
             var projectInfo = new GitLabPushEventDTO.ProjectInfo(
-                1L,
-                "new-name",
-                null,
-                "https://gitlab.com/org/new-name",
-                null,
-                "org/new-name",
-                "develop",
-                20
-            );
+                    1L, "new-name", null, "https://gitlab.com/org/new-name", null, "org/new-name", "develop", 20);
             Repository existing = new Repository();
             existing.setNativeId(1L);
             existing.setName("old-name");
             existing.setArchived(true); // should be preserved
-            when(repositoryRepository.findByNativeIdAndProviderId(1L, PROVIDER_ID)).thenReturn(Optional.of(existing));
+            when(repositoryRepository.findByNativeIdAndProviderId(1L, PROVIDER_ID))
+                    .thenReturn(Optional.of(existing));
 
             Repository result = processor.processPushEvent(projectInfo, gitLabProvider);
 

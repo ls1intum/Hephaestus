@@ -31,10 +31,9 @@ public class GithubApprovalChannel implements ApprovalChannel {
     private final OutboundEgressGuard egressGuard;
 
     public GithubApprovalChannel(
-        GitHubGraphQlClientProvider gitHubProvider,
-        GithubPrNodeIdResolver prNodeIdResolver,
-        OutboundEgressGuard egressGuard
-    ) {
+            GitHubGraphQlClientProvider gitHubProvider,
+            GithubPrNodeIdResolver prNodeIdResolver,
+            OutboundEgressGuard egressGuard) {
         this.gitHubProvider = gitHubProvider;
         this.prNodeIdResolver = prNodeIdResolver;
         this.egressGuard = egressGuard;
@@ -57,12 +56,12 @@ public class GithubApprovalChannel implements ApprovalChannel {
         String prNodeId = prNodeIdResolver.resolve(scopeId, pr.owner(), pr.name(), pr.number());
 
         ClientGraphQlResponse response = gitHubProvider
-            .forScope(scopeId)
-            .documentName("ApprovePullRequest")
-            .variable("pullRequestId", prNodeId)
-            .variable("body", message)
-            .execute()
-            .block(GRAPHQL_TIMEOUT);
+                .forScope(scopeId)
+                .documentName("ApprovePullRequest")
+                .variable("pullRequestId", prNodeId)
+                .variable("body", message)
+                .execute()
+                .block(GRAPHQL_TIMEOUT);
 
         if (response == null) {
             throw new FeedbackDeliveryException("Null response from ApprovePullRequest mutation");
@@ -73,12 +72,9 @@ public class GithubApprovalChannel implements ApprovalChannel {
             throw new FeedbackDeliveryException("GitHub ApprovePullRequest failed: " + response.getErrors());
         }
 
-        String reviewId = response.field("addPullRequestReview.pullRequestReview.id").getValue();
+        String reviewId =
+                response.field("addPullRequestReview.pullRequestReview.id").getValue();
         log.info(
-            "Posted GitHub approval review: workspaceId={}, prNodeId={}, reviewId={}",
-            scopeId,
-            prNodeId,
-            reviewId
-        );
+                "Posted GitHub approval review: workspaceId={}, prNodeId={}, reviewId={}", scopeId, prNodeId, reviewId);
     }
 }

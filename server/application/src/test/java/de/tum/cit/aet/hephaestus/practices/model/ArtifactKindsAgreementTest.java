@@ -41,14 +41,13 @@ class ArtifactKindsAgreementTest extends BaseUnitTest {
         // These strings are persisted in observation, feedback and agent_job rows and in every bundled
         // practice's bindings. Re-spelling one without migrating orphans every row already written under
         // the old spelling.
-        assertThat(
-            Stream.of(
-                ArtifactKinds.PULL_REQUEST,
-                ArtifactKinds.ISSUE,
-                ArtifactKinds.CONVERSATION_THREAD,
-                ArtifactKinds.DOCUMENT
-            ).map(ArtifactKind::value)
-        ).containsExactly("scm.pull_request", "scm.issue", "chat.conversation_thread", "docs.document");
+        assertThat(Stream.of(
+                                ArtifactKinds.PULL_REQUEST,
+                                ArtifactKinds.ISSUE,
+                                ArtifactKinds.CONVERSATION_THREAD,
+                                ArtifactKinds.DOCUMENT)
+                        .map(ArtifactKind::value))
+                .containsExactly("scm.pull_request", "scm.issue", "chat.conversation_thread", "docs.document");
     }
 
     @Test
@@ -56,7 +55,8 @@ class ArtifactKindsAgreementTest extends BaseUnitTest {
     void onlyPullRequestsHaveAnInlineLane() {
         assertThat(ArtifactKinds.hasInlineLane(ArtifactKinds.PULL_REQUEST)).isTrue();
         assertThat(ArtifactKinds.hasInlineLane(ArtifactKinds.ISSUE)).isFalse();
-        assertThat(ArtifactKinds.hasInlineLane(ArtifactKinds.CONVERSATION_THREAD)).isFalse();
+        assertThat(ArtifactKinds.hasInlineLane(ArtifactKinds.CONVERSATION_THREAD))
+                .isFalse();
         assertThat(ArtifactKinds.hasInlineLane(ArtifactKinds.DOCUMENT)).isFalse();
     }
 
@@ -67,14 +67,13 @@ class ArtifactKindsAgreementTest extends BaseUnitTest {
         // because DeliveryComposer is static and has no registry to ask. Held together here, against
         // every shipped descriptor, rather than by a comment promising they agree.
         for (ArtifactDescriptor descriptor : List.of(
-            new PullRequestArtifactDescriptor(),
-            new IssueArtifactDescriptor(),
-            new ConversationThreadArtifactDescriptor(),
-            new DocumentArtifactDescriptor()
-        )) {
+                new PullRequestArtifactDescriptor(),
+                new IssueArtifactDescriptor(),
+                new ConversationThreadArtifactDescriptor(),
+                new DocumentArtifactDescriptor())) {
             assertThat(ArtifactKinds.hasInlineLane(descriptor.kind()))
-                .as("ArtifactKinds and the descriptor disagree about the inline lane of '%s'", descriptor.kind())
-                .isEqualTo(descriptor.lanes().contains(FeedbackLane.IN_CONTEXT_INLINE));
+                    .as("ArtifactKinds and the descriptor disagree about the inline lane of '%s'", descriptor.kind())
+                    .isEqualTo(descriptor.lanes().contains(FeedbackLane.IN_CONTEXT_INLINE));
         }
     }
 

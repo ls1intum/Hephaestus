@@ -16,10 +16,9 @@ public class SlackAppHomeOpenedMessageHandler extends AbstractSlackEnvelopeHandl
     private final SlackAssistantEventHandler assistantEventHandler;
 
     public SlackAppHomeOpenedMessageHandler(
-        SlackAppHomeService appHomeService,
-        SlackAssistantEventHandler assistantEventHandler,
-        NatsMessageDeserializer deserializer
-    ) {
+            SlackAppHomeService appHomeService,
+            SlackAssistantEventHandler assistantEventHandler,
+            NatsMessageDeserializer deserializer) {
         super("app_home_opened", deserializer);
         this.appHomeService = appHomeService;
         this.assistantEventHandler = assistantEventHandler;

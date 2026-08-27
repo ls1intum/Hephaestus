@@ -26,10 +26,9 @@ public class ReviewCountEvaluator implements AchievementEvaluator {
     public boolean updateProgress(UserAchievement userAchievement, ActivitySavedEvent event) {
         if (!(userAchievement.getProgressData() instanceof LinearAchievementProgress(int current, int target))) {
             log.warn(
-                "Expected LinearAchievementProgress but received {} for achievement: {}",
-                userAchievement.getProgressData(),
-                userAchievement.getAchievementId()
-            );
+                    "Expected LinearAchievementProgress but received {} for achievement: {}",
+                    userAchievement.getProgressData(),
+                    userAchievement.getAchievementId());
             return false;
         }
 
@@ -37,22 +36,30 @@ public class ReviewCountEvaluator implements AchievementEvaluator {
 
         if (event.targetType() == ActivityTargetType.REVIEW) {
             isNotAuthoredByOneself = reviewRepository
-                .findByIdWithPullRequestAuthor(event.targetId())
-                .map(review -> {
-                    if (review.getPullRequest() == null || review.getPullRequest().getAuthor() == null) return false;
-                    if (event.user().isEmpty()) return false;
-                    return !review.getPullRequest().getAuthor().getId().equals(event.user().get().getId());
-                })
-                .orElse(false);
+                    .findByIdWithPullRequestAuthor(event.targetId())
+                    .map(review -> {
+                        if (review.getPullRequest() == null
+                                || review.getPullRequest().getAuthor() == null) return false;
+                        if (event.user().isEmpty()) return false;
+                        return !review.getPullRequest()
+                                .getAuthor()
+                                .getId()
+                                .equals(event.user().get().getId());
+                    })
+                    .orElse(false);
         } else if (event.targetType() == ActivityTargetType.REVIEW_COMMENT) {
             isNotAuthoredByOneself = reviewCommentRepository
-                .findByIdWithPullRequestAuthor(event.targetId())
-                .map(comment -> {
-                    if (comment.getPullRequest() == null || comment.getPullRequest().getAuthor() == null) return false;
-                    if (event.user().isEmpty()) return false;
-                    return !comment.getPullRequest().getAuthor().getId().equals(event.user().get().getId());
-                })
-                .orElse(false);
+                    .findByIdWithPullRequestAuthor(event.targetId())
+                    .map(comment -> {
+                        if (comment.getPullRequest() == null
+                                || comment.getPullRequest().getAuthor() == null) return false;
+                        if (event.user().isEmpty()) return false;
+                        return !comment.getPullRequest()
+                                .getAuthor()
+                                .getId()
+                                .equals(event.user().get().getId());
+                    })
+                    .orElse(false);
         }
 
         if (isNotAuthoredByOneself && current < target) {

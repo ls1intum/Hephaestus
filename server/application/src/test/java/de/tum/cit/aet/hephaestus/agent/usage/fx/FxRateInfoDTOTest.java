@@ -20,7 +20,7 @@ class FxRateInfoDTOTest extends BaseUnitTest {
     private static final LocalDate DATE = LocalDate.of(2026, 7, 24);
 
     @ParameterizedTest(name = "1 / {0} = {1}")
-    @CsvSource({ "1.1377, 0.878966", "18542.290000, 0.000054" })
+    @CsvSource({"1.1377, 0.878966", "18542.290000, 0.000054"})
     void shouldInvertEcbQuoteToSixDecimalPlaces(String usdPerEur, String expectedRatePerUsd) {
         FxRateInfoDTO info = FxRateInfoDTO.fromEcbRate("EUR", new BigDecimal(usdPerEur), DATE);
 

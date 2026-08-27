@@ -35,10 +35,9 @@ public class SlackChannelMetadataRefresher {
     private final SlackChannelConsentService consentService;
 
     public SlackChannelMetadataRefresher(
-        SlackMonitoredChannelRepository monitoredChannelRepository,
-        SlackMessageService slackMessageService,
-        SlackChannelConsentService consentService
-    ) {
+            SlackMonitoredChannelRepository monitoredChannelRepository,
+            SlackMessageService slackMessageService,
+            SlackChannelConsentService consentService) {
         this.monitoredChannelRepository = monitoredChannelRepository;
         this.slackMessageService = slackMessageService;
         this.consentService = consentService;
@@ -62,19 +61,16 @@ public class SlackChannelMetadataRefresher {
      * @return the number of channels actually checked (fewer than the workspace's total when cancelled)
      */
     public int refreshWorkspace(long workspaceId, BooleanSupplier cancelled) {
-        List<SlackMonitoredChannel> channels = monitoredChannelRepository.findByWorkspaceIdAndConsentStateNot(
-            workspaceId,
-            ConsentState.REVOKED
-        );
+        List<SlackMonitoredChannel> channels =
+                monitoredChannelRepository.findByWorkspaceIdAndConsentStateNot(workspaceId, ConsentState.REVOKED);
         int checked = 0;
         for (SlackMonitoredChannel channel : channels) {
             if (cancelled.getAsBoolean()) {
                 log.info(
-                    "slack.sync: metadata refresh cancelled for workspaceId={} after {} of {} channel(s)",
-                    workspaceId,
-                    checked,
-                    channels.size()
-                );
+                        "slack.sync: metadata refresh cancelled for workspaceId={} after {} of {} channel(s)",
+                        workspaceId,
+                        checked,
+                        channels.size());
                 return checked;
             }
             checked++;
@@ -82,11 +78,10 @@ public class SlackChannelMetadataRefresher {
                 refreshChannel(workspaceId, channel);
             } catch (RuntimeException e) {
                 log.warn(
-                    "slack.sync: metadata refresh failed for workspaceId={} channelId={}: {}",
-                    workspaceId,
-                    channel.getSlackChannelId(),
-                    e.toString()
-                );
+                        "slack.sync: metadata refresh failed for workspaceId={} channelId={}: {}",
+                        workspaceId,
+                        channel.getSlackChannelId(),
+                        e.toString());
             }
         }
         return checked;
@@ -107,27 +102,21 @@ public class SlackChannelMetadataRefresher {
                     consentService.pauseForPlatformEvent(workspaceId, channelId, "channel archived — detected by sync");
                 } else if (!info.member()) {
                     consentService.pauseForPlatformEvent(
-                        workspaceId,
-                        channelId,
-                        "bot removed from channel — detected by sync"
-                    );
+                            workspaceId, channelId, "bot removed from channel — detected by sync");
                 }
             }
             case ConversationLookup.NotFound(var error) -> {
                 if (channel.getConsentState() == ConsentState.ACTIVE) {
                     consentService.pauseForPlatformEvent(
-                        workspaceId,
-                        channelId,
-                        "channel no longer exists — detected by sync"
-                    );
+                            workspaceId, channelId, "channel no longer exists — detected by sync");
                 }
             }
-            case ConversationLookup.Unavailable(var error) -> log.debug(
-                "slack.sync: metadata for workspaceId={} channelId={} unavailable ({}) — skipped",
-                workspaceId,
-                channelId,
-                error
-            );
+            case ConversationLookup.Unavailable(var error) ->
+                log.debug(
+                        "slack.sync: metadata for workspaceId={} channelId={} unavailable ({}) — skipped",
+                        workspaceId,
+                        channelId,
+                        error);
         }
     }
 }

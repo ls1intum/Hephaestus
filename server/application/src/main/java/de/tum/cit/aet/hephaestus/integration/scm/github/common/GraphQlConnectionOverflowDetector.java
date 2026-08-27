@@ -67,13 +67,12 @@ public final class GraphQlConnectionOverflowDetector {
     public static boolean check(String connectionName, int fetchedCount, int totalCount, String context) {
         if (totalCount > fetchedCount) {
             log.warn(
-                "GraphQL embedded connection truncated: connection={}, fetchedCount={}, totalCount={}, context={}. " +
-                    "No follow-up pagination — remaining items were not fetched.",
-                connectionName,
-                fetchedCount,
-                totalCount,
-                context
-            );
+                    "GraphQL embedded connection truncated: connection={}, fetchedCount={}, totalCount={}, context={}. "
+                            + "No follow-up pagination — remaining items were not fetched.",
+                    connectionName,
+                    fetchedCount,
+                    totalCount,
+                    context);
             return true;
         }
         return false;
@@ -97,34 +96,27 @@ public final class GraphQlConnectionOverflowDetector {
      * @return {@code true} if data is incomplete (gap present and the loop stopped early)
      */
     public static boolean checkPaginated(
-        String connectionName,
-        int fetchedCount,
-        int totalCount,
-        boolean stoppedEarly,
-        String context
-    ) {
+            String connectionName, int fetchedCount, int totalCount, boolean stoppedEarly, String context) {
         if (totalCount <= fetchedCount) {
             return false;
         }
         if (stoppedEarly) {
             log.warn(
-                "GraphQL connection truncated by early stop: connection={}, fetchedCount={}, totalCount={}, " +
-                    "context={}. Pagination stopped before all pages were retrieved; data is incomplete.",
-                connectionName,
-                fetchedCount,
-                totalCount,
-                context
-            );
+                    "GraphQL connection truncated by early stop: connection={}, fetchedCount={}, totalCount={}, "
+                            + "context={}. Pagination stopped before all pages were retrieved; data is incomplete.",
+                    connectionName,
+                    fetchedCount,
+                    totalCount,
+                    context);
             return true;
         }
         log.debug(
-            "GraphQL connection count gap after full pagination (benign): connection={}, fetchedCount={}, " +
-                "totalCount={}, context={}.",
-            connectionName,
-            fetchedCount,
-            totalCount,
-            context
-        );
+                "GraphQL connection count gap after full pagination (benign): connection={}, fetchedCount={}, "
+                        + "totalCount={}, context={}.",
+                connectionName,
+                fetchedCount,
+                totalCount,
+                context);
         return false;
     }
 
@@ -144,12 +136,11 @@ public final class GraphQlConnectionOverflowDetector {
     public static boolean check(String connectionName, int fetchedCount, boolean hasNextPage, String context) {
         if (hasNextPage) {
             log.warn(
-                "GraphQL embedded connection truncated: connection={}, fetchedCount={}, hasNextPage=true, " +
-                    "context={}. No follow-up pagination — remaining items were not fetched.",
-                connectionName,
-                fetchedCount,
-                context
-            );
+                    "GraphQL embedded connection truncated: connection={}, fetchedCount={}, hasNextPage=true, "
+                            + "context={}. No follow-up pagination — remaining items were not fetched.",
+                    connectionName,
+                    fetchedCount,
+                    context);
             return true;
         }
         return false;

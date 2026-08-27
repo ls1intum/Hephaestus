@@ -22,21 +22,19 @@ public class SlackAssistantEventHandler {
 
     /** Context-safe openers: no stale "latest PR" claims before the mentor has loaded evidence. */
     static final List<SuggestedPrompt> PROMPTS = List.of(
-        new SuggestedPrompt("What needs attention?", "What software project practice should I focus on next?"),
-        new SuggestedPrompt("Review my recent work", "Review my recent pull requests, reviews, and issues."),
-        new SuggestedPrompt("Check my reviews", "How are my code reviews and review comments trending?"),
-        new SuggestedPrompt("Follow up", "What feedback or project-practice issue should I revisit?")
-    );
+            new SuggestedPrompt("What needs attention?", "What software project practice should I focus on next?"),
+            new SuggestedPrompt("Review my recent work", "Review my recent pull requests, reviews, and issues."),
+            new SuggestedPrompt("Check my reviews", "How are my code reviews and review comments trending?"),
+            new SuggestedPrompt("Follow up", "What feedback or project-practice issue should I revisit?"));
 
     private final SlackWorkspaceResolver workspaceResolver;
     private final SlackMessageService messageService;
     private final MentorReadinessQuery mentorReadinessQuery;
 
     public SlackAssistantEventHandler(
-        SlackWorkspaceResolver workspaceResolver,
-        SlackMessageService messageService,
-        MentorReadinessQuery mentorReadinessQuery
-    ) {
+            SlackWorkspaceResolver workspaceResolver,
+            SlackMessageService messageService,
+            MentorReadinessQuery mentorReadinessQuery) {
         this.workspaceResolver = workspaceResolver;
         this.messageService = messageService;
         this.mentorReadinessQuery = mentorReadinessQuery;

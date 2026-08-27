@@ -15,48 +15,47 @@ import org.jspecify.annotations.Nullable;
  * record is the review chokepoint.
  */
 public record ExportBundle(
-    String schemaVersion,
-    Instant generatedAt,
-    Profile account,
-    List<Identity> identities,
-    List<WorkspaceMembership> workspaceMemberships,
-    List<String> featureFlags,
-    @Nullable Preferences preferences,
-    List<AuthEvent> authEvents
-) {
+        String schemaVersion,
+        Instant generatedAt,
+        Profile account,
+        List<Identity> identities,
+        List<WorkspaceMembership> workspaceMemberships,
+        List<String> featureFlags,
+        @Nullable Preferences preferences,
+        List<AuthEvent> authEvents) {
     /** Current export schema version. Bump on any breaking shape change. */
     public static final String SCHEMA_VERSION = "1.0";
 
     public record Profile(
-        Long id,
-        String displayName,
-        @Nullable String primaryEmail,
-        // appRole intentionally omitted: it is controller-assigned authorization state, NOT data the
-        // subject "provided" under GDPR Art. 20(1) — out of portability scope. (Admin views surface it
-        // elsewhere.) `status` is kept: it is the subject's own account-lifecycle state.
-        String status,
-        Instant createdAt
-    ) {}
+            Long id,
+            String displayName,
+            @Nullable String primaryEmail,
+            // appRole intentionally omitted: it is controller-assigned authorization state, NOT data the
+            // subject "provided" under GDPR Art. 20(1) — out of portability scope. (Admin views surface it
+            // elsewhere.) `status` is kept: it is the subject's own account-lifecycle state.
+            String status,
+            Instant createdAt) {}
 
     public record Identity(
-        String provider,
-        String subject,
-        @Nullable String usernameAtSignup,
-        @Nullable String emailAtSignup,
-        @Nullable String displayName,
-        Instant linkedAt,
-        @Nullable Instant lastLoginAt
-    ) {}
+            String provider,
+            String subject,
+            @Nullable String usernameAtSignup,
+            @Nullable String emailAtSignup,
+            @Nullable String displayName,
+            Instant linkedAt,
+            @Nullable Instant lastLoginAt) {}
 
-    public record WorkspaceMembership(@Nullable String slug, @Nullable String name, @Nullable String role) {}
+    public record WorkspaceMembership(
+            @Nullable String slug,
+            @Nullable String name,
+            @Nullable String role) {}
 
     public record Preferences(boolean participateInResearch, boolean practiceFeedbackDeliveryEnabled) {}
 
     public record AuthEvent(
-        @Nullable Instant occurredAt,
-        @Nullable String eventType,
-        @Nullable String result,
-        @Nullable String ip,
-        @Nullable String userAgent
-    ) {}
+            @Nullable Instant occurredAt,
+            @Nullable String eventType,
+            @Nullable String result,
+            @Nullable String ip,
+            @Nullable String userAgent) {}
 }

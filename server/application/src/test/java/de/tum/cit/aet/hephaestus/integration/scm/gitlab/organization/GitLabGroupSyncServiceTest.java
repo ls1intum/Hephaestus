@@ -63,12 +63,11 @@ class GitLabGroupSyncServiceTest extends BaseUnitTest {
     private IdentityProviderRepository gitProviderRepository;
 
     private final GitLabProperties gitLabProperties = new GitLabProperties(
-        "https://gitlab.com",
-        Duration.ofSeconds(30),
-        Duration.ofSeconds(60),
-        Duration.ofMillis(10), // fast throttle for tests
-        Duration.ofMinutes(5)
-    );
+            "https://gitlab.com",
+            Duration.ofSeconds(30),
+            Duration.ofSeconds(60),
+            Duration.ofMillis(10), // fast throttle for tests
+            Duration.ofMinutes(5));
 
     private GitLabGroupSyncService service;
 
@@ -76,22 +75,21 @@ class GitLabGroupSyncServiceTest extends BaseUnitTest {
     void setUp() {
         IdentityProvider gitLabProvider = TestEntities.gitProvider(TEST_PROVIDER_ID, IdentityProviderType.GITLAB);
         lenient()
-            .when(gitProviderRepository.findByTypeAndServerUrl(IdentityProviderType.GITLAB, "https://gitlab.com"))
-            .thenReturn(Optional.of(gitLabProvider));
+                .when(gitProviderRepository.findByTypeAndServerUrl(IdentityProviderType.GITLAB, "https://gitlab.com"))
+                .thenReturn(Optional.of(gitLabProvider));
 
         // Default: responseHandler.handle() returns CONTINUE (valid response)
         lenient()
-            .when(responseHandler.handle(any(), anyString(), any()))
-            .thenReturn(new HandleResult(HandleResult.Action.CONTINUE, null));
+                .when(responseHandler.handle(any(), anyString(), any()))
+                .thenReturn(new HandleResult(HandleResult.Action.CONTINUE, null));
 
         service = new GitLabGroupSyncService(
-            graphQlClientProvider,
-            responseHandler,
-            groupProcessor,
-            projectProcessor,
-            gitLabProperties,
-            gitProviderRepository
-        );
+                graphQlClientProvider,
+                responseHandler,
+                groupProcessor,
+                projectProcessor,
+                gitLabProperties,
+                gitProviderRepository);
     }
 
     @Nested
@@ -117,8 +115,7 @@ class GitLabGroupSyncServiceTest extends BaseUnitTest {
             org.setId(42L);
             org.setLogin("my-org");
 
-            mockGraphQlGroupResponse(
-                new GitLabGroupResponse(
+            mockGraphQlGroupResponse(new GitLabGroupResponse(
                     "gid://gitlab/Group/42",
                     "my-org",
                     "My Org",
@@ -126,10 +123,9 @@ class GitLabGroupSyncServiceTest extends BaseUnitTest {
                     "https://gitlab.com/my-org",
                     null,
                     "public",
-                    null
-                )
-            );
-            when(groupProcessor.process(any(GitLabGroupResponse.class), anyLong())).thenReturn(org);
+                    null));
+            when(groupProcessor.process(any(GitLabGroupResponse.class), anyLong()))
+                    .thenReturn(org);
 
             Optional<Organization> result = service.syncGroup(1L, "my-org", null);
 
@@ -156,9 +152,8 @@ class GitLabGroupSyncServiceTest extends BaseUnitTest {
             lenient().when(response.getErrors()).thenReturn(List.of());
 
             // Invalid response → handler returns ABORT
-            when(responseHandler.handle(eq(response), anyString(), any())).thenReturn(
-                new HandleResult(HandleResult.Action.ABORT, null)
-            );
+            when(responseHandler.handle(eq(response), anyString(), any()))
+                    .thenReturn(new HandleResult(HandleResult.Action.ABORT, null));
 
             mockRequestSpec(client, response);
 
@@ -260,8 +255,10 @@ class GitLabGroupSyncServiceTest extends BaseUnitTest {
 
             Repository repo1 = createTestRepository(10L);
             Repository repo2 = createTestRepository(20L);
-            when(projectProcessor.processGraphQlResponse(eq(proj1), any(), any())).thenReturn(repo1);
-            when(projectProcessor.processGraphQlResponse(eq(proj2), any(), any())).thenReturn(repo2);
+            when(projectProcessor.processGraphQlResponse(eq(proj1), any(), any()))
+                    .thenReturn(repo1);
+            when(projectProcessor.processGraphQlResponse(eq(proj2), any(), any()))
+                    .thenReturn(repo2);
 
             GitLabSyncResult result = service.syncGroupProjects(1L, "my-org", null);
 
@@ -278,10 +275,8 @@ class GitLabGroupSyncServiceTest extends BaseUnitTest {
             var proj1 = createMinimalProject("gid://gitlab/Project/10", "my-org/proj-a", "proj-a");
             var proj2 = createMinimalProject("gid://gitlab/Project/20", "my-org/proj-b", "proj-b");
 
-            ClientGraphQlResponse page1 = mockProjectsPageWithGroup(
-                List.of(proj1),
-                new GitLabPageInfo(true, "cursor1")
-            );
+            ClientGraphQlResponse page1 =
+                    mockProjectsPageWithGroup(List.of(proj1), new GitLabPageInfo(true, "cursor1"));
             ClientGraphQlResponse page2 = mockProjectsPage(List.of(proj2), new GitLabPageInfo(false, null));
 
             HttpGraphQlClient client = mockClient();
@@ -291,8 +286,10 @@ class GitLabGroupSyncServiceTest extends BaseUnitTest {
 
             Repository repo1 = createTestRepository(10L);
             Repository repo2 = createTestRepository(20L);
-            when(projectProcessor.processGraphQlResponse(eq(proj1), any(), any())).thenReturn(repo1);
-            when(projectProcessor.processGraphQlResponse(eq(proj2), any(), any())).thenReturn(repo2);
+            when(projectProcessor.processGraphQlResponse(eq(proj1), any(), any()))
+                    .thenReturn(repo1);
+            when(projectProcessor.processGraphQlResponse(eq(proj2), any(), any()))
+                    .thenReturn(repo2);
 
             GitLabSyncResult result = service.syncGroupProjects(1L, "my-org", null);
 
@@ -314,8 +311,10 @@ class GitLabGroupSyncServiceTest extends BaseUnitTest {
             when(graphQlClientProvider.getRateLimitRemaining(1L)).thenReturn(100);
 
             Repository repo1 = createTestRepository(10L);
-            when(projectProcessor.processGraphQlResponse(eq(proj1), any(), any())).thenReturn(repo1);
-            when(projectProcessor.processGraphQlResponse(eq(proj2), any(), any())).thenReturn(null);
+            when(projectProcessor.processGraphQlResponse(eq(proj1), any(), any()))
+                    .thenReturn(repo1);
+            when(projectProcessor.processGraphQlResponse(eq(proj2), any(), any()))
+                    .thenReturn(null);
 
             GitLabSyncResult result = service.syncGroupProjects(1L, "my-org", null);
 
@@ -337,10 +336,10 @@ class GitLabGroupSyncServiceTest extends BaseUnitTest {
             when(graphQlClientProvider.getRateLimitRemaining(1L)).thenReturn(100);
 
             Repository repo2 = createTestRepository(20L);
-            when(projectProcessor.processGraphQlResponse(eq(proj1), any(), any())).thenThrow(
-                new RuntimeException("DB error")
-            );
-            when(projectProcessor.processGraphQlResponse(eq(proj2), any(), any())).thenReturn(repo2);
+            when(projectProcessor.processGraphQlResponse(eq(proj1), any(), any()))
+                    .thenThrow(new RuntimeException("DB error"));
+            when(projectProcessor.processGraphQlResponse(eq(proj2), any(), any()))
+                    .thenReturn(repo2);
 
             GitLabSyncResult result = service.syncGroupProjects(1L, "my-org", null);
 
@@ -368,7 +367,8 @@ class GitLabGroupSyncServiceTest extends BaseUnitTest {
             when(graphQlClientProvider.getRateLimitRemaining(1L)).thenReturn(100);
 
             Repository repo1 = createTestRepository(10L);
-            when(projectProcessor.processGraphQlResponse(eq(proj1), any(), any())).thenReturn(repo1);
+            when(projectProcessor.processGraphQlResponse(eq(proj1), any(), any()))
+                    .thenReturn(repo1);
 
             GitLabSyncResult result = service.syncGroupProjects(1L, "my-org", null);
 
@@ -382,30 +382,28 @@ class GitLabGroupSyncServiceTest extends BaseUnitTest {
         @Test
         void subgroupProject_usesOwnGroup() {
             var subGroupResponse = new GitLabGroupResponse(
-                "gid://gitlab/Group/99",
-                "my-org/sub-team",
-                "Sub Team",
-                null,
-                "https://gitlab.com/my-org/sub-team",
-                null,
-                "public",
-                null
-            );
+                    "gid://gitlab/Group/99",
+                    "my-org/sub-team",
+                    "Sub Team",
+                    null,
+                    "https://gitlab.com/my-org/sub-team",
+                    null,
+                    "public",
+                    null);
 
             // Project has its own group (from subgroup)
             var proj1 = new GitLabProjectResponse(
-                "gid://gitlab/Project/10",
-                "my-org/sub-team/proj-a",
-                "proj-a",
-                "https://gitlab.com/my-org/sub-team/proj-a",
-                null,
-                "public",
-                false,
-                null,
-                null,
-                subGroupResponse, // subgroup
-                null
-            );
+                    "gid://gitlab/Project/10",
+                    "my-org/sub-team/proj-a",
+                    "proj-a",
+                    "https://gitlab.com/my-org/sub-team/proj-a",
+                    null,
+                    "public",
+                    false,
+                    null,
+                    null,
+                    subGroupResponse, // subgroup
+                    null);
 
             ClientGraphQlResponse projectsResp = mockProjectsPageWithGroup(List.of(proj1), null);
 
@@ -422,7 +420,8 @@ class GitLabGroupSyncServiceTest extends BaseUnitTest {
             when(graphQlClientProvider.getRateLimitRemaining(1L)).thenReturn(100);
 
             Repository repo1 = createTestRepository(10L);
-            when(projectProcessor.processGraphQlResponse(eq(proj1), eq(subOrg), any())).thenReturn(repo1);
+            when(projectProcessor.processGraphQlResponse(eq(proj1), eq(subOrg), any()))
+                    .thenReturn(repo1);
 
             GitLabSyncResult result = service.syncGroupProjects(1L, "my-org", null);
 
@@ -440,9 +439,8 @@ class GitLabGroupSyncServiceTest extends BaseUnitTest {
             lenient().when(invalidResp.getErrors()).thenReturn(List.of());
 
             // Invalid response → handler returns ABORT
-            when(responseHandler.handle(eq(invalidResp), anyString(), any())).thenReturn(
-                new HandleResult(HandleResult.Action.ABORT, null)
-            );
+            when(responseHandler.handle(eq(invalidResp), anyString(), any()))
+                    .thenReturn(new HandleResult(HandleResult.Action.ABORT, null));
 
             HttpGraphQlClient.RequestSpec requestSpec = mock(HttpGraphQlClient.RequestSpec.class);
             when(client.documentName(anyString())).thenReturn(requestSpec);
@@ -477,8 +475,10 @@ class GitLabGroupSyncServiceTest extends BaseUnitTest {
 
             Repository repoA = createTestRepository(10L);
             Repository repoB = createTestRepository(20L);
-            when(projectProcessor.processGraphQlResponse(eq(projA), any(), any())).thenReturn(repoA);
-            when(projectProcessor.processGraphQlResponse(eq(projB), any(), any())).thenReturn(repoB);
+            when(projectProcessor.processGraphQlResponse(eq(projA), any(), any()))
+                    .thenReturn(repoA);
+            when(projectProcessor.processGraphQlResponse(eq(projB), any(), any()))
+                    .thenReturn(repoB);
 
             GitLabSyncResult result = service.syncGroupProjects(1L, "my-org", null);
 
@@ -505,8 +505,10 @@ class GitLabGroupSyncServiceTest extends BaseUnitTest {
 
             Repository repoA = createTestRepository(10L);
             Repository repoB = createTestRepository(20L);
-            when(projectProcessor.processGraphQlResponse(eq(projA), any(), any())).thenReturn(repoA);
-            when(projectProcessor.processGraphQlResponse(eq(projB), any(), any())).thenReturn(repoB);
+            when(projectProcessor.processGraphQlResponse(eq(projA), any(), any()))
+                    .thenReturn(repoA);
+            when(projectProcessor.processGraphQlResponse(eq(projB), any(), any()))
+                    .thenReturn(repoB);
 
             GitLabSyncResult result = service.syncGroupProjects(1L, "my-org", null);
 
@@ -527,9 +529,8 @@ class GitLabGroupSyncServiceTest extends BaseUnitTest {
             lenient().when(reconPage.getErrors()).thenReturn(List.of());
 
             // Invalid reconciliation response → handler returns ABORT
-            when(responseHandler.handle(eq(reconPage), anyString(), any())).thenReturn(
-                new HandleResult(HandleResult.Action.ABORT, null)
-            );
+            when(responseHandler.handle(eq(reconPage), anyString(), any()))
+                    .thenReturn(new HandleResult(HandleResult.Action.ABORT, null));
 
             HttpGraphQlClient client = mockClient();
             mockSequentialExecute(client, mainPage, reconPage);
@@ -537,7 +538,8 @@ class GitLabGroupSyncServiceTest extends BaseUnitTest {
             when(graphQlClientProvider.getRateLimitRemaining(1L)).thenReturn(100);
 
             Repository repoA = createTestRepository(10L);
-            when(projectProcessor.processGraphQlResponse(eq(projA), any(), any())).thenReturn(repoA);
+            when(projectProcessor.processGraphQlResponse(eq(projA), any(), any()))
+                    .thenReturn(repoA);
 
             GitLabSyncResult result = service.syncGroupProjects(1L, "my-org", null);
 
@@ -566,8 +568,10 @@ class GitLabGroupSyncServiceTest extends BaseUnitTest {
 
             Repository repoA = createTestRepository(10L);
             Repository repoB = createTestRepository(20L);
-            when(projectProcessor.processGraphQlResponse(eq(projA), any(), any())).thenReturn(repoA);
-            when(projectProcessor.processGraphQlResponse(eq(projB), any(), any())).thenReturn(repoB);
+            when(projectProcessor.processGraphQlResponse(eq(projA), any(), any()))
+                    .thenReturn(repoA);
+            when(projectProcessor.processGraphQlResponse(eq(projB), any(), any()))
+                    .thenReturn(repoB);
 
             GitLabSyncResult result = service.syncGroupProjects(1L, "my-org", null);
 
@@ -597,8 +601,10 @@ class GitLabGroupSyncServiceTest extends BaseUnitTest {
 
             Repository repoA = createTestRepository(10L);
             Repository repoB = createTestRepository(20L);
-            when(projectProcessor.processGraphQlResponse(eq(projA), any(), any())).thenReturn(repoA);
-            when(projectProcessor.processGraphQlResponse(eq(projB), any(), any())).thenReturn(repoB);
+            when(projectProcessor.processGraphQlResponse(eq(projA), any(), any()))
+                    .thenReturn(repoA);
+            when(projectProcessor.processGraphQlResponse(eq(projB), any(), any()))
+                    .thenReturn(repoB);
 
             GitLabSyncResult result = service.syncGroupProjects(1L, "my-org", null);
 
@@ -615,9 +621,8 @@ class GitLabGroupSyncServiceTest extends BaseUnitTest {
             lenient().when(invalidResp.getErrors()).thenReturn(List.of());
 
             // Invalid response → handler returns ABORT
-            when(responseHandler.handle(eq(invalidResp), anyString(), any())).thenReturn(
-                new HandleResult(HandleResult.Action.ABORT, null)
-            );
+            when(responseHandler.handle(eq(invalidResp), anyString(), any()))
+                    .thenReturn(new HandleResult(HandleResult.Action.ABORT, null));
 
             HttpGraphQlClient.RequestSpec requestSpec = mock(HttpGraphQlClient.RequestSpec.class);
             when(client.documentName(anyString())).thenReturn(requestSpec);
@@ -644,30 +649,21 @@ class GitLabGroupSyncServiceTest extends BaseUnitTest {
         }
 
         private static final GitLabGroupResponse DEFAULT_GROUP = new GitLabGroupResponse(
-            "gid://gitlab/Group/1",
-            "my-org",
-            "My Org",
-            null,
-            "https://gitlab.com/my-org",
-            null,
-            "public",
-            null
-        );
+                "gid://gitlab/Group/1", "my-org", "My Org", null, "https://gitlab.com/my-org", null, "public", null);
 
         private GitLabProjectResponse createMinimalProject(String gid, String fullPath, String name) {
             return new GitLabProjectResponse(
-                gid,
-                fullPath,
-                name,
-                "https://gitlab.com/" + fullPath,
-                null,
-                "public",
-                false,
-                null,
-                null,
-                null,
-                null
-            );
+                    gid,
+                    fullPath,
+                    name,
+                    "https://gitlab.com/" + fullPath,
+                    null,
+                    "public",
+                    false,
+                    null,
+                    null,
+                    null,
+                    null);
         }
 
         /**
@@ -676,9 +672,7 @@ class GitLabGroupSyncServiceTest extends BaseUnitTest {
          */
         @SuppressWarnings("unchecked")
         private ClientGraphQlResponse mockProjectsPageWithGroup(
-            List<GitLabProjectResponse> projects,
-            @Nullable GitLabPageInfo pageInfo
-        ) {
+                List<GitLabProjectResponse> projects, @Nullable GitLabPageInfo pageInfo) {
             ClientGraphQlResponse resp = mockProjectsPage(projects, pageInfo);
 
             // Add group field (inlined in GetGroupProjects query)
@@ -691,14 +685,13 @@ class GitLabGroupSyncServiceTest extends BaseUnitTest {
 
         @SuppressWarnings("unchecked")
         private ClientGraphQlResponse mockProjectsPage(
-            List<GitLabProjectResponse> projects,
-            @Nullable GitLabPageInfo pageInfo
-        ) {
+                List<GitLabProjectResponse> projects, @Nullable GitLabPageInfo pageInfo) {
             ClientGraphQlResponse resp = mock(ClientGraphQlResponse.class);
             when(resp.isValid()).thenReturn(true);
 
             ClientResponseField nodesField = mock(ClientResponseField.class);
-            when(nodesField.<GitLabProjectResponse>toEntityList(any(Class.class))).thenReturn(projects);
+            when(nodesField.<GitLabProjectResponse>toEntityList(any(Class.class)))
+                    .thenReturn(projects);
             when(resp.field("group.projects.nodes")).thenReturn(nodesField);
 
             ClientResponseField pageInfoField = mock(ClientResponseField.class);
@@ -710,10 +703,7 @@ class GitLabGroupSyncServiceTest extends BaseUnitTest {
 
         @SafeVarargs
         private void mockSequentialExecute(
-            HttpGraphQlClient client,
-            ClientGraphQlResponse first,
-            ClientGraphQlResponse... rest
-        ) {
+                HttpGraphQlClient client, ClientGraphQlResponse first, ClientGraphQlResponse... rest) {
             HttpGraphQlClient.RequestSpec requestSpec = mock(HttpGraphQlClient.RequestSpec.class);
             when(client.documentName(anyString())).thenReturn(requestSpec);
             when(requestSpec.variable(anyString(), any())).thenReturn(requestSpec);

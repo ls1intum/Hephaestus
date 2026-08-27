@@ -25,32 +25,28 @@ class TeamOrganizationLookupArchitectureTest extends HephaestusArchitectureTest 
 
     /** Only the sync engines, which have already fixed the provider for the run and filter in-loop. */
     private static final Set<String> ALLOWED_CALLERS = Set.of(
-        "de.tum.cit.aet.hephaestus.integration.scm.github.team.GitHubTeamSyncService",
-        "de.tum.cit.aet.hephaestus.integration.scm.gitlab.team.GitLabTeamSyncService"
-    );
+            "de.tum.cit.aet.hephaestus.integration.scm.github.team.GitHubTeamSyncService",
+            "de.tum.cit.aet.hephaestus.integration.scm.gitlab.team.GitLabTeamSyncService");
 
     @Test
     @DisplayName("no new caller of TeamRepository.findAllByOrganizationIgnoreCase outside the sync engines")
     void noNewBareOrganizationEnumerationCallers() {
         ArchRule rule = noClasses()
-            .that()
-            .doNotHaveFullyQualifiedName("de.tum.cit.aet.hephaestus.integration.scm.domain.team.TeamRepository")
-            .and(
-                new DescribedPredicate<>("are not allowlisted callers") {
+                .that()
+                .doNotHaveFullyQualifiedName("de.tum.cit.aet.hephaestus.integration.scm.domain.team.TeamRepository")
+                .and(new DescribedPredicate<>("are not allowlisted callers") {
                     @Override
                     public boolean test(JavaClass input) {
                         return !ALLOWED_CALLERS.contains(input.getFullName());
                     }
-                }
-            )
-            .should()
-            .callMethod(TeamRepository.class, "findAllByOrganizationIgnoreCase", String.class)
-            .because(
-                "the organization string is not a tenant boundary: two workspaces whose account_login " +
-                    "collides on different providers (a GitHub org and a GitLab group of the same name) share " +
-                    "it, so a bare enumeration returns the other tenant's teams. Workspace paths must scope by " +
-                    "(organization, provider_id) — resolve a WorkspaceTeamScope and use the *AndProviderId finders."
-            );
+                })
+                .should()
+                .callMethod(TeamRepository.class, "findAllByOrganizationIgnoreCase", String.class)
+                .because(
+                        "the organization string is not a tenant boundary: two workspaces whose account_login "
+                                + "collides on different providers (a GitHub org and a GitLab group of the same name) share "
+                                + "it, so a bare enumeration returns the other tenant's teams. Workspace paths must scope by "
+                                + "(organization, provider_id) — resolve a WorkspaceTeamScope and use the *AndProviderId finders.");
         rule.check(classes);
     }
 }

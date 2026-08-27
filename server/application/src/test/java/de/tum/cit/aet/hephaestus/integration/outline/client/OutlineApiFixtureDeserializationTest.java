@@ -35,9 +35,8 @@ import tools.jackson.databind.json.JsonMapper;
 @Tag("unit")
 @JsonTest
 @ContextConfiguration(
-    classes = JacksonAutoConfiguration.class,
-    initializers = ConfigDataApplicationContextInitializer.class
-)
+        classes = JacksonAutoConfiguration.class,
+        initializers = ConfigDataApplicationContextInitializer.class)
 class OutlineApiFixtureDeserializationTest {
 
     @Autowired
@@ -45,10 +44,8 @@ class OutlineApiFixtureDeserializationTest {
 
     @Test
     void documentsList_mapsRealDocumentsIncludingTheNestedChild() throws Exception {
-        OutlineEnvelope<List<OutlineDocumentModel>> response = deserialize(
-            "/outline-api/documents.list.json",
-            new TypeReference<>() {}
-        );
+        OutlineEnvelope<List<OutlineDocumentModel>> response =
+                deserialize("/outline-api/documents.list.json", new TypeReference<>() {});
 
         assertThat(response.data()).isNotNull().isNotEmpty();
         OutlineDocumentModel parent = findById(response.data(), "7d11d73d-1b36-43e3-9f31-b43e98c69b5b");
@@ -71,10 +68,8 @@ class OutlineApiFixtureDeserializationTest {
 
     @Test
     void documentsInfo_mapsARootDocumentWithNoParent() throws Exception {
-        OutlineEnvelope<OutlineDocumentModel> response = deserialize(
-            "/outline-api/documents.info.json",
-            new TypeReference<>() {}
-        );
+        OutlineEnvelope<OutlineDocumentModel> response =
+                deserialize("/outline-api/documents.info.json", new TypeReference<>() {});
 
         assertThat(response.data()).isNotNull();
         OutlineDocumentModel data = response.data();
@@ -92,10 +87,8 @@ class OutlineApiFixtureDeserializationTest {
 
     @Test
     void documentsInfo_mapsANestedChildWithItsParentId() throws Exception {
-        OutlineEnvelope<OutlineDocumentModel> response = deserialize(
-            "/outline-api/documents.info.child.json",
-            new TypeReference<>() {}
-        );
+        OutlineEnvelope<OutlineDocumentModel> response =
+                deserialize("/outline-api/documents.info.child.json", new TypeReference<>() {});
 
         OutlineDocumentModel data = response.data();
         assertNotNull(data);
@@ -106,36 +99,28 @@ class OutlineApiFixtureDeserializationTest {
 
     @Test
     void collectionsList_mapsTheRealCollectionCatalog() throws Exception {
-        OutlineEnvelope<List<OutlineCollectionModel>> response = deserialize(
-            "/outline-api/collections.list.json",
-            new TypeReference<>() {}
-        );
+        OutlineEnvelope<List<OutlineCollectionModel>> response =
+                deserialize("/outline-api/collections.list.json", new TypeReference<>() {});
 
         assertThat(response.data()).isNotNull().isNotEmpty();
-        OutlineCollectionModel engineering = response
-            .data()
-            .stream()
-            .filter(c -> "fbe68839-b131-44e2-bb93-0bc533d39193".equals(c.getId()))
-            .findFirst()
-            .orElseThrow();
+        OutlineCollectionModel engineering = response.data().stream()
+                .filter(c -> "fbe68839-b131-44e2-bb93-0bc533d39193".equals(c.getId()))
+                .findFirst()
+                .orElseThrow();
         assertThat(engineering.getName()).isEqualTo("Engineering Docs");
         assertThat(engineering.getUrlId()).isEqualTo("j4Gxqv1NCn");
     }
 
     @Test
     void collectionsDocuments_mapsTheRealNestedTree() throws Exception {
-        OutlineEnvelope<List<OutlineNavigationNode>> response = deserialize(
-            "/outline-api/collections.documents.json",
-            new TypeReference<>() {}
-        );
+        OutlineEnvelope<List<OutlineNavigationNode>> response =
+                deserialize("/outline-api/collections.documents.json", new TypeReference<>() {});
 
         assertThat(response.data()).isNotNull().isNotEmpty();
-        OutlineNavigationNode parent = response
-            .data()
-            .stream()
-            .filter(n -> "7d11d73d-1b36-43e3-9f31-b43e98c69b5b".equals(n.getId()))
-            .findFirst()
-            .orElseThrow();
+        OutlineNavigationNode parent = response.data().stream()
+                .filter(n -> "7d11d73d-1b36-43e3-9f31-b43e98c69b5b".equals(n.getId()))
+                .findFirst()
+                .orElseThrow();
         assertThat(parent.getTitle()).isEqualTo("Fixture Capture Doc Renamed");
         assertThat(parent.getChildren()).isNotNull().isNotEmpty();
         assertThat(parent.getChildren().get(0).getId()).isEqualTo("cec98e59-623c-4392-a343-6e96b0995e51");
@@ -144,10 +129,8 @@ class OutlineApiFixtureDeserializationTest {
 
     @Test
     void webhookSubscriptionsList_mapsTheRegisteredSubscription() throws Exception {
-        OutlineEnvelope<List<OutlineWebhookSubscription>> response = deserialize(
-            "/outline-api/webhookSubscriptions.list.json",
-            new TypeReference<>() {}
-        );
+        OutlineEnvelope<List<OutlineWebhookSubscription>> response =
+                deserialize("/outline-api/webhookSubscriptions.list.json", new TypeReference<>() {});
 
         assertThat(response.data()).isNotNull().hasSize(1);
         OutlineWebhookSubscription subscription = response.data().get(0);
@@ -159,11 +142,7 @@ class OutlineApiFixtureDeserializationTest {
     }
 
     private static OutlineDocumentModel findById(List<OutlineDocumentModel> data, String id) {
-        return data
-            .stream()
-            .filter(m -> id.equals(m.getId()))
-            .findFirst()
-            .orElseThrow();
+        return data.stream().filter(m -> id.equals(m.getId())).findFirst().orElseThrow();
     }
 
     private <T> T deserialize(String classpath, TypeReference<T> type) throws Exception {

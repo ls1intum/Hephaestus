@@ -26,5 +26,5 @@ import org.springframework.validation.annotation.Validated;
 @Validated
 @ConfigurationProperties(prefix = "hephaestus.cors")
 public record CorsProperties(
-    @NotEmpty(message = "CORS allowed origins must not be empty") List<String> allowedOrigins
-) {}
+        @NotEmpty(message = "CORS allowed origins must not be empty")
+        List<String> allowedOrigins) {}

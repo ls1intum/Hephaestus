@@ -46,30 +46,25 @@ public class LlmUsageAdminController {
 
     @GetMapping("/llm/usage")
     @Operation(
-        summary = "Per-workspace LLM spend rollup for one month (all workspaces)",
-        operationId = "adminGetLlmUsageReport"
-    )
+            summary = "Per-workspace LLM spend rollup for one month (all workspaces)",
+            operationId = "adminGetLlmUsageReport")
     public ResponseEntity<AdminLlmUsageReportDTO> getReport(
-        @RequestParam(required = false) @Pattern(
-            regexp = "\\d{4}-(0[1-9]|1[0-2])",
-            message = "month must be ISO yyyy-MM"
-        ) @Nullable String month
-    ) {
+            @RequestParam(required = false)
+                    @Pattern(regexp = "\\d{4}-(0[1-9]|1[0-2])", message = "month must be ISO yyyy-MM")
+                    @Nullable
+                    String month) {
         YearMonth target = month != null ? YearMonth.parse(month) : YearMonth.now(ZoneOffset.UTC);
         return ResponseEntity.ok(llmUsageAdminService.getReport(target));
     }
 
     @PutMapping("/workspaces/{workspaceSlug}/llm/budget")
     @Operation(
-        summary = "Set or clear a workspace's monthly cap on host-funded LLM spend",
-        operationId = "adminUpdateWorkspaceLlmBudget"
-    )
+            summary = "Set or clear a workspace's monthly cap on host-funded LLM spend",
+            operationId = "adminUpdateWorkspaceLlmBudget")
     @ApiResponse(responseCode = "204", description = "Cap updated")
     @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "WORKSPACE_INSTANCE_LLM_BUDGET")
     public ResponseEntity<Void> updateBudget(
-        @PathVariable String workspaceSlug,
-        @Valid @RequestBody UpdateLlmBudgetRequestDTO request
-    ) {
+            @PathVariable String workspaceSlug, @Valid @RequestBody UpdateLlmBudgetRequestDTO request) {
         llmUsageAdminService.updateBudget(workspaceSlug, request.monthlyBudgetUsd());
         return ResponseEntity.noContent().build();
     }

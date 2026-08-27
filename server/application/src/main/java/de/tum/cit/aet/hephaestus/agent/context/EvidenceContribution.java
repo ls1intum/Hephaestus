@@ -10,57 +10,54 @@ import java.util.Map;
 import java.util.Objects;
 
 public record EvidenceContribution(
-    Map<String, byte[]> files,
-    Map<SourceKind, SourceCompleteness> completeness,
-    Map<SourceKind, String> immutableIdentities,
-    Map<SourceKind, Instant> observedAt,
-    Map<SourceKind, Instant> sourceEffectiveAt,
-    Map<SourceKind, SourceContentState> contentStates,
-    /**
-     * Capture states only the collector can establish, such as evidence withheld for consent or an
-     * artifact absent upstream. The manifest otherwise infers absence from missing files, which
-     * cannot distinguish an empty source from one that was not permitted to be read.
-     */
-    Map<SourceKind, SourceCaptureState> stateOverrides,
-    /**
-     * Content already materialised on disk, staged by path so its bytes never enter this process. A
-     * repository checkout is written once by the collector and read once by the archive writer.
-     */
-    Map<String, java.nio.file.Path> filesOnDisk,
-    /**
-     * Releases whatever backs {@link #filesOnDisk}, or null when nothing needs releasing. The staging
-     * pipeline owns this and closes it once the sandbox has the files.
-     */
-    @org.jspecify.annotations.Nullable AutoCloseable cleanup,
-    /**
-     * Per source, what the capture could not include — the same codes the collector would use to say
-     * why it reported {@link SourceCompleteness#PARTIAL}. Reported here rather than inferred, because
-     * only the collector knows the difference between a tree with nothing more in it and a tree whose
-     * walk it stopped.
-     */
-    Map<SourceKind, List<String>> captureLimitations
-) {
-    public EvidenceContribution(
         Map<String, byte[]> files,
         Map<SourceKind, SourceCompleteness> completeness,
         Map<SourceKind, String> immutableIdentities,
         Map<SourceKind, Instant> observedAt,
         Map<SourceKind, Instant> sourceEffectiveAt,
         Map<SourceKind, SourceContentState> contentStates,
-        Map<SourceKind, SourceCaptureState> stateOverrides
-    ) {
+        /**
+         * Capture states only the collector can establish, such as evidence withheld for consent or an
+         * artifact absent upstream. The manifest otherwise infers absence from missing files, which
+         * cannot distinguish an empty source from one that was not permitted to be read.
+         */
+        Map<SourceKind, SourceCaptureState> stateOverrides,
+        /**
+         * Content already materialised on disk, staged by path so its bytes never enter this process. A
+         * repository checkout is written once by the collector and read once by the archive writer.
+         */
+        Map<String, java.nio.file.Path> filesOnDisk,
+        /**
+         * Releases whatever backs {@link #filesOnDisk}, or null when nothing needs releasing. The staging
+         * pipeline owns this and closes it once the sandbox has the files.
+         */
+        @org.jspecify.annotations.Nullable AutoCloseable cleanup,
+        /**
+         * Per source, what the capture could not include — the same codes the collector would use to say
+         * why it reported {@link SourceCompleteness#PARTIAL}. Reported here rather than inferred, because
+         * only the collector knows the difference between a tree with nothing more in it and a tree whose
+         * walk it stopped.
+         */
+        Map<SourceKind, List<String>> captureLimitations) {
+    public EvidenceContribution(
+            Map<String, byte[]> files,
+            Map<SourceKind, SourceCompleteness> completeness,
+            Map<SourceKind, String> immutableIdentities,
+            Map<SourceKind, Instant> observedAt,
+            Map<SourceKind, Instant> sourceEffectiveAt,
+            Map<SourceKind, SourceContentState> contentStates,
+            Map<SourceKind, SourceCaptureState> stateOverrides) {
         this(
-            files,
-            completeness,
-            immutableIdentities,
-            observedAt,
-            sourceEffectiveAt,
-            contentStates,
-            stateOverrides,
-            Map.of(),
-            null,
-            Map.of()
-        );
+                files,
+                completeness,
+                immutableIdentities,
+                observedAt,
+                sourceEffectiveAt,
+                contentStates,
+                stateOverrides,
+                Map.of(),
+                null,
+                Map.of());
     }
 
     public EvidenceContribution(Map<String, byte[]> files, Map<SourceKind, SourceCompleteness> completeness) {
@@ -68,65 +65,59 @@ public record EvidenceContribution(
     }
 
     public EvidenceContribution(
-        Map<String, byte[]> files,
-        Map<SourceKind, SourceCompleteness> completeness,
-        Map<SourceKind, String> immutableIdentities
-    ) {
+            Map<String, byte[]> files,
+            Map<SourceKind, SourceCompleteness> completeness,
+            Map<SourceKind, String> immutableIdentities) {
         this(
-            files,
-            completeness,
-            immutableIdentities,
-            Map.of(),
-            Map.of(),
-            Map.of(),
-            Map.of(),
-            Map.of(),
-            null,
-            Map.of()
-        );
+                files,
+                completeness,
+                immutableIdentities,
+                Map.of(),
+                Map.of(),
+                Map.of(),
+                Map.of(),
+                Map.of(),
+                null,
+                Map.of());
     }
 
     public EvidenceContribution(
-        Map<String, byte[]> files,
-        Map<SourceKind, SourceCompleteness> completeness,
-        Map<SourceKind, String> immutableIdentities,
-        Map<SourceKind, Instant> observedAt,
-        Map<SourceKind, Instant> sourceEffectiveAt
-    ) {
+            Map<String, byte[]> files,
+            Map<SourceKind, SourceCompleteness> completeness,
+            Map<SourceKind, String> immutableIdentities,
+            Map<SourceKind, Instant> observedAt,
+            Map<SourceKind, Instant> sourceEffectiveAt) {
         this(
-            files,
-            completeness,
-            immutableIdentities,
-            observedAt,
-            sourceEffectiveAt,
-            Map.of(),
-            Map.of(),
-            Map.of(),
-            null,
-            Map.of()
-        );
+                files,
+                completeness,
+                immutableIdentities,
+                observedAt,
+                sourceEffectiveAt,
+                Map.of(),
+                Map.of(),
+                Map.of(),
+                null,
+                Map.of());
     }
 
     public EvidenceContribution(
-        Map<String, byte[]> files,
-        Map<SourceKind, SourceCompleteness> completeness,
-        Map<SourceKind, String> immutableIdentities,
-        Map<SourceKind, Instant> observedAt,
-        Map<SourceKind, Instant> sourceEffectiveAt,
-        Map<SourceKind, SourceContentState> contentStates
-    ) {
+            Map<String, byte[]> files,
+            Map<SourceKind, SourceCompleteness> completeness,
+            Map<SourceKind, String> immutableIdentities,
+            Map<SourceKind, Instant> observedAt,
+            Map<SourceKind, Instant> sourceEffectiveAt,
+            Map<SourceKind, SourceContentState> contentStates) {
         this(
-            files,
-            completeness,
-            immutableIdentities,
-            observedAt,
-            sourceEffectiveAt,
-            contentStates,
-            Map.of(),
-            Map.of(),
-            null,
-            Map.of()
-        );
+                files,
+                completeness,
+                immutableIdentities,
+                observedAt,
+                sourceEffectiveAt,
+                contentStates,
+                Map.of(),
+                Map.of(),
+                null,
+                Map.of());
     }
 
     public EvidenceContribution {
@@ -137,35 +128,32 @@ public record EvidenceContribution(
         sourceEffectiveAt = Map.copyOf(Objects.requireNonNull(sourceEffectiveAt, "sourceEffectiveAt"));
         stateOverrides = Map.copyOf(Objects.requireNonNull(stateOverrides, "stateOverrides"));
         contentStates = Map.copyOf(Objects.requireNonNull(contentStates, "contentStates"));
-        captureLimitations = Objects.requireNonNull(captureLimitations, "captureLimitations")
-            .entrySet()
-            .stream()
-            .collect(java.util.stream.Collectors.toUnmodifiableMap(Map.Entry::getKey, e -> List.copyOf(e.getValue())));
+        captureLimitations = Objects.requireNonNull(captureLimitations, "captureLimitations").entrySet().stream()
+                .collect(java.util.stream.Collectors.toUnmodifiableMap(
+                        Map.Entry::getKey, e -> List.copyOf(e.getValue())));
     }
 
     /** For a collector that stages files on disk but reports no limitation. */
     public EvidenceContribution(
-        Map<String, byte[]> files,
-        Map<SourceKind, SourceCompleteness> completeness,
-        Map<SourceKind, String> immutableIdentities,
-        Map<SourceKind, Instant> observedAt,
-        Map<SourceKind, Instant> sourceEffectiveAt,
-        Map<SourceKind, SourceContentState> contentStates,
-        Map<SourceKind, SourceCaptureState> stateOverrides,
-        Map<String, java.nio.file.Path> filesOnDisk,
-        @org.jspecify.annotations.Nullable AutoCloseable cleanup
-    ) {
+            Map<String, byte[]> files,
+            Map<SourceKind, SourceCompleteness> completeness,
+            Map<SourceKind, String> immutableIdentities,
+            Map<SourceKind, Instant> observedAt,
+            Map<SourceKind, Instant> sourceEffectiveAt,
+            Map<SourceKind, SourceContentState> contentStates,
+            Map<SourceKind, SourceCaptureState> stateOverrides,
+            Map<String, java.nio.file.Path> filesOnDisk,
+            @org.jspecify.annotations.Nullable AutoCloseable cleanup) {
         this(
-            files,
-            completeness,
-            immutableIdentities,
-            observedAt,
-            sourceEffectiveAt,
-            contentStates,
-            stateOverrides,
-            filesOnDisk,
-            cleanup,
-            Map.of()
-        );
+                files,
+                completeness,
+                immutableIdentities,
+                observedAt,
+                sourceEffectiveAt,
+                contentStates,
+                stateOverrides,
+                filesOnDisk,
+                cleanup,
+                Map.of());
     }
 }

@@ -61,13 +61,12 @@ public class OutlineConnectionStrategy implements ConnectionStrategy {
     private final OutlineOriginPolicy originPolicy;
 
     public OutlineConnectionStrategy(
-        OutlineTokenClient outlineApiClient,
-        OutlineWebhookRegistrar webhookRegistrar,
-        OutlineDocumentRepository outlineDocumentRepository,
-        OutlineCollectionRepository outlineCollectionRepository,
-        OutlineDocumentEventRepository outlineDocumentEventRepository,
-        OutlineOriginPolicy originPolicy
-    ) {
+            OutlineTokenClient outlineApiClient,
+            OutlineWebhookRegistrar webhookRegistrar,
+            OutlineDocumentRepository outlineDocumentRepository,
+            OutlineCollectionRepository outlineCollectionRepository,
+            OutlineDocumentEventRepository outlineDocumentEventRepository,
+            OutlineOriginPolicy originPolicy) {
         this.outlineApiClient = outlineApiClient;
         this.webhookRegistrar = webhookRegistrar;
         this.outlineDocumentRepository = outlineDocumentRepository;
@@ -110,8 +109,7 @@ public class OutlineConnectionStrategy implements ConnectionStrategy {
     @Override
     public ConnectFinalization finalizeConnect(IntegrationRef ref, Map<String, String> callbackParams) {
         return new ConnectFinalization.Failed(
-            "Outline uses API-token paste — finalizeConnect is not applicable; use initiate() output directly"
-        );
+                "Outline uses API-token paste — finalizeConnect is not applicable; use initiate() output directly");
     }
 
     /**
@@ -126,10 +124,9 @@ public class OutlineConnectionStrategy implements ConnectionStrategy {
     @Transactional
     public void revoke(@Nullable IntegrationRef ref) {
         log.info(
-            "Outline revoke called for workspace={} instanceKey={} (tokens are revoked in Outline; state change handled by caller)",
-            ref == null ? null : ref.workspaceId(),
-            ref == null ? null : ref.instanceKey()
-        );
+                "Outline revoke called for workspace={} instanceKey={} (tokens are revoked in Outline; state change handled by caller)",
+                ref == null ? null : ref.workspaceId(),
+                ref == null ? null : ref.instanceKey());
         if (ref != null) {
             if (ref.connectionId() == null) {
                 webhookRegistrar.deregister(ref.workspaceId());
@@ -141,13 +138,13 @@ public class OutlineConnectionStrategy implements ConnectionStrategy {
             long events = outlineDocumentEventRepository.deleteByWorkspaceId(ref.workspaceId());
             if (erased > 0 || collections > 0 || events > 0) {
                 log.info(
-                    "outline.audit: revoke erase — actor={} erased {} mirrored document(s), {} collection registration(s) and {} document event(s) for workspace={}",
-                    LoggingUtils.sanitizeForLog(SecurityUtils.getCurrentUserLogin().orElse("system")),
-                    erased,
-                    collections,
-                    events,
-                    ref.workspaceId()
-                );
+                        "outline.audit: revoke erase — actor={} erased {} mirrored document(s), {} collection registration(s) and {} document event(s) for workspace={}",
+                        LoggingUtils.sanitizeForLog(
+                                SecurityUtils.getCurrentUserLogin().orElse("system")),
+                        erased,
+                        collections,
+                        events,
+                        ref.workspaceId());
             }
         }
     }

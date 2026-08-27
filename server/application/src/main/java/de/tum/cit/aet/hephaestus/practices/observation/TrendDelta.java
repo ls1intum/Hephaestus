@@ -21,14 +21,13 @@ import org.jspecify.annotations.Nullable;
  * LLM re-words its summary every run.
  */
 public record TrendDelta(
-    ArtifactKind artifactKind,
-    @Nullable Long artifactId,
-    UUID currentRunJobId,
-    UUID priorRunJobId,
-    Instant currentRunAt,
-    Instant priorRunAt,
-    List<LocusTransition> transitions
-) {
+        ArtifactKind artifactKind,
+        @Nullable Long artifactId,
+        UUID currentRunJobId,
+        UUID priorRunJobId,
+        Instant currentRunAt,
+        Instant priorRunAt,
+        List<LocusTransition> transitions) {
     public TrendDelta {
         transitions = List.copyOf(transitions); // the measurement primitive is immutable
     }
@@ -53,14 +52,13 @@ public record TrendDelta(
      * is null for NEW.
      */
     public record LocusTransition(
-        String recurrenceKey,
-        TransitionStatus status,
-        String practiceSlug,
-        @Nullable String summary,
-        @Nullable Assessment priorAssessment,
-        @Nullable Assessment currentAssessment,
-        @Nullable Severity currentSeverity
-    ) {}
+            String recurrenceKey,
+            TransitionStatus status,
+            String practiceSlug,
+            @Nullable String summary,
+            @Nullable Assessment priorAssessment,
+            @Nullable Assessment currentAssessment,
+            @Nullable Severity currentSeverity) {}
 
     /**
      * Count of NEW PROBLEMS — newly-appeared loci that are currently {@code BAD}. A newly-observed strength
@@ -68,10 +66,9 @@ public record TrendDelta(
      * "N new".
      */
     public int countNew() {
-        return (int) transitions
-            .stream()
-            .filter(t -> t.status() == TransitionStatus.NEW && t.currentAssessment() == Assessment.BAD)
-            .count();
+        return (int) transitions.stream()
+                .filter(t -> t.status() == TransitionStatus.NEW && t.currentAssessment() == Assessment.BAD)
+                .count();
     }
 
     /**
@@ -80,40 +77,35 @@ public record TrendDelta(
      * NOT "still open" and must not be counted here (C10).
      */
     public int countPersisted() {
-        return (int) transitions
-            .stream()
-            .filter(t -> t.status() == TransitionStatus.PERSISTED && t.currentAssessment() == Assessment.BAD)
-            .count();
+        return (int) transitions.stream()
+                .filter(t -> t.status() == TransitionStatus.PERSISTED && t.currentAssessment() == Assessment.BAD)
+                .count();
     }
 
     public int countResolved() {
-        return (int) transitions
-            .stream()
-            .filter(t -> t.status() == TransitionStatus.RESOLVED)
-            .count();
+        return (int) transitions.stream()
+                .filter(t -> t.status() == TransitionStatus.RESOLVED)
+                .count();
     }
 
     public int countRegressed() {
-        return (int) transitions
-            .stream()
-            .filter(t -> t.status() == TransitionStatus.REGRESSED)
-            .count();
+        return (int) transitions.stream()
+                .filter(t -> t.status() == TransitionStatus.REGRESSED)
+                .count();
     }
 
     /** The resolved loci, for the "Resolved since last review ✓" lines (B1). */
     public List<LocusTransition> resolved() {
-        return transitions
-            .stream()
-            .filter(t -> t.status() == TransitionStatus.RESOLVED)
-            .toList();
+        return transitions.stream()
+                .filter(t -> t.status() == TransitionStatus.RESOLVED)
+                .toList();
     }
 
     /** The slipped-back loci, for the "Slipped back" lines (B1). */
     public List<LocusTransition> regressed() {
-        return transitions
-            .stream()
-            .filter(t -> t.status() == TransitionStatus.REGRESSED)
-            .toList();
+        return transitions.stream()
+                .filter(t -> t.status() == TransitionStatus.REGRESSED)
+                .toList();
     }
 
     public boolean isEmptyDelta() {

@@ -29,8 +29,7 @@ public interface PullRequestReviewThreadRepository extends JpaRepository<PullReq
      * arbitrary order would vary both which threads the detector sees and in what order — and so would the
      * {@code agent_job.inputs_digest} that claims to identify those inputs.
      */
-    @Query(
-        """
+    @Query("""
         SELECT DISTINCT t
         FROM PullRequestReviewThread t
         LEFT JOIN FETCH t.resolvedBy
@@ -38,17 +37,14 @@ public interface PullRequestReviewThreadRepository extends JpaRepository<PullReq
         LEFT JOIN FETCH c.author
         WHERE t.pullRequest.id = :pullRequestId
         ORDER BY t.id
-        """
-    )
+        """)
     List<PullRequestReviewThread> findAllByPullRequestIdWithResolvedBy(@Param("pullRequestId") Long pullRequestId);
 
     @Query("SELECT t.id FROM PullRequestReviewThread t WHERE t.pullRequest.id = :pullRequestId ORDER BY t.id DESC")
     List<Long> findRecentIdsByPullRequestId(@Param("pullRequestId") Long pullRequestId, Pageable pageable);
 
-    @Query(
-        "SELECT DISTINCT t FROM PullRequestReviewThread t " +
-            "LEFT JOIN FETCH t.resolvedBy LEFT JOIN FETCH t.comments c LEFT JOIN FETCH c.author " +
-            "WHERE t.id IN :ids ORDER BY t.id"
-    )
+    @Query("SELECT DISTINCT t FROM PullRequestReviewThread t "
+            + "LEFT JOIN FETCH t.resolvedBy LEFT JOIN FETCH t.comments c LEFT JOIN FETCH c.author "
+            + "WHERE t.id IN :ids ORDER BY t.id")
     List<PullRequestReviewThread> findAllByIdWithResolvedBy(@Param("ids") List<Long> ids);
 }

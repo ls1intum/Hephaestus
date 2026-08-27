@@ -74,31 +74,31 @@ class HephaestusAuthSuccessHandlerTest extends BaseUnitTest {
         lenient().when(authIntentCookie.read(any())).thenReturn(null);
 
         handler = new HephaestusAuthSuccessHandler(
-            provisioningService,
-            jwtIssuer,
-            principalFactory,
-            authIntentCookie,
-            authProperties,
-            new AuthEventLogger(authEventWriter),
-            Clock.fixed(NOW, ZoneOffset.UTC),
-            /* webappBaseUrl */ ""
-        );
+                provisioningService,
+                jwtIssuer,
+                principalFactory,
+                authIntentCookie,
+                authProperties,
+                new AuthEventLogger(authEventWriter),
+                Clock.fixed(NOW, ZoneOffset.UTC),
+                /* webappBaseUrl */ "");
     }
 
     @Test
     void successHandlerDoesNotOwnTransactionSoHandledProvisioningErrorsCanRedirect() throws Exception {
         var method = HephaestusAuthSuccessHandler.class.getMethod(
-            "onAuthenticationSuccess",
-            jakarta.servlet.http.HttpServletRequest.class,
-            jakarta.servlet.http.HttpServletResponse.class,
-            Authentication.class
-        );
+                "onAuthenticationSuccess",
+                jakarta.servlet.http.HttpServletRequest.class,
+                jakarta.servlet.http.HttpServletResponse.class,
+                Authentication.class);
 
         Assertions.assertNull(method.getAnnotation(Transactional.class));
     }
 
     @ParameterizedTest
-    @EnumSource(value = Account.Status.class, names = { "SUSPENDED", "DELETING", "DELETED" })
+    @EnumSource(
+            value = Account.Status.class,
+            names = {"SUSPENDED", "DELETING", "DELETED"})
     void nonActiveAccountIsRefusedAtLoginWithNoCookie(Account.Status status) throws Exception {
         Account account = account(status);
         when(provisioningService.resolveOrProvision(any(), any(), any(), any())).thenReturn(provision(account, false));
@@ -120,9 +120,8 @@ class HephaestusAuthSuccessHandlerTest extends BaseUnitTest {
         when(authIntentCookie.read(any())).thenReturn(AuthIntentCookie.Intent.login(null, "/teams"));
         JwtPrincipal principal = mock(JwtPrincipal.class);
         when(principalFactory.forAccount(account)).thenReturn(principal);
-        when(jwtIssuer.issue(any(), any(), any(), any(), any())).thenReturn(
-            new HephaestusJwtIssuer.Token("minted-jwt", UUID.randomUUID(), NOW.plusSeconds(900))
-        );
+        when(jwtIssuer.issue(any(), any(), any(), any(), any()))
+                .thenReturn(new HephaestusJwtIssuer.Token("minted-jwt", UUID.randomUUID(), NOW.plusSeconds(900)));
 
         MockHttpServletResponse response = new MockHttpServletResponse();
         handler.onAuthenticationSuccess(githubRequest(), response, oauthToken("sub-1"));
@@ -150,9 +149,8 @@ class HephaestusAuthSuccessHandlerTest extends BaseUnitTest {
         Account account = account(Account.Status.ACTIVE);
         when(provisioningService.resolveOrProvision(any(), any(), any(), any())).thenReturn(provision(account, true));
         when(principalFactory.forAccount(account)).thenReturn(mock(JwtPrincipal.class));
-        when(jwtIssuer.issue(any(), any(), any(), any(), any())).thenReturn(
-            new HephaestusJwtIssuer.Token("minted-jwt", UUID.randomUUID(), NOW.plusSeconds(900))
-        );
+        when(jwtIssuer.issue(any(), any(), any(), any(), any()))
+                .thenReturn(new HephaestusJwtIssuer.Token("minted-jwt", UUID.randomUUID(), NOW.plusSeconds(900)));
 
         handler.onAuthenticationSuccess(githubRequest(), new MockHttpServletResponse(), oauthToken("sub-1"));
 
@@ -164,9 +162,8 @@ class HephaestusAuthSuccessHandlerTest extends BaseUnitTest {
 
     @Test
     void identityAlreadyLinkedElsewhereRedirectsToAuthErrorWithoutCookie() throws Exception {
-        when(provisioningService.resolveOrProvision(any(), any(), any(), any())).thenThrow(
-            new AccountLinkConflictException("github", "5898705", 5L)
-        );
+        when(provisioningService.resolveOrProvision(any(), any(), any(), any()))
+                .thenThrow(new AccountLinkConflictException("github", "5898705", 5L));
 
         MockHttpServletResponse response = new MockHttpServletResponse();
         handler.onAuthenticationSuccess(githubRequest(), response, oauthToken("5898705"));
@@ -179,9 +176,8 @@ class HephaestusAuthSuccessHandlerTest extends BaseUnitTest {
 
     @Test
     void linkOnlyProviderLoginRedirectsToAuthErrorWithoutCookie() throws Exception {
-        when(provisioningService.resolveOrProvision(any(), any(), any(), any())).thenThrow(
-            new LinkOnlyProviderLoginException("slack")
-        );
+        when(provisioningService.resolveOrProvision(any(), any(), any(), any()))
+                .thenThrow(new LinkOnlyProviderLoginException("slack"));
 
         MockHttpServletResponse response = new MockHttpServletResponse();
         handler.onAuthenticationSuccess(githubRequest(), response, oauthToken("U123"));
@@ -196,10 +192,9 @@ class HephaestusAuthSuccessHandlerTest extends BaseUnitTest {
     void nonOAuth2AuthenticationIsRejectedWithNoProvisioningAndNoCookie() throws Exception {
         MockHttpServletResponse response = new MockHttpServletResponse();
         var nonOauth = new UsernamePasswordAuthenticationToken(
-            new User("u", "p", List.of(new SimpleGrantedAuthority("ROLE_USER"))),
-            "p",
-            List.of(new SimpleGrantedAuthority("ROLE_USER"))
-        );
+                new User("u", "p", List.of(new SimpleGrantedAuthority("ROLE_USER"))),
+                "p",
+                List.of(new SimpleGrantedAuthority("ROLE_USER")));
 
         handler.onAuthenticationSuccess(githubRequest(), response, nonOauth);
 
@@ -239,10 +234,7 @@ class HephaestusAuthSuccessHandlerTest extends BaseUnitTest {
 
     private static OAuth2AuthenticationToken oauthToken(String subject) {
         OAuth2User principal = new DefaultOAuth2User(
-            List.of(new SimpleGrantedAuthority("ROLE_USER")),
-            Map.of("id", subject, "login", "octocat"),
-            "id"
-        );
+                List.of(new SimpleGrantedAuthority("ROLE_USER")), Map.of("id", subject, "login", "octocat"), "id");
         return new OAuth2AuthenticationToken(principal, principal.getAuthorities(), "github");
     }
 }

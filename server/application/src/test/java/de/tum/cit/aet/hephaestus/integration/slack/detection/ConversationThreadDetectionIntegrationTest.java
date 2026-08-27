@@ -18,7 +18,6 @@ import de.tum.cit.aet.hephaestus.testconfig.WorkspaceTestFixtures;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.time.Instant;
-import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
@@ -86,13 +85,12 @@ class ConversationThreadDetectionIntegrationTest extends BaseIntegrationTest {
     }
 
     private void seedThread(
-        long workspaceId,
-        String channelId,
-        @Nullable String threadTs,
-        String lastTs,
-        int messageCount,
-        String participants
-    ) {
+            long workspaceId,
+            String channelId,
+            @Nullable String threadTs,
+            String lastTs,
+            int messageCount,
+            String participants) {
         support.seedThread(workspaceId, channelId, threadTs, lastTs, messageCount, participants);
     }
 
@@ -102,8 +100,7 @@ class ConversationThreadDetectionIntegrationTest extends BaseIntegrationTest {
 
     @Test
     @DisplayName(
-        "a settled, deep, grown thread enqueues one CONVERSATION_REVIEW per participant and advances the watermark"
-    )
+            "a settled, deep, grown thread enqueues one CONVERSATION_REVIEW per participant and advances the watermark")
     void detectsSettledThreadAndEnqueuesPerParticipant() {
         long ws = newWorkspace();
         long baseSecond = Instant.now().getEpochSecond() - 1200; // 20 minutes ago → past the 10-minute quiescence
@@ -135,23 +132,21 @@ class ConversationThreadDetectionIntegrationTest extends BaseIntegrationTest {
         // The occurrence is in the ledger, which is what lets the artifact trace explain a conversation
         // that nothing happened to.
         Long recorded = jdbc.queryForObject(
-            "SELECT count(*) FROM artifact_signal WHERE workspace_id = ? AND artifact_kind = ?" +
-                " AND artifact_id > 0 AND signal_name = ?",
-            Long.class,
-            ws,
-            "chat.conversation_thread",
-            "chat.conversation_thread.settled"
-        );
+                "SELECT count(*) FROM artifact_signal WHERE workspace_id = ? AND artifact_kind = ?"
+                        + " AND artifact_id > 0 AND signal_name = ?",
+                Long.class,
+                ws,
+                "chat.conversation_thread",
+                "chat.conversation_thread.settled");
         assertThat(recorded).isEqualTo(1L);
 
         // Watermark advanced to the thread's newest ts after enqueue → a no-growth re-sweep enqueues nothing.
         String watermark = jdbc.queryForObject(
-            "SELECT last_reviewed_ts FROM slack_thread WHERE workspace_id = ? AND slack_channel_id = ? AND slack_thread_ts = ?",
-            String.class,
-            ws,
-            "C1",
-            rootTs
-        );
+                "SELECT last_reviewed_ts FROM slack_thread WHERE workspace_id = ? AND slack_channel_id = ? AND slack_thread_ts = ?",
+                String.class,
+                ws,
+                "C1",
+                rootTs);
         assertThat(watermark).isEqualTo(lastTs);
     }
 
@@ -245,7 +240,8 @@ class ConversationThreadDetectionIntegrationTest extends BaseIntegrationTest {
         seedThread(wsPaused, "C1", rootTs, replyTs, 2, "{100}");
         seedMessage(wsPaused, "C1", rootTs, null);
         seedMessage(wsPaused, "C1", replyTs, rootTs);
-        assertThat(projector.buildThreadPayload(wsPaused, "C1", rootTs).get("messages")).isEmpty();
+        assertThat(projector.buildThreadPayload(wsPaused, "C1", rootTs).get("messages"))
+                .isEmpty();
 
         // Control: the SAME thread shape on an ACTIVE channel still projects both turns.
         long wsActive = newWorkspace();
@@ -253,13 +249,13 @@ class ConversationThreadDetectionIntegrationTest extends BaseIntegrationTest {
         seedThread(wsActive, "C1", rootTs, replyTs, 2, "{100}");
         seedMessage(wsActive, "C1", rootTs, null);
         seedMessage(wsActive, "C1", replyTs, rootTs);
-        assertThat(projector.buildThreadPayload(wsActive, "C1", rootTs).get("messages")).hasSize(2);
+        assertThat(projector.buildThreadPayload(wsActive, "C1", rootTs).get("messages"))
+                .hasSize(2);
     }
 
     @Test
     @DisplayName(
-        "candidate scan is workspace-pinned: another workspace's thread with the same ids is not enqueued for this one"
-    )
+            "candidate scan is workspace-pinned: another workspace's thread with the same ids is not enqueued for this one")
     void doesNotLeakAcrossWorkspaces() {
         long wsA = newWorkspace();
         long wsB = newWorkspace();

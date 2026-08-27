@@ -87,8 +87,7 @@ public class GitlabConnectionStrategy implements ConnectionStrategy {
         // PAT-paste flow has no callback. Returning Failed surfaces a clear error if
         // the orchestrator mistakenly invokes this for GitLab.
         return new ConnectFinalization.Failed(
-            "GitLab uses PAT-paste — finalizeConnect is not applicable; use initiate() output directly"
-        );
+                "GitLab uses PAT-paste — finalizeConnect is not applicable; use initiate() output directly");
     }
 
     @Override
@@ -97,10 +96,9 @@ public class GitlabConnectionStrategy implements ConnectionStrategy {
             return;
         }
         log.info(
-            "GitLab revoke called for workspace={} instanceKey={} (deregistering group webhook; PAT revoke is user-side)",
-            ref.workspaceId(),
-            ref.instanceKey()
-        );
+                "GitLab revoke called for workspace={} instanceKey={} (deregistering group webhook; PAT revoke is user-side)",
+                ref.workspaceId(),
+                ref.instanceKey());
         if (ref.connectionId() == null) {
             webhookService.deregisterActiveWebhook(ref.workspaceId());
         } else {

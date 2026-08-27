@@ -22,7 +22,8 @@ public class WorkspaceReviewDefaultsProvider {
 
     @Transactional(readOnly = true)
     public WorkspaceReviewDefaults forWorkspace(Long workspaceId) {
-        return WorkspaceReviewDefaults.of(workspaceRepository.findById(workspaceId).orElse(null));
+        return WorkspaceReviewDefaults.of(
+                workspaceRepository.findById(workspaceId).orElse(null));
     }
 
     /**
@@ -32,9 +33,9 @@ public class WorkspaceReviewDefaultsProvider {
     @Transactional(readOnly = true)
     public @Nullable PracticeAutonomy rawDefaultAutonomy(Long workspaceId) {
         return workspaceRepository
-            .findById(workspaceId)
-            .map(workspace -> workspace.getReviewSettings().getDefaultAutonomy())
-            .map(PracticeAutonomy::valueOf)
-            .orElse(null);
+                .findById(workspaceId)
+                .map(workspace -> workspace.getReviewSettings().getDefaultAutonomy())
+                .map(PracticeAutonomy::valueOf)
+                .orElse(null);
     }
 }

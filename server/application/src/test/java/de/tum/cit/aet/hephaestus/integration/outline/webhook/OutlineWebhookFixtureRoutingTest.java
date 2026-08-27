@@ -94,8 +94,8 @@ class OutlineWebhookFixtureRoutingTest extends BaseUnitTest {
             return Stream.empty();
         }
         return Files.list(FIXTURE_DIR)
-            .filter(p -> p.getFileName().toString().endsWith(".json"))
-            .sorted();
+                .filter(p -> p.getFileName().toString().endsWith(".json"))
+                .sorted();
     }
 
     @ParameterizedTest(name = "{0}")
@@ -109,9 +109,15 @@ class OutlineWebhookFixtureRoutingTest extends BaseUnitTest {
         String actorId = payload.path("actorId").asString("");
         String createdAtRaw = payload.path("createdAt").asString("");
 
-        assertThat(subscriptionId).as("fixture %s must carry a subscription id", fixture.getFileName()).isNotBlank();
-        assertThat(event).as("fixture %s must carry an event name", fixture.getFileName()).isNotBlank();
-        assertThat(payloadId).as("fixture %s must carry a payload id", fixture.getFileName()).isNotBlank();
+        assertThat(subscriptionId)
+                .as("fixture %s must carry a subscription id", fixture.getFileName())
+                .isNotBlank();
+        assertThat(event)
+                .as("fixture %s must carry an event name", fixture.getFileName())
+                .isNotBlank();
+        assertThat(payloadId)
+                .as("fixture %s must carry a payload id", fixture.getFileName())
+                .isNotBlank();
 
         verifySignatureOverRealBytes(body);
         String subject = verifySubjectRoundTrip(payload, subscriptionId, event);
@@ -137,40 +143,34 @@ class OutlineWebhookFixtureRoutingTest extends BaseUnitTest {
         String sanitizedEvent = event.toLowerCase(Locale.ROOT).replace('.', '~');
         assertThat(subject).isEqualTo("outline." + subscriptionId + "." + sanitizedEvent);
 
-        String consumerFilterPrefix = ConsumerSubjectMath.subscriptionFilter("outline", subscriptionId).replace(
-            ".>",
-            "."
-        );
+        String consumerFilterPrefix = ConsumerSubjectMath.subscriptionFilter("outline", subscriptionId)
+                .replace(".>", ".");
         assertThat(subject).startsWith(consumerFilterPrefix);
-        assertThat(PARSER.parse(subject)).isEqualTo(
-            new EventTypeKey(IntegrationKind.OUTLINE, OutlineWebhookMessageHandler.EVENT_TYPE)
-        );
+        assertThat(PARSER.parse(subject))
+                .isEqualTo(new EventTypeKey(IntegrationKind.OUTLINE, OutlineWebhookMessageHandler.EVENT_TYPE));
         return subject;
     }
 
     private void verifyHandlerRouting(
-        byte[] rawBody,
-        String subscriptionId,
-        String event,
-        String payloadId,
-        String actorId,
-        String createdAtRaw
-    ) {
-        when(connectionService.findOutlineSubscription(subscriptionId)).thenReturn(
-            Optional.of(new OutlineSubscription(WORKSPACE_ID, "https://wiki.example.com", "secret"))
-        );
+            byte[] rawBody,
+            String subscriptionId,
+            String event,
+            String payloadId,
+            String actorId,
+            String createdAtRaw) {
+        when(connectionService.findOutlineSubscription(subscriptionId))
+                .thenReturn(Optional.of(new OutlineSubscription(WORKSPACE_ID, "https://wiki.example.com", "secret")));
         lenient().when(connection.getId()).thenReturn(CONNECTION_ID);
         lenient()
-            .when(connectionService.findActive(WORKSPACE_ID, IntegrationKind.OUTLINE))
-            .thenReturn(Optional.of(connection));
+                .when(connectionService.findActive(WORKSPACE_ID, IntegrationKind.OUTLINE))
+                .thenReturn(Optional.of(connection));
 
         OutlineWebhookMessageHandler handler = new OutlineWebhookMessageHandler(
-            connectionService,
-            syncScheduler,
-            documentEventRepository,
-            MAPPER,
-            new OutlineOriginPolicy(Set.of("https://wiki.example.com"))
-        );
+                connectionService,
+                syncScheduler,
+                documentEventRepository,
+                MAPPER,
+                new OutlineOriginPolicy(Set.of("https://wiki.example.com")));
 
         // Route the fixture bytes exactly as they arrive off the wire — the handler only trusts
         // event/payload.id/actorId/createdAt for routing (never the document body), but feeding the
@@ -186,8 +186,8 @@ class OutlineWebhookFixtureRoutingTest extends BaseUnitTest {
             // Every committed fixture carries a full payload.model — the HMAC-authenticated metadata the
             // handler trusts, sparing the sync path its own documents.info round-trip.
             assertThat(model.getValue())
-                .as("event %s (payload id %s) must carry a usable payload.model", event, payloadId)
-                .isNotNull();
+                    .as("event %s (payload id %s) must carry a usable payload.model", event, payloadId)
+                    .isNotNull();
             assertThat(model.getValue().getId()).isEqualTo(payloadId);
             assertThat(model.getValue().getCollectionId()).isNotBlank();
 

@@ -58,6 +58,7 @@ class OutlineDocumentSyncFixtureMappingTest extends BaseUnitTest {
 
     /** Real ids captured live — the "Engineering Docs" collection and the two fixture-capture documents. */
     private static final String COLLECTION_ID = "fbe68839-b131-44e2-bb93-0bc533d39193";
+
     private static final String PARENT_DOC_ID = "7d11d73d-1b36-43e3-9f31-b43e98c69b5b";
     private static final String CHILD_DOC_ID = "cec98e59-623c-4392-a343-6e96b0995e51";
     private static final String ADMIN_SUBJECT = "99bdd8e2-176a-42fa-ba0c-4f9c4ce6caa9";
@@ -66,9 +67,8 @@ class OutlineDocumentSyncFixtureMappingTest extends BaseUnitTest {
     // The exact tolerant policy the running Outline client uses (unknown fields + unknown enum values),
     // so the fixture round-trip exercises production deserialization, not a lax bespoke mapper.
     private static final JsonMapper MAPPER =
-        de.tum.cit.aet.hephaestus.integration.outline.client.OutlineClientConfig.tolerantMapper(
-            JsonMapper.builder().build()
-        );
+            de.tum.cit.aet.hephaestus.integration.outline.client.OutlineClientConfig.tolerantMapper(
+                    JsonMapper.builder().build());
 
     @Mock
     private ConnectionService connectionService;
@@ -92,55 +92,45 @@ class OutlineDocumentSyncFixtureMappingTest extends BaseUnitTest {
 
     private OutlineDocumentSyncService service() {
         OutlineProperties properties = new OutlineProperties(
-            new OutlineProperties.Sync(100),
-            new OutlineProperties.Cache(200),
-            Duration.ofDays(30)
-        );
-        OutlineMirrorWriter mirrorWriter = new OutlineMirrorWriter(
-            new OutlineMirrorTransactions(documentRepository, collectionRepository)
-        );
+                new OutlineProperties.Sync(100), new OutlineProperties.Cache(200), Duration.ofDays(30));
+        OutlineMirrorWriter mirrorWriter =
+                new OutlineMirrorWriter(new OutlineMirrorTransactions(documentRepository, collectionRepository));
         return new OutlineDocumentSyncService(
-            connectionService,
-            outlineApiClient,
-            documentRepository,
-            collectionRepository,
-            webhookRegistrar,
-            properties,
-            mirrorWriter,
-            new OutlineMirrorRetentionService(documentRepository, mirrorWriter, properties),
-            org.mockito.Mockito.mock(
-                de.tum.cit.aet.hephaestus.integration.outline.domain.signal.OutlineDocumentSignalRecorder.class
-            ),
-            // No review trigger: this suite is about mirroring, and a node that cannot submit a review
-            // still records every signal — which is exactly the ObjectProvider's absent case.
-            new org.springframework.beans.factory.support.StaticListableBeanFactory().getBeanProvider(
-                de.tum.cit.aet.hephaestus.agent.documentation.DocumentReviewTrigger.class
-            )
-        );
+                connectionService,
+                outlineApiClient,
+                documentRepository,
+                collectionRepository,
+                webhookRegistrar,
+                properties,
+                mirrorWriter,
+                new OutlineMirrorRetentionService(documentRepository, mirrorWriter, properties),
+                org.mockito.Mockito.mock(
+                        de.tum.cit.aet.hephaestus.integration.outline.domain.signal.OutlineDocumentSignalRecorder
+                                .class),
+                // No review trigger: this suite is about mirroring, and a node that cannot submit a review
+                // still records every signal — which is exactly the ObjectProvider's absent case.
+                new org.springframework.beans.factory.support.StaticListableBeanFactory()
+                        .getBeanProvider(de.tum.cit.aet.hephaestus.agent.documentation.DocumentReviewTrigger.class));
     }
 
     @BeforeEach
     void setUp() throws IOException {
         lenient().when(connection.getId()).thenReturn(CONNECTION);
         lenient()
-            .when(connection.getConfig())
-            .thenReturn(new ConnectionConfig.OutlineConfig(SERVER_URL, "sub-1", "secret", Set.of()));
+                .when(connection.getConfig())
+                .thenReturn(new ConnectionConfig.OutlineConfig(SERVER_URL, "sub-1", "secret", Set.of()));
         lenient()
-            .when(connectionService.findActive(WORKSPACE, IntegrationKind.OUTLINE))
-            .thenReturn(Optional.of(connection));
+                .when(connectionService.findActive(WORKSPACE, IntegrationKind.OUTLINE))
+                .thenReturn(Optional.of(connection));
         lenient()
-            .when(connectionService.findActiveBearerToken(WORKSPACE, IntegrationKind.OUTLINE))
-            .thenReturn(Optional.of(new BearerToken("token", null)));
+                .when(connectionService.findActiveBearerToken(WORKSPACE, IntegrationKind.OUTLINE))
+                .thenReturn(Optional.of(new BearerToken("token", null)));
         lenient()
-            .when(documentRepository.findSnapshotsByWorkspaceIdAndConnectionId(WORKSPACE, CONNECTION))
-            .thenReturn(List.of());
+                .when(documentRepository.findSnapshotsByWorkspaceIdAndConnectionId(WORKSPACE, CONNECTION))
+                .thenReturn(List.of());
         lenient().when(documentRepository.sumBodySizeByWorkspaceId(WORKSPACE)).thenReturn(0L);
-        lenient()
-            .when(documentRepository.saveAndFlush(any()))
-            .thenAnswer(inv -> inv.getArgument(0));
-        lenient()
-            .when(collectionRepository.saveAndFlush(any()))
-            .thenAnswer(inv -> inv.getArgument(0));
+        lenient().when(documentRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
+        lenient().when(collectionRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
 
         collection = new OutlineCollection();
         collection.setWorkspaceId(WORKSPACE);
@@ -149,65 +139,52 @@ class OutlineDocumentSyncFixtureMappingTest extends BaseUnitTest {
         collection.setState(MirrorState.ENABLED);
         collection.setSyncStatus(SyncStatus.PENDING);
         lenient()
-            .when(collectionRepository.findForSync(WORKSPACE, CONNECTION, MirrorState.ENABLED))
-            .thenReturn(List.of(collection));
+                .when(collectionRepository.findForSync(WORKSPACE, CONNECTION, MirrorState.ENABLED))
+                .thenReturn(List.of(collection));
         lenient()
-            .when(collectionRepository.findByWorkspaceIdOrderByCreatedAtAsc(WORKSPACE))
-            .thenReturn(List.of(collection));
+                .when(collectionRepository.findByWorkspaceIdOrderByCreatedAtAsc(WORKSPACE))
+                .thenReturn(List.of(collection));
         // The bookkeeping write re-reads the registry row inside its own transaction.
         lenient()
-            .when(
-                collectionRepository.findByWorkspaceIdAndConnectionIdAndCollectionId(
-                    WORKSPACE,
-                    CONNECTION,
-                    COLLECTION_ID
-                )
-            )
-            .thenReturn(Optional.of(collection));
+                .when(collectionRepository.findByWorkspaceIdAndConnectionIdAndCollectionId(
+                        WORKSPACE, CONNECTION, COLLECTION_ID))
+                .thenReturn(Optional.of(collection));
 
         // --- wire the mocked client's return values off the real captured fixtures ---
 
-        OutlineEnvelope<List<OutlineCollectionModel>> collectionsList = readFixture(
-            "/outline-api/collections.list.json",
-            new TypeReference<>() {}
-        );
+        OutlineEnvelope<List<OutlineCollectionModel>> collectionsList =
+                readFixture("/outline-api/collections.list.json", new TypeReference<>() {});
         assertNotNull(collectionsList.data());
-        OutlineCollectionModel engineeringDocs = collectionsList
-            .data()
-            .stream()
-            .filter(c -> COLLECTION_ID.equals(c.getId()))
-            .findFirst()
-            .orElseThrow();
+        OutlineCollectionModel engineeringDocs = collectionsList.data().stream()
+                .filter(c -> COLLECTION_ID.equals(c.getId()))
+                .findFirst()
+                .orElseThrow();
         lenient().when(outlineApiClient.listCollections(SERVER_URL, "token")).thenReturn(List.of(engineeringDocs));
 
-        OutlineEnvelope<List<OutlineDocumentModel>> documentsList = readFixture(
-            "/outline-api/documents.list.json",
-            new TypeReference<>() {}
-        );
+        OutlineEnvelope<List<OutlineDocumentModel>> documentsList =
+                readFixture("/outline-api/documents.list.json", new TypeReference<>() {});
         lenient()
-            .when(outlineApiClient.listDocuments(SERVER_URL, "token", COLLECTION_ID))
-            .thenReturn(documentsList.data());
+                .when(outlineApiClient.listDocuments(SERVER_URL, "token", COLLECTION_ID))
+                .thenReturn(documentsList.data());
 
-        OutlineEnvelope<List<OutlineNavigationNode>> tree = readFixture(
-            "/outline-api/collections.documents.json",
-            new TypeReference<>() {}
-        );
+        OutlineEnvelope<List<OutlineNavigationNode>> tree =
+                readFixture("/outline-api/collections.documents.json", new TypeReference<>() {});
         lenient()
-            .when(outlineApiClient.listCollectionDocuments(SERVER_URL, "token", COLLECTION_ID))
-            .thenReturn(tree.data());
+                .when(outlineApiClient.listCollectionDocuments(SERVER_URL, "token", COLLECTION_ID))
+                .thenReturn(tree.data());
 
         // Export bodies: real Markdown text captured for the two fixture-capture documents; a
         // deterministic placeholder for the rest of the (unrelated, pre-existing) documents in the
         // shared live collection so the pass completes without asserting on them.
         lenient()
-            .when(outlineApiClient.exportDocument(eq(SERVER_URL), eq("token"), anyString()))
-            .thenAnswer(inv -> "# placeholder body for " + inv.getArgument(2));
+                .when(outlineApiClient.exportDocument(eq(SERVER_URL), eq("token"), anyString()))
+                .thenAnswer(inv -> "# placeholder body for " + inv.getArgument(2));
         lenient()
-            .when(outlineApiClient.exportDocument(SERVER_URL, "token", PARENT_DOC_ID))
-            .thenReturn(realBodyText("/outline-api/documents.info.json"));
+                .when(outlineApiClient.exportDocument(SERVER_URL, "token", PARENT_DOC_ID))
+                .thenReturn(realBodyText("/outline-api/documents.info.json"));
         lenient()
-            .when(outlineApiClient.exportDocument(SERVER_URL, "token", CHILD_DOC_ID))
-            .thenReturn(realBodyText("/outline-api/documents.info.child.json"));
+                .when(outlineApiClient.exportDocument(SERVER_URL, "token", CHILD_DOC_ID))
+                .thenReturn(realBodyText("/outline-api/documents.info.child.json"));
     }
 
     @Test
@@ -226,9 +203,8 @@ class OutlineDocumentSyncFixtureMappingTest extends BaseUnitTest {
         assertThat(parent.getCreatedByName()).isEqualTo(ADMIN_NAME);
         assertThat(parent.getUpdatedBySubject()).isEqualTo(ADMIN_SUBJECT);
         assertThat(parent.getCollaboratorSubjects()).contains(ADMIN_SUBJECT);
-        assertThat(parent.getBodyMarkdown()).isEqualTo(
-            "# Fixture Capture Doc Renamed\n\nUpdated body for fixture capture (rename)."
-        );
+        assertThat(parent.getBodyMarkdown())
+                .isEqualTo("# Fixture Capture Doc Renamed\n\nUpdated body for fixture capture (rename).");
     }
 
     @Test
@@ -255,15 +231,12 @@ class OutlineDocumentSyncFixtureMappingTest extends BaseUnitTest {
 
     private OutlineDocument savedDocument(String documentId) {
         ArgumentCaptor<OutlineDocument> captor = ArgumentCaptor.forClass(OutlineDocument.class);
-        org.mockito.Mockito.verify(documentRepository, org.mockito.Mockito.atLeastOnce()).saveAndFlush(
-            captor.capture()
-        );
-        return captor
-            .getAllValues()
-            .stream()
-            .filter(d -> documentId.equals(d.getDocumentId()))
-            .reduce((first, second) -> second) // the last save wins (the export path saves once per doc)
-            .orElseThrow(() -> new AssertionError("document " + documentId + " was never saved"));
+        org.mockito.Mockito.verify(documentRepository, org.mockito.Mockito.atLeastOnce())
+                .saveAndFlush(captor.capture());
+        return captor.getAllValues().stream()
+                .filter(d -> documentId.equals(d.getDocumentId()))
+                .reduce((first, second) -> second) // the last save wins (the export path saves once per doc)
+                .orElseThrow(() -> new AssertionError("document " + documentId + " was never saved"));
     }
 
     private static <T> T readFixture(String classpath, TypeReference<T> type) throws IOException {

@@ -75,11 +75,10 @@ public class FeedbackLanePreparationSweeper {
     private final MeterRegistry meterRegistry;
 
     public FeedbackLanePreparationSweeper(
-        AgentJobRepository agentJobRepository,
-        ConversationalDeliveryListener inChatLane,
-        InAppCompositionListener inAppLane,
-        MeterRegistry meterRegistry
-    ) {
+            AgentJobRepository agentJobRepository,
+            ConversationalDeliveryListener inChatLane,
+            InAppCompositionListener inAppLane,
+            MeterRegistry meterRegistry) {
         this.agentJobRepository = agentJobRepository;
         this.inChatLane = inChatLane;
         this.inAppLane = inAppLane;
@@ -101,10 +100,7 @@ public class FeedbackLanePreparationSweeper {
      */
     public SweepOutcome sweepNow(Instant now) {
         List<UnpreparedFeedbackLanes> pending = agentJobRepository.findUnpreparedFeedbackLanes(
-            now.minus(LOOKBACK),
-            now.minus(SETTLE),
-            PageRequest.of(0, MAX_JOBS_PER_PASS)
-        );
+                now.minus(LOOKBACK), now.minus(SETTLE), PageRequest.of(0, MAX_JOBS_PER_PASS));
         if (pending.isEmpty()) {
             return SweepOutcome.NOTHING;
         }
@@ -139,33 +135,36 @@ public class FeedbackLanePreparationSweeper {
         // listeners are dropping events, which is a fact about the async pool worth seeing in the log even
         // on the passes where every recovery succeeded.
         log.info(
-            "feedback.lane.sweep: {} job(s) had an unprepared lane; recovered {}, prepared {} unit(s), {} still failing",
-            pending.size(),
-            recovered,
-            prepared,
-            failed
-        );
+                "feedback.lane.sweep: {} job(s) had an unprepared lane; recovered {}, prepared {} unit(s), {} still failing",
+                pending.size(),
+                recovered,
+                prepared,
+                failed);
         return new SweepOutcome(pending.size(), recovered, prepared, failed);
     }
 
     private LaneResult run(Lane lane, UnpreparedFeedbackLanes job) {
         try {
-            int units = switch (lane) {
-                case IN_CHAT -> inChatLane.prepare(job.agentJobId(), job.workspaceId());
-                case IN_APP -> inAppLane.prepare(job.agentJobId(), job.workspaceId());
-            };
-            meterRegistry.counter("feedback.lane.sweep.recovered", "lane", lane.tag).increment();
+            int units =
+                    switch (lane) {
+                        case IN_CHAT -> inChatLane.prepare(job.agentJobId(), job.workspaceId());
+                        case IN_APP -> inAppLane.prepare(job.agentJobId(), job.workspaceId());
+                    };
+            meterRegistry
+                    .counter("feedback.lane.sweep.recovered", "lane", lane.tag)
+                    .increment();
             return new LaneResult(true, units);
         } catch (RuntimeException e) {
             // The mark stays null, so the next pass tries again — until the job falls out of the lookback
             // window, at which point this counter is the only remaining evidence it was ever owed feedback.
             log.warn(
-                "feedback.lane.sweep: {} lane still failing for jobId={}: {}",
-                lane.tag,
-                job.agentJobId(),
-                e.toString()
-            );
-            meterRegistry.counter("feedback.lane.sweep.failure", "lane", lane.tag).increment();
+                    "feedback.lane.sweep: {} lane still failing for jobId={}: {}",
+                    lane.tag,
+                    job.agentJobId(),
+                    e.toString());
+            meterRegistry
+                    .counter("feedback.lane.sweep.failure", "lane", lane.tag)
+                    .increment();
             return new LaneResult(false, 0);
         }
     }

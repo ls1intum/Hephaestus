@@ -47,10 +47,9 @@ public class MentorChatController {
     @Operation(summary = "Send one mentor-chat turn; stream the response as AI SDK UIMessage chunks")
     @PreAuthorize("@workspaceSecure.isMember()")
     public SseEmitter chat(
-        WorkspaceContext workspaceContext,
-        @Valid @RequestBody MentorChatRequestBody body,
-        HttpServletResponse response
-    ) {
+            WorkspaceContext workspaceContext,
+            @Valid @RequestBody MentorChatRequestBody body,
+            HttpServletResponse response) {
         if (!workspaceContext.mentorEnabled()) {
             throw new EntityNotFoundException("Mentor chat", workspaceContext.slug());
         }
@@ -74,12 +73,8 @@ public class MentorChatController {
         SseEmitter emitter = new SseEmitter(EMITTER_TIMEOUT_MS);
         UUID threadId = body.id() != null ? body.id() : UUID.randomUUID();
         UUID clientUserMessageId = extractMessageId(body.message());
-        MentorTurnRequest serviceRequest = MentorTurnRequest.web(
-            workspaceContext.id(),
-            threadId,
-            userMessage,
-            clientUserMessageId
-        );
+        MentorTurnRequest serviceRequest =
+                MentorTurnRequest.web(workspaceContext.id(), threadId, userMessage, clientUserMessageId);
         mentorChatStarter.start(serviceRequest, emitter);
         return emitter;
     }
@@ -91,7 +86,10 @@ public class MentorChatController {
     }
 
     private static @Nullable String extractUserMessage(@Nullable JsonNode message) {
-        if (message == null || !message.isObject() || !message.has("parts") || !message.get("parts").isArray()) {
+        if (message == null
+                || !message.isObject()
+                || !message.has("parts")
+                || !message.get("parts").isArray()) {
             return null;
         }
         for (JsonNode part : message.get("parts")) {

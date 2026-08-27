@@ -40,18 +40,16 @@ public class GitLabMilestoneMessageHandler extends AbstractIntegrationMessageHan
     private final GitLabWebhookContextResolver contextResolver;
 
     GitLabMilestoneMessageHandler(
-        GitLabMilestoneProcessor milestoneProcessor,
-        GitLabWebhookContextResolver contextResolver,
-        NatsMessageDeserializer deserializer,
-        TransactionTemplate transactionTemplate
-    ) {
+            GitLabMilestoneProcessor milestoneProcessor,
+            GitLabWebhookContextResolver contextResolver,
+            NatsMessageDeserializer deserializer,
+            TransactionTemplate transactionTemplate) {
         super(
-            IntegrationKind.GITLAB,
-            GitLabEventType.MILESTONE.getValue(),
-            GitLabMilestoneEventDTO.class,
-            deserializer,
-            transactionTemplate
-        );
+                IntegrationKind.GITLAB,
+                GitLabEventType.MILESTONE.getValue(),
+                GitLabMilestoneEventDTO.class,
+                deserializer,
+                transactionTemplate);
         this.milestoneProcessor = milestoneProcessor;
         this.contextResolver = contextResolver;
     }
@@ -77,11 +75,10 @@ public class GitLabMilestoneMessageHandler extends AbstractIntegrationMessageHan
         GitLabEventAction action = event.actionType();
 
         log.info(
-            "Processing milestone event: projectPath={}, iid={}, action={}",
-            safeProjectPath,
-            event.objectAttributes().iid(),
-            action
-        );
+                "Processing milestone event: projectPath={}, iid={}, action={}",
+                safeProjectPath,
+                event.objectAttributes().iid(),
+                action);
 
         ProcessingContext context = contextResolver.resolve(projectPath, action.getValue(), "milestone");
         if (context == null) {

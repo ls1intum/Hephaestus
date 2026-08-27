@@ -21,8 +21,8 @@ class GitLabCommentReactionSinkTest extends BaseUnitTest {
     @Test
     void shouldSkipReactionMutationWhenSilentModeIsEngaged() {
         doThrow(new OutboundEgressSuppressedException("test"))
-            .when(egressGuard)
-            .requireDeliveryAllowed("gitlab.react-to-comment");
+                .when(egressGuard)
+                .requireDeliveryAllowed("gitlab.react-to-comment");
 
         new GitLabCommentReactionSink(provider, egressGuard).react(1L, 42L, "eyes");
 

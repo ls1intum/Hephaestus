@@ -13,15 +13,14 @@ import org.jspecify.annotations.Nullable;
  * below say the same thing without pretending to grade it.
  */
 public record TrendSupport(
-    int currentOpportunities,
-    int previousOpportunities,
-    int opportunitiesUntilComparable,
-    @Nullable Integer comparablePractices,
-    @Nullable Integer eligiblePractices,
-    @Nullable Instant firstOpportunityAt,
-    @Nullable Instant lastOpportunityAt,
-    @Nullable Integer calendarSpanDays,
-    int bundleSize,
-    double ropeHalfWidth,
-    double credibilityThreshold
-) {}
+        int currentOpportunities,
+        int previousOpportunities,
+        int opportunitiesUntilComparable,
+        @Nullable Integer comparablePractices,
+        @Nullable Integer eligiblePractices,
+        @Nullable Instant firstOpportunityAt,
+        @Nullable Instant lastOpportunityAt,
+        @Nullable Integer calendarSpanDays,
+        int bundleSize,
+        double ropeHalfWidth,
+        double credibilityThreshold) {}

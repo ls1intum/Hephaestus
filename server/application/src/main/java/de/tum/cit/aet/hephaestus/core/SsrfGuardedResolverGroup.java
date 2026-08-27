@@ -125,50 +125,42 @@ public final class SsrfGuardedResolverGroup extends AddressResolverGroup<InetSoc
 
         @Override
         public Future<List<InetSocketAddress>> resolveAll(
-            SocketAddress address,
-            Promise<List<InetSocketAddress>> promise
-        ) {
+                SocketAddress address, Promise<List<InetSocketAddress>> promise) {
             return gateAll(delegate.resolveAll(address), promise);
         }
 
         private Future<InetSocketAddress> gateOne(Future<InetSocketAddress> source, Promise<InetSocketAddress> target) {
-            source.addListener(
-                (FutureListener<InetSocketAddress>) f -> {
-                    if (!f.isSuccess()) {
-                        target.setFailure(f.cause());
-                        return;
-                    }
-                    UnknownHostException blocked = blockedReason(f.getNow(), allowLoopback);
-                    if (blocked != null) {
-                        target.setFailure(blocked);
-                    } else {
-                        target.setSuccess(f.getNow());
-                    }
+            source.addListener((FutureListener<InetSocketAddress>) f -> {
+                if (!f.isSuccess()) {
+                    target.setFailure(f.cause());
+                    return;
                 }
-            );
+                UnknownHostException blocked = blockedReason(f.getNow(), allowLoopback);
+                if (blocked != null) {
+                    target.setFailure(blocked);
+                } else {
+                    target.setSuccess(f.getNow());
+                }
+            });
             return target;
         }
 
         private Future<List<InetSocketAddress>> gateAll(
-            Future<List<InetSocketAddress>> source,
-            Promise<List<InetSocketAddress>> target
-        ) {
-            source.addListener(
-                (FutureListener<List<InetSocketAddress>>) f -> {
-                    if (!f.isSuccess()) {
-                        target.setFailure(f.cause());
+                Future<List<InetSocketAddress>> source, Promise<List<InetSocketAddress>> target) {
+            source.addListener((FutureListener<List<InetSocketAddress>>) f -> {
+                if (!f.isSuccess()) {
+                    target.setFailure(f.cause());
+                    return;
+                }
+                for (InetSocketAddress isa : f.getNow()) {
+                    UnknownHostException blocked = blockedReason(isa, allowLoopback);
+                    if (blocked != null) {
+                        target.setFailure(blocked);
                         return;
                     }
-                    for (InetSocketAddress isa : f.getNow()) {
-                        UnknownHostException blocked = blockedReason(isa, allowLoopback);
-                        if (blocked != null) {
-                            target.setFailure(blocked);
-                            return;
-                        }
-                    }
-                    target.setSuccess(f.getNow());
                 }
-            );
+                target.setSuccess(f.getNow());
+            });
             return target;
         }
 

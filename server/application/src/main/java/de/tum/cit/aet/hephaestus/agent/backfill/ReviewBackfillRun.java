@@ -39,12 +39,11 @@ import org.jspecify.annotations.Nullable;
  */
 @Entity
 @Table(
-    name = "review_backfill_run",
-    indexes = {
-        @Index(name = "idx_review_backfill_run_workspace", columnList = "workspace_id, created_at"),
-        @Index(name = "idx_review_backfill_run_status", columnList = "status"),
-    }
-)
+        name = "review_backfill_run",
+        indexes = {
+            @Index(name = "idx_review_backfill_run_workspace", columnList = "workspace_id, created_at"),
+            @Index(name = "idx_review_backfill_run_status", columnList = "status"),
+        })
 @Getter
 @Setter
 @NoArgsConstructor
@@ -70,11 +69,10 @@ public class ReviewBackfillRun {
     @NotNull
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(
-        name = "workspace_id",
-        nullable = false,
-        updatable = false,
-        foreignKey = @ForeignKey(name = "fk_review_backfill_run_workspace")
-    )
+            name = "workspace_id",
+            nullable = false,
+            updatable = false,
+            foreignKey = @ForeignKey(name = "fk_review_backfill_run_workspace"))
     @ToString.Exclude
     private Workspace workspace;
 

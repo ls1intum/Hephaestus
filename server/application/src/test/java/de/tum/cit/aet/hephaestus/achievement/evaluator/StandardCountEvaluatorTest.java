@@ -35,21 +35,15 @@ class StandardCountEvaluatorTest extends BaseUnitTest {
 
     private ActivitySavedEvent createEvent(ActivityEventType eventType) {
         return new ActivitySavedEvent(
-            Optional.of(testUser),
-            eventType,
-            Instant.now(),
-            1L,
-            ActivityTargetType.PULL_REQUEST,
-            100L
-        );
+                Optional.of(testUser), eventType, Instant.now(), 1L, ActivityTargetType.PULL_REQUEST, 100L);
     }
 
     private UserAchievement createUserAchievement(int current, int target) {
         return UserAchievement.builder()
-            .user(testUser)
-            .achievementId("test.achievement")
-            .progressData(new LinearAchievementProgress(current, target))
-            .build();
+                .user(testUser)
+                .achievementId("test.achievement")
+                .progressData(new LinearAchievementProgress(current, target))
+                .build();
     }
 
     @Nested
@@ -127,10 +121,10 @@ class StandardCountEvaluatorTest extends BaseUnitTest {
         @Test
         void returnsFalseForWrongProgressType() {
             UserAchievement ua = UserAchievement.builder()
-                .user(testUser)
-                .achievementId("test.achievement")
-                .progressData(new BinaryAchievementProgress())
-                .build();
+                    .user(testUser)
+                    .achievementId("test.achievement")
+                    .progressData(new BinaryAchievementProgress())
+                    .build();
 
             boolean result = evaluator.updateProgress(ua, createEvent(ActivityEventType.COMMIT_CREATED));
             assertThat(result).isFalse();

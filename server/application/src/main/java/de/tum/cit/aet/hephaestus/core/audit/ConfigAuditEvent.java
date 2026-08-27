@@ -97,16 +97,15 @@ public class ConfigAuditEvent {
 
     /** Only sanctioned construction path; keeps the entity {@code @Getter}-only (append-only invariant). */
     static ConfigAuditEvent create(
-        Instant occurredAt,
-        @Nullable Long workspaceId,
-        ConfigAuditActor actor,
-        ConfigAuditEntityType entityType,
-        String entityId,
-        ConfigAuditAction action,
-        List<String> changedKeys,
-        @Nullable String oldValue,
-        @Nullable String newValue
-    ) {
+            Instant occurredAt,
+            @Nullable Long workspaceId,
+            ConfigAuditActor actor,
+            ConfigAuditEntityType entityType,
+            String entityId,
+            ConfigAuditAction action,
+            List<String> changedKeys,
+            @Nullable String oldValue,
+            @Nullable String newValue) {
         ConfigAuditEvent e = new ConfigAuditEvent();
         e.occurredAt = occurredAt;
         e.workspaceId = workspaceId;

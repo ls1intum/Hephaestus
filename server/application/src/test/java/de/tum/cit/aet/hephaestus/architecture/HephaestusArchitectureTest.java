@@ -41,12 +41,12 @@ public abstract class HephaestusArchitectureTest {
 
     /** Production classes only (excludes tests). Used for most architecture rules. */
     protected static final JavaClasses classes = new ClassFileImporter()
-        .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
-        .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_JARS)
-        .importPackages(BASE_PACKAGE);
+            .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
+            .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_JARS)
+            .importPackages(BASE_PACKAGE);
 
     /** All classes including tests. Used for test architecture rules. */
     protected static final JavaClasses classesWithTests = new ClassFileImporter()
-        .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_JARS)
-        .importPackages(BASE_PACKAGE);
+            .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_JARS)
+            .importPackages(BASE_PACKAGE);
 }

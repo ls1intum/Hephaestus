@@ -110,11 +110,10 @@ public class GitHubCommitBackfillService {
             String headSha = gitRepositoryManager.resolveDefaultBranchHead(repoId, defaultBranch);
             if (headSha == null) {
                 log.warn(
-                    "Skipped commit backfill: reason=cannotResolveHead, repoId={}, repoName={}, branch={}",
-                    repoId,
-                    repoName,
-                    defaultBranch
-                );
+                        "Skipped commit backfill: reason=cannotResolveHead, repoId={}, repoName={}, branch={}",
+                        repoId,
+                        repoName,
+                        defaultBranch);
                 return -1;
             }
 
@@ -122,38 +121,32 @@ public class GitHubCommitBackfillService {
             String fromSha = findLatestKnownSha(repoId);
             if (fromSha != null && fromSha.equals(headSha)) {
                 log.debug(
-                    "Skipped commit backfill: reason=alreadyUpToDate, repoId={}, repoName={}, headSha={}",
-                    repoId,
-                    repoName,
-                    abbreviateSha(headSha)
-                );
+                        "Skipped commit backfill: reason=alreadyUpToDate, repoId={}, repoName={}, headSha={}",
+                        repoId,
+                        repoName,
+                        abbreviateSha(headSha));
                 return 0;
             }
 
             // Phase 4: Walk commits
-            List<GitRepositoryManager.CommitInfo> commitInfos = gitRepositoryManager.walkCommits(
-                repoId,
-                fromSha,
-                headSha
-            );
+            List<GitRepositoryManager.CommitInfo> commitInfos =
+                    gitRepositoryManager.walkCommits(repoId, fromSha, headSha);
 
             if (commitInfos.isEmpty()) {
                 log.debug(
-                    "No new commits to backfill: repoId={}, repoName={}, fromSha={}, headSha={}",
-                    repoId,
-                    repoName,
-                    fromSha != null ? abbreviateSha(fromSha) : "null",
-                    abbreviateSha(headSha)
-                );
+                        "No new commits to backfill: repoId={}, repoName={}, fromSha={}, headSha={}",
+                        repoId,
+                        repoName,
+                        fromSha != null ? abbreviateSha(fromSha) : "null",
+                        abbreviateSha(headSha));
                 return 0;
             }
 
             // Phase 5: Process commits (with batch limit)
             int total = commitInfos.size();
             boolean truncated = total > MAX_COMMITS_PER_CYCLE;
-            List<GitRepositoryManager.CommitInfo> batch = truncated
-                ? commitInfos.subList(0, MAX_COMMITS_PER_CYCLE)
-                : commitInfos;
+            List<GitRepositoryManager.CommitInfo> batch =
+                    truncated ? commitInfos.subList(0, MAX_COMMITS_PER_CYCLE) : commitInfos;
 
             int processed = 0;
             for (GitRepositoryManager.CommitInfo info : batch) {
@@ -164,32 +157,29 @@ public class GitHubCommitBackfillService {
 
             if (truncated) {
                 log.info(
-                    "Commit backfill batch limit reached: repoId={}, repoName={}, processed={}, total={}, remaining={}",
-                    repoId,
-                    repoName,
-                    processed,
-                    total,
-                    total - MAX_COMMITS_PER_CYCLE
-                );
+                        "Commit backfill batch limit reached: repoId={}, repoName={}, processed={}, total={}, remaining={}",
+                        repoId,
+                        repoName,
+                        processed,
+                        total,
+                        total - MAX_COMMITS_PER_CYCLE);
             } else {
                 log.info(
-                    "Completed commit backfill: repoId={}, repoName={}, newCommits={}, totalWalked={}, mode={}",
-                    repoId,
-                    repoName,
-                    processed,
-                    total,
-                    fromSha != null ? "incremental" : "full"
-                );
+                        "Completed commit backfill: repoId={}, repoName={}, newCommits={}, totalWalked={}, mode={}",
+                        repoId,
+                        repoName,
+                        processed,
+                        total,
+                        fromSha != null ? "incremental" : "full");
             }
 
             return processed;
         } catch (GitRepositoryManager.GitOperationException e) {
             log.error(
-                "Commit backfill failed (git operation): repoId={}, repoName={}, error={}",
-                repoId,
-                repoName,
-                e.getMessage()
-            );
+                    "Commit backfill failed (git operation): repoId={}, repoName={}, error={}",
+                    repoId,
+                    repoName,
+                    e.getMessage());
             return -1;
         } catch (Exception e) {
             log.error("Commit backfill failed: repoId={}, repoName={}, error={}", repoId, repoName, e.getMessage(), e);
@@ -228,7 +218,10 @@ public class GitHubCommitBackfillService {
      */
     @Nullable
     private String findLatestKnownSha(Long repositoryId) {
-        return commitRepository.findLatestByRepositoryId(repositoryId).map(Commit::getSha).orElse(null);
+        return commitRepository
+                .findLatestByRepositoryId(repositoryId)
+                .map(Commit::getSha)
+                .orElse(null);
     }
 
     /**
@@ -260,26 +253,27 @@ public class GitHubCommitBackfillService {
             // Defense-in-depth: git_commit.message is NOT NULL; default to empty string
             String message = info.message() != null ? info.message() : "";
             commitRepository.upsertCommit(
-                info.sha(),
-                message,
-                info.messageBody(),
-                buildCommitUrl(repository.getNameWithOwner(), info.sha()),
-                info.authoredAt(),
-                info.committedAt(),
-                info.additions(),
-                info.deletions(),
-                info.changedFiles(),
-                Instant.now(),
-                repository.getId(),
-                authorId,
-                committerId,
-                info.authorEmail(),
-                info.committerEmail()
-            );
+                    info.sha(),
+                    message,
+                    info.messageBody(),
+                    buildCommitUrl(repository.getNameWithOwner(), info.sha()),
+                    info.authoredAt(),
+                    info.committedAt(),
+                    info.additions(),
+                    info.deletions(),
+                    info.changedFiles(),
+                    Instant.now(),
+                    repository.getId(),
+                    authorId,
+                    committerId,
+                    info.authorEmail(),
+                    info.committerEmail());
 
             // Attach file changes if present
             if (!info.fileChanges().isEmpty()) {
-                Commit commit = commitRepository.findByShaAndRepositoryId(info.sha(), repository.getId()).orElse(null);
+                Commit commit = commitRepository
+                        .findByShaAndRepositoryId(info.sha(), repository.getId())
+                        .orElse(null);
                 if (commit != null) {
                     for (GitRepositoryManager.FileChange fc : info.fileChanges()) {
                         CommitFileChange fileChange = new CommitFileChange();
@@ -307,7 +301,9 @@ public class GitHubCommitBackfillService {
      * Publishes a {@link ScmDomainEvent.CommitCreated} event for a newly persisted commit.
      */
     private void publishCommitCreated(String sha, Repository repository, Long scopeId) {
-        Commit commit = commitRepository.findByShaAndRepositoryId(sha, repository.getId()).orElse(null);
+        Commit commit = commitRepository
+                .findByShaAndRepositoryId(sha, repository.getId())
+                .orElse(null);
         if (commit == null) {
             log.debug("Cannot publish CommitCreated: commit not found after upsert: sha={}", sha);
             return;
@@ -315,15 +311,14 @@ public class GitHubCommitBackfillService {
 
         ScmEventPayload.CommitData commitData = ScmEventPayload.CommitData.from(commit);
         EventContext context = new EventContext(
-            UUID.randomUUID(),
-            Instant.now(),
-            scopeId,
-            RepositoryRef.from(repository),
-            DataSource.GRAPHQL_SYNC,
-            null,
-            UUID.randomUUID().toString(),
-            IdentityProviderType.GITHUB
-        );
+                UUID.randomUUID(),
+                Instant.now(),
+                scopeId,
+                RepositoryRef.from(repository),
+                DataSource.GRAPHQL_SYNC,
+                null,
+                UUID.randomUUID().toString(),
+                IdentityProviderType.GITHUB);
 
         eventPublisher.publishEvent(new ScmDomainEvent.CommitCreated(commitData, context));
     }

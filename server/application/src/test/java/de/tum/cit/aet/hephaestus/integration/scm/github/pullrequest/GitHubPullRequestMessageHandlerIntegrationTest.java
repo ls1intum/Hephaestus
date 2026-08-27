@@ -19,7 +19,6 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
-import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubEventType;
 import de.tum.cit.aet.hephaestus.integration.scm.github.pullrequest.dto.GitHubPullRequestEventDTO;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.testconfig.RecordingScmEventListener;
@@ -190,8 +189,8 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
             // Use TransactionTemplate for lazy-loading assertions
             transactionTemplate.executeWithoutResult(status -> {
                 PullRequest pr = pullRequestRepository
-                    .findByRepositoryIdAndNumber(testRepository.getId(), PR_26_NUMBER)
-                    .orElseThrow();
+                        .findByRepositoryIdAndNumber(testRepository.getId(), PR_26_NUMBER)
+                        .orElseThrow();
 
                 // Core identification fields (inherited from Issue)
                 assertThat(pr.getNativeId()).isEqualTo(PR_26_ID);
@@ -248,7 +247,8 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
             });
 
             // Domain event published
-            assertThat(eventListener.ofType(ScmDomainEvent.PullRequestCreated.class)).hasSize(1);
+            assertThat(eventListener.ofType(ScmDomainEvent.PullRequestCreated.class))
+                    .hasSize(1);
         }
 
         @Test
@@ -262,14 +262,15 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
             handler.handleEvent(closedEvent);
 
             PullRequest pr = pullRequestRepository
-                .findByRepositoryIdAndNumber(testRepository.getId(), PR_26_NUMBER)
-                .orElse(null);
+                    .findByRepositoryIdAndNumber(testRepository.getId(), PR_26_NUMBER)
+                    .orElse(null);
             assertNotNull(pr);
             assertThat(pr.getState()).isEqualTo(PullRequest.State.CLOSED);
             assertThat(pr.isMerged()).isFalse(); // closed.json has merged=false
 
             // Verify Closed event was published
-            assertThat(eventListener.ofType(ScmDomainEvent.PullRequestClosed.class)).hasSize(1);
+            assertThat(eventListener.ofType(ScmDomainEvent.PullRequestClosed.class))
+                    .hasSize(1);
         }
 
         @Test
@@ -284,8 +285,8 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
             handler.handleEvent(reopenedEvent);
 
             PullRequest pr = pullRequestRepository
-                .findByRepositoryIdAndNumber(testRepository.getId(), PR_26_NUMBER)
-                .orElse(null);
+                    .findByRepositoryIdAndNumber(testRepository.getId(), PR_26_NUMBER)
+                    .orElse(null);
             assertNotNull(pr);
             assertThat(pr.getState()).isEqualTo(PullRequest.State.OPEN);
         }
@@ -307,13 +308,14 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
             handler.handleEvent(readyEvent);
 
             PullRequest pr = pullRequestRepository
-                .findByRepositoryIdAndNumber(testRepository.getId(), PR_26_NUMBER)
-                .orElse(null);
+                    .findByRepositoryIdAndNumber(testRepository.getId(), PR_26_NUMBER)
+                    .orElse(null);
             assertNotNull(pr);
             assertThat(pr.isDraft()).isFalse();
 
             // Verify PullRequestReady event was published
-            assertThat(eventListener.ofType(ScmDomainEvent.PullRequestReady.class)).hasSize(1);
+            assertThat(eventListener.ofType(ScmDomainEvent.PullRequestReady.class))
+                    .hasSize(1);
         }
 
         @Test
@@ -323,13 +325,14 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
             handler.handleEvent(draftEvent);
 
             PullRequest pr = pullRequestRepository
-                .findByRepositoryIdAndNumber(testRepository.getId(), PR_26_NUMBER)
-                .orElse(null);
+                    .findByRepositoryIdAndNumber(testRepository.getId(), PR_26_NUMBER)
+                    .orElse(null);
             assertNotNull(pr);
             assertThat(pr.isDraft()).isTrue();
 
             // Verify PullRequestDrafted event was published
-            assertThat(eventListener.ofType(ScmDomainEvent.PullRequestDrafted.class)).hasSize(1);
+            assertThat(eventListener.ofType(ScmDomainEvent.PullRequestDrafted.class))
+                    .hasSize(1);
         }
     }
 
@@ -349,12 +352,13 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
             handler.handleEvent(syncEvent);
 
             PullRequest pr = pullRequestRepository
-                .findByRepositoryIdAndNumber(testRepository.getId(), PR_26_NUMBER)
-                .orElse(null);
+                    .findByRepositoryIdAndNumber(testRepository.getId(), PR_26_NUMBER)
+                    .orElse(null);
             assertNotNull(pr);
 
             // Verify PullRequestSynchronized event was published
-            assertThat(eventListener.ofType(ScmDomainEvent.PullRequestSynchronized.class)).hasSize(1);
+            assertThat(eventListener.ofType(ScmDomainEvent.PullRequestSynchronized.class))
+                    .hasSize(1);
         }
     }
 
@@ -376,17 +380,19 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
             // Then - use TransactionTemplate for lazy-loading assertions
             transactionTemplate.executeWithoutResult(status -> {
                 PullRequest pr = pullRequestRepository
-                    .findByRepositoryIdAndNumber(testRepository.getId(), PR_26_NUMBER)
-                    .orElse(null);
+                        .findByRepositoryIdAndNumber(testRepository.getId(), PR_26_NUMBER)
+                        .orElse(null);
                 assertNotNull(pr);
                 assertThat(labelNames(pr)).contains(FIXTURE_LABEL_NAME);
             });
 
             // Verify label was created in repository
-            assertThat(labelRepository.findByNativeIdAndProviderId(FIXTURE_LABEL_ID, testProviderId())).isPresent();
+            assertThat(labelRepository.findByNativeIdAndProviderId(FIXTURE_LABEL_ID, testProviderId()))
+                    .isPresent();
 
             // Verify Labeled event was published
-            assertThat(eventListener.ofType(ScmDomainEvent.PullRequestLabeled.class)).hasSize(1);
+            assertThat(eventListener.ofType(ScmDomainEvent.PullRequestLabeled.class))
+                    .hasSize(1);
         }
 
         @Test
@@ -401,7 +407,8 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
             handler.handleEvent(unlabeledEvent);
 
             // Then - Unlabeled event should be published
-            assertThat(eventListener.ofType(ScmDomainEvent.PullRequestUnlabeled.class)).hasSize(1);
+            assertThat(eventListener.ofType(ScmDomainEvent.PullRequestUnlabeled.class))
+                    .hasSize(1);
         }
     }
 
@@ -420,8 +427,8 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
             // Use TransactionTemplate for lazy-loading assertions
             transactionTemplate.executeWithoutResult(status -> {
                 PullRequest pr = pullRequestRepository
-                    .findByRepositoryIdAndNumber(testRepository.getId(), PR_26_NUMBER)
-                    .orElse(null);
+                        .findByRepositoryIdAndNumber(testRepository.getId(), PR_26_NUMBER)
+                        .orElse(null);
                 assertNotNull(pr);
                 assertThat(pr.getAssignees()).isNotEmpty();
                 assertThat(userLogins(pr.getAssignees())).contains(FIXTURE_AUTHOR_LOGIN);
@@ -439,8 +446,8 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
 
             // Then - PR still exists and was processed
             PullRequest pr = pullRequestRepository
-                .findByRepositoryIdAndNumber(testRepository.getId(), PR_26_NUMBER)
-                .orElse(null);
+                    .findByRepositoryIdAndNumber(testRepository.getId(), PR_26_NUMBER)
+                    .orElse(null);
             assertNotNull(pr);
         }
     }
@@ -459,8 +466,8 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
             // Then - use TransactionTemplate for lazy-loading assertions
             transactionTemplate.executeWithoutResult(status -> {
                 PullRequest pr = pullRequestRepository
-                    .findByRepositoryIdAndNumber(testRepository.getId(), PR_26_NUMBER)
-                    .orElse(null);
+                        .findByRepositoryIdAndNumber(testRepository.getId(), PR_26_NUMBER)
+                        .orElse(null);
                 assertNotNull(pr);
                 assertThat(pr.getMilestone()).isNotNull();
                 assertThat(pr.getMilestone().getTitle()).isEqualTo(FIXTURE_MILESTONE_TITLE);
@@ -468,9 +475,8 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
             });
 
             // Verify milestone was created in repository
-            assertThat(
-                milestoneRepository.findByNativeIdAndProviderId(FIXTURE_MILESTONE_ID, testProviderId())
-            ).isPresent();
+            assertThat(milestoneRepository.findByNativeIdAndProviderId(FIXTURE_MILESTONE_ID, testProviderId()))
+                    .isPresent();
         }
 
         @Test
@@ -486,8 +492,8 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
             // Use TransactionTemplate for lazy-loading assertions
             transactionTemplate.executeWithoutResult(status -> {
                 PullRequest pr = pullRequestRepository
-                    .findByRepositoryIdAndNumber(testRepository.getId(), PR_26_NUMBER)
-                    .orElse(null);
+                        .findByRepositoryIdAndNumber(testRepository.getId(), PR_26_NUMBER)
+                        .orElse(null);
                 assertNotNull(pr);
                 // Milestone is null in the demilestoned payload itself
                 assertThat(pr.getMilestone()).isNull();
@@ -507,8 +513,8 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
             handler.handleEvent(reviewRequestedEvent);
 
             PullRequest pr = pullRequestRepository
-                .findByRepositoryIdAndNumber(testRepository.getId(), PR_26_NUMBER)
-                .orElse(null);
+                    .findByRepositoryIdAndNumber(testRepository.getId(), PR_26_NUMBER)
+                    .orElse(null);
             assertNotNull(pr);
             // Note: The fixture has requested_teams but no user reviewers in requested_reviewers
             // The handler processes this via the generic process() method
@@ -524,8 +530,8 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
             handler.handleEvent(reviewRequestRemovedEvent);
 
             PullRequest pr = pullRequestRepository
-                .findByRepositoryIdAndNumber(testRepository.getId(), PR_26_NUMBER)
-                .orElse(null);
+                    .findByRepositoryIdAndNumber(testRepository.getId(), PR_26_NUMBER)
+                    .orElse(null);
             assertNotNull(pr);
         }
     }
@@ -546,8 +552,8 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
 
             // Then - PR processed successfully
             PullRequest pr = pullRequestRepository
-                .findByRepositoryIdAndNumber(testRepository.getId(), PR_26_NUMBER)
-                .orElse(null);
+                    .findByRepositoryIdAndNumber(testRepository.getId(), PR_26_NUMBER)
+                    .orElse(null);
             assertNotNull(pr);
         }
 
@@ -562,8 +568,8 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
             handler.handleEvent(unlockedEvent);
 
             PullRequest pr = pullRequestRepository
-                .findByRepositoryIdAndNumber(testRepository.getId(), PR_26_NUMBER)
-                .orElse(null);
+                    .findByRepositoryIdAndNumber(testRepository.getId(), PR_26_NUMBER)
+                    .orElse(null);
             assertNotNull(pr);
         }
     }
@@ -635,7 +641,9 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
             handler.handleEvent(loadPayload("pull_request.opened"));
 
             // Then - author created with exact fixture values
-            var author = userRepository.findByNativeIdAndProviderId(FIXTURE_AUTHOR_ID, testProviderId()).orElseThrow();
+            var author = userRepository
+                    .findByNativeIdAndProviderId(FIXTURE_AUTHOR_ID, testProviderId())
+                    .orElseThrow();
             assertThat(author.getLogin()).isEqualTo(FIXTURE_AUTHOR_LOGIN);
             assertThat(author.getAvatarUrl()).isEqualTo(FIXTURE_AUTHOR_AVATAR_URL);
             assertThat(author.getHtmlUrl()).isEqualTo(FIXTURE_AUTHOR_HTML_URL);
@@ -646,15 +654,15 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
         void shouldHandleNullPullRequestDTOGracefully() throws Exception {
             // Given - a manually created event with null PR
             GitHubPullRequestEventDTO event = new GitHubPullRequestEventDTO(
-                "opened",
-                PR_26_NUMBER,
-                null, // null pull_request
-                null, // repository
-                null, // sender
-                null, // label
-                null, // requestedReviewer
-                null // changes
-            );
+                    "opened",
+                    PR_26_NUMBER,
+                    null, // null pull_request
+                    null, // repository
+                    null, // sender
+                    null, // label
+                    null, // requestedReviewer
+                    null // changes
+                    );
 
             // When/Then - should not throw
             assertThatCode(() -> handler.handleEvent(event)).doesNotThrowAnyException();
@@ -674,8 +682,8 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
             // 1. Open PR
             handler.handleEvent(loadPayload("pull_request.opened"));
             PullRequest pr = pullRequestRepository
-                .findByRepositoryIdAndNumber(testRepository.getId(), PR_26_NUMBER)
-                .orElse(null);
+                    .findByRepositoryIdAndNumber(testRepository.getId(), PR_26_NUMBER)
+                    .orElse(null);
             assertNotNull(pr);
             assertThat(pr.getState()).isEqualTo(PullRequest.State.OPEN);
 
@@ -683,26 +691,34 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
             handler.handleEvent(loadPayload("pull_request.labeled"));
             transactionTemplate.executeWithoutResult(status -> {
                 PullRequest prWithLabel = pullRequestRepository
-                    .findByRepositoryIdAndNumber(testRepository.getId(), PR_26_NUMBER)
-                    .orElseThrow();
+                        .findByRepositoryIdAndNumber(testRepository.getId(), PR_26_NUMBER)
+                        .orElseThrow();
                 assertThat(labelNames(prWithLabel)).contains(FIXTURE_LABEL_NAME);
             });
 
             // 3. Synchronize (push new commits)
             handler.handleEvent(loadPayload("pull_request.synchronize"));
-            pr = pullRequestRepository.findByRepositoryIdAndNumber(testRepository.getId(), PR_26_NUMBER).orElseThrow();
+            pr = pullRequestRepository
+                    .findByRepositoryIdAndNumber(testRepository.getId(), PR_26_NUMBER)
+                    .orElseThrow();
             assertThat(pr.getState()).isEqualTo(PullRequest.State.OPEN);
 
             // 4. Close
             handler.handleEvent(loadPayload("pull_request.closed"));
-            pr = pullRequestRepository.findByRepositoryIdAndNumber(testRepository.getId(), PR_26_NUMBER).orElseThrow();
+            pr = pullRequestRepository
+                    .findByRepositoryIdAndNumber(testRepository.getId(), PR_26_NUMBER)
+                    .orElseThrow();
             assertThat(pr.getState()).isEqualTo(PullRequest.State.CLOSED);
 
             // Verify events were published
-            assertThat(eventListener.ofType(ScmDomainEvent.PullRequestCreated.class)).hasSize(1);
-            assertThat(eventListener.ofType(ScmDomainEvent.PullRequestLabeled.class)).hasSize(1);
-            assertThat(eventListener.ofType(ScmDomainEvent.PullRequestSynchronized.class)).hasSize(1);
-            assertThat(eventListener.ofType(ScmDomainEvent.PullRequestClosed.class)).hasSize(1);
+            assertThat(eventListener.ofType(ScmDomainEvent.PullRequestCreated.class))
+                    .hasSize(1);
+            assertThat(eventListener.ofType(ScmDomainEvent.PullRequestLabeled.class))
+                    .hasSize(1);
+            assertThat(eventListener.ofType(ScmDomainEvent.PullRequestSynchronized.class))
+                    .hasSize(1);
+            assertThat(eventListener.ofType(ScmDomainEvent.PullRequestClosed.class))
+                    .hasSize(1);
         }
 
         @Test
@@ -710,18 +726,22 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
             // 1. Open PR (which is not draft in opened.json)
             handler.handleEvent(loadPayload("pull_request.opened"));
             PullRequest pr = pullRequestRepository
-                .findByRepositoryIdAndNumber(testRepository.getId(), PR_26_NUMBER)
-                .orElseThrow();
+                    .findByRepositoryIdAndNumber(testRepository.getId(), PR_26_NUMBER)
+                    .orElseThrow();
             assertThat(pr.isDraft()).isFalse();
 
             // 2. Mark ready for review (even if not draft, event is processed)
             handler.handleEvent(loadPayload("pull_request.ready_for_review"));
-            pr = pullRequestRepository.findByRepositoryIdAndNumber(testRepository.getId(), PR_26_NUMBER).orElseThrow();
+            pr = pullRequestRepository
+                    .findByRepositoryIdAndNumber(testRepository.getId(), PR_26_NUMBER)
+                    .orElseThrow();
             assertThat(pr.isDraft()).isFalse();
 
             // Verify events
-            assertThat(eventListener.ofType(ScmDomainEvent.PullRequestCreated.class)).hasSize(1);
-            assertThat(eventListener.ofType(ScmDomainEvent.PullRequestReady.class)).hasSize(1);
+            assertThat(eventListener.ofType(ScmDomainEvent.PullRequestCreated.class))
+                    .hasSize(1);
+            assertThat(eventListener.ofType(ScmDomainEvent.PullRequestReady.class))
+                    .hasSize(1);
         }
     }
 
@@ -799,7 +819,8 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
             assertThat(event.action()).isEqualTo("milestoned");
             assertThat(required(required(event.pullRequest()).milestone())).isNotNull();
             assertThat(required(required(event.pullRequest()).milestone()).id()).isEqualTo(FIXTURE_MILESTONE_ID);
-            assertThat(required(required(event.pullRequest()).milestone()).title()).isEqualTo(FIXTURE_MILESTONE_TITLE);
+            assertThat(required(required(event.pullRequest()).milestone()).title())
+                    .isEqualTo(FIXTURE_MILESTONE_TITLE);
         }
     }
 
@@ -819,10 +840,9 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
     private void setupTestData() {
         // Create GitHub provider
         testProvider = gitProviderRepository
-            .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
-            .orElseGet(() ->
-                gitProviderRepository.save(new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com"))
-            );
+                .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
+                .orElseGet(() -> gitProviderRepository.save(
+                        new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com")));
         IdentityProvider gitProvider = testProvider;
 
         // Create organization matching fixture data

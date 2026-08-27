@@ -47,18 +47,17 @@ public class PiEventToUiChunkTranslator {
             // Session-level events Pi emits that we intentionally drop. Listed explicitly so the
             // `default` arm can WARN on TRULY unknown types — silent default-drops hide protocol
             // drift (a new Pi event type would just disappear into DEBUG, never noticed).
-            case
-                "runner_ready",
-                "agent_start",
-                "turn_start",
-                "tool_execution_update",
-                "queue_update",
-                "compaction_start",
-                "compaction_end",
-                "session_info_changed",
-                "thinking_level_changed",
-                "auto_retry_start",
-                "auto_retry_end" -> List.of();
+            case "runner_ready",
+                    "agent_start",
+                    "turn_start",
+                    "tool_execution_update",
+                    "queue_update",
+                    "compaction_start",
+                    "compaction_end",
+                    "session_info_changed",
+                    "thinking_level_changed",
+                    "auto_retry_start",
+                    "auto_retry_end" -> List.of();
             default -> {
                 log.warn("Unknown Pi event type '{}' — dropping. Protocol drift?", type);
                 yield List.of();
@@ -181,15 +180,14 @@ public class PiEventToUiChunkTranslator {
             case "text_end" -> closeTextIfMatches(blockId, state);
             // text_start / thinking_start are pure lifecycle markers; we open lazily on the
             // first text delta, so the dedicated start events are no-ops.
-            case
-                "text_start",
-                "thinking_start",
-                "toolcall_start",
-                "toolcall_delta",
-                "toolcall_end",
-                "start",
-                "done",
-                "error" -> List.of();
+            case "text_start",
+                    "thinking_start",
+                    "toolcall_start",
+                    "toolcall_delta",
+                    "toolcall_end",
+                    "start",
+                    "done",
+                    "error" -> List.of();
             default -> {
                 log.debug("Unknown assistantMessageEvent.type '{}' — dropping", innerType);
                 yield List.of();
@@ -307,10 +305,9 @@ public class PiEventToUiChunkTranslator {
         }
         List<UIMessageChunk> out = closeOpenStreamingBlocks(state);
         UIMessageChunk.MessageMetadata metadata = UIMessageChunk.MessageMetadata.of(
-            state.observedModel(),
-            UIMessageChunk.MessageMetadata.Usage.fromJsonNode(state.observedUsage()),
-            /* costUsd, set by the persistence layer post-translation */ null
-        );
+                state.observedModel(),
+                UIMessageChunk.MessageMetadata.Usage.fromJsonNode(state.observedUsage()),
+                /* costUsd, set by the persistence layer post-translation */ null);
         out.add(new UIMessageChunk.Finish(mapStopReason(piStopReason), metadata));
         return out;
     }

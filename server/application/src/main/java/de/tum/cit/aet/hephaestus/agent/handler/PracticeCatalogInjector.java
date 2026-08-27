@@ -57,10 +57,9 @@ class PracticeCatalogInjector {
     private final WorkspaceReviewDefaultsProvider workspaceDefaults;
 
     PracticeCatalogInjector(
-        JsonMapper objectMapper,
-        PracticeRepository practiceRepository,
-        WorkspaceReviewDefaultsProvider workspaceDefaults
-    ) {
+            JsonMapper objectMapper,
+            PracticeRepository practiceRepository,
+            WorkspaceReviewDefaultsProvider workspaceDefaults) {
         this.objectMapper = objectMapper;
         this.practiceRepository = practiceRepository;
         this.workspaceDefaults = workspaceDefaults;
@@ -73,10 +72,9 @@ class PracticeCatalogInjector {
      * cannot be fabricated or drift in model prose. Practices with a blank principle are omitted.
      */
     Map<String, String> whyBySlug(Workspace workspace, ArtifactKind focus) {
-        return reviewedPractices(workspace, focus)
-            .stream()
-            .filter(p -> p.getWhyItMatters() != null && !p.getWhyItMatters().isBlank())
-            .collect(Collectors.toMap(Practice::getSlug, Practice::getWhyItMatters, (a, b) -> a));
+        return reviewedPractices(workspace, focus).stream()
+                .filter(p -> p.getWhyItMatters() != null && !p.getWhyItMatters().isBlank())
+                .collect(Collectors.toMap(Practice::getSlug, Practice::getWhyItMatters, (a, b) -> a));
     }
 
     /** Stage exactly the immutable revisions which produced a composition job's observations. */
@@ -86,47 +84,46 @@ class PracticeCatalogInjector {
             PracticeRevision revision = observation.getPracticeRevision();
             if (revision == null || revision.getId() == null) {
                 throw new JobPreparationException(
-                    "Observation has no reproducible practice revision: " + observation.getId()
-                );
+                        "Observation has no reproducible practice revision: " + observation.getId());
             }
             PracticeRevision prior = revisions.putIfAbsent(revision.getSlug(), revision);
             if (prior != null && !Objects.equals(prior.getId(), revision.getId())) {
                 throw new JobPreparationException(
-                    "One composition contains multiple revisions of " + revision.getSlug()
-                );
+                        "One composition contains multiple revisions of " + revision.getSlug());
             }
         }
         ArrayNode index = objectMapper.createArrayNode();
         StringBuilder bundle = new StringBuilder();
         Map<String, String> why = new LinkedHashMap<>();
-        revisions
-            .values()
-            .stream()
-            .sorted(Comparator.comparing(PracticeRevision::getSlug))
-            .forEach(revision -> {
-                ObjectNode entry = index.addObject();
-                entry.put("slug", revision.getSlug());
-                entry.put("name", revision.getName());
-                entry.put("revisionId", revision.getId());
-                String criteria = revision.getCriteria();
-                files.put(
-                    SandboxLayout.PRACTICES_PREFIX + revision.getSlug() + ".md",
-                    criteria.getBytes(StandardCharsets.UTF_8)
-                );
-                bundle.append("# ").append(revision.getSlug()).append("\n\n").append(criteria).append("\n\n---\n\n");
-                if (revision.getWhyItMatters() != null && !revision.getWhyItMatters().isBlank()) {
-                    why.put(revision.getSlug(), revision.getWhyItMatters());
-                }
-            });
+        revisions.values().stream()
+                .sorted(Comparator.comparing(PracticeRevision::getSlug))
+                .forEach(revision -> {
+                    ObjectNode entry = index.addObject();
+                    entry.put("slug", revision.getSlug());
+                    entry.put("name", revision.getName());
+                    entry.put("revisionId", revision.getId());
+                    String criteria = revision.getCriteria();
+                    files.put(
+                            SandboxLayout.PRACTICES_PREFIX + revision.getSlug() + ".md",
+                            criteria.getBytes(StandardCharsets.UTF_8));
+                    bundle.append("# ")
+                            .append(revision.getSlug())
+                            .append("\n\n")
+                            .append(criteria)
+                            .append("\n\n---\n\n");
+                    if (revision.getWhyItMatters() != null
+                            && !revision.getWhyItMatters().isBlank()) {
+                        why.put(revision.getSlug(), revision.getWhyItMatters());
+                    }
+                });
         try {
             files.put(SandboxLayout.PRACTICES_PREFIX + "index.json", objectMapper.writeValueAsBytes(index));
         } catch (JacksonException e) {
             throw new JobPreparationException("Failed to serialize composition practice index: " + e.getMessage(), e);
         }
         files.put(
-            SandboxLayout.PRACTICES_PREFIX + "all-criteria.md",
-            bundle.toString().getBytes(StandardCharsets.UTF_8)
-        );
+                SandboxLayout.PRACTICES_PREFIX + "all-criteria.md",
+                bundle.toString().getBytes(StandardCharsets.UTF_8));
         return Map.copyOf(why);
     }
 
@@ -158,7 +155,8 @@ class PracticeCatalogInjector {
 
     boolean isAdmitted(AgentJob job, String slug) {
         for (JsonNode practice : admittedPractices(job)) {
-            if (slug.equals(practice.path("slug").asString()) && practice.path("revisionId").isIntegralNumber()) {
+            if (slug.equals(practice.path("slug").asString())
+                    && practice.path("revisionId").isIntegralNumber()) {
                 return true;
             }
         }
@@ -187,54 +185,40 @@ class PracticeCatalogInjector {
         // By ID, not off the entity: the job's workspace association is lazy and the job is detached on
         // some paths, so reading the settings here would make the catalogue depend on whether the caller
         // holds a session.
-        PracticeAutonomy workspaceDefault = workspaceDefaults.forWorkspace(workspace.getId()).defaultAutonomy();
-        return practiceRepository
-            .findByWorkspaceIdAndArtifactKind(workspace.getId(), focus)
-            .stream()
-            .filter(p -> AutonomyResolver.effectiveAutonomyOf(p, workspaceDefault).admitsReview())
-            .toList();
+        PracticeAutonomy workspaceDefault =
+                workspaceDefaults.forWorkspace(workspace.getId()).defaultAutonomy();
+        return practiceRepository.findByWorkspaceIdAndArtifactKind(workspace.getId(), focus).stream()
+                .filter(p -> AutonomyResolver.effectiveAutonomyOf(p, workspaceDefault)
+                        .admitsReview())
+                .toList();
     }
 
     List<Practice> resolveEligiblePractices(AgentJob job, ArtifactKind focus) {
         if (job.getWorkspace() == null) {
             throw new JobPreparationException("Job has no workspace: jobId=" + job.getId());
         }
-        List<Practice> practices = reviewedPractices(job.getWorkspace(), focus)
-            .stream()
-            .sorted(Comparator.comparing(Practice::getSlug))
-            .toList();
+        List<Practice> practices = reviewedPractices(job.getWorkspace(), focus).stream()
+                .sorted(Comparator.comparing(Practice::getSlug))
+                .toList();
         SignalName signal = signalOf(job);
         if (signal != null) {
-            practices = practices
-                .stream()
-                .filter(p ->
-                    p
-                        .getBindings()
-                        .stream()
-                        .anyMatch(binding -> binding.matches(signal))
-                )
-                .toList();
+            practices = practices.stream()
+                    .filter(p -> p.getBindings().stream().anyMatch(binding -> binding.matches(signal)))
+                    .toList();
         }
-        practices = practices
-            .stream()
-            .filter(p -> attributable(p, signal, job))
-            .toList();
+        practices = practices.stream().filter(p -> attributable(p, signal, job)).toList();
         if (practices.isEmpty()) {
-            throw new JobPreparationException(
-                "No active " +
-                    focus +
-                    " practices this review can attribute to a person: workspaceId=" +
-                    job.getWorkspace().getId() +
-                    ", jobId=" +
-                    job.getId()
-            );
+            throw new JobPreparationException("No active " + focus
+                    + " practices this review can attribute to a person: workspaceId="
+                    + job.getWorkspace().getId()
+                    + ", jobId="
+                    + job.getId());
         }
         for (Practice p : practices) {
             String slug = p.getSlug();
             if (slug == null || !SandboxLayout.PRACTICE_SLUG.matcher(slug).matches()) {
                 throw new JobPreparationException(
-                    "Practice slug fails ABI pattern " + SandboxLayout.PRACTICE_SLUG.pattern() + ": " + slug
-                );
+                        "Practice slug fails ABI pattern " + SandboxLayout.PRACTICE_SLUG.pattern() + ": " + slug);
             }
         }
         return practices;
@@ -243,10 +227,9 @@ class PracticeCatalogInjector {
     private boolean attributable(Practice practice, @Nullable SignalName signal, AgentJob job) {
         ActorRole subject = PracticeBinding.subjectRoleOf(practice.getBindings(), signal);
         JsonNode metadata = job.getMetadata();
-        boolean reviewerRun =
-            metadata != null &&
-            metadata.path("about_user_id").isNumber() &&
-            "REVIEWER".equals(metadata.path("subject_role").asString());
+        boolean reviewerRun = metadata != null
+                && metadata.path("about_user_id").isNumber()
+                && "REVIEWER".equals(metadata.path("subject_role").asString());
         if (subject == ActorRole.AUTHOR) {
             return !reviewerRun;
         }
@@ -254,11 +237,10 @@ class PracticeCatalogInjector {
             return true;
         }
         log.debug(
-            "Practice withheld from review: no {} this job can name, slug={}, jobId={}",
-            subject,
-            practice.getSlug(),
-            job.getId()
-        );
+                "Practice withheld from review: no {} this job can name, slug={}, jobId={}",
+                subject,
+                practice.getSlug(),
+                job.getId());
         return false;
     }
 
@@ -283,22 +265,20 @@ class PracticeCatalogInjector {
             // A pointer, not a fence: what may be CITED is what the run staged (inputs/manifest.json), so
             // reading beyond this list is expected, not a violation.
             ArrayNode readsSources = entry.putArray("readsSources");
-            PracticeBinding.needsFor(p.getBindings(), signalOf(job))
-                .stream()
-                .map(need -> need.sourceKind().value())
-                .distinct()
-                .sorted()
-                .forEach(readsSources::add);
+            PracticeBinding.needsFor(p.getBindings(), signalOf(job)).stream()
+                    .map(need -> need.sourceKind().value())
+                    .distinct()
+                    .sorted()
+                    .forEach(readsSources::add);
             // The sources the practice claims to have searched exhaustively — what makes an ABSENT
             // observation assertable, and what the runner requires be searched before accepting one.
             ArrayNode exhaustiveSources = entry.putArray("exhaustiveSources");
-            PracticeBinding.needsFor(p.getBindings(), signalOf(job))
-                .stream()
-                .filter(need -> need.stance() == EvidenceStance.EXHAUSTIVE)
-                .map(need -> need.sourceKind().value())
-                .distinct()
-                .sorted()
-                .forEach(exhaustiveSources::add);
+            PracticeBinding.needsFor(p.getBindings(), signalOf(job)).stream()
+                    .filter(need -> need.stance() == EvidenceStance.EXHAUSTIVE)
+                    .map(need -> need.sourceKind().value())
+                    .distinct()
+                    .sorted()
+                    .forEach(exhaustiveSources::add);
         }
         try {
             files.put(SandboxLayout.PRACTICES_PREFIX + "index.json", objectMapper.writeValueAsBytes(index));
@@ -310,12 +290,15 @@ class PracticeCatalogInjector {
         for (Practice p : practices) {
             String criteria = p.getCriteria() + renderKnownLimitations(p);
             files.put(SandboxLayout.PRACTICES_PREFIX + p.getSlug() + ".md", criteria.getBytes(StandardCharsets.UTF_8));
-            bundle.append("# ").append(p.getSlug()).append("\n\n").append(criteria).append("\n\n---\n\n");
+            bundle.append("# ")
+                    .append(p.getSlug())
+                    .append("\n\n")
+                    .append(criteria)
+                    .append("\n\n---\n\n");
         }
         files.put(
-            SandboxLayout.PRACTICES_PREFIX + "all-criteria.md",
-            bundle.toString().getBytes(StandardCharsets.UTF_8)
-        );
+                SandboxLayout.PRACTICES_PREFIX + "all-criteria.md",
+                bundle.toString().getBytes(StandardCharsets.UTF_8));
 
         files.put(SandboxLayout.ANALYSIS_PRACTICES_PREFIX + ".gitkeep", new byte[0]);
 
@@ -324,26 +307,25 @@ class PracticeCatalogInjector {
             String script = p.getPrecomputeScript();
             if (script != null && !script.isBlank()) {
                 files.put(
-                    SandboxLayout.PRECOMPUTE_PREFIX + "practices/" + p.getSlug() + ".ts",
-                    script.getBytes(StandardCharsets.UTF_8)
-                );
+                        SandboxLayout.PRECOMPUTE_PREFIX + "practices/" + p.getSlug() + ".ts",
+                        script.getBytes(StandardCharsets.UTF_8));
                 precomputeCount++;
             }
         }
 
         log.info(
-            "Injected practice catalog: {} {} practices ({} with precompute), workspaceId={}, jobId={}",
-            practices.size(),
-            focus,
-            precomputeCount,
-            workspaceId,
-            job.getId()
-        );
+                "Injected practice catalog: {} {} practices ({} with precompute), workspaceId={}, jobId={}",
+                practices.size(),
+                focus,
+                precomputeCount,
+                workspaceId,
+                job.getId());
     }
 
     /** The claims this practice's evidence cannot support, appended to the criteria staged for the model. */
     private static String renderKnownLimitations(Practice p) {
-        List<PracticeEvidenceLimitation> limitations = p.getAutomatedReviewPolicy().knownLimitations();
+        List<PracticeEvidenceLimitation> limitations =
+                p.getAutomatedReviewPolicy().knownLimitations();
         if (limitations.isEmpty()) {
             return "";
         }

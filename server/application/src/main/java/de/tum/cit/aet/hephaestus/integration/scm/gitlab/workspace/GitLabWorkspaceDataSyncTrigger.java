@@ -59,11 +59,10 @@ public class GitLabWorkspaceDataSyncTrigger implements WorkspaceDataSyncTrigger 
     private final SyncJobService syncJobService;
 
     public GitLabWorkspaceDataSyncTrigger(
-        GitLabWorkspaceInitializationService gitLabInitService,
-        WorkspaceRepository workspaceRepository,
-        ConnectionRepository connectionRepository,
-        SyncJobService syncJobService
-    ) {
+            GitLabWorkspaceInitializationService gitLabInitService,
+            WorkspaceRepository workspaceRepository,
+            ConnectionRepository connectionRepository,
+            SyncJobService syncJobService) {
         this.gitLabInitService = gitLabInitService;
         this.workspaceRepository = workspaceRepository;
         this.connectionRepository = connectionRepository;
@@ -78,11 +77,8 @@ public class GitLabWorkspaceDataSyncTrigger implements WorkspaceDataSyncTrigger 
     @Override
     public void syncAllRepositories(long workspaceId) {
         Optional<Connection> connection =
-            connectionRepository.findFirstByWorkspaceIdAndKindAndStateOrderByCreatedAtDesc(
-                workspaceId,
-                IntegrationKind.GITLAB,
-                IntegrationState.ACTIVE
-            );
+                connectionRepository.findFirstByWorkspaceIdAndKindAndStateOrderByCreatedAtDesc(
+                        workspaceId, IntegrationKind.GITLAB, IntegrationState.ACTIVE);
         if (connection.isEmpty()) {
             syncAllRepositoriesBody(workspaceId, () -> false);
             return;
@@ -90,22 +86,19 @@ public class GitLabWorkspaceDataSyncTrigger implements WorkspaceDataSyncTrigger 
 
         try {
             syncJobService.run(
-                new SyncJobRequest(
-                    workspaceId,
-                    connection.get().getId(),
-                    IntegrationKind.GITLAB,
-                    SyncJobType.INITIAL,
-                    SyncJobTrigger.LIFECYCLE,
-                    null
-                ),
-                handle -> syncAllRepositoriesBody(workspaceId, handle::isCancellationRequested)
-            );
+                    new SyncJobRequest(
+                            workspaceId,
+                            connection.get().getId(),
+                            IntegrationKind.GITLAB,
+                            SyncJobType.INITIAL,
+                            SyncJobTrigger.LIFECYCLE,
+                            null),
+                    handle -> syncAllRepositoriesBody(workspaceId, handle::isCancellationRequested));
         } catch (SyncJobConflictException e) {
             log.info(
-                "Skipped GitLab lifecycle sync, already an active sync job: workspaceId={}, connectionId={}",
-                workspaceId,
-                connection.get().getId()
-            );
+                    "Skipped GitLab lifecycle sync, already an active sync job: workspaceId={}, connectionId={}",
+                    workspaceId,
+                    connection.get().getId());
         }
     }
 

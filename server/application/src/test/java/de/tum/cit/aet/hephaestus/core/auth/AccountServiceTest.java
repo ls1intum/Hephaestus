@@ -53,12 +53,11 @@ class AccountServiceTest extends BaseUnitTest {
     @BeforeEach
     void setUp() {
         service = new AccountService(
-            accountRepository,
-            identityLinkRepository,
-            issuedJwtRepository,
-            new AuthEventLogger(auditWriter),
-            clock
-        );
+                accountRepository,
+                identityLinkRepository,
+                issuedJwtRepository,
+                new AuthEventLogger(auditWriter),
+                clock);
     }
 
     private static IdentityLink link(long id, long gitProviderId) {
@@ -106,10 +105,10 @@ class AccountServiceTest extends BaseUnitTest {
         List<IdentityLink> active = List.of(link(10L, 100L));
         when(identityLinkRepository.findActiveByAccountIdForUpdate(1L)).thenReturn(active);
 
-        assertThatThrownBy(() -> service.unlinkIdentity(1L, 10L, null)).isInstanceOfSatisfying(
-            ResponseStatusException.class,
-            e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.CONFLICT)
-        );
+        assertThatThrownBy(() -> service.unlinkIdentity(1L, 10L, null))
+                .isInstanceOfSatisfying(
+                        ResponseStatusException.class,
+                        e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.CONFLICT));
 
         verify(identityLinkRepository, never()).deleteByIdAndAccountId(anyLong(), anyLong());
         verifyNoInteractions(auditWriter);
@@ -120,10 +119,10 @@ class AccountServiceTest extends BaseUnitTest {
         List<IdentityLink> active = List.of(link(10L, 100L), link(11L, 101L));
         when(identityLinkRepository.findActiveByAccountIdForUpdate(1L)).thenReturn(active);
 
-        assertThatThrownBy(() -> service.unlinkIdentity(1L, 999L, null)).isInstanceOfSatisfying(
-            ResponseStatusException.class,
-            e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND)
-        );
+        assertThatThrownBy(() -> service.unlinkIdentity(1L, 999L, null))
+                .isInstanceOfSatisfying(
+                        ResponseStatusException.class,
+                        e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND));
 
         verify(identityLinkRepository, never()).deleteByIdAndAccountId(anyLong(), anyLong());
         verifyNoInteractions(auditWriter);
@@ -135,10 +134,10 @@ class AccountServiceTest extends BaseUnitTest {
         when(identityLinkRepository.findActiveByAccountIdForUpdate(1L)).thenReturn(active);
         when(identityLinkRepository.deleteByIdAndAccountId(10L, 1L)).thenReturn(0);
 
-        assertThatThrownBy(() -> service.unlinkIdentity(1L, 10L, null)).isInstanceOfSatisfying(
-            ResponseStatusException.class,
-            e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND)
-        );
+        assertThatThrownBy(() -> service.unlinkIdentity(1L, 10L, null))
+                .isInstanceOfSatisfying(
+                        ResponseStatusException.class,
+                        e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND));
 
         verifyNoInteractions(auditWriter);
     }
@@ -174,9 +173,8 @@ class AccountServiceTest extends BaseUnitTest {
     @Test
     void demotingAnotherAdminSucceedsWhileMoreAdminsRemain() {
         Account account = accountWithRole(2L, Account.AppRole.APP_ADMIN);
-        when(
-            accountRepository.findByAppRoleAndStatusForUpdate(Account.AppRole.APP_ADMIN, Account.Status.ACTIVE)
-        ).thenReturn(List.of(new Account(), new Account()));
+        when(accountRepository.findByAppRoleAndStatusForUpdate(Account.AppRole.APP_ADMIN, Account.Status.ACTIVE))
+                .thenReturn(List.of(new Account(), new Account()));
 
         service.adminSetRole(2L, "USER", 1L);
 
@@ -192,10 +190,10 @@ class AccountServiceTest extends BaseUnitTest {
     void unknownRoleIsRejectedWithoutSavingOrAuditing() {
         accountWithRole(2L, Account.AppRole.USER);
 
-        assertThatThrownBy(() -> service.adminSetRole(2L, "BOGUS", 1L)).isInstanceOfSatisfying(
-            ResponseStatusException.class,
-            e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY)
-        );
+        assertThatThrownBy(() -> service.adminSetRole(2L, "BOGUS", 1L))
+                .isInstanceOfSatisfying(
+                        ResponseStatusException.class,
+                        e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY));
 
         verify(accountRepository, never()).save(any());
         verifyNoInteractions(auditWriter);
@@ -205,10 +203,10 @@ class AccountServiceTest extends BaseUnitTest {
     void cannotRevokeYourOwnAdmin() {
         accountWithRole(1L, Account.AppRole.APP_ADMIN);
 
-        assertThatThrownBy(() -> service.adminSetRole(1L, "USER", 1L)).isInstanceOfSatisfying(
-            ResponseStatusException.class,
-            e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.CONFLICT)
-        );
+        assertThatThrownBy(() -> service.adminSetRole(1L, "USER", 1L))
+                .isInstanceOfSatisfying(
+                        ResponseStatusException.class,
+                        e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.CONFLICT));
 
         verify(accountRepository, never()).save(any());
         verifyNoInteractions(auditWriter);
@@ -217,14 +215,13 @@ class AccountServiceTest extends BaseUnitTest {
     @Test
     void cannotRevokeTheLastRemainingActiveAdmin() {
         accountWithRole(2L, Account.AppRole.APP_ADMIN);
-        when(
-            accountRepository.findByAppRoleAndStatusForUpdate(Account.AppRole.APP_ADMIN, Account.Status.ACTIVE)
-        ).thenReturn(List.of(new Account()));
+        when(accountRepository.findByAppRoleAndStatusForUpdate(Account.AppRole.APP_ADMIN, Account.Status.ACTIVE))
+                .thenReturn(List.of(new Account()));
 
-        assertThatThrownBy(() -> service.adminSetRole(2L, "USER", 1L)).isInstanceOfSatisfying(
-            ResponseStatusException.class,
-            e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.CONFLICT)
-        );
+        assertThatThrownBy(() -> service.adminSetRole(2L, "USER", 1L))
+                .isInstanceOfSatisfying(
+                        ResponseStatusException.class,
+                        e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.CONFLICT));
 
         verify(accountRepository, never()).save(any());
         verifyNoInteractions(auditWriter);
@@ -279,9 +276,8 @@ class AccountServiceTest extends BaseUnitTest {
     @Test
     void adminRevokeAllSessionsRevokesAndAuditsJwtRevokedWithAttribution() {
         accountWithRole(2L, Account.AppRole.USER); // requireById target exists
-        when(
-            issuedJwtRepository.revokeAllForAccount(eq(2L), any(), eq(IssuedJwt.RevokedReason.ADMIN_REVOKE))
-        ).thenReturn(3);
+        when(issuedJwtRepository.revokeAllForAccount(eq(2L), any(), eq(IssuedJwt.RevokedReason.ADMIN_REVOKE)))
+                .thenReturn(3);
 
         int revoked = service.adminRevokeAllSessions(2L, 1L);
 

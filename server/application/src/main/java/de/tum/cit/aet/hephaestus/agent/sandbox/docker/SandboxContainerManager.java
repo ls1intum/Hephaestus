@@ -37,24 +37,23 @@ public class SandboxContainerManager {
      * via {@code destroyMethod="shutdown"} on the bean definition.
      */
     private final ExecutorService dockerWaitExecutor;
+
     private final Duration postStopWaitTimeout;
 
     public SandboxContainerManager(
-        DockerContainerOperations containerOps,
-        SandboxImageGuard imageGuard,
-        SandboxProperties properties,
-        ExecutorService dockerWaitExecutor
-    ) {
+            DockerContainerOperations containerOps,
+            SandboxImageGuard imageGuard,
+            SandboxProperties properties,
+            ExecutorService dockerWaitExecutor) {
         this(containerOps, imageGuard, properties, dockerWaitExecutor, POST_STOP_WAIT_TIMEOUT);
     }
 
     SandboxContainerManager(
-        DockerContainerOperations containerOps,
-        SandboxImageGuard imageGuard,
-        SandboxProperties properties,
-        ExecutorService dockerWaitExecutor,
-        Duration postStopWaitTimeout
-    ) {
+            DockerContainerOperations containerOps,
+            SandboxImageGuard imageGuard,
+            SandboxProperties properties,
+            ExecutorService dockerWaitExecutor,
+            Duration postStopWaitTimeout) {
         this.containerOps = containerOps;
         this.imageGuard = imageGuard;
         this.properties = properties;
@@ -92,9 +91,8 @@ public class SandboxContainerManager {
         // Future.cancel(true) actually interrupts the blocking docker-wait thread.
         // CompletableFuture.cancel(true) does NOT propagate interruption, which would
         // exhaust the bounded thread pool under sustained cancellation/timeout.
-        Future<DockerOperations.WaitResult> waitFuture = dockerWaitExecutor.submit(() ->
-            containerOps.waitContainer(containerId)
-        );
+        Future<DockerOperations.WaitResult> waitFuture =
+                dockerWaitExecutor.submit(() -> containerOps.waitContainer(containerId));
 
         try {
             DockerOperations.WaitResult result = waitFuture.get(timeout.toMillis(), TimeUnit.MILLISECONDS);
@@ -108,10 +106,8 @@ public class SandboxContainerManager {
             }
             // Wait for the stop to take effect
             try {
-                DockerOperations.WaitResult result = waitFuture.get(
-                    postStopWaitTimeout.toMillis(),
-                    TimeUnit.MILLISECONDS
-                );
+                DockerOperations.WaitResult result =
+                        waitFuture.get(postStopWaitTimeout.toMillis(), TimeUnit.MILLISECONDS);
                 return new WaitOutcome(result.exitCode(), true);
             } catch (InterruptedException ex) {
                 waitFuture.cancel(true);

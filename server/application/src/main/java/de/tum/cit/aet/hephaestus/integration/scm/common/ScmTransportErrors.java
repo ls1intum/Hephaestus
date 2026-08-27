@@ -51,11 +51,9 @@ public final class ScmTransportErrors {
             }
 
             // Timeout during blocking read (body consumption timeout)
-            if (
-                cause instanceof IllegalStateException &&
-                message != null &&
-                message.toLowerCase().contains("timeout on blocking read")
-            ) {
+            if (cause instanceof IllegalStateException
+                    && message != null
+                    && message.toLowerCase().contains("timeout on blocking read")) {
                 log.debug("Transport error detected: blocking read timeout");
                 return true;
             }
@@ -63,13 +61,11 @@ public final class ScmTransportErrors {
             // Check for IOException indicating connection issues
             if (cause instanceof java.io.IOException && message != null) {
                 String lower = message.toLowerCase();
-                if (
-                    lower.contains("connection reset") ||
-                    lower.contains("broken pipe") ||
-                    lower.contains("connection abort") ||
-                    lower.contains("premature") ||
-                    lower.contains("stream closed")
-                ) {
+                if (lower.contains("connection reset")
+                        || lower.contains("broken pipe")
+                        || lower.contains("connection abort")
+                        || lower.contains("premature")
+                        || lower.contains("stream closed")) {
                     log.debug("Transport error detected: IOException - {}", message);
                     return true;
                 }

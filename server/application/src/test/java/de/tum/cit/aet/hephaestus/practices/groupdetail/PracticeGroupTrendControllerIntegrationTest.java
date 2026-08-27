@@ -12,7 +12,6 @@ import de.tum.cit.aet.hephaestus.workspace.AbstractWorkspaceIntegrationTest;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembership;
-import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -67,19 +66,19 @@ class PracticeGroupTrendControllerIntegrationTest extends AbstractWorkspaceInteg
     @DisplayName("returns the caller's group and practice trends")
     void shouldReturnOwnTrend() {
         webTestClient
-            .get()
-            .uri(URI, workspace.getWorkspaceSlug(), "code-quality")
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody()
-            .jsonPath("$.group.slug")
-            .isEqualTo("code-quality")
-            .jsonPath("$.group.direction")
-            .isEqualTo("INSUFFICIENT_EVIDENCE")
-            .jsonPath("$.practices[0].slug")
-            .isEqualTo("small-functions");
+                .get()
+                .uri(URI, workspace.getWorkspaceSlug(), "code-quality")
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$.group.slug")
+                .isEqualTo("code-quality")
+                .jsonPath("$.group.direction")
+                .isEqualTo("INSUFFICIENT_EVIDENCE")
+                .jsonPath("$.practices[0].slug")
+                .isEqualTo("small-functions");
     }
 
     @Test
@@ -93,12 +92,12 @@ class PracticeGroupTrendControllerIntegrationTest extends AbstractWorkspaceInteg
         Workspace foreign = createWorkspace("foreign-ws", "Foreign WS", "foreign-org", AccountType.ORG, otherOwner);
 
         webTestClient
-            .get()
-            .uri(URI, foreign.getWorkspaceSlug(), "code-quality")
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isForbidden();
+                .get()
+                .uri(URI, foreign.getWorkspaceSlug(), "code-quality")
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isForbidden();
     }
 
     @Test
@@ -106,16 +105,16 @@ class PracticeGroupTrendControllerIntegrationTest extends AbstractWorkspaceInteg
     @DisplayName("returns an RFC 7807 response for an unknown group")
     void shouldReturnProblemDetailForUnknownGroup() {
         webTestClient
-            .get()
-            .uri(URI, workspace.getWorkspaceSlug(), "unknown-group")
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isNotFound()
-            .expectHeader()
-            .contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON)
-            .expectBody()
-            .jsonPath("$.status")
-            .isEqualTo(404);
+                .get()
+                .uri(URI, workspace.getWorkspaceSlug(), "unknown-group")
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isNotFound()
+                .expectHeader()
+                .contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON)
+                .expectBody()
+                .jsonPath("$.status")
+                .isEqualTo(404);
     }
 }

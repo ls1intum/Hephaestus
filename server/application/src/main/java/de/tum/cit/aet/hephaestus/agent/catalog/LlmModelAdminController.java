@@ -47,25 +47,21 @@ public class LlmModelAdminController {
     @Operation(summary = "Create a model on an LLM connection", operationId = "adminCreateLlmModel")
     @ApiResponse(responseCode = "201", description = "Model created; URL in the Location header")
     @ApiResponse(
-        responseCode = "404",
-        description = "LLM connection not found",
-        content = @Content(schema = @Schema(hidden = true))
-    )
+            responseCode = "404",
+            description = "LLM connection not found",
+            content = @Content(schema = @Schema(hidden = true)))
     @ApiResponse(
-        responseCode = "409",
-        description = "A model with this slug or upstream model id already exists on the connection",
-        content = @Content(schema = @Schema(hidden = true))
-    )
+            responseCode = "409",
+            description = "A model with this slug or upstream model id already exists on the connection",
+            content = @Content(schema = @Schema(hidden = true)))
     @Audited(ledger = AuditLedger.AUTH_EVENT, type = "LLM_MODEL_CREATED")
     public ResponseEntity<LlmModelDTO> create(
-        @PathVariable Long connectionId,
-        @Valid @RequestBody CreateLlmModelRequestDTO request
-    ) {
+            @PathVariable Long connectionId, @Valid @RequestBody CreateLlmModelRequestDTO request) {
         LlmModel created = modelService.create(connectionId, request);
         URI location = ServletUriComponentsBuilder.fromCurrentContextPath()
-            .path("/admin/llm/models/{id}")
-            .buildAndExpand(created.getId())
-            .toUri();
+                .path("/admin/llm/models/{id}")
+                .buildAndExpand(created.getId())
+                .toUri();
         return ResponseEntity.created(location).body(toDTO(created));
     }
 
@@ -76,32 +72,24 @@ public class LlmModelAdminController {
         List<Long> modelIds = models.stream().map(LlmModel::getId).toList();
         var currentPrices = modelService.currentPricesByModelId(modelIds);
         var grantedWorkspaceIds = modelService.grantedWorkspaceIdsByModelId(modelIds);
-        return ResponseEntity.ok(
-            models
-                .stream()
-                .map(model ->
-                    LlmModelDTO.from(
+        return ResponseEntity.ok(models.stream()
+                .map(model -> LlmModelDTO.from(
                         model,
                         currentPrices.get(model.getId()),
-                        grantedWorkspaceIds.getOrDefault(model.getId(), List.of())
-                    )
-                )
-                .toList()
-        );
+                        grantedWorkspaceIds.getOrDefault(model.getId(), List.of())))
+                .toList());
     }
 
     @GetMapping("/models/{id}")
     @Operation(summary = "Get an LLM catalog model", operationId = "adminGetLlmModel")
     @ApiResponse(
-        responseCode = "200",
-        description = "OK",
-        content = @Content(schema = @Schema(implementation = LlmModelDTO.class))
-    )
+            responseCode = "200",
+            description = "OK",
+            content = @Content(schema = @Schema(implementation = LlmModelDTO.class)))
     @ApiResponse(
-        responseCode = "404",
-        description = "LLM model not found",
-        content = @Content(schema = @Schema(hidden = true))
-    )
+            responseCode = "404",
+            description = "LLM model not found",
+            content = @Content(schema = @Schema(hidden = true)))
     public ResponseEntity<LlmModelDTO> get(@PathVariable Long id) {
         return ResponseEntity.ok(toDTO(modelService.get(id)));
     }
@@ -109,25 +97,20 @@ public class LlmModelAdminController {
     @PatchMapping("/models/{id}")
     @Operation(summary = "Update a model's metadata", operationId = "adminUpdateLlmModel")
     @ApiResponse(
-        responseCode = "200",
-        description = "OK",
-        content = @Content(schema = @Schema(implementation = LlmModelDTO.class))
-    )
+            responseCode = "200",
+            description = "OK",
+            content = @Content(schema = @Schema(implementation = LlmModelDTO.class)))
     @ApiResponse(
-        responseCode = "404",
-        description = "LLM model not found",
-        content = @Content(schema = @Schema(hidden = true))
-    )
+            responseCode = "404",
+            description = "LLM model not found",
+            content = @Content(schema = @Schema(hidden = true)))
     @ApiResponse(
-        responseCode = "409",
-        description = "Another model on the connection already uses this upstream model id",
-        content = @Content(schema = @Schema(hidden = true))
-    )
+            responseCode = "409",
+            description = "Another model on the connection already uses this upstream model id",
+            content = @Content(schema = @Schema(hidden = true)))
     @Audited(ledger = AuditLedger.AUTH_EVENT, type = "LLM_MODEL_UPDATED")
     public ResponseEntity<LlmModelDTO> update(
-        @PathVariable Long id,
-        @Valid @RequestBody UpdateLlmModelRequestDTO request
-    ) {
+            @PathVariable Long id, @Valid @RequestBody UpdateLlmModelRequestDTO request) {
         return ResponseEntity.ok(toDTO(modelService.update(id, request)));
     }
 
@@ -135,15 +118,13 @@ public class LlmModelAdminController {
     @Operation(summary = "Delete an LLM catalog model", operationId = "adminDeleteLlmModel")
     @ApiResponse(responseCode = "204", description = "Model deleted")
     @ApiResponse(
-        responseCode = "404",
-        description = "LLM model not found",
-        content = @Content(schema = @Schema(hidden = true))
-    )
+            responseCode = "404",
+            description = "LLM model not found",
+            content = @Content(schema = @Schema(hidden = true)))
     @ApiResponse(
-        responseCode = "409",
-        description = "Cannot delete a model still bound to an agent configuration",
-        content = @Content(schema = @Schema(hidden = true))
-    )
+            responseCode = "409",
+            description = "Cannot delete a model still bound to an agent configuration",
+            content = @Content(schema = @Schema(hidden = true)))
     @Audited(ledger = AuditLedger.AUTH_EVENT, type = "LLM_MODEL_DELETED")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         modelService.delete(id);
@@ -153,20 +134,16 @@ public class LlmModelAdminController {
     @PutMapping("/models/{id}/price")
     @Operation(summary = "Reprice a model", operationId = "adminUpdateLlmModelPrice")
     @ApiResponse(
-        responseCode = "200",
-        description = "OK",
-        content = @Content(schema = @Schema(implementation = LlmModelDTO.class))
-    )
+            responseCode = "200",
+            description = "OK",
+            content = @Content(schema = @Schema(implementation = LlmModelDTO.class)))
     @ApiResponse(
-        responseCode = "404",
-        description = "LLM model not found",
-        content = @Content(schema = @Schema(hidden = true))
-    )
+            responseCode = "404",
+            description = "LLM model not found",
+            content = @Content(schema = @Schema(hidden = true)))
     @Audited(ledger = AuditLedger.AUTH_EVENT, type = "LLM_MODEL_PRICE_CHANGED")
     public ResponseEntity<LlmModelDTO> updatePrice(
-        @PathVariable Long id,
-        @Valid @RequestBody UpdateLlmModelPriceRequestDTO request
-    ) {
+            @PathVariable Long id, @Valid @RequestBody UpdateLlmModelPriceRequestDTO request) {
         modelService.updatePrice(id, request);
         return ResponseEntity.ok(toDTO(modelService.get(id)));
     }
@@ -174,28 +151,21 @@ public class LlmModelAdminController {
     @PutMapping("/models/{id}/sharing")
     @Operation(summary = "Share a model with all or selected workspaces", operationId = "adminUpdateLlmModelSharing")
     @ApiResponse(
-        responseCode = "200",
-        description = "OK",
-        content = @Content(schema = @Schema(implementation = LlmModelDTO.class))
-    )
+            responseCode = "200",
+            description = "OK",
+            content = @Content(schema = @Schema(implementation = LlmModelDTO.class)))
     @ApiResponse(
-        responseCode = "404",
-        description = "LLM model not found",
-        content = @Content(schema = @Schema(hidden = true))
-    )
+            responseCode = "404",
+            description = "LLM model not found",
+            content = @Content(schema = @Schema(hidden = true)))
     @Audited(ledger = AuditLedger.AUTH_EVENT, type = "LLM_MODEL_SHARING_CHANGED")
     public ResponseEntity<LlmModelDTO> updateSharing(
-        @PathVariable Long id,
-        @Valid @RequestBody UpdateLlmModelSharingRequestDTO request
-    ) {
+            @PathVariable Long id, @Valid @RequestBody UpdateLlmModelSharingRequestDTO request) {
         return ResponseEntity.ok(toDTO(modelService.updateSharing(id, request)));
     }
 
     private LlmModelDTO toDTO(LlmModel model) {
         return LlmModelDTO.from(
-            model,
-            modelService.currentPrice(model.getId()),
-            modelService.grantedWorkspaceIds(model.getId())
-        );
+                model, modelService.currentPrice(model.getId()), modelService.grantedWorkspaceIds(model.getId()));
     }
 }

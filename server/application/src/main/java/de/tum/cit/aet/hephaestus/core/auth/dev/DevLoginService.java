@@ -53,13 +53,12 @@ public class DevLoginService {
     private final Duration sessionMaxLifetime;
 
     public DevLoginService(
-        AuthProperties authProperties,
-        AccountRepository accountRepository,
-        JwtPrincipalFactory principalFactory,
-        HephaestusJwtIssuer jwtIssuer,
-        Clock clock,
-        Environment environment
-    ) {
+            AuthProperties authProperties,
+            AccountRepository accountRepository,
+            JwtPrincipalFactory principalFactory,
+            HephaestusJwtIssuer jwtIssuer,
+            Clock clock,
+            Environment environment) {
         this.enabled = authProperties.devLoginEnabled();
         this.accountRepository = accountRepository;
         this.principalFactory = principalFactory;
@@ -72,16 +71,13 @@ public class DevLoginService {
         // prod (application.yml). The same idiom guards JwtSigningKeyService / AuthSecurityConfig.
         if (enabled && environment.acceptsProfiles(Profiles.of("prod"))) {
             throw new IllegalStateException(
-                "hephaestus.auth.dev-login-enabled must NOT be true under the 'prod' profile — " +
-                    "a passwordless sign-in is fail-closed in production."
-            );
+                    "hephaestus.auth.dev-login-enabled must NOT be true under the 'prod' profile — "
+                            + "a passwordless sign-in is fail-closed in production.");
         }
         if (enabled) {
-            log.warn(
-                "auth.dev-login: PASSWORDLESS dev sign-in POST /auth/dev-login is ENABLED " +
-                    "(hephaestus.auth.dev-login-enabled=true). For local dev / E2E only — NEVER on an " +
-                    "internet-exposed deployment."
-            );
+            log.warn("auth.dev-login: PASSWORDLESS dev sign-in POST /auth/dev-login is ENABLED "
+                    + "(hephaestus.auth.dev-login-enabled=true). For local dev / E2E only — NEVER on an "
+                    + "internet-exposed deployment.");
         }
     }
 
@@ -102,23 +98,17 @@ public class DevLoginService {
      */
     @Transactional
     public HephaestusJwtIssuer.Token devLogin(
-        String username,
-        @Nullable String displayName,
-        boolean admin,
-        @Nullable HttpServletRequest request
-    ) {
+            String username, @Nullable String displayName, boolean admin, @Nullable HttpServletRequest request) {
         if (!enabled) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND);
         }
         String email = username.trim().toLowerCase(Locale.ROOT) + DEV_EMAIL_DOMAIN;
-        Account account = accountRepository
-            .findByPrimaryEmail(email)
-            .orElseGet(() -> {
-                Account fresh = new Account(displayName != null && !displayName.isBlank() ? displayName : username);
-                fresh.setPrimaryEmail(email);
-                fresh.setAppRole(admin ? Account.AppRole.APP_ADMIN : Account.AppRole.USER);
-                return accountRepository.save(fresh);
-            });
+        Account account = accountRepository.findByPrimaryEmail(email).orElseGet(() -> {
+            Account fresh = new Account(displayName != null && !displayName.isBlank() ? displayName : username);
+            fresh.setPrimaryEmail(email);
+            fresh.setAppRole(admin ? Account.AppRole.APP_ADMIN : Account.AppRole.USER);
+            return accountRepository.save(fresh);
+        });
         if (admin && account.getAppRole() != Account.AppRole.APP_ADMIN) {
             account.setAppRole(Account.AppRole.APP_ADMIN);
             account = accountRepository.save(account);
@@ -128,11 +118,10 @@ public class DevLoginService {
         // can't be silently kept alive past sessionMaxLifetime by the rolling refresh (OWASP absolute
         // timeout). Reuses the identical issuer seam, so the token stays issued_jwt-backed and revocable.
         return jwtIssuer.issue(
-            principalFactory.forAccountId(Objects.requireNonNull(account.getId())),
-            /* impersonator */ null,
-            /* impersonationExpiresAt */ null,
-            clock.instant().plus(sessionMaxLifetime),
-            request
-        );
+                principalFactory.forAccountId(Objects.requireNonNull(account.getId())),
+                /* impersonator */ null,
+                /* impersonationExpiresAt */ null,
+                clock.instant().plus(sessionMaxLifetime),
+                request);
     }
 }

@@ -23,8 +23,7 @@ public class GitlabWebhookSecretSource implements WebhookSecretSource {
     private final byte[] sharedSecretBytes;
 
     public GitlabWebhookSecretSource(@Value("${hephaestus.webhook.secret:}") String sharedSecret) {
-        this.sharedSecretBytes =
-            sharedSecret == null || sharedSecret.isBlank()
+        this.sharedSecretBytes = sharedSecret == null || sharedSecret.isBlank()
                 ? new byte[0]
                 : sharedSecret.getBytes(StandardCharsets.UTF_8);
     }

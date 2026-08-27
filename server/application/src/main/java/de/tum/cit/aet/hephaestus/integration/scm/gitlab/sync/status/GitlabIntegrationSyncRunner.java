@@ -26,9 +26,7 @@ public class GitlabIntegrationSyncRunner implements IntegrationSyncRunner {
     private final GitLabHistoricalBackfillService backfillService;
 
     public GitlabIntegrationSyncRunner(
-        GitlabDataSyncScheduler dataSyncScheduler,
-        GitLabHistoricalBackfillService backfillService
-    ) {
+            GitlabDataSyncScheduler dataSyncScheduler, GitLabHistoricalBackfillService backfillService) {
         this.dataSyncScheduler = dataSyncScheduler;
         this.backfillService = backfillService;
     }

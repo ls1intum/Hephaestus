@@ -26,14 +26,12 @@ public interface ProjectItemRepository extends JpaRepository<ProjectItem, Long> 
      * @param nodeId the GitHub GraphQL node ID
      * @return the item if found
      */
-    @Query(
-        """
+    @Query("""
         SELECT i
         FROM ProjectItem i
         LEFT JOIN FETCH i.issue
         WHERE i.project.id = :projectId AND i.nodeId = :nodeId
-        """
-    )
+        """)
     Optional<ProjectItem> findByProjectIdAndNodeId(@Param("projectId") Long projectId, @Param("nodeId") String nodeId);
 
     /**
@@ -102,13 +100,11 @@ public interface ProjectItemRepository extends JpaRepository<ProjectItem, Long> 
      */
     @Modifying
     @Query(
-        "DELETE FROM ProjectItem i WHERE i.project.id = :projectId AND i.contentType = :contentType AND i.nodeId NOT IN :nodeIds AND i.archived = false"
-    )
+            "DELETE FROM ProjectItem i WHERE i.project.id = :projectId AND i.contentType = :contentType AND i.nodeId NOT IN :nodeIds AND i.archived = false")
     int deleteByProjectIdAndContentTypeAndNodeIdNotIn(
-        @Param("projectId") Long projectId,
-        @Param("contentType") ProjectItem.ContentType contentType,
-        @Param("nodeIds") List<String> nodeIds
-    );
+            @Param("projectId") Long projectId,
+            @Param("contentType") ProjectItem.ContentType contentType,
+            @Param("nodeIds") List<String> nodeIds);
 
     /**
      * Deletes all non-archived items of a specific content type for a project.
@@ -124,12 +120,9 @@ public interface ProjectItemRepository extends JpaRepository<ProjectItem, Long> 
      */
     @Modifying
     @Query(
-        "DELETE FROM ProjectItem i WHERE i.project.id = :projectId AND i.contentType = :contentType AND i.archived = false"
-    )
+            "DELETE FROM ProjectItem i WHERE i.project.id = :projectId AND i.contentType = :contentType AND i.archived = false")
     int deleteByProjectIdAndContentType(
-        @Param("projectId") Long projectId,
-        @Param("contentType") ProjectItem.ContentType contentType
-    );
+            @Param("projectId") Long projectId, @Param("contentType") ProjectItem.ContentType contentType);
 
     /**
      * Atomically inserts or updates a project item (race-condition safe).
@@ -141,8 +134,7 @@ public interface ProjectItemRepository extends JpaRepository<ProjectItem, Long> 
      */
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Transactional
-    @Query(
-        value = """
+    @Query(value = """
         INSERT INTO project_item (
             native_id, provider_id, node_id, project_id, content_type, issue_id, content_database_id,
             draft_title, draft_body, archived, creator_id, created_at, updated_at
@@ -161,24 +153,21 @@ public interface ProjectItemRepository extends JpaRepository<ProjectItem, Long> 
             creator_id = COALESCE(EXCLUDED.creator_id, project_item.creator_id),
             created_at = COALESCE(project_item.created_at, EXCLUDED.created_at),
             updated_at = EXCLUDED.updated_at
-        """,
-        nativeQuery = true
-    )
+        """, nativeQuery = true)
     int upsertCore(
-        @Param("nativeId") Long nativeId,
-        @Param("providerId") Long providerId,
-        @Param("nodeId") String nodeId,
-        @Param("projectId") Long projectId,
-        @Param("contentType") String contentType,
-        @Param("issueId") @Nullable Long issueId,
-        @Param("contentDatabaseId") @Nullable Long contentDatabaseId,
-        @Param("draftTitle") @Nullable String draftTitle,
-        @Param("draftBody") @Nullable String draftBody,
-        @Param("archived") boolean archived,
-        @Param("creatorId") @Nullable Long creatorId,
-        @Param("createdAt") @Nullable Instant createdAt,
-        @Param("updatedAt") @Nullable Instant updatedAt
-    );
+            @Param("nativeId") Long nativeId,
+            @Param("providerId") Long providerId,
+            @Param("nodeId") String nodeId,
+            @Param("projectId") Long projectId,
+            @Param("contentType") String contentType,
+            @Param("issueId") @Nullable Long issueId,
+            @Param("contentDatabaseId") @Nullable Long contentDatabaseId,
+            @Param("draftTitle") @Nullable String draftTitle,
+            @Param("draftBody") @Nullable String draftBody,
+            @Param("archived") boolean archived,
+            @Param("creatorId") @Nullable Long creatorId,
+            @Param("createdAt") @Nullable Instant createdAt,
+            @Param("updatedAt") @Nullable Instant updatedAt);
 
     /**
      * Relinks orphaned project items to their issues after issue sync completes.
@@ -192,17 +181,14 @@ public interface ProjectItemRepository extends JpaRepository<ProjectItem, Long> 
      */
     @Modifying
     @Transactional
-    @Query(
-        value = """
+    @Query(value = """
         UPDATE project_item pi
         SET issue_id = pi.content_database_id
         WHERE pi.issue_id IS NULL
           AND pi.content_database_id IS NOT NULL
           AND pi.content_type IN ('ISSUE', 'PULL_REQUEST')
           AND EXISTS (SELECT 1 FROM issue i WHERE i.id = pi.content_database_id)
-        """,
-        nativeQuery = true
-    )
+        """, nativeQuery = true)
     int relinkOrphanedItems();
 
     /**
@@ -222,13 +208,11 @@ public interface ProjectItemRepository extends JpaRepository<ProjectItem, Long> 
      */
     @Modifying
     @Query(
-        "DELETE FROM ProjectItem i WHERE i.project.id = :projectId AND i.contentType IN :contentTypes AND i.nodeId NOT IN :nodeIds AND i.archived = false"
-    )
+            "DELETE FROM ProjectItem i WHERE i.project.id = :projectId AND i.contentType IN :contentTypes AND i.nodeId NOT IN :nodeIds AND i.archived = false")
     int deleteByProjectIdAndContentTypeInAndNodeIdNotIn(
-        @Param("projectId") Long projectId,
-        @Param("contentTypes") List<ProjectItem.ContentType> contentTypes,
-        @Param("nodeIds") List<String> nodeIds
-    );
+            @Param("projectId") Long projectId,
+            @Param("contentTypes") List<ProjectItem.ContentType> contentTypes,
+            @Param("nodeIds") List<String> nodeIds);
 
     /**
      * Deletes all non-archived items of specific content types for a project.
@@ -244,10 +228,7 @@ public interface ProjectItemRepository extends JpaRepository<ProjectItem, Long> 
      */
     @Modifying
     @Query(
-        "DELETE FROM ProjectItem i WHERE i.project.id = :projectId AND i.contentType IN :contentTypes AND i.archived = false"
-    )
+            "DELETE FROM ProjectItem i WHERE i.project.id = :projectId AND i.contentType IN :contentTypes AND i.archived = false")
     int deleteByProjectIdAndContentTypeIn(
-        @Param("projectId") Long projectId,
-        @Param("contentTypes") List<ProjectItem.ContentType> contentTypes
-    );
+            @Param("projectId") Long projectId, @Param("contentTypes") List<ProjectItem.ContentType> contentTypes);
 }

@@ -27,36 +27,35 @@ import org.jspecify.annotations.Nullable;
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record GitHubProjectItemEventDTO(
-    @JsonProperty("action") String action,
-    @JsonProperty("projects_v2_item") GitHubProjectItemDTO item,
-    @JsonProperty("changes") Changes changes,
-    @JsonProperty("organization") GitHubOrganizationEventDTO.GitHubOrganizationDTO organization,
-    @JsonProperty("repository") GitHubRepositoryRefDTO repository,
-    @JsonProperty("sender") GitHubUserDTO sender
-) {
+        @JsonProperty("action") String action,
+        @JsonProperty("projects_v2_item") GitHubProjectItemDTO item,
+        @JsonProperty("changes") Changes changes,
+        @JsonProperty("organization") GitHubOrganizationEventDTO.GitHubOrganizationDTO organization,
+        @JsonProperty("repository") GitHubRepositoryRefDTO repository,
+        @JsonProperty("sender") GitHubUserDTO sender) {
     /**
      * Changes made to the item. Only present for certain actions.
      */
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record Changes(
-        @JsonProperty("field_value") FieldValueChange fieldValue,
-        @JsonProperty("archived_at") ArchivedAtChange archivedAt
-    ) {}
+            @JsonProperty("field_value") FieldValueChange fieldValue,
+            @JsonProperty("archived_at") ArchivedAtChange archivedAt) {}
 
     /**
      * Change to a field value.
      */
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record FieldValueChange(
-        @JsonProperty("field_node_id") String fieldNodeId,
-        @JsonProperty("field_type") String fieldType
-    ) {}
+            @JsonProperty("field_node_id") String fieldNodeId,
+            @JsonProperty("field_type") String fieldType) {}
 
     /**
      * Change to archived status.
      */
     @JsonIgnoreProperties(ignoreUnknown = true)
-    public record ArchivedAtChange(@JsonProperty("from") String from, @JsonProperty("to") String to) {}
+    public record ArchivedAtChange(
+            @JsonProperty("from") String from,
+            @JsonProperty("to") String to) {}
 
     /**
      * Detects the owner type from the webhook payload fields.

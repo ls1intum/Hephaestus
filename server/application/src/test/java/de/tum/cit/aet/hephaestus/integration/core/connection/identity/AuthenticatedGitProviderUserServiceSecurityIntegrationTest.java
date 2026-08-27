@@ -62,10 +62,7 @@ class AuthenticatedGitProviderUserServiceSecurityIntegrationTest extends BaseInt
         // Observable DB state: the actor binding is unchanged (read straight from the row, not the
         // persistence context, so a stale first-level cache cannot mask a real overwrite).
         Long persistedActorId = jdbcTemplate.queryForObject(
-            "SELECT external_actor_id FROM identity_link WHERE id = ?",
-            Long.class,
-            linkId
-        );
+                "SELECT external_actor_id FROM identity_link WHERE id = ?", Long.class, linkId);
         assertThat(persistedActorId).isEqualTo(1000L);
     }
 
@@ -86,10 +83,7 @@ class AuthenticatedGitProviderUserServiceSecurityIntegrationTest extends BaseInt
 
         assertThat(updated).isEqualTo(1);
         Long persistedActorId = jdbcTemplate.queryForObject(
-            "SELECT external_actor_id FROM identity_link WHERE id = ?",
-            Long.class,
-            linkId
-        );
+                "SELECT external_actor_id FROM identity_link WHERE id = ?", Long.class, linkId);
         assertThat(persistedActorId).isEqualTo(3000L);
     }
 }

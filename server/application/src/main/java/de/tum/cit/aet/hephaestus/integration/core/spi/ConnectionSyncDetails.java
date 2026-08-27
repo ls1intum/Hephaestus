@@ -27,13 +27,12 @@ import org.jspecify.annotations.Nullable;
  *                                resource
  */
 public record ConnectionSyncDetails(
-    @Nullable Boolean webhookRegistered,
-    @Nullable Instant nextScheduledSyncAt,
-    @Nullable Duration syncInterval,
-    @Nullable RateLimitSnapshot rateLimit,
-    @Nullable BackfillSummary backfill,
-    boolean vendorHealthDegraded
-) {
+        @Nullable Boolean webhookRegistered,
+        @Nullable Instant nextScheduledSyncAt,
+        @Nullable Duration syncInterval,
+        @Nullable RateLimitSnapshot rateLimit,
+        @Nullable BackfillSummary backfill,
+        boolean vendorHealthDegraded) {
     public static ConnectionSyncDetails empty() {
         return new ConnectionSyncDetails(null, null, null, null, null, false);
     }

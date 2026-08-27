@@ -34,16 +34,15 @@ class WebhookPayloadCapacityCheck {
         long publishable = connection.getMaxPayload();
         if (publishable > 0 && accepted > publishable) {
             log.error(
-                "The receiver accepts webhooks up to {} bytes but this NATS server caps a message at {}: " +
-                    "every delivery between the two is verified, accepted, and then lost at publish. " +
-                    "Raise max_payload on the broker to at least {}, or lower " +
-                    "hephaestus.webhook.http.max-payload-bytes to {} so oversize deliveries are refused " +
-                    "at the edge instead.",
-                accepted,
-                publishable,
-                accepted,
-                publishable
-            );
+                    "The receiver accepts webhooks up to {} bytes but this NATS server caps a message at {}: "
+                            + "every delivery between the two is verified, accepted, and then lost at publish. "
+                            + "Raise max_payload on the broker to at least {}, or lower "
+                            + "hephaestus.webhook.http.max-payload-bytes to {} so oversize deliveries are refused "
+                            + "at the edge instead.",
+                    accepted,
+                    publishable,
+                    accepted,
+                    publishable);
         }
     }
 }

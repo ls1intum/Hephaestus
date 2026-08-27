@@ -20,21 +20,19 @@ public class JavaJwtWorkerJwtVerifier implements WorkerJwtVerifier {
     private final MeterRegistry meterRegistry;
 
     public JavaJwtWorkerJwtVerifier(
-        WorkerKeyRing keyRing,
-        WorkerTokenProperties properties,
-        WorkerTokenDenylistService denylist,
-        MeterRegistry meterRegistry
-    ) {
+            WorkerKeyRing keyRing,
+            WorkerTokenProperties properties,
+            WorkerTokenDenylistService denylist,
+            MeterRegistry meterRegistry) {
         Map<String, JWTVerifier> map = new HashMap<>();
         for (WorkerSigningKey key : keyRing.all()) {
             map.put(
-                key.kid(),
-                JWT.require(Algorithm.RSA256(key.publicKey(), null))
-                    .withIssuer(properties.issuer())
-                    .withAudience(properties.audience())
-                    .acceptLeeway(5)
-                    .build()
-            );
+                    key.kid(),
+                    JWT.require(Algorithm.RSA256(key.publicKey(), null))
+                            .withIssuer(properties.issuer())
+                            .withAudience(properties.audience())
+                            .acceptLeeway(5)
+                            .build());
         }
         this.verifiersByKid = Map.copyOf(map);
         this.denylist = denylist;
@@ -48,7 +46,9 @@ public class JavaJwtWorkerJwtVerifier implements WorkerJwtVerifier {
             meterRegistry.counter(AUDIT_METRIC, "outcome", "success").increment();
             return jwt;
         } catch (WorkerJwtInvalidException e) {
-            meterRegistry.counter(AUDIT_METRIC, "outcome", "failed", "reason", e.getReasonTag()).increment();
+            meterRegistry
+                    .counter(AUDIT_METRIC, "outcome", "failed", "reason", e.getReasonTag())
+                    .increment();
             throw e;
         }
     }

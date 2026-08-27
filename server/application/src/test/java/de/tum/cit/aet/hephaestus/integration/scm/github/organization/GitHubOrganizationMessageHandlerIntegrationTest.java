@@ -10,7 +10,6 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.Organizatio
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.OrganizationRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
-import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubEventType;
 import de.tum.cit.aet.hephaestus.integration.scm.github.organization.dto.GitHubOrganizationEventDTO;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
@@ -63,10 +62,9 @@ class GitHubOrganizationMessageHandlerIntegrationTest extends BaseIntegrationTes
     private void setupTestData() {
         // Create GitHub provider (required by the handler)
         githubProvider = gitProviderRepository
-            .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
-            .orElseGet(() ->
-                gitProviderRepository.save(new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com"))
-            );
+                .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
+                .orElseGet(() -> gitProviderRepository.save(
+                        new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com")));
 
         // Create organization
         testOrganization = new Organization();
@@ -107,9 +105,9 @@ class GitHubOrganizationMessageHandlerIntegrationTest extends BaseIntegrationTes
         assertThat(organizationRepository.findById(testOrganization.getId())).isPresent();
         // User should be created if membership contains user info
         if (event.membership() != null && event.membership().user() != null) {
-            assertThat(
-                userRepository.findByNativeIdAndProviderId(required(event.membership().user().id()), githubProviderId())
-            ).isPresent();
+            assertThat(userRepository.findByNativeIdAndProviderId(
+                            required(event.membership().user().id()), githubProviderId()))
+                    .isPresent();
         }
     }
 
@@ -145,12 +143,12 @@ class GitHubOrganizationMessageHandlerIntegrationTest extends BaseIntegrationTes
 
         // Then - organization should reflect new name
         assertThat(organizationRepository.findById(testOrganization.getId()))
-            .isPresent()
-            .get()
-            .satisfies(org -> {
-                // The handler should update the organization login
-                assertThat(org.getLogin()).isEqualTo(event.organization().login());
-            });
+                .isPresent()
+                .get()
+                .satisfies(org -> {
+                    // The handler should update the organization login
+                    assertThat(org.getLogin()).isEqualTo(event.organization().login());
+                });
     }
 
     private GitHubOrganizationEventDTO loadPayload(String filename) throws IOException {

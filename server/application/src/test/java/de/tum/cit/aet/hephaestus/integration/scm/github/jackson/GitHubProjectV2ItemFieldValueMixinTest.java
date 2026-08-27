@@ -4,16 +4,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHProjectV2ItemFieldDateValue;
-import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHProjectV2ItemFieldIterationValue;
-import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHProjectV2ItemFieldLabelValue;
-import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHProjectV2ItemFieldMilestoneValue;
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHProjectV2ItemFieldNumberValue;
-import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHProjectV2ItemFieldPullRequestValue;
-import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHProjectV2ItemFieldRepositoryValue;
-import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHProjectV2ItemFieldReviewerValue;
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHProjectV2ItemFieldSingleSelectValue;
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHProjectV2ItemFieldTextValue;
-import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHProjectV2ItemFieldUserValue;
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHProjectV2ItemFieldValue;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
@@ -39,32 +32,30 @@ class GitHubProjectV2ItemFieldValueMixinTest {
     void setUp() {
         // GitHub responses omit numeric fields like iteration.duration; allow nulls for primitives.
         objectMapper = JsonMapper.builder()
-            .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
-            .disable(DeserializationFeature.FAIL_ON_NULL_FOR_PRIMITIVES)
-            .enable(DeserializationFeature.USE_LONG_FOR_INTS)
-            .addMixIn(GHProjectV2ItemFieldValue.class, GitHubProjectV2ItemFieldValueMixin.class)
-            .build();
+                .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
+                .disable(DeserializationFeature.FAIL_ON_NULL_FOR_PRIMITIVES)
+                .enable(DeserializationFeature.USE_LONG_FOR_INTS)
+                .addMixIn(GHProjectV2ItemFieldValue.class, GitHubProjectV2ItemFieldValueMixin.class)
+                .build();
     }
 
     @Nested
     class PolymorphicDeserialization {
 
         @ParameterizedTest(name = "__typename={0} -> {1}")
-        @CsvSource(
-            {
-                "ProjectV2ItemFieldTextValue, GHProjectV2ItemFieldTextValue",
-                "ProjectV2ItemFieldNumberValue, GHProjectV2ItemFieldNumberValue",
-                "ProjectV2ItemFieldDateValue, GHProjectV2ItemFieldDateValue",
-                "ProjectV2ItemFieldSingleSelectValue, GHProjectV2ItemFieldSingleSelectValue",
-                "ProjectV2ItemFieldIterationValue, GHProjectV2ItemFieldIterationValue",
-                "ProjectV2ItemFieldLabelValue, GHProjectV2ItemFieldLabelValue",
-                "ProjectV2ItemFieldMilestoneValue, GHProjectV2ItemFieldMilestoneValue",
-                "ProjectV2ItemFieldPullRequestValue, GHProjectV2ItemFieldPullRequestValue",
-                "ProjectV2ItemFieldRepositoryValue, GHProjectV2ItemFieldRepositoryValue",
-                "ProjectV2ItemFieldReviewerValue, GHProjectV2ItemFieldReviewerValue",
-                "ProjectV2ItemFieldUserValue, GHProjectV2ItemFieldUserValue",
-            }
-        )
+        @CsvSource({
+            "ProjectV2ItemFieldTextValue, GHProjectV2ItemFieldTextValue",
+            "ProjectV2ItemFieldNumberValue, GHProjectV2ItemFieldNumberValue",
+            "ProjectV2ItemFieldDateValue, GHProjectV2ItemFieldDateValue",
+            "ProjectV2ItemFieldSingleSelectValue, GHProjectV2ItemFieldSingleSelectValue",
+            "ProjectV2ItemFieldIterationValue, GHProjectV2ItemFieldIterationValue",
+            "ProjectV2ItemFieldLabelValue, GHProjectV2ItemFieldLabelValue",
+            "ProjectV2ItemFieldMilestoneValue, GHProjectV2ItemFieldMilestoneValue",
+            "ProjectV2ItemFieldPullRequestValue, GHProjectV2ItemFieldPullRequestValue",
+            "ProjectV2ItemFieldRepositoryValue, GHProjectV2ItemFieldRepositoryValue",
+            "ProjectV2ItemFieldReviewerValue, GHProjectV2ItemFieldReviewerValue",
+            "ProjectV2ItemFieldUserValue, GHProjectV2ItemFieldUserValue",
+        })
         void shouldDeserializeToCorrectType(String typename, String expectedClassName) throws Exception {
             String json = "{\"__typename\": \"" + typename + "\"}";
 
@@ -111,10 +102,8 @@ class GitHubProjectV2ItemFieldValueMixinTest {
                 ]
                 """;
 
-            List<GHProjectV2ItemFieldValue> results = objectMapper.readValue(
-                json,
-                new TypeReference<List<GHProjectV2ItemFieldValue>>() {}
-            );
+            List<GHProjectV2ItemFieldValue> results =
+                    objectMapper.readValue(json, new TypeReference<List<GHProjectV2ItemFieldValue>>() {});
 
             assertThat(results).hasSize(4);
             assertThat(results.get(0)).isInstanceOf(GHProjectV2ItemFieldTextValue.class);

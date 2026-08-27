@@ -45,8 +45,7 @@ class GithubSubjectKeyDeriverTest extends BaseUnitTest {
         // monitored-repo filter (pinned to the OLD name) nor the org filter, so the event — and every
         // later event for that repo — would be silently ACK-dropped.
         JsonNode payload = objectMapper.readTree(
-            "{\"action\":\"renamed\",\"repository\":{\"name\":\"web-renamed\",\"owner\":{\"login\":\"acme\"}}}"
-        );
+                "{\"action\":\"renamed\",\"repository\":{\"name\":\"web-renamed\",\"owner\":{\"login\":\"acme\"}}}");
         String subject = deriver.deriveSubject(payload, Map.of("X-GitHub-Event", "repository"));
 
         assertThat(subject).isEqualTo("github.acme.?.repository");
@@ -54,9 +53,8 @@ class GithubSubjectKeyDeriverTest extends BaseUnitTest {
 
     @Test
     void repositoryLifecycleEventFallsBackToOrganizationLoginForOwner() throws Exception {
-        JsonNode payload = objectMapper.readTree(
-            "{\"repository\":{\"name\":\"web\"},\"organization\":{\"login\":\"acme\"}}"
-        );
+        JsonNode payload =
+                objectMapper.readTree("{\"repository\":{\"name\":\"web\"},\"organization\":{\"login\":\"acme\"}}");
         String subject = deriver.deriveSubject(payload, Map.of("X-GitHub-Event", "repository"));
 
         assertThat(subject).isEqualTo("github.acme.?.repository");
@@ -66,20 +64,17 @@ class GithubSubjectKeyDeriverTest extends BaseUnitTest {
     void nonLifecycleEventsKeepTheRepositoryTier() throws Exception {
         JsonNode payload = objectMapper.readTree("{\"repository\":{\"name\":\"web\",\"owner\":{\"login\":\"acme\"}}}");
 
-        assertThat(deriver.deriveSubject(payload, Map.of("X-GitHub-Event", "issues"))).isEqualTo(
-            "github.acme.web.issues"
-        );
+        assertThat(deriver.deriveSubject(payload, Map.of("X-GitHub-Event", "issues")))
+                .isEqualTo("github.acme.web.issues");
         // `repositories` / `installation_repositories` must NOT be caught by the prefix-free match.
-        assertThat(deriver.deriveSubject(payload, Map.of("X-GitHub-Event", "installation_repositories"))).isEqualTo(
-            "github.acme.web.installation_repositories"
-        );
+        assertThat(deriver.deriveSubject(payload, Map.of("X-GitHub-Event", "installation_repositories")))
+                .isEqualTo("github.acme.web.installation_repositories");
     }
 
     @Test
     void sanitizesDotsInTokens() throws Exception {
-        JsonNode payload = objectMapper.readTree(
-            "{\"repository\":{\"name\":\"my.repo\",\"owner\":{\"login\":\"team.x\"}}}"
-        );
+        JsonNode payload =
+                objectMapper.readTree("{\"repository\":{\"name\":\"my.repo\",\"owner\":{\"login\":\"team.x\"}}}");
         String subject = deriver.deriveSubject(payload, Map.of("X-GitHub-Event", "push"));
 
         assertThat(subject).isEqualTo("github.team~x.my~repo.push");

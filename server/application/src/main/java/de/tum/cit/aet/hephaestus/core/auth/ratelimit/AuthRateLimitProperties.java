@@ -30,13 +30,12 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  */
 @ConfigurationProperties(prefix = "hephaestus.auth.rate-limit")
 public record AuthRateLimitProperties(
-    @DefaultValue("true") boolean enabled,
-    @DefaultValue Limit oauthAuthorization,
-    @DefaultValue Limit refresh,
-    @DefaultValue Limit impersonate,
-    @DefaultValue Limit deleteUser,
-    @DefaultValue Limit export
-) {
+        @DefaultValue("true") boolean enabled,
+        @DefaultValue Limit oauthAuthorization,
+        @DefaultValue Limit refresh,
+        @DefaultValue Limit impersonate,
+        @DefaultValue Limit deleteUser,
+        @DefaultValue Limit export) {
     public AuthRateLimitProperties {
         // Bind nulls (a partially-specified YAML block) to the spec defaults so a misconfigured
         // sub-key never silently disables a limit.
@@ -55,7 +54,9 @@ public record AuthRateLimitProperties(
      * @param capacity max requests permitted within one {@code period}; must be {@code >= 1}.
      * @param period   refill window; must be positive.
      */
-    public record Limit(@DefaultValue("20") long capacity, @DefaultValue("1m") Duration period) {
+    public record Limit(
+            @DefaultValue("20") long capacity,
+            @DefaultValue("1m") Duration period) {
         public Limit {
             if (capacity < 1) {
                 throw new IllegalArgumentException("rate-limit capacity must be >= 1, got: " + capacity);

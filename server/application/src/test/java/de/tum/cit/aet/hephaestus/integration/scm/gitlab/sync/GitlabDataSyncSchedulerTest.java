@@ -88,66 +88,59 @@ class GitlabDataSyncSchedulerTest extends BaseUnitTest {
     @BeforeEach
     void setUp() {
         SyncSchedulerProperties syncProps = new SyncSchedulerProperties(
-            true,
-            7,
-            "0 0 3 * * *",
-            15,
-            new SyncSchedulerProperties.BackfillProperties(false, 50, 100, 60),
-            new SyncSchedulerProperties.FilterProperties(Set.of(), Set.of(), Set.of()),
-            new SyncSchedulerProperties.DiscussionsProperties(false),
-            new SyncSchedulerProperties.ProjectsProperties(false)
-        );
+                true,
+                7,
+                "0 0 3 * * *",
+                15,
+                new SyncSchedulerProperties.BackfillProperties(false, 50, 100, 60),
+                new SyncSchedulerProperties.FilterProperties(Set.of(), Set.of(), Set.of()),
+                new SyncSchedulerProperties.DiscussionsProperties(false),
+                new SyncSchedulerProperties.ProjectsProperties(false));
 
         // A synchronous Executor so CompletableFuture.runAsync completes inline — no thread races
         // to coordinate in assertions.
         Executor synchronousExecutor = Runnable::run;
 
         scheduler = new GitlabDataSyncScheduler(
-            syncTargetProvider,
-            syncContextProvider,
-            organizationRepository,
-            repositoryRepository,
-            syncServiceHolderProvider,
-            rateLimitTrackerProvider,
-            syncProps,
-            synchronousExecutor,
-            connectionRepository,
-            syncJobService,
-            deletionSweepService
-        );
+                syncTargetProvider,
+                syncContextProvider,
+                organizationRepository,
+                repositoryRepository,
+                syncServiceHolderProvider,
+                rateLimitTrackerProvider,
+                syncProps,
+                synchronousExecutor,
+                connectionRepository,
+                syncJobService,
+                deletionSweepService);
 
         // syncScope's first real step: no GitLabSyncServiceHolder available -> it logs and returns
         // immediately. This isolates the job-recording wrapper from the sync pipeline itself.
         lenient().when(syncServiceHolderProvider.getIfAvailable()).thenReturn(null);
 
         session = new SyncSession(
-            WORKSPACE_ID,
-            "my-workspace",
-            "My Workspace",
-            "my-group",
-            null,
-            "https://gitlab.com",
-            List.of(),
-            new SyncContextProvider.SyncContext(WORKSPACE_ID, "my-workspace", "My Workspace", null)
-        );
-        lenient().when(syncTargetProvider.getSyncSessions(IntegrationKind.GITLAB)).thenReturn(List.of(session));
+                WORKSPACE_ID,
+                "my-workspace",
+                "My Workspace",
+                "my-group",
+                null,
+                "https://gitlab.com",
+                List.of(),
+                new SyncContextProvider.SyncContext(WORKSPACE_ID, "my-workspace", "My Workspace", null));
+        lenient()
+                .when(syncTargetProvider.getSyncSessions(IntegrationKind.GITLAB))
+                .thenReturn(List.of(session));
     }
 
     private Connection activeGitLabConnection() {
         Workspace workspace = new Workspace();
         ReflectionTestUtils.setField(workspace, "id", WORKSPACE_ID);
         Connection connection = new Connection(
-            workspace,
-            IntegrationKind.GITLAB,
-            "gitlab.com:1",
-            new ConnectionConfig.GitLabConfig(
-                "https://gitlab.com",
-                1L,
-                null,
-                ConnectionConfig.GitLabConfig.SigningMode.PLAINTEXT,
-                Set.of()
-            )
-        );
+                workspace,
+                IntegrationKind.GITLAB,
+                "gitlab.com:1",
+                new ConnectionConfig.GitLabConfig(
+                        "https://gitlab.com", 1L, null, ConnectionConfig.GitLabConfig.SigningMode.PLAINTEXT, Set.of()));
         ReflectionTestUtils.setField(connection, "id", CONNECTION_ID);
         return connection;
     }
@@ -155,13 +148,9 @@ class GitlabDataSyncSchedulerTest extends BaseUnitTest {
     @Test
     void shouldRecordJobWhenActiveConnectionExists() {
         Connection connection = activeGitLabConnection();
-        when(
-            connectionRepository.findFirstByWorkspaceIdAndKindAndStateOrderByCreatedAtDesc(
-                WORKSPACE_ID,
-                IntegrationKind.GITLAB,
-                IntegrationState.ACTIVE
-            )
-        ).thenReturn(Optional.of(connection));
+        when(connectionRepository.findFirstByWorkspaceIdAndKindAndStateOrderByCreatedAtDesc(
+                        WORKSPACE_ID, IntegrationKind.GITLAB, IntegrationState.ACTIVE))
+                .thenReturn(Optional.of(connection));
 
         scheduler.syncDataCron();
 
@@ -178,20 +167,16 @@ class GitlabDataSyncSchedulerTest extends BaseUnitTest {
     @Test
     void shouldRunBodyThroughJobTemplate() {
         Connection connection = activeGitLabConnection();
-        when(
-            connectionRepository.findFirstByWorkspaceIdAndKindAndStateOrderByCreatedAtDesc(
-                WORKSPACE_ID,
-                IntegrationKind.GITLAB,
-                IntegrationState.ACTIVE
-            )
-        ).thenReturn(Optional.of(connection));
+        when(connectionRepository.findFirstByWorkspaceIdAndKindAndStateOrderByCreatedAtDesc(
+                        WORKSPACE_ID, IntegrationKind.GITLAB, IntegrationState.ACTIVE))
+                .thenReturn(Optional.of(connection));
         doAnswer(inv -> {
-            Consumer<SyncJobHandle> body = inv.getArgument(1);
-            body.accept(syncJobHandle);
-            return null;
-        })
-            .when(syncJobService)
-            .run(any(), any());
+                    Consumer<SyncJobHandle> body = inv.getArgument(1);
+                    body.accept(syncJobHandle);
+                    return null;
+                })
+                .when(syncJobService)
+                .run(any(), any());
 
         scheduler.syncDataCron();
 
@@ -202,13 +187,9 @@ class GitlabDataSyncSchedulerTest extends BaseUnitTest {
 
     @Test
     void shouldRunUnrecordedWhenNoActiveConnection() {
-        when(
-            connectionRepository.findFirstByWorkspaceIdAndKindAndStateOrderByCreatedAtDesc(
-                eq(WORKSPACE_ID),
-                eq(IntegrationKind.GITLAB),
-                eq(IntegrationState.ACTIVE)
-            )
-        ).thenReturn(Optional.empty());
+        when(connectionRepository.findFirstByWorkspaceIdAndKindAndStateOrderByCreatedAtDesc(
+                        eq(WORKSPACE_ID), eq(IntegrationKind.GITLAB), eq(IntegrationState.ACTIVE)))
+                .thenReturn(Optional.empty());
 
         scheduler.syncDataCron();
 
@@ -219,14 +200,12 @@ class GitlabDataSyncSchedulerTest extends BaseUnitTest {
     @Test
     void shouldSkipScopeOnJobConflictWithoutFailingCron() {
         Connection connection = activeGitLabConnection();
-        when(
-            connectionRepository.findFirstByWorkspaceIdAndKindAndStateOrderByCreatedAtDesc(
-                WORKSPACE_ID,
-                IntegrationKind.GITLAB,
-                IntegrationState.ACTIVE
-            )
-        ).thenReturn(Optional.of(connection));
-        doThrow(new SyncJobConflictException(existingActiveJob(connection))).when(syncJobService).run(any(), any());
+        when(connectionRepository.findFirstByWorkspaceIdAndKindAndStateOrderByCreatedAtDesc(
+                        WORKSPACE_ID, IntegrationKind.GITLAB, IntegrationState.ACTIVE))
+                .thenReturn(Optional.of(connection));
+        doThrow(new SyncJobConflictException(existingActiveJob(connection)))
+                .when(syncJobService)
+                .run(any(), any());
 
         assertThatCode(() -> scheduler.syncDataCron()).doesNotThrowAnyException();
 
@@ -238,10 +217,11 @@ class GitlabDataSyncSchedulerTest extends BaseUnitTest {
         // With the service holder present, syncScope runs to completion and ends with the sweep. A
         // RECONCILIATION job must invoke it — this is the whole point of the type on GitLab.
         when(syncServiceHolderProvider.getIfAvailable()).thenReturn(mockHolder());
-        lenient().when(repositoryRepository.findAllByWorkspaceMonitors(WORKSPACE_ID)).thenReturn(List.of());
-        when(deletionSweepService.sweepScope(eq(WORKSPACE_ID), any())).thenReturn(
-            new GitLabDeletionSweepService.SweepOutcome(0, 0, false)
-        );
+        lenient()
+                .when(repositoryRepository.findAllByWorkspaceMonitors(WORKSPACE_ID))
+                .thenReturn(List.of());
+        when(deletionSweepService.sweepScope(eq(WORKSPACE_ID), any()))
+                .thenReturn(new GitLabDeletionSweepService.SweepOutcome(0, 0, false));
 
         scheduler.syncWorkspaceNow(WORKSPACE_ID, syncJobHandle, SyncJobType.RECONCILIATION);
 
@@ -254,7 +234,9 @@ class GitlabDataSyncSchedulerTest extends BaseUnitTest {
         // would look deleted. It must skip the sweep entirely — otherwise a manual INITIAL on a mature
         // connection would mass-tombstone.
         when(syncServiceHolderProvider.getIfAvailable()).thenReturn(mockHolder());
-        lenient().when(repositoryRepository.findAllByWorkspaceMonitors(WORKSPACE_ID)).thenReturn(List.of());
+        lenient()
+                .when(repositoryRepository.findAllByWorkspaceMonitors(WORKSPACE_ID))
+                .thenReturn(List.of());
 
         scheduler.syncWorkspaceNow(WORKSPACE_ID, syncJobHandle, SyncJobType.INITIAL);
 
@@ -264,10 +246,11 @@ class GitlabDataSyncSchedulerTest extends BaseUnitTest {
     @Test
     void shouldReportWarningsWhenSweepCouldNotVerifyEveryProject() {
         when(syncServiceHolderProvider.getIfAvailable()).thenReturn(mockHolder());
-        lenient().when(repositoryRepository.findAllByWorkspaceMonitors(WORKSPACE_ID)).thenReturn(List.of());
-        when(deletionSweepService.sweepScope(eq(WORKSPACE_ID), any())).thenReturn(
-            new GitLabDeletionSweepService.SweepOutcome(0, 0, true)
-        );
+        lenient()
+                .when(repositoryRepository.findAllByWorkspaceMonitors(WORKSPACE_ID))
+                .thenReturn(List.of());
+        when(deletionSweepService.sweepScope(eq(WORKSPACE_ID), any()))
+                .thenReturn(new GitLabDeletionSweepService.SweepOutcome(0, 0, true));
 
         scheduler.syncWorkspaceNow(WORKSPACE_ID, syncJobHandle, SyncJobType.RECONCILIATION);
 
@@ -278,7 +261,9 @@ class GitlabDataSyncSchedulerTest extends BaseUnitTest {
     void shouldNotRunDeletionSweepWhenCancelledDuringRepositoryPhase() {
         // A cancel observed during the repo phase skips the remaining phases, the sweep included.
         when(syncServiceHolderProvider.getIfAvailable()).thenReturn(mockHolder());
-        lenient().when(repositoryRepository.findAllByWorkspaceMonitors(WORKSPACE_ID)).thenReturn(List.of());
+        lenient()
+                .when(repositoryRepository.findAllByWorkspaceMonitors(WORKSPACE_ID))
+                .thenReturn(List.of());
         when(syncJobHandle.isCancellationRequested()).thenReturn(true);
 
         scheduler.syncWorkspaceNow(WORKSPACE_ID, syncJobHandle, SyncJobType.RECONCILIATION);
@@ -293,13 +278,12 @@ class GitlabDataSyncSchedulerTest extends BaseUnitTest {
 
     private SyncJob existingActiveJob(Connection connection) {
         SyncJob job = new SyncJob(
-            connection.getWorkspace(),
-            connection,
-            IntegrationKind.GITLAB,
-            SyncJobType.RECONCILIATION,
-            SyncJobTrigger.SCHEDULED,
-            null
-        );
+                connection.getWorkspace(),
+                connection,
+                IntegrationKind.GITLAB,
+                SyncJobType.RECONCILIATION,
+                SyncJobTrigger.SCHEDULED,
+                null);
         ReflectionTestUtils.setField(job, "id", 500L);
         return job;
     }

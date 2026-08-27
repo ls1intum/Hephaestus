@@ -13,12 +13,12 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.user.dto.GitHubUserDTO;
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record GitHubSubIssuesEventDTO(
-    @JsonProperty("action") String action,
-    @JsonProperty("sub_issue") GitHubIssueDTO subIssue,
-    @JsonProperty("parent_issue") GitHubIssueDTO parentIssue,
-    @JsonProperty("repository") GitHubRepositoryRefDTO repository,
-    @JsonProperty("sender") GitHubUserDTO sender
-) implements GitHubWebhookEvent {
+        @JsonProperty("action") String action,
+        @JsonProperty("sub_issue") GitHubIssueDTO subIssue,
+        @JsonProperty("parent_issue") GitHubIssueDTO parentIssue,
+        @JsonProperty("repository") GitHubRepositoryRefDTO repository,
+        @JsonProperty("sender") GitHubUserDTO sender)
+        implements GitHubWebhookEvent {
     @Override
     public GitHubEventAction.SubIssue actionType() {
         return GitHubEventAction.SubIssue.fromString(action);

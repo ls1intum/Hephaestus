@@ -12,14 +12,14 @@ import org.jspecify.annotations.Nullable;
  */
 @Schema(description = "Instance-admin per-workspace month rollup (metadata only, no tenant content)")
 public record AdminLlmUsageReportDTO(
-    @NonNull @Schema(description = "Calendar month (UTC), ISO yyyy-MM", example = "2026-07") String month,
-    @Nullable
-    @Schema(
-        description = "Display-only conversion when the instance has a display currency. " +
-            "Absent = show USD only. Applies to every USD amount in this response."
-    )
-    FxRateInfoDTO fx,
-    @NonNull
-    @Schema(description = "One row per workspace, including workspaces with no ledger activity this month")
-    List<AdminWorkspaceLlmUsageDTO> workspaces
-) {}
+        @NonNull @Schema(description = "Calendar month (UTC), ISO yyyy-MM", example = "2026-07")
+        String month,
+
+        @Nullable
+        @Schema(
+                description = "Display-only conversion when the instance has a display currency. "
+                        + "Absent = show USD only. Applies to every USD amount in this response.")
+        FxRateInfoDTO fx,
+
+        @NonNull @Schema(description = "One row per workspace, including workspaces with no ledger activity this month")
+        List<AdminWorkspaceLlmUsageDTO> workspaces) {}

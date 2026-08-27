@@ -21,10 +21,9 @@ public class PracticeDefinitionOptionsService {
     private final PracticeSignalOptions signalOptions;
 
     public PracticeDefinitionOptionsService(
-        ArtifactSourceCatalogRegistry catalogs,
-        PracticeEvidenceDefaults defaults,
-        PracticeSignalOptions signalOptions
-    ) {
+            ArtifactSourceCatalogRegistry catalogs,
+            PracticeEvidenceDefaults defaults,
+            PracticeSignalOptions signalOptions) {
         this.catalogs = catalogs;
         this.defaults = defaults;
         this.signalOptions = signalOptions;
@@ -33,47 +32,37 @@ public class PracticeDefinitionOptionsService {
     public PracticeDefinitionOptionsDTO options() {
         ArtifactSourceCatalog catalog = catalogs.current();
         return new PracticeDefinitionOptionsDTO(
-            catalog.version(),
-            signalOptions
-                .authorableKinds()
-                .stream()
-                .map(artifact -> options(catalog, artifact))
-                .toList()
-        );
+                catalog.version(),
+                signalOptions.authorableKinds().stream()
+                        .map(artifact -> options(catalog, artifact))
+                        .toList());
     }
 
     private PracticeWorkTypeDefinitionOptionsDTO options(ArtifactSourceCatalog catalog, ArtifactKind artifact) {
         Set<SourceKind> applicable = catalogs.requireSourcesFor(catalog.version(), artifact.value());
         return new PracticeWorkTypeDefinitionOptionsDTO(
-            artifact,
-            signalOptions
-                .bindableOptionsFor(artifact)
-                .stream()
-                .map(option -> new PracticeSignalOptionDTO(option.signal(), option.displayName(), option.recommended()))
-                .toList(),
-            signalOptions
-                .manualRequestOptionFor(artifact)
-                .map(option -> new PracticeManualReviewSignalDTO(option.signal(), option.displayName()))
-                .orElse(null),
-            defaults.policyFor(artifact),
-            defaults.needsFor(artifact),
-            List.of(PracticeAutomatedReviewMode.LANGUAGE_MODEL),
-            catalog
-                .sources()
-                .stream()
-                .filter(source -> applicable.contains(source.kind()))
-                .map(source ->
-                    new PracticeEvidenceSourceOptionDTO(
-                        source.kind().value(),
-                        source.displayName(),
-                        source.description(),
-                        source.selectionScope(),
-                        source.privacyClass(),
-                        source.requiredQuality(),
-                        source.completenessPolicy().supportsComplete()
-                    )
-                )
-                .toList()
-        );
+                artifact,
+                signalOptions.bindableOptionsFor(artifact).stream()
+                        .map(option -> new PracticeSignalOptionDTO(
+                                option.signal(), option.displayName(), option.recommended()))
+                        .toList(),
+                signalOptions
+                        .manualRequestOptionFor(artifact)
+                        .map(option -> new PracticeManualReviewSignalDTO(option.signal(), option.displayName()))
+                        .orElse(null),
+                defaults.policyFor(artifact),
+                defaults.needsFor(artifact),
+                List.of(PracticeAutomatedReviewMode.LANGUAGE_MODEL),
+                catalog.sources().stream()
+                        .filter(source -> applicable.contains(source.kind()))
+                        .map(source -> new PracticeEvidenceSourceOptionDTO(
+                                source.kind().value(),
+                                source.displayName(),
+                                source.description(),
+                                source.selectionScope(),
+                                source.privacyClass(),
+                                source.requiredQuality(),
+                                source.completenessPolicy().supportsComplete()))
+                        .toList());
     }
 }

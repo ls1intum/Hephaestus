@@ -32,14 +32,12 @@ public interface UserAchievementRepository extends JpaRepository<UserAchievement
      * @param userId the user's ID
      * @return list of all achievement progress records for the user
      */
-    @Query(
-        """
+    @Query("""
         SELECT ua
         FROM UserAchievement ua
         WHERE ua.user.id = :userId
         ORDER BY ua.unlockedAt DESC NULLS LAST
-        """
-    )
+        """)
     List<UserAchievement> findByUserId(@Param("userId") Long userId);
 
     /**
@@ -79,18 +77,14 @@ public interface UserAchievementRepository extends JpaRepository<UserAchievement
      * @param achievementIds the achievement IDs to look for
      * @return list of matching achievements with their current progress
      */
-    @Query(
-        """
+    @Query("""
         SELECT ua
         FROM UserAchievement ua
         WHERE ua.user.id = :userId
         AND ua.achievementId IN :achievementIds
-        """
-    )
+        """)
     List<UserAchievement> findByUserIdAndAchievementIdIn(
-        @Param("userId") Long userId,
-        @Param("achievementIds") Set<String> achievementIds
-    );
+            @Param("userId") Long userId, @Param("achievementIds") Set<String> achievementIds);
 
     /**
      * Delete all achievement progress records for a specific user.
@@ -131,8 +125,7 @@ public interface UserAchievementRepository extends JpaRepository<UserAchievement
      */
     @Modifying
     @Transactional
-    @Query(
-        value = """
+    @Query(value = """
         INSERT INTO user_achievement (id, user_id, achievement_id, progress_data, unlocked_at, version)
         VALUES (
             CAST(:id AS uuid),
@@ -143,14 +136,11 @@ public interface UserAchievementRepository extends JpaRepository<UserAchievement
             0
         )
         ON CONFLICT ON CONSTRAINT uk_user_achievement_user_achievement DO NOTHING
-        """,
-        nativeQuery = true
-    )
+        """, nativeQuery = true)
     int insertIfAbsent(
-        @Param("id") UUID id,
-        @Param("userId") Long userId,
-        @Param("achievementId") String achievementId,
-        @Param("progressDataJson") String progressDataJson,
-        @Param("unlockedAt") @Nullable Instant unlockedAt
-    );
+            @Param("id") UUID id,
+            @Param("userId") Long userId,
+            @Param("achievementId") String achievementId,
+            @Param("progressDataJson") String progressDataJson,
+            @Param("unlockedAt") @Nullable Instant unlockedAt);
 }

@@ -19,7 +19,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import org.jspecify.annotations.Nullable;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.web.reactive.server.WebTestClient;
@@ -58,18 +57,18 @@ class AccountAdminRoleIntegrationTest extends RealAuthIntegrationTest {
         Account victim = persistAdmin("Demote Me");
 
         webTestClient
-            .patch()
-            .uri("/admin/users/{id}", persistedId(victim.getId()))
-            .headers(h -> h.setBearerAuth(tokenFor(keeper)))
-            .bodyValue(Map.of("appRole", "USER"))
-            .exchange()
-            .expectStatus()
-            .isOk();
+                .patch()
+                .uri("/admin/users/{id}", persistedId(victim.getId()))
+                .headers(h -> h.setBearerAuth(tokenFor(keeper)))
+                .bodyValue(Map.of("appRole", "USER"))
+                .exchange()
+                .expectStatus()
+                .isOk();
 
         assertThat(accountRepository.findById(persistedId(victim.getId())))
-            .get()
-            .extracting(Account::getAppRole)
-            .isEqualTo(Account.AppRole.USER);
+                .get()
+                .extracting(Account::getAppRole)
+                .isEqualTo(Account.AppRole.USER);
         assertThat(activeAdminCount()).isEqualTo(1L);
     }
 
@@ -79,21 +78,21 @@ class AccountAdminRoleIntegrationTest extends RealAuthIntegrationTest {
         persistAdmin("Backup Admin"); // another admin exists, yet self-demotion is still refused
 
         webTestClient
-            .patch()
-            .uri("/admin/users/{id}", persistedId(self.getId()))
-            .headers(h -> h.setBearerAuth(tokenFor(self)))
-            .bodyValue(Map.of("appRole", "USER"))
-            .exchange()
-            .expectStatus()
-            .isEqualTo(409)
-            .expectBody()
-            .jsonPath("$.detail")
-            .isEqualTo("You can't revoke your own admin access. Have another admin do it.");
+                .patch()
+                .uri("/admin/users/{id}", persistedId(self.getId()))
+                .headers(h -> h.setBearerAuth(tokenFor(self)))
+                .bodyValue(Map.of("appRole", "USER"))
+                .exchange()
+                .expectStatus()
+                .isEqualTo(409)
+                .expectBody()
+                .jsonPath("$.detail")
+                .isEqualTo("You can't revoke your own admin access. Have another admin do it.");
 
         assertThat(accountRepository.findById(persistedId(self.getId())))
-            .get()
-            .extracting(Account::getAppRole)
-            .isEqualTo(Account.AppRole.APP_ADMIN);
+                .get()
+                .extracting(Account::getAppRole)
+                .isEqualTo(Account.AppRole.APP_ADMIN);
     }
 
     @Test
@@ -129,23 +128,25 @@ class AccountAdminRoleIntegrationTest extends RealAuthIntegrationTest {
         Account admin = persistAdmin("Admin");
         Account user = persistUser("Plain User");
         tokenFor(user); // mints + records an active issued_jwt for the user
-        assertThat(issuedJwtRepository.findActiveByAccountId(persistedId(user.getId()), Instant.now())).hasSize(1);
+        assertThat(issuedJwtRepository.findActiveByAccountId(persistedId(user.getId()), Instant.now()))
+                .hasSize(1);
 
         // Admin force sign-out revokes the user's active session(s).
         webTestClient
-            .delete()
-            .uri("/admin/users/{id}/sessions", persistedId(user.getId()))
-            .headers(h -> h.setBearerAuth(tokenFor(admin)))
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody()
-            .jsonPath("$.revoked")
-            .isEqualTo(1);
+                .delete()
+                .uri("/admin/users/{id}/sessions", persistedId(user.getId()))
+                .headers(h -> h.setBearerAuth(tokenFor(admin)))
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$.revoked")
+                .isEqualTo(1);
 
         // The account now has no active sessions — RevocationAwareJwtDecoder rejects the token on its
         // next request (enforced per-request via the issued_jwt revocation row).
-        assertThat(issuedJwtRepository.findActiveByAccountId(persistedId(user.getId()), Instant.now())).isEmpty();
+        assertThat(issuedJwtRepository.findActiveByAccountId(persistedId(user.getId()), Instant.now()))
+                .isEmpty();
     }
 
     @Test
@@ -153,12 +154,12 @@ class AccountAdminRoleIntegrationTest extends RealAuthIntegrationTest {
         Account user = persistUser("Plain User");
 
         webTestClient
-            .delete()
-            .uri("/admin/users/{id}/sessions", persistedId(user.getId()))
-            .headers(h -> h.setBearerAuth(tokenFor(user)))
-            .exchange()
-            .expectStatus()
-            .isForbidden();
+                .delete()
+                .uri("/admin/users/{id}/sessions", persistedId(user.getId()))
+                .headers(h -> h.setBearerAuth(tokenFor(user)))
+                .exchange()
+                .expectStatus()
+                .isForbidden();
     }
 
     private Callable<Integer> demote(String token, Long targetId, CountDownLatch ready, CountDownLatch go) {
@@ -166,14 +167,14 @@ class AccountAdminRoleIntegrationTest extends RealAuthIntegrationTest {
             ready.countDown();
             go.await(10, TimeUnit.SECONDS);
             return webTestClient
-                .patch()
-                .uri("/admin/users/{id}", targetId)
-                .headers(h -> h.setBearerAuth(token))
-                .bodyValue(Map.of("appRole", "USER"))
-                .exchange()
-                .returnResult(Void.class)
-                .getStatus()
-                .value();
+                    .patch()
+                    .uri("/admin/users/{id}", targetId)
+                    .headers(h -> h.setBearerAuth(token))
+                    .bodyValue(Map.of("appRole", "USER"))
+                    .exchange()
+                    .returnResult(Void.class)
+                    .getStatus()
+                    .value();
         };
     }
 
@@ -194,11 +195,9 @@ class AccountAdminRoleIntegrationTest extends RealAuthIntegrationTest {
     // Plain (non-locking) count for assertions. The production guard's query is @Lock(PESSIMISTIC_WRITE)
     // and so requires an active transaction; counting here via findAll avoids needing one in the test.
     private long activeAdminCount() {
-        return accountRepository
-            .findAll()
-            .stream()
-            .filter(a -> a.getAppRole() == Account.AppRole.APP_ADMIN && a.getStatus() == Account.Status.ACTIVE)
-            .count();
+        return accountRepository.findAll().stream()
+                .filter(a -> a.getAppRole() == Account.AppRole.APP_ADMIN && a.getStatus() == Account.Status.ACTIVE)
+                .count();
     }
 
     private String tokenFor(Account account) {

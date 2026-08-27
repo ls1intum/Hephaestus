@@ -35,16 +35,15 @@ import org.jspecify.annotations.Nullable;
  */
 @Entity
 @Table(
-    name = "commit_contributor",
-    uniqueConstraints = @UniqueConstraint(
-        name = "uq_commit_contributor_commit_email_role",
-        columnNames = { "commit_id", "email", "role" }
-    ),
-    indexes = {
-        @Index(name = "idx_commit_contributor_commit_id", columnList = "commit_id"),
-        @Index(name = "idx_commit_contributor_user_id", columnList = "user_id"),
-    }
-)
+        name = "commit_contributor",
+        uniqueConstraints =
+                @UniqueConstraint(
+                        name = "uq_commit_contributor_commit_email_role",
+                        columnNames = {"commit_id", "email", "role"}),
+        indexes = {
+            @Index(name = "idx_commit_contributor_commit_id", columnList = "commit_id"),
+            @Index(name = "idx_commit_contributor_user_id", columnList = "user_id"),
+        })
 @Getter
 @Setter
 @NoArgsConstructor

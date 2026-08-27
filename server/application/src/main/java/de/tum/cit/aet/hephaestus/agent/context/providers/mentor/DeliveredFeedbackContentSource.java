@@ -72,49 +72,40 @@ public class DeliveredFeedbackContentSource implements ContentSource {
 
     public ObjectNode buildPayload(Long workspaceId, Long developerId) {
         User user = userRepository
-            .findById(developerId)
-            .orElseThrow(() -> new EntityNotFoundException("User", developerId.toString()));
+                .findById(developerId)
+                .orElseThrow(() -> new EntityNotFoundException("User", developerId.toString()));
         Instant since = Instant.now().minus(LOOKBACK_DAYS, ChronoUnit.DAYS);
 
         List<Feedback> candidates = feedbackRepository.findRecentDeliveredForRecipient(
-            workspaceId,
-            developerId,
-            since,
-            PageRequest.of(0, MAX_DELIVERED)
-        );
+                workspaceId, developerId, since, PageRequest.of(0, MAX_DELIVERED));
 
-        List<UUID> feedbackIds = candidates.stream().map(Feedback::getId).filter(java.util.Objects::nonNull).toList();
+        List<UUID> feedbackIds = candidates.stream()
+                .map(Feedback::getId)
+                .filter(java.util.Objects::nonNull)
+                .toList();
         List<FeedbackObservationVisibility> bindings = feedbackIds.isEmpty()
-            ? List.of()
-            : feedbackObservationRepository.findForVisibility(workspaceId, feedbackIds);
-        Map<UUID, List<Observation>> observationsByFeedback = bindings
-            .stream()
-            .collect(
-                Collectors.groupingBy(
-                    FeedbackObservationVisibility::getFeedbackId,
-                    Collectors.mapping(FeedbackObservationVisibility::getObservation, Collectors.toList())
-                )
-            );
+                ? List.of()
+                : feedbackObservationRepository.findForVisibility(workspaceId, feedbackIds);
+        Map<UUID, List<Observation>> observationsByFeedback = bindings.stream()
+                .collect(Collectors.groupingBy(
+                        FeedbackObservationVisibility::getFeedbackId,
+                        Collectors.mapping(FeedbackObservationVisibility::getObservation, Collectors.toList())));
         Set<UUID> visible = visibilityPolicy.permitsAll(
-            workspaceId,
-            bindings.stream().map(FeedbackObservationVisibility::getObservation).toList(),
-            SourceUsePurpose.CONVERSATIONAL_MENTORING
-        );
-        List<Feedback> delivered = candidates
-            .stream()
-            .filter(feedback -> {
-                List<Observation> observations = observationsByFeedback.getOrDefault(feedback.getId(), List.of());
-                return (
-                    !observations.isEmpty() &&
-                    observations.stream().allMatch(observation -> visible.contains(observation.getId()))
-                );
-            })
-            .toList();
+                workspaceId,
+                bindings.stream()
+                        .map(FeedbackObservationVisibility::getObservation)
+                        .toList(),
+                SourceUsePurpose.CONVERSATIONAL_MENTORING);
+        List<Feedback> delivered = candidates.stream()
+                .filter(feedback -> {
+                    List<Observation> observations = observationsByFeedback.getOrDefault(feedback.getId(), List.of());
+                    return (!observations.isEmpty()
+                            && observations.stream().allMatch(observation -> visible.contains(observation.getId())));
+                })
+                .toList();
 
-        Set<Long> activeThreadIds = conversationConsentGate.activeThreadIds(
-            workspaceId,
-            conversationThreadIds(delivered)
-        );
+        Set<Long> activeThreadIds =
+                conversationConsentGate.activeThreadIds(workspaceId, conversationThreadIds(delivered));
         boolean anyConversationSurvivor = delivered.stream().anyMatch(f -> isSurvivingConversation(f, activeThreadIds));
 
         ObjectNode root = objectMapper.createObjectNode();
@@ -139,10 +130,8 @@ public class DeliveredFeedbackContentSource implements ContentSource {
             if (ConversationBriefBody.isBrief(body)) {
                 continue;
             }
-            if (
-                ArtifactKinds.CONVERSATION_THREAD.equals(f.getArtifactKind()) &&
-                !isSurvivingConversation(f, activeThreadIds)
-            ) {
+            if (ArtifactKinds.CONVERSATION_THREAD.equals(f.getArtifactKind())
+                    && !isSurvivingConversation(f, activeThreadIds)) {
                 continue;
             }
             ObjectNode node = arr.addObject();
@@ -173,10 +162,8 @@ public class DeliveredFeedbackContentSource implements ContentSource {
     }
 
     private static boolean isSurvivingConversation(Feedback f, Set<Long> activeThreadIds) {
-        return (
-            ArtifactKinds.CONVERSATION_THREAD.equals(f.getArtifactKind()) &&
-            f.getArtifactId() != null &&
-            activeThreadIds.contains(f.getArtifactId())
-        );
+        return (ArtifactKinds.CONVERSATION_THREAD.equals(f.getArtifactKind())
+                && f.getArtifactId() != null
+                && activeThreadIds.contains(f.getArtifactId()));
     }
 }

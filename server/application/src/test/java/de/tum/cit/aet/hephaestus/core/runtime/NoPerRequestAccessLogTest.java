@@ -39,8 +39,8 @@ class NoPerRequestAccessLogTest extends BaseUnitTest {
     @Test
     void tomcatAccessLogStaysDisabledInTheProductionProfile() throws Exception {
         assertThat(propertyIn(PROD_PROFILE, "server.tomcat.accesslog.enabled"))
-            .as("application-prod.yml claims no layer writes a per-request record; Tomcat is one of them")
-            .isEqualTo("false");
+                .as("application-prod.yml claims no layer writes a per-request record; Tomcat is one of them")
+                .isEqualTo("false");
     }
 
     @Test
@@ -48,12 +48,10 @@ class NoPerRequestAccessLogTest extends BaseUnitTest {
         List<String> serverLevel = directivesAtServerLevel(Files.readString(WEBAPP_NGINX_CONF, StandardCharsets.UTF_8));
 
         assertThat(serverLevel)
-            .as(
-                "webapp/docker/nginx.conf must carry `access_log off;` in the server block: " +
-                    "nginx:stable-alpine turns the access log ON at http level, so anything the server " +
-                    "block does not override logs the request URL — and SPA deep links name contributors"
-            )
-            .contains("access_log off");
+                .as("webapp/docker/nginx.conf must carry `access_log off;` in the server block: "
+                        + "nginx:stable-alpine turns the access log ON at http level, so anything the server "
+                        + "block does not override logs the request URL — and SPA deep links name contributors")
+                .contains("access_log off");
     }
 
     @Test
@@ -61,14 +59,12 @@ class NoPerRequestAccessLogTest extends BaseUnitTest {
         String conf = propertyIn(PROXY_COMPOSE, "configs.nginx-default-config.content");
 
         assertThat(conf)
-            .as("docker/compose.proxy.yaml no longer inlines an nginx server config under that key")
-            .isNotNull();
+                .as("docker/compose.proxy.yaml no longer inlines an nginx server config under that key")
+                .isNotNull();
         assertThat(directivesAtServerLevel(conf))
-            .as(
-                "the maintenance page answers on a catch-all Host rule whenever the webapp router is " +
-                    "down, so the URL it would log is the deep link the contributor was reaching for"
-            )
-            .contains("access_log off");
+                .as("the maintenance page answers on a catch-all Host rule whenever the webapp router is "
+                        + "down, so the URL it would log is the deep link the contributor was reaching for")
+                .contains("access_log off");
     }
 
     /**
@@ -80,17 +76,17 @@ class NoPerRequestAccessLogTest extends BaseUnitTest {
     void noNginxLocationReEnablesTheAccessLog() throws Exception {
         List<String> reEnabling = new ArrayList<>();
         for (String conf : List.of(
-            Files.readString(WEBAPP_NGINX_CONF, StandardCharsets.UTF_8),
-            propertyIn(PROXY_COMPOSE, "configs.nginx-default-config.content")
-        )) {
-            conf
-                .lines()
-                .map(NoPerRequestAccessLogTest::directive)
-                .filter(line -> line.startsWith("access_log") && !line.equals("access_log off"))
-                .forEach(reEnabling::add);
+                Files.readString(WEBAPP_NGINX_CONF, StandardCharsets.UTF_8),
+                propertyIn(PROXY_COMPOSE, "configs.nginx-default-config.content"))) {
+            conf.lines()
+                    .map(NoPerRequestAccessLogTest::directive)
+                    .filter(line -> line.startsWith("access_log") && !line.equals("access_log off"))
+                    .forEach(reEnabling::add);
         }
 
-        assertThat(reEnabling).as("every access_log directive in a shipped nginx config must be `off`").isEmpty();
+        assertThat(reEnabling)
+                .as("every access_log directive in a shipped nginx config must be `off`")
+                .isEmpty();
     }
 
     /**
@@ -117,24 +113,22 @@ class NoPerRequestAccessLogTest extends BaseUnitTest {
         if (comment >= 0) {
             stripped = stripped.substring(0, comment).strip();
         }
-        return stripped.endsWith(";") ? stripped.substring(0, stripped.length() - 1).strip() : stripped;
+        return stripped.endsWith(";")
+                ? stripped.substring(0, stripped.length() - 1).strip()
+                : stripped;
     }
 
     private static int count(String line, char c) {
-        return (int) line
-            .chars()
-            .filter(ch -> ch == c)
-            .count();
+        return (int) line.chars().filter(ch -> ch == c).count();
     }
 
     private static @Nullable String propertyIn(Path yaml, String key) throws IOException {
         return new YamlPropertySourceLoader()
-            .load(yaml.toString(), new FileSystemResource(yaml))
-            .stream()
-            .map(PropertySource.class::cast)
-            .filter(source -> source.containsProperty(key))
-            .findFirst()
-            .map(source -> String.valueOf(source.getProperty(key)))
-            .orElse(null);
+                .load(yaml.toString(), new FileSystemResource(yaml)).stream()
+                        .map(PropertySource.class::cast)
+                        .filter(source -> source.containsProperty(key))
+                        .findFirst()
+                        .map(source -> String.valueOf(source.getProperty(key)))
+                        .orElse(null);
     }
 }

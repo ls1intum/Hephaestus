@@ -56,16 +56,16 @@ public class SlackIngestService {
     private final boolean conversationIngestEnabled;
 
     public SlackIngestService(
-        SlackWorkspaceResolver workspaceResolver,
-        SlackMonitoredChannelRepository monitoredChannelRepository,
-        SlackChannelConsentGate consentGate,
-        SlackParticipantConsentGate participantConsentGate,
-        SlackMessageRepository messageRepository,
-        SlackThreadRepository threadRepository,
-        SlackMentorIdentityResolver identityResolver,
-        ConversationFeedbackErasure conversationFeedbackErasure,
-        @Value("${hephaestus.integration.slack.conversation-ingest.enabled:true}") boolean conversationIngestEnabled
-    ) {
+            SlackWorkspaceResolver workspaceResolver,
+            SlackMonitoredChannelRepository monitoredChannelRepository,
+            SlackChannelConsentGate consentGate,
+            SlackParticipantConsentGate participantConsentGate,
+            SlackMessageRepository messageRepository,
+            SlackThreadRepository threadRepository,
+            SlackMentorIdentityResolver identityResolver,
+            ConversationFeedbackErasure conversationFeedbackErasure,
+            @Value("${hephaestus.integration.slack.conversation-ingest.enabled:true}")
+                    boolean conversationIngestEnabled) {
         this.workspaceResolver = workspaceResolver;
         this.monitoredChannelRepository = monitoredChannelRepository;
         this.consentGate = consentGate;
@@ -79,24 +79,22 @@ public class SlackIngestService {
 
     @Transactional
     public void ingestChannelMessage(
-        String teamId,
-        String channelId,
-        String ts,
-        @Nullable String threadTs,
-        @Nullable String authorSlackUserId,
-        @Nullable String text
-    ) {
+            String teamId,
+            String channelId,
+            String ts,
+            @Nullable String threadTs,
+            @Nullable String authorSlackUserId,
+            @Nullable String text) {
         ingestChannelMessageInternal(teamId, channelId, ts, threadTs, authorSlackUserId, text);
     }
 
     private void ingestChannelMessageInternal(
-        String teamId,
-        String channelId,
-        String ts,
-        @Nullable String threadTs,
-        @Nullable String authorSlackUserId,
-        @Nullable String text
-    ) {
+            String teamId,
+            String channelId,
+            String ts,
+            @Nullable String threadTs,
+            @Nullable String authorSlackUserId,
+            @Nullable String text) {
         if (!conversationIngestEnabled) {
             return;
         }
@@ -120,7 +118,9 @@ public class SlackIngestService {
         // the consent announcement was posted (consent_announced_at). Pre-announcement history never enters — a
         // channel activated today does not retroactively ingest the backlog people wrote before they were told. An
         // ACTIVE channel is always stamped at activation, so a missing stamp fails closed (store nothing).
-        Instant announcedAt = monitoredChannelRepository.findConsentAnnouncedAt(workspaceId, channelId).orElse(null);
+        Instant announcedAt = monitoredChannelRepository
+                .findConsentAnnouncedAt(workspaceId, channelId)
+                .orElse(null);
         if (announcedAt == null || !isAfterAnnouncement(ts, announcedAt)) {
             return;
         }
@@ -128,29 +128,21 @@ public class SlackIngestService {
         // Person firewall: an opted-out individual is never stored, even on an ACTIVE channel with the capability on.
         // Deny-if-opted-out / allow-if-absent, keyed on the author's Slack id (an unauthored/blank sender has no
         // person to gate, so it proceeds — it stamps no member id and unions nothing into participant_member_ids).
-        if (
-            authorSlackUserId != null &&
-            !authorSlackUserId.isBlank() &&
-            !participantConsentGate.ingestionAllowed(workspaceId, authorSlackUserId)
-        ) {
+        if (authorSlackUserId != null
+                && !authorSlackUserId.isBlank()
+                && !participantConsentGate.ingestionAllowed(workspaceId, authorSlackUserId)) {
             return;
         }
 
         // Firewall stamp: the workspace member id the author links to within this workspace (null when unlinked).
         Long authorMemberId = (authorSlackUserId == null || authorSlackUserId.isBlank())
-            ? null
-            : identityResolver.resolveMemberId(workspaceId, teamId, authorSlackUserId).orElse(null);
+                ? null
+                : identityResolver
+                        .resolveMemberId(workspaceId, teamId, authorSlackUserId)
+                        .orElse(null);
 
         int inserted = messageRepository.insertIfAbsent(
-            workspaceId,
-            teamId,
-            channelId,
-            ts,
-            threadTs,
-            authorSlackUserId,
-            authorMemberId,
-            text
-        );
+                workspaceId, teamId, channelId, ts, threadTs, authorSlackUserId, authorMemberId, text);
         if (inserted > 0) {
             // thread_ts := the reply's parent, or the message's own ts for a thread root.
             String aggregateThreadTs = (threadTs == null || threadTs.isBlank()) ? ts : threadTs;
@@ -184,7 +176,9 @@ public class SlackIngestService {
         // below still applies (a pre-announcement message was never stored), and the durable upsert both
         // tombstones an ingested row AND blocks a later out-of-order base insert from resurrecting the content.
         // No participant-firewall check: a tombstone is contentless (text NULL).
-        Instant announcedAt = monitoredChannelRepository.findConsentAnnouncedAt(workspaceId, channelId).orElse(null);
+        Instant announcedAt = monitoredChannelRepository
+                .findConsentAnnouncedAt(workspaceId, channelId)
+                .orElse(null);
         if (announcedAt == null || !isAfterAnnouncement(deletedTs, announcedAt)) {
             return;
         }
@@ -201,13 +195,12 @@ public class SlackIngestService {
      */
     @Transactional
     public void editMessage(
-        String teamId,
-        String channelId,
-        String ts,
-        @Nullable String threadTs,
-        @Nullable String authorSlackUserId,
-        @Nullable String text
-    ) {
+            String teamId,
+            String channelId,
+            String ts,
+            @Nullable String threadTs,
+            @Nullable String authorSlackUserId,
+            @Nullable String text) {
         if (!conversationIngestEnabled || channelId.isEmpty() || ts.isEmpty()) {
             return;
         }
@@ -218,7 +211,8 @@ public class SlackIngestService {
         long workspaceId = workspaceOpt.get();
 
         // Normal case: the base row exists -> scoped UPDATE swaps in the edited text. The deleted_at IS NULL guard in
-        // applyEdit means a delete-then-edit reorder no-ops (updated == 0, row present) and never resurrects a tombstone.
+        // applyEdit means a delete-then-edit reorder no-ops (updated == 0, row present) and never resurrects a
+        // tombstone.
         int updated = messageRepository.applyEdit(workspaceId, channelId, ts, text, Instant.now());
         if (updated > 0) {
             return;
@@ -227,7 +221,8 @@ public class SlackIngestService {
         // (updated == 0 but present -> skip, no resurrection) from a genuinely-absent one (re-ingest).
         if (!messageRepository.existsByWorkspaceIdAndSlackChannelIdAndSlackTs(workspaceId, channelId, ts)) {
             ingestChannelMessageInternal(teamId, channelId, ts, threadTs, authorSlackUserId, text);
-            // Stamp edited_at (insertIfAbsent does not): a row born from message_changed genuinely is an edited message,
+            // Stamp edited_at (insertIfAbsent does not): a row born from message_changed genuinely is an edited
+            // message,
             // so the projector's `edited` flag reads true. Idempotent second write on the now-present row.
             messageRepository.applyEdit(workspaceId, channelId, ts, text, Instant.now());
         }

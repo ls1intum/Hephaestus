@@ -26,10 +26,10 @@ final class CatalogSlug {
 
     static String from(String value) {
         String slug = Normalizer.normalize(value, Normalizer.Form.NFKD)
-            .replaceAll("\\p{M}", "")
-            .toLowerCase(Locale.ROOT)
-            .replaceAll("[^a-z0-9]+", "-")
-            .replaceAll("(^-+|-+$)", "");
+                .replaceAll("\\p{M}", "")
+                .toLowerCase(Locale.ROOT)
+                .replaceAll("[^a-z0-9]+", "-")
+                .replaceAll("(^-+|-+$)", "");
         if (slug.isEmpty()) slug = "item";
         return slug.substring(0, Math.min(63, slug.length())).replaceAll("-+$", "");
     }

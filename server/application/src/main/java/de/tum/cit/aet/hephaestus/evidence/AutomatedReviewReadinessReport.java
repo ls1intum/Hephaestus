@@ -6,13 +6,12 @@ import java.util.List;
 import java.util.Objects;
 
 public record AutomatedReviewReadinessReport(
-    SourceContractVersion contractVersion,
-    String catalogDigest,
-    String artifactKind,
-    Instant manifestCapturedAt,
-    Instant decidedAt,
-    List<AutomatedReviewReadinessDecision> decisions
-) {
+        SourceContractVersion contractVersion,
+        String catalogDigest,
+        String artifactKind,
+        Instant manifestCapturedAt,
+        Instant decidedAt,
+        List<AutomatedReviewReadinessDecision> decisions) {
     public AutomatedReviewReadinessReport {
         Objects.requireNonNull(contractVersion, "contractVersion");
         Objects.requireNonNull(catalogDigest, "catalogDigest");
@@ -26,10 +25,11 @@ public record AutomatedReviewReadinessReport(
         if (decisions.isEmpty()) {
             throw new IllegalArgumentException("A readiness report requires at least one decision");
         }
-        if (
-            new HashSet<>(decisions.stream().map(AutomatedReviewReadinessDecision::practiceSlug).toList()).size() !=
-            decisions.size()
-        ) {
+        if (new HashSet<>(decisions.stream()
+                                .map(AutomatedReviewReadinessDecision::practiceSlug)
+                                .toList())
+                        .size()
+                != decisions.size()) {
             throw new IllegalArgumentException("A readiness report cannot repeat a practice");
         }
         if (decisions.stream().anyMatch(decision -> !decision.decidedAt().equals(decidedAt))) {

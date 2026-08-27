@@ -37,41 +37,30 @@ public class GitLabPreflightController {
     @PostMapping("/preflight")
     @Operation(summary = "Validate a GitLab PAT before workspace creation")
     @ApiResponse(
-        responseCode = "200",
-        description = "Validation result",
-        content = @Content(schema = @Schema(implementation = GitLabPreflightResponseDTO.class))
-    )
+            responseCode = "200",
+            description = "Validation result",
+            content = @Content(schema = @Schema(implementation = GitLabPreflightResponseDTO.class)))
     @PreAuthorize(
-        "@featureFlagService.isEnabled(T(de.tum.cit.aet.hephaestus.feature.FeatureFlag).GITLAB_WORKSPACE_CREATION)"
-    )
+            "@featureFlagService.isEnabled(T(de.tum.cit.aet.hephaestus.feature.FeatureFlag).GITLAB_WORKSPACE_CREATION)")
     public ResponseEntity<GitLabPreflightResponseDTO> gitLabPreflight(
-        @Valid @RequestBody GitLabPreflightRequestDTO request
-    ) {
+            @Valid @RequestBody GitLabPreflightRequestDTO request) {
         GitLabPreflightResponseDTO result = gitLabPreflightService.validateToken(
-            request.personalAccessToken(),
-            request.serverUrl(),
-            request.groupFullPath()
-        );
+                request.personalAccessToken(), request.serverUrl(), request.groupFullPath());
         return ResponseEntity.ok(result);
     }
 
     @PostMapping("/groups")
     @Operation(summary = "List GitLab groups accessible to a PAT")
     @ApiResponse(
-        responseCode = "200",
-        description = "Accessible groups",
-        content = @Content(array = @ArraySchema(schema = @Schema(implementation = GitLabGroupDTO.class)))
-    )
+            responseCode = "200",
+            description = "Accessible groups",
+            content = @Content(array = @ArraySchema(schema = @Schema(implementation = GitLabGroupDTO.class))))
     @PreAuthorize(
-        "@featureFlagService.isEnabled(T(de.tum.cit.aet.hephaestus.feature.FeatureFlag).GITLAB_WORKSPACE_CREATION)"
-    )
+            "@featureFlagService.isEnabled(T(de.tum.cit.aet.hephaestus.feature.FeatureFlag).GITLAB_WORKSPACE_CREATION)")
     public ResponseEntity<List<GitLabGroupDTO>> listGitLabGroups(
-        @Valid @RequestBody GitLabPreflightRequestDTO request
-    ) {
-        List<GitLabGroupDTO> groups = gitLabPreflightService.listAccessibleGroups(
-            request.personalAccessToken(),
-            request.serverUrl()
-        );
+            @Valid @RequestBody GitLabPreflightRequestDTO request) {
+        List<GitLabGroupDTO> groups =
+                gitLabPreflightService.listAccessibleGroups(request.personalAccessToken(), request.serverUrl());
         return ResponseEntity.ok(groups);
     }
 }

@@ -6,7 +6,6 @@ import org.jspecify.annotations.NonNull;
 
 @Schema(description = "A signal a practice can start an automated review on")
 public record PracticeSignalOptionDTO(
-    @NonNull @Schema(example = "scm.pull_request.ready") SignalName signal,
-    @NonNull String displayName,
-    @Schema(requiredMode = Schema.RequiredMode.REQUIRED) boolean recommended
-) {}
+        @NonNull @Schema(example = "scm.pull_request.ready") SignalName signal,
+        @NonNull String displayName,
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) boolean recommended) {}

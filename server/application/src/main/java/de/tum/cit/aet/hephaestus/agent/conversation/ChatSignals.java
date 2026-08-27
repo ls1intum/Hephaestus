@@ -49,17 +49,11 @@ public final class ChatSignals {
      *     already call this artifact
      */
     public static SignalKey threadSettledKey(
-        long workspaceId,
-        long threadId,
-        String threadTs,
-        String lastTs,
-        long liveTurnCount
-    ) {
+            long workspaceId, long threadId, String threadTs, String lastTs, long liveTurnCount) {
         return new SignalKey(
-            workspaceId,
-            threadId,
-            CONVERSATION_THREAD_SETTLED,
-            SignalRevision.ofContentDigest(threadTs, lastTs, Long.toString(liveTurnCount))
-        );
+                workspaceId,
+                threadId,
+                CONVERSATION_THREAD_SETTLED,
+                SignalRevision.ofContentDigest(threadTs, lastTs, Long.toString(liveTurnCount)));
     }
 }

@@ -25,19 +25,16 @@ public interface ProjectRepository extends JpaRepository<Project, Long> {
      * @param number the project number within the owner context
      * @return the project if found
      */
-    @Query(
-        """
+    @Query("""
         SELECT p
         FROM Project p
         LEFT JOIN FETCH p.creator
         WHERE p.ownerType = :ownerType AND p.ownerId = :ownerId AND p.number = :number
-        """
-    )
+        """)
     Optional<Project> findByOwnerTypeAndOwnerIdAndNumber(
-        @Param("ownerType") Project.OwnerType ownerType,
-        @Param("ownerId") Long ownerId,
-        @Param("number") int number
-    );
+            @Param("ownerType") Project.OwnerType ownerType,
+            @Param("ownerId") Long ownerId,
+            @Param("number") int number);
 
     /**
      * Checks if a project exists by owner type, owner ID, and project number.
@@ -77,8 +74,7 @@ public interface ProjectRepository extends JpaRepository<Project, Long> {
      */
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Transactional
-    @Query(
-        value = """
+    @Query(value = """
         INSERT INTO project (
             native_id, provider_id, node_id, owner_type, owner_id, number, title, short_description,
             readme, template, url, closed, closed_at, is_public, creator_id, last_sync_at,
@@ -103,29 +99,26 @@ public interface ProjectRepository extends JpaRepository<Project, Long> {
             last_sync_at = EXCLUDED.last_sync_at,
             created_at = COALESCE(project.created_at, EXCLUDED.created_at),
             updated_at = EXCLUDED.updated_at
-        """,
-        nativeQuery = true
-    )
+        """, nativeQuery = true)
     int upsertCore(
-        @Param("nativeId") Long nativeId,
-        @Param("providerId") Long providerId,
-        @Param("nodeId") String nodeId,
-        @Param("ownerType") String ownerType,
-        @Param("ownerId") Long ownerId,
-        @Param("number") int number,
-        @Param("title") String title,
-        @Param("shortDescription") @Nullable String shortDescription,
-        @Param("readme") @Nullable String readme,
-        @Param("template") boolean template,
-        @Param("url") @Nullable String url,
-        @Param("closed") boolean closed,
-        @Param("closedAt") @Nullable Instant closedAt,
-        @Param("isPublic") boolean isPublic,
-        @Param("creatorId") @Nullable Long creatorId,
-        @Param("lastSyncAt") Instant lastSyncAt,
-        @Param("createdAt") @Nullable Instant createdAt,
-        @Param("updatedAt") @Nullable Instant updatedAt
-    );
+            @Param("nativeId") Long nativeId,
+            @Param("providerId") Long providerId,
+            @Param("nodeId") String nodeId,
+            @Param("ownerType") String ownerType,
+            @Param("ownerId") Long ownerId,
+            @Param("number") int number,
+            @Param("title") String title,
+            @Param("shortDescription") @Nullable String shortDescription,
+            @Param("readme") @Nullable String readme,
+            @Param("template") boolean template,
+            @Param("url") @Nullable String url,
+            @Param("closed") boolean closed,
+            @Param("closedAt") @Nullable Instant closedAt,
+            @Param("isPublic") boolean isPublic,
+            @Param("creatorId") @Nullable Long creatorId,
+            @Param("lastSyncAt") Instant lastSyncAt,
+            @Param("createdAt") @Nullable Instant createdAt,
+            @Param("updatedAt") @Nullable Instant updatedAt);
 
     /**
      * Updates the item sync cursor for a project.
@@ -234,8 +227,7 @@ public interface ProjectRepository extends JpaRepository<Project, Long> {
     @Modifying
     @Transactional
     @Query(
-        "UPDATE Project p SET p.statusUpdatesSyncedAt = :syncedAt, p.statusUpdateSyncCursor = NULL WHERE p.id = :projectId"
-    )
+            "UPDATE Project p SET p.statusUpdatesSyncedAt = :syncedAt, p.statusUpdateSyncCursor = NULL WHERE p.id = :projectId")
     void updateStatusUpdatesSyncedAt(@Param("projectId") Long projectId, @Param("syncedAt") Instant syncedAt);
 
     /**
@@ -266,19 +258,16 @@ public interface ProjectRepository extends JpaRepository<Project, Long> {
      * @param cooldownThreshold projects synced after this time are skipped
      * @return list of projects that need item sync
      */
-    @Query(
-        """
+    @Query("""
         SELECT p FROM Project p
         WHERE p.ownerType = :ownerType AND p.ownerId = :ownerId
           AND (p.itemsSyncedAt IS NULL OR p.itemsSyncedAt < :cooldownThreshold)
         ORDER BY COALESCE(p.itemsSyncedAt, p.createdAt) ASC
-        """
-    )
+        """)
     List<Project> findProjectsNeedingItemSync(
-        @Param("ownerType") Project.OwnerType ownerType,
-        @Param("ownerId") Long ownerId,
-        @Param("cooldownThreshold") Instant cooldownThreshold
-    );
+            @Param("ownerType") Project.OwnerType ownerType,
+            @Param("ownerId") Long ownerId,
+            @Param("cooldownThreshold") Instant cooldownThreshold);
 
     // Cascade Delete Operations
     // These methods support application-level referential integrity for the
@@ -339,8 +328,7 @@ public interface ProjectRepository extends JpaRepository<Project, Long> {
      *
      * @return list of orphaned projects
      */
-    @Query(
-        value = """
+    @Query(value = """
         SELECT p.* FROM project p
         LEFT JOIN organization o ON p.owner_type = 'ORGANIZATION' AND p.owner_id = o.id
         LEFT JOIN repository r ON p.owner_type = 'REPOSITORY' AND p.owner_id = r.id
@@ -348,8 +336,6 @@ public interface ProjectRepository extends JpaRepository<Project, Long> {
         WHERE (p.owner_type = 'ORGANIZATION' AND o.id IS NULL)
            OR (p.owner_type = 'REPOSITORY' AND r.id IS NULL)
            OR (p.owner_type = 'USER' AND u.id IS NULL)
-        """,
-        nativeQuery = true
-    )
+        """, nativeQuery = true)
     List<Project> findOrphanedProjects();
 }

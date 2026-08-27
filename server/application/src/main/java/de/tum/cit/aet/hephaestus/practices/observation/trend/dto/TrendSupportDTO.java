@@ -6,31 +6,29 @@ import java.time.Instant;
 import org.jspecify.annotations.Nullable;
 
 public record TrendSupportDTO(
-    @Schema(requiredMode = Schema.RequiredMode.REQUIRED) int currentOpportunities,
-    @Schema(requiredMode = Schema.RequiredMode.REQUIRED) int previousOpportunities,
-    @Schema(requiredMode = Schema.RequiredMode.REQUIRED) int opportunitiesUntilComparable,
-    @Nullable Integer comparablePractices,
-    @Nullable Integer eligiblePractices,
-    @Nullable Instant firstOpportunityAt,
-    @Nullable Instant lastOpportunityAt,
-    @Nullable Integer calendarSpanDays,
-    @Schema(requiredMode = Schema.RequiredMode.REQUIRED) int bundleSize,
-    @Schema(requiredMode = Schema.RequiredMode.REQUIRED) double ropeHalfWidth,
-    @Schema(requiredMode = Schema.RequiredMode.REQUIRED) double credibilityThreshold
-) {
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) int currentOpportunities,
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) int previousOpportunities,
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) int opportunitiesUntilComparable,
+        @Nullable Integer comparablePractices,
+        @Nullable Integer eligiblePractices,
+        @Nullable Instant firstOpportunityAt,
+        @Nullable Instant lastOpportunityAt,
+        @Nullable Integer calendarSpanDays,
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) int bundleSize,
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) double ropeHalfWidth,
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) double credibilityThreshold) {
     public static TrendSupportDTO from(TrendSupport support) {
         return new TrendSupportDTO(
-            support.currentOpportunities(),
-            support.previousOpportunities(),
-            support.opportunitiesUntilComparable(),
-            support.comparablePractices(),
-            support.eligiblePractices(),
-            support.firstOpportunityAt(),
-            support.lastOpportunityAt(),
-            support.calendarSpanDays(),
-            support.bundleSize(),
-            support.ropeHalfWidth(),
-            support.credibilityThreshold()
-        );
+                support.currentOpportunities(),
+                support.previousOpportunities(),
+                support.opportunitiesUntilComparable(),
+                support.comparablePractices(),
+                support.eligiblePractices(),
+                support.firstOpportunityAt(),
+                support.lastOpportunityAt(),
+                support.calendarSpanDays(),
+                support.bundleSize(),
+                support.ropeHalfWidth(),
+                support.credibilityThreshold());
     }
 }

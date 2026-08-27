@@ -13,7 +13,6 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.Organizatio
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.OrganizationRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
-import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabEventType;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.milestone.dto.GitLabMilestoneEventDTO;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.testconfig.RecordingScmEventListener;
@@ -59,7 +58,7 @@ class GitLabMilestoneMessageHandlerIntegrationTest extends BaseIntegrationTest {
     private static final String FIXTURE_MILESTONE_DESC = "Second major release";
     private static final String FIXTURE_DUE_DATE = "2026-06-01";
     private static final String FIXTURE_MILESTONE_HTML_URL =
-        "https://gitlab.lrz.de/hephaestustest/demo-repository/-/milestones/2";
+            "https://gitlab.lrz.de/hephaestustest/demo-repository/-/milestones/2";
 
     // Repository/org setup
     private static final String FIXTURE_ORG_LOGIN = "hephaestustest";
@@ -121,8 +120,8 @@ class GitLabMilestoneMessageHandlerIntegrationTest extends BaseIntegrationTest {
             handler.handleEvent(event);
 
             Milestone milestone = milestoneRepository
-                .findByNumberAndRepositoryId(MILESTONE_IID, savedRepo.getId())
-                .orElseThrow();
+                    .findByNumberAndRepositoryId(MILESTONE_IID, savedRepo.getId())
+                    .orElseThrow();
 
             assertThat(milestone.getNativeId()).isEqualTo(NATIVE_MILESTONE_ID);
             assertThat(milestone.getNumber()).isEqualTo(MILESTONE_IID);
@@ -133,7 +132,8 @@ class GitLabMilestoneMessageHandlerIntegrationTest extends BaseIntegrationTest {
             assertThat(milestone.getHtmlUrl()).isEqualTo(FIXTURE_MILESTONE_HTML_URL);
             assertThat(milestone.getRepository().getId()).isEqualTo(savedRepo.getId());
 
-            assertThat(eventListener.ofType(ScmDomainEvent.MilestoneCreated.class)).hasSize(1);
+            assertThat(eventListener.ofType(ScmDomainEvent.MilestoneCreated.class))
+                    .hasSize(1);
         }
 
         @Test
@@ -146,13 +146,14 @@ class GitLabMilestoneMessageHandlerIntegrationTest extends BaseIntegrationTest {
             handler.handleEvent(loadPayload("milestone.close"));
 
             Milestone milestone = milestoneRepository
-                .findByNumberAndRepositoryId(MILESTONE_IID, savedRepo.getId())
-                .orElse(null);
+                    .findByNumberAndRepositoryId(MILESTONE_IID, savedRepo.getId())
+                    .orElse(null);
             assertThat(milestone).isNotNull();
             assertThat(milestone.getState()).isEqualTo(Milestone.State.CLOSED);
             assertThat(milestone.getClosedAt()).isNotNull();
 
-            assertThat(eventListener.ofType(ScmDomainEvent.MilestoneUpdated.class)).hasSize(1);
+            assertThat(eventListener.ofType(ScmDomainEvent.MilestoneUpdated.class))
+                    .hasSize(1);
         }
 
         @Test
@@ -166,13 +167,14 @@ class GitLabMilestoneMessageHandlerIntegrationTest extends BaseIntegrationTest {
             handler.handleEvent(loadPayload("milestone.reopen"));
 
             Milestone milestone = milestoneRepository
-                .findByNumberAndRepositoryId(MILESTONE_IID, savedRepo.getId())
-                .orElse(null);
+                    .findByNumberAndRepositoryId(MILESTONE_IID, savedRepo.getId())
+                    .orElse(null);
             assertThat(milestone).isNotNull();
             assertThat(milestone.getState()).isEqualTo(Milestone.State.OPEN);
             assertThat(milestone.getClosedAt()).isNull();
 
-            assertThat(eventListener.ofType(ScmDomainEvent.MilestoneUpdated.class)).hasSize(1);
+            assertThat(eventListener.ofType(ScmDomainEvent.MilestoneUpdated.class))
+                    .hasSize(1);
         }
     }
 
@@ -207,28 +209,25 @@ class GitLabMilestoneMessageHandlerIntegrationTest extends BaseIntegrationTest {
         @Test
         void shouldHandleFullLifecycle() throws Exception {
             handler.handleEvent(loadPayload("milestone.create"));
-            assertThat(
-                milestoneRepository
-                    .findByNumberAndRepositoryId(MILESTONE_IID, savedRepo.getId())
-                    .orElseThrow()
-                    .getState()
-            ).isEqualTo(Milestone.State.OPEN);
+            assertThat(milestoneRepository
+                            .findByNumberAndRepositoryId(MILESTONE_IID, savedRepo.getId())
+                            .orElseThrow()
+                            .getState())
+                    .isEqualTo(Milestone.State.OPEN);
 
             handler.handleEvent(loadPayload("milestone.close"));
-            assertThat(
-                milestoneRepository
-                    .findByNumberAndRepositoryId(MILESTONE_IID, savedRepo.getId())
-                    .orElseThrow()
-                    .getState()
-            ).isEqualTo(Milestone.State.CLOSED);
+            assertThat(milestoneRepository
+                            .findByNumberAndRepositoryId(MILESTONE_IID, savedRepo.getId())
+                            .orElseThrow()
+                            .getState())
+                    .isEqualTo(Milestone.State.CLOSED);
 
             handler.handleEvent(loadPayload("milestone.reopen"));
-            assertThat(
-                milestoneRepository
-                    .findByNumberAndRepositoryId(MILESTONE_IID, savedRepo.getId())
-                    .orElseThrow()
-                    .getState()
-            ).isEqualTo(Milestone.State.OPEN);
+            assertThat(milestoneRepository
+                            .findByNumberAndRepositoryId(MILESTONE_IID, savedRepo.getId())
+                            .orElseThrow()
+                            .getState())
+                    .isEqualTo(Milestone.State.OPEN);
 
             assertThat(milestoneRepository.count()).isEqualTo(1);
         }
@@ -244,10 +243,9 @@ class GitLabMilestoneMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
     private void setupTestData() {
         IdentityProvider provider = gitProviderRepository
-            .findByTypeAndServerUrl(IdentityProviderType.GITLAB, "https://gitlab.lrz.de")
-            .orElseGet(() ->
-                gitProviderRepository.save(new IdentityProvider(IdentityProviderType.GITLAB, "https://gitlab.lrz.de"))
-            );
+                .findByTypeAndServerUrl(IdentityProviderType.GITLAB, "https://gitlab.lrz.de")
+                .orElseGet(() -> gitProviderRepository.save(
+                        new IdentityProvider(IdentityProviderType.GITLAB, "https://gitlab.lrz.de")));
 
         Organization org = new Organization();
         org.setNativeId(1L);

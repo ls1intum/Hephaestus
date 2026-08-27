@@ -35,32 +35,25 @@ class OutlineApiClientTokenDescriptionTest extends BaseUnitTest {
 
     /** Two keys, one of which ends in the token's last four characters. */
     private static final String API_KEYS_BODY =
-        "{\"data\":[" +
-        "{\"id\":\"k-other\",\"name\":\"CI bot\",\"last4\":\"zz99\"}," +
-        "{\"id\":\"k-mine\",\"name\":\"Hephaestus\",\"last4\":\"ab12\"," +
-        "\"expiresAt\":\"2026-12-01T10:00:00.000Z\",\"lastActiveAt\":\"2026-07-13T08:30:00.000Z\"}" +
-        "]}";
+            "{\"data\":[" + "{\"id\":\"k-other\",\"name\":\"CI bot\",\"last4\":\"zz99\"},"
+                    + "{\"id\":\"k-mine\",\"name\":\"Hephaestus\",\"last4\":\"ab12\","
+                    + "\"expiresAt\":\"2026-12-01T10:00:00.000Z\",\"lastActiveAt\":\"2026-07-13T08:30:00.000Z\"}"
+                    + "]}";
 
     private static OutlineApiClient clientRespondingWith(
-        int status,
-        String body,
-        AtomicReference<ClientRequest> captured
-    ) {
+            int status, String body, AtomicReference<ClientRequest> captured) {
         ExchangeFunction exchange = request -> {
             captured.set(request);
-            return Mono.just(
-                ClientResponse.create(HttpStatus.valueOf(status))
+            return Mono.just(ClientResponse.create(HttpStatus.valueOf(status))
                     .header("Content-Type", "application/json")
                     .body(body)
-                    .build()
-            );
+                    .build());
         };
         return new OutlineApiClient(
-            CircuitBreaker.ofDefaults("outlineRestApi"),
-            Retry.ofDefaults("outlineRestApi"),
-            WebClient.builder().exchangeFunction(exchange).build(),
-            new OutlineOriginPolicy(java.util.Set.of("https://wiki.example.com"))
-        );
+                CircuitBreaker.ofDefaults("outlineRestApi"),
+                Retry.ofDefaults("outlineRestApi"),
+                WebClient.builder().exchangeFunction(exchange).build(),
+                new OutlineOriginPolicy(java.util.Set.of("https://wiki.example.com")));
     }
 
     @Test
@@ -87,21 +80,17 @@ class OutlineApiClientTokenDescriptionTest extends BaseUnitTest {
         // The key exists upstream but belongs to someone else — matching on name or position would
         // hand the admin another key's expiry.
         OutlineApiClient client = clientRespondingWith(
-            200,
-            "{\"data\":[{\"id\":\"k-other\",\"name\":\"CI bot\",\"last4\":\"zz99\"}]}",
-            new AtomicReference<>()
-        );
+                200,
+                "{\"data\":[{\"id\":\"k-other\",\"name\":\"CI bot\",\"last4\":\"zz99\"}]}",
+                new AtomicReference<>());
 
         assertThat(client.describeToken(SERVER_URL, TOKEN)).isEmpty();
     }
 
     @Test
     void describeToken_isEmptyOnForbidden_becauseAnOutOfScopeKeyStillSyncs() {
-        OutlineApiClient client = clientRespondingWith(
-            403,
-            "{\"error\":\"authorization_error\"}",
-            new AtomicReference<>()
-        );
+        OutlineApiClient client =
+                clientRespondingWith(403, "{\"error\":\"authorization_error\"}", new AtomicReference<>());
 
         assertThat(client.describeToken(SERVER_URL, TOKEN)).isEmpty();
     }
@@ -110,15 +99,12 @@ class OutlineApiClientTokenDescriptionTest extends BaseUnitTest {
     void describeToken_propagatesAnyOtherFailure() {
         // A revoked token (401 authentication_required) is a real problem — it must not be laundered
         // into "no metadata available".
-        OutlineApiClient client = clientRespondingWith(
-            401,
-            "{\"error\":\"authentication_required\"}",
-            new AtomicReference<>()
-        );
+        OutlineApiClient client =
+                clientRespondingWith(401, "{\"error\":\"authentication_required\"}", new AtomicReference<>());
 
         assertThatThrownBy(() -> client.describeToken(SERVER_URL, TOKEN))
-            .isInstanceOf(OutlineApiException.class)
-            .hasMessageContaining("HTTP 401");
+                .isInstanceOf(OutlineApiException.class)
+                .hasMessageContaining("HTTP 401");
     }
 
     @Test

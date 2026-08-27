@@ -24,13 +24,11 @@ class WorkspaceMembershipAutoSeederTest extends BaseUnitTest {
 
     @Test
     void shouldNotInspectOrModifyMembershipsWhenDisabled() {
-        WorkspaceMembershipAutoSeeder seeder = new WorkspaceMembershipAutoSeeder(
-            membershipRepository,
-            membershipService,
-            false
-        );
+        WorkspaceMembershipAutoSeeder seeder =
+                new WorkspaceMembershipAutoSeeder(membershipRepository, membershipService, false);
 
-        assertThat(seeder.seedFirstUserWhenEmpty(TestEntities.workspace(42L), List.of(new User()))).isEmpty();
+        assertThat(seeder.seedFirstUserWhenEmpty(TestEntities.workspace(42L), List.of(new User())))
+                .isEmpty();
         verifyNoInteractions(membershipRepository, membershipService);
     }
 
@@ -38,11 +36,8 @@ class WorkspaceMembershipAutoSeederTest extends BaseUnitTest {
     void shouldNotGrantAdminWhenWorkspaceAlreadyHasMemberships() {
         Workspace workspace = TestEntities.workspace(42L);
         when(membershipRepository.countByWorkspace_Id(42L)).thenReturn(1L);
-        WorkspaceMembershipAutoSeeder seeder = new WorkspaceMembershipAutoSeeder(
-            membershipRepository,
-            membershipService,
-            true
-        );
+        WorkspaceMembershipAutoSeeder seeder =
+                new WorkspaceMembershipAutoSeeder(membershipRepository, membershipService, true);
 
         User user = new User();
         user.setId(7L);

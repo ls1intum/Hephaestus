@@ -8,15 +8,14 @@ import org.jspecify.annotations.Nullable;
  * {@code task.json} envelope the handler writes.
  */
 public record PracticeAgentRequest(
-    String apiProtocol,
-    String upstreamModelId,
-    @Nullable Integer contextWindow,
-    @Nullable Integer maxOutputTokens,
-    boolean supportsReasoning,
-    String jobToken,
-    boolean allowInternet,
-    int timeoutSeconds
-) {
+        String apiProtocol,
+        String upstreamModelId,
+        @Nullable Integer contextWindow,
+        @Nullable Integer maxOutputTokens,
+        boolean supportsReasoning,
+        String jobToken,
+        boolean allowInternet,
+        int timeoutSeconds) {
     public PracticeAgentRequest {
         Objects.requireNonNull(apiProtocol, "apiProtocol must not be null");
         Objects.requireNonNull(upstreamModelId, "upstreamModelId must not be null");

@@ -31,31 +31,24 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
 
     Page<AgentJob> findByWorkspaceIdAndStatus(Long workspaceId, AgentJobStatus status, Pageable pageable);
 
-    @Query(
-        "SELECT j.id AS id, j.jobType AS jobType, j.integrationKind AS integrationKind, j.metadata AS metadata " +
-            "FROM AgentJob j WHERE j.workspace.id = :workspaceId AND j.id IN :ids"
-    )
+    @Query("SELECT j.id AS id, j.jobType AS jobType, j.integrationKind AS integrationKind, j.metadata AS metadata "
+            + "FROM AgentJob j WHERE j.workspace.id = :workspaceId AND j.id IN :ids")
     List<ReviewRunTargetRow> findReviewRunTargets(
-        @Param("workspaceId") Long workspaceId,
-        @Param("ids") Collection<UUID> ids
-    );
+            @Param("workspaceId") Long workspaceId, @Param("ids") Collection<UUID> ids);
 
     /**
      * What these runs decided, for the trace view. {@code reviewReadiness} is the per-practice record
      * and is deliberately fetched with them: a run that ends without measuring a practice looks the
      * same from {@code status} and {@code output} whatever the cause, and only readiness says which.
      */
-    @Query(
-        "SELECT j.id AS id, j.status AS status, j.output AS output, j.reviewReadiness AS reviewReadiness, " +
-            "j.completedAt AS completedAt FROM AgentJob j WHERE j.workspace.id = :workspaceId AND j.id IN :ids"
-    )
+    @Query("SELECT j.id AS id, j.status AS status, j.output AS output, j.reviewReadiness AS reviewReadiness, "
+            + "j.completedAt AS completedAt FROM AgentJob j WHERE j.workspace.id = :workspaceId AND j.id IN :ids")
     List<ReviewOutcomeRow> findReviewOutcomes(
-        @Param("workspaceId") Long workspaceId,
-        @Param("ids") Collection<UUID> ids
-    );
+            @Param("workspaceId") Long workspaceId, @Param("ids") Collection<UUID> ids);
 
     interface ReviewOutcomeRow {
         UUID getId();
+
         AgentJobStatus getStatus();
 
         @Nullable
@@ -80,22 +73,19 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
      * type a null bound; see {@code AuthEventRepository#findForAdmin}, which is allowlisted out of the
      * parameter-count arch rule for exactly this reason.
      */
-    @Query(
-        "SELECT j.id AS id, j.status AS status, j.jobType AS jobType, j.integrationKind AS integrationKind, " +
-            "j.metadata AS metadata, j.createdAt AS createdAt FROM AgentJob j " +
-            "WHERE j.workspace.id = :workspaceId AND j.purpose = :purpose " +
-            "AND (:status IS NULL OR j.status = :status) " +
-            "AND (CAST(:from AS Instant) IS NULL OR j.createdAt >= :from) " +
-            "AND (CAST(:to AS Instant) IS NULL OR j.createdAt < :to)"
-    )
+    @Query("SELECT j.id AS id, j.status AS status, j.jobType AS jobType, j.integrationKind AS integrationKind, "
+            + "j.metadata AS metadata, j.createdAt AS createdAt FROM AgentJob j "
+            + "WHERE j.workspace.id = :workspaceId AND j.purpose = :purpose "
+            + "AND (:status IS NULL OR j.status = :status) "
+            + "AND (CAST(:from AS Instant) IS NULL OR j.createdAt >= :from) "
+            + "AND (CAST(:to AS Instant) IS NULL OR j.createdAt < :to)")
     Page<ReviewRunSummaryRow> findReviewRunSummaries(
-        @Param("workspaceId") Long workspaceId,
-        @Param("purpose") AgentPurpose purpose,
-        @Param("status") @Nullable AgentJobStatus status,
-        @Param("from") @Nullable Instant from,
-        @Param("to") @Nullable Instant to,
-        Pageable pageable
-    );
+            @Param("workspaceId") Long workspaceId,
+            @Param("purpose") AgentPurpose purpose,
+            @Param("status") @Nullable AgentJobStatus status,
+            @Param("from") @Nullable Instant from,
+            @Param("to") @Nullable Instant to,
+            Pageable pageable);
 
     Optional<AgentJob> findByIdAndWorkspaceId(UUID id, Long workspaceId);
 
@@ -112,10 +102,9 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
      *     evidence — both of which mean nothing may be cited from it
      */
     @Query(
-        value = "SELECT jsonb_extract_path_text(j.evidence_snapshot, 'manifest', 'contractVersion') " +
-            "FROM agent_job j WHERE j.id = :id AND j.workspace_id = :workspaceId",
-        nativeQuery = true
-    )
+            value = "SELECT jsonb_extract_path_text(j.evidence_snapshot, 'manifest', 'contractVersion') "
+                    + "FROM agent_job j WHERE j.id = :id AND j.workspace_id = :workspaceId",
+            nativeQuery = true)
     Optional<String> findEvidenceContractVersion(@Param("id") UUID id, @Param("workspaceId") Long workspaceId);
 
     /**
@@ -129,20 +118,15 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
      * whose value is {@code null}. Both mean nothing may be cited from it, exactly as the empty
      * {@link Optional} does on the single-row query.
      */
-    @Query(
-        value = """
+    @Query(value = """
         SELECT j.id AS "id",
                jsonb_extract_path_text(j.evidence_snapshot, 'manifest', 'contractVersion') AS "contractVersion"
         FROM agent_job j
         WHERE j.id IN :ids
           AND j.workspace_id = :workspaceId
-        """,
-        nativeQuery = true
-    )
+        """, nativeQuery = true)
     List<EvidenceContractVersionRow> findEvidenceContractVersions(
-        @Param("workspaceId") Long workspaceId,
-        @Param("ids") Collection<UUID> ids
-    );
+            @Param("workspaceId") Long workspaceId, @Param("ids") Collection<UUID> ids);
 
     interface EvidenceContractVersionRow {
         UUID getId();
@@ -151,22 +135,17 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
         String getContractVersion();
     }
 
-    @Query(
-        "SELECT CASE WHEN COUNT(j) > 0 THEN true ELSE false END FROM AgentJob j " +
-            "WHERE j.workspace.id = :workspaceId AND (" +
-            "j.status IN (" +
-            "de.tum.cit.aet.hephaestus.agent.job.AgentJobStatus.QUEUED, " +
-            "de.tum.cit.aet.hephaestus.agent.job.AgentJobStatus.RUNNING) OR " +
-            "(j.status = de.tum.cit.aet.hephaestus.agent.job.AgentJobStatus.COMPLETED AND " +
-            "j.deliveryStatus = de.tum.cit.aet.hephaestus.agent.job.DeliveryStatus.PENDING))"
-    )
+    @Query("SELECT CASE WHEN COUNT(j) > 0 THEN true ELSE false END FROM AgentJob j "
+            + "WHERE j.workspace.id = :workspaceId AND ("
+            + "j.status IN ("
+            + "de.tum.cit.aet.hephaestus.agent.job.AgentJobStatus.QUEUED, "
+            + "de.tum.cit.aet.hephaestus.agent.job.AgentJobStatus.RUNNING) OR "
+            + "(j.status = de.tum.cit.aet.hephaestus.agent.job.AgentJobStatus.COMPLETED AND "
+            + "j.deliveryStatus = de.tum.cit.aet.hephaestus.agent.job.DeliveryStatus.PENDING))")
     boolean existsPurgeBlockingWork(@Param("workspaceId") Long workspaceId);
 
     long countByWorkspaceIdAndPurposeAndStatusIn(
-        Long workspaceId,
-        AgentPurpose purpose,
-        Collection<AgentJobStatus> statuses
-    );
+            Long workspaceId, AgentPurpose purpose, Collection<AgentJobStatus> statuses);
 
     List<AgentJob> findByStatus(AgentJobStatus status);
 
@@ -183,17 +162,12 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
      */
     @WorkspaceAgnostic("Workspace-scoped release; caller is the budget writer for that workspace")
     @Modifying(flushAutomatically = true, clearAutomatically = true)
-    @Query(
-        "UPDATE AgentJob j SET j.availableAt = :now, j.holdReason = null " +
-            "WHERE j.workspace.id = :workspaceId AND j.status = 'QUEUED' AND j.holdReason = 'BUDGET'"
-    )
+    @Query("UPDATE AgentJob j SET j.availableAt = :now, j.holdReason = null "
+            + "WHERE j.workspace.id = :workspaceId AND j.status = 'QUEUED' AND j.holdReason = 'BUDGET'")
     int releaseBudgetHolds(@Param("workspaceId") Long workspaceId, @Param("now") Instant now);
 
     Optional<AgentJob> findByWorkspaceIdAndIdempotencyKeyAndStatusIn(
-        Long workspaceId,
-        String idempotencyKey,
-        Collection<AgentJobStatus> statuses
-    );
+            Long workspaceId, String idempotencyKey, Collection<AgentJobStatus> statuses);
 
     Optional<AgentJob> findByWorkspaceIdAndIdempotencyKey(Long workspaceId, String idempotencyKey);
 
@@ -201,18 +175,15 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
      * Matches on an idempotency-key prefix, so a caller can look across the varying tail of the key
      * (head SHA, revision, timestamp) for an earlier review of the same subject.
      */
-    @Query(
-        "SELECT j FROM AgentJob j WHERE j.workspace.id = :workspaceId" +
-            " AND j.idempotencyKey LIKE :keyPrefix ESCAPE '\\'" +
-            " AND j.createdAt > :cutoff" +
-            " ORDER BY j.createdAt DESC" +
-            " LIMIT 1"
-    )
+    @Query("SELECT j FROM AgentJob j WHERE j.workspace.id = :workspaceId"
+            + " AND j.idempotencyKey LIKE :keyPrefix ESCAPE '\\'"
+            + " AND j.createdAt > :cutoff"
+            + " ORDER BY j.createdAt DESC"
+            + " LIMIT 1")
     Optional<AgentJob> findRecentJobByKeyPrefix(
-        @Param("workspaceId") Long workspaceId,
-        @Param("keyPrefix") String keyPrefix,
-        @Param("cutoff") Instant cutoff
-    );
+            @Param("workspaceId") Long workspaceId,
+            @Param("keyPrefix") String keyPrefix,
+            @Param("cutoff") Instant cutoff);
 
     /**
      * Empty if a concurrent poller holds the row, or it is no longer eligible. Eligibility is
@@ -222,11 +193,10 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
      */
     @WorkspaceAgnostic("ID-based claim; job ID from a workspace-scoped candidate poll")
     @Query(
-        value = "SELECT j.* FROM agent_job j JOIN workspace w ON w.id = j.workspace_id " +
-            "WHERE j.id = :id AND j.status = 'QUEUED' AND j.available_at <= :now AND w.status = 'ACTIVE' " +
-            "FOR UPDATE OF j SKIP LOCKED",
-        nativeQuery = true
-    )
+            value = "SELECT j.* FROM agent_job j JOIN workspace w ON w.id = j.workspace_id "
+                    + "WHERE j.id = :id AND j.status = 'QUEUED' AND j.available_at <= :now AND w.status = 'ACTIVE' "
+                    + "FOR UPDATE OF j SKIP LOCKED",
+            nativeQuery = true)
     Optional<AgentJob> findByIdQueuedForUpdateSkipLocked(@Param("id") UUID id, @Param("now") Instant now);
 
     @WorkspaceAgnostic("ID-based reload; job ID from workspace-scoped claim context")
@@ -246,17 +216,14 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
     /** @return rows updated (0 or 1); 0 means a concurrent transition won. */
     @WorkspaceAgnostic("ID-based status transition; job ID from workspace-scoped context")
     @Modifying(flushAutomatically = true, clearAutomatically = true)
-    @Query(
-        "UPDATE AgentJob j SET j.status = :newStatus, j.completedAt = :now, j.errorMessage = :error " +
-            "WHERE j.id = :id AND j.status IN :fromStatuses"
-    )
+    @Query("UPDATE AgentJob j SET j.status = :newStatus, j.completedAt = :now, j.errorMessage = :error "
+            + "WHERE j.id = :id AND j.status IN :fromStatuses")
     int transitionStatus(
-        @Param("id") UUID id,
-        @Param("newStatus") AgentJobStatus newStatus,
-        @Param("now") Instant now,
-        @Param("error") @Nullable String error,
-        @Param("fromStatuses") Collection<AgentJobStatus> fromStatuses
-    );
+            @Param("id") UUID id,
+            @Param("newStatus") AgentJobStatus newStatus,
+            @Param("now") Instant now,
+            @Param("error") @Nullable String error,
+            @Param("fromStatuses") Collection<AgentJobStatus> fromStatuses);
 
     /**
      * Like {@link #transitionStatus}, but a worker whose job was orphan-requeued to a sibling cannot
@@ -266,18 +233,15 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
      */
     @WorkspaceAgnostic("ID-based fenced transition; job ID + owner from worker-local execution context")
     @Modifying(flushAutomatically = true, clearAutomatically = true)
-    @Query(
-        "UPDATE AgentJob j SET j.status = :newStatus, j.completedAt = :now, j.errorMessage = :error " +
-            "WHERE j.id = :id AND j.status IN :fromStatuses AND j.workerId = :workerId"
-    )
+    @Query("UPDATE AgentJob j SET j.status = :newStatus, j.completedAt = :now, j.errorMessage = :error "
+            + "WHERE j.id = :id AND j.status IN :fromStatuses AND j.workerId = :workerId")
     int transitionStatusOwnedBy(
-        @Param("id") UUID id,
-        @Param("newStatus") AgentJobStatus newStatus,
-        @Param("now") Instant now,
-        @Param("error") @Nullable String error,
-        @Param("fromStatuses") Collection<AgentJobStatus> fromStatuses,
-        @Param("workerId") String workerId
-    );
+            @Param("id") UUID id,
+            @Param("newStatus") AgentJobStatus newStatus,
+            @Param("now") Instant now,
+            @Param("error") @Nullable String error,
+            @Param("fromStatuses") Collection<AgentJobStatus> fromStatuses,
+            @Param("workerId") String workerId);
 
     /**
      * Unfenced by worker; callers that know the owning worker should prefer
@@ -287,18 +251,15 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
      */
     @WorkspaceAgnostic("ID-based cancel; job ID from worker-local drain or user-scoped admin call")
     @Modifying(flushAutomatically = true, clearAutomatically = true)
-    @Query(
-        "UPDATE AgentJob j SET j.status = de.tum.cit.aet.hephaestus.agent.job.AgentJobStatus.CANCELLED, " +
-            "j.completedAt = :now, j.errorMessage = :error, j.cancellationReason = :reason " +
-            "WHERE j.id = :id AND j.status IN :fromStatuses"
-    )
+    @Query("UPDATE AgentJob j SET j.status = de.tum.cit.aet.hephaestus.agent.job.AgentJobStatus.CANCELLED, "
+            + "j.completedAt = :now, j.errorMessage = :error, j.cancellationReason = :reason "
+            + "WHERE j.id = :id AND j.status IN :fromStatuses")
     int transitionToCancelled(
-        @Param("id") UUID id,
-        @Param("now") Instant now,
-        @Param("error") String error,
-        @Param("reason") AgentJobCancellationReason reason,
-        @Param("fromStatuses") Collection<AgentJobStatus> fromStatuses
-    );
+            @Param("id") UUID id,
+            @Param("now") Instant now,
+            @Param("error") String error,
+            @Param("reason") AgentJobCancellationReason reason,
+            @Param("fromStatuses") Collection<AgentJobStatus> fromStatuses);
 
     /**
      * Adds one proxied call's tokens to the running totals of ONE attempt, so a job that crashes
@@ -318,36 +279,30 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
      */
     @WorkspaceAgnostic("ID-based per-call usage accumulation from the worker-local proxy")
     @Modifying(flushAutomatically = true, clearAutomatically = true)
-    @Query(
-        "UPDATE AgentJob j SET " +
-            "j.llmTotalCalls = COALESCE(j.llmTotalCalls, 0) + 1, " +
-            "j.llmTotalInputTokens = COALESCE(j.llmTotalInputTokens, 0) + :input, " +
-            "j.llmTotalOutputTokens = COALESCE(j.llmTotalOutputTokens, 0) + :output, " +
-            "j.llmTotalReasoningTokens = COALESCE(j.llmTotalReasoningTokens, 0) + :reasoning, " +
-            "j.llmCacheReadTokens = COALESCE(j.llmCacheReadTokens, 0) + :cacheRead " +
-            "WHERE j.id = :id AND j.retryCount = :attempt AND j.status = 'RUNNING'"
-    )
+    @Query("UPDATE AgentJob j SET " + "j.llmTotalCalls = COALESCE(j.llmTotalCalls, 0) + 1, "
+            + "j.llmTotalInputTokens = COALESCE(j.llmTotalInputTokens, 0) + :input, "
+            + "j.llmTotalOutputTokens = COALESCE(j.llmTotalOutputTokens, 0) + :output, "
+            + "j.llmTotalReasoningTokens = COALESCE(j.llmTotalReasoningTokens, 0) + :reasoning, "
+            + "j.llmCacheReadTokens = COALESCE(j.llmCacheReadTokens, 0) + :cacheRead "
+            + "WHERE j.id = :id AND j.retryCount = :attempt AND j.status = 'RUNNING'")
     int accumulateLlmUsage(
-        @Param("id") UUID id,
-        @Param("attempt") int attempt,
-        @Param("input") int input,
-        @Param("output") int output,
-        @Param("reasoning") int reasoning,
-        @Param("cacheRead") int cacheRead
-    );
+            @Param("id") UUID id,
+            @Param("attempt") int attempt,
+            @Param("input") int input,
+            @Param("output") int output,
+            @Param("reasoning") int reasoning,
+            @Param("cacheRead") int cacheRead);
 
     /**
      * Reads the totals straight from the row rather than from a possibly stale in-memory entity, so
      * committed proxy accumulations are included.
      */
     @WorkspaceAgnostic("ID-based usage read; job ID from worker-local terminal accounting")
-    @Query(
-        "SELECT new de.tum.cit.aet.hephaestus.agent.job.AgentJobLlmUsage(" +
-            "COALESCE(j.llmTotalCalls, 0), COALESCE(j.llmTotalInputTokens, 0), " +
-            "COALESCE(j.llmTotalOutputTokens, 0), COALESCE(j.llmTotalReasoningTokens, 0), " +
-            "COALESCE(j.llmCacheReadTokens, 0), COALESCE(j.llmCacheWriteTokens, 0)) " +
-            "FROM AgentJob j WHERE j.id = :id"
-    )
+    @Query("SELECT new de.tum.cit.aet.hephaestus.agent.job.AgentJobLlmUsage("
+            + "COALESCE(j.llmTotalCalls, 0), COALESCE(j.llmTotalInputTokens, 0), "
+            + "COALESCE(j.llmTotalOutputTokens, 0), COALESCE(j.llmTotalReasoningTokens, 0), "
+            + "COALESCE(j.llmCacheReadTokens, 0), COALESCE(j.llmCacheWriteTokens, 0)) "
+            + "FROM AgentJob j WHERE j.id = :id")
     Optional<AgentJobLlmUsage> findLlmUsageById(@Param("id") UUID id);
 
     /**
@@ -365,21 +320,16 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
      * from re-routing every recent job forever.
      */
     @WorkspaceAgnostic("Cross-tenant recovery sweep over jobs whose feedback lanes have no completion mark")
-    @Query(
-        "SELECT new de.tum.cit.aet.hephaestus.agent.job.UnpreparedFeedbackLanes(" +
-            "j.id, j.workspace.id, j.inChatPreparedAt, j.inAppPreparedAt) FROM AgentJob j " +
-            "WHERE j.status = de.tum.cit.aet.hephaestus.agent.job.AgentJobStatus.COMPLETED " +
-            "AND j.jobType IN (de.tum.cit.aet.hephaestus.agent.AgentJobType.PULL_REQUEST_REVIEW, " +
-            "de.tum.cit.aet.hephaestus.agent.AgentJobType.ISSUE_REVIEW) " +
-            "AND j.completedAt >= :from AND j.completedAt < :until " +
-            "AND (j.inChatPreparedAt IS NULL OR j.inAppPreparedAt IS NULL) " +
-            "ORDER BY j.completedAt"
-    )
+    @Query("SELECT new de.tum.cit.aet.hephaestus.agent.job.UnpreparedFeedbackLanes("
+            + "j.id, j.workspace.id, j.inChatPreparedAt, j.inAppPreparedAt) FROM AgentJob j "
+            + "WHERE j.status = de.tum.cit.aet.hephaestus.agent.job.AgentJobStatus.COMPLETED "
+            + "AND j.jobType IN (de.tum.cit.aet.hephaestus.agent.AgentJobType.PULL_REQUEST_REVIEW, "
+            + "de.tum.cit.aet.hephaestus.agent.AgentJobType.ISSUE_REVIEW) "
+            + "AND j.completedAt >= :from AND j.completedAt < :until "
+            + "AND (j.inChatPreparedAt IS NULL OR j.inAppPreparedAt IS NULL) "
+            + "ORDER BY j.completedAt")
     List<UnpreparedFeedbackLanes> findUnpreparedFeedbackLanes(
-        @Param("from") Instant from,
-        @Param("until") Instant until,
-        Pageable pageable
-    );
+            @Param("from") Instant from, @Param("until") Instant until, Pageable pageable);
 
     /**
      * Records that the conversational lane ran for this job. Written by the lane itself and by the
@@ -410,76 +360,61 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
      */
     @WorkspaceAgnostic("ID-based fenced cancel; job ID + owner from worker-local drain context")
     @Modifying(flushAutomatically = true, clearAutomatically = true)
-    @Query(
-        "UPDATE AgentJob j SET j.status = de.tum.cit.aet.hephaestus.agent.job.AgentJobStatus.CANCELLED, " +
-            "j.completedAt = :now, j.errorMessage = :error, j.cancellationReason = :reason " +
-            "WHERE j.id = :id AND j.status IN :fromStatuses AND j.workerId = :workerId"
-    )
+    @Query("UPDATE AgentJob j SET j.status = de.tum.cit.aet.hephaestus.agent.job.AgentJobStatus.CANCELLED, "
+            + "j.completedAt = :now, j.errorMessage = :error, j.cancellationReason = :reason "
+            + "WHERE j.id = :id AND j.status IN :fromStatuses AND j.workerId = :workerId")
     int transitionToCancelledOwnedBy(
-        @Param("id") UUID id,
-        @Param("now") Instant now,
-        @Param("error") String error,
-        @Param("reason") AgentJobCancellationReason reason,
-        @Param("fromStatuses") Collection<AgentJobStatus> fromStatuses,
-        @Param("workerId") String workerId
-    );
+            @Param("id") UUID id,
+            @Param("now") Instant now,
+            @Param("error") String error,
+            @Param("reason") AgentJobCancellationReason reason,
+            @Param("fromStatuses") Collection<AgentJobStatus> fromStatuses,
+            @Param("workerId") String workerId);
 
     /** Persists the accounting boundary immediately before sandbox/provider execution. */
     @WorkspaceAgnostic("ID-based execution-start fence; job ID + owner from worker-local execution context")
     @Modifying(flushAutomatically = true, clearAutomatically = true)
-    @Query(
-        "UPDATE AgentJob j SET j.executionStartedAt = :now " +
-            "WHERE j.id = :id AND j.status = 'RUNNING' AND j.executionStartedAt IS NULL " +
-            "AND ((:workerId IS NULL AND j.workerId IS NULL) OR j.workerId = :workerId)"
-    )
+    @Query("UPDATE AgentJob j SET j.executionStartedAt = :now "
+            + "WHERE j.id = :id AND j.status = 'RUNNING' AND j.executionStartedAt IS NULL "
+            + "AND ((:workerId IS NULL AND j.workerId IS NULL) OR j.workerId = :workerId)")
     int markExecutionStarted(
-        @Param("id") UUID id,
-        @Param("workerId") @Nullable String workerId,
-        @Param("now") Instant now
-    );
+            @Param("id") UUID id, @Param("workerId") @Nullable String workerId, @Param("now") Instant now);
 
     /** Written before the sandbox starts, so a failed or cancelled run still records what it consumed. */
     @WorkspaceAgnostic("ID-based provenance stamp; job ID + owner from worker-local execution context")
     @Modifying(flushAutomatically = true, clearAutomatically = true)
-    @Query(
-        "UPDATE AgentJob j SET j.promptDigest = :#{#stamp.promptDigest}, " +
-            "j.inputsDigest = :#{#stamp.inputsDigest}, " +
-            "j.evidenceSnapshot = :#{#stamp.evidenceSnapshot}, " +
-            "j.reviewReadiness = :#{#stamp.reviewReadiness} " +
-            "WHERE j.id = :id AND j.status = 'RUNNING' " +
-            "AND ((:workerId IS NULL AND j.workerId IS NULL) OR j.workerId = :workerId) " +
-            "AND j.retryCount = :retryCount"
-    )
+    @Query("UPDATE AgentJob j SET j.promptDigest = :#{#stamp.promptDigest}, "
+            + "j.inputsDigest = :#{#stamp.inputsDigest}, "
+            + "j.evidenceSnapshot = :#{#stamp.evidenceSnapshot}, "
+            + "j.reviewReadiness = :#{#stamp.reviewReadiness} "
+            + "WHERE j.id = :id AND j.status = 'RUNNING' "
+            + "AND ((:workerId IS NULL AND j.workerId IS NULL) OR j.workerId = :workerId) "
+            + "AND j.retryCount = :retryCount")
     int updateProvenanceDigests(
-        @Param("id") UUID id,
-        @Param("workerId") @Nullable String workerId,
-        @Param("retryCount") int retryCount,
-        @Param("stamp") ProvenanceStamp stamp
-    );
+            @Param("id") UUID id,
+            @Param("workerId") @Nullable String workerId,
+            @Param("retryCount") int retryCount,
+            @Param("stamp") ProvenanceStamp stamp);
 
     /** Written as a unit so the evidence snapshot and the readiness decisions over it cannot diverge. */
     record ProvenanceStamp(
-        @Nullable String promptDigest,
-        @Nullable String inputsDigest,
-        @Nullable JsonNode evidenceSnapshot,
-        @Nullable JsonNode reviewReadiness
-    ) {}
+            @Nullable String promptDigest,
+            @Nullable String inputsDigest,
+            @Nullable JsonNode evidenceSnapshot,
+            @Nullable JsonNode reviewReadiness) {}
 
     @WorkspaceAgnostic("ID-based evidence-refusal transition; job ID + owner from worker-local execution context")
     @Modifying(flushAutomatically = true, clearAutomatically = true)
-    @Query(
-        "UPDATE AgentJob j SET j.status = 'COMPLETED', j.completedAt = :now, j.output = :output, " +
-            "j.errorMessage = NULL WHERE j.id = :id AND j.status = 'RUNNING' " +
-            "AND ((:workerId IS NULL AND j.workerId IS NULL) OR j.workerId = :workerId) " +
-            "AND j.retryCount = :retryCount"
-    )
+    @Query("UPDATE AgentJob j SET j.status = 'COMPLETED', j.completedAt = :now, j.output = :output, "
+            + "j.errorMessage = NULL WHERE j.id = :id AND j.status = 'RUNNING' "
+            + "AND ((:workerId IS NULL AND j.workerId IS NULL) OR j.workerId = :workerId) "
+            + "AND j.retryCount = :retryCount")
     int transitionToEvidenceRefused(
-        @Param("id") UUID id,
-        @Param("workerId") @Nullable String workerId,
-        @Param("retryCount") int retryCount,
-        @Param("now") Instant now,
-        @Param("output") JsonNode output
-    );
+            @Param("id") UUID id,
+            @Param("workerId") @Nullable String workerId,
+            @Param("retryCount") int retryCount,
+            @Param("now") Instant now,
+            @Param("output") JsonNode output);
 
     /**
      * Poll-loop candidates, id-only because {@link #findByIdQueuedForUpdateSkipLocked} re-checks and
@@ -493,19 +428,18 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
      */
     @WorkspaceAgnostic("Cross-workspace poll candidates; caller is the @WorkspaceAgnostic job poller")
     @Query(
-        value = "SELECT j.id FROM agent_job j JOIN workspace w ON w.id = j.workspace_id " +
-            "WHERE j.status = 'QUEUED' " +
-            "AND w.status = 'ACTIVE' " +
-            "AND j.available_at <= now() " +
-            "AND (" +
-            "  (SELECT count(*) FROM agent_job r " +
-            "     WHERE r.workspace_id = j.workspace_id AND r.purpose = j.purpose AND r.status = 'RUNNING') " +
-            "  < COALESCE((SELECT b.max_concurrent_jobs FROM workspace_agent_binding b " +
-            "     WHERE b.workspace_id = j.workspace_id AND b.purpose = j.purpose), 2147483647)" +
-            ") " +
-            "ORDER BY j.available_at ASC, j.id ASC LIMIT :limit",
-        nativeQuery = true
-    )
+            value = "SELECT j.id FROM agent_job j JOIN workspace w ON w.id = j.workspace_id "
+                    + "WHERE j.status = 'QUEUED' "
+                    + "AND w.status = 'ACTIVE' "
+                    + "AND j.available_at <= now() "
+                    + "AND ("
+                    + "  (SELECT count(*) FROM agent_job r "
+                    + "     WHERE r.workspace_id = j.workspace_id AND r.purpose = j.purpose AND r.status = 'RUNNING') "
+                    + "  < COALESCE((SELECT b.max_concurrent_jobs FROM workspace_agent_binding b "
+                    + "     WHERE b.workspace_id = j.workspace_id AND b.purpose = j.purpose), 2147483647)"
+                    + ") "
+                    + "ORDER BY j.available_at ASC, j.id ASC LIMIT :limit",
+            nativeQuery = true)
     List<UUID> findQueuedIdsOldestFirst(@Param("limit") int limit);
 
     @WorkspaceAgnostic("Cross-workspace stale job reaper; caller is @WorkspaceAgnostic sweeper")
@@ -519,18 +453,15 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
      */
     @WorkspaceAgnostic("Cross-workspace orphan recovery; caller is @WorkspaceAgnostic sweeper")
     @Query(
-        value = "SELECT j.id AS jobId, j.workspace_id AS workspaceId, j.retry_count AS retryCount, " +
-            "j.worker_id AS workerId " +
-            "FROM agent_job j WHERE j.status = 'RUNNING' AND j.worker_id IS NOT NULL " +
-            "AND j.started_at < :graceCutoff " +
-            "AND NOT EXISTS (SELECT 1 FROM worker_registry w WHERE w.worker_id = j.worker_id " +
-            "AND w.last_heartbeat >= now() - make_interval(secs => :leaseTtlSeconds))",
-        nativeQuery = true
-    )
+            value = "SELECT j.id AS jobId, j.workspace_id AS workspaceId, j.retry_count AS retryCount, "
+                    + "j.worker_id AS workerId "
+                    + "FROM agent_job j WHERE j.status = 'RUNNING' AND j.worker_id IS NOT NULL "
+                    + "AND j.started_at < :graceCutoff "
+                    + "AND NOT EXISTS (SELECT 1 FROM worker_registry w WHERE w.worker_id = j.worker_id "
+                    + "AND w.last_heartbeat >= now() - make_interval(secs => :leaseTtlSeconds))",
+            nativeQuery = true)
     List<OrphanedJobRef> findOrphanedRunningJobs(
-        @Param("graceCutoff") Instant graceCutoff,
-        @Param("leaseTtlSeconds") long leaseTtlSeconds
-    );
+            @Param("graceCutoff") Instant graceCutoff, @Param("leaseTtlSeconds") long leaseTtlSeconds);
 
     /**
      * CAS requeue of an orphaned or draining job: RUNNING → QUEUED, ownership cleared, retry_count
@@ -553,23 +484,20 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
      */
     @WorkspaceAgnostic("ID-based orphan/drain requeue; caller is @WorkspaceAgnostic sweeper or worker-local drain")
     @Modifying(flushAutomatically = true, clearAutomatically = true)
-    @Query(
-        "UPDATE AgentJob j SET j.status = 'QUEUED', j.workerId = null, " +
-            "j.startedAt = null, j.executionStartedAt = null, " +
-            "j.retryCount = j.retryCount + 1, j.availableAt = :availableAt, " +
-            "j.jobToken = :newJobToken, j.jobTokenHash = :newJobTokenHash, " +
-            "j.llmTotalCalls = 0, j.llmTotalInputTokens = 0, j.llmTotalOutputTokens = 0, " +
-            "j.llmTotalReasoningTokens = 0, j.llmCacheReadTokens = 0, j.llmCacheWriteTokens = 0 " +
-            "WHERE j.id = :id AND j.status = 'RUNNING' AND j.workerId = :workerId AND j.retryCount < :maxRetries"
-    )
+    @Query("UPDATE AgentJob j SET j.status = 'QUEUED', j.workerId = null, "
+            + "j.startedAt = null, j.executionStartedAt = null, "
+            + "j.retryCount = j.retryCount + 1, j.availableAt = :availableAt, "
+            + "j.jobToken = :newJobToken, j.jobTokenHash = :newJobTokenHash, "
+            + "j.llmTotalCalls = 0, j.llmTotalInputTokens = 0, j.llmTotalOutputTokens = 0, "
+            + "j.llmTotalReasoningTokens = 0, j.llmCacheReadTokens = 0, j.llmCacheWriteTokens = 0 "
+            + "WHERE j.id = :id AND j.status = 'RUNNING' AND j.workerId = :workerId AND j.retryCount < :maxRetries")
     int requeueOrphan(
-        @Param("id") UUID id,
-        @Param("workerId") String workerId,
-        @Param("maxRetries") int maxRetries,
-        @Param("availableAt") Instant availableAt,
-        @Param("newJobToken") String newJobToken,
-        @Param("newJobTokenHash") String newJobTokenHash
-    );
+            @Param("id") UUID id,
+            @Param("workerId") String workerId,
+            @Param("maxRetries") int maxRetries,
+            @Param("availableAt") Instant availableAt,
+            @Param("newJobToken") String newJobToken,
+            @Param("newJobTokenHash") String newJobTokenHash);
 
     /**
      * Requeue of a claim this same worker just won but could not dispatch (sandbox executor pool
@@ -584,41 +512,33 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
      */
     @WorkspaceAgnostic("ID-based self-fenced requeue; caller is the claiming worker itself")
     @Modifying(flushAutomatically = true, clearAutomatically = true)
-    @Query(
-        "UPDATE AgentJob j SET j.status = 'QUEUED', j.workerId = null, j.startedAt = null, " +
-            "j.executionStartedAt = null " +
-            "WHERE j.id = :id AND j.status = 'RUNNING' AND (:workerId IS NULL OR j.workerId = :workerId)"
-    )
+    @Query("UPDATE AgentJob j SET j.status = 'QUEUED', j.workerId = null, j.startedAt = null, "
+            + "j.executionStartedAt = null "
+            + "WHERE j.id = :id AND j.status = 'RUNNING' AND (:workerId IS NULL OR j.workerId = :workerId)")
     int requeueRejectedClaim(@Param("id") UUID id, @Param("workerId") @Nullable String workerId);
 
     @WorkspaceAgnostic("ID-based delivery update; job ID from workspace-scoped delivery context")
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("UPDATE AgentJob j SET j.deliveryStatus = :status, j.deliveryCommentId = :commentId " + "WHERE j.id = :id")
     void updateDeliveryStatus(
-        @Param("id") UUID id,
-        @Param("status") DeliveryStatus status,
-        @Param("commentId") @Nullable String commentId
-    );
+            @Param("id") UUID id,
+            @Param("status") DeliveryStatus status,
+            @Param("commentId") @Nullable String commentId);
 
     /** @return 1 if transitioned, 0 if the row no longer matches the expected job/delivery statuses. */
     @WorkspaceAgnostic("ID-based delivery transition; job ID from workspace-scoped context")
     @Modifying(flushAutomatically = true, clearAutomatically = true)
-    @Query(
-        "UPDATE AgentJob j SET j.deliveryStatus = :newStatus " +
-            "WHERE j.id = :id AND j.status = 'COMPLETED' AND j.deliveryStatus IN :fromStatuses"
-    )
+    @Query("UPDATE AgentJob j SET j.deliveryStatus = :newStatus "
+            + "WHERE j.id = :id AND j.status = 'COMPLETED' AND j.deliveryStatus IN :fromStatuses")
     int transitionDeliveryStatus(
-        @Param("id") UUID id,
-        @Param("newStatus") DeliveryStatus newStatus,
-        @Param("fromStatuses") Collection<DeliveryStatus> fromStatuses
-    );
+            @Param("id") UUID id,
+            @Param("newStatus") DeliveryStatus newStatus,
+            @Param("fromStatuses") Collection<DeliveryStatus> fromStatuses);
 
     /** Bounded by {@code pageable} so one sweep pass never loads an unbounded backlog. */
     @WorkspaceAgnostic("Cross-workspace delivery-recovery sweep; caller is @WorkspaceAgnostic sweeper")
-    @Query(
-        "SELECT j FROM AgentJob j WHERE j.status = 'COMPLETED' AND j.deliveryStatus = 'PENDING' " +
-            "AND j.completedAt < :cutoff ORDER BY j.completedAt ASC"
-    )
+    @Query("SELECT j FROM AgentJob j WHERE j.status = 'COMPLETED' AND j.deliveryStatus = 'PENDING' "
+            + "AND j.completedAt < :cutoff ORDER BY j.completedAt ASC")
     List<AgentJob> findStuckPendingDeliveries(@Param("cutoff") Instant cutoff, Pageable pageable);
 
     /**
@@ -628,11 +548,9 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
      */
     @WorkspaceAgnostic("ID-based delivery-recovery CAS; job ID from workspace-scoped sweep candidate")
     @Modifying(flushAutomatically = true, clearAutomatically = true)
-    @Query(
-        "UPDATE AgentJob j SET j.deliveryAttempts = j.deliveryAttempts + 1 " +
-            "WHERE j.id = :id AND j.status = 'COMPLETED' AND j.deliveryStatus = 'PENDING' " +
-            "AND j.deliveryAttempts = :expectedAttempts"
-    )
+    @Query("UPDATE AgentJob j SET j.deliveryAttempts = j.deliveryAttempts + 1 "
+            + "WHERE j.id = :id AND j.status = 'COMPLETED' AND j.deliveryStatus = 'PENDING' "
+            + "AND j.deliveryAttempts = :expectedAttempts")
     int claimDeliveryRecoveryAttempt(@Param("id") UUID id, @Param("expectedAttempts") short expectedAttempts);
 
     /**
@@ -646,18 +564,15 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
      */
     @WorkspaceAgnostic("ID-based fenced delivery-recovery terminal write; job ID from workspace-scoped sweep candidate")
     @Modifying(flushAutomatically = true, clearAutomatically = true)
-    @Query(
-        "UPDATE AgentJob j SET j.deliveryStatus = :newStatus, j.deliveryCommentId = :commentId " +
-            "WHERE j.id = :id AND j.status = 'COMPLETED' AND j.deliveryStatus IN :fromStatuses " +
-            "AND j.deliveryAttempts = :expectedAttempts"
-    )
+    @Query("UPDATE AgentJob j SET j.deliveryStatus = :newStatus, j.deliveryCommentId = :commentId "
+            + "WHERE j.id = :id AND j.status = 'COMPLETED' AND j.deliveryStatus IN :fromStatuses "
+            + "AND j.deliveryAttempts = :expectedAttempts")
     int transitionDeliveryStatusFenced(
-        @Param("id") UUID id,
-        @Param("newStatus") DeliveryStatus newStatus,
-        @Param("commentId") @Nullable String commentId,
-        @Param("fromStatuses") Collection<DeliveryStatus> fromStatuses,
-        @Param("expectedAttempts") short expectedAttempts
-    );
+            @Param("id") UUID id,
+            @Param("newStatus") DeliveryStatus newStatus,
+            @Param("commentId") @Nullable String commentId,
+            @Param("fromStatuses") Collection<DeliveryStatus> fromStatuses,
+            @Param("expectedAttempts") short expectedAttempts);
 
     /**
      * Strips the heavy payload columns from terminal rows, batched so a large backlog is worked off in
@@ -669,33 +584,29 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
     @WorkspaceAgnostic("Cross-workspace retention batch; caller is @WorkspaceAgnostic retention service")
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query(
-        value = "UPDATE agent_job SET container_logs = NULL, output = NULL " +
-            "WHERE id IN (" +
-            "  SELECT id FROM agent_job " +
-            "  WHERE status IN ('COMPLETED','FAILED','TIMED_OUT','CANCELLED') " +
-            "  AND completed_at < :cutoff " +
-            "  AND delivery_status <> 'PENDING' " +
-            "  AND (container_logs IS NOT NULL OR output IS NOT NULL) " +
-            "  LIMIT :batchSize" +
-            ")",
-        nativeQuery = true
-    )
+            value = "UPDATE agent_job SET container_logs = NULL, output = NULL " + "WHERE id IN ("
+                    + "  SELECT id FROM agent_job "
+                    + "  WHERE status IN ('COMPLETED','FAILED','TIMED_OUT','CANCELLED') "
+                    + "  AND completed_at < :cutoff "
+                    + "  AND delivery_status <> 'PENDING' "
+                    + "  AND (container_logs IS NOT NULL OR output IS NOT NULL) "
+                    + "  LIMIT :batchSize"
+                    + ")",
+            nativeQuery = true)
     int stripTerminalPayloads(@Param("cutoff") Instant cutoff, @Param("batchSize") int batchSize);
 
     @WorkspaceAgnostic("Cross-workspace retention batch; caller is @WorkspaceAgnostic retention service")
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query(
-        value = "DELETE FROM agent_job WHERE id IN (" +
-            "  SELECT j.id FROM agent_job j " +
-            "  WHERE j.status IN ('COMPLETED','FAILED','TIMED_OUT','CANCELLED') " +
-            "  AND j.completed_at < :cutoff " +
-            "  AND j.delivery_status <> 'PENDING' " +
-            "  AND NOT EXISTS (SELECT 1 FROM feedback f WHERE f.agent_job_id = j.id) " +
-            "  AND NOT EXISTS (SELECT 1 FROM observation o WHERE o.agent_job_id = j.id) " +
-            "  LIMIT :batchSize" +
-            ")",
-        nativeQuery = true
-    )
+            value = "DELETE FROM agent_job WHERE id IN (" + "  SELECT j.id FROM agent_job j "
+                    + "  WHERE j.status IN ('COMPLETED','FAILED','TIMED_OUT','CANCELLED') "
+                    + "  AND j.completed_at < :cutoff "
+                    + "  AND j.delivery_status <> 'PENDING' "
+                    + "  AND NOT EXISTS (SELECT 1 FROM feedback f WHERE f.agent_job_id = j.id) "
+                    + "  AND NOT EXISTS (SELECT 1 FROM observation o WHERE o.agent_job_id = j.id) "
+                    + "  LIMIT :batchSize"
+                    + ")",
+            nativeQuery = true)
     int deleteUnreferencedTerminalRowsOlderThan(@Param("cutoff") Instant cutoff, @Param("batchSize") int batchSize);
 
     /**
@@ -711,14 +622,12 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
      */
     @WorkspaceAgnostic("Fleet-wide queue-health snapshot; caller is @WorkspaceAgnostic health sampler")
     @Query(
-        value = "SELECT " +
-            "  COUNT(*) FILTER (WHERE status = 'QUEUED' AND available_at <= :now) AS depth, " +
-            "  MIN(available_at) FILTER (WHERE status = 'QUEUED' AND available_at <= :now) AS oldestAvailableAt, " +
-            "  COUNT(*) FILTER (WHERE status = 'QUEUED' AND hold_reason IS NOT NULL) AS held, " +
-            "  COUNT(*) FILTER (WHERE status = 'RUNNING') AS running " +
-            "FROM agent_job WHERE status IN ('QUEUED', 'RUNNING')",
-        nativeQuery = true
-    )
+            value = "SELECT " + "  COUNT(*) FILTER (WHERE status = 'QUEUED' AND available_at <= :now) AS depth, "
+                    + "  MIN(available_at) FILTER (WHERE status = 'QUEUED' AND available_at <= :now) AS oldestAvailableAt, "
+                    + "  COUNT(*) FILTER (WHERE status = 'QUEUED' AND hold_reason IS NOT NULL) AS held, "
+                    + "  COUNT(*) FILTER (WHERE status = 'RUNNING') AS running "
+                    + "FROM agent_job WHERE status IN ('QUEUED', 'RUNNING')",
+            nativeQuery = true)
     QueueHealthSnapshot queueHealthSnapshot(@Param("now") Instant now);
 
     /** {@code oldestAvailableAt} is null when nothing is eligible. */
@@ -746,54 +655,51 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
      * decision, which needs {@code jsonb_array_elements}.
      */
     @Query(
-        value = "WITH recent AS (" +
-            "  SELECT j.id, j.review_readiness FROM agent_job j" +
-            "   WHERE j.workspace_id = :workspaceId AND j.review_readiness IS NOT NULL" +
-            "   ORDER BY j.created_at DESC, j.id DESC LIMIT :window" +
-            "), decision AS (" +
-            "  SELECT d FROM recent," +
-            "   jsonb_array_elements(recent.review_readiness -> 'decisions') d" +
-            "), counted AS (" +
-            "  SELECT d ->> 'practiceSlug' AS practice_slug," +
-            "         count(*) AS considered," +
-            "         count(*) FILTER (WHERE (d ->> 'ready')::boolean) AS reviewed" +
-            "    FROM decision GROUP BY 1" +
-            "), blocked AS (" +
-            // A decision can be skipped without any source failing: the author set the practice to a
-            // mode that runs no model. Those carry a decision-level reason and no failing check, so
-            // reporting only source failures would leave the skip with no stated cause at all.
-            "  SELECT d ->> 'practiceSlug' AS practice_slug," +
-            "         c ->> 'sourceKind' AS source_kind," +
-            "         reason AS reason_code," +
-            "         count(*) AS reviews" +
-            "    FROM decision," +
-            "         jsonb_array_elements(d -> 'sourceChecks') c," +
-            "         jsonb_array_elements_text(c -> 'reasonCodes') reason" +
-            "   WHERE NOT (d ->> 'ready')::boolean AND NOT (c ->> 'meetsRequirements')::boolean" +
-            "   GROUP BY 1, 2, 3" +
-            "   UNION ALL" +
-            "  SELECT d ->> 'practiceSlug', NULL, reason, count(*)" +
-            "    FROM decision, jsonb_array_elements_text(d -> 'reasonCodes') reason" +
-            "   WHERE NOT (d ->> 'ready')::boolean" +
-            "   GROUP BY 1, 2, 3" +
-            "), aggregated AS (" +
-            "  SELECT practice_slug, jsonb_agg(jsonb_build_object(" +
-            "           'sourceKind', source_kind, 'reasonCode', reason_code, 'reviewsAffected', reviews" +
-            "         ) ORDER BY reviews DESC, source_kind NULLS FIRST, reason_code) AS blockers" +
-            "    FROM blocked GROUP BY 1" +
-            ")" +
-            " SELECT counted.practice_slug AS practiceSlug," +
-            "        counted.considered AS consideredReviews," +
-            "        counted.reviewed AS reviewedCount," +
-            "        coalesce(aggregated.blockers, '[]'::jsonb)::text AS blockersObserved" +
-            "   FROM counted LEFT JOIN aggregated USING (practice_slug)" +
-            "  ORDER BY counted.practice_slug",
-        nativeQuery = true
-    )
+            value = "WITH recent AS (" + "  SELECT j.id, j.review_readiness FROM agent_job j"
+                    + "   WHERE j.workspace_id = :workspaceId AND j.review_readiness IS NOT NULL"
+                    + "   ORDER BY j.created_at DESC, j.id DESC LIMIT :window"
+                    + "), decision AS ("
+                    + "  SELECT d FROM recent,"
+                    + "   jsonb_array_elements(recent.review_readiness -> 'decisions') d"
+                    + "), counted AS ("
+                    + "  SELECT d ->> 'practiceSlug' AS practice_slug,"
+                    + "         count(*) AS considered,"
+                    + "         count(*) FILTER (WHERE (d ->> 'ready')::boolean) AS reviewed"
+                    + "    FROM decision GROUP BY 1"
+                    + "), blocked AS ("
+                    +
+                    // A decision can be skipped without any source failing: the author set the practice to a
+                    // mode that runs no model. Those carry a decision-level reason and no failing check, so
+                    // reporting only source failures would leave the skip with no stated cause at all.
+                    "  SELECT d ->> 'practiceSlug' AS practice_slug,"
+                    + "         c ->> 'sourceKind' AS source_kind,"
+                    + "         reason AS reason_code,"
+                    + "         count(*) AS reviews"
+                    + "    FROM decision,"
+                    + "         jsonb_array_elements(d -> 'sourceChecks') c,"
+                    + "         jsonb_array_elements_text(c -> 'reasonCodes') reason"
+                    + "   WHERE NOT (d ->> 'ready')::boolean AND NOT (c ->> 'meetsRequirements')::boolean"
+                    + "   GROUP BY 1, 2, 3"
+                    + "   UNION ALL"
+                    + "  SELECT d ->> 'practiceSlug', NULL, reason, count(*)"
+                    + "    FROM decision, jsonb_array_elements_text(d -> 'reasonCodes') reason"
+                    + "   WHERE NOT (d ->> 'ready')::boolean"
+                    + "   GROUP BY 1, 2, 3"
+                    + "), aggregated AS ("
+                    + "  SELECT practice_slug, jsonb_agg(jsonb_build_object("
+                    + "           'sourceKind', source_kind, 'reasonCode', reason_code, 'reviewsAffected', reviews"
+                    + "         ) ORDER BY reviews DESC, source_kind NULLS FIRST, reason_code) AS blockers"
+                    + "    FROM blocked GROUP BY 1"
+                    + ")"
+                    + " SELECT counted.practice_slug AS practiceSlug,"
+                    + "        counted.considered AS consideredReviews,"
+                    + "        counted.reviewed AS reviewedCount,"
+                    + "        coalesce(aggregated.blockers, '[]'::jsonb)::text AS blockersObserved"
+                    + "   FROM counted LEFT JOIN aggregated USING (practice_slug)"
+                    + "  ORDER BY counted.practice_slug",
+            nativeQuery = true)
     List<PracticeReadinessRow> findReadinessOutcomes(
-        @Param("workspaceId") Long workspaceId,
-        @Param("window") int window
-    );
+            @Param("workspaceId") Long workspaceId, @Param("window") int window);
 
     interface PracticeReadinessRow {
         String getPracticeSlug();

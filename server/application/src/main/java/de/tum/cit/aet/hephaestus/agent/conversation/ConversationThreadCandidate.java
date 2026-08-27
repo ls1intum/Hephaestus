@@ -8,12 +8,11 @@ import org.jspecify.annotations.Nullable;
  * against; {@code lastReviewedTs} is the growth watermark (null before the first review).
  */
 public record ConversationThreadCandidate(
-    long workspaceId,
-    long threadId,
-    String channelId,
-    @Nullable String channelName,
-    String threadTs,
-    String lastTs,
-    @Nullable String lastReviewedTs,
-    long[] participantMemberIds
-) {}
+        long workspaceId,
+        long threadId,
+        String channelId,
+        @Nullable String channelName,
+        String threadTs,
+        String lastTs,
+        @Nullable String lastReviewedTs,
+        long[] participantMemberIds) {}

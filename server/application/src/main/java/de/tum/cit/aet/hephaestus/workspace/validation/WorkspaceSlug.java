@@ -15,7 +15,7 @@ import java.lang.annotation.Target;
  */
 @Documented
 @Constraint(validatedBy = WorkspaceSlugValidator.class)
-@Target({ FIELD, PARAMETER })
+@Target({FIELD, PARAMETER})
 @Retention(RUNTIME)
 public @interface WorkspaceSlug {
     String message() default "Slug must be 3-51 lowercase characters or digits and may include single hyphens";

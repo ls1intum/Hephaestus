@@ -27,23 +27,21 @@ class GitHubLiveMilestoneSyncIntegrationTest extends AbstractGitHubLiveSyncInteg
     @Test
     void syncsMilestonesAndReflectsUpdates() throws Exception {
         var repository = createEphemeralRepository("milestone-sync");
-        var milestone = createRepositoryMilestone(
-            repository.fullName(),
-            "IT milestone",
-            "Focused milestone sync coverage"
-        );
+        var milestone =
+                createRepositoryMilestone(repository.fullName(), "IT milestone", "Focused milestone sync coverage");
 
-        repositorySyncService.syncRepository(workspace.getId(), repository.fullName(), githubProvider).orElseThrow();
-        var localRepo = repositoryRepository.findByNameWithOwner(repository.fullName()).orElseThrow();
+        repositorySyncService
+                .syncRepository(workspace.getId(), repository.fullName(), githubProvider)
+                .orElseThrow();
+        var localRepo =
+                repositoryRepository.findByNameWithOwner(repository.fullName()).orElseThrow();
 
         milestoneSyncService.syncMilestonesForRepository(workspace.getId(), localRepo.getId());
 
-        var storedMilestone = milestoneRepository
-            .findAll()
-            .stream()
-            .filter(candidate -> candidate.getRepository().getId().equals(localRepo.getId()))
-            .findFirst()
-            .orElseThrow();
+        var storedMilestone = milestoneRepository.findAll().stream()
+                .filter(candidate -> candidate.getRepository().getId().equals(localRepo.getId()))
+                .findFirst()
+                .orElseThrow();
         assertThat(storedMilestone.getTitle()).isEqualTo(milestone.title());
         assertThat(storedMilestone.getState()).isEqualTo(Milestone.State.OPEN);
 
@@ -52,12 +50,10 @@ class GitHubLiveMilestoneSyncIntegrationTest extends AbstractGitHubLiveSyncInteg
 
         milestoneSyncService.syncMilestonesForRepository(workspace.getId(), localRepo.getId());
 
-        var updatedMilestone = milestoneRepository
-            .findAll()
-            .stream()
-            .filter(candidate -> candidate.getRepository().getId().equals(localRepo.getId()))
-            .findFirst()
-            .orElseThrow();
+        var updatedMilestone = milestoneRepository.findAll().stream()
+                .filter(candidate -> candidate.getRepository().getId().equals(localRepo.getId()))
+                .findFirst()
+                .orElseThrow();
         assertThat(updatedMilestone.getState()).isEqualTo(Milestone.State.CLOSED);
 
         // Delete milestone via REST API
@@ -69,6 +65,7 @@ class GitHubLiveMilestoneSyncIntegrationTest extends AbstractGitHubLiveSyncInteg
 
         milestoneSyncService.syncMilestonesForRepository(workspace.getId(), localRepo.getId());
 
-        assertThat(milestoneRepository.findAllByRepository_Id(localRepo.getId())).isEmpty();
+        assertThat(milestoneRepository.findAllByRepository_Id(localRepo.getId()))
+                .isEmpty();
     }
 }

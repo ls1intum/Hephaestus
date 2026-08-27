@@ -33,9 +33,8 @@ class WorkerControlChannelHealthIndicatorTest extends BaseUnitTest {
 
     static Stream<Arguments> connectionStates() {
         return Stream.of(
-            Arguments.of("up when connected + recent inbound", true, Instant.now(), Status.UP),
-            Arguments.of("down when disconnected", false, Instant.EPOCH, Status.DOWN)
-        );
+                Arguments.of("up when connected + recent inbound", true, Instant.now(), Status.UP),
+                Arguments.of("down when disconnected", false, Instant.EPOCH, Status.DOWN));
     }
 
     @Test
@@ -52,11 +51,10 @@ class WorkerControlChannelHealthIndicatorTest extends BaseUnitTest {
 
     private static WorkerProperties props(Duration interval) {
         return new WorkerProperties(
-            "w",
-            new WorkerProperties.Capacity("1", "1"),
-            new WorkerProperties.Drain(Duration.ofMinutes(5)),
-            new WorkerProperties.Heartbeat(interval),
-            new WorkerProperties.Control(URI.create("ws://example"), "tok", Duration.ofSeconds(10))
-        );
+                "w",
+                new WorkerProperties.Capacity("1", "1"),
+                new WorkerProperties.Drain(Duration.ofMinutes(5)),
+                new WorkerProperties.Heartbeat(interval),
+                new WorkerProperties.Control(URI.create("ws://example"), "tok", Duration.ofSeconds(10)));
     }
 }

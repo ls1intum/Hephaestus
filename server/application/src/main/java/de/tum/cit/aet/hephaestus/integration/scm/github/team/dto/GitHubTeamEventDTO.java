@@ -14,12 +14,12 @@ import org.jspecify.annotations.Nullable;
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record GitHubTeamEventDTO(
-    @JsonProperty("action") String action,
-    @JsonProperty("team") GitHubTeamDTO team,
-    @JsonProperty("organization") GitHubOrgRefDTO organization,
-    @JsonProperty("repository") GitHubRepositoryRefDTO repository,
-    @JsonProperty("sender") GitHubUserDTO sender
-) implements GitHubWebhookEvent {
+        @JsonProperty("action") String action,
+        @JsonProperty("team") GitHubTeamDTO team,
+        @JsonProperty("organization") GitHubOrgRefDTO organization,
+        @JsonProperty("repository") GitHubRepositoryRefDTO repository,
+        @JsonProperty("sender") GitHubUserDTO sender)
+        implements GitHubWebhookEvent {
     @Override
     public GitHubEventAction.Team actionType() {
         return GitHubEventAction.Team.fromString(action);
@@ -35,21 +35,22 @@ public record GitHubTeamEventDTO(
      */
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record GitHubTeamDTO(
-        @JsonProperty("id") @Nullable Long id,
-        @JsonProperty("node_id") String nodeId,
-        @JsonProperty("name") String name,
-        @JsonProperty("slug") String slug,
-        @JsonProperty("description") String description,
-        @JsonProperty("privacy") @Nullable String privacy,
-        @JsonProperty("permission") @Nullable String permission,
-        @JsonProperty("html_url") @Nullable String htmlUrl,
-        @JsonProperty("created_at") @Nullable Instant createdAt,
-        @JsonProperty("updated_at") @Nullable Instant updatedAt
-    ) {}
+            @JsonProperty("id") @Nullable Long id,
+            @JsonProperty("node_id") String nodeId,
+            @JsonProperty("name") String name,
+            @JsonProperty("slug") String slug,
+            @JsonProperty("description") String description,
+            @JsonProperty("privacy") @Nullable String privacy,
+            @JsonProperty("permission") @Nullable String permission,
+            @JsonProperty("html_url") @Nullable String htmlUrl,
+            @JsonProperty("created_at") @Nullable Instant createdAt,
+            @JsonProperty("updated_at") @Nullable Instant updatedAt) {}
 
     /**
      * DTO for organization reference.
      */
     @JsonIgnoreProperties(ignoreUnknown = true)
-    public record GitHubOrgRefDTO(@JsonProperty("id") Long id, @JsonProperty("login") String login) {}
+    public record GitHubOrgRefDTO(
+            @JsonProperty("id") Long id,
+            @JsonProperty("login") String login) {}
 }

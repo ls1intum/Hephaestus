@@ -10,60 +10,56 @@ import org.jspecify.annotations.Nullable;
 /** DTO for GitLab note webhook events ({@code object_kind: "note"}). */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record GitLabNoteEventDTO(
-    @JsonProperty("object_kind") String objectKind,
-    @JsonProperty("event_type") String eventType,
-    @Nullable GitLabWebhookUser user,
-    @Nullable GitLabWebhookProject project,
-    @JsonProperty("object_attributes") @Nullable NoteAttributes objectAttributes,
-    @Nullable EmbeddedIssue issue,
-    @Nullable @JsonProperty("merge_request") EmbeddedMergeRequest mergeRequest
-) {
+        @JsonProperty("object_kind") String objectKind,
+        @JsonProperty("event_type") String eventType,
+        @Nullable GitLabWebhookUser user,
+        @Nullable GitLabWebhookProject project,
+        @JsonProperty("object_attributes") @Nullable NoteAttributes objectAttributes,
+        @Nullable EmbeddedIssue issue,
+        @Nullable @JsonProperty("merge_request") EmbeddedMergeRequest mergeRequest) {
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record NoteAttributes(
-        Long id,
-        String note,
-        @JsonProperty("noteable_type") String noteableType,
-        boolean system,
-        boolean internal,
-        @Nullable Object position,
-        String action,
-        String url,
-        @JsonProperty("created_at") String createdAt,
-        @JsonProperty("updated_at") String updatedAt,
-        @Nullable @JsonProperty("discussion_id") String discussionId,
-        @Nullable String type
-    ) {}
+            Long id,
+            String note,
+            @JsonProperty("noteable_type") String noteableType,
+            boolean system,
+            boolean internal,
+            @Nullable Object position,
+            String action,
+            String url,
+            @JsonProperty("created_at") String createdAt,
+            @JsonProperty("updated_at") String updatedAt,
+            @Nullable @JsonProperty("discussion_id") String discussionId,
+            @Nullable String type) {}
 
     /** Embedded issue data — enough fields for stub creation if the parent doesn't exist yet. */
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record EmbeddedIssue(
-        Long id,
-        Integer iid,
-        String title,
-        String description,
-        String state,
-        boolean confidential,
-        String url,
-        @JsonProperty("created_at") String createdAt,
-        @JsonProperty("updated_at") String updatedAt
-    ) {}
+            Long id,
+            Integer iid,
+            String title,
+            String description,
+            String state,
+            boolean confidential,
+            String url,
+            @JsonProperty("created_at") String createdAt,
+            @JsonProperty("updated_at") String updatedAt) {}
 
     /** Embedded merge request data — enough fields for stub creation if the parent doesn't exist yet. */
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record EmbeddedMergeRequest(
-        Long id,
-        Integer iid,
-        String title,
-        String description,
-        String state,
-        boolean draft,
-        @JsonProperty("source_branch") String sourceBranch,
-        @JsonProperty("target_branch") String targetBranch,
-        String url,
-        @JsonProperty("created_at") String createdAt,
-        @JsonProperty("updated_at") String updatedAt,
-        @Nullable @JsonProperty("detailed_merge_status") String detailedMergeStatus
-    ) {}
+            Long id,
+            Integer iid,
+            String title,
+            String description,
+            String state,
+            boolean draft,
+            @JsonProperty("source_branch") String sourceBranch,
+            @JsonProperty("target_branch") String targetBranch,
+            String url,
+            @JsonProperty("created_at") String createdAt,
+            @JsonProperty("updated_at") String updatedAt,
+            @Nullable @JsonProperty("detailed_merge_status") String detailedMergeStatus) {}
 
     public boolean isSystemNote() {
         return objectAttributes != null && objectAttributes.system();

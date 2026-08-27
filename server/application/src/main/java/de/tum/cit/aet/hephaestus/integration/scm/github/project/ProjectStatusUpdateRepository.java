@@ -28,8 +28,7 @@ public interface ProjectStatusUpdateRepository extends JpaRepository<ProjectStat
 
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Transactional
-    @Query(
-        value = """
+    @Query(value = """
         INSERT INTO project_status_update (
             native_id, provider_id, node_id, project_id, body, body_html, start_date, target_date, status, creator_id, created_at, updated_at
         )
@@ -43,21 +42,18 @@ public interface ProjectStatusUpdateRepository extends JpaRepository<ProjectStat
             target_date = EXCLUDED.target_date,
             status = EXCLUDED.status,
             updated_at = EXCLUDED.updated_at
-        """,
-        nativeQuery = true
-    )
+        """, nativeQuery = true)
     int upsertCore(
-        @Param("nativeId") Long nativeId,
-        @Param("providerId") Long providerId,
-        @Param("nodeId") String nodeId,
-        @Param("projectId") Long projectId,
-        @Param("body") @Nullable String body,
-        @Param("bodyHtml") @Nullable String bodyHtml,
-        @Param("startDate") @Nullable LocalDate startDate,
-        @Param("targetDate") @Nullable LocalDate targetDate,
-        @Param("status") @Nullable String status,
-        @Param("creatorId") @Nullable Long creatorId,
-        @Param("createdAt") Instant createdAt,
-        @Param("updatedAt") Instant updatedAt
-    );
+            @Param("nativeId") Long nativeId,
+            @Param("providerId") Long providerId,
+            @Param("nodeId") String nodeId,
+            @Param("projectId") Long projectId,
+            @Param("body") @Nullable String body,
+            @Param("bodyHtml") @Nullable String bodyHtml,
+            @Param("startDate") @Nullable LocalDate startDate,
+            @Param("targetDate") @Nullable LocalDate targetDate,
+            @Param("status") @Nullable String status,
+            @Param("creatorId") @Nullable Long creatorId,
+            @Param("createdAt") Instant createdAt,
+            @Param("updatedAt") Instant updatedAt);
 }

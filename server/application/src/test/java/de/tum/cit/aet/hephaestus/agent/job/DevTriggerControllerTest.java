@@ -57,18 +57,11 @@ class DevTriggerControllerTest extends BaseUnitTest {
     @SuppressWarnings("unchecked")
     void setUp() {
         controller = new DevTriggerController(
-            agentJobService,
-            artifactLoader,
-            detectionGate,
-            transactionTemplate,
-            signalRecorder
-        );
-        lenient()
-            .when(transactionTemplate.execute(any()))
-            .thenAnswer(invocation -> {
-                TransactionCallback<?> callback = invocation.getArgument(0);
-                return callback.doInTransaction(mock(TransactionStatus.class));
-            });
+                agentJobService, artifactLoader, detectionGate, transactionTemplate, signalRecorder);
+        lenient().when(transactionTemplate.execute(any())).thenAnswer(invocation -> {
+            TransactionCallback<?> callback = invocation.getArgument(0);
+            return callback.doInTransaction(mock(TransactionStatus.class));
+        });
     }
 
     @Test
@@ -87,9 +80,9 @@ class DevTriggerControllerTest extends BaseUnitTest {
     void shouldRecordTheGatesOwnReasonWhenItNamesOne() {
         PullRequest pr = pullRequest();
         when(artifactLoader.findPullRequestForGate(WORKSPACE_ID, PR_ID)).thenReturn(Optional.of(pr));
-        when(detectionGate.evaluate(any(), any(), any())).thenReturn(
-            new GateDecision.Skip("nobody it could be attributed to is linked", SignalStateReason.SUBJECT_UNLINKED)
-        );
+        when(detectionGate.evaluate(any(), any(), any()))
+                .thenReturn(new GateDecision.Skip(
+                        "nobody it could be attributed to is linked", SignalStateReason.SUBJECT_UNLINKED));
 
         controller.triggerReview(PR_ID, null, WORKSPACE_ID, "scm.pull_request.merged");
 
@@ -107,26 +100,25 @@ class DevTriggerControllerTest extends BaseUnitTest {
         String response = controller.triggerReview(null, ISSUE_ID, WORKSPACE_ID, "scm.issue.closed");
 
         assertThat(response).contains("Gate skipped");
-        verify(signalRecorder).markRefused(
-            ScmSignals.issueKey(
-                WORKSPACE_ID,
-                ISSUE_ID,
-                ScmSignals.ISSUE_CLOSED,
-                issue.getTitle(),
-                issue.getBody(),
-                null
-            ).orElseThrow(),
-            SignalStateReason.GATE_SKIPPED
-        );
+        verify(signalRecorder)
+                .markRefused(
+                        ScmSignals.issueKey(
+                                        WORKSPACE_ID,
+                                        ISSUE_ID,
+                                        ScmSignals.ISSUE_CLOSED,
+                                        issue.getTitle(),
+                                        issue.getBody(),
+                                        null)
+                                .orElseThrow(),
+                        SignalStateReason.GATE_SKIPPED);
     }
 
     @Test
     void shouldSettleNothingWhenTheGatePasses() {
         PullRequest pr = pullRequest();
         when(artifactLoader.findPullRequestForGate(WORKSPACE_ID, PR_ID)).thenReturn(Optional.of(pr));
-        when(detectionGate.evaluate(any(), any(), any())).thenReturn(
-            new GateDecision.Detect(new Workspace(), List.of())
-        );
+        when(detectionGate.evaluate(any(), any(), any()))
+                .thenReturn(new GateDecision.Detect(new Workspace(), List.of()));
         when(agentJobService.buildReviewRequest(any(), any())).thenReturn(null);
 
         controller.triggerReview(PR_ID, null, WORKSPACE_ID, "scm.pull_request.merged");
@@ -151,13 +143,8 @@ class DevTriggerControllerTest extends BaseUnitTest {
 
     private static SignalKey expectedPullRequestKey() {
         return ScmSignals.pullRequestKey(
-            WORKSPACE_ID,
-            PR_ID,
-            ScmSignals.PULL_REQUEST_MERGED,
-            "abc123",
-            "Add a thing",
-            "Because."
-        ).orElseThrow();
+                        WORKSPACE_ID, PR_ID, ScmSignals.PULL_REQUEST_MERGED, "abc123", "Add a thing", "Because.")
+                .orElseThrow();
     }
 
     private static PullRequest pullRequest() {

@@ -23,6 +23,8 @@ public class RestTemplateConfig {
      */
     @Bean("gitHubRawRestTemplate")
     public RestTemplate gitHubRawRestTemplate(RestTemplateBuilder builder) {
-        return builder.connectTimeout(Duration.ofSeconds(5)).readTimeout(Duration.ofSeconds(10)).build();
+        return builder.connectTimeout(Duration.ofSeconds(5))
+                .readTimeout(Duration.ofSeconds(10))
+                .build();
     }
 }

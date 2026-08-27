@@ -13,37 +13,39 @@ import org.jspecify.annotations.Nullable;
  * but {@code observedAt}. Clients must render absence as absence, never as a zero or a placeholder digit.
  */
 @Schema(
-    description = "Vendor API rate-limit observation, read from in-memory trackers (not persisted across restarts). " +
-        "Every field except observedAt is present only if the vendor actually reported it."
-)
+        description =
+                "Vendor API rate-limit observation, read from in-memory trackers (not persisted across restarts). "
+                        + "Every field except observedAt is present only if the vendor actually reported it.")
 public record RateLimitSnapshotDTO(
-    @Schema(
-        description = "Window ceiling, if the vendor reported one. Survives window rollover — a ceiling is window-invariant."
-    )
-    @Nullable
-    Integer limit,
-    @Schema(
-        description = "Remaining budget, if reported and still inside the observed window. Null once the window has rolled over."
-    )
-    @Nullable
-    Integer remaining,
-    @Schema(description = "When the observed window ends, if reported and still in the future")
-    @Nullable
-    Instant resetAt,
-    @NonNull @Schema(description = "When the underlying vendor response was seen") Instant observedAt,
-    @Schema(
-        description = "An observed 429's back-off deadline (observedAt + Retry-After); null if the vendor never told us to back off"
-    )
-    @Nullable
-    Instant throttledUntil
-) {
+        @Schema(
+                description =
+                        "Window ceiling, if the vendor reported one. Survives window rollover — a ceiling is window-invariant.")
+        @Nullable
+        Integer limit,
+
+        @Schema(
+                description =
+                        "Remaining budget, if reported and still inside the observed window. Null once the window has rolled over.")
+        @Nullable
+        Integer remaining,
+
+        @Schema(description = "When the observed window ends, if reported and still in the future") @Nullable
+        Instant resetAt,
+
+        @NonNull @Schema(description = "When the underlying vendor response was seen")
+        Instant observedAt,
+
+        @Schema(
+                description =
+                        "An observed 429's back-off deadline (observedAt + Retry-After); null if the vendor never told us to back off")
+        @Nullable
+        Instant throttledUntil) {
     public static RateLimitSnapshotDTO from(RateLimitSnapshot snapshot) {
         return new RateLimitSnapshotDTO(
-            snapshot.limit(),
-            snapshot.remaining(),
-            snapshot.resetAt(),
-            snapshot.observedAt(),
-            snapshot.throttledUntil()
-        );
+                snapshot.limit(),
+                snapshot.remaining(),
+                snapshot.resetAt(),
+                snapshot.observedAt(),
+                snapshot.throttledUntil());
     }
 }

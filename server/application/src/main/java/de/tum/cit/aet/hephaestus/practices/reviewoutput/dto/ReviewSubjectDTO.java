@@ -6,11 +6,15 @@ import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
 public record ReviewSubjectDTO(
-    @NonNull Long id,
-    @NonNull @Schema(description = "Login on the source provider") String login,
-    @Schema(description = "Display name, when known") @Nullable String name,
-    @Nullable String avatarUrl
-) {
+        @NonNull Long id,
+
+        @NonNull @Schema(description = "Login on the source provider")
+        String login,
+
+        @Schema(description = "Display name, when known") @Nullable
+        String name,
+
+        @Nullable String avatarUrl) {
     public static ReviewSubjectDTO from(User user) {
         return new ReviewSubjectDTO(user.getId(), user.getLogin(), user.getName(), user.getAvatarUrl());
     }

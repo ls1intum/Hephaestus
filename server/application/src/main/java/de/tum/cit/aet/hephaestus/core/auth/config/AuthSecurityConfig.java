@@ -76,9 +76,7 @@ public class AuthSecurityConfig {
 
     @Bean
     public CookieOAuth2AuthorizationRequestRepository cookieAuthorizationRequestRepository(
-        AuthProperties properties,
-        Environment environment
-    ) {
+            AuthProperties properties, Environment environment) {
         return new CookieOAuth2AuthorizationRequestRepository(resolveStateCookieKey(properties, isProd(environment)));
     }
 
@@ -105,10 +103,8 @@ public class AuthSecurityConfig {
      * code-injection defense for the confidential GitHub client with no test failure.
      */
     static OAuth2AuthorizationRequestResolver pkceResolver(ClientRegistrationRepository repo) {
-        DefaultOAuth2AuthorizationRequestResolver resolver = new DefaultOAuth2AuthorizationRequestResolver(
-            repo,
-            "/oauth2/authorization"
-        );
+        DefaultOAuth2AuthorizationRequestResolver resolver =
+                new DefaultOAuth2AuthorizationRequestResolver(repo, "/oauth2/authorization");
         resolver.setAuthorizationRequestCustomizer(OAuth2AuthorizationRequestCustomizers.withPkce());
         return resolver;
     }
@@ -143,54 +139,51 @@ public class AuthSecurityConfig {
     }
 
     private static boolean isGitHub(ClientRegistration registration) {
-        String userInfoUri = registration.getProviderDetails().getUserInfoEndpoint().getUri();
+        String userInfoUri =
+                registration.getProviderDetails().getUserInfoEndpoint().getUri();
         return userInfoUri != null && userInfoUri.startsWith(GITHUB_USERINFO_PREFIX);
     }
 
     private boolean isOutline(ClientRegistration registration) {
         return loginProviderRepository
-            .findByRegistrationId(registration.getRegistrationId())
-            .map(provider -> provider.getType() == LoginProvider.ProviderType.OUTLINE)
-            .orElse(false);
+                .findByRegistrationId(registration.getRegistrationId())
+                .map(provider -> provider.getType() == LoginProvider.ProviderType.OUTLINE)
+                .orElse(false);
     }
 
     @Bean
     @Order(Ordered.HIGHEST_PRECEDENCE + 10)
     public SecurityFilterChain oauthLoginSecurityFilterChain(
-        HttpSecurity http,
-        CookieOAuth2AuthorizationRequestRepository cookieRepo,
-        HephaestusAuthSuccessHandler successHandler,
-        HephaestusAuthFailureHandler failureHandler,
-        AuthRateLimitFilter authRateLimitFilter,
-        ClientRegistrationRepository clientRegistrationRepository
-    ) throws Exception {
-        http
-            .securityMatcher("/oauth2/authorization/**", "/login/oauth2/code/**", "/auth/login", "/auth/error")
-            .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-            .csrf(csrf -> csrf.disable())
-            .authorizeHttpRequests(req -> {
-                req.requestMatchers("/auth/error").permitAll();
-                req.anyRequest().permitAll(); // oauth2Login handles the actual auth
-            })
-            .oauth2Login(oauth -> {
-                // Explicit loginPage: the SPA owns the login UI, and without this Spring Security's
-                // OAuth2LoginConfigurer ENUMERATES the ClientRegistrationRepository at config time to build
-                // default login links. That repo is DB-backed (LoginProviderClientRegistrationRepository
-                // reads the login_provider store), so the enumeration opens a JDBC connection during context
-                // refresh — which has no DB during the Paketo CDS-training build run and fails the image
-                // build. Setting a loginPage skips the default-page generation and that startup DB hit.
-                oauth.loginPage("/login");
-                oauth.authorizationEndpoint(endpoint ->
-                    endpoint
-                        .authorizationRequestRepository(cookieRepo)
-                        .authorizationRequestResolver(pkceResolver(clientRegistrationRepository))
-                );
-                // GitHub: enrich attributes with the primary+verified email from /user/emails so
-                // VerifiedEmailResolver can stamp primaryEmailVerifiedAt. OIDC providers are untouched.
-                oauth.userInfoEndpoint(userInfo -> userInfo.userService(oauthUserService()));
-                oauth.successHandler(successHandler);
-                oauth.failureHandler(failureHandler);
-            });
+            HttpSecurity http,
+            CookieOAuth2AuthorizationRequestRepository cookieRepo,
+            HephaestusAuthSuccessHandler successHandler,
+            HephaestusAuthFailureHandler failureHandler,
+            AuthRateLimitFilter authRateLimitFilter,
+            ClientRegistrationRepository clientRegistrationRepository)
+            throws Exception {
+        http.securityMatcher("/oauth2/authorization/**", "/login/oauth2/code/**", "/auth/login", "/auth/error")
+                .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .csrf(csrf -> csrf.disable())
+                .authorizeHttpRequests(req -> {
+                    req.requestMatchers("/auth/error").permitAll();
+                    req.anyRequest().permitAll(); // oauth2Login handles the actual auth
+                })
+                .oauth2Login(oauth -> {
+                    // Explicit loginPage: the SPA owns the login UI, and without this Spring Security's
+                    // OAuth2LoginConfigurer ENUMERATES the ClientRegistrationRepository at config time to build
+                    // default login links. That repo is DB-backed (LoginProviderClientRegistrationRepository
+                    // reads the login_provider store), so the enumeration opens a JDBC connection during context
+                    // refresh — which has no DB during the Paketo CDS-training build run and fails the image
+                    // build. Setting a loginPage skips the default-page generation and that startup DB hit.
+                    oauth.loginPage("/login");
+                    oauth.authorizationEndpoint(endpoint -> endpoint.authorizationRequestRepository(cookieRepo)
+                            .authorizationRequestResolver(pkceResolver(clientRegistrationRepository)));
+                    // GitHub: enrich attributes with the primary+verified email from /user/emails so
+                    // VerifiedEmailResolver can stamp primaryEmailVerifiedAt. OIDC providers are untouched.
+                    oauth.userInfoEndpoint(userInfo -> userInfo.userService(oauthUserService()));
+                    oauth.successHandler(successHandler);
+                    oauth.failureHandler(failureHandler);
+                });
 
         // Same header set as the resource-server chain — this chain serves /auth/error to the SPA.
         SecurityHeaders.apply(http);
@@ -214,23 +207,19 @@ public class AuthSecurityConfig {
             byte[] decoded = Base64.getDecoder().decode(properties.stateCookieKey());
             if (decoded.length != 32) {
                 throw new IllegalStateException(
-                    "hephaestus.auth.state-cookie-key must decode to 32 bytes (256-bit AES); got " + decoded.length
-                );
+                        "hephaestus.auth.state-cookie-key must decode to 32 bytes (256-bit AES); got "
+                                + decoded.length);
             }
             return decoded;
         }
         if (prodProfile) {
-            throw new IllegalStateException(
-                "hephaestus.auth.state-cookie-key is required in production (fail-closed). " +
-                    "Set it to a base64-encoded 32-byte (256-bit AES) value."
-            );
+            throw new IllegalStateException("hephaestus.auth.state-cookie-key is required in production (fail-closed). "
+                    + "Set it to a base64-encoded 32-byte (256-bit AES) value.");
         }
         byte[] ephemeral = new byte[32];
         new SecureRandom().nextBytes(ephemeral);
-        log.warn(
-            "auth: hephaestus.auth.state-cookie-key is unset — generated ephemeral 256-bit key for this boot. " +
-                "In-flight logins will not survive a restart. Set the env var for stable behaviour."
-        );
+        log.warn("auth: hephaestus.auth.state-cookie-key is unset — generated ephemeral 256-bit key for this boot. "
+                + "In-flight logins will not survive a restart. Set the env var for stable behaviour.");
         return ephemeral;
     }
 }

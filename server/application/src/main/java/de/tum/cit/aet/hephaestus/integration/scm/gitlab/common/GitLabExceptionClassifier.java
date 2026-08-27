@@ -55,11 +55,10 @@ public class GitLabExceptionClassifier {
     }
 
     public record ClassificationResult(
-        Category category,
-        @Nullable Instant rateLimitResetAt,
-        @Nullable Duration suggestedWait,
-        String message
-    ) {
+            Category category,
+            @Nullable Instant rateLimitResetAt,
+            @Nullable Duration suggestedWait,
+            String message) {
         public static ClassificationResult of(Category category, String message) {
             return new ClassificationResult(category, null, null, message);
         }
@@ -74,11 +73,7 @@ public class GitLabExceptionClassifier {
 
         public static ClassificationResult rateLimited(Duration suggestedWait, String message) {
             return new ClassificationResult(
-                Category.RATE_LIMITED,
-                Instant.now().plus(suggestedWait),
-                suggestedWait,
-                message
-            );
+                    Category.RATE_LIMITED, Instant.now().plus(suggestedWait), suggestedWait, message);
         }
     }
 
@@ -91,23 +86,23 @@ public class GitLabExceptionClassifier {
 
     public GitLabExceptionClassifier(MeterRegistry meterRegistry) {
         this.retryableCounter = Counter.builder("gitlab.sync.errors.total")
-            .tag("category", "retryable")
-            .register(meterRegistry);
+                .tag("category", "retryable")
+                .register(meterRegistry);
         this.rateLimitedCounter = Counter.builder("gitlab.sync.errors.total")
-            .tag("category", "rate_limited")
-            .register(meterRegistry);
+                .tag("category", "rate_limited")
+                .register(meterRegistry);
         this.notFoundCounter = Counter.builder("gitlab.sync.errors.total")
-            .tag("category", "not_found")
-            .register(meterRegistry);
+                .tag("category", "not_found")
+                .register(meterRegistry);
         this.authErrorCounter = Counter.builder("gitlab.sync.errors.total")
-            .tag("category", "auth_error")
-            .register(meterRegistry);
+                .tag("category", "auth_error")
+                .register(meterRegistry);
         this.clientErrorCounter = Counter.builder("gitlab.sync.errors.total")
-            .tag("category", "client_error")
-            .register(meterRegistry);
+                .tag("category", "client_error")
+                .register(meterRegistry);
         this.unknownCounter = Counter.builder("gitlab.sync.errors.total")
-            .tag("category", "unknown")
-            .register(meterRegistry);
+                .tag("category", "unknown")
+                .register(meterRegistry);
     }
 
     public Category classify(Throwable e) {
@@ -120,11 +115,10 @@ public class GitLabExceptionClassifier {
 
         if (log.isDebugEnabled()) {
             log.debug(
-                "Classified exception: category={}, type={}, message={}",
-                result.category(),
-                e != null ? e.getClass().getSimpleName() : "null",
-                result.message()
-            );
+                    "Classified exception: category={}, type={}, message={}",
+                    result.category(),
+                    e != null ? e.getClass().getSimpleName() : "null",
+                    result.message());
         }
 
         return result;
@@ -166,18 +160,14 @@ public class GitLabExceptionClassifier {
                 case "RATE_LIMITED", "RATE_LIMIT", "TOO_MANY_REQUESTS" -> {
                     rateLimitedCounter.increment();
                     return ClassificationResult.rateLimited(
-                        Duration.ofMinutes(1),
-                        "GraphQL rate limit: " + error.getMessage()
-                    );
+                            Duration.ofMinutes(1), "GraphQL rate limit: " + error.getMessage());
                 }
                 case "FORBIDDEN" -> {
                     String message = error.getMessage();
                     if (message != null && message.toLowerCase().contains("rate limit")) {
                         rateLimitedCounter.increment();
                         return ClassificationResult.rateLimited(
-                            Duration.ofMinutes(1),
-                            "GraphQL rate limit: " + message
-                        );
+                                Duration.ofMinutes(1), "GraphQL rate limit: " + message);
                     }
                     authErrorCounter.increment();
                     return ClassificationResult.of(Category.AUTH_ERROR, "GraphQL FORBIDDEN: " + message);
@@ -189,9 +179,7 @@ public class GitLabExceptionClassifier {
                 case "RESOURCE_LIMITS_EXCEEDED", "MAX_COMPLEXITY_EXCEEDED" -> {
                     clientErrorCounter.increment();
                     return ClassificationResult.of(
-                        Category.CLIENT_ERROR,
-                        "GraphQL resource limit: " + error.getMessage()
-                    );
+                            Category.CLIENT_ERROR, "GraphQL resource limit: " + error.getMessage());
                 }
                 default -> {
                     /* continue */
@@ -200,7 +188,8 @@ public class GitLabExceptionClassifier {
         }
 
         unknownCounter.increment();
-        return ClassificationResult.of(Category.UNKNOWN, "Unclassified GraphQL error: " + errors.get(0).getMessage());
+        return ClassificationResult.of(
+                Category.UNKNOWN, "Unclassified GraphQL error: " + errors.get(0).getMessage());
     }
 
     private ClassificationResult doClassify(Throwable e) {
@@ -210,12 +199,10 @@ public class GitLabExceptionClassifier {
 
         // Unwrap common wrapper exceptions
         Throwable cause = e;
-        if (
-            e.getCause() != null &&
-            (e instanceof RuntimeException ||
-                e.getClass().getName().contains("CompletionException") ||
-                e.getClass().getName().contains("ExecutionException"))
-        ) {
+        if (e.getCause() != null
+                && (e instanceof RuntimeException
+                        || e.getClass().getName().contains("CompletionException")
+                        || e.getClass().getName().contains("ExecutionException"))) {
             cause = e.getCause();
         }
 
@@ -227,16 +214,12 @@ public class GitLabExceptionClassifier {
         // Database deadlocks
         if (isDeadlockException(cause)) {
             return ClassificationResult.of(
-                Category.RETRYABLE,
-                "Database deadlock detected - will retry: " + cause.getMessage()
-            );
+                    Category.RETRYABLE, "Database deadlock detected - will retry: " + cause.getMessage());
         }
 
         if (cause instanceof UnexpectedRollbackException) {
             return ClassificationResult.of(
-                Category.RETRYABLE,
-                "Transaction rollback detected - will retry: " + cause.getMessage()
-            );
+                    Category.RETRYABLE, "Transaction rollback detected - will retry: " + cause.getMessage());
         }
 
         // HTTP response errors
@@ -275,9 +258,7 @@ public class GitLabExceptionClassifier {
         }
 
         return ClassificationResult.of(
-            Category.UNKNOWN,
-            "Unclassified: " + cause.getClass().getSimpleName() + " - " + cause.getMessage()
-        );
+                Category.UNKNOWN, "Unclassified: " + cause.getClass().getSimpleName() + " - " + cause.getMessage());
     }
 
     private ClassificationResult classifyHttpStatus(WebClientResponseException e) {
@@ -321,9 +302,7 @@ public class GitLabExceptionClassifier {
 
     private ClassificationResult classifyNetworkException(Throwable e) {
         return ClassificationResult.of(
-            Category.RETRYABLE,
-            "Network error: " + e.getClass().getSimpleName() + " - " + e.getMessage()
-        );
+                Category.RETRYABLE, "Network error: " + e.getClass().getSimpleName() + " - " + e.getMessage());
     }
 
     private boolean isDeadlockException(Throwable e) {
@@ -332,19 +311,15 @@ public class GitLabExceptionClassifier {
             String className = current.getClass().getName();
             String message = current.getMessage();
 
-            if (
-                className.contains("CannotAcquireLockException") ||
-                className.contains("LockAcquisitionException") ||
-                className.contains("DeadlockLoserDataAccessException")
-            ) {
+            if (className.contains("CannotAcquireLockException")
+                    || className.contains("LockAcquisitionException")
+                    || className.contains("DeadlockLoserDataAccessException")) {
                 return true;
             }
 
-            if (
-                (className.contains("SQLException") || className.contains("PSQLException")) &&
-                message != null &&
-                (message.contains("deadlock detected") || message.contains("40P01"))
-            ) {
+            if ((className.contains("SQLException") || className.contains("PSQLException"))
+                    && message != null
+                    && (message.contains("deadlock detected") || message.contains("40P01"))) {
                 return true;
             }
 
@@ -358,11 +333,9 @@ public class GitLabExceptionClassifier {
     private boolean isTimeoutException(Throwable e) {
         if (e instanceof TimeoutException || e instanceof SocketTimeoutException) return true;
         String className = e.getClass().getName();
-        return (
-            className.contains("TimeoutException") ||
-            className.contains("ReadTimeoutException") ||
-            className.contains("WriteTimeoutException")
-        );
+        return (className.contains("TimeoutException")
+                || className.contains("ReadTimeoutException")
+                || className.contains("WriteTimeoutException"));
     }
 
     private boolean isNetworkException(Throwable e) {
@@ -370,13 +343,11 @@ public class GitLabExceptionClassifier {
             return true;
         }
         String className = e.getClass().getName();
-        return (
-            className.contains("PrematureCloseException") ||
-            className.contains("AbortedException") ||
-            className.contains("ConnectionException") ||
-            className.contains("ConnectionReset") ||
-            className.contains("GraphQlTransportException")
-        );
+        return (className.contains("PrematureCloseException")
+                || className.contains("AbortedException")
+                || className.contains("ConnectionException")
+                || className.contains("ConnectionReset")
+                || className.contains("GraphQlTransportException"));
     }
 
     private boolean isRateLimitResponse(WebClientResponseException e) {

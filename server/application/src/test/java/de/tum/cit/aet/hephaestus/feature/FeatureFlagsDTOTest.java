@@ -2,7 +2,6 @@ package de.tum.cit.aet.hephaestus.feature;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.lenient;
-import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.lang.reflect.RecordComponent;
@@ -31,17 +30,18 @@ class FeatureFlagsDTOTest extends BaseUnitTest {
         @Test
         void dtoFieldCountMatchesEnumCount() {
             assertThat(FeatureFlagsDTO.class.getRecordComponents())
-                .as("FeatureFlagsDTO must have one field per FeatureFlag constant")
-                .hasSize(FeatureFlag.values().length);
+                    .as("FeatureFlagsDTO must have one field per FeatureFlag constant")
+                    .hasSize(FeatureFlag.values().length);
         }
 
         @Test
         void dtoFieldNamesMatchEnumNames() {
-            Set<String> enumNames = Arrays.stream(FeatureFlag.values()).map(Enum::name).collect(Collectors.toSet());
+            Set<String> enumNames =
+                    Arrays.stream(FeatureFlag.values()).map(Enum::name).collect(Collectors.toSet());
 
             Set<String> dtoNames = Arrays.stream(FeatureFlagsDTO.class.getRecordComponents())
-                .map(RecordComponent::getName)
-                .collect(Collectors.toSet());
+                    .map(RecordComponent::getName)
+                    .collect(Collectors.toSet());
 
             assertThat(dtoNames).isEqualTo(enumNames);
         }
@@ -73,14 +73,14 @@ class FeatureFlagsDTOTest extends BaseUnitTest {
 
             // Use reflection to read the DTO field matching the flag's name
             RecordComponent component = Arrays.stream(FeatureFlagsDTO.class.getRecordComponents())
-                .filter(rc -> rc.getName().equals(flag.name()))
-                .findFirst()
-                .orElseThrow(() -> new AssertionError("No DTO field for " + flag.name()));
+                    .filter(rc -> rc.getName().equals(flag.name()))
+                    .findFirst()
+                    .orElseThrow(() -> new AssertionError("No DTO field for " + flag.name()));
 
             boolean actual = (boolean) component.getAccessor().invoke(dto);
             assertThat(actual)
-                .as("DTO field %s should match service.isEnabled(%s)", flag.name(), flag)
-                .isEqualTo(expected);
+                    .as("DTO field %s should match service.isEnabled(%s)", flag.name(), flag)
+                    .isEqualTo(expected);
         }
 
         @Test
@@ -89,8 +89,8 @@ class FeatureFlagsDTOTest extends BaseUnitTest {
             for (FeatureFlag f : FeatureFlag.values()) {
                 if (f.kind() == FeatureFlag.Kind.CONFIG) {
                     lenient()
-                        .when(featureProperties.isEnabled(f.key()))
-                        .thenReturn(f == FeatureFlag.GITLAB_WORKSPACE_CREATION);
+                            .when(featureProperties.isEnabled(f.key()))
+                            .thenReturn(f == FeatureFlag.GITLAB_WORKSPACE_CREATION);
                 }
             }
 

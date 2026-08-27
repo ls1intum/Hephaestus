@@ -32,19 +32,15 @@ public class IntegrationMessageHandlerRegistry {
             EventTypeKey key = handler.key();
             if (key == null) {
                 throw new IllegalStateException(
-                    handler.getClass().getName() + " returned null from key() — every handler must declare a key"
-                );
+                        handler.getClass().getName() + " returned null from key() — every handler must declare a key");
             }
             IntegrationMessageHandler previous = map.putIfAbsent(key, handler);
             if (previous != null) {
-                throw new IllegalStateException(
-                    "Duplicate IntegrationMessageHandler for key " +
-                        key +
-                        ": " +
-                        previous.getClass().getName() +
-                        " conflicts with " +
-                        handler.getClass().getName()
-                );
+                throw new IllegalStateException("Duplicate IntegrationMessageHandler for key " + key
+                        + ": "
+                        + previous.getClass().getName()
+                        + " conflicts with "
+                        + handler.getClass().getName());
             }
         }
         this.handlers = Collections.unmodifiableMap(map);

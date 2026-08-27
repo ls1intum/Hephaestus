@@ -18,35 +18,38 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.server.ResponseStatusException;
 
 public record ReviewFeedbackFilterParams(
-    @RequestParam(required = false) @Nullable List<FeedbackDeliveryState> deliveryState,
-    @RequestParam(required = false) @Nullable List<FeedbackSuppressionReason> suppressionReason,
-    @RequestParam(required = false) @Nullable List<FeedbackChannel> channel,
-    @RequestParam(required = false) @Nullable UUID agentJobId,
-    /**
-     * A bare string, not an {@link ArtifactKind} — {@link QueryFilterSupport#artifactKind} has the reason,
-     * and parses it in {@link #toFilter()}, where a malformed value becomes a 400.
-     */
-    @Parameter(description = "Kind of reviewed work, e.g. scm.pull_request")
-    @RequestParam(required = false)
-    @Nullable
-    String artifactKind,
-    @Parameter(description = "Artifact ID; requires artifactKind")
-    @RequestParam(required = false)
-    @Positive
-    @Nullable
-    Long artifactId,
-    @RequestParam(required = false) @Positive @Nullable Long recipientUserId,
-    @Parameter(description = "Inclusive lower bound")
-    @RequestParam(required = false)
-    @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
-    @Nullable
-    Instant from,
-    @Parameter(description = "Exclusive upper bound")
-    @RequestParam(required = false)
-    @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
-    @Nullable
-    Instant to
-) {
+        @RequestParam(required = false) @Nullable List<FeedbackDeliveryState> deliveryState,
+        @RequestParam(required = false) @Nullable List<FeedbackSuppressionReason> suppressionReason,
+        @RequestParam(required = false) @Nullable List<FeedbackChannel> channel,
+        @RequestParam(required = false) @Nullable UUID agentJobId,
+        /**
+         * A bare string, not an {@link ArtifactKind} — {@link QueryFilterSupport#artifactKind} has the reason,
+         * and parses it in {@link #toFilter()}, where a malformed value becomes a 400.
+         */
+        @Parameter(description = "Kind of reviewed work, e.g. scm.pull_request")
+        @RequestParam(required = false)
+        @Nullable
+        String artifactKind,
+
+        @Parameter(description = "Artifact ID; requires artifactKind")
+        @RequestParam(required = false)
+        @Positive
+        @Nullable
+        Long artifactId,
+
+        @RequestParam(required = false) @Positive @Nullable Long recipientUserId,
+
+        @Parameter(description = "Inclusive lower bound")
+        @RequestParam(required = false)
+        @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
+        @Nullable
+        Instant from,
+
+        @Parameter(description = "Exclusive upper bound")
+        @RequestParam(required = false)
+        @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
+        @Nullable
+        Instant to) {
     public FeedbackQueryFilter toFilter() {
         if (artifactId != null && artifactKind == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "artifactId requires artifactKind");
@@ -56,15 +59,6 @@ public record ReviewFeedbackFilterParams(
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "from must not be after to");
         }
         return new FeedbackQueryFilter(
-            deliveryState,
-            suppressionReason,
-            channel,
-            agentJobId,
-            kind,
-            artifactId,
-            recipientUserId,
-            from,
-            to
-        );
+                deliveryState, suppressionReason, channel, agentJobId, kind, artifactId, recipientUserId, from, to);
     }
 }

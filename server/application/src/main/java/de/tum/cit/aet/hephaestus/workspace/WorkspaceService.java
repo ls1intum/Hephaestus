@@ -81,16 +81,15 @@ public class WorkspaceService {
     private final TransactionTemplate transactionTemplate;
 
     public WorkspaceService(
-        WorkspaceRepository workspaceRepository,
-        UserRepository userRepository,
-        WorkspaceSlugService workspaceSlugService,
-        WorkspaceSettingsService workspaceSettingsService,
-        LeaguePointsRecalculator leaguePointsRecalculator,
-        WorkspaceMembershipService workspaceMembershipService,
-        ConnectionService connectionService,
-        ApplicationEventPublisher eventPublisher,
-        PlatformTransactionManager transactionManager
-    ) {
+            WorkspaceRepository workspaceRepository,
+            UserRepository userRepository,
+            WorkspaceSlugService workspaceSlugService,
+            WorkspaceSettingsService workspaceSettingsService,
+            LeaguePointsRecalculator leaguePointsRecalculator,
+            WorkspaceMembershipService workspaceMembershipService,
+            ConnectionService connectionService,
+            ApplicationEventPublisher eventPublisher,
+            PlatformTransactionManager transactionManager) {
         this.workspaceRepository = workspaceRepository;
         this.userRepository = userRepository;
         this.workspaceSlugService = workspaceSlugService;
@@ -112,22 +111,20 @@ public class WorkspaceService {
 
     @Transactional
     public Workspace createWorkspace(
-        String rawSlug,
-        String displayName,
-        String accountLogin,
-        AccountType accountType,
-        @Nullable Long ownerUserId
-    ) {
+            String rawSlug,
+            String displayName,
+            String accountLogin,
+            AccountType accountType,
+            @Nullable Long ownerUserId) {
         return createWorkspaceInTransaction(rawSlug, displayName, accountLogin, accountType, ownerUserId);
     }
 
     private Workspace createWorkspaceInTransaction(
-        String rawSlug,
-        String displayName,
-        String accountLogin,
-        AccountType accountType,
-        @Nullable Long ownerUserId
-    ) {
+            String rawSlug,
+            String displayName,
+            String accountLogin,
+            AccountType accountType,
+            @Nullable Long ownerUserId) {
         String slug = Objects.requireNonNull(workspaceSlugService.normalize(rawSlug));
         workspaceSlugService.validate(slug);
 
@@ -169,22 +166,15 @@ public class WorkspaceService {
         String accountLogin = Objects.requireNonNull(request.accountLogin(), "accountLogin is required");
         AccountType accountType = Objects.requireNonNull(request.accountType(), "accountType is required");
         IntegrationKind kind = Objects.requireNonNull(request.kind(), "kind is required");
-        String personalAccessToken = Objects.requireNonNull(
-            request.personalAccessToken(),
-            "personalAccessToken is required"
-        );
+        String personalAccessToken =
+                Objects.requireNonNull(request.personalAccessToken(), "personalAccessToken is required");
 
         // Always prefer the authenticated user to prevent privilege escalation.
         // Fall back to the deprecated ownerUserId only when no auth context exists (e.g. tests).
         Long ownerUserId = userRepository.getCurrentUser().map(User::getId).orElse(request.ownerUserId());
 
-        Workspace workspace = createWorkspaceInTransaction(
-            workspaceSlug,
-            displayName,
-            accountLogin,
-            accountType,
-            ownerUserId
-        );
+        Workspace workspace =
+                createWorkspaceInTransaction(workspaceSlug, displayName, accountLogin, accountType, ownerUserId);
 
         boolean isGitLab = kind == IntegrationKind.GITLAB;
 
@@ -193,39 +183,38 @@ public class WorkspaceService {
             workspace.setRepositorySelection(RepositorySelection.ALL);
             workspaceRepository.save(workspace);
 
-            String serverUrl = (request.serverUrl() != null && !request.serverUrl().isBlank())
-                ? request.serverUrl().trim()
-                : null;
+            String serverUrl =
+                    (request.serverUrl() != null && !request.serverUrl().isBlank())
+                            ? request.serverUrl().trim()
+                            : null;
             connectionService.provisionPatConnection(
-                workspace,
-                IntegrationKind.GITLAB,
-                serverUrl,
-                new ConnectionConfig.GitLabConfig(
+                    workspace,
+                    IntegrationKind.GITLAB,
                     serverUrl,
-                    /* gitlabGroupId */ null,
-                    /* gitlabWebhookId */ null,
-                    ConnectionConfig.GitLabConfig.SigningMode.PLAINTEXT,
-                    Set.of()
-                ),
-                personalAccessToken,
-                "create-workspace-" + workspace.getId()
-            );
+                    new ConnectionConfig.GitLabConfig(
+                            serverUrl,
+                            /* gitlabGroupId */ null,
+                            /* gitlabWebhookId */ null,
+                            ConnectionConfig.GitLabConfig.SigningMode.PLAINTEXT,
+                            Set.of()),
+                    personalAccessToken,
+                    "create-workspace-" + workspace.getId());
         } else {
             // kind == GITHUB → PAT-backed; App installations bypass this DTO entirely
             // (they arrive via GithubLifecycleListener.createOrUpdateFromInstallation).
             // The DTO validator rejects any other kind.
             workspaceRepository.save(workspace);
-            String serverUrl = (request.serverUrl() != null && !request.serverUrl().isBlank())
-                ? request.serverUrl().trim()
-                : null;
+            String serverUrl =
+                    (request.serverUrl() != null && !request.serverUrl().isBlank())
+                            ? request.serverUrl().trim()
+                            : null;
             connectionService.provisionPatConnection(
-                workspace,
-                IntegrationKind.GITHUB,
-                "pat",
-                new ConnectionConfig.GitHubPatConfig(accountLogin, serverUrl, Set.of()),
-                personalAccessToken,
-                "create-workspace-" + workspace.getId()
-            );
+                    workspace,
+                    IntegrationKind.GITHUB,
+                    "pat",
+                    new ConnectionConfig.GitHubPatConfig(accountLogin, serverUrl, Set.of()),
+                    personalAccessToken,
+                    "create-workspace-" + workspace.getId());
         }
 
         return workspace;
@@ -238,25 +227,21 @@ public class WorkspaceService {
      * @return the created workspace
      */
     public Workspace createWorkspaceWithInitialization(CreateWorkspaceRequestDTO request) {
-        Workspace workspace = Objects.requireNonNull(
-            transactionTemplate.execute(status -> createWorkspaceInTransaction(request))
-        );
+        Workspace workspace =
+                Objects.requireNonNull(transactionTemplate.execute(status -> createWorkspaceInTransaction(request)));
 
-        eventPublisher.publishEvent(
-            new WorkspaceCreatedEvent(workspace.getId(), Objects.requireNonNull(request.kind(), "kind is required"))
-        );
+        eventPublisher.publishEvent(new WorkspaceCreatedEvent(
+                workspace.getId(), Objects.requireNonNull(request.kind(), "kind is required")));
 
         return workspace;
     }
 
     private void createOwnerRole(Workspace workspace, @Nullable Long ownerUserId) {
         if (ownerUserId == null) {
-            throw new IllegalStateException(
-                "Cannot create workspace without an owner. " +
-                    "The authenticated user must have a corresponding git provider User entity. " +
-                    "workspaceSlug=" +
-                    workspace.getWorkspaceSlug()
-            );
+            throw new IllegalStateException("Cannot create workspace without an owner. "
+                    + "The authenticated user must have a corresponding git provider User entity. "
+                    + "workspaceSlug="
+                    + workspace.getWorkspaceSlug());
         }
         workspaceMembershipService.createMembership(workspace, ownerUserId, WorkspaceMembership.WorkspaceRole.OWNER);
     }
@@ -266,8 +251,8 @@ public class WorkspaceService {
     @Transactional
     public Workspace updateAccountLogin(Long workspaceId, String accountLogin) {
         Workspace workspace = workspaceRepository
-            .findById(workspaceId)
-            .orElseThrow(() -> new IllegalArgumentException("Workspace not found: " + workspaceId));
+                .findById(workspaceId)
+                .orElseThrow(() -> new IllegalArgumentException("Workspace not found: " + workspaceId));
 
         if (!Objects.equals(workspace.getAccountLogin(), accountLogin)) {
             workspace.setAccountLogin(accountLogin);
@@ -287,10 +272,9 @@ public class WorkspaceService {
     public void resetAndRecalculateLeagues(String slug) {
         Workspace workspace = requireWorkspace(slug);
         log.info(
-            "Reset league points: workspaceId={}, workspaceSlug={}",
-            workspace.getId(),
-            workspace.getWorkspaceSlug()
-        );
+                "Reset league points: workspaceId={}, workspaceSlug={}",
+                workspace.getId(),
+                workspace.getWorkspaceSlug());
         resetAndRecalculateLeaguesInternal(workspace.getId());
     }
 
@@ -324,44 +308,32 @@ public class WorkspaceService {
     }
 
     public Workspace updateNotifications(
-        String slug,
-        @Nullable Boolean enabled,
-        @Nullable String team,
-        @Nullable String channelId
-    ) {
+            String slug, @Nullable Boolean enabled, @Nullable String team, @Nullable String channelId) {
         Workspace workspace = requireWorkspace(slug);
         return workspaceSettingsService.updateNotifications(workspace.getId(), enabled, team, channelId);
     }
 
     public Workspace updateNotifications(
-        WorkspaceContext workspaceContext,
-        @Nullable Boolean enabled,
-        @Nullable String team,
-        @Nullable String channelId
-    ) {
+            WorkspaceContext workspaceContext,
+            @Nullable Boolean enabled,
+            @Nullable String team,
+            @Nullable String channelId) {
         return updateNotifications(requireSlug(workspaceContext), enabled, team, channelId);
     }
 
     public Workspace updateLeaderboardDigest(
-        String slug,
-        Integer day,
-        String time,
-        Boolean enabled,
-        @Nullable String team,
-        @Nullable String channelId
-    ) {
+            String slug, Integer day, String time, Boolean enabled, @Nullable String team, @Nullable String channelId) {
         Workspace workspace = requireWorkspace(slug);
         return workspaceSettingsService.updateLeaderboardDigest(workspace.getId(), day, time, enabled, team, channelId);
     }
 
     public Workspace updateLeaderboardDigest(
-        WorkspaceContext workspaceContext,
-        Integer day,
-        String time,
-        Boolean enabled,
-        @Nullable String team,
-        @Nullable String channelId
-    ) {
+            WorkspaceContext workspaceContext,
+            Integer day,
+            String time,
+            Boolean enabled,
+            @Nullable String team,
+            @Nullable String channelId) {
         return updateLeaderboardDigest(requireSlug(workspaceContext), day, time, enabled, team, channelId);
     }
 
@@ -411,17 +383,16 @@ public class WorkspaceService {
         workspaceSlugService.validate(newSlug);
 
         Workspace workspace = workspaceRepository
-            .findById(workspaceId)
-            .orElseThrow(() -> new EntityNotFoundException("Workspace", workspaceId.toString()));
+                .findById(workspaceId)
+                .orElseThrow(() -> new EntityNotFoundException("Workspace", workspaceId.toString()));
 
         String currentSlug = workspace.getWorkspaceSlug();
 
         if (currentSlug.equals(newSlug)) {
             log.debug(
-                "Skipped workspace rename: reason=slugUnchanged, workspaceId={}, slug={}",
-                workspaceId,
-                LoggingUtils.sanitizeForLog(newSlug)
-            );
+                    "Skipped workspace rename: reason=slugUnchanged, workspaceId={}, slug={}",
+                    workspaceId,
+                    LoggingUtils.sanitizeForLog(newSlug));
             return workspace;
         }
 
@@ -439,11 +410,10 @@ public class WorkspaceService {
         Workspace saved = workspaceRepository.save(workspace);
 
         log.info(
-            "Renamed workspace: workspaceId={}, oldSlug={}, newSlug={}",
-            workspaceId,
-            LoggingUtils.sanitizeForLog(currentSlug),
-            LoggingUtils.sanitizeForLog(newSlug)
-        );
+                "Renamed workspace: workspaceId={}, oldSlug={}, newSlug={}",
+                workspaceId,
+                LoggingUtils.sanitizeForLog(currentSlug),
+                LoggingUtils.sanitizeForLog(newSlug));
 
         return saved;
     }
@@ -455,8 +425,8 @@ public class WorkspaceService {
             throw new IllegalArgumentException("Workspace slug must not be blank.");
         }
         return workspaceRepository
-            .findByWorkspaceSlug(slug)
-            .orElseThrow(() -> new EntityNotFoundException("Workspace", slug));
+                .findByWorkspaceSlug(slug)
+                .orElseThrow(() -> new EntityNotFoundException("Workspace", slug));
     }
 
     private String requireSlug(WorkspaceContext workspaceContext) {

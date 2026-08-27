@@ -44,12 +44,11 @@ public class GitlabApprovalChannel implements ApprovalChannel {
     private final OutboundEgressGuard egressGuard;
 
     public GitlabApprovalChannel(
-        GitLabGraphQlClientProvider gitLabProvider,
-        GitLabTokenService tokenService,
-        GitlabSummaryChannel feedbackChannel,
-        WebClient.Builder webClientBuilder,
-        OutboundEgressGuard egressGuard
-    ) {
+            GitLabGraphQlClientProvider gitLabProvider,
+            GitLabTokenService tokenService,
+            GitlabSummaryChannel feedbackChannel,
+            WebClient.Builder webClientBuilder,
+            OutboundEgressGuard egressGuard) {
         this.gitLabProvider = gitLabProvider;
         this.tokenService = tokenService;
         this.feedbackChannel = feedbackChannel;
@@ -73,26 +72,26 @@ public class GitlabApprovalChannel implements ApprovalChannel {
         try {
             egressGuard.requireDeliveryAllowed("gitlab.approve");
             webClient
-                .post()
-                .uri(approvalUri(tokenService.resolveServerUrl(scopeId), mr))
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenService.getAccessToken(scopeId))
-                .retrieve()
-                .toBodilessEntity()
-                .block(REQUEST_TIMEOUT);
+                    .post()
+                    .uri(approvalUri(tokenService.resolveServerUrl(scopeId), mr))
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenService.getAccessToken(scopeId))
+                    .retrieve()
+                    .toBodilessEntity()
+                    .block(REQUEST_TIMEOUT);
         } catch (OutboundEgressSuppressedException e) {
             throw e;
         } catch (WebClientResponseException e) {
             // GitLab answers 401, not 403, when the token's user may not approve this MR — usually its author.
             throw new FeedbackDeliveryException(
-                "GitLab approve failed for " +
-                    mr.projectPath() +
-                    "!" +
-                    mr.iid() +
-                    ": HTTP " +
-                    e.getStatusCode() +
-                    (e.getStatusCode().value() == 401 ? " (the token's user may not approve this merge request)" : ""),
-                e
-            );
+                    "GitLab approve failed for " + mr.projectPath()
+                            + "!"
+                            + mr.iid()
+                            + ": HTTP "
+                            + e.getStatusCode()
+                            + (e.getStatusCode().value() == 401
+                                    ? " (the token's user may not approve this merge request)"
+                                    : ""),
+                    e);
         } catch (RuntimeException e) {
             throw new FeedbackDeliveryException("GitLab approve transport error: " + e.getMessage(), e);
         }
@@ -111,13 +110,10 @@ public class GitlabApprovalChannel implements ApprovalChannel {
      */
     private static URI approvalUri(String serverUrl, MrCoordinates mr) {
         String base = serverUrl.endsWith("/") ? serverUrl.substring(0, serverUrl.length() - 1) : serverUrl;
-        return URI.create(
-            base +
-                "/api/v4/projects/" +
-                mr.projectPath().replace("/", "%2F") +
-                "/merge_requests/" +
-                mr.iid() +
-                "/approve"
-        );
+        return URI.create(base + "/api/v4/projects/"
+                + mr.projectPath().replace("/", "%2F")
+                + "/merge_requests/"
+                + mr.iid()
+                + "/approve");
     }
 }

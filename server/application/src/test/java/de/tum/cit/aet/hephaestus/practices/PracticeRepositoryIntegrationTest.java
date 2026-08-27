@@ -98,18 +98,16 @@ class PracticeRepositoryIntegrationTest extends BaseIntegrationTest {
             practiceRepository.save(createPractice("unique-slug", "First"));
 
             Practice duplicate = createPractice("unique-slug", "Second");
-            assertThatThrownBy(() -> practiceRepository.saveAndFlush(duplicate)).isInstanceOf(
-                DataIntegrityViolationException.class
-            );
+            assertThatThrownBy(() -> practiceRepository.saveAndFlush(duplicate))
+                    .isInstanceOf(DataIntegrityViolationException.class);
         }
 
         @Test
         void allowsSameSlugInDifferentWorkspaces() {
             practiceRepository.save(createPractice("shared-slug", "First"));
 
-            Workspace otherWorkspace = workspaceRepository.save(
-                WorkspaceTestFixtures.activeWorkspace("other-workspace")
-            );
+            Workspace otherWorkspace =
+                    workspaceRepository.save(WorkspaceTestFixtures.activeWorkspace("other-workspace"));
             Practice otherPractice = createPractice("shared-slug", "Second");
             otherPractice.setWorkspace(otherWorkspace);
 
@@ -157,14 +155,12 @@ class PracticeRepositoryIntegrationTest extends BaseIntegrationTest {
             Practice inheriting = createPractice("inheriting", "Inheriting");
             practiceRepository.saveAll(List.of(loud, observed, silent, inheriting));
 
-            List<Practice> result = practiceRepository.findByWorkspaceIdAndArtifactKind(
-                workspace.getId(),
-                loud.getArtifactKind()
-            );
+            List<Practice> result =
+                    practiceRepository.findByWorkspaceIdAndArtifactKind(workspace.getId(), loud.getArtifactKind());
 
             assertThat(result)
-                .extracting(Practice::getSlug)
-                .containsExactlyInAnyOrder("loud", "observed", "silent", "inheriting");
+                    .extracting(Practice::getSlug)
+                    .containsExactlyInAnyOrder("loud", "observed", "silent", "inheriting");
         }
 
         @Test
@@ -176,10 +172,8 @@ class PracticeRepositoryIntegrationTest extends BaseIntegrationTest {
             issue.setAutomatedReviewPolicy(PracticeTestEvidence.forArtifact(ArtifactKinds.ISSUE));
             practiceRepository.saveAll(List.of(pullRequest, issue));
 
-            List<Practice> result = practiceRepository.findByWorkspaceIdAndArtifactKind(
-                workspace.getId(),
-                ArtifactKinds.PULL_REQUEST
-            );
+            List<Practice> result =
+                    practiceRepository.findByWorkspaceIdAndArtifactKind(workspace.getId(), ArtifactKinds.PULL_REQUEST);
 
             assertThat(result).extracting(Practice::getSlug).containsExactly("on-pull-requests");
         }
@@ -208,24 +202,21 @@ class PracticeRepositoryIntegrationTest extends BaseIntegrationTest {
             List<PracticeRepository.PracticeAutonomyRow> rows = practiceRepository.findAutonomyRows(workspace.getId());
 
             assertThat(rows)
-                .extracting(
-                    PracticeRepository.PracticeAutonomyRow::getPracticeAutonomy,
-                    PracticeRepository.PracticeAutonomyRow::getGroupAutonomy,
-                    PracticeRepository.PracticeAutonomyRow::getGroupId,
-                    PracticeRepository.PracticeAutonomyRow::getArtifactKind
-                )
-                .containsExactlyInAnyOrder(
-                    tuple(
-                        PracticeAutonomy.HUMAN_APPROVAL,
-                        PracticeAutonomy.OFF,
-                        silencedGroup.getId(),
-                        ArtifactKinds.PULL_REQUEST
-                    ),
-                    tuple(null, PracticeAutonomy.OFF, silencedGroup.getId(), ArtifactKinds.PULL_REQUEST),
-                    tuple(null, null, undecidedGroup.getId(), ArtifactKinds.PULL_REQUEST),
-                    // No group at all: the chain falls straight through to the workspace.
-                    tuple(null, null, null, ArtifactKinds.PULL_REQUEST)
-                );
+                    .extracting(
+                            PracticeRepository.PracticeAutonomyRow::getPracticeAutonomy,
+                            PracticeRepository.PracticeAutonomyRow::getGroupAutonomy,
+                            PracticeRepository.PracticeAutonomyRow::getGroupId,
+                            PracticeRepository.PracticeAutonomyRow::getArtifactKind)
+                    .containsExactlyInAnyOrder(
+                            tuple(
+                                    PracticeAutonomy.HUMAN_APPROVAL,
+                                    PracticeAutonomy.OFF,
+                                    silencedGroup.getId(),
+                                    ArtifactKinds.PULL_REQUEST),
+                            tuple(null, PracticeAutonomy.OFF, silencedGroup.getId(), ArtifactKinds.PULL_REQUEST),
+                            tuple(null, null, undecidedGroup.getId(), ArtifactKinds.PULL_REQUEST),
+                            // No group at all: the chain falls straight through to the workspace.
+                            tuple(null, null, null, ArtifactKinds.PULL_REQUEST));
         }
 
         @Test
@@ -260,11 +251,13 @@ class PracticeRepositoryIntegrationTest extends BaseIntegrationTest {
 
         @Test
         void existsByWorkspace() {
-            assertThat(practiceRepository.existsByWorkspaceId(workspace.getId())).isFalse();
+            assertThat(practiceRepository.existsByWorkspaceId(workspace.getId()))
+                    .isFalse();
 
             practiceRepository.save(createPractice("test", "Test"));
 
-            assertThat(practiceRepository.existsByWorkspaceId(workspace.getId())).isTrue();
+            assertThat(practiceRepository.existsByWorkspaceId(workspace.getId()))
+                    .isTrue();
         }
 
         @Test
@@ -279,8 +272,10 @@ class PracticeRepositoryIntegrationTest extends BaseIntegrationTest {
 
             practiceRepository.deleteAllByWorkspaceId(workspace.getId());
 
-            assertThat(practiceRepository.existsByWorkspaceId(workspace.getId())).isFalse();
-            assertThat(practiceRepository.existsByWorkspaceId(otherWorkspace.getId())).isTrue();
+            assertThat(practiceRepository.existsByWorkspaceId(workspace.getId()))
+                    .isFalse();
+            assertThat(practiceRepository.existsByWorkspaceId(otherWorkspace.getId()))
+                    .isTrue();
         }
     }
 }

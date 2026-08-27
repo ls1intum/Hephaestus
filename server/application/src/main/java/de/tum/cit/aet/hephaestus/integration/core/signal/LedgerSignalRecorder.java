@@ -34,11 +34,7 @@ public class LedgerSignalRecorder implements SignalRecorder {
     @Override
     @Transactional(propagation = Propagation.MANDATORY)
     public boolean record(
-        SignalKey key,
-        Instant occurredAt,
-        DiscoveredVia discoveredVia,
-        @Nullable Long requestedByUserId
-    ) {
+            SignalKey key, Instant occurredAt, DiscoveredVia discoveredVia, @Nullable Long requestedByUserId) {
         Instant now = Instant.now();
         // A reconciliation pass knows that something happened, not that it is the right one to act on it,
         // so it may only ever add a row; a live or requested observation may also take over one nobody
@@ -54,25 +50,18 @@ public class LedgerSignalRecorder implements SignalRecorder {
             return ownsSignal(recorded, key);
         }
         int affected = repository.insertOrClaimUndecided(
-            key,
-            UUID.randomUUID(),
-            occurredAt,
-            discoveredVia.name(),
-            now,
-            requestedByUserId
-        );
+                key, UUID.randomUUID(), occurredAt, discoveredVia.name(), now, requestedByUserId);
         return ownsSignal(affected, key);
     }
 
     private boolean ownsSignal(int affected, SignalKey key) {
         if (affected == 0) {
             log.debug(
-                "Signal already settled, not acting: workspaceId={}, signal={}, artifactId={}, revision={}",
-                key.workspaceId(),
-                key.signalName(),
-                key.artifactId(),
-                key.revision()
-            );
+                    "Signal already settled, not acting: workspaceId={}, signal={}, artifactId={}, revision={}",
+                    key.workspaceId(),
+                    key.signalName(),
+                    key.artifactId(),
+                    key.revision());
         }
         return affected == 1;
     }
@@ -86,12 +75,11 @@ public class LedgerSignalRecorder implements SignalRecorder {
             return;
         }
         log.debug(
-            "Signal triggered: workspaceId={}, signal={}, artifactId={}, jobId={}",
-            key.workspaceId(),
-            key.signalName(),
-            key.artifactId(),
-            jobId
-        );
+                "Signal triggered: workspaceId={}, signal={}, artifactId={}, jobId={}",
+                key.workspaceId(),
+                key.signalName(),
+                key.artifactId(),
+                jobId);
     }
 
     @Override
@@ -103,16 +91,20 @@ public class LedgerSignalRecorder implements SignalRecorder {
             return;
         }
         meterRegistry
-            .counter("practice.review.refused", "phase", "submission", "reason", reason.name().toLowerCase(Locale.ROOT))
-            .increment();
+                .counter(
+                        "practice.review.refused",
+                        "phase",
+                        "submission",
+                        "reason",
+                        reason.name().toLowerCase(Locale.ROOT))
+                .increment();
         log.debug(
-            "Signal refused: workspaceId={}, signal={}, artifactId={}, reason={}, state={}",
-            key.workspaceId(),
-            key.signalName(),
-            key.artifactId(),
-            reason,
-            reason.resultingState()
-        );
+                "Signal refused: workspaceId={}, signal={}, artifactId={}, reason={}, state={}",
+                key.workspaceId(),
+                key.signalName(),
+                key.artifactId(),
+                reason,
+                reason.resultingState());
     }
 
     /**
@@ -121,13 +113,12 @@ public class LedgerSignalRecorder implements SignalRecorder {
      */
     private void logUnsettled(String attempted, SignalKey key) {
         log.warn(
-            "Signal was not settleable as {}, leaving whoever decided it: workspaceId={}, signal={}," +
-                " artifactId={}, revision={}",
-            attempted,
-            key.workspaceId(),
-            key.signalName(),
-            key.artifactId(),
-            key.revision()
-        );
+                "Signal was not settleable as {}, leaving whoever decided it: workspaceId={}, signal={},"
+                        + " artifactId={}, revision={}",
+                attempted,
+                key.workspaceId(),
+                key.signalName(),
+                key.artifactId(),
+                key.revision());
     }
 }

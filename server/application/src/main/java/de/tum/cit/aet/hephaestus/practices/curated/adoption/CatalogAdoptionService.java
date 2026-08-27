@@ -44,8 +44,8 @@ public class CatalogAdoptionService {
     public Practice adopt(WorkspaceContext context, String slug, String ifMatch) {
         catalogLock.acquire();
         workspaceRepository
-            .findByIdForUpdate(context.id())
-            .orElseThrow(() -> new EntityNotFoundException("Workspace", context.slug()));
+                .findByIdForUpdate(context.id())
+                .orElseThrow(() -> new EntityNotFoundException("Workspace", context.slug()));
 
         CatalogAdoptionPlan plan;
         try {
@@ -56,16 +56,14 @@ public class CatalogAdoptionService {
         requireCurrentPlan(ifMatch, plan.etag());
         if (plan.availability() != CatalogAdoptionAvailability.AVAILABLE) {
             throw new PracticeSlugConflictException(
-                "A practice with slug '" + slug + "' already exists in this workspace."
-            );
+                    "A practice with slug '" + slug + "' already exists in this workspace.");
         }
         if (plan.groupDisposition() == CatalogGroupDisposition.CREATE_CATALOG_GROUP) {
             groupService.adoptGroupFromCatalog(
-                context,
-                Objects.requireNonNull(plan.groupSlug()),
-                Objects.requireNonNull(plan.groupDefinition()),
-                plan.groupDisplayOrder()
-            );
+                    context,
+                    Objects.requireNonNull(plan.groupSlug()),
+                    Objects.requireNonNull(plan.groupDefinition()),
+                    plan.groupDisplayOrder());
         }
         return practiceService.adoptPracticeFromCatalog(context, slug, plan.definition(), plan.initialAutonomy());
     }
@@ -74,8 +72,8 @@ public class CatalogAdoptionService {
     public CatalogGroupAdoptionResult adoptGroup(WorkspaceContext context, String slug, String ifMatch) {
         catalogLock.acquire();
         workspaceRepository
-            .findByIdForUpdate(context.id())
-            .orElseThrow(() -> new EntityNotFoundException("Workspace", context.slug()));
+                .findByIdForUpdate(context.id())
+                .orElseThrow(() -> new EntityNotFoundException("Workspace", context.slug()));
 
         CatalogGroupAdoptionPlan plan;
         try {
@@ -87,19 +85,11 @@ public class CatalogAdoptionService {
         if (plan.disposition() == CatalogGroupDisposition.CREATE_CATALOG_GROUP) {
             groupService.adoptGroupFromCatalog(context, slug, plan.definition(), plan.displayOrder());
         }
-        List<Practice> added = plan
-            .practices()
-            .stream()
-            .filter(practice -> practice.availability() == CatalogAdoptionAvailability.AVAILABLE)
-            .map(practice ->
-                practiceService.adoptPracticeFromCatalog(
-                    context,
-                    practice.slug(),
-                    practice.definition(),
-                    practice.initialAutonomy()
-                )
-            )
-            .toList();
+        List<Practice> added = plan.practices().stream()
+                .filter(practice -> practice.availability() == CatalogAdoptionAvailability.AVAILABLE)
+                .map(practice -> practiceService.adoptPracticeFromCatalog(
+                        context, practice.slug(), practice.definition(), practice.initialAutonomy()))
+                .toList();
         List<Practice> moved = new java.util.ArrayList<>();
         int position = 0;
         for (CatalogGroupPracticeActionDTO action : plan.actions()) {

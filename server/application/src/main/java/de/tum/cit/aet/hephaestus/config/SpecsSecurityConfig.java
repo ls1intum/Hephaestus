@@ -22,8 +22,7 @@ public class SpecsSecurityConfig {
     @Bean
     @Primary
     JwtDecoder specsJwtDecoder() {
-        return token ->
-            Jwt.withTokenValue(token)
+        return token -> Jwt.withTokenValue(token)
                 .header("alg", "none")
                 .header("typ", "JWT")
                 .claims(claims -> {

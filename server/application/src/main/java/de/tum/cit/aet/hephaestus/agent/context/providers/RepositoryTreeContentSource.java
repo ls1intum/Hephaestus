@@ -74,33 +74,24 @@ public class RepositoryTreeContentSource implements EvidenceSource {
         snapshot.files().forEach((path, file) -> onDisk.put(SandboxLayout.REPO_MOUNT_RELATIVE + path, file));
         // A truncated tree must report PARTIAL, not COMPLETE — otherwise a practice asserting something is
         // absent from the repository gets answered from a fragment that merely doesn't happen to contain it.
-        SourceCompleteness completeness = snapshot.complete()
-            ? SourceCompleteness.COMPLETE
-            : SourceCompleteness.PARTIAL;
+        SourceCompleteness completeness =
+                snapshot.complete() ? SourceCompleteness.COMPLETE : SourceCompleteness.PARTIAL;
         return new EvidenceContribution(
-            Map.of(),
-            Map.of(KIND, completeness),
-            Map.of(KIND, snapshot.commitSha() + ":" + snapshot.treeSha()),
-            Map.of(),
-            Map.of(),
-            Map.of(),
-            Map.of(),
-            onDisk,
-            snapshot,
-            snapshot.limitations().isEmpty() ? Map.of() : Map.of(KIND, List.copyOf(snapshot.limitations()))
-        );
+                Map.of(),
+                Map.of(KIND, completeness),
+                Map.of(KIND, snapshot.commitSha() + ":" + snapshot.treeSha()),
+                Map.of(),
+                Map.of(),
+                Map.of(),
+                Map.of(),
+                onDisk,
+                snapshot,
+                snapshot.limitations().isEmpty() ? Map.of() : Map.of(KIND, List.copyOf(snapshot.limitations())));
     }
 
     private static EvidenceContribution absent(SourceCaptureState state) {
         return new EvidenceContribution(
-            Map.of(),
-            Map.of(),
-            Map.of(),
-            Map.of(),
-            Map.of(),
-            Map.of(),
-            Map.of(KIND, state)
-        );
+                Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), Map.of(KIND, state));
     }
 
     @Nullable
@@ -115,7 +106,8 @@ public class RepositoryTreeContentSource implements EvidenceSource {
         if (metadata == null || !metadata.path("repository_id").isNumber()) {
             return null;
         }
-        if (gitRepositoryManager.isRepositoryCloned(metadata.path("repository_id").asLong())) {
+        if (gitRepositoryManager.isRepositoryCloned(
+                metadata.path("repository_id").asLong())) {
             return null;
         }
         return new SourceCaptureState.Unavailable(SourceAbsenceReason.NO_WORKING_COPY);
@@ -127,17 +119,18 @@ public class RepositoryTreeContentSource implements EvidenceSource {
         }
         JsonNode metadata = review.job().getMetadata();
         if (metadata == null || !metadata.path("repository_id").isNumber()) {
-            throw new JobPreparationException("Pull request job has no repository_id: jobId=" + review.job().getId());
+            throw new JobPreparationException("Pull request job has no repository_id: jobId="
+                    + review.job().getId());
         }
         String commitSha = metadata.path("commit_sha").asString();
         if (commitSha == null || commitSha.isBlank()) {
-            throw new JobPreparationException("Pull request job has no commit_sha: jobId=" + review.job().getId());
+            throw new JobPreparationException(
+                    "Pull request job has no commit_sha: jobId=" + review.job().getId());
         }
         long repositoryId = metadata.path("repository_id").asLong();
         if (!gitRepositoryManager.isRepositoryCloned(repositoryId)) {
-            throw new JobPreparationException(
-                "Repository not cloned: repoId=" + repositoryId + ", jobId=" + review.job().getId()
-            );
+            throw new JobPreparationException("Repository not cloned: repoId=" + repositoryId + ", jobId="
+                    + review.job().getId());
         }
         try {
             return gitRepositoryManager.readTreeSnapshot(repositoryId, commitSha);

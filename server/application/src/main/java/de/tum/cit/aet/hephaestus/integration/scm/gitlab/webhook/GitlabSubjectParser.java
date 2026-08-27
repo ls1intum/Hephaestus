@@ -34,8 +34,7 @@ public class GitlabSubjectParser implements SubjectParser {
         String[] parts = fullSubject.split("\\.", -1);
         if (parts.length < 4) {
             throw new IllegalArgumentException(
-                "GitLab subject must have at least 4 components (gitlab.<ns>.<proj>.<event>), got: " + fullSubject
-            );
+                    "GitLab subject must have at least 4 components (gitlab.<ns>.<proj>.<event>), got: " + fullSubject);
         }
         if (!"gitlab".equals(parts[0])) {
             throw new IllegalArgumentException("subject must start with 'gitlab.', got: " + fullSubject);

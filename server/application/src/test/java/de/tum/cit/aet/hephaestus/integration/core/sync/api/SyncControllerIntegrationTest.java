@@ -77,6 +77,7 @@ class SyncControllerIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     /** A second tenant the test's admin has NO membership in — the cross-tenant IDOR target. */
     private Workspace otherWorkspace;
+
     private Connection otherConnection;
     private SyncJob otherJob;
 
@@ -93,20 +94,12 @@ class SyncControllerIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
         User owner = persistUser("sync-owner-" + System.nanoTime());
         workspace = createWorkspace(
-            "sync-ws-" + System.nanoTime(),
-            "Sync Observability Test",
-            "sync-org",
-            AccountType.ORG,
-            owner
-        );
-        connection = connectionRepository.save(
-            new Connection(
+                "sync-ws-" + System.nanoTime(), "Sync Observability Test", "sync-org", AccountType.ORG, owner);
+        connection = connectionRepository.save(new Connection(
                 workspace,
                 IntegrationKind.GITHUB,
                 "100",
-                new ConnectionConfig.GitHubAppConfig(100L, "sync-org", null, Set.of())
-            )
-        );
+                new ConnectionConfig.GitHubAppConfig(100L, "sync-org", null, Set.of())));
         connection.setState(IntegrationState.ACTIVE);
         connection = connectionRepository.save(connection);
 
@@ -115,32 +108,21 @@ class SyncControllerIntegrationTest extends AbstractWorkspaceIntegrationTest {
         // against these ids is a genuine cross-tenant reach.
         User otherOwner = persistUser("sync-other-owner-" + System.nanoTime());
         otherWorkspace = createWorkspace(
-            "sync-other-ws-" + System.nanoTime(),
-            "Other Tenant",
-            "other-org",
-            AccountType.ORG,
-            otherOwner
-        );
-        otherConnection = connectionRepository.save(
-            new Connection(
+                "sync-other-ws-" + System.nanoTime(), "Other Tenant", "other-org", AccountType.ORG, otherOwner);
+        otherConnection = connectionRepository.save(new Connection(
                 otherWorkspace,
                 IntegrationKind.GITHUB,
                 "200",
-                new ConnectionConfig.GitHubAppConfig(200L, "other-org", null, Set.of())
-            )
-        );
+                new ConnectionConfig.GitHubAppConfig(200L, "other-org", null, Set.of())));
         otherConnection.setState(IntegrationState.ACTIVE);
         otherConnection = connectionRepository.save(otherConnection);
-        otherJob = syncJobRepository.save(
-            new SyncJob(
+        otherJob = syncJobRepository.save(new SyncJob(
                 otherWorkspace,
                 otherConnection,
                 IntegrationKind.GITHUB,
                 SyncJobType.RECONCILIATION,
                 SyncJobTrigger.MANUAL,
-                null
-            )
-        );
+                null));
     }
 
     @Test
@@ -149,11 +131,11 @@ class SyncControllerIntegrationTest extends AbstractWorkspaceIntegrationTest {
         ensureAdminMembership(workspace);
 
         ConnectionSyncStatusDTO status = statusRequest()
-            .expectStatus()
-            .isOk()
-            .expectBody(ConnectionSyncStatusDTO.class)
-            .returnResult()
-            .getResponseBody();
+                .expectStatus()
+                .isOk()
+                .expectBody(ConnectionSyncStatusDTO.class)
+                .returnResult()
+                .getResponseBody();
 
         assertThat(status).isNotNull();
         assertThat(status.connectionId()).isEqualTo(connection.getId());
@@ -171,11 +153,11 @@ class SyncControllerIntegrationTest extends AbstractWorkspaceIntegrationTest {
         connectionRepository.save(connection);
 
         ConnectionSyncStatusDTO status = statusRequest()
-            .expectStatus()
-            .isOk()
-            .expectBody(ConnectionSyncStatusDTO.class)
-            .returnResult()
-            .getResponseBody();
+                .expectStatus()
+                .isOk()
+                .expectBody(ConnectionSyncStatusDTO.class)
+                .returnResult()
+                .getResponseBody();
 
         assertThat(status).isNotNull();
         assertThat(status.health()).isEqualTo(ConnectionHealth.SUSPENDED);
@@ -187,12 +169,15 @@ class SyncControllerIntegrationTest extends AbstractWorkspaceIntegrationTest {
         ensureAdminMembership(workspace);
 
         webTestClient
-            .get()
-            .uri("/workspaces/{slug}/connections/{id}/sync", workspace.getWorkspaceSlug(), connection.getId() + 999_999)
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isNotFound();
+                .get()
+                .uri(
+                        "/workspaces/{slug}/connections/{id}/sync",
+                        workspace.getWorkspaceSlug(),
+                        connection.getId() + 999_999)
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isNotFound();
     }
 
     @Test
@@ -205,16 +190,16 @@ class SyncControllerIntegrationTest extends AbstractWorkspaceIntegrationTest {
         CountDownLatch runnerStarted = new CountDownLatch(1);
         CountDownLatch release = new CountDownLatch(1);
         Mockito.doAnswer(invocation -> {
-            runnerStarted.countDown();
-            try {
-                release.await(5, TimeUnit.SECONDS);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-            }
-            return null;
-        })
-            .when(githubSyncRunner)
-            .reconcile(any(), any(), any());
+                    runnerStarted.countDown();
+                    try {
+                        release.await(5, TimeUnit.SECONDS);
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                    }
+                    return null;
+                })
+                .when(githubSyncRunner)
+                .reconcile(any(), any(), any());
 
         AtomicReference<WebTestClient.ResponseSpec> firstResponse = new AtomicReference<>();
         Thread firstCaller = new Thread(() -> firstResponse.set(triggerRequest(adminToken)));
@@ -224,11 +209,11 @@ class SyncControllerIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
         // Duplicate manual trigger while the first job is still RUNNING: idempotent-absorb, 200 not 409.
         SyncJobDTO duplicateJob = triggerRequest(adminToken)
-            .expectStatus()
-            .isOk()
-            .expectBody(SyncJobDTO.class)
-            .returnResult()
-            .getResponseBody();
+                .expectStatus()
+                .isOk()
+                .expectBody(SyncJobDTO.class)
+                .returnResult()
+                .getResponseBody();
         assertThat(duplicateJob).isNotNull();
 
         release.countDown();
@@ -236,12 +221,11 @@ class SyncControllerIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
         WebTestClient.ResponseSpec response = firstResponse.get();
         assertNotNull(response);
-        SyncJobDTO firstJob = response
-            .expectStatus()
-            .isEqualTo(HttpStatus.ACCEPTED)
-            .expectBody(SyncJobDTO.class)
-            .returnResult()
-            .getResponseBody();
+        SyncJobDTO firstJob = response.expectStatus()
+                .isEqualTo(HttpStatus.ACCEPTED)
+                .expectBody(SyncJobDTO.class)
+                .returnResult()
+                .getResponseBody();
         assertThat(firstJob).isNotNull();
         assertThat(duplicateJob.id()).isEqualTo(firstJob.id());
     }
@@ -256,16 +240,16 @@ class SyncControllerIntegrationTest extends AbstractWorkspaceIntegrationTest {
         CountDownLatch runnerStarted = new CountDownLatch(1);
         CountDownLatch release = new CountDownLatch(1);
         Mockito.doAnswer(invocation -> {
-            runnerStarted.countDown();
-            try {
-                release.await(5, TimeUnit.SECONDS);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-            }
-            return null;
-        })
-            .when(githubSyncRunner)
-            .reconcile(any(), any(), any());
+                    runnerStarted.countDown();
+                    try {
+                        release.await(5, TimeUnit.SECONDS);
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                    }
+                    return null;
+                })
+                .when(githubSyncRunner)
+                .reconcile(any(), any(), any());
 
         AtomicReference<WebTestClient.ResponseSpec> firstResponse = new AtomicReference<>();
         Thread firstCaller = new Thread(() -> firstResponse.set(triggerRequest(adminToken))); // RECONCILIATION
@@ -285,14 +269,14 @@ class SyncControllerIntegrationTest extends AbstractWorkspaceIntegrationTest {
     void trigger_missingType_returns400() {
         ensureAdminMembership(workspace);
         webTestClient
-            .post()
-            .uri("/workspaces/{slug}/connections/{id}/sync/jobs", workspace.getWorkspaceSlug(), connection.getId())
-            .headers(h -> h.setBearerAuth(TestAuthUtils.getCurrentUserToken()))
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue("{}")
-            .exchange()
-            .expectStatus()
-            .isBadRequest();
+                .post()
+                .uri("/workspaces/{slug}/connections/{id}/sync/jobs", workspace.getWorkspaceSlug(), connection.getId())
+                .headers(h -> h.setBearerAuth(TestAuthUtils.getCurrentUserToken()))
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("{}")
+                .exchange()
+                .expectStatus()
+                .isBadRequest();
     }
 
     @Test
@@ -312,26 +296,26 @@ class SyncControllerIntegrationTest extends AbstractWorkspaceIntegrationTest {
         String adminToken = TestAuthUtils.getCurrentUserToken();
         CountDownLatch runnerStarted = new CountDownLatch(1);
         Mockito.doAnswer(invocation -> {
-            runnerStarted.countDown();
-            SyncJobHandle handle = invocation.getArgument(1);
-            long deadline = System.currentTimeMillis() + 5000;
-            while (!handle.isCancellationRequested() && System.currentTimeMillis() < deadline) {
-                try {
-                    Thread.sleep(25);
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
+                    runnerStarted.countDown();
+                    SyncJobHandle handle = invocation.getArgument(1);
+                    long deadline = System.currentTimeMillis() + 5000;
+                    while (!handle.isCancellationRequested() && System.currentTimeMillis() < deadline) {
+                        try {
+                            Thread.sleep(25);
+                        } catch (InterruptedException e) {
+                            Thread.currentThread().interrupt();
+                            return null;
+                        }
+                    }
+                    // A real cooperative runner reports that it stopped early so the engine finalizes CANCELLED;
+                    // a body that merely returns after seeing the flag is (correctly) recorded SUCCEEDED.
+                    if (handle.isCancellationRequested()) {
+                        handle.reportCancelled();
+                    }
                     return null;
-                }
-            }
-            // A real cooperative runner reports that it stopped early so the engine finalizes CANCELLED;
-            // a body that merely returns after seeing the flag is (correctly) recorded SUCCEEDED.
-            if (handle.isCancellationRequested()) {
-                handle.reportCancelled();
-            }
-            return null;
-        })
-            .when(githubSyncRunner)
-            .reconcile(any(), any(), any());
+                })
+                .when(githubSyncRunner)
+                .reconcile(any(), any(), any());
 
         AtomicReference<WebTestClient.ResponseSpec> firstResponse = new AtomicReference<>();
         Thread firstCaller = new Thread(() -> firstResponse.set(triggerRequest(adminToken)));
@@ -341,28 +325,27 @@ class SyncControllerIntegrationTest extends AbstractWorkspaceIntegrationTest {
         SyncJobDTO created = duplicateJobDuringRun(adminToken);
 
         webTestClient
-            .patch()
-            .uri(
-                "/workspaces/{slug}/connections/{id}/sync/jobs/{jobId}",
-                workspace.getWorkspaceSlug(),
-                connection.getId(),
-                created.id()
-            )
-            .headers(h -> h.setBearerAuth(adminToken))
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue("{\"cancelRequested\":true}")
-            .exchange()
-            .expectStatus()
-            .isEqualTo(HttpStatus.ACCEPTED);
+                .patch()
+                .uri(
+                        "/workspaces/{slug}/connections/{id}/sync/jobs/{jobId}",
+                        workspace.getWorkspaceSlug(),
+                        connection.getId(),
+                        created.id())
+                .headers(h -> h.setBearerAuth(adminToken))
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("{\"cancelRequested\":true}")
+                .exchange()
+                .expectStatus()
+                .isEqualTo(HttpStatus.ACCEPTED);
 
         firstCaller.join(5000);
 
         ConnectionSyncStatusDTO status = statusRequest()
-            .expectStatus()
-            .isOk()
-            .expectBody(ConnectionSyncStatusDTO.class)
-            .returnResult()
-            .getResponseBody();
+                .expectStatus()
+                .isOk()
+                .expectBody(ConnectionSyncStatusDTO.class)
+                .returnResult()
+                .getResponseBody();
         assertThat(status).isNotNull();
         assertThat(status.activeJob()).isNull();
         assertThat(status.lastJob()).isNotNull();
@@ -375,19 +358,18 @@ class SyncControllerIntegrationTest extends AbstractWorkspaceIntegrationTest {
         ensureAdminMembership(workspace);
 
         webTestClient
-            .patch()
-            .uri(
-                "/workspaces/{slug}/connections/{id}/sync/jobs/{jobId}",
-                workspace.getWorkspaceSlug(),
-                connection.getId(),
-                1L
-            )
-            .headers(h -> h.setBearerAuth(TestAuthUtils.getCurrentUserToken()))
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue("{\"cancelRequested\":false}")
-            .exchange()
-            .expectStatus()
-            .isBadRequest();
+                .patch()
+                .uri(
+                        "/workspaces/{slug}/connections/{id}/sync/jobs/{jobId}",
+                        workspace.getWorkspaceSlug(),
+                        connection.getId(),
+                        1L)
+                .headers(h -> h.setBearerAuth(TestAuthUtils.getCurrentUserToken()))
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("{\"cancelRequested\":false}")
+                .exchange()
+                .expectStatus()
+                .isBadRequest();
     }
 
     @Test
@@ -396,22 +378,21 @@ class SyncControllerIntegrationTest extends AbstractWorkspaceIntegrationTest {
         ensureAdminMembership(workspace);
 
         List<IntegrationCatalogEntryDTO> catalog = webTestClient
-            .get()
-            .uri("/workspaces/{slug}/connections/catalog", workspace.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBodyList(IntegrationCatalogEntryDTO.class)
-            .returnResult()
-            .getResponseBody();
+                .get()
+                .uri("/workspaces/{slug}/connections/catalog", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBodyList(IntegrationCatalogEntryDTO.class)
+                .returnResult()
+                .getResponseBody();
 
         assertThat(catalog).isNotNull();
-        IntegrationCatalogEntryDTO github = catalog
-            .stream()
-            .filter(e -> e.kind() == IntegrationKind.GITHUB)
-            .findFirst()
-            .orElseThrow(() -> new AssertionError("GITHUB missing from catalog"));
+        IntegrationCatalogEntryDTO github = catalog.stream()
+                .filter(e -> e.kind() == IntegrationKind.GITHUB)
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("GITHUB missing from catalog"));
         assertThat(github.connected()).isTrue();
         assertThat(github.connectionId()).isEqualTo(connection.getId());
     }
@@ -425,12 +406,12 @@ class SyncControllerIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
         statusRequest().expectStatus().isForbidden();
         webTestClient
-            .get()
-            .uri("/workspaces/{slug}/connections/catalog", workspace.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isForbidden();
+                .get()
+                .uri("/workspaces/{slug}/connections/catalog", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isForbidden();
         triggerRequest(TestAuthUtils.getCurrentUserToken()).expectStatus().isForbidden();
     }
 
@@ -446,55 +427,55 @@ class SyncControllerIntegrationTest extends AbstractWorkspaceIntegrationTest {
         // probing admin an existence oracle over other tenants' connection ids. And never 200 — that is
         // the IDOR itself. Both wrong answers are asserted against by pinning the exact status.
         webTestClient
-            .get()
-            .uri("/workspaces/{slug}/connections/{id}/sync", workspace.getWorkspaceSlug(), foreignId)
-            .headers(h -> h.setBearerAuth(adminToken))
-            .exchange()
-            .expectStatus()
-            .isNotFound();
+                .get()
+                .uri("/workspaces/{slug}/connections/{id}/sync", workspace.getWorkspaceSlug(), foreignId)
+                .headers(h -> h.setBearerAuth(adminToken))
+                .exchange()
+                .expectStatus()
+                .isNotFound();
 
         webTestClient
-            .get()
-            .uri("/workspaces/{slug}/connections/{id}/sync/resources", workspace.getWorkspaceSlug(), foreignId)
-            .headers(h -> h.setBearerAuth(adminToken))
-            .exchange()
-            .expectStatus()
-            .isNotFound();
+                .get()
+                .uri("/workspaces/{slug}/connections/{id}/sync/resources", workspace.getWorkspaceSlug(), foreignId)
+                .headers(h -> h.setBearerAuth(adminToken))
+                .exchange()
+                .expectStatus()
+                .isNotFound();
 
         webTestClient
-            .get()
-            .uri("/workspaces/{slug}/connections/{id}/sync/jobs", workspace.getWorkspaceSlug(), foreignId)
-            .headers(h -> h.setBearerAuth(adminToken))
-            .exchange()
-            .expectStatus()
-            .isNotFound();
+                .get()
+                .uri("/workspaces/{slug}/connections/{id}/sync/jobs", workspace.getWorkspaceSlug(), foreignId)
+                .headers(h -> h.setBearerAuth(adminToken))
+                .exchange()
+                .expectStatus()
+                .isNotFound();
 
         webTestClient
-            .post()
-            .uri("/workspaces/{slug}/connections/{id}/sync/jobs", workspace.getWorkspaceSlug(), foreignId)
-            .headers(h -> h.setBearerAuth(adminToken))
-            .bodyValue(new TriggerSyncJobRequestDTO(SyncJobType.RECONCILIATION))
-            .exchange()
-            .expectStatus()
-            .isNotFound();
+                .post()
+                .uri("/workspaces/{slug}/connections/{id}/sync/jobs", workspace.getWorkspaceSlug(), foreignId)
+                .headers(h -> h.setBearerAuth(adminToken))
+                .bodyValue(new TriggerSyncJobRequestDTO(SyncJobType.RECONCILIATION))
+                .exchange()
+                .expectStatus()
+                .isNotFound();
 
         webTestClient
-            .patch()
-            .uri(
-                "/workspaces/{slug}/connections/{id}/sync/jobs/{jobId}",
-                workspace.getWorkspaceSlug(),
-                foreignId,
-                otherJob.getId()
-            )
-            .headers(h -> h.setBearerAuth(adminToken))
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue("{\"cancelRequested\":true}")
-            .exchange()
-            .expectStatus()
-            .isNotFound();
+                .patch()
+                .uri(
+                        "/workspaces/{slug}/connections/{id}/sync/jobs/{jobId}",
+                        workspace.getWorkspaceSlug(),
+                        foreignId,
+                        otherJob.getId())
+                .headers(h -> h.setBearerAuth(adminToken))
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("{\"cancelRequested\":true}")
+                .exchange()
+                .expectStatus()
+                .isNotFound();
 
         // The reach must not have mutated the other tenant's job on the way to the 404.
-        assertThat(syncJobRepository.findById(otherJob.getId()).orElseThrow().isCancelRequested()).isFalse();
+        assertThat(syncJobRepository.findById(otherJob.getId()).orElseThrow().isCancelRequested())
+                .isFalse();
     }
 
     @Test
@@ -507,31 +488,31 @@ class SyncControllerIntegrationTest extends AbstractWorkspaceIntegrationTest {
         ensureAdminMembership(workspace);
 
         webTestClient
-            .patch()
-            .uri(
-                "/workspaces/{slug}/connections/{id}/sync/jobs/{jobId}",
-                workspace.getWorkspaceSlug(),
-                connection.getId(),
-                otherJob.getId()
-            )
-            .headers(h -> h.setBearerAuth(TestAuthUtils.getCurrentUserToken()))
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue("{\"cancelRequested\":true}")
-            .exchange()
-            .expectStatus()
-            .isNotFound();
+                .patch()
+                .uri(
+                        "/workspaces/{slug}/connections/{id}/sync/jobs/{jobId}",
+                        workspace.getWorkspaceSlug(),
+                        connection.getId(),
+                        otherJob.getId())
+                .headers(h -> h.setBearerAuth(TestAuthUtils.getCurrentUserToken()))
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("{\"cancelRequested\":true}")
+                .exchange()
+                .expectStatus()
+                .isNotFound();
 
-        assertThat(syncJobRepository.findById(otherJob.getId()).orElseThrow().isCancelRequested()).isFalse();
+        assertThat(syncJobRepository.findById(otherJob.getId()).orElseThrow().isCancelRequested())
+                .isFalse();
     }
 
     // --- helpers ---
 
     private WebTestClient.ResponseSpec statusRequest() {
         return webTestClient
-            .get()
-            .uri("/workspaces/{slug}/connections/{id}/sync", workspace.getWorkspaceSlug(), connection.getId())
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange();
+                .get()
+                .uri("/workspaces/{slug}/connections/{id}/sync", workspace.getWorkspaceSlug(), connection.getId())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange();
     }
 
     /**
@@ -546,23 +527,21 @@ class SyncControllerIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     private WebTestClient.ResponseSpec triggerRequest(String bearerToken, SyncJobType type) {
         return webTestClient
-            .post()
-            .uri("/workspaces/{slug}/connections/{id}/sync/jobs", workspace.getWorkspaceSlug(), connection.getId())
-            .headers(h -> h.setBearerAuth(bearerToken))
-            .bodyValue(new TriggerSyncJobRequestDTO(type))
-            .exchange();
+                .post()
+                .uri("/workspaces/{slug}/connections/{id}/sync/jobs", workspace.getWorkspaceSlug(), connection.getId())
+                .headers(h -> h.setBearerAuth(bearerToken))
+                .bodyValue(new TriggerSyncJobRequestDTO(type))
+                .exchange();
     }
 
     /** A trigger call made WHILE another job is running answers 200 with the still-active job. */
     private SyncJobDTO duplicateJobDuringRun(String bearerToken) {
-        return required(
-            triggerRequest(bearerToken)
+        return required(triggerRequest(bearerToken)
                 .expectStatus()
                 .isOk()
                 .expectBody(SyncJobDTO.class)
                 .returnResult()
-                .getResponseBody()
-        );
+                .getResponseBody());
     }
 
     private static <T> T required(@Nullable T value) {

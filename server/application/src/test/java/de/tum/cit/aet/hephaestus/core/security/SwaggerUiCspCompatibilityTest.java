@@ -24,27 +24,28 @@ class SwaggerUiCspCompatibilityTest extends BaseUnitTest {
 
     @Test
     void shippedSwaggerUiHasNoInlineScriptSoEnforcedScriptSrcSelfIsSafe() throws Exception {
-        Resource[] indexes = new PathMatchingResourcePatternResolver().getResources(
-            "classpath*:/META-INF/resources/webjars/swagger-ui/*/index.html"
-        );
+        Resource[] indexes = new PathMatchingResourcePatternResolver()
+                .getResources("classpath*:/META-INF/resources/webjars/swagger-ui/*/index.html");
 
         assertThat(indexes)
-            .as("swagger-ui webjar index.html must be on the classpath (springdoc serves it)")
-            .isNotEmpty();
+                .as("swagger-ui webjar index.html must be on the classpath (springdoc serves it)")
+                .isNotEmpty();
 
         for (Resource index : indexes) {
             String html = index.getContentAsString(StandardCharsets.UTF_8);
             Matcher tag = SCRIPT_TAG.matcher(html);
             while (tag.find()) {
                 assertThat(tag.group())
-                    .as("every swagger-ui <script> must be external (src=) for enforced script-src 'self'; %s", index)
-                    .contains("src=");
+                        .as(
+                                "every swagger-ui <script> must be external (src=) for enforced script-src 'self'; %s",
+                                index)
+                        .contains("src=");
             }
             // No inline event handlers either (onload=/onclick= would also need 'unsafe-inline').
             assertThat(html.toLowerCase())
-                .as("swagger-ui index.html must carry no inline event handlers; %s", index)
-                .doesNotContain("onload=")
-                .doesNotContain("onclick=");
+                    .as("swagger-ui index.html must carry no inline event handlers; %s", index)
+                    .doesNotContain("onload=")
+                    .doesNotContain("onclick=");
         }
     }
 }

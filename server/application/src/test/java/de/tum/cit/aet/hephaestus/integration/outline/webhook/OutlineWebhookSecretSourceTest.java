@@ -31,19 +31,15 @@ class OutlineWebhookSecretSourceTest extends BaseUnitTest {
 
     private OutlineWebhookSecretSource secretSource() {
         return new OutlineWebhookSecretSource(
-            connectionService,
-            new EncryptedStringConverter(),
-            JsonMapper.builder().build(),
-            new OutlineOriginPolicy(Set.of("https://wiki.example.com"))
-        );
+                connectionService,
+                new EncryptedStringConverter(),
+                JsonMapper.builder().build(),
+                new OutlineOriginPolicy(Set.of("https://wiki.example.com")));
     }
 
     private static SecretLookup lookup(String subscriptionId) {
-        byte[] body = (
-            "{\"webhookSubscriptionId\":\"" +
-            subscriptionId +
-            "\",\"event\":\"documents.update\"}"
-        ).getBytes(StandardCharsets.UTF_8);
+        byte[] body = ("{\"webhookSubscriptionId\":\"" + subscriptionId + "\",\"event\":\"documents.update\"}")
+                .getBytes(StandardCharsets.UTF_8);
         return new SecretLookup(Map.of(), body);
     }
 
@@ -54,9 +50,8 @@ class OutlineWebhookSecretSourceTest extends BaseUnitTest {
 
     @Test
     void getSecret_returnsStoredSecretBytesForResolvedSubscription() {
-        when(connectionService.findOutlineSubscription("sub-b")).thenReturn(
-            Optional.of(new OutlineSubscription(2L, "https://wiki.example.com", "secret-b"))
-        );
+        when(connectionService.findOutlineSubscription("sub-b"))
+                .thenReturn(Optional.of(new OutlineSubscription(2L, "https://wiki.example.com", "secret-b")));
 
         Optional<byte[]> secret = secretSource().getSecret(lookup("sub-b"));
 
@@ -66,9 +61,8 @@ class OutlineWebhookSecretSourceTest extends BaseUnitTest {
 
     @Test
     void getSecret_isEmptyWhenOriginApprovalWasRemoved() {
-        when(connectionService.findOutlineSubscription("sub-b")).thenReturn(
-            Optional.of(new OutlineSubscription(2L, "https://removed.example.com", "secret-b"))
-        );
+        when(connectionService.findOutlineSubscription("sub-b"))
+                .thenReturn(Optional.of(new OutlineSubscription(2L, "https://removed.example.com", "secret-b")));
 
         assertThat(secretSource().getSecret(lookup("sub-b"))).isEmpty();
     }
@@ -81,9 +75,9 @@ class OutlineWebhookSecretSourceTest extends BaseUnitTest {
 
     @Test
     void getSecret_isEmptyForAnUnparseableOrEmptyBody() {
-        assertThat(secretSource().getSecret(new SecretLookup(Map.of(), new byte[0]))).isEmpty();
-        assertThat(
-            secretSource().getSecret(new SecretLookup(Map.of(), "not-json".getBytes(StandardCharsets.UTF_8)))
-        ).isEmpty();
+        assertThat(secretSource().getSecret(new SecretLookup(Map.of(), new byte[0])))
+                .isEmpty();
+        assertThat(secretSource().getSecret(new SecretLookup(Map.of(), "not-json".getBytes(StandardCharsets.UTF_8))))
+                .isEmpty();
     }
 }

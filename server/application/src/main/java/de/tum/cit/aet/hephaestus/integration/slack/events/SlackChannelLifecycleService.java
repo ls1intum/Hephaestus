@@ -27,9 +27,7 @@ public class SlackChannelLifecycleService {
     private final SlackChannelConsentService consentService;
 
     public SlackChannelLifecycleService(
-        SlackWorkspaceResolver workspaceResolver,
-        SlackChannelConsentService consentService
-    ) {
+            SlackWorkspaceResolver workspaceResolver, SlackChannelConsentService consentService) {
         this.workspaceResolver = workspaceResolver;
         this.consentService = consentService;
     }
@@ -40,16 +38,20 @@ public class SlackChannelLifecycleService {
      * admin UI keeps reporting "monitoring on" for a channel nothing is being read from.
      */
     public void onBotRemoved(String teamId, JsonNode event) {
-        withChannel(teamId, event, (workspaceId, channelId) ->
-            consentService.pauseForPlatformEvent(workspaceId, channelId, "bot removed from channel")
-        );
+        withChannel(
+                teamId,
+                event,
+                (workspaceId, channelId) ->
+                        consentService.pauseForPlatformEvent(workspaceId, channelId, "bot removed from channel"));
     }
 
     /** {@code channel_archive} / {@code group_archive}: an archived channel receives no further messages. */
     public void onArchived(String teamId, JsonNode event) {
-        withChannel(teamId, event, (workspaceId, channelId) ->
-            consentService.pauseForPlatformEvent(workspaceId, channelId, "channel archived")
-        );
+        withChannel(
+                teamId,
+                event,
+                (workspaceId, channelId) ->
+                        consentService.pauseForPlatformEvent(workspaceId, channelId, "channel archived"));
     }
 
     /**
@@ -57,9 +59,11 @@ public class SlackChannelLifecycleService {
      * leave a zombie allow-list row and lingering thread-aggregate PII.
      */
     public void onDeleted(String teamId, JsonNode event) {
-        withChannel(teamId, event, (workspaceId, channelId) ->
-            consentService.revokeForPlatformEvent(workspaceId, channelId, "channel deleted in Slack")
-        );
+        withChannel(
+                teamId,
+                event,
+                (workspaceId, channelId) ->
+                        consentService.revokeForPlatformEvent(workspaceId, channelId, "channel deleted in Slack"));
     }
 
     /**

@@ -56,12 +56,7 @@ class OutlineConnectionSyncStateProviderTest extends BaseUnitTest {
 
     private OutlineConnectionSyncStateProvider provider(String cron) {
         return new OutlineConnectionSyncStateProvider(
-            connectionRepository,
-            collectionRepository,
-            documentRepository,
-            rateLimitTrackerProvider,
-            cron
-        );
+                connectionRepository, collectionRepository, documentRepository, rateLimitTrackerProvider, cron);
     }
 
     private OutlineConnectionSyncStateProvider provider() {
@@ -71,10 +66,9 @@ class OutlineConnectionSyncStateProviderTest extends BaseUnitTest {
     @Test
     void describe_webhookSubscriptionIdPresent_isRegistered() {
         lenient()
-            .when(connection.getConfig())
-            .thenReturn(
-                new ConnectionConfig.OutlineConfig("https://outline.example.test", "sub-1", "secret", Set.of())
-            );
+                .when(connection.getConfig())
+                .thenReturn(new ConnectionConfig.OutlineConfig(
+                        "https://outline.example.test", "sub-1", "secret", Set.of()));
         when(connectionRepository.findById(CONNECTION_ID)).thenReturn(Optional.of(connection));
 
         ConnectionSyncDetails details = provider().describe(REF, CONNECTION_ID);
@@ -89,20 +83,16 @@ class OutlineConnectionSyncStateProviderTest extends BaseUnitTest {
     void describe_surfacesTheTrackedRateLimitForTheConnectionHost() {
         String serverUrl = "https://outline.example.test";
         lenient()
-            .when(connection.getConfig())
-            .thenReturn(new ConnectionConfig.OutlineConfig(serverUrl, "sub-1", "secret", Set.of()));
+                .when(connection.getConfig())
+                .thenReturn(new ConnectionConfig.OutlineConfig(serverUrl, "sub-1", "secret", Set.of()));
         when(connectionRepository.findById(CONNECTION_ID)).thenReturn(Optional.of(connection));
 
         RateLimitSnapshot snapshot = new RateLimitSnapshot(
-            1000,
-            987,
-            Instant.parse("2026-07-17T12:00:00Z"),
-            Instant.parse("2026-07-17T11:59:00Z"),
-            null
-        );
+                1000, 987, Instant.parse("2026-07-17T12:00:00Z"), Instant.parse("2026-07-17T11:59:00Z"), null);
         when(rateLimitTrackerProvider.getIfAvailable()).thenReturn(rateLimitTracker);
         // Keyed by the normalized server origin, exactly as the exchange filter records it.
-        when(rateLimitTracker.snapshot(OutlineRateLimitTracker.scopeOf(serverUrl))).thenReturn(snapshot);
+        when(rateLimitTracker.snapshot(OutlineRateLimitTracker.scopeOf(serverUrl)))
+                .thenReturn(snapshot);
 
         assertThat(provider().describe(REF, CONNECTION_ID).rateLimit()).isSameAs(snapshot);
     }
@@ -110,8 +100,9 @@ class OutlineConnectionSyncStateProviderTest extends BaseUnitTest {
     @Test
     void describe_blankWebhookSubscriptionId_isNotRegistered() {
         lenient()
-            .when(connection.getConfig())
-            .thenReturn(new ConnectionConfig.OutlineConfig("https://outline.example.test", " ", "secret", Set.of()));
+                .when(connection.getConfig())
+                .thenReturn(
+                        new ConnectionConfig.OutlineConfig("https://outline.example.test", " ", "secret", Set.of()));
         when(connectionRepository.findById(CONNECTION_ID)).thenReturn(Optional.of(connection));
 
         assertThat(provider().describe(REF, CONNECTION_ID).webhookRegistered()).isFalse();
@@ -145,7 +136,8 @@ class OutlineConnectionSyncStateProviderTest extends BaseUnitTest {
     void describe_invalidCron_yieldsNullNextScheduledSyncAt() {
         when(connectionRepository.findById(CONNECTION_ID)).thenReturn(Optional.empty());
 
-        assertThat(provider("not a cron").describe(REF, CONNECTION_ID).nextScheduledSyncAt()).isNull();
+        assertThat(provider("not a cron").describe(REF, CONNECTION_ID).nextScheduledSyncAt())
+                .isNull();
     }
 
     @Test
@@ -163,12 +155,10 @@ class OutlineConnectionSyncStateProviderTest extends BaseUnitTest {
         collection.setDocumentsUpstream(12);
         collection.setLastSyncError(null);
 
-        when(collectionRepository.findByWorkspaceIdAndConnectionId(WORKSPACE, CONNECTION_ID)).thenReturn(
-            List.of(collection)
-        );
-        when(documentRepository.countLiveByCollection(WORKSPACE, CONNECTION_ID)).thenReturn(
-            List.<Object[]>of(new Object[] { "col-1", 9L })
-        );
+        when(collectionRepository.findByWorkspaceIdAndConnectionId(WORKSPACE, CONNECTION_ID))
+                .thenReturn(List.of(collection));
+        when(documentRepository.countLiveByCollection(WORKSPACE, CONNECTION_ID))
+                .thenReturn(List.<Object[]>of(new Object[] {"col-1", 9L}));
 
         List<SyncResourceState> resources = provider().resources(REF, CONNECTION_ID);
 
@@ -198,9 +188,8 @@ class OutlineConnectionSyncStateProviderTest extends BaseUnitTest {
         paused.setState(MirrorState.PAUSED);
         paused.setSyncStatus(SyncStatus.PENDING);
 
-        when(collectionRepository.findByWorkspaceIdAndConnectionId(WORKSPACE, CONNECTION_ID)).thenReturn(
-            List.of(paused)
-        );
+        when(collectionRepository.findByWorkspaceIdAndConnectionId(WORKSPACE, CONNECTION_ID))
+                .thenReturn(List.of(paused));
         when(documentRepository.countLiveByCollection(WORKSPACE, CONNECTION_ID)).thenReturn(List.of());
 
         assertThat(provider().resources(REF, CONNECTION_ID).get(0).state()).isEqualTo("PAUSED");
@@ -216,9 +205,8 @@ class OutlineConnectionSyncStateProviderTest extends BaseUnitTest {
         unnamed.setState(MirrorState.ENABLED);
         unnamed.setSyncStatus(SyncStatus.PENDING);
 
-        when(collectionRepository.findByWorkspaceIdAndConnectionId(WORKSPACE, CONNECTION_ID)).thenReturn(
-            List.of(unnamed)
-        );
+        when(collectionRepository.findByWorkspaceIdAndConnectionId(WORKSPACE, CONNECTION_ID))
+                .thenReturn(List.of(unnamed));
         when(documentRepository.countLiveByCollection(WORKSPACE, CONNECTION_ID)).thenReturn(List.of());
 
         assertThat(provider().resources(REF, CONNECTION_ID).get(0).name()).isEqualTo("col-3");
@@ -236,19 +224,18 @@ class OutlineConnectionSyncStateProviderTest extends BaseUnitTest {
         errored.setSyncStatus(SyncStatus.PENDING);
         errored.setLastSyncError("Outline /api/documents.export failed (HTTP 500)");
 
-        when(collectionRepository.findByWorkspaceIdAndConnectionId(WORKSPACE, CONNECTION_ID)).thenReturn(
-            List.of(errored)
-        );
+        when(collectionRepository.findByWorkspaceIdAndConnectionId(WORKSPACE, CONNECTION_ID))
+                .thenReturn(List.of(errored));
         when(documentRepository.countLiveByCollection(WORKSPACE, CONNECTION_ID)).thenReturn(List.of());
 
-        assertThat(provider().resources(REF, CONNECTION_ID).get(0).lastError()).isEqualTo(
-            "Outline /api/documents.export failed (HTTP 500)"
-        );
+        assertThat(provider().resources(REF, CONNECTION_ID).get(0).lastError())
+                .isEqualTo("Outline /api/documents.export failed (HTTP 500)");
     }
 
     @Test
     void resources_noCollections_isEmpty() {
-        when(collectionRepository.findByWorkspaceIdAndConnectionId(WORKSPACE, CONNECTION_ID)).thenReturn(List.of());
+        when(collectionRepository.findByWorkspaceIdAndConnectionId(WORKSPACE, CONNECTION_ID))
+                .thenReturn(List.of());
         when(documentRepository.countLiveByCollection(WORKSPACE, CONNECTION_ID)).thenReturn(List.of());
 
         assertThat(provider().resources(REF, CONNECTION_ID)).isEmpty();

@@ -55,36 +55,32 @@ public final class SyncTargetFactory {
         }
 
         return new SyncTarget(
-            rtm.getId(),
-            workspaceId,
-            installationId,
-            personalAccessToken,
-            authMode,
-            rtm.getNameWithOwner(),
-            rtm.getLabelsSyncedAt(),
-            rtm.getMilestonesSyncedAt(),
-            rtm.getIssuesSyncedAt(),
-            rtm.getPullRequestsSyncedAt(),
-            rtm.getDiscussionsSyncedAt(),
-            rtm.getCollaboratorsSyncedAt(),
-            rtm.getRepositorySyncedAt(),
-            rtm.getIssueBackfillHighWaterMark(),
-            rtm.getIssueBackfillCheckpoint(),
-            rtm.getPullRequestBackfillHighWaterMark(),
-            rtm.getPullRequestBackfillCheckpoint(),
-            rtm.getBackfillLastRunAt(),
-            rtm.getIssueSyncCursor(),
-            rtm.getPullRequestSyncCursor(),
-            rtm.getDiscussionSyncCursor(),
-            rtm.getNativeId()
-        );
+                rtm.getId(),
+                workspaceId,
+                installationId,
+                personalAccessToken,
+                authMode,
+                rtm.getNameWithOwner(),
+                rtm.getLabelsSyncedAt(),
+                rtm.getMilestonesSyncedAt(),
+                rtm.getIssuesSyncedAt(),
+                rtm.getPullRequestsSyncedAt(),
+                rtm.getDiscussionsSyncedAt(),
+                rtm.getCollaboratorsSyncedAt(),
+                rtm.getRepositorySyncedAt(),
+                rtm.getIssueBackfillHighWaterMark(),
+                rtm.getIssueBackfillCheckpoint(),
+                rtm.getPullRequestBackfillHighWaterMark(),
+                rtm.getPullRequestBackfillCheckpoint(),
+                rtm.getBackfillLastRunAt(),
+                rtm.getIssueSyncCursor(),
+                rtm.getPullRequestSyncCursor(),
+                rtm.getDiscussionSyncCursor(),
+                rtm.getNativeId());
     }
 
     private static @Nullable String resolveBearerToken(
-        ConnectionService connectionService,
-        long workspaceId,
-        IntegrationKind kind
-    ) {
+            ConnectionService connectionService, long workspaceId, IntegrationKind kind) {
         Optional<BearerToken> bundle = connectionService.findActiveBearerToken(workspaceId, kind);
         return bundle.map(BearerToken::token).orElse(null);
     }

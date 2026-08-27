@@ -14,7 +14,7 @@ import org.junit.jupiter.api.parallel.ExecutionMode;
  * {@code DockerClientFactory.isDockerAvailable()}. Combine with {@link LiveLlmTest} when the
  * sandbox payload also needs LLM credentials (the LLM gate then short-circuits as well).
  */
-@Target({ ElementType.TYPE, ElementType.METHOD })
+@Target({ElementType.TYPE, ElementType.METHOD})
 @Retention(RetentionPolicy.RUNTIME)
 @Tag("live")
 @Execution(ExecutionMode.SAME_THREAD)

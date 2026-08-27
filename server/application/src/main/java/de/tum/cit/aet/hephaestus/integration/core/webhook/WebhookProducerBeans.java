@@ -38,7 +38,7 @@ class WebhookProducerBeans {
     @Bean
     @Primary
     JetStreamManagement webhookJetStreamManagement(@Qualifier("natsConnection") Connection natsConnection)
-        throws IOException {
+            throws IOException {
         return natsConnection.jetStreamManagement();
     }
 
@@ -52,68 +52,56 @@ class WebhookProducerBeans {
      */
     @Bean
     JetStreamManagement webhookAdminJetStreamManagement(
-        @Qualifier("natsConnection") Connection natsConnection,
-        WebhookProperties properties
-    ) throws IOException {
-        return natsConnection.jetStreamManagement(
-            JetStreamOptions.builder().requestTimeout(properties.stream().limitUpdateTimeout()).build()
-        );
+            @Qualifier("natsConnection") Connection natsConnection, WebhookProperties properties) throws IOException {
+        return natsConnection.jetStreamManagement(JetStreamOptions.builder()
+                .requestTimeout(properties.stream().limitUpdateTimeout())
+                .build());
     }
 
     @Bean
     Retry webhookPublishRetry(WebhookProperties properties) {
         WebhookProperties.Publish p = properties.publish();
         RetryConfig config = RetryConfig.custom()
-            .maxAttempts(p.maxRetries())
-            .intervalFunction(IntervalFunction.ofExponentialRandomBackoff(p.retryBaseDelay(), 2.0, 0.25))
-            // Subject misconfiguration (unknown stream prefix) is permanent; don't burn retries on it.
-            .ignoreExceptions(IllegalArgumentException.class)
-            .failAfterMaxAttempts(true)
-            .build();
+                .maxAttempts(p.maxRetries())
+                .intervalFunction(IntervalFunction.ofExponentialRandomBackoff(p.retryBaseDelay(), 2.0, 0.25))
+                // Subject misconfiguration (unknown stream prefix) is permanent; don't burn retries on it.
+                .ignoreExceptions(IllegalArgumentException.class)
+                .failAfterMaxAttempts(true)
+                .build();
         return Retry.of("webhook-publish", config);
     }
 
     @Bean
     JetStreamPublisher jetStreamPublisher(
-        JetStream jetStream,
-        Retry webhookPublishRetry,
-        WebhookProperties properties,
-        MeterRegistry meterRegistry
-    ) {
+            JetStream jetStream, Retry webhookPublishRetry, WebhookProperties properties, MeterRegistry meterRegistry) {
         return new JetStreamPublisher(jetStream, webhookPublishRetry, properties, meterRegistry);
     }
 
     @Bean
     WebhookJetStreamBootstrap webhookJetStreamBootstrap(
-        @Qualifier("webhookAdminJetStreamManagement") JetStreamManagement jsm,
-        WebhookProperties properties
-    ) {
+            @Qualifier("webhookAdminJetStreamManagement") JetStreamManagement jsm, WebhookProperties properties) {
         return new WebhookJetStreamBootstrap(jsm, properties);
     }
 
     @Bean
     WebhookStreamMonitor webhookStreamMonitor(
-        JetStreamManagement jsm,
-        WebhookProperties properties,
-        NatsConnectionProperties natsProperties,
-        MeterRegistry meterRegistry
-    ) {
+            JetStreamManagement jsm,
+            WebhookProperties properties,
+            NatsConnectionProperties natsProperties,
+            MeterRegistry meterRegistry) {
         // The webhook and server containers must be given the same name, or the monitor charges loss
         // to nothing: docker/compose.core.yaml forwards it to both for that reason.
         String durableBase = natsProperties.durableConsumerName();
         return new WebhookStreamMonitor(
-            jsm,
-            properties,
-            durableBase == null || durableBase.isBlank() ? "hephaestus" : durableBase,
-            meterRegistry
-        );
+                jsm,
+                properties,
+                durableBase == null || durableBase.isBlank() ? "hephaestus" : durableBase,
+                meterRegistry);
     }
 
     @Bean
     WebhookPayloadCapacityCheck webhookPayloadCapacityCheck(
-        @Qualifier("natsConnection") Connection natsConnection,
-        WebhookProperties properties
-    ) {
+            @Qualifier("natsConnection") Connection natsConnection, WebhookProperties properties) {
         return new WebhookPayloadCapacityCheck(natsConnection, properties);
     }
 

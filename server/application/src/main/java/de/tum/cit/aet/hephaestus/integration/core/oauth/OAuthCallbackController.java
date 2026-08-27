@@ -55,103 +55,82 @@ public class OAuthCallbackController {
     private final OAuthCallbackProperties properties;
 
     public OAuthCallbackController(
-        IntegrationKindRouting kindRouting,
-        OAuthStateService oauthStateService,
-        OAuthCallbackService callbackService,
-        List<ConnectionStrategy> strategyBeans,
-        OAuthCallbackProperties properties
-    ) {
+            IntegrationKindRouting kindRouting,
+            OAuthStateService oauthStateService,
+            OAuthCallbackService callbackService,
+            List<ConnectionStrategy> strategyBeans,
+            OAuthCallbackProperties properties) {
         this.kindRouting = kindRouting;
         this.oauthStateService = oauthStateService;
         this.callbackService = callbackService;
-        this.strategies = strategyBeans
-            .stream()
-            .collect(
-                Collectors.toUnmodifiableMap(
-                    ConnectionStrategy::kind,
-                    s -> s,
-                    (a, b) -> {
-                        throw new IllegalStateException(
-                            "Duplicate ConnectionStrategy for kind=" +
-                                a.kind() +
-                                ": " +
-                                a.getClass() +
-                                " vs " +
-                                b.getClass()
-                        );
-                    }
-                )
-            );
+        this.strategies = strategyBeans.stream()
+                .collect(Collectors.toUnmodifiableMap(ConnectionStrategy::kind, s -> s, (a, b) -> {
+                    throw new IllegalStateException("Duplicate ConnectionStrategy for kind=" + a.kind()
+                            + ": "
+                            + a.getClass()
+                            + " vs "
+                            + b.getClass());
+                }));
         this.properties = properties;
     }
 
     @GetMapping("/{kind}")
     @PreAuthorize("permitAll()")
     public ResponseEntity<?> callbackGet(
-        @PathVariable String kind,
-        @RequestParam(value = "state", required = false) @Nullable String state,
-        @RequestParam(value = "error", required = false) @Nullable String error,
-        @RequestParam(value = "error_description", required = false) @Nullable String errorDescription,
-        @RequestParam Map<String, String> allParams,
-        HttpServletRequest request
-    ) {
+            @PathVariable String kind,
+            @RequestParam(value = "state", required = false) @Nullable String state,
+            @RequestParam(value = "error", required = false) @Nullable String error,
+            @RequestParam(value = "error_description", required = false) @Nullable String errorDescription,
+            @RequestParam Map<String, String> allParams,
+            HttpServletRequest request) {
         return handleCallback(kind, state, error, errorDescription, allParams, wantsJson(request));
     }
 
     @PostMapping("/{kind}")
     @PreAuthorize("permitAll()")
     public ResponseEntity<?> callbackPost(
-        @PathVariable String kind,
-        @RequestParam(value = "state", required = false) @Nullable String state,
-        @RequestParam(value = "error", required = false) @Nullable String error,
-        @RequestParam(value = "error_description", required = false) @Nullable String errorDescription,
-        @RequestParam Map<String, String> allParams,
-        HttpServletRequest request
-    ) {
+            @PathVariable String kind,
+            @RequestParam(value = "state", required = false) @Nullable String state,
+            @RequestParam(value = "error", required = false) @Nullable String error,
+            @RequestParam(value = "error_description", required = false) @Nullable String errorDescription,
+            @RequestParam Map<String, String> allParams,
+            HttpServletRequest request) {
         return handleCallback(kind, state, error, errorDescription, allParams, wantsJson(request));
     }
 
     /** Shared core for GET + POST callbacks. Package-visible for unit tests. */
     ResponseEntity<?> handleCallback(
-        String kindPathSegment,
-        @Nullable String state,
-        @Nullable String vendorError,
-        @Nullable String vendorErrorDescription,
-        Map<String, String> allParams,
-        boolean wantsJson
-    ) {
+            String kindPathSegment,
+            @Nullable String state,
+            @Nullable String vendorError,
+            @Nullable String vendorErrorDescription,
+            Map<String, String> allParams,
+            boolean wantsJson) {
         Optional<IntegrationKind> kindOpt = kindRouting.resolve(kindPathSegment);
         if (kindOpt.isEmpty()) {
             log.info("OAuth callback for unknown kind path segment: {}", sanitize(kindPathSegment));
             return failure(
-                kindPathSegment,
-                "unknown_kind",
-                "No integration registered for path segment: " + sanitize(kindPathSegment),
-                HttpStatus.NOT_FOUND,
-                wantsJson
-            );
+                    kindPathSegment,
+                    "unknown_kind",
+                    "No integration registered for path segment: " + sanitize(kindPathSegment),
+                    HttpStatus.NOT_FOUND,
+                    wantsJson);
         }
         IntegrationKind kind = kindOpt.get();
 
         if (vendorError != null && !vendorError.isBlank()) {
             log.info(
-                "OAuth callback for kind={} returned vendor error={} description={}",
-                kind,
-                sanitize(vendorError),
-                sanitize(vendorErrorDescription)
-            );
+                    "OAuth callback for kind={} returned vendor error={} description={}",
+                    kind,
+                    sanitize(vendorError),
+                    sanitize(vendorErrorDescription));
             return failure(kind.name(), vendorError, vendorErrorDescription, HttpStatus.BAD_REQUEST, wantsJson);
         }
 
         if (state == null || state.isBlank()) {
             log.info("OAuth callback for kind={} missing state parameter", kind);
             return failure(
-                kind.name(),
-                "missing_state",
-                "state parameter is required",
-                HttpStatus.BAD_REQUEST,
-                wantsJson
-            );
+                    kind.name(), "missing_state", "state parameter is required", HttpStatus.BAD_REQUEST, wantsJson);
         }
         StateBinding binding;
         try {
@@ -163,21 +142,18 @@ public class OAuthCallbackController {
 
         if (binding.kind() != kind) {
             log.warn(
-                "OAuth state-kind mismatch: path={} stateKind={} workspace={}",
-                kind,
-                binding.kind(),
-                binding.workspaceId()
-            );
+                    "OAuth state-kind mismatch: path={} stateKind={} workspace={}",
+                    kind,
+                    binding.kind(),
+                    binding.workspaceId());
             return failure(
-                kind.name(),
-                "kind_mismatch",
-                "State issued for kind=" +
-                    binding.kind() +
-                    " replayed against callback path /oauth/callback/" +
-                    kindPathSegment,
-                HttpStatus.BAD_REQUEST,
-                wantsJson
-            );
+                    kind.name(),
+                    "kind_mismatch",
+                    "State issued for kind=" + binding.kind()
+                            + " replayed against callback path /oauth/callback/"
+                            + kindPathSegment,
+                    HttpStatus.BAD_REQUEST,
+                    wantsJson);
         }
 
         ConnectionStrategy strategy = strategies.get(kind);
@@ -186,11 +162,10 @@ public class OAuthCallbackController {
             // 500 is a server-side wiring bug — always problem+json, no point redirecting the user
             // to a broken flow they'll just retry.
             return problemDetail(
-                kind.name(),
-                "no_strategy",
-                "No ConnectionStrategy registered for kind=" + kind,
-                HttpStatus.INTERNAL_SERVER_ERROR
-            );
+                    kind.name(),
+                    "no_strategy",
+                    "No ConnectionStrategy registered for kind=" + kind,
+                    HttpStatus.INTERNAL_SERVER_ERROR);
         }
 
         Connection connection = callbackService.findOrCreatePendingConnection(binding.workspaceId(), kind);
@@ -203,11 +178,10 @@ public class OAuthCallbackController {
             result = strategy.finalizeConnect(ref, callbackParams);
         } catch (RuntimeException e) {
             log.warn(
-                "Strategy.finalizeConnect threw for kind={} workspace={}: {}",
-                kind,
-                binding.workspaceId(),
-                e.toString()
-            );
+                    "Strategy.finalizeConnect threw for kind={} workspace={}: {}",
+                    kind,
+                    binding.workspaceId(),
+                    e.toString());
             return failure(kind.name(), "strategy_error", e.getMessage(), HttpStatus.BAD_REQUEST, wantsJson);
         }
 
@@ -218,31 +192,25 @@ public class OAuthCallbackController {
     }
 
     private ResponseEntity<?> handleCompleted(
-        Connection connection,
-        ConnectFinalization.Completed completed,
-        StateBinding binding,
-        IntegrationKind kind,
-        boolean wantsJson
-    ) {
+            Connection connection,
+            ConnectFinalization.Completed completed,
+            StateBinding binding,
+            IntegrationKind kind,
+            boolean wantsJson) {
         try {
             callbackService.completeConnection(connection, completed, binding.actorRef());
         } catch (IllegalStateException e) {
             log.warn(
-                "OAuth complete rejected by transition guard for connection={}: {}",
-                connection.getId(),
-                e.getMessage()
-            );
+                    "OAuth complete rejected by transition guard for connection={}: {}",
+                    connection.getId(),
+                    e.getMessage());
             return failure(kind.name(), "transition_conflict", e.getMessage(), HttpStatus.CONFLICT, wantsJson);
         }
         return redirect(properties.successRedirect());
     }
 
     private ResponseEntity<?> handleFailed(
-        IntegrationKind kind,
-        StateBinding binding,
-        ConnectFinalization.Failed failed,
-        boolean wantsJson
-    ) {
+            IntegrationKind kind, StateBinding binding, ConnectFinalization.Failed failed, boolean wantsJson) {
         log.warn("OAuth callback failed for kind={} workspace={}: {}", kind, binding.workspaceId(), failed.reason());
         return failure(kind.name(), "finalize_failed", failed.reason(), HttpStatus.BAD_REQUEST, wantsJson);
     }
@@ -254,12 +222,11 @@ public class OAuthCallbackController {
      * status so curl / devtools / E2E suites surface the failure clearly.
      */
     private ResponseEntity<?> failure(
-        @Nullable String kind,
-        String error,
-        @Nullable String description,
-        HttpStatus jsonStatus,
-        boolean wantsJson
-    ) {
+            @Nullable String kind,
+            String error,
+            @Nullable String description,
+            HttpStatus jsonStatus,
+            boolean wantsJson) {
         if (wantsJson) {
             return problemDetail(kind, error, description, jsonStatus);
         }
@@ -301,16 +268,14 @@ public class OAuthCallbackController {
      * members so an API client can branch on the Slack/GitHub error code.
      */
     private static ResponseEntity<ProblemDetail> problemDetail(
-        @Nullable String kind,
-        String error,
-        @Nullable String description,
-        HttpStatus status
-    ) {
+            @Nullable String kind, String error, @Nullable String description, HttpStatus status) {
         ProblemDetail pd = ProblemDetail.forStatusAndDetail(status, description != null ? description : error);
         pd.setTitle("OAuth callback failed");
         pd.setProperty("kind", kind == null ? "unknown" : kind);
         pd.setProperty("error", error);
-        return ResponseEntity.status(status).contentType(MediaType.APPLICATION_PROBLEM_JSON).body(pd);
+        return ResponseEntity.status(status)
+                .contentType(MediaType.APPLICATION_PROBLEM_JSON)
+                .body(pd);
     }
 
     @Nullable

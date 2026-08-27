@@ -37,9 +37,7 @@ class PracticesIntegrationBoundaryTest extends HephaestusArchitectureTest {
      * vendor-neutral by construction and carries no behaviour beyond its own grammar.
      */
     private static final Set<String> ALLOWED_PACKAGES = Set.of(
-        "de.tum.cit.aet.hephaestus.integration.core.spi",
-        "de.tum.cit.aet.hephaestus.integration.core.signal"
-    );
+            "de.tum.cit.aet.hephaestus.integration.core.spi", "de.tum.cit.aet.hephaestus.integration.core.signal");
 
     /**
      * Every dependency from {@code practices} into an integration package outside {@link #ALLOWED_PACKAGES},
@@ -53,35 +51,31 @@ class PracticesIntegrationBoundaryTest extends HephaestusArchitectureTest {
      * do not read its silence as proof that none exists.
      */
     private static final Set<String> FROZEN_VIOLATIONS = Set.of(
-        "de.tum.cit.aet.hephaestus.practices.observation.ObservationService -> de.tum.cit.aet.hephaestus.integration.scm.domain.user.User",
-        "de.tum.cit.aet.hephaestus.practices.observation.ObservationService -> de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository",
-        "de.tum.cit.aet.hephaestus.practices.feedback.inapp.InAppFeedbackService -> de.tum.cit.aet.hephaestus.integration.scm.domain.user.User",
-        "de.tum.cit.aet.hephaestus.practices.feedback.inapp.InAppFeedbackService -> de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository",
-        "de.tum.cit.aet.hephaestus.practices.review.PracticeReviewDetectionGate -> de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue",
-        "de.tum.cit.aet.hephaestus.practices.review.PracticeReviewDetectionGate -> de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest",
-        "de.tum.cit.aet.hephaestus.practices.review.PracticeReviewDetectionGate -> de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository",
-        "de.tum.cit.aet.hephaestus.practices.reviewoutput.ReviewSubjectResolver -> de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository",
-        "de.tum.cit.aet.hephaestus.practices.reviewoutput.dto.ReviewSubjectDTO -> de.tum.cit.aet.hephaestus.integration.scm.domain.user.User"
-    );
+            "de.tum.cit.aet.hephaestus.practices.observation.ObservationService -> de.tum.cit.aet.hephaestus.integration.scm.domain.user.User",
+            "de.tum.cit.aet.hephaestus.practices.observation.ObservationService -> de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository",
+            "de.tum.cit.aet.hephaestus.practices.feedback.inapp.InAppFeedbackService -> de.tum.cit.aet.hephaestus.integration.scm.domain.user.User",
+            "de.tum.cit.aet.hephaestus.practices.feedback.inapp.InAppFeedbackService -> de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository",
+            "de.tum.cit.aet.hephaestus.practices.review.PracticeReviewDetectionGate -> de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue",
+            "de.tum.cit.aet.hephaestus.practices.review.PracticeReviewDetectionGate -> de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest",
+            "de.tum.cit.aet.hephaestus.practices.review.PracticeReviewDetectionGate -> de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository",
+            "de.tum.cit.aet.hephaestus.practices.reviewoutput.ReviewSubjectResolver -> de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository",
+            "de.tum.cit.aet.hephaestus.practices.reviewoutput.dto.ReviewSubjectDTO -> de.tum.cit.aet.hephaestus.integration.scm.domain.user.User");
 
     @Test
     void practicesNeverNamesAVendor() {
         // No freeze here: a vendor package is the hard line, unlike the shared SCM domain FROZEN_VIOLATIONS covers.
         ArchRule rule = noClasses()
-            .that()
-            .resideInAPackage(PRACTICES)
-            .should()
-            .dependOnClassesThat()
-            .resideInAnyPackage(
-                "..integration.scm.github..",
-                "..integration.scm.gitlab..",
-                "..integration.slack..",
-                "..integration.outline.."
-            )
-            .because(
-                "A practice binds to a vendor-neutral signal so it works on every provider. Naming one " +
-                    "vendor here is what makes adding another an edit to the practices module."
-            );
+                .that()
+                .resideInAPackage(PRACTICES)
+                .should()
+                .dependOnClassesThat()
+                .resideInAnyPackage(
+                        "..integration.scm.github..",
+                        "..integration.scm.gitlab..",
+                        "..integration.slack..",
+                        "..integration.outline..")
+                .because("A practice binds to a vendor-neutral signal so it works on every provider. Naming one "
+                        + "vendor here is what makes adding another an edit to the practices module.");
         rule.check(classes);
     }
 
@@ -92,12 +86,11 @@ class PracticesIntegrationBoundaryTest extends HephaestusArchitectureTest {
         added.removeAll(FROZEN_VIOLATIONS);
 
         Assertions.assertThat(added)
-            .as(
-                "New dependency from practices into integration internals. The contract is reachable " +
-                    "through %s — take a port, do not take an entity.",
-                ALLOWED_PACKAGES
-            )
-            .isEmpty();
+                .as(
+                        "New dependency from practices into integration internals. The contract is reachable "
+                                + "through %s — take a port, do not take an entity.",
+                        ALLOWED_PACKAGES)
+                .isEmpty();
     }
 
     @Test
@@ -107,8 +100,8 @@ class PracticesIntegrationBoundaryTest extends HephaestusArchitectureTest {
         stale.removeAll(current);
 
         Assertions.assertThat(stale)
-            .as("These frozen violations are gone — delete them so the list can only ever shrink")
-            .isEmpty();
+                .as("These frozen violations are gone — delete them so the list can only ever shrink")
+                .isEmpty();
     }
 
     /**
@@ -133,6 +126,7 @@ class PracticesIntegrationBoundaryTest extends HephaestusArchitectureTest {
     }
 
     private static boolean isAllowed(JavaClass target) {
-        return ALLOWED_PACKAGES.stream().anyMatch(allowed -> target.getPackageName().startsWith(allowed));
+        return ALLOWED_PACKAGES.stream()
+                .anyMatch(allowed -> target.getPackageName().startsWith(allowed));
     }
 }

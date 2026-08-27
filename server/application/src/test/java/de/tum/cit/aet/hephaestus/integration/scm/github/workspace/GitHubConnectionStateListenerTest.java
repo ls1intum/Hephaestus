@@ -40,19 +40,18 @@ class GitHubConnectionStateListenerTest extends BaseUnitTest {
 
     private void runExecutorSynchronously() {
         doAnswer(invocation -> {
-            invocation.<Runnable>getArgument(0).run();
-            return null;
-        })
-            .when(monitoringExecutor)
-            .execute(any(Runnable.class));
+                    invocation.<Runnable>getArgument(0).run();
+                    return null;
+                })
+                .when(monitoringExecutor)
+                .execute(any(Runnable.class));
     }
 
     @Test
     void patActivation_recordsInitialSyncOnce() {
         runExecutorSynchronously();
-        when(connectionService.findActiveGitHubPatConfig(5L)).thenReturn(
-            Optional.of(new ConnectionConfig.GitHubPatConfig("acme", null, Set.of()))
-        );
+        when(connectionService.findActiveGitHubPatConfig(5L))
+                .thenReturn(Optional.of(new ConnectionConfig.GitHubPatConfig("acme", null, Set.of())));
 
         listener.onActivated(new ConnectionLifecycleEvent.Activated(42L, 5L, IntegrationKind.GITHUB));
 

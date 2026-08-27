@@ -30,17 +30,17 @@ import org.jspecify.annotations.Nullable;
  */
 @Entity
 @Table(
-    name = "llm_model",
-    uniqueConstraints = {
-        // Named here so the ddl-auto test schema matches the changelog's: the create path catches this
-        // constraint by name.
-        @UniqueConstraint(
-            name = "ux_llm_model_connection_upstream",
-            columnNames = { "connection_id", "upstream_model_id" }
-        ),
-        @UniqueConstraint(name = "ux_llm_model_connection_slug", columnNames = { "connection_id", "slug" }),
-    }
-)
+        name = "llm_model",
+        uniqueConstraints = {
+            // Named here so the ddl-auto test schema matches the changelog's: the create path catches this
+            // constraint by name.
+            @UniqueConstraint(
+                    name = "ux_llm_model_connection_upstream",
+                    columnNames = {"connection_id", "upstream_model_id"}),
+            @UniqueConstraint(
+                    name = "ux_llm_model_connection_slug",
+                    columnNames = {"connection_id", "slug"}),
+        })
 @Getter
 @Setter
 @NoArgsConstructor

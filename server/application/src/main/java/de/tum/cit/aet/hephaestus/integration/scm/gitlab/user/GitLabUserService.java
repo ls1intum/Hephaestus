@@ -68,17 +68,17 @@ public class GitLabUserService {
         String htmlUrl = gitLabProperties.defaultServerUrl() + "/" + login;
 
         userRepository.upsertUser(
-            nativeId,
-            providerId,
-            login,
-            name,
-            avatarUrl,
-            htmlUrl,
-            GitLabUserClassifier.classify(login).name(),
-            dto.email(),
-            null, // createdAt — not in webhook
-            null // updatedAt — not in webhook
-        );
+                nativeId,
+                providerId,
+                login,
+                name,
+                avatarUrl,
+                htmlUrl,
+                GitLabUserClassifier.classify(login).name(),
+                dto.email(),
+                null, // createdAt — not in webhook
+                null // updatedAt — not in webhook
+                );
 
         return userRepository.findByNativeIdAndProviderId(nativeId, providerId).orElse(null);
     }
@@ -110,23 +110,22 @@ public class GitLabUserService {
         String resolvedName = lookup.name() != null ? lookup.name() : username;
         String resolvedAvatarUrl = resolveAvatarUrl(lookup.avatarUrl());
         String resolvedHtmlUrl =
-            lookup.webUrl() != null ? lookup.webUrl() : (gitLabProperties.defaultServerUrl() + "/" + username);
-        String resolvedEmail = (lookup.publicEmail() != null && !lookup.publicEmail().isBlank())
-            ? lookup.publicEmail()
-            : null;
+                lookup.webUrl() != null ? lookup.webUrl() : (gitLabProperties.defaultServerUrl() + "/" + username);
+        String resolvedEmail =
+                (lookup.publicEmail() != null && !lookup.publicEmail().isBlank()) ? lookup.publicEmail() : null;
 
         userRepository.upsertUser(
-            nativeId,
-            providerId,
-            username,
-            resolvedName,
-            resolvedAvatarUrl,
-            resolvedHtmlUrl,
-            GitLabUserClassifier.classify(username).name(),
-            resolvedEmail,
-            null, // createdAt — not in GraphQL user data
-            null // updatedAt — not in GraphQL user data
-        );
+                nativeId,
+                providerId,
+                username,
+                resolvedName,
+                resolvedAvatarUrl,
+                resolvedHtmlUrl,
+                GitLabUserClassifier.classify(username).name(),
+                resolvedEmail,
+                null, // createdAt — not in GraphQL user data
+                null // updatedAt — not in GraphQL user data
+                );
 
         return userRepository.findByNativeIdAndProviderId(nativeId, providerId).orElse(null);
     }

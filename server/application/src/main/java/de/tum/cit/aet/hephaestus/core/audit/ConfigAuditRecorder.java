@@ -42,8 +42,7 @@ class ConfigAuditRecorder implements ConfigAuditPort {
             return;
         }
 
-        repository.save(
-            ConfigAuditEvent.create(
+        repository.save(ConfigAuditEvent.create(
                 clock.instant(),
                 entry.workspaceId(),
                 ConfigAuditActor.fromSecurityContext(),
@@ -52,9 +51,7 @@ class ConfigAuditRecorder implements ConfigAuditPort {
                 action,
                 changedKeys,
                 ConfigAuditSnapshotMapper.toJson(before),
-                ConfigAuditSnapshotMapper.toJson(after)
-            )
-        );
+                ConfigAuditSnapshotMapper.toJson(after)));
     }
 
     /**
@@ -70,15 +67,13 @@ class ConfigAuditRecorder implements ConfigAuditPort {
     private static void requireWritableTransaction() {
         if (!TransactionSynchronizationManager.isActualTransactionActive()) {
             throw new ConfigAuditUnavailableException(
-                "config audit must be recorded inside the transaction that performs the change, " +
-                    "otherwise the change can commit without its audit row"
-            );
+                    "config audit must be recorded inside the transaction that performs the change, "
+                            + "otherwise the change can commit without its audit row");
         }
         if (TransactionSynchronizationManager.isCurrentTransactionReadOnly()) {
             throw new ConfigAuditUnavailableException(
-                "config audit was called inside a read-only transaction; the insert would never be " +
-                    "flushed (FlushMode.MANUAL) and the change would commit with no audit row"
-            );
+                    "config audit was called inside a read-only transaction; the insert would never be "
+                            + "flushed (FlushMode.MANUAL) and the change would commit with no audit row");
         }
     }
 }

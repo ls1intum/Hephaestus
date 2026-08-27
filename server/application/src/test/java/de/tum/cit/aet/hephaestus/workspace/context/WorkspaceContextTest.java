@@ -54,15 +54,7 @@ class WorkspaceContextTest {
     @Test
     void shouldCheckIfUserHasSpecificRole() {
         WorkspaceContext context = new WorkspaceContext(
-            1L,
-            "test",
-            "Test",
-            AccountType.ORG,
-            null,
-            false,
-            false,
-            Set.of(WorkspaceRole.MEMBER)
-        );
+                1L, "test", "Test", AccountType.ORG, null, false, false, Set.of(WorkspaceRole.MEMBER));
 
         assertTrue(context.hasRole(WorkspaceRole.MEMBER));
         assertFalse(context.hasRole(WorkspaceRole.OWNER));
@@ -72,26 +64,10 @@ class WorkspaceContextTest {
     @Test
     void shouldCheckIfUserHasAnyMembership() {
         WorkspaceContext withRoles = new WorkspaceContext(
-            1L,
-            "test",
-            "Test",
-            AccountType.ORG,
-            null,
-            false,
-            false,
-            Set.of(WorkspaceRole.MEMBER)
-        );
+                1L, "test", "Test", AccountType.ORG, null, false, false, Set.of(WorkspaceRole.MEMBER));
 
-        WorkspaceContext withoutRoles = new WorkspaceContext(
-            2L,
-            "test2",
-            "Test2",
-            AccountType.USER,
-            null,
-            false,
-            false,
-            Set.of()
-        );
+        WorkspaceContext withoutRoles =
+                new WorkspaceContext(2L, "test2", "Test2", AccountType.USER, null, false, false, Set.of());
 
         assertTrue(withRoles.hasMembership());
         assertFalse(withoutRoles.hasMembership());

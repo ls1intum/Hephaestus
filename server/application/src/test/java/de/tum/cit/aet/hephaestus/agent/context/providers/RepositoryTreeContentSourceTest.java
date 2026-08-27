@@ -15,8 +15,6 @@ import de.tum.cit.aet.hephaestus.evidence.SourceCaptureState;
 import de.tum.cit.aet.hephaestus.evidence.SourceKind;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.workdir.GitRepositoryManager;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
-import java.nio.charset.StandardCharsets;
-import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
 import org.jspecify.annotations.Nullable;
@@ -46,18 +44,16 @@ class RepositoryTreeContentSourceTest extends BaseUnitTest {
         AgentJob job = job(17L, "0123456789012345678901234567890123456789");
         when(gitRepositoryManager.isEnabled()).thenReturn(true);
         when(gitRepositoryManager.isRepositoryCloned(17L)).thenReturn(true);
-        when(gitRepositoryManager.readTreeSnapshot(17L, "0123456789012345678901234567890123456789")).thenReturn(
-            new GitRepositoryManager.GitTreeSnapshot(
-                stagingDir,
-                "0123456789012345678901234567890123456789",
-                "1123456789012345678901234567890123456789",
-                Map.of("src/App.java", stagingDir.resolve("src/App.java")),
-                12,
-                1,
-                true,
-                Set.of()
-            )
-        );
+        when(gitRepositoryManager.readTreeSnapshot(17L, "0123456789012345678901234567890123456789"))
+                .thenReturn(new GitRepositoryManager.GitTreeSnapshot(
+                        stagingDir,
+                        "0123456789012345678901234567890123456789",
+                        "1123456789012345678901234567890123456789",
+                        Map.of("src/App.java", stagingDir.resolve("src/App.java")),
+                        12,
+                        1,
+                        true,
+                        Set.of()));
 
         var contribution = source.capture(new ContextRequest.PracticeReviewRequest(job), source.sourceKinds());
 
@@ -74,36 +70,31 @@ class RepositoryTreeContentSourceTest extends BaseUnitTest {
         AgentJob job = job(17L, "0123456789012345678901234567890123456789");
         when(gitRepositoryManager.isEnabled()).thenReturn(true);
         when(gitRepositoryManager.isRepositoryCloned(17L)).thenReturn(true);
-        when(gitRepositoryManager.readTreeSnapshot(17L, "0123456789012345678901234567890123456789")).thenReturn(
-            new GitRepositoryManager.GitTreeSnapshot(
-                stagingDir,
-                "0123456789012345678901234567890123456789",
-                "1123456789012345678901234567890123456789",
-                Map.of("src/App.java", stagingDir.resolve("src/App.java")),
-                12,
-                40_000,
-                false,
-                Set.of(
-                    GitRepositoryManager.TREE_LIMITATION_FILE_COUNT,
-                    GitRepositoryManager.TREE_LIMITATION_FILE_TOO_LARGE
-                )
-            )
-        );
+        when(gitRepositoryManager.readTreeSnapshot(17L, "0123456789012345678901234567890123456789"))
+                .thenReturn(new GitRepositoryManager.GitTreeSnapshot(
+                        stagingDir,
+                        "0123456789012345678901234567890123456789",
+                        "1123456789012345678901234567890123456789",
+                        Map.of("src/App.java", stagingDir.resolve("src/App.java")),
+                        12,
+                        40_000,
+                        false,
+                        Set.of(
+                                GitRepositoryManager.TREE_LIMITATION_FILE_COUNT,
+                                GitRepositoryManager.TREE_LIMITATION_FILE_TOO_LARGE)));
 
         var contribution = source.capture(new ContextRequest.PracticeReviewRequest(job), source.sourceKinds());
 
         // COMPLETE here would license a practice to say "this does not exist anywhere in the
         // repository" about a tree whose walk we cut short.
-        assertThat(contribution.completeness()).containsEntry(
-            new SourceKind("scm.repository.tree"),
-            de.tum.cit.aet.hephaestus.evidence.SourceCompleteness.PARTIAL
-        );
-        assertThat(
-            contribution.captureLimitations().get(new SourceKind("scm.repository.tree"))
-        ).containsExactlyInAnyOrder(
-            GitRepositoryManager.TREE_LIMITATION_FILE_COUNT,
-            GitRepositoryManager.TREE_LIMITATION_FILE_TOO_LARGE
-        );
+        assertThat(contribution.completeness())
+                .containsEntry(
+                        new SourceKind("scm.repository.tree"),
+                        de.tum.cit.aet.hephaestus.evidence.SourceCompleteness.PARTIAL);
+        assertThat(contribution.captureLimitations().get(new SourceKind("scm.repository.tree")))
+                .containsExactlyInAnyOrder(
+                        GitRepositoryManager.TREE_LIMITATION_FILE_COUNT,
+                        GitRepositoryManager.TREE_LIMITATION_FILE_TOO_LARGE);
     }
 
     @Test
@@ -111,10 +102,9 @@ class RepositoryTreeContentSourceTest extends BaseUnitTest {
         when(gitRepositoryManager.isEnabled()).thenReturn(true);
         when(gitRepositoryManager.isRepositoryCloned(17L)).thenReturn(true);
         assertThatThrownBy(() ->
-            source.capture(new ContextRequest.PracticeReviewRequest(job(17L, null)), source.sourceKinds())
-        )
-            .isInstanceOf(JobPreparationException.class)
-            .hasMessageContaining("commit_sha");
+                        source.capture(new ContextRequest.PracticeReviewRequest(job(17L, null)), source.sourceKinds()))
+                .isInstanceOf(JobPreparationException.class)
+                .hasMessageContaining("commit_sha");
     }
 
     @Test
@@ -122,13 +112,13 @@ class RepositoryTreeContentSourceTest extends BaseUnitTest {
         AgentJob job = job(17L, "0123456789012345678901234567890123456789");
         when(gitRepositoryManager.isEnabled()).thenReturn(true);
         when(gitRepositoryManager.isRepositoryCloned(17L)).thenReturn(true);
-        when(gitRepositoryManager.readTreeSnapshot(17L, "0123456789012345678901234567890123456789")).thenThrow(
-            new GitRepositoryManager.GitOperationException("unreadable commit", new java.io.IOException())
-        );
+        when(gitRepositoryManager.readTreeSnapshot(17L, "0123456789012345678901234567890123456789"))
+                .thenThrow(
+                        new GitRepositoryManager.GitOperationException("unreadable commit", new java.io.IOException()));
 
         assertThatThrownBy(() -> source.capture(new ContextRequest.PracticeReviewRequest(job), source.sourceKinds()))
-            .isInstanceOf(EvidenceCollectionException.class)
-            .hasMessageContaining("Could not capture repository tree");
+                .isInstanceOf(EvidenceCollectionException.class)
+                .hasMessageContaining("Could not capture repository tree");
     }
 
     @Test
@@ -139,12 +129,10 @@ class RepositoryTreeContentSourceTest extends BaseUnitTest {
         var contribution = source.capture(new ContextRequest.PracticeReviewRequest(job), source.sourceKinds());
 
         assertThat(contribution.files()).isEmpty();
-        assertThat(contribution.stateOverrides()).containsExactly(
-            entry(
-                new SourceKind("scm.repository.tree"),
-                new SourceCaptureState.NotCollected(SourceAbsenceReason.DISABLED)
-            )
-        );
+        assertThat(contribution.stateOverrides())
+                .containsExactly(entry(
+                        new SourceKind("scm.repository.tree"),
+                        new SourceCaptureState.NotCollected(SourceAbsenceReason.DISABLED)));
     }
 
     @Test
@@ -156,12 +144,10 @@ class RepositoryTreeContentSourceTest extends BaseUnitTest {
         var contribution = source.capture(new ContextRequest.PracticeReviewRequest(job), source.sourceKinds());
 
         assertThat(contribution.files()).isEmpty();
-        assertThat(contribution.stateOverrides()).containsExactly(
-            entry(
-                new SourceKind("scm.repository.tree"),
-                new SourceCaptureState.Unavailable(SourceAbsenceReason.NO_WORKING_COPY)
-            )
-        );
+        assertThat(contribution.stateOverrides())
+                .containsExactly(entry(
+                        new SourceKind("scm.repository.tree"),
+                        new SourceCaptureState.Unavailable(SourceAbsenceReason.NO_WORKING_COPY)));
     }
 
     private static AgentJob job(long repositoryId, @Nullable String commitSha) {

@@ -50,11 +50,10 @@ class LlmUsageAdminControllerIntegrationTest extends AbstractWorkspaceIntegratio
     }
 
     private void seedEvent(
-        Workspace workspace,
-        @org.jspecify.annotations.Nullable String cost,
-        FundingSource funding,
-        PricingState pricing
-    ) {
+            Workspace workspace,
+            @org.jspecify.annotations.Nullable String cost,
+            FundingSource funding,
+            PricingState pricing) {
         LlmUsageEvent event = new LlmUsageEvent();
         event.setId(UUID.randomUUID());
         event.setWorkspace(workspace);
@@ -73,23 +72,21 @@ class LlmUsageAdminControllerIntegrationTest extends AbstractWorkspaceIntegratio
 
     private AdminWorkspaceLlmUsageDTO rollupFor(Workspace workspace) {
         AdminLlmUsageReportDTO report = webTestClient
-            .get()
-            .uri("/admin/llm/usage")
-            .headers(h -> h.setBearerAuth(ADMIN_TOKEN))
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody(AdminLlmUsageReportDTO.class)
-            .returnResult()
-            .getResponseBody();
+                .get()
+                .uri("/admin/llm/usage")
+                .headers(h -> h.setBearerAuth(ADMIN_TOKEN))
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody(AdminLlmUsageReportDTO.class)
+                .returnResult()
+                .getResponseBody();
 
         assertThat(report).isNotNull();
-        return report
-            .workspaces()
-            .stream()
-            .filter(r -> r.workspaceSlug().equals(workspace.getWorkspaceSlug()))
-            .findFirst()
-            .orElseThrow();
+        return report.workspaces().stream()
+                .filter(r -> r.workspaceSlug().equals(workspace.getWorkspaceSlug()))
+                .findFirst()
+                .orElseThrow();
     }
 
     @Test
@@ -156,28 +153,28 @@ class LlmUsageAdminControllerIntegrationTest extends AbstractWorkspaceIntegratio
         Workspace workspace = setupWorkspace("adm-budget");
 
         webTestClient
-            .put()
-            .uri("/admin/workspaces/{slug}/llm/budget", workspace.getWorkspaceSlug())
-            .headers(h -> h.setBearerAuth(ADMIN_TOKEN))
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(Map.of("monthlyBudgetUsd", "25.00"))
-            .exchange()
-            .expectStatus()
-            .isNoContent();
-        assertThat(
-            workspaceRepository.findById(workspace.getId()).orElseThrow().getMonthlyLlmBudgetUsd()
-        ).isEqualByComparingTo("25.00");
+                .put()
+                .uri("/admin/workspaces/{slug}/llm/budget", workspace.getWorkspaceSlug())
+                .headers(h -> h.setBearerAuth(ADMIN_TOKEN))
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(Map.of("monthlyBudgetUsd", "25.00"))
+                .exchange()
+                .expectStatus()
+                .isNoContent();
+        assertThat(workspaceRepository.findById(workspace.getId()).orElseThrow().getMonthlyLlmBudgetUsd())
+                .isEqualByComparingTo("25.00");
 
         webTestClient
-            .put()
-            .uri("/admin/workspaces/{slug}/llm/budget", workspace.getWorkspaceSlug())
-            .headers(h -> h.setBearerAuth(ADMIN_TOKEN))
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(Map.of())
-            .exchange()
-            .expectStatus()
-            .isNoContent();
-        assertThat(workspaceRepository.findById(workspace.getId()).orElseThrow().getMonthlyLlmBudgetUsd()).isNull();
+                .put()
+                .uri("/admin/workspaces/{slug}/llm/budget", workspace.getWorkspaceSlug())
+                .headers(h -> h.setBearerAuth(ADMIN_TOKEN))
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(Map.of())
+                .exchange()
+                .expectStatus()
+                .isNoContent();
+        assertThat(workspaceRepository.findById(workspace.getId()).orElseThrow().getMonthlyLlmBudgetUsd())
+                .isNull();
     }
 
     /**
@@ -187,14 +184,14 @@ class LlmUsageAdminControllerIntegrationTest extends AbstractWorkspaceIntegratio
     @Test
     void settingTheCapOnAnUnknownWorkspaceSlugIs404() {
         webTestClient
-            .put()
-            .uri("/admin/workspaces/{slug}/llm/budget", "adm-no-such-workspace")
-            .headers(h -> h.setBearerAuth(ADMIN_TOKEN))
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(Map.of("monthlyBudgetUsd", "25.00"))
-            .exchange()
-            .expectStatus()
-            .isNotFound();
+                .put()
+                .uri("/admin/workspaces/{slug}/llm/budget", "adm-no-such-workspace")
+                .headers(h -> h.setBearerAuth(ADMIN_TOKEN))
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(Map.of("monthlyBudgetUsd", "25.00"))
+                .exchange()
+                .expectStatus()
+                .isNotFound();
     }
 
     @Test
@@ -202,14 +199,14 @@ class LlmUsageAdminControllerIntegrationTest extends AbstractWorkspaceIntegratio
         Workspace workspace = setupWorkspace("adm-negative");
 
         webTestClient
-            .put()
-            .uri("/admin/workspaces/{slug}/llm/budget", workspace.getWorkspaceSlug())
-            .headers(h -> h.setBearerAuth(ADMIN_TOKEN))
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(Map.of("monthlyBudgetUsd", "-1.00"))
-            .exchange()
-            .expectStatus()
-            .isBadRequest();
+                .put()
+                .uri("/admin/workspaces/{slug}/llm/budget", workspace.getWorkspaceSlug())
+                .headers(h -> h.setBearerAuth(ADMIN_TOKEN))
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(Map.of("monthlyBudgetUsd", "-1.00"))
+                .exchange()
+                .expectStatus()
+                .isBadRequest();
     }
 
     /**
@@ -227,19 +224,19 @@ class LlmUsageAdminControllerIntegrationTest extends AbstractWorkspaceIntegratio
         fxRateRepository.save(rate);
 
         byte[] body = webTestClient
-            .get()
-            .uri("/admin/llm/usage")
-            .headers(h -> h.setBearerAuth(ADMIN_TOKEN))
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody()
-            .jsonPath("$.fx")
-            .doesNotExist()
-            .jsonPath("$.workspaces[0].fx")
-            .doesNotExist()
-            .returnResult()
-            .getResponseBody();
+                .get()
+                .uri("/admin/llm/usage")
+                .headers(h -> h.setBearerAuth(ADMIN_TOKEN))
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$.fx")
+                .doesNotExist()
+                .jsonPath("$.workspaces[0].fx")
+                .doesNotExist()
+                .returnResult()
+                .getResponseBody();
 
         assertThat(new String(body, StandardCharsets.UTF_8)).doesNotContain("\"fx\"");
     }
@@ -247,12 +244,12 @@ class LlmUsageAdminControllerIntegrationTest extends AbstractWorkspaceIntegratio
     @Test
     void nonAdminIsForbidden() {
         webTestClient
-            .get()
-            .uri("/admin/llm/usage")
-            .headers(h -> h.setBearerAuth(MENTOR_TOKEN))
-            .exchange()
-            .expectStatus()
-            .isForbidden();
+                .get()
+                .uri("/admin/llm/usage")
+                .headers(h -> h.setBearerAuth(MENTOR_TOKEN))
+                .exchange()
+                .expectStatus()
+                .isForbidden();
     }
 
     @Test
@@ -266,26 +263,26 @@ class LlmUsageAdminControllerIntegrationTest extends AbstractWorkspaceIntegratio
     @Test
     void settingAWorkspacesBudgetIsRefusedForBothANonAdminAndAnAnonymousCaller() {
         webTestClient
-            .put()
-            .uri("/admin/workspaces/{slug}/llm/budget", "any-workspace")
-            .headers(h -> h.setBearerAuth(MENTOR_TOKEN))
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(Map.of("monthlyBudgetUsd", 1))
-            .exchange()
-            .expectStatus()
-            .isForbidden();
+                .put()
+                .uri("/admin/workspaces/{slug}/llm/budget", "any-workspace")
+                .headers(h -> h.setBearerAuth(MENTOR_TOKEN))
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(Map.of("monthlyBudgetUsd", 1))
+                .exchange()
+                .expectStatus()
+                .isForbidden();
 
         // 403, not the 401 the anonymous *read* above returns: a state-changing request with no
         // `Authorization: Bearer` header is cookie-shaped, so SecurityConfig#requiresCsrf refuses it
         // at the CSRF filter before authentication ever runs. Asserting 401 here would invite someone
         // to "fix" the app by exempting this mutation from CSRF. Either way the handler is unreachable.
         webTestClient
-            .put()
-            .uri("/admin/workspaces/{slug}/llm/budget", "any-workspace")
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(Map.of("monthlyBudgetUsd", 1))
-            .exchange()
-            .expectStatus()
-            .isForbidden();
+                .put()
+                .uri("/admin/workspaces/{slug}/llm/budget", "any-workspace")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(Map.of("monthlyBudgetUsd", 1))
+                .exchange()
+                .expectStatus()
+                .isForbidden();
     }
 }

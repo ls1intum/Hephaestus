@@ -14,5 +14,6 @@ package de.tum.cit.aet.hephaestus.integration.scm.domain.common;
  */
 public interface RepositoryItemCountProjection {
     Long getRepositoryId();
+
     Long getItemCount();
 }

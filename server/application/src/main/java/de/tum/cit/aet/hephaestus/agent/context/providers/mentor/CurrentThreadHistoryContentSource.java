@@ -48,11 +48,7 @@ public class CurrentThreadHistoryContentSource implements ContentSource {
         root.put("maxMessages", MAX_MESSAGES);
 
         List<ChatMessage> messages = chatMessageRepository.findContextMessages(
-            req.workspaceId(),
-            req.developerId(),
-            req.threadId(),
-            req.currentUserMessageId()
-        );
+                req.workspaceId(), req.developerId(), req.threadId(), req.currentUserMessageId());
         int from = Math.max(0, messages.size() - MAX_MESSAGES);
         ArrayNode arr = root.putArray("messages");
         for (ChatMessage message : messages.subList(from, messages.size())) {

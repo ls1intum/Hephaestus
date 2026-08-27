@@ -59,10 +59,9 @@ public class SlackScopeConsumerReconciler {
             });
         } catch (RuntimeException e) {
             log.warn(
-                "slack.lifecycle: scope-consumer reconcile failed for workspaceId={}: {}",
-                workspaceId,
-                e.toString()
-            );
+                    "slack.lifecycle: scope-consumer reconcile failed for workspaceId={}: {}",
+                    workspaceId,
+                    e.toString());
         }
     }
 }

@@ -32,14 +32,13 @@ class FeedbackDeliveryService {
     private final PracticeFeedbackCommentFormatter commentFormatter;
 
     FeedbackDeliveryService(
-        PullRequestCommentPoster commentPoster,
-        DiffNotePoster diffNotePoster,
-        PracticeFeedbackDeliveryPolicy deliveryPolicy,
-        PracticeReviewProperties reviewProperties,
-        FeedbackLedgerRecorder feedbackLedgerRecorder,
-        ObservationTrendService observationTrendService,
-        PracticeFeedbackCommentFormatter commentFormatter
-    ) {
+            PullRequestCommentPoster commentPoster,
+            DiffNotePoster diffNotePoster,
+            PracticeFeedbackDeliveryPolicy deliveryPolicy,
+            PracticeReviewProperties reviewProperties,
+            FeedbackLedgerRecorder feedbackLedgerRecorder,
+            ObservationTrendService observationTrendService,
+            PracticeFeedbackCommentFormatter commentFormatter) {
         this.commentPoster = commentPoster;
         this.diffNotePoster = diffNotePoster;
         this.deliveryPolicy = deliveryPolicy;
@@ -50,10 +49,9 @@ class FeedbackDeliveryService {
     }
 
     void recordProposal(
-        AgentJob job,
-        @Nullable DeliveryContent delivery,
-        List<PracticeDetectionResultParser.ValidatedObservation> observations
-    ) {
+            AgentJob job,
+            @Nullable DeliveryContent delivery,
+            List<PracticeDetectionResultParser.ValidatedObservation> observations) {
         feedbackLedgerRecorder.recordProposal(job, delivery, observations);
     }
 
@@ -96,13 +94,7 @@ class FeedbackDeliveryService {
     private void recordPartialSummaryDelivery(AgentJob job, DeliveryContent delivery) {
         try {
             feedbackLedgerRecorder.recordWithoutConversation(
-                job,
-                delivery,
-                ArtifactKinds.PULL_REQUEST,
-                List.of(),
-                true,
-                false
-            );
+                    job, delivery, ArtifactKinds.PULL_REQUEST, List.of(), true, false);
         } catch (RuntimeException e) {
             log.warn("Partial delivery ledger record failed: jobId={}, error={}", job.getId(), e.getMessage());
         }
@@ -110,10 +102,13 @@ class FeedbackDeliveryService {
 
     private void doDeliverEligible(AgentJob job, DeliveryContent delivery, PullRequest pullRequest) {
         TrendDelta trend = reviewProperties.progressFooter()
-            ? observationTrendService
-                  .computeForTarget(ArtifactKinds.PULL_REQUEST, pullRequest.getId(), job.getWorkspace().getId())
-                  .orElse(null)
-            : null;
+                ? observationTrendService
+                        .computeForTarget(
+                                ArtifactKinds.PULL_REQUEST,
+                                pullRequest.getId(),
+                                job.getWorkspace().getId())
+                        .orElse(null)
+                : null;
 
         SummaryOutcome summaryOutcome = postSummaryNote(job, delivery, trend);
         DiffNotePoster.DiffNoteResult inlineResult;
@@ -147,29 +142,26 @@ class FeedbackDeliveryService {
         try {
             if (inlineResult.suppressed()) {
                 feedbackLedgerRecorder.recordWithoutConversation(
-                    job,
-                    delivery,
-                    ArtifactKinds.PULL_REQUEST,
-                    inlineSignals,
-                    summaryOutcome == SummaryOutcome.DELIVERED,
-                    inlineDelivered
-                );
+                        job,
+                        delivery,
+                        ArtifactKinds.PULL_REQUEST,
+                        inlineSignals,
+                        summaryOutcome == SummaryOutcome.DELIVERED,
+                        inlineDelivered);
             } else {
                 feedbackLedgerRecorder.record(
-                    job,
-                    delivery,
-                    ArtifactKinds.PULL_REQUEST,
-                    inlineSignals,
-                    summaryOutcome == SummaryOutcome.DELIVERED,
-                    inlineDelivered
-                );
+                        job,
+                        delivery,
+                        ArtifactKinds.PULL_REQUEST,
+                        inlineSignals,
+                        summaryOutcome == SummaryOutcome.DELIVERED,
+                        inlineDelivered);
             }
         } catch (RuntimeException e) {
             log.warn(
-                "Feedback ledger record failed (delivery unaffected): jobId={}, error={}",
-                job.getId(),
-                e.getMessage()
-            );
+                    "Feedback ledger record failed (delivery unaffected): jobId={}, error={}",
+                    job.getId(),
+                    e.getMessage());
         }
         if (inlineResult.suppressed()) {
             recordSuppressedRemainder(job, delivery, inlineResult.suppressedRecurrenceKeys());
@@ -177,27 +169,17 @@ class FeedbackDeliveryService {
     }
 
     private void recordSuppressedRemainder(
-        AgentJob job,
-        DeliveryContent delivery,
-        List<String> suppressedRecurrenceKeys
-    ) {
+            AgentJob job, DeliveryContent delivery, List<String> suppressedRecurrenceKeys) {
         try {
             feedbackLedgerRecorder.recordSuppressedRemainder(
-                job,
-                delivery,
-                FeedbackSuppressionReason.INSTANCE_SILENCED,
-                suppressedRecurrenceKeys
-            );
+                    job, delivery, FeedbackSuppressionReason.INSTANCE_SILENCED, suppressedRecurrenceKeys);
         } catch (RuntimeException e) {
             log.warn("Suppressed delivery ledger record failed: jobId={}, error={}", job.getId(), e.getMessage());
         }
     }
 
     private void recordGateSuppressed(
-        AgentJob job,
-        DeliveryContent delivery,
-        @Nullable FeedbackSuppressionReason reason
-    ) {
+            AgentJob job, DeliveryContent delivery, @Nullable FeedbackSuppressionReason reason) {
         if (reason == null) {
             throw new IllegalArgumentException("Suppressed delivery requires a reason");
         }
@@ -205,11 +187,10 @@ class FeedbackDeliveryService {
             feedbackLedgerRecorder.recordSuppressedUnit(job, delivery, reason);
         } catch (RuntimeException e) {
             log.warn(
-                "Gate-suppressed ledger record failed (delivery unaffected): jobId={}, reason={}, error={}",
-                job.getId(),
-                reason,
-                e.getMessage()
-            );
+                    "Gate-suppressed ledger record failed (delivery unaffected): jobId={}, reason={}, error={}",
+                    job.getId(),
+                    reason,
+                    e.getMessage());
         }
     }
 
@@ -239,8 +220,7 @@ class FeedbackDeliveryService {
         String commentId = commentPoster.postFormattedBody(job, formatted);
         if (commentId == null) {
             throw new JobDeliveryException(
-                "Summary note post returned no comment id despite a non-empty body: jobId=" + job.getId()
-            );
+                    "Summary note post returned no comment id despite a non-empty body: jobId=" + job.getId());
         }
         job.setDeliveryCommentId(commentId);
         log.info("Practice summary note delivered: jobId={}, commentId={}", job.getId(), commentId);
@@ -251,12 +231,11 @@ class FeedbackDeliveryService {
         // Empty reconciliation must still remove stale inline notes after policy guards pass.
         DiffNotePoster.DiffNoteResult diffResult = diffNotePoster.reconcileInlineNotes(job, delivery.diffNotes());
         log.info(
-            "Diff notes reconciled: posted={}, failed={}, total={}, jobId={}",
-            diffResult.posted(),
-            diffResult.failed(),
-            delivery.diffNotes().size(),
-            job.getId()
-        );
+                "Diff notes reconciled: posted={}, failed={}, total={}, jobId={}",
+                diffResult.posted(),
+                diffResult.failed(),
+                delivery.diffNotes().size(),
+                job.getId());
         return diffResult;
     }
 
@@ -269,10 +248,9 @@ class FeedbackDeliveryService {
             feedbackLedgerRecorder.recordUndelivered(job, delivery);
         } catch (RuntimeException e) {
             log.warn(
-                "Undelivered-feedback ledger record failed (delivery unaffected): jobId={}, error={}",
-                job.getId(),
-                e.getMessage()
-            );
+                    "Undelivered-feedback ledger record failed (delivery unaffected): jobId={}, error={}",
+                    job.getId(),
+                    e.getMessage());
         }
     }
 }

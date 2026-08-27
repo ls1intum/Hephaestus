@@ -12,28 +12,22 @@ public final class OutlineWebhookEvents {
 
     /** Dotted document event names as Outline emits and subscribes them. */
     public static final List<String> DOCUMENT_EVENTS = List.of(
-        "documents.create",
-        "documents.publish",
-        "documents.unpublish",
-        "documents.update",
-        "documents.archive",
-        "documents.unarchive",
-        "documents.delete",
-        "documents.move"
-    );
+            "documents.create",
+            "documents.publish",
+            "documents.unpublish",
+            "documents.update",
+            "documents.archive",
+            "documents.unarchive",
+            "documents.delete",
+            "documents.move");
 
     /** Collection lifecycle events: renames/recolors refresh the catalog, deletes tombstone the mirror. */
-    public static final List<String> COLLECTION_EVENTS = List.of(
-        "collections.create",
-        "collections.update",
-        "collections.delete"
-    );
+    public static final List<String> COLLECTION_EVENTS =
+            List.of("collections.create", "collections.update", "collections.delete");
 
     /** Everything the registrar subscribes upstream. */
-    public static final List<String> SUBSCRIBED_EVENTS = Stream.concat(
-        DOCUMENT_EVENTS.stream(),
-        COLLECTION_EVENTS.stream()
-    ).toList();
+    public static final List<String> SUBSCRIBED_EVENTS =
+            Stream.concat(DOCUMENT_EVENTS.stream(), COLLECTION_EVENTS.stream()).toList();
 
     private OutlineWebhookEvents() {}
 }

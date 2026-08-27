@@ -13,12 +13,11 @@ import org.jspecify.annotations.NonNull;
  * filtered on later as though it meant something.
  */
 record EvidenceOpportunity(
-    @NonNull ArtifactKind artifactKind,
-    long artifactId,
-    @NonNull Instant occurredAt,
-    @NonNull OutcomeVector outcomes,
-    @NonNull TrendBundle bundle
-) {
+        @NonNull ArtifactKind artifactKind,
+        long artifactId,
+        @NonNull Instant occurredAt,
+        @NonNull OutcomeVector outcomes,
+        @NonNull TrendBundle bundle) {
     boolean applicable() {
         return outcomes.applicable() > 0;
     }

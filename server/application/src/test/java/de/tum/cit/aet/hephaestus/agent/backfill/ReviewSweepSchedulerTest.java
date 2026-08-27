@@ -63,7 +63,9 @@ class ReviewSweepSchedulerTest extends BaseUnitTest {
     void aFailedDeferralIsSwallowedSoTheRemainingSchedulesStillRun() {
         when(scheduleRepository.findDue(any(), any())).thenReturn(List.of(schedule(FIRST), schedule(SECOND)));
         when(opener.openDueRun(eq(FIRST), any())).thenThrow(new IllegalStateException("scope query blew up"));
-        doThrow(new IllegalStateException("and so did the deferral")).when(opener).deferAfterFailure(eq(FIRST), any());
+        doThrow(new IllegalStateException("and so did the deferral"))
+                .when(opener)
+                .deferAfterFailure(eq(FIRST), any());
         when(opener.openDueRun(eq(SECOND), any())).thenReturn(ReviewSweepOutcome.OPENED);
 
         scheduler().tick();

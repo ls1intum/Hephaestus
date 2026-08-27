@@ -25,19 +25,15 @@ class AgentJobDTOTest extends BaseUnitTest {
 
     static Stream<Arguments> scopes() {
         return Stream.of(
-            Arguments.of(FundingSource.INSTANCE, REDACTED_URL, "an instance connection is redacted"),
-            Arguments.of(null, REDACTED_URL, "a legacy null-scope config is redacted too"),
-            Arguments.of(FundingSource.WORKSPACE, FULL_URL, "a BYO connection is the workspace's own config")
-        );
+                Arguments.of(FundingSource.INSTANCE, REDACTED_URL, "an instance connection is redacted"),
+                Arguments.of(null, REDACTED_URL, "a legacy null-scope config is redacted too"),
+                Arguments.of(FundingSource.WORKSPACE, FULL_URL, "a BYO connection is the workspace's own config"));
     }
 
     @ParameterizedTest(name = "{2}")
     @MethodSource("scopes")
     void redactsBaseUrlUnlessTheWorkspaceOwnsTheConnection(
-        @Nullable FundingSource scope,
-        String expectedBaseUrl,
-        String why
-    ) {
+            @Nullable FundingSource scope, String expectedBaseUrl, String why) {
         AgentJobDTO dto = AgentJobDTO.from(jobWithSnapshot(snapshotWithScope(scope)));
 
         ObjectNode snapshot = (ObjectNode) dto.configSnapshot();
@@ -70,7 +66,9 @@ class AgentJobDTOTest extends BaseUnitTest {
         AgentJobDTO dto = AgentJobDTO.from(job);
 
         assertThat(dto.holdReason()).isNull();
-        assertThat(dto.availableAt()).as("defaulted to submit time by prePersist, never null").isNotNull();
+        assertThat(dto.availableAt())
+                .as("defaulted to submit time by prePersist, never null")
+                .isNotNull();
     }
 
     private static AgentJob jobWithSnapshot(ConfigSnapshot snapshot) {
@@ -84,21 +82,20 @@ class AgentJobDTOTest extends BaseUnitTest {
 
     private static ConfigSnapshot snapshotWithScope(@Nullable FundingSource scope) {
         return new ConfigSnapshot(
-            ConfigSnapshot.SCHEMA_VERSION,
-            "openai-completions",
-            FULL_URL,
-            "gpt-5",
-            null,
-            null,
-            null,
-            false,
-            scope,
-            scope != null ? 42L : null,
-            null,
-            null,
-            600,
-            false,
-            null
-        );
+                ConfigSnapshot.SCHEMA_VERSION,
+                "openai-completions",
+                FULL_URL,
+                "gpt-5",
+                null,
+                null,
+                null,
+                false,
+                scope,
+                scope != null ? 42L : null,
+                null,
+                null,
+                600,
+                false,
+                null);
     }
 }

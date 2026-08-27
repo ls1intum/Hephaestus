@@ -31,35 +31,34 @@ class ObservationOrderTest extends BaseUnitTest {
         var citations = evidence.putArray("citations");
         for (int i = 0; i < loci; i++) {
             citations
-                .addObject()
-                .put("sourceKind", "scm.pull-request.diff")
-                .put("path", "src/File" + i + ".java")
-                .put("side", "NEW")
-                .put("startLine", 10)
-                .put("endLine", 10);
+                    .addObject()
+                    .put("sourceKind", "scm.pull-request.diff")
+                    .put("path", "src/File" + i + ".java")
+                    .put("side", "NEW")
+                    .put("startLine", 10)
+                    .put("endLine", 10);
         }
         for (int i = 0; i < repeats; i++) {
             citations
-                .addObject()
-                .put("sourceKind", "scm.pull-request.diff")
-                .put("path", "src/File0.java")
-                .put("side", "NEW")
-                .put("startLine", 10)
-                .put("endLine", 10);
+                    .addObject()
+                    .put("sourceKind", "scm.pull-request.diff")
+                    .put("path", "src/File0.java")
+                    .put("side", "NEW")
+                    .put("startLine", 10)
+                    .put("endLine", 10);
         }
         return evidence;
     }
 
     private static ValidatedObservation observation(String title, @Nullable Severity severity, int loci) {
         return new ValidatedObservation(
-            "slug",
-            title,
-            severity == null ? Presence.ABSENT : Presence.PRESENT,
-            severity == null ? Assessment.GOOD : Assessment.BAD,
-            severity,
-            evidence(loci, 0),
-            "reasoning"
-        );
+                "slug",
+                title,
+                severity == null ? Presence.ABSENT : Presence.PRESENT,
+                severity == null ? Assessment.GOOD : Assessment.BAD,
+                severity,
+                evidence(loci, 0),
+                "reasoning");
     }
 
     @Test
@@ -89,12 +88,8 @@ class ObservationOrderTest extends BaseUnitTest {
 
         // Breadth never outranks severity: the widest MINOR still sorts below the narrowest MAJOR, because
         // proportionality favours the more consequential lesson.
-        assertThat(sorted.stream().map(ValidatedObservation::summary)).containsExactly(
-            "critical narrow",
-            "major wide",
-            "major narrow",
-            "minor wide"
-        );
+        assertThat(sorted.stream().map(ValidatedObservation::summary))
+                .containsExactly("critical narrow", "major wide", "major narrow", "minor wide");
     }
 
     @Test
@@ -123,10 +118,8 @@ class ObservationOrderTest extends BaseUnitTest {
         List<ValidatedObservation> sorted = new ArrayList<>(List.of(narrow, wide));
         sorted.sort(ObservationOrder.bestAttestedFirst());
 
-        assertThat(sorted.stream().map(ValidatedObservation::summary)).containsExactly(
-            "wide strength",
-            "narrow strength"
-        );
+        assertThat(sorted.stream().map(ValidatedObservation::summary))
+                .containsExactly("wide strength", "narrow strength");
         // Every one of them has a null severity, so including severity would advertise a dimension that does
         // not exist here. Ranking must still be strict.
         assertThat(sorted.get(0).severity()).isNull();
@@ -136,19 +129,19 @@ class ObservationOrderTest extends BaseUnitTest {
     @DisplayName("persisted rows fall back to their id, so the ledger's ordinal survives a re-run")
     void persistedRowsTiebreakOnId() {
         var earlier = de.tum.cit.aet.hephaestus.practices.model.Observation.builder()
-            .id(UUID.fromString("00000000-0000-0000-0000-000000000001"))
-            .presence(Presence.PRESENT)
-            .assessment(Assessment.BAD)
-            .severity(Severity.MINOR)
-            .evidence(evidence(1, 0))
-            .build();
+                .id(UUID.fromString("00000000-0000-0000-0000-000000000001"))
+                .presence(Presence.PRESENT)
+                .assessment(Assessment.BAD)
+                .severity(Severity.MINOR)
+                .evidence(evidence(1, 0))
+                .build();
         var later = de.tum.cit.aet.hephaestus.practices.model.Observation.builder()
-            .id(UUID.fromString("00000000-0000-0000-0000-000000000002"))
-            .presence(Presence.PRESENT)
-            .assessment(Assessment.BAD)
-            .severity(Severity.MINOR)
-            .evidence(evidence(1, 0))
-            .build();
+                .id(UUID.fromString("00000000-0000-0000-0000-000000000002"))
+                .presence(Presence.PRESENT)
+                .assessment(Assessment.BAD)
+                .severity(Severity.MINOR)
+                .evidence(evidence(1, 0))
+                .build();
 
         var sorted = new ArrayList<>(List.of(later, earlier));
         sorted.sort(ObservationOrder.worstFirst());

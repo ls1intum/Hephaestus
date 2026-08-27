@@ -81,8 +81,7 @@ public final class WorkerKeyRing {
             WorkerSigningKey chosen = map.get(activeKid);
             if (chosen == null) {
                 throw new IllegalStateException(
-                    "hephaestus.worker.hub.token.active-kid=" + activeKid + " not present in keys[]"
-                );
+                        "hephaestus.worker.hub.token.active-kid=" + activeKid + " not present in keys[]");
             }
             return chosen;
         }

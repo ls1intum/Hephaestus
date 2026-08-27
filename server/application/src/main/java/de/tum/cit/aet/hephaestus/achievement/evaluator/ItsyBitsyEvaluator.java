@@ -30,19 +30,21 @@ public class ItsyBitsyEvaluator implements AchievementEvaluator {
         }
 
         return commitRepository
-            .findById(event.targetId())
-            .map(commit -> {
-                int additions = commit.getAdditions();
-                int deletions = commit.getDeletions();
-                boolean itsyBitsy =
-                    commit.getChangedFiles() == 1 && additions <= 1 && deletions <= 1 && (additions + deletions) > 0;
+                .findById(event.targetId())
+                .map(commit -> {
+                    int additions = commit.getAdditions();
+                    int deletions = commit.getDeletions();
+                    boolean itsyBitsy = commit.getChangedFiles() == 1
+                            && additions <= 1
+                            && deletions <= 1
+                            && (additions + deletions) > 0;
 
-                if (itsyBitsy) {
-                    userAchievement.setProgressData(new BinaryAchievementProgress(true));
-                    return true;
-                }
-                return false;
-            })
-            .orElse(false);
+                    if (itsyBitsy) {
+                        userAchievement.setProgressData(new BinaryAchievementProgress(true));
+                        return true;
+                    }
+                    return false;
+                })
+                .orElse(false);
     }
 }

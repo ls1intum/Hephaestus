@@ -29,15 +29,14 @@ import org.springframework.validation.annotation.Validated;
 @Validated
 @ConfigurationProperties(prefix = "hephaestus.mentor")
 public record InteractiveSandboxProperties(
-    @DefaultValue("300") @Min(1) int idleTtlSeconds,
-    @DefaultValue("25") @Min(1) @Max(25) int graceTimeoutSeconds,
-    @DefaultValue("30") @Min(1) int reapIntervalSeconds,
-    @DefaultValue("512") @Min(16) int ringBufferFrames,
-    @DefaultValue("5000") @Min(100) int stdinWriteTimeoutMs,
-    @DefaultValue("64") @Min(1) int sendQueueCapacity,
-    @DefaultValue("64") @Min(1) int subscriberQueueCapacity,
-    @DefaultValue("30") @Min(1) int attachFirstFrameTimeoutSeconds,
-    @DefaultValue("3") @Min(1) int maxSessionsPerUser,
-    @DefaultValue("50") @Min(1) int maxSessionsTotal,
-    @DefaultValue("1048576") @Min(1024) int maxFrameChars
-) {}
+        @DefaultValue("300") @Min(1) int idleTtlSeconds,
+        @DefaultValue("25") @Min(1) @Max(25) int graceTimeoutSeconds,
+        @DefaultValue("30") @Min(1) int reapIntervalSeconds,
+        @DefaultValue("512") @Min(16) int ringBufferFrames,
+        @DefaultValue("5000") @Min(100) int stdinWriteTimeoutMs,
+        @DefaultValue("64") @Min(1) int sendQueueCapacity,
+        @DefaultValue("64") @Min(1) int subscriberQueueCapacity,
+        @DefaultValue("30") @Min(1) int attachFirstFrameTimeoutSeconds,
+        @DefaultValue("3") @Min(1) int maxSessionsPerUser,
+        @DefaultValue("50") @Min(1) int maxSessionsTotal,
+        @DefaultValue("1048576") @Min(1024) int maxFrameChars) {}

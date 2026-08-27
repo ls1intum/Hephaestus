@@ -42,8 +42,7 @@ class LlmModelAdminControllerIntegrationTest extends AbstractWorkspaceIntegratio
     private LlmModelDTO createModel(Long connectionId, String slug) {
         // Models start inactive until an explicit price declaration is supplied.
         var request = new CreateLlmModelRequestDTO(slug, "Test Model", "gpt-5", null, null, null, false);
-        return Objects.requireNonNull(
-            webTestClient
+        return Objects.requireNonNull(webTestClient
                 .post()
                 .uri("/admin/llm/connections/{connectionId}/models", connectionId)
                 .headers(h -> h.setBearerAuth(ADMIN_TOKEN))
@@ -54,8 +53,7 @@ class LlmModelAdminControllerIntegrationTest extends AbstractWorkspaceIntegratio
                 .isCreated()
                 .expectBody(LlmModelDTO.class)
                 .returnResult()
-                .getResponseBody()
-        );
+                .getResponseBody());
     }
 
     @Test
@@ -68,56 +66,56 @@ class LlmModelAdminControllerIntegrationTest extends AbstractWorkspaceIntegratio
         assertThat(created.currentPrice()).isNull();
 
         webTestClient
-            .get()
-            .uri("/admin/llm/models/{id}", created.id())
-            .headers(h -> h.setBearerAuth(ADMIN_TOKEN))
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody()
-            .jsonPath("$.slug")
-            .isEqualTo("gpt-5-eu");
+                .get()
+                .uri("/admin/llm/models/{id}", created.id())
+                .headers(h -> h.setBearerAuth(ADMIN_TOKEN))
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$.slug")
+                .isEqualTo("gpt-5-eu");
 
         webTestClient
-            .get()
-            .uri("/admin/llm/models")
-            .headers(h -> h.setBearerAuth(ADMIN_TOKEN))
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody()
-            .jsonPath("$.length()")
-            .isEqualTo(1);
+                .get()
+                .uri("/admin/llm/models")
+                .headers(h -> h.setBearerAuth(ADMIN_TOKEN))
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$.length()")
+                .isEqualTo(1);
 
         var updateRequest = new UpdateLlmModelRequestDTO("Renamed Model", null, null, null, null);
         webTestClient
-            .patch()
-            .uri("/admin/llm/models/{id}", created.id())
-            .headers(h -> h.setBearerAuth(ADMIN_TOKEN))
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(updateRequest)
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody()
-            .jsonPath("$.displayName")
-            .isEqualTo("Renamed Model");
+                .patch()
+                .uri("/admin/llm/models/{id}", created.id())
+                .headers(h -> h.setBearerAuth(ADMIN_TOKEN))
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(updateRequest)
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$.displayName")
+                .isEqualTo("Renamed Model");
 
         webTestClient
-            .delete()
-            .uri("/admin/llm/models/{id}", created.id())
-            .headers(h -> h.setBearerAuth(ADMIN_TOKEN))
-            .exchange()
-            .expectStatus()
-            .isNoContent();
+                .delete()
+                .uri("/admin/llm/models/{id}", created.id())
+                .headers(h -> h.setBearerAuth(ADMIN_TOKEN))
+                .exchange()
+                .expectStatus()
+                .isNoContent();
 
         webTestClient
-            .get()
-            .uri("/admin/llm/models/{id}", created.id())
-            .headers(h -> h.setBearerAuth(ADMIN_TOKEN))
-            .exchange()
-            .expectStatus()
-            .isNotFound();
+                .get()
+                .uri("/admin/llm/models/{id}", created.id())
+                .headers(h -> h.setBearerAuth(ADMIN_TOKEN))
+                .exchange()
+                .expectStatus()
+                .isNotFound();
     }
 
     @Test
@@ -126,43 +124,31 @@ class LlmModelAdminControllerIntegrationTest extends AbstractWorkspaceIntegratio
         LlmModelDTO model = createModel(connection.getId(), "reprice-model");
 
         var firstPrice = new UpdateLlmModelPriceRequestDTO(
-            PricingMode.PRICED,
-            new BigDecimal("1.00"),
-            new BigDecimal("2.00"),
-            null,
-            null,
-            null
-        );
+                PricingMode.PRICED, new BigDecimal("1.00"), new BigDecimal("2.00"), null, null, null);
         webTestClient
-            .put()
-            .uri("/admin/llm/models/{id}/price", model.id())
-            .headers(h -> h.setBearerAuth(ADMIN_TOKEN))
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(firstPrice)
-            .exchange()
-            .expectStatus()
-            .isOk();
+                .put()
+                .uri("/admin/llm/models/{id}/price", model.id())
+                .headers(h -> h.setBearerAuth(ADMIN_TOKEN))
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(firstPrice)
+                .exchange()
+                .expectStatus()
+                .isOk();
 
         var secondPrice = new UpdateLlmModelPriceRequestDTO(
-            PricingMode.PRICED,
-            new BigDecimal("3.00"),
-            new BigDecimal("4.00"),
-            null,
-            null,
-            null
-        );
+                PricingMode.PRICED, new BigDecimal("3.00"), new BigDecimal("4.00"), null, null, null);
         LlmModelDTO afterSecondPrice = webTestClient
-            .put()
-            .uri("/admin/llm/models/{id}/price", model.id())
-            .headers(h -> h.setBearerAuth(ADMIN_TOKEN))
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(secondPrice)
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody(LlmModelDTO.class)
-            .returnResult()
-            .getResponseBody();
+                .put()
+                .uri("/admin/llm/models/{id}/price", model.id())
+                .headers(h -> h.setBearerAuth(ADMIN_TOKEN))
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(secondPrice)
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody(LlmModelDTO.class)
+                .returnResult()
+                .getResponseBody();
 
         assertThat(afterSecondPrice).isNotNull();
         assertThat(afterSecondPrice.currentPrice()).isNotNull();
@@ -170,17 +156,18 @@ class LlmModelAdminControllerIntegrationTest extends AbstractWorkspaceIntegratio
         assertThat(afterSecondPrice.currentPrice().per1mOutputUsd()).isEqualByComparingTo("4.00");
 
         LlmModelDTO fetched = webTestClient
-            .get()
-            .uri("/admin/llm/models/{id}", model.id())
-            .headers(h -> h.setBearerAuth(ADMIN_TOKEN))
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody(LlmModelDTO.class)
-            .returnResult()
-            .getResponseBody();
+                .get()
+                .uri("/admin/llm/models/{id}", model.id())
+                .headers(h -> h.setBearerAuth(ADMIN_TOKEN))
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody(LlmModelDTO.class)
+                .returnResult()
+                .getResponseBody();
         assertThat(fetched).isNotNull();
-        assertThat(Objects.requireNonNull(fetched.currentPrice()).per1mInputUsd()).isEqualByComparingTo("3.00");
+        assertThat(Objects.requireNonNull(fetched.currentPrice()).per1mInputUsd())
+                .isEqualByComparingTo("3.00");
     }
 
     @Test
@@ -195,17 +182,17 @@ class LlmModelAdminControllerIntegrationTest extends AbstractWorkspaceIntegratio
 
         var grantRequest = new UpdateLlmModelSharingRequestDTO(ModelVisibility.GRANTED, List.of(workspaceA.getId()));
         LlmModelDTO afterGrant = webTestClient
-            .put()
-            .uri("/admin/llm/models/{id}/sharing", model.id())
-            .headers(h -> h.setBearerAuth(ADMIN_TOKEN))
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(grantRequest)
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody(LlmModelDTO.class)
-            .returnResult()
-            .getResponseBody();
+                .put()
+                .uri("/admin/llm/models/{id}/sharing", model.id())
+                .headers(h -> h.setBearerAuth(ADMIN_TOKEN))
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(grantRequest)
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody(LlmModelDTO.class)
+                .returnResult()
+                .getResponseBody();
 
         assertThat(afterGrant).isNotNull();
         assertThat(afterGrant.visibility()).isEqualTo(ModelVisibility.GRANTED);
@@ -214,33 +201,33 @@ class LlmModelAdminControllerIntegrationTest extends AbstractWorkspaceIntegratio
 
         var replaceRequest = new UpdateLlmModelSharingRequestDTO(ModelVisibility.GRANTED, List.of(workspaceB.getId()));
         LlmModelDTO afterReplace = webTestClient
-            .put()
-            .uri("/admin/llm/models/{id}/sharing", model.id())
-            .headers(h -> h.setBearerAuth(ADMIN_TOKEN))
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(replaceRequest)
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody(LlmModelDTO.class)
-            .returnResult()
-            .getResponseBody();
+                .put()
+                .uri("/admin/llm/models/{id}/sharing", model.id())
+                .headers(h -> h.setBearerAuth(ADMIN_TOKEN))
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(replaceRequest)
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody(LlmModelDTO.class)
+                .returnResult()
+                .getResponseBody();
         assertThat(afterReplace).isNotNull();
         assertThat(afterReplace.grantedWorkspaceIds()).containsExactly(workspaceB.getId());
 
         var publicRequest = new UpdateLlmModelSharingRequestDTO(ModelVisibility.PUBLIC, null);
         LlmModelDTO afterPublic = webTestClient
-            .put()
-            .uri("/admin/llm/models/{id}/sharing", model.id())
-            .headers(h -> h.setBearerAuth(ADMIN_TOKEN))
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(publicRequest)
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody(LlmModelDTO.class)
-            .returnResult()
-            .getResponseBody();
+                .put()
+                .uri("/admin/llm/models/{id}/sharing", model.id())
+                .headers(h -> h.setBearerAuth(ADMIN_TOKEN))
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(publicRequest)
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody(LlmModelDTO.class)
+                .returnResult()
+                .getResponseBody();
         assertThat(afterPublic).isNotNull();
         assertThat(afterPublic.visibility()).isEqualTo(ModelVisibility.PUBLIC);
         assertThat(afterPublic.grantedWorkspaceIds()).isEmpty();
@@ -252,13 +239,8 @@ class LlmModelAdminControllerIntegrationTest extends AbstractWorkspaceIntegratio
         LlmModelDTO model = createModel(connection.getId(), "bound-model");
 
         User owner = persistUser("delete-guard-owner");
-        Workspace workspace = createWorkspace(
-            "delete-guard-ws",
-            "Delete Guard",
-            "delete-guard-org",
-            AccountType.ORG,
-            owner
-        );
+        Workspace workspace =
+                createWorkspace("delete-guard-ws", "Delete Guard", "delete-guard-org", AccountType.ORG, owner);
         WorkspaceAgentBinding binding = new WorkspaceAgentBinding();
         binding.setWorkspace(workspace);
         binding.setPurpose(AgentPurpose.PRACTICE_REVIEW);
@@ -266,12 +248,12 @@ class LlmModelAdminControllerIntegrationTest extends AbstractWorkspaceIntegratio
         agentBindingRepository.save(binding);
 
         webTestClient
-            .delete()
-            .uri("/admin/llm/models/{id}", model.id())
-            .headers(h -> h.setBearerAuth(ADMIN_TOKEN))
-            .exchange()
-            .expectStatus()
-            .isEqualTo(409);
+                .delete()
+                .uri("/admin/llm/models/{id}", model.id())
+                .headers(h -> h.setBearerAuth(ADMIN_TOKEN))
+                .exchange()
+                .expectStatus()
+                .isEqualTo(409);
     }
 
     @Test
@@ -287,36 +269,36 @@ class LlmModelAdminControllerIntegrationTest extends AbstractWorkspaceIntegratio
         createModel(connection.getId(), "dup-first");
 
         webTestClient
-            .post()
-            .uri("/admin/llm/connections/{connectionId}/models", connection.getId())
-            .headers(h -> h.setBearerAuth(ADMIN_TOKEN))
-            .contentType(MediaType.APPLICATION_JSON)
-            // Different slug, SAME upstream model id as "dup-first" — only the upstream-id guard can
-            // reject this, so a pass cannot be the slug-conflict handler answering by accident.
-            .bodyValue(new CreateLlmModelRequestDTO("dup-second", "Test Model", "gpt-5", null, null, null, false))
-            .exchange()
-            .expectStatus()
-            .isEqualTo(409)
-            .expectHeader()
-            .contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON)
-            .expectBody()
-            .jsonPath("$.status")
-            .isEqualTo(409)
-            .jsonPath("$.title")
-            .isEqualTo("LLM model upstream id conflict")
-            .jsonPath("$.detail")
-            .value(detail -> assertThat((String) detail).contains("gpt-5"));
+                .post()
+                .uri("/admin/llm/connections/{connectionId}/models", connection.getId())
+                .headers(h -> h.setBearerAuth(ADMIN_TOKEN))
+                .contentType(MediaType.APPLICATION_JSON)
+                // Different slug, SAME upstream model id as "dup-first" — only the upstream-id guard can
+                // reject this, so a pass cannot be the slug-conflict handler answering by accident.
+                .bodyValue(new CreateLlmModelRequestDTO("dup-second", "Test Model", "gpt-5", null, null, null, false))
+                .exchange()
+                .expectStatus()
+                .isEqualTo(409)
+                .expectHeader()
+                .contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON)
+                .expectBody()
+                .jsonPath("$.status")
+                .isEqualTo(409)
+                .jsonPath("$.title")
+                .isEqualTo("LLM model upstream id conflict")
+                .jsonPath("$.detail")
+                .value(detail -> assertThat((String) detail).contains("gpt-5"));
     }
 
     @Test
     void nonAdminIsForbidden() {
         webTestClient
-            .get()
-            .uri("/admin/llm/models")
-            .headers(h -> h.setBearerAuth(MENTOR_TOKEN))
-            .exchange()
-            .expectStatus()
-            .isForbidden();
+                .get()
+                .uri("/admin/llm/models")
+                .headers(h -> h.setBearerAuth(MENTOR_TOKEN))
+                .exchange()
+                .expectStatus()
+                .isForbidden();
     }
 
     private LlmModel llmModelFromRepository(Long id) {

@@ -10,7 +10,6 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.atLeastOnce;
-import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -66,11 +65,7 @@ class GitLabDeletionSweepServiceTest extends BaseUnitTest {
 
     /** The committed operation document each connection prefix is listed by. */
     private static final Map<String, String> LISTING_DOCUMENTS = Map.of(
-        "project.issues",
-        "GetProjectIssueNumbers",
-        "project.mergeRequests",
-        "GetProjectMergeRequestNumbers"
-    );
+            "project.issues", "GetProjectIssueNumbers", "project.mergeRequests", "GetProjectMergeRequestNumbers");
 
     @Mock
     private IssueRepository issueRepository;
@@ -101,32 +96,26 @@ class GitLabDeletionSweepServiceTest extends BaseUnitTest {
     @BeforeEach
     void setUp() {
         GitLabProperties properties = new GitLabProperties(
-            "https://gitlab.com",
-            Duration.ofSeconds(30),
-            Duration.ofSeconds(60),
-            Duration.ZERO,
-            Duration.ofMinutes(5)
-        );
+                "https://gitlab.com",
+                Duration.ofSeconds(30),
+                Duration.ofSeconds(60),
+                Duration.ZERO,
+                Duration.ofMinutes(5));
 
         service = new GitLabDeletionSweepService(
-            issueRepository,
-            repositoryRepository,
-            graphQlClientProvider,
-            responseHandler,
-            properties
-        );
+                issueRepository, repositoryRepository, graphQlClientProvider, responseHandler, properties);
 
         lenient().when(graphQlClientProvider.forScope(SCOPE_ID)).thenReturn(client);
         lenient().when(graphQlClientProvider.getRateLimitRemaining(SCOPE_ID)).thenReturn(100);
         lenient().when(client.documentName(anyString())).thenReturn(requestSpec);
         lenient().when(requestSpec.variable(anyString(), any())).thenReturn(requestSpec);
         lenient()
-            .when(requestSpec.execute())
-            .thenAnswer(invocation -> scriptedResponses.isEmpty() ? Mono.empty() : scriptedResponses.poll());
+                .when(requestSpec.execute())
+                .thenAnswer(invocation -> scriptedResponses.isEmpty() ? Mono.empty() : scriptedResponses.poll());
         // Default: every valid response is CONTINUE. Individual tests override for the invalid ones.
         lenient()
-            .when(responseHandler.handle(any(), anyString(), any()))
-            .thenReturn(new HandleResult(HandleResult.Action.CONTINUE, null));
+                .when(responseHandler.handle(any(), anyString(), any()))
+                .thenReturn(new HandleResult(HandleResult.Action.CONTINUE, null));
     }
 
     private static Repository repository() {
@@ -142,11 +131,7 @@ class GitLabDeletionSweepServiceTest extends BaseUnitTest {
 
     private ClientGraphQlResponse mergeRequestPage(List<Integer> iids, boolean hasNextPage, int count) {
         return page(
-            "project.mergeRequests",
-            iids,
-            new GitLabPageInfo(hasNextPage, hasNextPage ? "cursor" : null),
-            count
-        );
+                "project.mergeRequests", iids, new GitLabPageInfo(hasNextPage, hasNextPage ? "cursor" : null), count);
     }
 
     /** A valid response whose connection carries the given IIDs, count and pageInfo, at {@code prefix}. */
@@ -159,10 +144,9 @@ class GitLabDeletionSweepServiceTest extends BaseUnitTest {
         lenient().when(response.field(prefix + ".count")).thenReturn(countField);
 
         ClientResponseField nodesField = mock(ClientResponseField.class);
-        List<Map<String, Object>> nodes = iids
-            .stream()
-            .map(iid -> Map.<String, Object>of("iid", String.valueOf(iid)))
-            .toList();
+        List<Map<String, Object>> nodes = iids.stream()
+                .map(iid -> Map.<String, Object>of("iid", String.valueOf(iid)))
+                .toList();
         String document = LISTING_DOCUMENTS.get(prefix);
         assertNotNull(document);
         assertVendorCouldReturn(GITLAB, document, prefix + ".nodes", nodes);
@@ -196,16 +180,9 @@ class GitLabDeletionSweepServiceTest extends BaseUnitTest {
     }
 
     private ClientGraphQlResponse mergeRequestPage(
-        List<Integer> iids,
-        boolean hasNextPage,
-        int count,
-        Boolean mergeRequestsEnabled
-    ) {
+            List<Integer> iids, boolean hasNextPage, int count, Boolean mergeRequestsEnabled) {
         return withFlag(
-            mergeRequestPage(iids, hasNextPage, count),
-            "project.mergeRequestsEnabled",
-            mergeRequestsEnabled
-        );
+                mergeRequestPage(iids, hasNextPage, count), "project.mergeRequestsEnabled", mergeRequestsEnabled);
     }
 
     /** Both entity classes report an empty, provably-complete upstream — the inert default. */
@@ -215,8 +192,12 @@ class GitLabDeletionSweepServiceTest extends BaseUnitTest {
     }
 
     private void stubLocalNumbers(List<Integer> issues, List<Integer> mergeRequests) {
-        lenient().when(issueRepository.findLiveIssueNumbersByRepositoryId(REPO_ID)).thenReturn(issues);
-        lenient().when(issueRepository.findLivePullRequestNumbersByRepositoryId(REPO_ID)).thenReturn(mergeRequests);
+        lenient()
+                .when(issueRepository.findLiveIssueNumbersByRepositoryId(REPO_ID))
+                .thenReturn(issues);
+        lenient()
+                .when(issueRepository.findLivePullRequestNumbersByRepositoryId(REPO_ID))
+                .thenReturn(mergeRequests);
     }
 
     /**
@@ -226,11 +207,8 @@ class GitLabDeletionSweepServiceTest extends BaseUnitTest {
      */
     private void verifyNothingTombstoned() {
         verify(issueRepository, never()).tombstoneIssuesByRepositoryIdAndNumbers(anyLong(), anyCollection(), any());
-        verify(issueRepository, never()).tombstonePullRequestsByRepositoryIdAndNumbers(
-            anyLong(),
-            anyCollection(),
-            any()
-        );
+        verify(issueRepository, never())
+                .tombstonePullRequestsByRepositoryIdAndNumbers(anyLong(), anyCollection(), any());
     }
 
     @Nested
@@ -243,18 +221,14 @@ class GitLabDeletionSweepServiceTest extends BaseUnitTest {
             scriptedResponses.add(Mono.just(issuePage(List.of(1, 3), false, 2)));
             scriptedResponses.add(Mono.just(mergeRequestPage(List.of(), false, 0)));
             stubLocalNumbers(List.of(1, 2, 3), List.of());
-            when(issueRepository.tombstoneIssuesByRepositoryIdAndNumbers(anyLong(), anyCollection(), any())).thenReturn(
-                1
-            );
+            when(issueRepository.tombstoneIssuesByRepositoryIdAndNumbers(anyLong(), anyCollection(), any()))
+                    .thenReturn(1);
 
             var outcome = service.sweepRepository(SCOPE_ID, repository(), handle);
 
             ArgumentCaptor<Collection<Integer>> captor = ArgumentCaptor.captor();
-            verify(issueRepository).tombstoneIssuesByRepositoryIdAndNumbers(
-                eq(REPO_ID),
-                captor.capture(),
-                any(Instant.class)
-            );
+            verify(issueRepository)
+                    .tombstoneIssuesByRepositoryIdAndNumbers(eq(REPO_ID), captor.capture(), any(Instant.class));
             assertThat(captor.getValue()).containsExactly(2);
             assertThat(outcome.issuesTombstoned()).isEqualTo(1);
             assertThat(outcome.skipped()).isFalse();
@@ -267,18 +241,14 @@ class GitLabDeletionSweepServiceTest extends BaseUnitTest {
             scriptedResponses.add(Mono.just(issuePage(List.of(), false, 0)));
             scriptedResponses.add(Mono.just(mergeRequestPage(List.of(10), false, 1)));
             stubLocalNumbers(List.of(), List.of(10, 11));
-            when(
-                issueRepository.tombstonePullRequestsByRepositoryIdAndNumbers(anyLong(), anyCollection(), any())
-            ).thenReturn(1);
+            when(issueRepository.tombstonePullRequestsByRepositoryIdAndNumbers(anyLong(), anyCollection(), any()))
+                    .thenReturn(1);
 
             var outcome = service.sweepRepository(SCOPE_ID, repository(), handle);
 
             ArgumentCaptor<Collection<Integer>> captor = ArgumentCaptor.captor();
-            verify(issueRepository).tombstonePullRequestsByRepositoryIdAndNumbers(
-                eq(REPO_ID),
-                captor.capture(),
-                any(Instant.class)
-            );
+            verify(issueRepository)
+                    .tombstonePullRequestsByRepositoryIdAndNumbers(eq(REPO_ID), captor.capture(), any(Instant.class));
             assertThat(captor.getValue()).containsExactly(11);
             assertThat(outcome.mergeRequestsTombstoned()).isEqualTo(1);
         }
@@ -322,15 +292,15 @@ class GitLabDeletionSweepServiceTest extends BaseUnitTest {
         void shouldNotTombstoneAnIssueInsertedByWebhookWhileTheListingWasRunning() {
             List<Integer> mirror = new ArrayList<>(List.of(1, 3));
             lenient()
-                .when(issueRepository.findLiveIssueNumbersByRepositoryId(REPO_ID))
-                .thenAnswer(invocation -> List.copyOf(mirror));
-            lenient().when(issueRepository.findLivePullRequestNumbersByRepositoryId(REPO_ID)).thenReturn(List.of());
-            scriptedResponses.add(
-                Mono.fromSupplier(() -> {
-                    mirror.add(4); // the webhook insert, landing mid-listing
-                    return issuePage(List.of(1, 3), false, 2);
-                })
-            );
+                    .when(issueRepository.findLiveIssueNumbersByRepositoryId(REPO_ID))
+                    .thenAnswer(invocation -> List.copyOf(mirror));
+            lenient()
+                    .when(issueRepository.findLivePullRequestNumbersByRepositoryId(REPO_ID))
+                    .thenReturn(List.of());
+            scriptedResponses.add(Mono.fromSupplier(() -> {
+                mirror.add(4); // the webhook insert, landing mid-listing
+                return issuePage(List.of(1, 3), false, 2);
+            }));
             scriptedResponses.add(Mono.just(mergeRequestPage(List.of(), false, 0)));
 
             var outcome = service.sweepRepository(SCOPE_ID, repository(), handle);
@@ -346,28 +316,24 @@ class GitLabDeletionSweepServiceTest extends BaseUnitTest {
             // started and upstream does not have it, so it is a genuine deletion.
             List<Integer> mirror = new ArrayList<>(List.of(1, 2, 3));
             lenient()
-                .when(issueRepository.findLiveIssueNumbersByRepositoryId(REPO_ID))
-                .thenAnswer(invocation -> List.copyOf(mirror));
-            lenient().when(issueRepository.findLivePullRequestNumbersByRepositoryId(REPO_ID)).thenReturn(List.of());
-            scriptedResponses.add(
-                Mono.fromSupplier(() -> {
-                    mirror.add(4);
-                    return issuePage(List.of(1, 3), false, 2);
-                })
-            );
+                    .when(issueRepository.findLiveIssueNumbersByRepositoryId(REPO_ID))
+                    .thenAnswer(invocation -> List.copyOf(mirror));
+            lenient()
+                    .when(issueRepository.findLivePullRequestNumbersByRepositoryId(REPO_ID))
+                    .thenReturn(List.of());
+            scriptedResponses.add(Mono.fromSupplier(() -> {
+                mirror.add(4);
+                return issuePage(List.of(1, 3), false, 2);
+            }));
             scriptedResponses.add(Mono.just(mergeRequestPage(List.of(), false, 0)));
-            when(issueRepository.tombstoneIssuesByRepositoryIdAndNumbers(anyLong(), anyCollection(), any())).thenReturn(
-                1
-            );
+            when(issueRepository.tombstoneIssuesByRepositoryIdAndNumbers(anyLong(), anyCollection(), any()))
+                    .thenReturn(1);
 
             var outcome = service.sweepRepository(SCOPE_ID, repository(), handle);
 
             ArgumentCaptor<Collection<Integer>> captor = ArgumentCaptor.captor();
-            verify(issueRepository).tombstoneIssuesByRepositoryIdAndNumbers(
-                eq(REPO_ID),
-                captor.capture(),
-                any(Instant.class)
-            );
+            verify(issueRepository)
+                    .tombstoneIssuesByRepositoryIdAndNumbers(eq(REPO_ID), captor.capture(), any(Instant.class));
             assertThat(captor.getValue()).containsExactly(2);
             assertThat(outcome.issuesTombstoned()).isEqualTo(1);
         }
@@ -416,9 +382,8 @@ class GitLabDeletionSweepServiceTest extends BaseUnitTest {
             // A GraphQL error / auth failure / complexity rejection — the handler says ABORT.
             ClientGraphQlResponse invalid = mock(ClientGraphQlResponse.class);
             lenient().when(invalid.isValid()).thenReturn(false);
-            when(responseHandler.handle(eq(invalid), anyString(), any())).thenReturn(
-                new HandleResult(HandleResult.Action.ABORT, null)
-            );
+            when(responseHandler.handle(eq(invalid), anyString(), any()))
+                    .thenReturn(new HandleResult(HandleResult.Action.ABORT, null));
             scriptedResponses.add(Mono.just(invalid));
             scriptedResponses.add(Mono.just(mergeRequestPage(List.of(), false, 0)));
             stubLocalNumbers(List.of(1, 2, 3), List.of());
@@ -453,7 +418,10 @@ class GitLabDeletionSweepServiceTest extends BaseUnitTest {
             lenient().when(countField.getValue()).thenReturn(1);
             lenient().when(response.field("project.issues.count")).thenReturn(countField);
             ClientResponseField nodesField = mock(ClientResponseField.class);
-            lenient().doReturn(List.of(Map.of("iid", "not-a-number"))).when(nodesField).toEntityList(Map.class);
+            lenient()
+                    .doReturn(List.of(Map.of("iid", "not-a-number")))
+                    .when(nodesField)
+                    .toEntityList(Map.class);
             lenient().when(response.field("project.issues.nodes")).thenReturn(nodesField);
             ClientResponseField pageInfoField = mock(ClientResponseField.class);
             lenient().when(pageInfoField.toEntity(GitLabPageInfo.class)).thenReturn(new GitLabPageInfo(false, null));
@@ -476,9 +444,8 @@ class GitLabDeletionSweepServiceTest extends BaseUnitTest {
             scriptedResponses.add(Mono.just(issuePage(List.of(1), false, 900))); // count mismatch → skip
             scriptedResponses.add(Mono.just(mergeRequestPage(List.of(10), false, 1)));
             stubLocalNumbers(List.of(1, 2), List.of(10, 11));
-            when(
-                issueRepository.tombstonePullRequestsByRepositoryIdAndNumbers(anyLong(), anyCollection(), any())
-            ).thenReturn(1);
+            when(issueRepository.tombstonePullRequestsByRepositoryIdAndNumbers(anyLong(), anyCollection(), any()))
+                    .thenReturn(1);
 
             var outcome = service.sweepRepository(SCOPE_ID, repository(), handle);
 
@@ -486,11 +453,8 @@ class GitLabDeletionSweepServiceTest extends BaseUnitTest {
             assertThat(outcome.mergeRequestsTombstoned()).isEqualTo(1);
             assertThat(outcome.skipped()).isTrue();
             verify(issueRepository, never()).tombstoneIssuesByRepositoryIdAndNumbers(anyLong(), anyCollection(), any());
-            verify(issueRepository, times(1)).tombstonePullRequestsByRepositoryIdAndNumbers(
-                anyLong(),
-                anyCollection(),
-                any()
-            );
+            verify(issueRepository, times(1))
+                    .tombstonePullRequestsByRepositoryIdAndNumbers(anyLong(), anyCollection(), any());
         }
 
         @Test
@@ -612,18 +576,14 @@ class GitLabDeletionSweepServiceTest extends BaseUnitTest {
             scriptedResponses.add(Mono.just(issuePage(List.of(1, 3), false, 2, true)));
             scriptedResponses.add(Mono.just(mergeRequestPage(List.of(), false, 0, true)));
             stubLocalNumbers(List.of(1, 2, 3), List.of());
-            when(issueRepository.tombstoneIssuesByRepositoryIdAndNumbers(anyLong(), anyCollection(), any())).thenReturn(
-                1
-            );
+            when(issueRepository.tombstoneIssuesByRepositoryIdAndNumbers(anyLong(), anyCollection(), any()))
+                    .thenReturn(1);
 
             var outcome = service.sweepRepository(SCOPE_ID, repository(), handle);
 
             ArgumentCaptor<Collection<Integer>> captor = ArgumentCaptor.captor();
-            verify(issueRepository).tombstoneIssuesByRepositoryIdAndNumbers(
-                eq(REPO_ID),
-                captor.capture(),
-                any(Instant.class)
-            );
+            verify(issueRepository)
+                    .tombstoneIssuesByRepositoryIdAndNumbers(eq(REPO_ID), captor.capture(), any(Instant.class));
             assertThat(captor.getValue()).containsExactly(2);
             assertThat(outcome.issuesTombstoned()).isEqualTo(1);
             assertThat(outcome.skipped()).isFalse();
@@ -693,11 +653,8 @@ class GitLabDeletionSweepServiceTest extends BaseUnitTest {
 
             service.sweepScope(SCOPE_ID, handle);
 
-            verify(handle, atLeastOnce()).progress(
-                any(),
-                any(),
-                ArgumentMatchers.argThat(progress -> progress.phase() == SyncPhase.SWEEP)
-            );
+            verify(handle, atLeastOnce())
+                    .progress(any(), any(), ArgumentMatchers.argThat(progress -> progress.phase() == SyncPhase.SWEEP));
         }
 
         @Test

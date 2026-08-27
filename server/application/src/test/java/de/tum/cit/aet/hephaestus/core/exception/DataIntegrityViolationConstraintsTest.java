@@ -15,24 +15,19 @@ class DataIntegrityViolationConstraintsTest extends BaseUnitTest {
         var cause = new ConstraintViolationException("duplicate", new SQLException(), "UK_PRACTICE_WORKSPACE_SLUG");
         var exception = new DataIntegrityViolationException("save failed", new RuntimeException(cause));
 
-        assertThat(DataIntegrityViolationConstraints.hasName(exception, "uk_practice_workspace_slug")).isTrue();
+        assertThat(DataIntegrityViolationConstraints.hasName(exception, "uk_practice_workspace_slug"))
+                .isTrue();
     }
 
     @Test
     void rejectsDifferentOrUnnamedIntegrityViolations() {
         var cause = new ConstraintViolationException("duplicate", new SQLException(), "some_other_constraint");
 
-        assertThat(
-            DataIntegrityViolationConstraints.hasName(
-                new DataIntegrityViolationException("save failed", cause),
-                "uk_practice_workspace_slug"
-            )
-        ).isFalse();
-        assertThat(
-            DataIntegrityViolationConstraints.hasName(
-                new DataIntegrityViolationException("save failed"),
-                "uk_practice_workspace_slug"
-            )
-        ).isFalse();
+        assertThat(DataIntegrityViolationConstraints.hasName(
+                        new DataIntegrityViolationException("save failed", cause), "uk_practice_workspace_slug"))
+                .isFalse();
+        assertThat(DataIntegrityViolationConstraints.hasName(
+                        new DataIntegrityViolationException("save failed"), "uk_practice_workspace_slug"))
+                .isFalse();
     }
 }

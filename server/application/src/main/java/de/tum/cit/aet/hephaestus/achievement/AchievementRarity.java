@@ -40,7 +40,6 @@ public enum AchievementRarity {
     /**
      * Comparator that sorts by rarity from lowest to highest (common -> mythic).
      */
-    public static final Comparator<AchievementRarity> RARITY_COMPARATOR = Comparator.comparingInt(
-        AchievementRarity::getRank
-    );
+    public static final Comparator<AchievementRarity> RARITY_COMPARATOR =
+            Comparator.comparingInt(AchievementRarity::getRank);
 }

@@ -62,10 +62,9 @@ public class InAppFeedbackPreparer {
     private final FeedbackSupersession supersession;
 
     public InAppFeedbackPreparer(
-        FeedbackRepository feedbackRepository,
-        FeedbackObservationRepository feedbackObservationRepository,
-        FeedbackSupersession supersession
-    ) {
+            FeedbackRepository feedbackRepository,
+            FeedbackObservationRepository feedbackObservationRepository,
+            FeedbackSupersession supersession) {
         this.feedbackRepository = feedbackRepository;
         this.feedbackObservationRepository = feedbackObservationRepository;
         this.supersession = supersession;
@@ -79,10 +78,7 @@ public class InAppFeedbackPreparer {
      *     withholding to explain, it is a message that was never owed.
      */
     public record RoutedMessage(
-        ComposedInAppMessage message,
-        InAppRoutingDecision decision,
-        List<Observation> evidence
-    ) {}
+            ComposedInAppMessage message, InAppRoutingDecision decision, List<Observation> evidence) {}
 
     /**
      * Prepare IN_APP units for one recipient in one cycle. Runs REQUIRES_NEW so a preparation failure is
@@ -101,31 +97,21 @@ public class InAppFeedbackPreparer {
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public int prepare(
-        UUID agentJobId,
-        Long workspaceId,
-        Long recipientUserId,
-        List<RoutedMessage> routed,
-        int positionBase
-    ) {
+            UUID agentJobId, Long workspaceId, Long recipientUserId, List<RoutedMessage> routed, int positionBase) {
         if (routed.isEmpty()) {
             return 0;
         }
         int lastOrdinal = positionBase + routed.size() - 1;
-        if (
-            lastOrdinal >=
-            FeedbackLedgerRecorder.IN_APP_UNIT_ORDINAL_BASE + FeedbackLedgerRecorder.UNIT_ORDINAL_BAND_WIDTH
-        ) {
+        if (lastOrdinal
+                >= FeedbackLedgerRecorder.IN_APP_UNIT_ORDINAL_BASE + FeedbackLedgerRecorder.UNIT_ORDINAL_BAND_WIDTH) {
             // Overflowing the band would address the next band's rows and silently drop these writes.
             // A cycle with this many composed messages, or this many recipients, is pathological — fail
             // loudly rather than write into somebody else's ordinals.
-            throw new IllegalStateException(
-                "In-app units exceed the ordinal band: jobId=" +
-                    agentJobId +
-                    ", lastOrdinal=" +
-                    lastOrdinal +
-                    ", band=" +
-                    FeedbackLedgerRecorder.UNIT_ORDINAL_BAND_WIDTH
-            );
+            throw new IllegalStateException("In-app units exceed the ordinal band: jobId=" + agentJobId
+                    + ", lastOrdinal="
+                    + lastOrdinal
+                    + ", band="
+                    + FeedbackLedgerRecorder.UNIT_ORDINAL_BAND_WIDTH);
         }
         Instant now = Instant.now();
         int position = positionBase;
@@ -144,22 +130,18 @@ public class InAppFeedbackPreparer {
                 continue;
             }
             ComposedInAppMessage message = routedMessage.message();
-            String threadKey = FeedbackThreadKey.forPractice(
-                message.practiceSlug(),
-                recipientUserId,
-                FeedbackChannel.IN_APP
-            );
+            String threadKey =
+                    FeedbackThreadKey.forPractice(message.practiceSlug(), recipientUserId, FeedbackChannel.IN_APP);
             // The claim and the write below are one swap, and this method's REQUIRES_NEW transaction is
             // what makes them one: a retired card with no replacement leaves the recipient with less than
             // they had before the run.
             FeedbackSupersession.Outcome outcome = supersedes(message, threadKey)
-                ? supersession.supersede(workspaceId, recipientUserId, FeedbackChannel.IN_APP, threadKey)
-                : FeedbackSupersession.Outcome.standalone();
+                    ? supersession.supersede(workspaceId, recipientUserId, FeedbackChannel.IN_APP, threadKey)
+                    : FeedbackSupersession.Outcome.standalone();
             if (outcome.retiredSomething()) {
                 superseded++;
             }
-            Feedback unit = feedbackRepository.save(
-                Feedback.builder()
+            Feedback unit = feedbackRepository.save(Feedback.builder()
                     .agentJobId(agentJobId)
                     .workspaceId(workspaceId)
                     // Unanchored on purpose: the message is about a habit across several pieces of work,
@@ -180,30 +162,24 @@ public class InAppFeedbackPreparer {
                     // its predecessor was read still follows it.
                     .replacesId(outcome.replacesId())
                     .createdAt(now)
-                    .build()
-            );
+                    .build());
             int ordinal = 0;
             for (Observation observation : routedMessage.evidence()) {
                 if (observation.getId() == null) {
                     continue;
                 }
                 feedbackObservationRepository.insertIfAbsent(
-                    unit.getId(),
-                    observation.getId(),
-                    EvidenceRole.PRIMARY.name(),
-                    ordinal++
-                );
+                        unit.getId(), observation.getId(), EvidenceRole.PRIMARY.name(), ordinal++);
             }
             prepared++;
         }
         if (prepared > 0) {
             log.info(
-                "In-app feedback prepared: jobId={}, recipientUserId={}, units={}, superseded={}",
-                agentJobId,
-                recipientUserId,
-                prepared,
-                superseded
-            );
+                    "In-app feedback prepared: jobId={}, recipientUserId={}, units={}, superseded={}",
+                    agentJobId,
+                    recipientUserId,
+                    prepared,
+                    superseded);
         }
         return prepared;
     }
@@ -231,9 +207,8 @@ public class InAppFeedbackPreparer {
             return true;
         }
         log.warn(
-            "In-app message named a supersession target on another habit's thread; written as new: practice={}",
-            message.practiceSlug()
-        );
+                "In-app message named a supersession target on another habit's thread; written as new: practice={}",
+                message.practiceSlug());
         return false;
     }
 }

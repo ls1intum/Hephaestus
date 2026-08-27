@@ -78,9 +78,8 @@ class GitLabTokenRotationClientTest extends BaseUnitTest {
             when(uriSpec.uri(anyString())).thenReturn(headersSpec);
             when(headersSpec.header(anyString(), anyString())).thenReturn(headersSpec);
             when(headersSpec.retrieve()).thenReturn(responseSpec);
-            when(responseSpec.bodyToMono(any(ParameterizedTypeReference.class))).thenReturn(
-                Mono.just(Map.of("id", 123, "name", "my-token", "expires_at", "2026-06-01"))
-            );
+            when(responseSpec.bodyToMono(any(ParameterizedTypeReference.class)))
+                    .thenReturn(Mono.just(Map.of("id", 123, "name", "my-token", "expires_at", "2026-06-01")));
 
             TokenInfo result = rotationClient.getTokenInfo(SCOPE_ID);
 
@@ -125,19 +124,12 @@ class GitLabTokenRotationClientTest extends BaseUnitTest {
             when(mockWebClient.get()).thenReturn(uriSpec);
             when(uriSpec.uri(anyString())).thenReturn(headersSpec);
             when(headersSpec.header(anyString(), anyString())).thenReturn(headersSpec);
-            when(headersSpec.retrieve()).thenThrow(
-                WebClientResponseException.create(
-                    401,
-                    "Unauthorized",
-                    HttpHeaders.EMPTY,
-                    new byte[0],
-                    StandardCharsets.UTF_8
-                )
-            );
+            when(headersSpec.retrieve())
+                    .thenThrow(WebClientResponseException.create(
+                            401, "Unauthorized", HttpHeaders.EMPTY, new byte[0], StandardCharsets.UTF_8));
 
-            assertThatThrownBy(() -> rotationClient.getTokenInfo(SCOPE_ID)).isInstanceOf(
-                WebClientResponseException.class
-            );
+            assertThatThrownBy(() -> rotationClient.getTokenInfo(SCOPE_ID))
+                    .isInstanceOf(WebClientResponseException.class);
         }
     }
 
@@ -157,9 +149,8 @@ class GitLabTokenRotationClientTest extends BaseUnitTest {
             Mockito.doReturn(bodySpec).when(bodySpec).header(anyString(), anyString());
             Mockito.doReturn(bodySpec).when(bodySpec).bodyValue(any());
             when(bodySpec.retrieve()).thenReturn(responseSpec);
-            when(responseSpec.bodyToMono(any(ParameterizedTypeReference.class))).thenReturn(
-                Mono.just(Map.of("token", "glpat-new-rotated-token", "expires_at", "2026-09-01"))
-            );
+            when(responseSpec.bodyToMono(any(ParameterizedTypeReference.class)))
+                    .thenReturn(Mono.just(Map.of("token", "glpat-new-rotated-token", "expires_at", "2026-09-01")));
 
             RotatedToken result = rotationClient.rotateToken(SCOPE_ID, LocalDate.of(2026, 9, 1));
 
@@ -188,8 +179,8 @@ class GitLabTokenRotationClientTest extends BaseUnitTest {
             when(responseSpec.bodyToMono(any(ParameterizedTypeReference.class))).thenReturn(Mono.just(responseMap));
 
             assertThatThrownBy(() -> rotationClient.rotateToken(SCOPE_ID, LocalDate.of(2026, 9, 1)))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("missing 'token' field");
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("missing 'token' field");
         }
 
         @Test
@@ -204,19 +195,12 @@ class GitLabTokenRotationClientTest extends BaseUnitTest {
             Mockito.doReturn(bodySpec).when(bodyUriSpec).uri(anyString());
             Mockito.doReturn(bodySpec).when(bodySpec).header(anyString(), anyString());
             Mockito.doReturn(bodySpec).when(bodySpec).bodyValue(any());
-            when(bodySpec.retrieve()).thenThrow(
-                WebClientResponseException.create(
-                    403,
-                    "Forbidden",
-                    HttpHeaders.EMPTY,
-                    new byte[0],
-                    StandardCharsets.UTF_8
-                )
-            );
+            when(bodySpec.retrieve())
+                    .thenThrow(WebClientResponseException.create(
+                            403, "Forbidden", HttpHeaders.EMPTY, new byte[0], StandardCharsets.UTF_8));
 
-            assertThatThrownBy(() -> rotationClient.rotateToken(SCOPE_ID, LocalDate.of(2026, 9, 1))).isInstanceOf(
-                WebClientResponseException.class
-            );
+            assertThatThrownBy(() -> rotationClient.rotateToken(SCOPE_ID, LocalDate.of(2026, 9, 1)))
+                    .isInstanceOf(WebClientResponseException.class);
         }
     }
 

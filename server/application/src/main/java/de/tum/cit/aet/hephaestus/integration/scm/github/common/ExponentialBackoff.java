@@ -128,7 +128,7 @@ public final class ExponentialBackoff {
      * @throws IllegalArgumentException if any parameter is negative
      */
     public static void sleep(int attempt, long baseDelayMs, long maxDelayMs, long maxJitterMs)
-        throws InterruptedException {
+            throws InterruptedException {
         Thread.sleep(calculateDelay(attempt, baseDelayMs, maxDelayMs, maxJitterMs));
     }
 

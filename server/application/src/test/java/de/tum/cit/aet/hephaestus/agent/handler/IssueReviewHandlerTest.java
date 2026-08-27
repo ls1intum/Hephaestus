@@ -1,38 +1,24 @@
 package de.tum.cit.aet.hephaestus.agent.handler;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
 import de.tum.cit.aet.hephaestus.agent.context.WorkspaceContextBuilder;
-import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.DeliveryContent;
 import de.tum.cit.aet.hephaestus.agent.handler.composition.FeedbackCompositionInputs;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobSubmission;
-import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
 import de.tum.cit.aet.hephaestus.agent.task.TaskEnvelopeWriter;
-import de.tum.cit.aet.hephaestus.config.ApplicationProperties;
 import de.tum.cit.aet.hephaestus.core.auth.spi.AccountPreferencesQuery;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.ObservationOrigin;
-import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties;
 import de.tum.cit.aet.hephaestus.practices.review.WorkspaceReviewDefaults;
 import de.tum.cit.aet.hephaestus.practices.review.WorkspaceReviewDefaultsProvider;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
@@ -40,20 +26,16 @@ import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitorRepository;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.nio.charset.StandardCharsets;
-import java.time.Instant;
 import java.util.EnumSet;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
-import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
-import tools.jackson.databind.node.ObjectNode;
 
 class IssueReviewHandlerTest extends BaseUnitTest {
 
@@ -97,30 +79,29 @@ class IssueReviewHandlerTest extends BaseUnitTest {
     void setUp() {
         silentModeEngaged = false;
         handler = new IssueReviewHandler(
-            objectMapper,
-            workspaceContextBuilder,
-            new TaskEnvelopeWriter(objectMapper),
-            new PracticeCatalogInjector(objectMapper, practiceRepository, workspaceDefaults()),
-            new PracticeDetectionResultParser(objectMapper),
-            new de.tum.cit.aet.hephaestus.agent.handler.composition.FeedbackCompositionResultParser(),
-            deliveryService,
-            // Real gate over the same mocked catalogue: with no practice rows, every slug is unknown and
-            // therefore admitted, so these tests exercise delivery rather than the autonomy.
-            new InContextDeliveryGate(
-                practiceRepository,
-                org.mockito.Mockito.mock(de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository.class),
+                objectMapper,
+                workspaceContextBuilder,
+                new TaskEnvelopeWriter(objectMapper),
+                new PracticeCatalogInjector(objectMapper, practiceRepository, workspaceDefaults()),
+                new PracticeDetectionResultParser(objectMapper),
+                new de.tum.cit.aet.hephaestus.agent.handler.composition.FeedbackCompositionResultParser(),
+                deliveryService,
+                // Real gate over the same mocked catalogue: with no practice rows, every slug is unknown and
+                // therefore admitted, so these tests exercise delivery rather than the autonomy.
+                new InContextDeliveryGate(
+                        practiceRepository,
+                        org.mockito.Mockito.mock(
+                                de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository.class),
+                        feedbackLedgerRecorder,
+                        workspaceDefaults()),
+                commentPoster,
                 feedbackLedgerRecorder,
-                workspaceDefaults()
-            ),
-            commentPoster,
-            feedbackLedgerRecorder,
-            mock(PracticeFeedbackDeliveryPolicy.class),
-            mock(PracticeFeedbackCommentFormatter.class),
-            mock(de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository.class)
-        );
+                mock(PracticeFeedbackDeliveryPolicy.class),
+                mock(PracticeFeedbackCommentFormatter.class),
+                mock(de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository.class));
         lenient()
-            .when(repositoryToMonitorRepository.existsByWorkspaceIdAndNameWithOwner(1L, "owner/repo"))
-            .thenReturn(true);
+                .when(repositoryToMonitorRepository.existsByWorkspaceIdAndNameWithOwner(1L, "owner/repo"))
+                .thenReturn(true);
         lenient().when(workspaceRepository.findById(1L)).thenReturn(Optional.of(activePracticeWorkspace()));
     }
 
@@ -133,17 +114,16 @@ class IssueReviewHandlerTest extends BaseUnitTest {
 
     private IssueReviewSubmissionRequest sampleRequest() {
         return new IssueReviewSubmissionRequest(
-            777L,
-            12,
-            123L,
-            "owner/repo",
-            "Add dark mode",
-            "Users want a dark theme toggle in settings.",
-            "OPEN",
-            "https://github.com/owner/repo/issues/12",
-            java.time.Instant.ofEpochMilli(1_700_000_000_000L),
-            null
-        );
+                777L,
+                12,
+                123L,
+                "owner/repo",
+                "Add dark mode",
+                "Users want a dark theme toggle in settings.",
+                "OPEN",
+                "https://github.com/owner/repo/issues/12",
+                java.time.Instant.ofEpochMilli(1_700_000_000_000L),
+                null);
     }
 
     @Nested
@@ -168,22 +148,22 @@ class IssueReviewHandlerTest extends BaseUnitTest {
         void theStagedRequestAllowsOnlyArtifactPlacement() {
             Map<String, byte[]> files = new LinkedHashMap<>();
             FeedbackCompositionInputs.stage(
-                files,
-                ObservationOrigin.LIVE,
-                IssueReviewHandler.ISSUE_REVIEW_CHANNELS,
-                EnumSet.of(FeedbackCompositionInputs.InContextPlacementKind.ARTIFACT)
-            );
+                    files,
+                    ObservationOrigin.LIVE,
+                    IssueReviewHandler.ISSUE_REVIEW_CHANNELS,
+                    EnumSet.of(FeedbackCompositionInputs.InContextPlacementKind.ARTIFACT));
 
             JsonNode request = objectMapper.readTree(
-                new String(files.get(SandboxLayout.FEEDBACK_COMPOSITION_PATH), StandardCharsets.UTF_8)
-            );
-            assertThat(
-                request.get("channels").get(FeedbackChannel.IN_CONTEXT.name()).get("enabled").asBoolean()
-            ).isTrue();
+                    new String(files.get(SandboxLayout.FEEDBACK_COMPOSITION_PATH), StandardCharsets.UTF_8));
+            assertThat(request.get("channels")
+                            .get(FeedbackChannel.IN_CONTEXT.name())
+                            .get("enabled")
+                            .asBoolean())
+                    .isTrue();
             assertThat(request.get("inContextPlacementKinds"))
-                .singleElement()
-                .extracting(JsonNode::asString)
-                .isEqualTo("ARTIFACT");
+                    .singleElement()
+                    .extracting(JsonNode::asString)
+                    .isEqualTo("ARTIFACT");
         }
     }
 
@@ -214,8 +194,8 @@ class IssueReviewHandlerTest extends BaseUnitTest {
         @Test
         void rejectsWrongRequestType() {
             assertThatThrownBy(() -> handler.createSubmission(new WrongRequest()))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("Expected IssueReviewSubmissionRequest");
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("Expected IssueReviewSubmissionRequest");
         }
     }
 

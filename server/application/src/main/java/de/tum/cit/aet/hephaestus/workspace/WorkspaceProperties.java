@@ -69,12 +69,11 @@ import org.springframework.validation.annotation.Validated;
 @Validated
 @ConfigurationProperties(prefix = "hephaestus.workspace")
 public record WorkspaceProperties(
-    @DefaultValue("false") boolean initDefault,
-    @Name("default") @Valid DefaultProperties defaultProperties,
-    @DefaultValue("false") boolean initGitlabDefault,
-    @Valid GitLabDefaultProperties gitlabDefault,
-    @DefaultValue("ADMIN_ONLY") CreationPolicy creationPolicy
-) {
+        @DefaultValue("false") boolean initDefault,
+        @Name("default") @Valid DefaultProperties defaultProperties,
+        @DefaultValue("false") boolean initGitlabDefault,
+        @Valid GitLabDefaultProperties gitlabDefault,
+        @DefaultValue("ADMIN_ONLY") CreationPolicy creationPolicy) {
     /**
      * Who may create workspaces via {@code POST /workspaces}. Defaults to {@code ADMIN_ONLY} (safe for
      * a shared instance); set {@code SELF_SERVICE} to let any authenticated user create one. This is
@@ -86,38 +85,33 @@ public record WorkspaceProperties(
     }
 
     public WorkspaceProperties(
-        boolean initDefault,
-        @Nullable DefaultProperties defaultProperties,
-        boolean initGitlabDefault,
-        @Nullable GitLabDefaultProperties gitlabDefault,
-        @Nullable CreationPolicy creationPolicy
-    ) {
+            boolean initDefault,
+            @Nullable DefaultProperties defaultProperties,
+            boolean initGitlabDefault,
+            @Nullable GitLabDefaultProperties gitlabDefault,
+            @Nullable CreationPolicy creationPolicy) {
         DefaultProperties normalizedDefault =
-            defaultProperties == null ? new DefaultProperties(null, null, List.of()) : defaultProperties;
+                defaultProperties == null ? new DefaultProperties(null, null, List.of()) : defaultProperties;
         GitLabDefaultProperties normalizedGitlab =
-            gitlabDefault == null ? new GitLabDefaultProperties(null, null, null) : gitlabDefault;
+                gitlabDefault == null ? new GitLabDefaultProperties(null, null, null) : gitlabDefault;
         if (initDefault) {
             if (normalizedDefault.login() == null || normalizedDefault.login().isBlank()) {
                 throw new IllegalStateException(
-                    "hephaestus.workspace.default.login must not be blank when init-default is true"
-                );
+                        "hephaestus.workspace.default.login must not be blank when init-default is true");
             }
             if (normalizedDefault.token() == null || normalizedDefault.token().isBlank()) {
                 throw new IllegalStateException(
-                    "hephaestus.workspace.default.token must not be blank when init-default is true"
-                );
+                        "hephaestus.workspace.default.token must not be blank when init-default is true");
             }
         }
         if (initGitlabDefault) {
             if (normalizedGitlab.login() == null || normalizedGitlab.login().isBlank()) {
                 throw new IllegalStateException(
-                    "hephaestus.workspace.gitlab-default.login must not be blank when init-gitlab-default is true"
-                );
+                        "hephaestus.workspace.gitlab-default.login must not be blank when init-gitlab-default is true");
             }
             if (normalizedGitlab.token() == null || normalizedGitlab.token().isBlank()) {
                 throw new IllegalStateException(
-                    "hephaestus.workspace.gitlab-default.token must not be blank when init-gitlab-default is true"
-                );
+                        "hephaestus.workspace.gitlab-default.token must not be blank when init-gitlab-default is true");
             }
         }
         this.initDefault = initDefault;
@@ -133,30 +127,26 @@ public record WorkspaceProperties(
         if (!initDefault) {
             return true;
         }
-        return (
-            defaultProperties != null &&
-            defaultProperties.login() != null &&
-            !defaultProperties.login().isBlank() &&
-            defaultProperties.token() != null &&
-            !defaultProperties.token().isBlank()
-        );
+        return (defaultProperties != null
+                && defaultProperties.login() != null
+                && !defaultProperties.login().isBlank()
+                && defaultProperties.token() != null
+                && !defaultProperties.token().isBlank());
     }
 
     @AssertTrue(
-        message = "When init-gitlab-default is true, gitlab-default.login and gitlab-default.token must not be blank"
-    )
+            message =
+                    "When init-gitlab-default is true, gitlab-default.login and gitlab-default.token must not be blank")
     @SuppressWarnings("PMD.UnusedPrivateMethod")
     private boolean isGitLabCredentialsValidWhenInitGitlabDefaultEnabled() {
         if (!initGitlabDefault) {
             return true;
         }
-        return (
-            gitlabDefault != null &&
-            gitlabDefault.login() != null &&
-            !gitlabDefault.login().isBlank() &&
-            gitlabDefault.token() != null &&
-            !gitlabDefault.token().isBlank()
-        );
+        return (gitlabDefault != null
+                && gitlabDefault.login() != null
+                && !gitlabDefault.login().isBlank()
+                && gitlabDefault.token() != null
+                && !gitlabDefault.token().isBlank());
     }
 
     /**
@@ -174,10 +164,7 @@ public record WorkspaceProperties(
      *                              to monitor in the default workspace (default: empty list)
      */
     public record DefaultProperties(
-        @Nullable String login,
-        @Nullable String token,
-        List<String> repositoriesToMonitor
-    ) {
+            @Nullable String login, @Nullable String token, List<String> repositoriesToMonitor) {
         /**
          * Compact constructor ensuring the repository list is never null.
          *
@@ -199,5 +186,8 @@ public record WorkspaceProperties(
      * @param token     the GitLab Group or Personal Access Token
      * @param serverUrl optional custom server URL for self-hosted GitLab instances
      */
-    public record GitLabDefaultProperties(@Nullable String login, @Nullable String token, @Nullable String serverUrl) {}
+    public record GitLabDefaultProperties(
+            @Nullable String login,
+            @Nullable String token,
+            @Nullable String serverUrl) {}
 }

@@ -41,13 +41,12 @@ public final class InAppFeedbackRouter {
     private InAppFeedbackRouter() {}
 
     public static InAppRoutingDecision route(
-        ComposedInAppMessage message,
-        List<Observation> evidence,
-        @Nullable PracticeAutonomy autonomy,
-        ActorRole subjectRole,
-        @Nullable Instant lastSurfaced,
-        Instant now
-    ) {
+            ComposedInAppMessage message,
+            List<Observation> evidence,
+            @Nullable PracticeAutonomy autonomy,
+            ActorRole subjectRole,
+            @Nullable Instant lastSurfaced,
+            Instant now) {
         if (!message.isComplete()) {
             return InAppRoutingDecision.INCOMPLETE;
         }
@@ -86,8 +85,8 @@ public final class InAppFeedbackRouter {
      */
     private static ObservationOrigin weakestOrigin(List<Observation> problems) {
         return problems.stream().anyMatch(o -> o.getOrigin() != ObservationOrigin.BACKFILL)
-            ? ObservationOrigin.LIVE
-            : ObservationOrigin.BACKFILL;
+                ? ObservationOrigin.LIVE
+                : ObservationOrigin.BACKFILL;
     }
 
     /**
@@ -100,11 +99,10 @@ public final class InAppFeedbackRouter {
      * was done well — which reads as a false accusation to the one person who knows it is false.
      */
     public static List<Observation> problemsIn(List<Observation> evidence) {
-        return evidence
-            .stream()
-            .filter(o -> o.getPresence() != null && o.getPresence().carriesValence())
-            .filter(o -> o.getAssessment() == Assessment.BAD)
-            .toList();
+        return evidence.stream()
+                .filter(o -> o.getPresence() != null && o.getPresence().carriesValence())
+                .filter(o -> o.getAssessment() == Assessment.BAD)
+                .toList();
     }
 
     /** How many separate pieces of work carry the problem — the unit of proof at the process level. */

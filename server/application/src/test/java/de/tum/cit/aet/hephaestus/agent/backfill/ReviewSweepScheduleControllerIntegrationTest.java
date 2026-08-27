@@ -55,13 +55,13 @@ class ReviewSweepScheduleControllerIntegrationTest extends AbstractWorkspaceInte
     @Test
     void refusesAnAnonymousCaller() {
         webTestClient
-            .post()
-            .uri(SCHEDULES, workspace.getWorkspaceSlug())
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(body("scm.pull_request", "DAILY", 2))
-            .exchange()
-            .expectStatus()
-            .isForbidden();
+                .post()
+                .uri(SCHEDULES, workspace.getWorkspaceSlug())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(body("scm.pull_request", "DAILY", 2))
+                .exchange()
+                .expectStatus()
+                .isForbidden();
     }
 
     /** Membership is not authority to commit the workspace's budget every night. */
@@ -72,29 +72,29 @@ class ReviewSweepScheduleControllerIntegrationTest extends AbstractWorkspaceInte
         ensureWorkspaceMembership(workspace, member, WorkspaceRole.MEMBER);
 
         webTestClient
-            .post()
-            .uri(SCHEDULES, workspace.getWorkspaceSlug())
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(body("scm.pull_request", "DAILY", 2))
-            .exchange()
-            .expectStatus()
-            .isForbidden();
+                .post()
+                .uri(SCHEDULES, workspace.getWorkspaceSlug())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(body("scm.pull_request", "DAILY", 2))
+                .exchange()
+                .expectStatus()
+                .isForbidden();
     }
 
     @Test
     void anAdminCreatesAScheduleThatIsAlreadyDue() {
         post(body("scm.pull_request", "DAILY", 2))
-            .expectStatus()
-            .isCreated()
-            .expectBody()
-            .jsonPath("$.cadence")
-            .isEqualTo("DAILY")
-            .jsonPath("$.lookbackDays")
-            .isEqualTo(2)
-            .jsonPath("$.enabled")
-            .isEqualTo(true)
-            .jsonPath("$.lastRunAt")
-            .doesNotExist();
+                .expectStatus()
+                .isCreated()
+                .expectBody()
+                .jsonPath("$.cadence")
+                .isEqualTo("DAILY")
+                .jsonPath("$.lookbackDays")
+                .isEqualTo(2)
+                .jsonPath("$.enabled")
+                .isEqualTo(true)
+                .jsonPath("$.lastRunAt")
+                .doesNotExist();
 
         ReviewSweepSchedule saved = scheduleRepository.findAll().getFirst();
         // So an admin who has just described a sweep can watch one happen rather than take it on faith.
@@ -130,19 +130,19 @@ class ReviewSweepScheduleControllerIntegrationTest extends AbstractWorkspaceInte
         UUID scheduleId = scheduleRepository.findAll().getFirst().getId();
 
         webTestClient
-            .put()
-            .uri(SCHEDULES + "/{id}", workspace.getWorkspaceSlug(), scheduleId)
-            .headers(asAdminAccount())
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(Map.of("cadence", "WEEKLY", "lookbackDays", 7, "enabled", false))
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody()
-            .jsonPath("$.cadence")
-            .isEqualTo("WEEKLY")
-            .jsonPath("$.enabled")
-            .isEqualTo(false);
+                .put()
+                .uri(SCHEDULES + "/{id}", workspace.getWorkspaceSlug(), scheduleId)
+                .headers(asAdminAccount())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(Map.of("cadence", "WEEKLY", "lookbackDays", 7, "enabled", false))
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$.cadence")
+                .isEqualTo("WEEKLY")
+                .jsonPath("$.enabled")
+                .isEqualTo(false);
     }
 
     @Test
@@ -151,12 +151,12 @@ class ReviewSweepScheduleControllerIntegrationTest extends AbstractWorkspaceInte
         UUID scheduleId = scheduleRepository.findAll().getFirst().getId();
 
         webTestClient
-            .delete()
-            .uri(SCHEDULES + "/{id}", workspace.getWorkspaceSlug(), scheduleId)
-            .headers(asAdminAccount())
-            .exchange()
-            .expectStatus()
-            .isNoContent();
+                .delete()
+                .uri(SCHEDULES + "/{id}", workspace.getWorkspaceSlug(), scheduleId)
+                .headers(asAdminAccount())
+                .exchange()
+                .expectStatus()
+                .isNoContent();
 
         assertThat(scheduleRepository.findAll()).isEmpty();
     }
@@ -164,22 +164,22 @@ class ReviewSweepScheduleControllerIntegrationTest extends AbstractWorkspaceInte
     @Test
     void aScheduleFromAnotherWorkspaceIsNotFound() {
         webTestClient
-            .delete()
-            .uri(SCHEDULES + "/{id}", workspace.getWorkspaceSlug(), UUID.randomUUID())
-            .headers(asAdminAccount())
-            .exchange()
-            .expectStatus()
-            .isNotFound();
+                .delete()
+                .uri(SCHEDULES + "/{id}", workspace.getWorkspaceSlug(), UUID.randomUUID())
+                .headers(asAdminAccount())
+                .exchange()
+                .expectStatus()
+                .isNotFound();
     }
 
     private WebTestClient.ResponseSpec post(Map<String, Object> body) {
         return webTestClient
-            .post()
-            .uri(SCHEDULES, workspace.getWorkspaceSlug())
-            .headers(asAdminAccount())
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(body)
-            .exchange();
+                .post()
+                .uri(SCHEDULES, workspace.getWorkspaceSlug())
+                .headers(asAdminAccount())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(body)
+                .exchange();
     }
 
     private static java.util.function.Consumer<HttpHeaders> asAdminAccount() {

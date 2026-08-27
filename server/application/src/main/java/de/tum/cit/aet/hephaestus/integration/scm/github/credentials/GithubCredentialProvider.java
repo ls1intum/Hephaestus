@@ -39,10 +39,9 @@ public class GithubCredentialProvider implements ApiCredentialProvider {
     private final GitHubAppTokenService appTokenService;
 
     public GithubCredentialProvider(
-        ConnectionService connectionService,
-        CredentialBundleConverter credentialConverter,
-        GitHubAppTokenService appTokenService
-    ) {
+            ConnectionService connectionService,
+            CredentialBundleConverter credentialConverter,
+            GitHubAppTokenService appTokenService) {
         this.connectionService = connectionService;
         this.credentialConverter = credentialConverter;
         this.appTokenService = appTokenService;
@@ -71,21 +70,18 @@ public class GithubCredentialProvider implements ApiCredentialProvider {
                 Long installationId = appCfg.installationId();
                 if (installationId == null) {
                     log.warn(
-                        "GitHub App Connection {} is ACTIVE but has no installationId — skipping credential resolution",
-                        connection.getInstanceKey()
-                    );
+                            "GitHub App Connection {} is ACTIVE but has no installationId — skipping credential resolution",
+                            connection.getInstanceKey());
                     yield Optional.empty();
                 }
-                yield Optional.of(
-                    new InstallationCredential(installationId, String.valueOf(appTokenService.getConfiguredAppId()))
-                );
+                yield Optional.of(new InstallationCredential(
+                        installationId, String.valueOf(appTokenService.getConfiguredAppId())));
             }
             case ConnectionConfig.GitHubPatConfig ignored -> {
                 if (connection.getCredentialsEncrypted() == null) {
                     log.warn(
-                        "GitHub PAT Connection {} has no credentials blob — cannot resolve token",
-                        connection.getInstanceKey()
-                    );
+                            "GitHub PAT Connection {} has no credentials blob — cannot resolve token",
+                            connection.getInstanceKey());
                     yield Optional.empty();
                 }
                 yield connection.credentials(credentialConverter);

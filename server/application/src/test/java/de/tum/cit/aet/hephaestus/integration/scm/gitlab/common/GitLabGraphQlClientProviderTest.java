@@ -45,12 +45,7 @@ class GitLabGraphQlClientProviderTest extends BaseUnitTest {
     @BeforeEach
     void setUp() {
         provider = new GitLabGraphQlClientProvider(
-            baseClient,
-            tokenService,
-            circuitBreaker,
-            rateLimitTracker,
-            clientFactory
-        );
+                baseClient, tokenService, circuitBreaker, rateLimitTracker, clientFactory);
     }
 
     @Nested
@@ -62,26 +57,24 @@ class GitLabGraphQlClientProviderTest extends BaseUnitTest {
             when(tokenService.resolveServerUrl(1L)).thenReturn("https://gitlab.example.com");
 
             HttpGraphQlClient builtClient = mock(HttpGraphQlClient.class);
-            when(
-                clientFactory.withBearerTokenAndAttribute(
-                    baseClient,
-                    "https://gitlab.example.com/api/graphql",
-                    "glpat-test-token",
-                    GitLabGraphQlClientProvider.SCOPE_ID_ATTRIBUTE,
-                    1L
-                )
-            ).thenReturn(builtClient);
+            when(clientFactory.withBearerTokenAndAttribute(
+                            baseClient,
+                            "https://gitlab.example.com/api/graphql",
+                            "glpat-test-token",
+                            GitLabGraphQlClientProvider.SCOPE_ID_ATTRIBUTE,
+                            1L))
+                    .thenReturn(builtClient);
 
             HttpGraphQlClient result = provider.forScope(1L);
 
             assertThat(result).isSameAs(builtClient);
-            verify(clientFactory).withBearerTokenAndAttribute(
-                baseClient,
-                "https://gitlab.example.com/api/graphql",
-                "glpat-test-token",
-                GitLabGraphQlClientProvider.SCOPE_ID_ATTRIBUTE,
-                1L
-            );
+            verify(clientFactory)
+                    .withBearerTokenAndAttribute(
+                            baseClient,
+                            "https://gitlab.example.com/api/graphql",
+                            "glpat-test-token",
+                            GitLabGraphQlClientProvider.SCOPE_ID_ATTRIBUTE,
+                            1L);
         }
 
         @Test
@@ -98,9 +91,8 @@ class GitLabGraphQlClientProviderTest extends BaseUnitTest {
         @Test
         void shouldBuildClientWithProvidedTokenAndUrl() {
             HttpGraphQlClient builtClient = mock(HttpGraphQlClient.class);
-            when(
-                clientFactory.withBearerToken(baseClient, "https://gitlab.com/api/graphql", "glpat-direct")
-            ).thenReturn(builtClient);
+            when(clientFactory.withBearerToken(baseClient, "https://gitlab.com/api/graphql", "glpat-direct"))
+                    .thenReturn(builtClient);
 
             HttpGraphQlClient result = provider.withToken("glpat-direct", "https://gitlab.com");
 

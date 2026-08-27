@@ -61,13 +61,12 @@ public class GitHubRepositorySyncService {
     private static final int MAX_RETRY_ATTEMPTS = 3;
 
     public GitHubRepositorySyncService(
-        GitHubGraphQlClientProvider graphQlClientProvider,
-        RepositoryRepository repositoryRepository,
-        OrganizationRepository organizationRepository,
-        GitHubSyncProperties syncProperties,
-        GitHubExceptionClassifier exceptionClassifier,
-        GitHubGraphQlSyncCoordinator graphQlSyncHelper
-    ) {
+            GitHubGraphQlClientProvider graphQlClientProvider,
+            RepositoryRepository repositoryRepository,
+            OrganizationRepository organizationRepository,
+            GitHubSyncProperties syncProperties,
+            GitHubExceptionClassifier exceptionClassifier,
+            GitHubGraphQlSyncCoordinator graphQlSyncHelper) {
         this.graphQlClientProvider = graphQlClientProvider;
         this.repositoryRepository = repositoryRepository;
         this.organizationRepository = organizationRepository;
@@ -93,19 +92,14 @@ public class GitHubRepositorySyncService {
      * Internal implementation with retry counter to prevent infinite recursion.
      */
     private Optional<Repository> syncRepositoryWithRetry(
-        Long scopeId,
-        String nameWithOwner,
-        IdentityProvider provider,
-        int retryAttempt
-    ) {
+            Long scopeId, String nameWithOwner, IdentityProvider provider, int retryAttempt) {
         String safeNameWithOwner = Objects.requireNonNull(sanitizeForLog(nameWithOwner));
         Optional<RepositoryOwnerAndName> parsedName = GitHubRepositoryNameParser.parse(nameWithOwner);
         if (parsedName.isEmpty()) {
             log.warn(
-                "Skipped repository sync: reason=invalidNameFormat, scopeId={}, repoName={}",
-                scopeId,
-                safeNameWithOwner
-            );
+                    "Skipped repository sync: reason=invalidNameFormat, scopeId={}, repoName={}",
+                    scopeId,
+                    safeNameWithOwner);
             return Optional.empty();
         }
         String repoOwner = parsedName.get().owner();
@@ -113,51 +107,41 @@ public class GitHubRepositorySyncService {
 
         try {
             HttpGraphQlClient client = graphQlClientProvider.forScope(scopeId);
-            ClientGraphQlResponse response = Mono.defer(() ->
-                client.documentName(QUERY_DOCUMENT).variable("owner", repoOwner).variable("name", repoName).execute()
-            )
-                .retryWhen(
-                    Retry.backoff(TRANSPORT_MAX_RETRIES, TRANSPORT_INITIAL_BACKOFF)
-                        .maxBackoff(TRANSPORT_MAX_BACKOFF)
-                        .jitter(JITTER_FACTOR)
-                        .filter(ScmTransportErrors::isTransportError)
-                        .doBeforeRetry(signal ->
-                            log.warn(
-                                "Retrying repository sync after transport error: repoName={}, attempt={}, error={}",
-                                safeNameWithOwner,
-                                signal.totalRetries() + 1,
-                                signal.failure().getMessage()
-                            )
-                        )
-                )
-                .block(syncProperties.graphqlTimeout());
+            ClientGraphQlResponse response = Mono.defer(() -> client.documentName(QUERY_DOCUMENT)
+                            .variable("owner", repoOwner)
+                            .variable("name", repoName)
+                            .execute())
+                    .retryWhen(Retry.backoff(TRANSPORT_MAX_RETRIES, TRANSPORT_INITIAL_BACKOFF)
+                            .maxBackoff(TRANSPORT_MAX_BACKOFF)
+                            .jitter(JITTER_FACTOR)
+                            .filter(ScmTransportErrors::isTransportError)
+                            .doBeforeRetry(signal -> log.warn(
+                                    "Retrying repository sync after transport error: repoName={}, attempt={}, error={}",
+                                    safeNameWithOwner,
+                                    signal.totalRetries() + 1,
+                                    signal.failure().getMessage())))
+                    .block(syncProperties.graphqlTimeout());
 
             if (response == null || !response.isValid()) {
                 ClassificationResult classification = graphQlSyncHelper.classifyGraphQlErrors(response);
                 if (classification != null) {
-                    if (
-                        graphQlSyncHelper.handleGraphQlClassification(
-                            new GraphQlClassificationContext(
-                                classification,
-                                retryAttempt,
-                                MAX_RETRY_ATTEMPTS,
-                                "repository sync",
-                                "repoName",
-                                safeNameWithOwner,
-                                log
-                            )
-                        )
-                    ) {
+                    if (graphQlSyncHelper.handleGraphQlClassification(new GraphQlClassificationContext(
+                            classification,
+                            retryAttempt,
+                            MAX_RETRY_ATTEMPTS,
+                            "repository sync",
+                            "repoName",
+                            safeNameWithOwner,
+                            log))) {
                         return syncRepositoryWithRetry(scopeId, nameWithOwner, provider, retryAttempt + 1);
                     }
                     return Optional.empty();
                 }
                 log.warn(
-                    "Failed to fetch repository: scopeId={}, repoName={}, errors={}",
-                    scopeId,
-                    safeNameWithOwner,
-                    response != null ? response.getErrors() : "null response"
-                );
+                        "Failed to fetch repository: scopeId={}, repoName={}, errors={}",
+                        scopeId,
+                        safeNameWithOwner,
+                        response != null ? response.getErrors() : "null response");
                 return Optional.empty();
             }
 
@@ -165,15 +149,8 @@ public class GitHubRepositorySyncService {
             graphQlClientProvider.trackRateLimit(scopeId, response);
 
             if (graphQlClientProvider.isRateLimitCritical(scopeId)) {
-                if (
-                    !graphQlSyncHelper.waitForRateLimitIfNeeded(
-                        scopeId,
-                        "repository sync",
-                        "repoName",
-                        safeNameWithOwner,
-                        log
-                    )
-                ) {
+                if (!graphQlSyncHelper.waitForRateLimitIfNeeded(
+                        scopeId, "repository sync", "repoName", safeNameWithOwner, log)) {
                     return Optional.empty();
                 }
             }
@@ -186,10 +163,9 @@ public class GitHubRepositorySyncService {
                 // caller relies on the exception to decide whether it is safe to remove a
                 // user-configured monitoring row. See ADR-0012 and pass-14 incident.
                 log.warn(
-                    "Skipped repository sync: reason=notFoundOnGitHub, scopeId={}, repoName={}",
-                    scopeId,
-                    safeNameWithOwner
-                );
+                        "Skipped repository sync: reason=notFoundOnGitHub, scopeId={}, repoName={}",
+                        scopeId,
+                        safeNameWithOwner);
                 throw new RepositoryNotFoundOnGitProviderException(nameWithOwner);
             }
 
@@ -198,19 +174,19 @@ public class GitHubRepositorySyncService {
             Organization organization = ensureOrganization(owner, provider);
 
             // Create or update repository using typed accessors
-            Long githubDatabaseId = repoData.getDatabaseId() != null ? repoData.getDatabaseId().longValue() : null;
+            Long githubDatabaseId =
+                    repoData.getDatabaseId() != null ? repoData.getDatabaseId().longValue() : null;
             if (githubDatabaseId == null) {
                 log.warn(
-                    "Skipped repository sync: reason=missingDatabaseId, scopeId={}, repoName={}",
-                    scopeId,
-                    safeNameWithOwner
-                );
+                        "Skipped repository sync: reason=missingDatabaseId, scopeId={}, repoName={}",
+                        scopeId,
+                        safeNameWithOwner);
                 return Optional.empty();
             }
 
             Repository repository = repositoryRepository
-                .findByNativeIdAndProviderId(githubDatabaseId, Objects.requireNonNull(provider.getId()))
-                .orElseGet(Repository::new);
+                    .findByNativeIdAndProviderId(githubDatabaseId, Objects.requireNonNull(provider.getId()))
+                    .orElseGet(Repository::new);
 
             repository.setNativeId(githubDatabaseId);
             repository.setProvider(provider);
@@ -242,7 +218,8 @@ public class GitHubRepositorySyncService {
             }
 
             if (repoData.getVisibility() != null) {
-                repository.setVisibility(Repository.Visibility.valueOf(repoData.getVisibility().name()));
+                repository.setVisibility(
+                        Repository.Visibility.valueOf(repoData.getVisibility().name()));
             } else {
                 repository.setVisibility(Repository.Visibility.PRIVATE);
             }
@@ -251,11 +228,10 @@ public class GitHubRepositorySyncService {
 
             repository = repositoryRepository.save(repository);
             log.info(
-                "Synced repository: scopeId={}, repoId={}, repoName={}",
-                scopeId,
-                repository.getId(),
-                safeNameWithOwner
-            );
+                    "Synced repository: scopeId={}, repoId={}, repoName={}",
+                    scopeId,
+                    repository.getId(),
+                    safeNameWithOwner);
 
             return Optional.of(repository);
         } catch (InstallationNotFoundException | RepositoryNotFoundOnGitProviderException e) {
@@ -264,17 +240,14 @@ public class GitHubRepositorySyncService {
             throw e;
         } catch (Exception e) {
             ClassificationResult classification = exceptionClassifier.classifyWithDetails(e);
-            graphQlSyncHelper.handleGraphQlClassification(
-                new GraphQlClassificationContext(
+            graphQlSyncHelper.handleGraphQlClassification(new GraphQlClassificationContext(
                     classification,
                     retryAttempt,
                     MAX_RETRY_ATTEMPTS,
                     "repository sync",
                     "repoName",
                     safeNameWithOwner,
-                    log
-                )
-            );
+                    log));
             return Optional.empty();
         }
     }
@@ -301,20 +274,16 @@ public class GitHubRepositorySyncService {
             String login = graphQlOrg.getLogin();
             String name = graphQlOrg.getName() != null ? graphQlOrg.getName() : login;
             String url = graphQlOrg.getUrl() != null ? graphQlOrg.getUrl().toString() : null;
-            String avatarUrl = graphQlOrg.getAvatarUrl() != null ? graphQlOrg.getAvatarUrl().toString() : null;
+            String avatarUrl = graphQlOrg.getAvatarUrl() != null
+                    ? graphQlOrg.getAvatarUrl().toString()
+                    : null;
 
             // Use upsert for thread-safe concurrent inserts
             organizationRepository.upsert(
-                databaseId,
-                Objects.requireNonNull(provider.getId()),
-                login,
-                name,
-                avatarUrl,
-                url
-            );
+                    databaseId, Objects.requireNonNull(provider.getId()), login, name, avatarUrl, url);
             return organizationRepository
-                .findByNativeIdAndProviderId(databaseId, Objects.requireNonNull(provider.getId()))
-                .orElse(null);
+                    .findByNativeIdAndProviderId(databaseId, Objects.requireNonNull(provider.getId()))
+                    .orElse(null);
         } else if (owner instanceof GHUser graphQlUser) {
             // User repositories - create a "virtual" organization from the user
             Integer dbId = graphQlUser.getDatabaseId();
@@ -326,20 +295,16 @@ public class GitHubRepositorySyncService {
             String login = graphQlUser.getLogin();
             String name = graphQlUser.getName() != null ? graphQlUser.getName() : login;
             String url = graphQlUser.getUrl() != null ? graphQlUser.getUrl().toString() : null;
-            String avatarUrl = graphQlUser.getAvatarUrl() != null ? graphQlUser.getAvatarUrl().toString() : null;
+            String avatarUrl = graphQlUser.getAvatarUrl() != null
+                    ? graphQlUser.getAvatarUrl().toString()
+                    : null;
 
             // Use upsert for thread-safe concurrent inserts
             organizationRepository.upsert(
-                databaseId,
-                Objects.requireNonNull(provider.getId()),
-                login,
-                name,
-                avatarUrl,
-                url
-            );
+                    databaseId, Objects.requireNonNull(provider.getId()), login, name, avatarUrl, url);
             return organizationRepository
-                .findByNativeIdAndProviderId(databaseId, Objects.requireNonNull(provider.getId()))
-                .orElse(null);
+                    .findByNativeIdAndProviderId(databaseId, Objects.requireNonNull(provider.getId()))
+                    .orElse(null);
         }
 
         return null;

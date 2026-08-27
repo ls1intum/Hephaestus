@@ -45,11 +45,10 @@ public class GitHubMilestoneProcessor {
     private final ApplicationEventPublisher eventPublisher;
 
     public GitHubMilestoneProcessor(
-        MilestoneRepository milestoneRepository,
-        IssueRepository issueRepository,
-        GitHubUserProcessor gitHubUserProcessor,
-        ApplicationEventPublisher eventPublisher
-    ) {
+            MilestoneRepository milestoneRepository,
+            IssueRepository issueRepository,
+            GitHubUserProcessor gitHubUserProcessor,
+            ApplicationEventPublisher eventPublisher) {
         this.milestoneRepository = milestoneRepository;
         this.issueRepository = issueRepository;
         this.gitHubUserProcessor = gitHubUserProcessor;
@@ -74,16 +73,14 @@ public class GitHubMilestoneProcessor {
      */
     @Transactional
     public @Nullable Milestone process(
-        @Nullable GitHubMilestoneDTO dto,
-        Repository repository,
-        @Nullable GitHubUserDTO creatorDto,
-        ProcessingContext context
-    ) {
+            @Nullable GitHubMilestoneDTO dto,
+            Repository repository,
+            @Nullable GitHubUserDTO creatorDto,
+            ProcessingContext context) {
         if (dto == null) {
             log.warn(
-                "Skipped milestone processing: reason=nullDto, repoId={}",
-                repository != null ? repository.getId() : null
-            );
+                    "Skipped milestone processing: reason=nullDto, repoId={}",
+                    repository != null ? repository.getId() : null);
             return null;
         }
 
@@ -94,10 +91,8 @@ public class GitHubMilestoneProcessor {
 
         // Always look up by number within the repository to avoid duplicates.
         // The milestone number is unique within a repository and is the canonical identifier.
-        Optional<Milestone> existingOpt = milestoneRepository.findByNumberAndRepositoryId(
-            dto.number(),
-            repository.getId()
-        );
+        Optional<Milestone> existingOpt =
+                milestoneRepository.findByNumberAndRepositoryId(dto.number(), repository.getId());
         boolean isNew = existingOpt.isEmpty();
 
         Milestone milestone = existingOpt.orElseGet(Milestone::new);
@@ -224,23 +219,25 @@ public class GitHubMilestoneProcessor {
         }
 
         milestoneRepository
-            .findByNativeIdAndProviderId(nativeId, Objects.requireNonNull(context.providerId()))
-            .ifPresent(milestone -> {
-                Long milestoneId = milestone.getId();
-                // Clean up issue references via direct database UPDATE before deletion.
-                // Using issueRepository.clearMilestoneReferences() instead of milestone.removeAllIssues()
-                // because the in-memory collection may be stale or not fully loaded.
-                int clearedCount = issueRepository.clearMilestoneReferences(milestoneId);
-                if (clearedCount > 0) {
-                    log.debug("Cleared milestone references from {} issues before deletion", clearedCount);
-                }
+                .findByNativeIdAndProviderId(nativeId, Objects.requireNonNull(context.providerId()))
+                .ifPresent(milestone -> {
+                    Long milestoneId = milestone.getId();
+                    // Clean up issue references via direct database UPDATE before deletion.
+                    // Using issueRepository.clearMilestoneReferences() instead of milestone.removeAllIssues()
+                    // because the in-memory collection may be stale or not fully loaded.
+                    int clearedCount = issueRepository.clearMilestoneReferences(milestoneId);
+                    if (clearedCount > 0) {
+                        log.debug("Cleared milestone references from {} issues before deletion", clearedCount);
+                    }
 
-                milestoneRepository.delete(milestone);
-                eventPublisher.publishEvent(
-                    new ScmDomainEvent.MilestoneDeleted(milestoneId, milestone.getTitle(), EventContext.from(context))
-                );
-                log.info("Deleted milestone: milestoneId={}, milestoneNumber={}", milestoneId, milestone.getNumber());
-            });
+                    milestoneRepository.delete(milestone);
+                    eventPublisher.publishEvent(new ScmDomainEvent.MilestoneDeleted(
+                            milestoneId, milestone.getTitle(), EventContext.from(context)));
+                    log.info(
+                            "Deleted milestone: milestoneId={}, milestoneNumber={}",
+                            milestoneId,
+                            milestone.getNumber());
+                });
     }
 
     /**
@@ -249,8 +246,7 @@ public class GitHubMilestoneProcessor {
     private Milestone.State parseState(String state) {
         if (state == null) {
             log.warn(
-                "Milestone state is null, defaulting to OPEN. This may indicate missing data in webhook or GraphQL response."
-            );
+                    "Milestone state is null, defaulting to OPEN. This may indicate missing data in webhook or GraphQL response.");
             return Milestone.State.OPEN;
         }
         return switch (state.toUpperCase()) {

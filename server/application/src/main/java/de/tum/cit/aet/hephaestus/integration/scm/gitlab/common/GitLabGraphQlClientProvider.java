@@ -34,12 +34,11 @@ public class GitLabGraphQlClientProvider {
     private final SilentModeGraphQlClientFactory clientFactory;
 
     public GitLabGraphQlClientProvider(
-        @Qualifier("gitLabGraphQlClient") HttpGraphQlClient gitLabGraphQlClient,
-        GitLabTokenService tokenService,
-        @Qualifier("gitlabGraphQlCircuitBreaker") CircuitBreaker circuitBreaker,
-        GitLabRateLimitTracker rateLimitTracker,
-        SilentModeGraphQlClientFactory clientFactory
-    ) {
+            @Qualifier("gitLabGraphQlClient") HttpGraphQlClient gitLabGraphQlClient,
+            GitLabTokenService tokenService,
+            @Qualifier("gitlabGraphQlCircuitBreaker") CircuitBreaker circuitBreaker,
+            GitLabRateLimitTracker rateLimitTracker,
+            SilentModeGraphQlClientFactory clientFactory) {
         this.baseClient = gitLabGraphQlClient;
         this.tokenService = tokenService;
         this.circuitBreaker = circuitBreaker;
@@ -103,12 +102,7 @@ public class GitLabGraphQlClientProvider {
         String serverUrl = tokenService.resolveServerUrl(scopeId);
 
         return clientFactory.withBearerTokenAndAttribute(
-            baseClient,
-            serverUrl + GITLAB_GRAPHQL_PATH,
-            token,
-            SCOPE_ID_ATTRIBUTE,
-            scopeId
-        );
+                baseClient, serverUrl + GITLAB_GRAPHQL_PATH, token, SCOPE_ID_ATTRIBUTE, scopeId);
     }
 
     /**

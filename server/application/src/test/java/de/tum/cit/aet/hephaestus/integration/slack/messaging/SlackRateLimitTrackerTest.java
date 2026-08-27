@@ -40,7 +40,8 @@ class SlackRateLimitTrackerTest extends BaseUnitTest {
         RateLimitSnapshot snapshot = tracker.snapshot(WORKSPACE_ID);
         assertThat(snapshot).isNotNull();
         assertThat(snapshot.throttledUntil()).isNotNull();
-        assertThat(snapshot.throttledUntil()).isBetween(before.plusSeconds(60), Instant.now().plusSeconds(60));
+        assertThat(snapshot.throttledUntil())
+                .isBetween(before.plusSeconds(60), Instant.now().plusSeconds(60));
         assertThat(snapshot.observedAt()).isBetween(before, Instant.now());
     }
 

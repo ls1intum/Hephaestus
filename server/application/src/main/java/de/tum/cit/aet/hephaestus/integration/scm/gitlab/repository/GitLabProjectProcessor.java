@@ -60,10 +60,7 @@ public class GitLabProjectProcessor {
     @Transactional
     @Nullable
     public Repository processGraphQlResponse(
-        @Nullable GitLabProjectResponse project,
-        @Nullable Organization organization,
-        IdentityProvider provider
-    ) {
+            @Nullable GitLabProjectResponse project, @Nullable Organization organization, IdentityProvider provider) {
         if (project == null || project.id() == null || project.fullPath() == null || project.webUrl() == null) {
             log.warn("Skipped project processing: reason=nullOrMissingFields");
             return null;
@@ -78,8 +75,8 @@ public class GitLabProjectProcessor {
         }
 
         Repository repository = repositoryRepository
-            .findByNativeIdAndProviderId(nativeId, Objects.requireNonNull(provider.getId()))
-            .orElseGet(Repository::new);
+                .findByNativeIdAndProviderId(nativeId, Objects.requireNonNull(provider.getId()))
+                .orElseGet(Repository::new);
 
         repository.setNativeId(nativeId);
         repository.setProvider(provider);
@@ -141,24 +138,20 @@ public class GitLabProjectProcessor {
     @Transactional
     @Nullable
     public Repository processPushEvent(
-        GitLabPushEventDTO.@Nullable ProjectInfo projectInfo,
-        IdentityProvider provider
-    ) {
-        if (
-            projectInfo == null ||
-            projectInfo.id() == null ||
-            projectInfo.name() == null ||
-            projectInfo.pathWithNamespace() == null ||
-            projectInfo.webUrl() == null
-        ) {
+            GitLabPushEventDTO.@Nullable ProjectInfo projectInfo, IdentityProvider provider) {
+        if (projectInfo == null
+                || projectInfo.id() == null
+                || projectInfo.name() == null
+                || projectInfo.pathWithNamespace() == null
+                || projectInfo.webUrl() == null) {
             log.warn("Skipped push event project processing: reason=nullOrMissingFields");
             return null;
         }
 
         long nativeId = GitLabSyncConstants.toEntityId(projectInfo.id());
         Repository repository = repositoryRepository
-            .findByNativeIdAndProviderId(nativeId, Objects.requireNonNull(provider.getId()))
-            .orElseGet(Repository::new);
+                .findByNativeIdAndProviderId(nativeId, Objects.requireNonNull(provider.getId()))
+                .orElseGet(Repository::new);
 
         repository.setNativeId(nativeId);
         repository.setProvider(provider);

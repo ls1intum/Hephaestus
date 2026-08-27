@@ -35,10 +35,9 @@ public class InstanceSettingsService implements SilentModeQuery {
     private final ObjectMapper objectMapper;
 
     InstanceSettingsService(
-        InstanceSettingsRepository repository,
-        Optional<AuthEventLogger> authEventLogger,
-        ObjectMapper objectMapper
-    ) {
+            InstanceSettingsRepository repository,
+            Optional<AuthEventLogger> authEventLogger,
+            ObjectMapper objectMapper) {
         this.repository = repository;
         this.authEventLogger = authEventLogger;
         this.objectMapper = objectMapper;
@@ -57,35 +56,30 @@ public class InstanceSettingsService implements SilentModeQuery {
 
     @Transactional
     public InstanceSettings updateSilentMode(
-        boolean engaged,
-        @Nullable String reason,
-        @Nullable String actor,
-        @Nullable EntityTagPrecondition precondition
-    ) {
+            boolean engaged,
+            @Nullable String reason,
+            @Nullable String actor,
+            @Nullable EntityTagPrecondition precondition) {
         repository.insertFailSafeSingletonIfMissing();
         String effectiveReason = engaged && reason != null && !reason.isBlank() ? reason.trim() : null;
         Instant changedAt = Instant.now();
-        InstanceSettings saved = engaged
-            ? engage(effectiveReason, actor, changedAt)
-            : release(actor, changedAt, precondition);
+        InstanceSettings saved =
+                engaged ? engage(effectiveReason, actor, changedAt) : release(actor, changedAt, precondition);
         log.warn(
-            "Instance silent mode {}: actor={}, reason={}",
-            engaged ? "ENGAGED — all outbound delivery suppressed" : "RELEASED — outbound delivery resumed",
-            actor,
-            effectiveReason
-        );
+                "Instance silent mode {}: actor={}, reason={}",
+                engaged ? "ENGAGED — all outbound delivery suppressed" : "RELEASED — outbound delivery resumed",
+                actor,
+                effectiveReason);
         Map<String, Object> details = new LinkedHashMap<>();
         details.put("engaged", engaged);
         if (effectiveReason != null) {
             details.put("reason", effectiveReason);
         }
-        authEventLogger.ifPresent(logger ->
-            logger
-                .event(AuthEvent.EventType.SILENT_MODE_CHANGED, AuthEvent.Result.SUCCESS)
-                .actingAccount(SecurityUtils.getCurrentAccountId().orElse(null))
-                .details(objectMapper.writeValueAsString(details))
-                .record()
-        );
+        authEventLogger.ifPresent(
+                logger -> logger.event(AuthEvent.EventType.SILENT_MODE_CHANGED, AuthEvent.Result.SUCCESS)
+                        .actingAccount(SecurityUtils.getCurrentAccountId().orElse(null))
+                        .details(objectMapper.writeValueAsString(details))
+                        .record());
         return saved;
     }
 
@@ -97,10 +91,7 @@ public class InstanceSettingsService implements SilentModeQuery {
     }
 
     private InstanceSettings release(
-        @Nullable String actor,
-        Instant changedAt,
-        @Nullable EntityTagPrecondition precondition
-    ) {
+            @Nullable String actor, Instant changedAt, @Nullable EntityTagPrecondition precondition) {
         InstanceSettings settings = currentSettings();
         if (precondition == null) {
             throw new InstanceSettingsPreconditionRequiredException();
@@ -121,7 +112,7 @@ public class InstanceSettingsService implements SilentModeQuery {
 
     private InstanceSettings currentSettings() {
         return repository
-            .findById(InstanceSettings.SINGLETON_ID)
-            .orElseThrow(() -> new IllegalStateException("Failed to initialize instance_settings singleton"));
+                .findById(InstanceSettings.SINGLETON_ID)
+                .orElseThrow(() -> new IllegalStateException("Failed to initialize instance_settings singleton"));
     }
 }

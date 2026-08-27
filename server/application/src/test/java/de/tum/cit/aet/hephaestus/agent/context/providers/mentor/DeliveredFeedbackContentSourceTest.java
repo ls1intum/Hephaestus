@@ -10,7 +10,6 @@ import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
 import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
-import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
@@ -70,9 +69,9 @@ class DeliveredFeedbackContentSourceTest extends BaseUnitTest {
         User user = new User();
         user.setLogin("octo");
         when(userRepository.findById(eq(2L))).thenReturn(Optional.of(user));
-        when(
-            feedbackRepository.findRecentDeliveredForRecipient(eq(1L), eq(2L), any(Instant.class), any(Pageable.class))
-        ).thenReturn(List.of());
+        when(feedbackRepository.findRecentDeliveredForRecipient(
+                        eq(1L), eq(2L), any(Instant.class), any(Pageable.class)))
+                .thenReturn(List.of());
 
         Map<String, byte[]> files = new HashMap<>();
         provider.contribute(new ContextRequest.MentorChatRequest(1L, 2L, UUID.randomUUID()), files);
@@ -94,24 +93,24 @@ class DeliveredFeedbackContentSourceTest extends BaseUnitTest {
         when(userRepository.findById(eq(2L))).thenReturn(Optional.of(user));
 
         Feedback withBody = Feedback.builder()
-            .id(UUID.randomUUID())
-            .channel(FeedbackChannel.IN_CONTEXT)
-            .artifactKind(ArtifactKinds.PULL_REQUEST)
-            .artifactId(575L)
-            .deliveredAt(Instant.parse("2026-06-17T08:30:00Z"))
-            .body("Nice work scoping this PR — one thing to tighten before merge.")
-            .build();
+                .id(UUID.randomUUID())
+                .channel(FeedbackChannel.IN_CONTEXT)
+                .artifactKind(ArtifactKinds.PULL_REQUEST)
+                .artifactId(575L)
+                .deliveredAt(Instant.parse("2026-06-17T08:30:00Z"))
+                .body("Nice work scoping this PR — one thing to tighten before merge.")
+                .build();
         Feedback blank = Feedback.builder()
-            .id(UUID.randomUUID())
-            .channel(FeedbackChannel.IN_CONTEXT)
-            .artifactKind(ArtifactKinds.ISSUE)
-            .artifactId(574L)
-            .deliveredAt(Instant.parse("2026-06-16T08:30:00Z"))
-            .body("   ")
-            .build();
-        when(
-            feedbackRepository.findRecentDeliveredForRecipient(eq(1L), eq(2L), any(Instant.class), any(Pageable.class))
-        ).thenReturn(List.of(withBody, blank));
+                .id(UUID.randomUUID())
+                .channel(FeedbackChannel.IN_CONTEXT)
+                .artifactKind(ArtifactKinds.ISSUE)
+                .artifactId(574L)
+                .deliveredAt(Instant.parse("2026-06-16T08:30:00Z"))
+                .body("   ")
+                .build();
+        when(feedbackRepository.findRecentDeliveredForRecipient(
+                        eq(1L), eq(2L), any(Instant.class), any(Pageable.class)))
+                .thenReturn(List.of(withBody, blank));
         authorize(withBody, blank);
 
         Map<String, byte[]> files = new HashMap<>();
@@ -134,14 +133,14 @@ class DeliveredFeedbackContentSourceTest extends BaseUnitTest {
         when(userRepository.findById(eq(2L))).thenReturn(Optional.of(user));
 
         Feedback noArtifact = Feedback.builder()
-            .id(UUID.randomUUID())
-            .channel(FeedbackChannel.IN_CONTEXT)
-            .deliveredAt(Instant.parse("2026-06-17T08:30:00Z"))
-            .body("Reflecting on your last few reviews — here is a pattern to watch.")
-            .build();
-        when(
-            feedbackRepository.findRecentDeliveredForRecipient(eq(1L), eq(2L), any(Instant.class), any(Pageable.class))
-        ).thenReturn(List.of(noArtifact));
+                .id(UUID.randomUUID())
+                .channel(FeedbackChannel.IN_CONTEXT)
+                .deliveredAt(Instant.parse("2026-06-17T08:30:00Z"))
+                .body("Reflecting on your last few reviews — here is a pattern to watch.")
+                .build();
+        when(feedbackRepository.findRecentDeliveredForRecipient(
+                        eq(1L), eq(2L), any(Instant.class), any(Pageable.class)))
+                .thenReturn(List.of(noArtifact));
         authorize(noArtifact);
 
         Map<String, byte[]> files = new HashMap<>();
@@ -162,20 +161,16 @@ class DeliveredFeedbackContentSourceTest extends BaseUnitTest {
         User user = new User();
         user.setLogin("octo");
         when(userRepository.findById(eq(2L))).thenReturn(Optional.of(user));
-        when(
-            feedbackRepository.findRecentDeliveredForRecipient(eq(1L), eq(2L), any(Instant.class), any(Pageable.class))
-        ).thenReturn(List.of());
+        when(feedbackRepository.findRecentDeliveredForRecipient(
+                        eq(1L), eq(2L), any(Instant.class), any(Pageable.class)))
+                .thenReturn(List.of());
 
         var request = new ContextRequest.MentorChatRequest(1L, 2L, UUID.randomUUID());
         provider.contribute(request, new HashMap<>());
         provider.contribute(request, new HashMap<>());
 
-        verify(feedbackRepository, times(2)).findRecentDeliveredForRecipient(
-            eq(1L),
-            eq(2L),
-            any(Instant.class),
-            any(Pageable.class)
-        );
+        verify(feedbackRepository, times(2))
+                .findRecentDeliveredForRecipient(eq(1L), eq(2L), any(Instant.class), any(Pageable.class));
     }
 
     @Test
@@ -183,18 +178,17 @@ class DeliveredFeedbackContentSourceTest extends BaseUnitTest {
         User user = new User();
         user.setLogin("octo");
         Feedback feedback = Feedback.builder()
-            .id(UUID.randomUUID())
-            .channel(FeedbackChannel.IN_CONTEXT)
-            .body("Previously delivered")
-            .build();
+                .id(UUID.randomUUID())
+                .channel(FeedbackChannel.IN_CONTEXT)
+                .body("Previously delivered")
+                .build();
         when(userRepository.findById(2L)).thenReturn(Optional.of(user));
-        when(
-            feedbackRepository.findRecentDeliveredForRecipient(eq(1L), eq(2L), any(Instant.class), any(Pageable.class))
-        ).thenReturn(List.of(feedback));
+        when(feedbackRepository.findRecentDeliveredForRecipient(
+                        eq(1L), eq(2L), any(Instant.class), any(Pageable.class)))
+                .thenReturn(List.of(feedback));
         bind(feedback);
-        when(visibilityPolicy.permitsAll(eq(1L), any(), eq(SourceUsePurpose.CONVERSATIONAL_MENTORING))).thenReturn(
-            Set.of()
-        );
+        when(visibilityPolicy.permitsAll(eq(1L), any(), eq(SourceUsePurpose.CONVERSATIONAL_MENTORING)))
+                .thenReturn(Set.of());
 
         ObjectNode root = provider.buildPayload(1L, 2L);
 
@@ -212,9 +206,8 @@ class DeliveredFeedbackContentSourceTest extends BaseUnitTest {
             bindings.add(binding);
             permitted.add(observation.getId());
         }
-        when(visibilityPolicy.permitsAll(eq(1L), any(), eq(SourceUsePurpose.CONVERSATIONAL_MENTORING))).thenReturn(
-            permitted
-        );
+        when(visibilityPolicy.permitsAll(eq(1L), any(), eq(SourceUsePurpose.CONVERSATIONAL_MENTORING)))
+                .thenReturn(permitted);
         when(feedbackObservationRepository.findForVisibility(eq(1L), any())).thenReturn(bindings);
     }
 

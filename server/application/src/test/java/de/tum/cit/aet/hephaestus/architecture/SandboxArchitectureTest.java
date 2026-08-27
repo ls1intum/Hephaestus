@@ -23,37 +23,37 @@ class SandboxArchitectureTest extends HephaestusArchitectureTest {
         @Test
         void spiShouldNotDependOnDockerJava() {
             noClasses()
-                .that()
-                .resideInAPackage("..agent.sandbox.spi..")
-                .should()
-                .dependOnClassesThat()
-                .resideInAPackage("com.github.dockerjava..")
-                .because("SPI types must remain Docker-agnostic for future remote runner support")
-                .check(classes);
+                    .that()
+                    .resideInAPackage("..agent.sandbox.spi..")
+                    .should()
+                    .dependOnClassesThat()
+                    .resideInAPackage("com.github.dockerjava..")
+                    .because("SPI types must remain Docker-agnostic for future remote runner support")
+                    .check(classes);
         }
 
         @Test
         void spiShouldNotDependOnSpring() {
             noClasses()
-                .that()
-                .resideInAPackage("..agent.sandbox.spi..")
-                .should()
-                .dependOnClassesThat()
-                .resideInAPackage("org.springframework..")
-                .because("SPI types must be framework-agnostic — no Spring annotations or imports")
-                .check(classes);
+                    .that()
+                    .resideInAPackage("..agent.sandbox.spi..")
+                    .should()
+                    .dependOnClassesThat()
+                    .resideInAPackage("org.springframework..")
+                    .because("SPI types must be framework-agnostic — no Spring annotations or imports")
+                    .check(classes);
         }
 
         @Test
         void spiShouldNotDependOnDockerImpl() {
             noClasses()
-                .that()
-                .resideInAPackage("..agent.sandbox.spi..")
-                .should()
-                .dependOnClassesThat()
-                .resideInAPackage("..agent.sandbox.docker..")
-                .because("SPI must not reference implementation details")
-                .check(classes);
+                    .that()
+                    .resideInAPackage("..agent.sandbox.spi..")
+                    .should()
+                    .dependOnClassesThat()
+                    .resideInAPackage("..agent.sandbox.docker..")
+                    .because("SPI must not reference implementation details")
+                    .check(classes);
         }
     }
 
@@ -63,25 +63,25 @@ class SandboxArchitectureTest extends HephaestusArchitectureTest {
         @Test
         void dockerImplNotImportedOutside() {
             noClasses()
-                .that()
-                .resideOutsideOfPackage("..agent.sandbox..")
-                .should()
-                .dependOnClassesThat()
-                .resideInAPackage("..agent.sandbox.docker..")
-                .because("Only the SPI should be used outside the sandbox package")
-                .check(classes);
+                    .that()
+                    .resideOutsideOfPackage("..agent.sandbox..")
+                    .should()
+                    .dependOnClassesThat()
+                    .resideInAPackage("..agent.sandbox.docker..")
+                    .because("Only the SPI should be used outside the sandbox package")
+                    .check(classes);
         }
 
         @Test
         void dockerClientOnlyInDockerPackage() {
             noClasses()
-                .that()
-                .resideOutsideOfPackage("..agent.sandbox.docker..")
-                .should()
-                .dependOnClassesThat()
-                .resideInAPackage("com.github.dockerjava..")
-                .because("Docker SDK access must be confined to the docker subpackage")
-                .check(classes);
+                    .that()
+                    .resideOutsideOfPackage("..agent.sandbox.docker..")
+                    .should()
+                    .dependOnClassesThat()
+                    .resideInAPackage("com.github.dockerjava..")
+                    .because("Docker SDK access must be confined to the docker subpackage")
+                    .check(classes);
         }
     }
 
@@ -95,26 +95,26 @@ class SandboxArchitectureTest extends HephaestusArchitectureTest {
         @Test
         void mentorMustNotInvokeSandboxManagerExecute() {
             noClasses()
-                .that()
-                .resideInAPackage("..agent.mentor..")
-                .should()
-                .callMethod(SandboxManager.class, "execute", SandboxSpec.class)
-                .because(
-                    "The mentor flow is interactive by definition; SandboxManager.execute is the one-shot path. " +
-                        "Use InteractiveSandboxService.attach instead."
-                )
-                .check(classes);
+                    .that()
+                    .resideInAPackage("..agent.mentor..")
+                    .should()
+                    .callMethod(SandboxManager.class, "execute", SandboxSpec.class)
+                    .because(
+                            "The mentor flow is interactive by definition; SandboxManager.execute is the one-shot path. "
+                                    + "Use InteractiveSandboxService.attach instead.")
+                    .check(classes);
         }
 
         @Test
         void practiceMustNotInvokeInteractiveAttach() {
             noClasses()
-                .that()
-                .resideInAPackage("..agent.practice..")
-                .should()
-                .callMethod(InteractiveSandboxService.class, "attach", InteractiveSandboxSpec.class)
-                .because("Practice review is a one-shot agent run; the interactive sandbox is reserved for tutoring.")
-                .check(classes);
+                    .that()
+                    .resideInAPackage("..agent.practice..")
+                    .should()
+                    .callMethod(InteractiveSandboxService.class, "attach", InteractiveSandboxSpec.class)
+                    .because(
+                            "Practice review is a one-shot agent run; the interactive sandbox is reserved for tutoring.")
+                    .check(classes);
         }
 
         /** Guards against ArchUnit #324: callMethod silently passes when the parameter signature mismatches. */
@@ -123,14 +123,14 @@ class SandboxArchitectureTest extends HephaestusArchitectureTest {
             JavaClasses fixtureClasses = importTestFixture("de.tum.cit.aet.hephaestus.agent.mentor");
 
             ArchRule rule = noClasses()
-                .that()
-                .resideInAPackage("..agent.mentor..")
-                .should()
-                .callMethod(SandboxManager.class, "execute", SandboxSpec.class);
+                    .that()
+                    .resideInAPackage("..agent.mentor..")
+                    .should()
+                    .callMethod(SandboxManager.class, "execute", SandboxSpec.class);
 
             Assertions.assertThatThrownBy(() -> rule.check(fixtureClasses))
-                .as("Rule must reject the deliberate violation fixture")
-                .isInstanceOf(AssertionError.class);
+                    .as("Rule must reject the deliberate violation fixture")
+                    .isInstanceOf(AssertionError.class);
         }
 
         @Test
@@ -138,23 +138,23 @@ class SandboxArchitectureTest extends HephaestusArchitectureTest {
             JavaClasses fixtureClasses = importTestFixture("de.tum.cit.aet.hephaestus.agent.practice");
 
             ArchRule rule = noClasses()
-                .that()
-                .resideInAPackage("..agent.practice..")
-                .should()
-                .callMethod(InteractiveSandboxService.class, "attach", InteractiveSandboxSpec.class);
+                    .that()
+                    .resideInAPackage("..agent.practice..")
+                    .should()
+                    .callMethod(InteractiveSandboxService.class, "attach", InteractiveSandboxSpec.class);
 
             Assertions.assertThatThrownBy(() -> rule.check(fixtureClasses))
-                .as("Rule must reject the deliberate violation fixture")
-                .isInstanceOf(AssertionError.class);
+                    .as("Rule must reject the deliberate violation fixture")
+                    .isInstanceOf(AssertionError.class);
         }
 
         private JavaClasses importTestFixture(String packageName) {
             JavaClasses imported = new ClassFileImporter()
-                .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_JARS)
-                .importPackages(packageName, "de.tum.cit.aet.hephaestus.agent.sandbox.spi");
+                    .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_JARS)
+                    .importPackages(packageName, "de.tum.cit.aet.hephaestus.agent.sandbox.spi");
             Assertions.assertThat(imported)
-                .as("Architecture fixture under %s must be present on the test classpath", packageName)
-                .isNotEmpty();
+                    .as("Architecture fixture under %s must be present on the test classpath", packageName)
+                    .isNotEmpty();
             return imported;
         }
     }

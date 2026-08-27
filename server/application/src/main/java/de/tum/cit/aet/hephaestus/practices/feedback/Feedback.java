@@ -23,18 +23,21 @@ import org.jspecify.annotations.Nullable;
 @Entity
 @Immutable
 @Table(
-    name = "feedback",
-    uniqueConstraints = { @UniqueConstraint(name = "uk_feedback_unit", columnNames = { "agent_job_id", "position" }) },
-    indexes = {
-        @Index(name = "idx_feedback_agent_job", columnList = "agent_job_id"),
-        @Index(name = "idx_feedback_workspace", columnList = "workspace_id"),
-        @Index(name = "idx_feedback_workspace_created", columnList = "workspace_id, created_at DESC, id DESC"),
-        @Index(name = "idx_feedback_recipient_created", columnList = "recipient_user_id, created_at DESC"),
-        @Index(name = "idx_feedback_target", columnList = "artifact_kind, artifact_id"),
-        @Index(name = "idx_feedback_continuity", columnList = "thread_key"),
-        @Index(name = "idx_feedback_replaces", columnList = "replaces_id"),
-    }
-)
+        name = "feedback",
+        uniqueConstraints = {
+            @UniqueConstraint(
+                    name = "uk_feedback_unit",
+                    columnNames = {"agent_job_id", "position"})
+        },
+        indexes = {
+            @Index(name = "idx_feedback_agent_job", columnList = "agent_job_id"),
+            @Index(name = "idx_feedback_workspace", columnList = "workspace_id"),
+            @Index(name = "idx_feedback_workspace_created", columnList = "workspace_id, created_at DESC, id DESC"),
+            @Index(name = "idx_feedback_recipient_created", columnList = "recipient_user_id, created_at DESC"),
+            @Index(name = "idx_feedback_target", columnList = "artifact_kind, artifact_id"),
+            @Index(name = "idx_feedback_continuity", columnList = "thread_key"),
+            @Index(name = "idx_feedback_replaces", columnList = "replaces_id"),
+        })
 @Getter
 @Builder
 @NoArgsConstructor

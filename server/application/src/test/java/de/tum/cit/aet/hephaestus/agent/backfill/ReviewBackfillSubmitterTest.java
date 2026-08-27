@@ -60,12 +60,7 @@ class ReviewBackfillSubmitterTest extends BaseUnitTest {
 
     private ReviewBackfillSubmitter submitter() {
         return new ReviewBackfillSubmitter(
-            agentJobService,
-            pullRequestRepository,
-            issueRepository,
-            detectionGate,
-            signalRecorder
-        );
+                agentJobService, pullRequestRepository, issueRepository, detectionGate, signalRecorder);
     }
 
     /**
@@ -79,21 +74,19 @@ class ReviewBackfillSubmitterTest extends BaseUnitTest {
         when(pullRequestRepository.findByIdWithAllForGate(PR_ID)).thenReturn(Optional.of(pr));
         when(signalRecorder.record(any(), any(), eq(DiscoveredVia.BACKFILL))).thenReturn(true);
         Workspace workspace = workspace();
-        when(detectionGate.evaluate(eq(pr), any(), eq(TriggerMode.MANUAL))).thenReturn(
-            new GateDecision.Detect(workspace, List.of())
-        );
+        when(detectionGate.evaluate(eq(pr), any(), eq(TriggerMode.MANUAL)))
+                .thenReturn(new GateDecision.Detect(workspace, List.of()));
 
         assertThat(submitter().offer(run(), PR_ID)).isEqualTo(ReviewBackfillSubmitter.Outcome.SUBMITTED);
 
-        ArgumentCaptor<PullRequestReviewSubmissionRequest> request = ArgumentCaptor.forClass(
-            PullRequestReviewSubmissionRequest.class
-        );
-        verify(agentJobService).submit(
-            eq(WORKSPACE_ID),
-            eq(AgentJobType.PULL_REQUEST_REVIEW),
-            request.capture(),
-            any(SignalKey.class)
-        );
+        ArgumentCaptor<PullRequestReviewSubmissionRequest> request =
+                ArgumentCaptor.forClass(PullRequestReviewSubmissionRequest.class);
+        verify(agentJobService)
+                .submit(
+                        eq(WORKSPACE_ID),
+                        eq(AgentJobType.PULL_REQUEST_REVIEW),
+                        request.capture(),
+                        any(SignalKey.class));
         assertThat(request.getValue().observationOrigin()).isEqualTo(ObservationOrigin.BACKFILL);
     }
 
@@ -108,18 +101,16 @@ class ReviewBackfillSubmitterTest extends BaseUnitTest {
         PullRequest pr = mergedPullRequest();
         when(pullRequestRepository.findByIdWithAllForGate(PR_ID)).thenReturn(Optional.of(pr));
         when(signalRecorder.record(any(), any(), eq(DiscoveredVia.SWEEP))).thenReturn(true);
-        when(detectionGate.evaluate(eq(pr), any(), eq(TriggerMode.MANUAL))).thenReturn(
-            new GateDecision.Detect(workspace(), List.of())
-        );
+        when(detectionGate.evaluate(eq(pr), any(), eq(TriggerMode.MANUAL)))
+                .thenReturn(new GateDecision.Detect(workspace(), List.of()));
         ReviewBackfillRun run = run();
         run.setDiscoveredVia(DiscoveredVia.SWEEP);
 
         assertThat(submitter().offer(run, PR_ID)).isEqualTo(ReviewBackfillSubmitter.Outcome.SUBMITTED);
 
         verify(signalRecorder).record(any(), any(), eq(DiscoveredVia.SWEEP));
-        ArgumentCaptor<PullRequestReviewSubmissionRequest> request = ArgumentCaptor.forClass(
-            PullRequestReviewSubmissionRequest.class
-        );
+        ArgumentCaptor<PullRequestReviewSubmissionRequest> request =
+                ArgumentCaptor.forClass(PullRequestReviewSubmissionRequest.class);
         verify(agentJobService).submit(eq(WORKSPACE_ID), any(), request.capture(), any(SignalKey.class));
         assertThat(request.getValue().observationOrigin()).isEqualTo(ObservationOrigin.LIVE);
     }
@@ -144,9 +135,8 @@ class ReviewBackfillSubmitterTest extends BaseUnitTest {
         PullRequest pr = mergedPullRequest();
         when(pullRequestRepository.findByIdWithAllForGate(PR_ID)).thenReturn(Optional.of(pr));
         when(signalRecorder.record(any(), any(), eq(DiscoveredVia.BACKFILL))).thenReturn(true);
-        when(detectionGate.evaluate(eq(pr), any(), eq(TriggerMode.MANUAL))).thenReturn(
-            new GateDecision.Skip("manual trigger disabled for workspace")
-        );
+        when(detectionGate.evaluate(eq(pr), any(), eq(TriggerMode.MANUAL)))
+                .thenReturn(new GateDecision.Skip("manual trigger disabled for workspace"));
 
         assertThat(submitter().offer(run(), PR_ID)).isEqualTo(ReviewBackfillSubmitter.Outcome.PASSED);
         verify(signalRecorder).markRefused(any(), eq(SignalStateReason.GATE_SKIPPED));

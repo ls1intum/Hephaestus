@@ -41,9 +41,8 @@ class AgentOutlineReadPathBoundaryTest extends HephaestusArchitectureTest {
     /** SQL keyword immediately preceding the Outline table — precise enough to ignore JSON keys and javadoc
      * mentions ({@code {@code outline_document}}). {@code \\s+} spans newlines so it also catches multi-line
      * text-block SQL. */
-    private static final Pattern OUTLINE_TABLE_IN_SQL = Pattern.compile(
-        "(?is)\\b(from|join|into|update)\\s+outline_document\\b"
-    );
+    private static final Pattern OUTLINE_TABLE_IN_SQL =
+            Pattern.compile("(?is)\\b(from|join|into|update)\\s+outline_document\\b");
 
     @Test
     @DisplayName("the outline_document SQL detector matches real tunnels and ignores JSON-key / javadoc lookalikes")
@@ -52,33 +51,46 @@ class AgentOutlineReadPathBoundaryTest extends HephaestusArchitectureTest {
         // vacuously), agentSourcesDoNotNameOutlineTableInSql would silently pass forever. This pins that the
         // detector still fires on a reintroduced raw-SQL Outline tunnel and still ignores the two things that
         // must NOT trip it.
-        assertThat(
-            OUTLINE_TABLE_IN_SQL.matcher("SELECT 1 FROM outline_document WHERE workspace_id = ?").find()
-        ).isTrue();
-        assertThat(OUTLINE_TABLE_IN_SQL.matcher("... JOIN outline_document d ON ...").find()).isTrue();
-        assertThat(OUTLINE_TABLE_IN_SQL.matcher("UPDATE outline_document SET body_markdown = NULL").find()).isTrue();
-        assertThat(
-            OUTLINE_TABLE_IN_SQL.matcher("INSERT INTO outline_document (workspace_id) VALUES (?)").find()
-        ).isTrue();
+        assertThat(OUTLINE_TABLE_IN_SQL
+                        .matcher("SELECT 1 FROM outline_document WHERE workspace_id = ?")
+                        .find())
+                .isTrue();
+        assertThat(OUTLINE_TABLE_IN_SQL
+                        .matcher("... JOIN outline_document d ON ...")
+                        .find())
+                .isTrue();
+        assertThat(OUTLINE_TABLE_IN_SQL
+                        .matcher("UPDATE outline_document SET body_markdown = NULL")
+                        .find())
+                .isTrue();
+        assertThat(OUTLINE_TABLE_IN_SQL
+                        .matcher("INSERT INTO outline_document (workspace_id) VALUES (?)")
+                        .find())
+                .isTrue();
 
         // Lookalikes that must NOT match: a JSON metadata key and a javadoc {@code} mention.
-        assertThat(OUTLINE_TABLE_IN_SQL.matcher("payload.path(\"outline_document_id\").asString()").find()).isFalse();
-        assertThat(OUTLINE_TABLE_IN_SQL.matcher(" * reads the {@code outline_document} mirror.").find()).isFalse();
+        assertThat(OUTLINE_TABLE_IN_SQL
+                        .matcher("payload.path(\"outline_document_id\").asString()")
+                        .find())
+                .isFalse();
+        assertThat(OUTLINE_TABLE_IN_SQL
+                        .matcher(" * reads the {@code outline_document} mirror.")
+                        .find())
+                .isFalse();
     }
 
     @Test
     @DisplayName("agent must not import any integration.outline type")
     void agentDoesNotImportOutline() {
         ArchRule rule = noClasses()
-            .that()
-            .resideInAPackage(AGENT)
-            .should()
-            .dependOnClassesThat()
-            .resideInAPackage("de.tum.cit.aet.hephaestus.integration.outline..")
-            .because(
-                "The agent documentation read path is inverted through the agent-owned agent.documentation SPI " +
-                    "(implemented by integration.outline); the agent must never depend on the Outline module directly"
-            );
+                .that()
+                .resideInAPackage(AGENT)
+                .should()
+                .dependOnClassesThat()
+                .resideInAPackage("de.tum.cit.aet.hephaestus.integration.outline..")
+                .because(
+                        "The agent documentation read path is inverted through the agent-owned agent.documentation SPI "
+                                + "(implemented by integration.outline); the agent must never depend on the Outline module directly");
         rule.check(classes);
     }
 
@@ -87,29 +99,22 @@ class AgentOutlineReadPathBoundaryTest extends HephaestusArchitectureTest {
     void agentSourcesDoNotNameOutlineTableInSql() {
         Path agentDir = Path.of("src/main/java/de/tum/cit/aet/hephaestus/agent");
         if (!Files.isDirectory(agentDir)) {
-            fail(
-                "Could not locate the agent source directory at %s (cwd=%s)".formatted(
-                    agentDir,
-                    Path.of("").toAbsolutePath()
-                )
-            );
+            fail("Could not locate the agent source directory at %s (cwd=%s)"
+                    .formatted(agentDir, Path.of("").toAbsolutePath()));
         }
         List<String> offenders;
         try (Stream<Path> paths = Files.walk(agentDir)) {
-            offenders = paths
-                .filter(p -> p.toString().endsWith(".java"))
-                .filter(AgentOutlineReadPathBoundaryTest::namesOutlineTableInSql)
-                .map(Path::toString)
-                .toList();
+            offenders = paths.filter(p -> p.toString().endsWith(".java"))
+                    .filter(AgentOutlineReadPathBoundaryTest::namesOutlineTableInSql)
+                    .map(Path::toString)
+                    .toList();
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
         assertThat(offenders)
-            .as(
-                "agent source files must not embed raw SQL against Outline's private table (outline_document) — " +
-                    "read it through the agent.documentation SPI implemented by integration.outline"
-            )
-            .isEmpty();
+                .as("agent source files must not embed raw SQL against Outline's private table (outline_document) — "
+                        + "read it through the agent.documentation SPI implemented by integration.outline")
+                .isEmpty();
     }
 
     private static boolean namesOutlineTableInSql(Path javaFile) {

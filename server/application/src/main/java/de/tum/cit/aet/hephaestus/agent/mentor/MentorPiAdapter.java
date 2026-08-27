@@ -45,11 +45,10 @@ public class MentorPiAdapter {
      * injects the prior turn's JSONL so Pi restores it, keeping the prompt cache warm.
      */
     public InteractiveSandboxSpec buildSandboxSpec(
-        MentorAgentRequest request,
-        MentorLlmConfig llmConfig,
-        Map<String, byte[]> contextInputs,
-        @Nullable SessionRestore sessionRestore
-    ) {
+            MentorAgentRequest request,
+            MentorLlmConfig llmConfig,
+            Map<String, byte[]> contextInputs,
+            @Nullable SessionRestore sessionRestore) {
         Objects.requireNonNull(request, "request");
         Objects.requireNonNull(llmConfig, "llmConfig");
         Objects.requireNonNull(contextInputs, "contextInputs");
@@ -69,46 +68,42 @@ public class MentorPiAdapter {
         // sandbox adapter revokes this token by the same sessionId when it disposes the session.
         UUID sessionId = UUID.randomUUID();
         String proxyToken = proxyCredentialRegistry.mint(
-            sessionId,
-            new Route(
-                llmConfig.apiProtocol(),
-                baseUrl,
-                llmConfig.connectionScope(),
-                llmConfig.connectionId(),
-                llmConfig.modelId(),
-                llmConfig.workspaceId()
-            )
-        );
+                sessionId,
+                new Route(
+                        llmConfig.apiProtocol(),
+                        baseUrl,
+                        llmConfig.connectionScope(),
+                        llmConfig.connectionId(),
+                        llmConfig.modelId(),
+                        llmConfig.workspaceId()));
 
         PiPlanSpec planSpec = new PiPlanSpec(
-            llmConfig.apiProtocol(),
-            llmConfig.upstreamModelId(),
-            llmConfig.contextWindow(),
-            llmConfig.maxOutputTokens(),
-            llmConfig.supportsReasoning(),
-            proxyToken,
-            llmConfig.allowInternet(),
-            timeoutSeconds,
-            PROFILE,
-            extraInputs,
-            ""
-        );
+                llmConfig.apiProtocol(),
+                llmConfig.upstreamModelId(),
+                llmConfig.contextWindow(),
+                llmConfig.maxOutputTokens(),
+                llmConfig.supportsReasoning(),
+                proxyToken,
+                llmConfig.allowInternet(),
+                timeoutSeconds,
+                PROFILE,
+                extraInputs,
+                "");
 
         PiPlan plan = runtimeFactory.build(planSpec);
 
         return new InteractiveSandboxSpec(
-            sessionId,
-            Long.toString(request.developerId()),
-            Long.toString(request.workspaceId()),
-            imageProperties.reference(),
-            plan.command(),
-            plan.environment(),
-            plan.networkPolicy(),
-            ResourceLimits.DEFAULT,
-            SecurityProfile.DEFAULT,
-            plan.inputFiles(),
-            Map.of()
-        );
+                sessionId,
+                Long.toString(request.developerId()),
+                Long.toString(request.workspaceId()),
+                imageProperties.reference(),
+                plan.command(),
+                plan.environment(),
+                plan.networkPolicy(),
+                ResourceLimits.DEFAULT,
+                SecurityProfile.DEFAULT,
+                plan.inputFiles(),
+                Map.of());
     }
 
     /**
@@ -117,10 +112,9 @@ public class MentorPiAdapter {
      */
     private static int clampToRunnableTurnBudget(int configuredTimeoutSeconds) {
         return Math.clamp(
-            configuredTimeoutSeconds,
-            PiRuntimeFactory.TIMEOUT_BUFFER_SECONDS + 1,
-            AgentBindingLimits.MAX_TIMEOUT_SECONDS
-        );
+                configuredTimeoutSeconds,
+                PiRuntimeFactory.TIMEOUT_BUFFER_SECONDS + 1,
+                AgentBindingLimits.MAX_TIMEOUT_SECONDS);
     }
 
     private static void validateContextInputs(Map<String, byte[]> contextInputs) {
@@ -128,8 +122,7 @@ public class MentorPiAdapter {
             String key = entry.getKey();
             if (key == null || !key.startsWith(CONTEXT_INPUT_PREFIX)) {
                 throw new IllegalArgumentException(
-                    "contextInputs key must begin with '" + CONTEXT_INPUT_PREFIX + "', got: " + key
-                );
+                        "contextInputs key must begin with '" + CONTEXT_INPUT_PREFIX + "', got: " + key);
             }
             if (!MentorContextKeys.ALLOWED_OUTPUT_KEYS.contains(key)) {
                 throw new IllegalArgumentException("unsupported mentor context input key: " + key);

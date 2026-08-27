@@ -38,7 +38,8 @@ class CredentialBundleCryptoCompatTest extends BaseUnitTest {
             String plaintext = "ghp_secret-PAT-value-with-symbols_+/=";
             String encoded = encryptLegacy(plaintext, KEY_BYTES);
 
-            assertThat(WorkspaceConnectionBackfillChange.decryptLegacy(encoded, KEY_BYTES)).isEqualTo(plaintext);
+            assertThat(WorkspaceConnectionBackfillChange.decryptLegacy(encoded, KEY_BYTES))
+                    .isEqualTo(plaintext);
         }
 
         @Test
@@ -46,19 +47,15 @@ class CredentialBundleCryptoCompatTest extends BaseUnitTest {
             // EncryptedStringConverter writes ENC:<base64> for encrypted values but tolerates
             // legacy unencrypted plaintext for pre-encryption rows. Match that behaviour so
             // a workspace with a plaintext PAT (dev-mode, no key set) still migrates.
-            assertThat(WorkspaceConnectionBackfillChange.decryptLegacy("plain-token", KEY_BYTES)).isEqualTo(
-                "plain-token"
-            );
+            assertThat(WorkspaceConnectionBackfillChange.decryptLegacy("plain-token", KEY_BYTES))
+                    .isEqualTo("plain-token");
         }
 
         @Test
         void rejectsCiphertextShorterThanTheIv() {
-            assertThatThrownBy(() ->
-                WorkspaceConnectionBackfillChange.decryptLegacy(
-                    "ENC:" + Base64.getEncoder().encodeToString(new byte[5]),
-                    KEY_BYTES
-                )
-            ).isInstanceOf(IllegalStateException.class);
+            assertThatThrownBy(() -> WorkspaceConnectionBackfillChange.decryptLegacy(
+                            "ENC:" + Base64.getEncoder().encodeToString(new byte[5]), KEY_BYTES))
+                    .isInstanceOf(IllegalStateException.class);
         }
     }
 
@@ -68,21 +65,17 @@ class CredentialBundleCryptoCompatTest extends BaseUnitTest {
         @Test
         void producesBlobsThatDecryptBackWithTheRealConverter() {
             CredentialBundleConverter converter = new CredentialBundleConverter(KEY, "dev");
-            EncryptionContext ctx = new EncryptionContext(
-                7L,
-                IntegrationKind.GITHUB,
-                "pat",
-                "connection.credentials_encrypted"
-            );
+            EncryptionContext ctx =
+                    new EncryptionContext(7L, IntegrationKind.GITHUB, "pat", "connection.credentials_encrypted");
 
             // Build the bundle JSON via Jackson (matches what the customChange does internally)
             // — hardcoding a literal would drift from the discriminator on the sealed type.
             String bundleJson;
             try {
                 bundleJson = tools.jackson.databind.json.JsonMapper.builder()
-                    .findAndAddModules()
-                    .build()
-                    .writeValueAsString(new ApiCredentialProvider.BearerToken("ghp_xyz", null));
+                        .findAndAddModules()
+                        .build()
+                        .writeValueAsString(new ApiCredentialProvider.BearerToken("ghp_xyz", null));
             } catch (Exception e) {
                 throw new AssertionError(e);
             }
@@ -90,10 +83,7 @@ class CredentialBundleCryptoCompatTest extends BaseUnitTest {
             byte[] blob;
             try {
                 blob = WorkspaceConnectionBackfillChange.encryptV2(
-                    bundleJson.getBytes(StandardCharsets.UTF_8),
-                    KEY_BYTES,
-                    ctx.toAad()
-                );
+                        bundleJson.getBytes(StandardCharsets.UTF_8), KEY_BYTES, ctx.toAad());
             } catch (Exception e) {
                 throw new AssertionError(e);
             }
@@ -111,31 +101,20 @@ class CredentialBundleCryptoCompatTest extends BaseUnitTest {
         @Test
         void aadIsBoundToTheRow_wrongContextFailsAuthentication() {
             CredentialBundleConverter converter = new CredentialBundleConverter(KEY, "dev");
-            EncryptionContext writeCtx = new EncryptionContext(
-                7L,
-                IntegrationKind.GITHUB,
-                "pat",
-                "connection.credentials_encrypted"
-            );
+            EncryptionContext writeCtx =
+                    new EncryptionContext(7L, IntegrationKind.GITHUB, "pat", "connection.credentials_encrypted");
             EncryptionContext readCtx = new EncryptionContext(
-                7L,
-                IntegrationKind.GITHUB,
-                "different-instance",
-                "connection.credentials_encrypted"
-            );
+                    7L, IntegrationKind.GITHUB, "different-instance", "connection.credentials_encrypted");
 
             String bundleJson;
             byte[] blob;
             try {
                 bundleJson = tools.jackson.databind.json.JsonMapper.builder()
-                    .findAndAddModules()
-                    .build()
-                    .writeValueAsString(new ApiCredentialProvider.BearerToken("x", null));
+                        .findAndAddModules()
+                        .build()
+                        .writeValueAsString(new ApiCredentialProvider.BearerToken("x", null));
                 blob = WorkspaceConnectionBackfillChange.encryptV2(
-                    bundleJson.getBytes(StandardCharsets.UTF_8),
-                    KEY_BYTES,
-                    writeCtx.toAad()
-                );
+                        bundleJson.getBytes(StandardCharsets.UTF_8), KEY_BYTES, writeCtx.toAad());
             } catch (Exception e) {
                 throw new AssertionError(e);
             }

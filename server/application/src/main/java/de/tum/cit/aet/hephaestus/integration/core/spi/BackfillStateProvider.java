@@ -33,11 +33,10 @@ public interface BackfillStateProvider {
      * @param lastRunAt      when the backfill was last run, or null to keep current
      */
     void updateIssueBackfillState(
-        Long syncTargetId,
-        @Nullable Integer highWaterMark,
-        @Nullable Integer checkpoint,
-        @Nullable Instant lastRunAt
-    );
+            Long syncTargetId,
+            @Nullable Integer highWaterMark,
+            @Nullable Integer checkpoint,
+            @Nullable Instant lastRunAt);
 
     /**
      * Updates the pull request backfill state for a sync target.
@@ -48,11 +47,10 @@ public interface BackfillStateProvider {
      * @param lastRunAt      when the backfill was last run, or null to keep current
      */
     void updatePullRequestBackfillState(
-        Long syncTargetId,
-        @Nullable Integer highWaterMark,
-        @Nullable Integer checkpoint,
-        @Nullable Instant lastRunAt
-    );
+            Long syncTargetId,
+            @Nullable Integer highWaterMark,
+            @Nullable Integer checkpoint,
+            @Nullable Instant lastRunAt);
 
     /**
      * Removes a sync target. Called when a repository no longer exists upstream (NOT_FOUND)
@@ -77,10 +75,9 @@ public interface BackfillStateProvider {
      * @param resolvedNameWithOwner the repository's current {@code owner/name} as the provider reports it
      */
     default void reconcileSyncTargetIdentity(
-        Long syncTargetId,
-        @org.jspecify.annotations.Nullable Long resolvedNativeId,
-        @org.jspecify.annotations.Nullable String resolvedNameWithOwner
-    ) {
+            Long syncTargetId,
+            @org.jspecify.annotations.Nullable Long resolvedNativeId,
+            @org.jspecify.annotations.Nullable String resolvedNameWithOwner) {
         // Default no-op: providers/tests that don't track a stable monitor identity keep prior behavior.
     }
 
@@ -99,9 +96,8 @@ public interface BackfillStateProvider {
      * @param newNameWithOwner  the repository's new {@code owner/name} as the payload reports it
      */
     default void reconcileSyncTargetsForRepository(
-        @org.jspecify.annotations.Nullable Long nativeId,
-        @org.jspecify.annotations.Nullable String newNameWithOwner
-    ) {
+            @org.jspecify.annotations.Nullable Long nativeId,
+            @org.jspecify.annotations.Nullable String newNameWithOwner) {
         // Default no-op: see reconcileSyncTargetIdentity.
     }
 

@@ -17,29 +17,27 @@ import org.jspecify.annotations.Nullable;
  * response build time so adding/removing a capability needs no DB migration.
  */
 public record ConnectionSummaryDTO(
-    Long id,
-    IntegrationKind kind,
-    IntegrationFamily family,
-    IntegrationState state,
-    @Nullable String instanceKey,
-    @Nullable String displayName,
-    @Nullable String stateReason,
-    Instant createdAt,
-    Instant updatedAt,
-    Set<Capability> capabilities
-) {
+        Long id,
+        IntegrationKind kind,
+        IntegrationFamily family,
+        IntegrationState state,
+        @Nullable String instanceKey,
+        @Nullable String displayName,
+        @Nullable String stateReason,
+        Instant createdAt,
+        Instant updatedAt,
+        Set<Capability> capabilities) {
     public static ConnectionSummaryDTO from(Connection c, IntegrationManifestRegistry manifests) {
         return new ConnectionSummaryDTO(
-            c.getId(),
-            c.getKind(),
-            c.getKind().family(),
-            c.getState(),
-            c.getInstanceKey(),
-            c.getDisplayName(),
-            c.getStateReason(),
-            c.getCreatedAt(),
-            c.getUpdatedAt(),
-            manifests.capabilitiesFor(c.getKind())
-        );
+                c.getId(),
+                c.getKind(),
+                c.getKind().family(),
+                c.getState(),
+                c.getInstanceKey(),
+                c.getDisplayName(),
+                c.getStateReason(),
+                c.getCreatedAt(),
+                c.getUpdatedAt(),
+                manifests.capabilitiesFor(c.getKind()));
     }
 }

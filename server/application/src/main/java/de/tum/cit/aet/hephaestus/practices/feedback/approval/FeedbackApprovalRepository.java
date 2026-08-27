@@ -13,16 +13,16 @@ public interface FeedbackApprovalRepository extends JpaRepository<FeedbackApprov
     Optional<FeedbackApproval> findByFeedbackIdAndWorkspaceId(UUID feedbackId, Long workspaceId);
 
     @Query(
-        value = "SELECT a.workspace_id AS workspaceId, a.feedback_id AS feedbackId FROM feedback_approval a " +
-            "JOIN feedback f ON f.id = a.feedback_id AND f.workspace_id = a.workspace_id " +
-            "WHERE a.decision = 'APPROVED' " +
-            "AND f.delivery_state = 'PREPARED' ORDER BY a.decided_at",
-        nativeQuery = true
-    )
+            value = "SELECT a.workspace_id AS workspaceId, a.feedback_id AS feedbackId FROM feedback_approval a "
+                    + "JOIN feedback f ON f.id = a.feedback_id AND f.workspace_id = a.workspace_id "
+                    + "WHERE a.decision = 'APPROVED' "
+                    + "AND f.delivery_state = 'PREPARED' ORDER BY a.decided_at",
+            nativeQuery = true)
     List<PendingApproval> findPendingApproved(Pageable pageable);
 
     interface PendingApproval {
         Long getWorkspaceId();
+
         UUID getFeedbackId();
     }
 }

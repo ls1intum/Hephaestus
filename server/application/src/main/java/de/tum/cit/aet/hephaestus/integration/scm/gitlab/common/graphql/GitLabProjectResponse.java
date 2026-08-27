@@ -24,18 +24,17 @@ import org.jspecify.annotations.Nullable;
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record GitLabProjectResponse(
-    String id,
-    @Nullable String fullPath,
-    String name,
-    @Nullable String webUrl,
-    @Nullable String description,
-    @Nullable String visibility,
-    @Nullable Boolean archived,
-    @Nullable String createdAt,
-    @Nullable String lastActivityAt,
-    @Nullable GitLabGroupResponse group,
-    @Nullable RepositoryInfo repository
-) {
+        String id,
+        @Nullable String fullPath,
+        String name,
+        @Nullable String webUrl,
+        @Nullable String description,
+        @Nullable String visibility,
+        @Nullable Boolean archived,
+        @Nullable String createdAt,
+        @Nullable String lastActivityAt,
+        @Nullable GitLabGroupResponse group,
+        @Nullable RepositoryInfo repository) {
     /**
      * Repository metadata from the GraphQL response.
      *

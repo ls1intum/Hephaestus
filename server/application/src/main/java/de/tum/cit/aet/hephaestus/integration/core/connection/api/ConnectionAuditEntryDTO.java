@@ -12,23 +12,21 @@ import org.jspecify.annotations.Nullable;
  * {@code Connection} that this DTO omits.
  */
 public record ConnectionAuditEntryDTO(
-    String eventType,
-    @Nullable IntegrationState fromState,
-    @Nullable IntegrationState toState,
-    String actorKind,
-    @Nullable String actorRef,
-    @Nullable String correlationId,
-    Instant occurredAt
-) {
+        String eventType,
+        @Nullable IntegrationState fromState,
+        @Nullable IntegrationState toState,
+        String actorKind,
+        @Nullable String actorRef,
+        @Nullable String correlationId,
+        Instant occurredAt) {
     public static ConnectionAuditEntryDTO from(ConnectionAudit audit) {
         return new ConnectionAuditEntryDTO(
-            audit.getEventType(),
-            audit.getFromState(),
-            audit.getToState(),
-            audit.getActorKind(),
-            audit.getActorRef(),
-            audit.getCorrelationId(),
-            audit.getOccurredAt()
-        );
+                audit.getEventType(),
+                audit.getFromState(),
+                audit.getToState(),
+                audit.getActorKind(),
+                audit.getActorRef(),
+                audit.getCorrelationId(),
+                audit.getOccurredAt());
     }
 }

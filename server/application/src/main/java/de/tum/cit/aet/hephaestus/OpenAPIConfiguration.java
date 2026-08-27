@@ -41,54 +41,54 @@ import org.springframework.data.web.PagedModel;
  */
 @Configuration
 @OpenAPIDefinition(
-    info = @Info(
-        title = "Hephaestus API",
-        description = "API documentation for the Hephaestus application server.\n\n" +
-            "### Money and exact decimals\n\n" +
-            "Every monetary amount and per-unit rate is a JSON number carrying `format: decimal`. It is an " +
-            "exact decimal on the server (`BigDecimal`, backed by a `NUMERIC` column) and MUST NOT be parsed " +
-            "into a binary floating-point type in a language that has an exact decimal one: bind it to " +
-            "`BigDecimal` / `decimal` / `Decimal`, not to `double`.\n\n" +
-            "JavaScript has no exact decimal type, so the generated TypeScript client necessarily binds these " +
-            "to `number` (IEEE-754 binary64). That is lossless for every value this API produces, and the " +
-            "margin is large: a binary64 round-trips any decimal of at most 15 significant digits exactly " +
-            "(`DBL_DIG`). Amounts are quantised to 6 decimal places, so they are exact below **$1,000,000,000**; " +
-            "per-1M-token rates are quantised to 8 places, so they are exact below **$10,000,000** per 1M " +
-            "tokens; budget caps are quantised to 2 places and their column tops out at $99,999,999.99. Every " +
-            "reachable value sits orders of magnitude inside those bounds.\n\n" +
-            "What that margin does NOT license is arithmetic. Totals, remaining budget and cap verdicts are " +
-            "computed on the server in exact decimal and shipped as fields; a client that re-derives them by " +
-            "summing rows is accumulating binary rounding error the server does not have. Read the totals, do " +
-            "not add them up.\n\n" +
-            "Amounts are USD throughout — the ledger, the caps and the gates all meter in USD, and the " +
-            "currency is therefore part of the field name (`...Usd`) rather than a per-amount field. Where a " +
-            "response also carries `FxRateInfo`, that is a display-only estimate in a second currency and is " +
-            "never an input to a budget decision.",
-        version = "0.0.0-development",
-        contact = @Contact(name = "Felix T.J. Dietrich", email = "felixtj.dietrich@tum.de"),
-        license = @License(name = "MIT License", url = "https://github.com/ls1intum/Hephaestus/blob/develop/LICENSE")
-    ),
-    tags = {
-        @Tag(
-            name = "Practice reviews",
-            description = "Workspace-admin access to review runs, observations, and feedback delivery history"
-        ),
-        @Tag(
-            name = "Practice review trace",
-            description = "Why each practice did or did not run on one piece of work; readable by any workspace member"
-        ),
-    },
-    servers = { @Server(url = "/", description = "Default Server URL") },
-    security = { @SecurityRequirement(name = "bearerAuth") }
-)
+        info =
+                @Info(
+                        title = "Hephaestus API",
+                        description = "API documentation for the Hephaestus application server.\n\n"
+                                + "### Money and exact decimals\n\n"
+                                + "Every monetary amount and per-unit rate is a JSON number carrying `format: decimal`. It is an "
+                                + "exact decimal on the server (`BigDecimal`, backed by a `NUMERIC` column) and MUST NOT be parsed "
+                                + "into a binary floating-point type in a language that has an exact decimal one: bind it to "
+                                + "`BigDecimal` / `decimal` / `Decimal`, not to `double`.\n\n"
+                                + "JavaScript has no exact decimal type, so the generated TypeScript client necessarily binds these "
+                                + "to `number` (IEEE-754 binary64). That is lossless for every value this API produces, and the "
+                                + "margin is large: a binary64 round-trips any decimal of at most 15 significant digits exactly "
+                                + "(`DBL_DIG`). Amounts are quantised to 6 decimal places, so they are exact below **$1,000,000,000**; "
+                                + "per-1M-token rates are quantised to 8 places, so they are exact below **$10,000,000** per 1M "
+                                + "tokens; budget caps are quantised to 2 places and their column tops out at $99,999,999.99. Every "
+                                + "reachable value sits orders of magnitude inside those bounds.\n\n"
+                                + "What that margin does NOT license is arithmetic. Totals, remaining budget and cap verdicts are "
+                                + "computed on the server in exact decimal and shipped as fields; a client that re-derives them by "
+                                + "summing rows is accumulating binary rounding error the server does not have. Read the totals, do "
+                                + "not add them up.\n\n"
+                                + "Amounts are USD throughout — the ledger, the caps and the gates all meter in USD, and the "
+                                + "currency is therefore part of the field name (`...Usd`) rather than a per-amount field. Where a "
+                                + "response also carries `FxRateInfo`, that is a display-only estimate in a second currency and is "
+                                + "never an input to a budget decision.",
+                        version = "0.0.0-development",
+                        contact = @Contact(name = "Felix T.J. Dietrich", email = "felixtj.dietrich@tum.de"),
+                        license =
+                                @License(
+                                        name = "MIT License",
+                                        url = "https://github.com/ls1intum/Hephaestus/blob/develop/LICENSE")),
+        tags = {
+            @Tag(
+                    name = "Practice reviews",
+                    description = "Workspace-admin access to review runs, observations, and feedback delivery history"),
+            @Tag(
+                    name = "Practice review trace",
+                    description =
+                            "Why each practice did or did not run on one piece of work; readable by any workspace member"),
+        },
+        servers = {@Server(url = "/", description = "Default Server URL")},
+        security = {@SecurityRequirement(name = "bearerAuth")})
 @SecurityScheme(
-    name = "bearerAuth",
-    type = SecuritySchemeType.HTTP,
-    scheme = "bearer",
-    bearerFormat = "JWT",
-    description = "Hephaestus-native JWT bearer authentication. The SPA normally authenticates via the " +
-        "`__Host-HEPHAESTUS_AT` session cookie; this scheme documents the equivalent bearer token."
-)
+        name = "bearerAuth",
+        type = SecuritySchemeType.HTTP,
+        scheme = "bearer",
+        bearerFormat = "JWT",
+        description = "Hephaestus-native JWT bearer authentication. The SPA normally authenticates via the "
+                + "`__Host-HEPHAESTUS_AT` session cookie; this scheme documents the equivalent bearer token.")
 public class OpenAPIConfiguration {
 
     private static final Logger log = LoggerFactory.getLogger(OpenAPIConfiguration.class);
@@ -97,36 +97,35 @@ public class OpenAPIConfiguration {
      * Domain objects to include even without DTO suffix
      */
     private static final List<String> ALLOWED_DOMAIN_OBJECTS = List.of(
-        "PageableObject",
-        "SortObject",
-        "ProblemDetail",
-        "PageMetadata",
-        "PracticeAutomatedReviewPolicy",
-        // The binding is the shape a practice is authored in, so a client that cannot see it cannot
-        // create one. It has no DTO suffix because it is the domain type the API deliberately exposes.
-        "PracticeBinding",
-        "PracticeSubject",
-        "PracticeSubjectClause",
-        "SubjectEvidenceCollection",
-        "PracticeEvidenceRequirement",
-        "PracticeOptionalContextSource",
-        "PracticeInsufficientEvidenceAction",
-        "PracticeEvidenceLimitation",
-        "PracticeAutomatedReviewValidation",
-        "PracticeAutomatedReviewValidationStatus",
-        "PracticeAutomatedReview",
-        "PracticeAutomatedReviewMode",
-        "PracticeEvidenceSufficiency",
-        "EvidenceCompletenessRequirement",
-        "EvidenceFreshnessRequirement",
-        "ReviewClaimCurrentness",
-        "SourceContractVersion",
-        "SourceKind",
-        // The workspace review scope is the shape an admin edits directly on the settings resource; a
-        // client that cannot see it cannot render, let alone change, the scope. Domain type by choice,
-        // like PracticeBinding: it is the same value the gate reads, not a transport copy of it.
-        "WorkspaceReviewScope"
-    );
+            "PageableObject",
+            "SortObject",
+            "ProblemDetail",
+            "PageMetadata",
+            "PracticeAutomatedReviewPolicy",
+            // The binding is the shape a practice is authored in, so a client that cannot see it cannot
+            // create one. It has no DTO suffix because it is the domain type the API deliberately exposes.
+            "PracticeBinding",
+            "PracticeSubject",
+            "PracticeSubjectClause",
+            "SubjectEvidenceCollection",
+            "PracticeEvidenceRequirement",
+            "PracticeOptionalContextSource",
+            "PracticeInsufficientEvidenceAction",
+            "PracticeEvidenceLimitation",
+            "PracticeAutomatedReviewValidation",
+            "PracticeAutomatedReviewValidationStatus",
+            "PracticeAutomatedReview",
+            "PracticeAutomatedReviewMode",
+            "PracticeEvidenceSufficiency",
+            "EvidenceCompletenessRequirement",
+            "EvidenceFreshnessRequirement",
+            "ReviewClaimCurrentness",
+            "SourceContractVersion",
+            "SourceKind",
+            // The workspace review scope is the shape an admin edits directly on the settings resource; a
+            // client that cannot see it cannot render, let alone change, the scope. Domain type by choice,
+            // like PracticeBinding: it is the same value the gate reads, not a transport copy of it.
+            "WorkspaceReviewScope");
     /**
      * Domain objects to include by specific suffix (like AchievementProgress records)
      */
@@ -142,9 +141,7 @@ public class OpenAPIConfiguration {
 
     @Bean
     public OpenApiCustomizer schemaCustomizer(
-        AchievementRegistry registry,
-        @Value("${spring.application.version:0.0.0-development}") String appVersion
-    ) {
+            AchievementRegistry registry, @Value("${spring.application.version:0.0.0-development}") String appVersion) {
         return openApi -> {
             openApi.getInfo().setVersion(appVersion);
             includeSpringDataPageMetadata(openApi);
@@ -161,8 +158,7 @@ public class OpenAPIConfiguration {
                 log.info("Injected {} achievement IDs into OpenAPI", achievementIds.size());
                 if (achievementIds.isEmpty()) {
                     log.error(
-                        "Achievement registry is empty during OpenAPI generation! This will cause frontend type errors."
-                    );
+                            "Achievement registry is empty during OpenAPI generation! This will cause frontend type errors.");
                 }
 
                 StringSchema idSchema = new StringSchema();
@@ -174,8 +170,8 @@ public class OpenAPIConfiguration {
 
     private void includeSpringDataPageMetadata(OpenAPI openApi) {
         ModelConverters.getInstance()
-            .read(PagedModel.PageMetadata.class)
-            .forEach((name, schema) -> openApi.getComponents().addSchemas(name, schema));
+                .read(PagedModel.PageMetadata.class)
+                .forEach((name, schema) -> openApi.getComponents().addSchemas(name, schema));
     }
 
     /**
@@ -192,28 +188,20 @@ public class OpenAPIConfiguration {
         Map<String, Schema> filteredSchemas = new HashMap<>();
 
         // Include DTOs with suffix removed
-        components
-            .getSchemas()
-            .entrySet()
-            .stream()
-            .filter(e -> e.getKey().endsWith("DTO"))
-            .forEach(e -> {
-                String nameWithoutDto = e.getKey().substring(0, e.getKey().length() - 3);
-                e.getValue().setName(nameWithoutDto);
-                filteredSchemas.put(nameWithoutDto, e.getValue());
-            });
+        components.getSchemas().entrySet().stream()
+                .filter(e -> e.getKey().endsWith("DTO"))
+                .forEach(e -> {
+                    String nameWithoutDto = e.getKey().substring(0, e.getKey().length() - 3);
+                    e.getValue().setName(nameWithoutDto);
+                    filteredSchemas.put(nameWithoutDto, e.getValue());
+                });
 
         // Include allowed domain objects
-        components
-            .getSchemas()
-            .entrySet()
-            .stream()
-            .filter(
-                e ->
-                    ALLOWED_DOMAIN_OBJECTS.contains(e.getKey()) ||
-                    SAFE_DOMAIN_SUFFIXES.stream().anyMatch(s -> e.getKey().endsWith(s))
-            )
-            .forEach(e -> filteredSchemas.put(e.getKey(), e.getValue()));
+        components.getSchemas().entrySet().stream()
+                .filter(e -> ALLOWED_DOMAIN_OBJECTS.contains(e.getKey())
+                        || SAFE_DOMAIN_SUFFIXES.stream()
+                                .anyMatch(s -> e.getKey().endsWith(s)))
+                .forEach(e -> filteredSchemas.put(e.getKey(), e.getValue()));
 
         // Update $ref to remove DTO suffix
         filteredSchemas.values().forEach(this::removeDtoSuffixFromRefs);
@@ -229,64 +217,48 @@ public class OpenAPIConfiguration {
         if (paths == null) return;
 
         paths.forEach((path, pathItem) -> {
-            pathItem
-                .readOperations()
-                .forEach(operation -> {
-                    // Remove DTO suffix from response/request schemas
-                    if (operation.getResponses() != null) {
-                        operation
-                            .getResponses()
-                            .forEach((code, response) -> {
-                                if (response.getContent() != null) {
-                                    response
-                                        .getContent()
-                                        .forEach((type, media) -> {
-                                            if (media.getSchema() != null) {
-                                                removeDtoSuffixFromRefs(media.getSchema());
-                                            }
-                                        });
-                                }
-                            });
-                    }
-
-                    if (operation.getRequestBody() != null && operation.getRequestBody().getContent() != null) {
-                        operation
-                            .getRequestBody()
-                            .getContent()
-                            .forEach((type, media) -> {
+            pathItem.readOperations().forEach(operation -> {
+                // Remove DTO suffix from response/request schemas
+                if (operation.getResponses() != null) {
+                    operation.getResponses().forEach((code, response) -> {
+                        if (response.getContent() != null) {
+                            response.getContent().forEach((type, media) -> {
                                 if (media.getSchema() != null) {
                                     removeDtoSuffixFromRefs(media.getSchema());
                                 }
                             });
-                    }
+                        }
+                    });
+                }
 
-                    // Clean up controller suffix from tags
-                    if (operation.getTags() != null) {
-                        operation.setTags(
-                            operation
-                                .getTags()
-                                .stream()
-                                .map(tag -> tag.endsWith("-controller") ? tag.substring(0, tag.length() - 11) : tag)
-                                .collect(Collectors.toList())
-                        );
-                    }
+                if (operation.getRequestBody() != null
+                        && operation.getRequestBody().getContent() != null) {
+                    operation.getRequestBody().getContent().forEach((type, media) -> {
+                        if (media.getSchema() != null) {
+                            removeDtoSuffixFromRefs(media.getSchema());
+                        }
+                    });
+                }
 
-                    // Filter out WorkspaceContext parameter
-                    if (operation.getParameters() != null) {
-                        operation.setParameters(
-                            operation
-                                .getParameters()
-                                .stream()
-                                .filter(p -> !isWorkspaceContextParam(p))
-                                .collect(Collectors.toCollection(ArrayList::new))
-                        );
-                    }
+                // Clean up controller suffix from tags
+                if (operation.getTags() != null) {
+                    operation.setTags(operation.getTags().stream()
+                            .map(tag -> tag.endsWith("-controller") ? tag.substring(0, tag.length() - 11) : tag)
+                            .collect(Collectors.toList()));
+                }
 
-                    // Ensure workspaceSlug parameter for workspace paths
-                    if (path.contains("{workspaceSlug}")) {
-                        ensureWorkspaceSlugParam(operation);
-                    }
-                });
+                // Filter out WorkspaceContext parameter
+                if (operation.getParameters() != null) {
+                    operation.setParameters(operation.getParameters().stream()
+                            .filter(p -> !isWorkspaceContextParam(p))
+                            .collect(Collectors.toCollection(ArrayList::new)));
+                }
+
+                // Ensure workspaceSlug parameter for workspace paths
+                if (path.contains("{workspaceSlug}")) {
+                    ensureWorkspaceSlugParam(operation);
+                }
+            });
         });
 
         // Also normalize refs inside component schemas (not only request/response bodies)
@@ -304,14 +276,10 @@ public class OpenAPIConfiguration {
         if (openApi.getComponents() == null || openApi.getComponents().getSchemas() == null) {
             return;
         }
-        openApi
-            .getComponents()
-            .getSchemas()
-            .values()
-            .forEach(schema -> declareExactDecimals(schema, new HashSet<>()));
+        openApi.getComponents().getSchemas().values().forEach(schema -> declareExactDecimals(schema, new HashSet<>()));
     }
 
-    @SuppressWarnings({ "rawtypes", "unchecked" })
+    @SuppressWarnings({"rawtypes", "unchecked"})
     private void declareExactDecimals(Schema schema, Set<Schema> seen) {
         if (schema == null || !seen.add(schema)) {
             return;
@@ -328,9 +296,9 @@ public class OpenAPIConfiguration {
         declareExactDecimals(schema.getItems(), seen);
         declareExactDecimals(schema.getNot(), seen);
         Stream.of(schema.getAllOf(), schema.getAnyOf(), schema.getOneOf())
-            .filter(Objects::nonNull)
-            .flatMap(List::stream)
-            .forEach(member -> declareExactDecimals((Schema) member, seen));
+                .filter(Objects::nonNull)
+                .flatMap(List::stream)
+                .forEach(member -> declareExactDecimals((Schema) member, seen));
         if (schema.getAdditionalProperties() instanceof Schema additionalSchema) {
             declareExactDecimals(additionalSchema, seen);
         }
@@ -340,7 +308,7 @@ public class OpenAPIConfiguration {
      * OpenAPI 3.1 moved the type into the {@code types} set (a nullable number is {@code [number, null]})
      * and leaves {@code getType()} populated only in the 3.0 shape, so both have to be read.
      */
-    @SuppressWarnings({ "rawtypes", "unchecked" })
+    @SuppressWarnings({"rawtypes", "unchecked"})
     private boolean isFormatlessNumber(Schema schema) {
         if (schema.getFormat() != null) {
             return false;
@@ -374,18 +342,17 @@ public class OpenAPIConfiguration {
 
         if (!exists) {
             params.add(
-                0,
-                new Parameter()
-                    .name("workspaceSlug")
-                    .in("path")
-                    .required(true)
-                    .description("Workspace slug")
-                    .schema(new StringSchema().pattern("^[a-z0-9][a-z0-9-]{2,50}$"))
-            );
+                    0,
+                    new Parameter()
+                            .name("workspaceSlug")
+                            .in("path")
+                            .required(true)
+                            .description("Workspace slug")
+                            .schema(new StringSchema().pattern("^[a-z0-9][a-z0-9-]{2,50}$")));
         }
     }
 
-    @SuppressWarnings({ "rawtypes", "unchecked" })
+    @SuppressWarnings({"rawtypes", "unchecked"})
     private void removeDtoSuffixFromRefs(Schema schema) {
         if (schema == null) return;
 

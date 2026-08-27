@@ -12,11 +12,10 @@ import org.springframework.web.reactive.function.client.WebClient;
 class OutlineApiClientSsrfTest extends BaseUnitTest {
 
     private final OutlineApiClient client = new OutlineApiClient(
-        CircuitBreaker.ofDefaults("outlineRestApi"),
-        Retry.ofDefaults("outlineRestApi"),
-        WebClient.builder().build(),
-        new OutlineOriginPolicy(java.util.Set.of())
-    );
+            CircuitBreaker.ofDefaults("outlineRestApi"),
+            Retry.ofDefaults("outlineRestApi"),
+            WebClient.builder().build(),
+            new OutlineOriginPolicy(java.util.Set.of()));
 
     @Test
     void validateToken_rejectsBlankServerUrl() {
@@ -25,8 +24,7 @@ class OutlineApiClientSsrfTest extends BaseUnitTest {
 
     @Test
     void validateToken_rejectsPublicButUnapprovedOrigin() {
-        assertThatThrownBy(() -> client.validateToken("https://wiki.example.com", "tok")).isInstanceOf(
-            OutlineApiException.class
-        );
+        assertThatThrownBy(() -> client.validateToken("https://wiki.example.com", "tok"))
+                .isInstanceOf(OutlineApiException.class);
     }
 }

@@ -41,10 +41,10 @@ class AccountBootstrapServiceTest extends BaseUnitTest {
     @Test
     void disabledWhenTokenBlank_returns404() {
         AccountBootstrapService service = serviceWithToken("");
-        assertThatThrownBy(() -> service.bootstrapFirstAdmin(1L, "anything")).isInstanceOfSatisfying(
-            ResponseStatusException.class,
-            e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND)
-        );
+        assertThatThrownBy(() -> service.bootstrapFirstAdmin(1L, "anything"))
+                .isInstanceOfSatisfying(
+                        ResponseStatusException.class,
+                        e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND));
         verify(accountRepository, never()).promoteToFirstAdminIfNoneExists(anyLong());
         verifyNoInteractions(auditWriter);
     }
@@ -52,10 +52,10 @@ class AccountBootstrapServiceTest extends BaseUnitTest {
     @Test
     void wrongToken_returns403_andDoesNotTouchTheDb() {
         AccountBootstrapService service = serviceWithToken(TOKEN);
-        assertThatThrownBy(() -> service.bootstrapFirstAdmin(1L, "wrong")).isInstanceOfSatisfying(
-            ResponseStatusException.class,
-            e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN)
-        );
+        assertThatThrownBy(() -> service.bootstrapFirstAdmin(1L, "wrong"))
+                .isInstanceOfSatisfying(
+                        ResponseStatusException.class,
+                        e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN));
         verify(accountRepository, never()).promoteToFirstAdminIfNoneExists(anyLong());
         verifyNoInteractions(auditWriter);
     }
@@ -65,10 +65,10 @@ class AccountBootstrapServiceTest extends BaseUnitTest {
         AccountBootstrapService service = serviceWithToken(TOKEN);
         when(accountRepository.promoteToFirstAdminIfNoneExists(1L)).thenReturn(0); // self-disabled
 
-        assertThatThrownBy(() -> service.bootstrapFirstAdmin(1L, TOKEN)).isInstanceOfSatisfying(
-            ResponseStatusException.class,
-            e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.CONFLICT)
-        );
+        assertThatThrownBy(() -> service.bootstrapFirstAdmin(1L, TOKEN))
+                .isInstanceOfSatisfying(
+                        ResponseStatusException.class,
+                        e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.CONFLICT));
         verifyNoInteractions(auditWriter);
     }
 

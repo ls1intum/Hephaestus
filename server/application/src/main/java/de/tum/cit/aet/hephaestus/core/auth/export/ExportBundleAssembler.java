@@ -60,14 +60,13 @@ public class ExportBundleAssembler {
     private final Clock clock;
 
     public ExportBundleAssembler(
-        AccountService accountService,
-        AccountFeatureRepository accountFeatureRepository,
-        AuthEventRepository authEventRepository,
-        AccountWorkspaceMembershipQuery workspaceMembershipQuery,
-        AccountPreferencesQuery preferencesQuery,
-        GitProviderRegistry gitProviderRegistry,
-        Clock clock
-    ) {
+            AccountService accountService,
+            AccountFeatureRepository accountFeatureRepository,
+            AuthEventRepository authEventRepository,
+            AccountWorkspaceMembershipQuery workspaceMembershipQuery,
+            AccountPreferencesQuery preferencesQuery,
+            GitProviderRegistry gitProviderRegistry,
+            Clock clock) {
         this.accountService = accountService;
         this.accountFeatureRepository = accountFeatureRepository;
         this.authEventRepository = authEventRepository;
@@ -84,89 +83,86 @@ public class ExportBundleAssembler {
 
         Set<String> logins = new LinkedHashSet<>();
         for (IdentityLink link : identities) {
-            if (link.getUsernameAtSignup() != null && !link.getUsernameAtSignup().isBlank()) {
+            if (link.getUsernameAtSignup() != null
+                    && !link.getUsernameAtSignup().isBlank()) {
                 logins.add(link.getUsernameAtSignup());
             }
         }
 
         ExportBundle.Profile profile = new ExportBundle.Profile(
-            Objects.requireNonNull(account.getId()),
-            account.getDisplayName(),
-            account.getPrimaryEmail(),
-            // appRole deliberately not disclosed here — see ExportBundle.Profile (Art. 20(1) scope).
-            account.getStatus().name(),
-            Objects.requireNonNull(account.getCreatedAt())
-        );
+                Objects.requireNonNull(account.getId()),
+                account.getDisplayName(),
+                account.getPrimaryEmail(),
+                // appRole deliberately not disclosed here — see ExportBundle.Profile (Art. 20(1) scope).
+                account.getStatus().name(),
+                Objects.requireNonNull(account.getCreatedAt()));
 
-        List<ExportBundle.Identity> identityViews = identities.stream().map(this::toIdentity).toList();
+        List<ExportBundle.Identity> identityViews =
+                identities.stream().map(this::toIdentity).toList();
 
-        List<ExportBundle.WorkspaceMembership> memberships = workspaceMembershipQuery
-            .membershipsForLogins(logins)
-            .stream()
-            .map(m -> new ExportBundle.WorkspaceMembership(m.workspaceSlug(), m.workspaceName(), m.role()))
-            .toList();
+        List<ExportBundle.WorkspaceMembership> memberships =
+                workspaceMembershipQuery.membershipsForLogins(logins).stream()
+                        .map(m -> new ExportBundle.WorkspaceMembership(m.workspaceSlug(), m.workspaceName(), m.role()))
+                        .toList();
 
         List<String> featureFlags = accountFeatureRepository.findFlagsByAccountId(accountId);
 
         // Preferences are keyed by a single SCM login; use the principal's primary (first active)
         // login. Absent if no preferences row exists yet.
-        ExportBundle.Preferences preferences = logins
-            .stream()
-            .findFirst()
-            .flatMap(preferencesQuery::preferencesForLogin)
-            .map(p -> new ExportBundle.Preferences(p.participateInResearch(), p.practiceFeedbackDeliveryEnabled()))
-            .orElse(null);
+        ExportBundle.Preferences preferences = logins.stream()
+                .findFirst()
+                .flatMap(preferencesQuery::preferencesForLogin)
+                .map(p -> new ExportBundle.Preferences(p.participateInResearch(), p.practiceFeedbackDeliveryEnabled()))
+                .orElse(null);
 
         // Real calendar months (not 30-day approximations) so this window matches the partition
         // retention (pg_partman, 12 months), which is also 12 calendar months.
-        Instant since = Instant.now(clock).atZone(ZoneOffset.UTC).minusMonths(AUTH_EVENT_WINDOW_MONTHS).toInstant();
-        List<ExportBundle.AuthEvent> authEvents = authEventRepository
-            .findByAccountSince(accountId, since)
-            .stream()
-            // GDPR Art. 20(4): the export "shall not adversely affect the rights and freedoms of
-            // others." Impersonation rows are authored about this subject BY ANOTHER account (the
-            // operator) and carry that operator's id (acting_account_id) + operator-supplied reason
-            // (details) — operator-accountability audit records, not data this subject provided
-            // (Art. 20(1)). Excluded from the portable bundle; they remain in the immutable auth_event log.
-            .filter(e -> !isImpersonationEvent(e))
-            .map(ExportBundleAssembler::toAuthEvent)
-            .toList();
+        Instant since = Instant.now(clock)
+                .atZone(ZoneOffset.UTC)
+                .minusMonths(AUTH_EVENT_WINDOW_MONTHS)
+                .toInstant();
+        List<ExportBundle.AuthEvent> authEvents = authEventRepository.findByAccountSince(accountId, since).stream()
+                // GDPR Art. 20(4): the export "shall not adversely affect the rights and freedoms of
+                // others." Impersonation rows are authored about this subject BY ANOTHER account (the
+                // operator) and carry that operator's id (acting_account_id) + operator-supplied reason
+                // (details) — operator-accountability audit records, not data this subject provided
+                // (Art. 20(1)). Excluded from the portable bundle; they remain in the immutable auth_event log.
+                .filter(e -> !isImpersonationEvent(e))
+                .map(ExportBundleAssembler::toAuthEvent)
+                .toList();
 
         return new ExportBundle(
-            ExportBundle.SCHEMA_VERSION,
-            Instant.now(clock),
-            profile,
-            identityViews,
-            memberships,
-            featureFlags,
-            preferences,
-            authEvents
-        );
+                ExportBundle.SCHEMA_VERSION,
+                Instant.now(clock),
+                profile,
+                identityViews,
+                memberships,
+                featureFlags,
+                preferences,
+                authEvents);
     }
 
     private ExportBundle.Identity toIdentity(IdentityLink il) {
         String provider = gitProviderRegistry.providerTypeName(il.getProviderId());
         return new ExportBundle.Identity(
-            provider,
-            il.getSubject(),
-            il.getUsernameAtSignup(),
-            il.getEmailAtSignup(),
-            il.getDisplayName(),
-            il.getLinkedAt(),
-            il.getLastLoginAt()
-        );
+                provider,
+                il.getSubject(),
+                il.getUsernameAtSignup(),
+                il.getEmailAtSignup(),
+                il.getDisplayName(),
+                il.getLinkedAt(),
+                il.getLastLoginAt());
     }
 
     private static ExportBundle.AuthEvent toAuthEvent(AuthEvent e) {
         // NOTE (Art. 20(4) chokepoint): this mapper deliberately never reads e.getActingAccountId()
         // or e.getDetails() — both can reference / be authored by another account. Do NOT add them.
         return new ExportBundle.AuthEvent(
-            e.getId() != null ? e.getId().getOccurredAt() : null,
-            e.getEventType() != null ? e.getEventType().name() : null,
-            e.getResult() != null ? e.getResult().name() : null,
-            e.getIpInet(),
-            e.getUserAgent()
-        );
+                e.getId() != null ? e.getId().getOccurredAt() : null,
+                e.getEventType() != null ? e.getEventType().name() : null,
+                e.getResult() != null ? e.getResult().name() : null,
+                e.getIpInet(),
+                e.getUserAgent());
     }
 
     /** Impersonation events are operator-authored records about the subject; excluded under Art. 20(4). */

@@ -15,12 +15,12 @@ import org.jspecify.annotations.Nullable;
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record GitHubPullRequestReviewCommentEventDTO(
-    @JsonProperty("action") String action,
-    @JsonProperty("comment") GitHubReviewCommentDTO comment,
-    @JsonProperty("pull_request") GitHubPullRequestDTO pullRequest,
-    @JsonProperty("repository") GitHubRepositoryRefDTO repository,
-    @JsonProperty("sender") GitHubUserDTO sender
-) implements GitHubWebhookEvent {
+        @JsonProperty("action") String action,
+        @JsonProperty("comment") GitHubReviewCommentDTO comment,
+        @JsonProperty("pull_request") GitHubPullRequestDTO pullRequest,
+        @JsonProperty("repository") GitHubRepositoryRefDTO repository,
+        @JsonProperty("sender") GitHubUserDTO sender)
+        implements GitHubWebhookEvent {
     @Override
     public GitHubEventAction.PullRequestReviewComment actionType() {
         return GitHubEventAction.PullRequestReviewComment.fromString(action);
@@ -36,26 +36,28 @@ public record GitHubPullRequestReviewCommentEventDTO(
      */
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record GitHubReviewCommentDTO(
-        @JsonProperty("id") Long id,
-        @JsonProperty("node_id") String nodeId,
-        @JsonProperty("diff_hunk") String diffHunk,
-        @JsonProperty("path") String path,
-        @JsonProperty("body") String body,
-        @JsonProperty("html_url") @Nullable String htmlUrl,
-        @JsonProperty("user") @Nullable GitHubUserDTO author,
-        @JsonProperty("created_at") @Nullable Instant createdAt,
-        @JsonProperty("updated_at") @Nullable Instant updatedAt,
-        @JsonProperty("pull_request_review_id") @Nullable Long reviewId,
-        @JsonProperty("commit_id") @Nullable String commitId,
-        @JsonProperty("original_commit_id") @Nullable String originalCommitId,
-        @JsonProperty("author_association") String authorAssociation,
-        @JsonProperty("line") @Nullable Integer line,
-        @JsonProperty("original_line") @Nullable Integer originalLine,
-        @JsonProperty("start_line") @Nullable Integer startLine,
-        @JsonProperty("original_start_line") @Nullable Integer originalStartLine,
-        @JsonProperty("side") @Nullable String side,
-        @JsonProperty("start_side") @Nullable String startSide,
-        @JsonProperty("in_reply_to_id") @Nullable Long inReplyToId,
-        @JsonProperty("outdated") Boolean outdated
-    ) {}
+            @JsonProperty("id") Long id,
+            @JsonProperty("node_id") String nodeId,
+            @JsonProperty("diff_hunk") String diffHunk,
+            @JsonProperty("path") String path,
+            @JsonProperty("body") String body,
+            @JsonProperty("html_url") @Nullable String htmlUrl,
+            @JsonProperty("user") @Nullable GitHubUserDTO author,
+            @JsonProperty("created_at") @Nullable Instant createdAt,
+            @JsonProperty("updated_at") @Nullable Instant updatedAt,
+
+            @JsonProperty("pull_request_review_id") @Nullable
+            Long reviewId,
+
+            @JsonProperty("commit_id") @Nullable String commitId,
+            @JsonProperty("original_commit_id") @Nullable String originalCommitId,
+            @JsonProperty("author_association") String authorAssociation,
+            @JsonProperty("line") @Nullable Integer line,
+            @JsonProperty("original_line") @Nullable Integer originalLine,
+            @JsonProperty("start_line") @Nullable Integer startLine,
+            @JsonProperty("original_start_line") @Nullable Integer originalStartLine,
+            @JsonProperty("side") @Nullable String side,
+            @JsonProperty("start_side") @Nullable String startSide,
+            @JsonProperty("in_reply_to_id") @Nullable Long inReplyToId,
+            @JsonProperty("outdated") Boolean outdated) {}
 }

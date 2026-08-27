@@ -46,9 +46,8 @@ class AchievementRegistryTest extends BaseUnitTest {
 
         @Test
         void getByIdThrowsForUnknownId() {
-            assertThatThrownBy(() -> registry.getById("nonexistent.achievement")).isInstanceOf(
-                IllegalArgumentException.class
-            );
+            assertThatThrownBy(() -> registry.getById("nonexistent.achievement"))
+                    .isInstanceOf(IllegalArgumentException.class);
         }
     }
 
@@ -58,33 +57,6 @@ class AchievementRegistryTest extends BaseUnitTest {
         @Test
         void allCommitAchievementsHaveCommitCreatedTrigger() {
             List<String> commitMainlineIds = List.of(
-                "commit.common.1",
-                "commit.common.2",
-                "commit.uncommon.1",
-                "commit.uncommon.2",
-                "commit.rare",
-                "commit.epic",
-                "commit.legendary",
-                "commit.mythic"
-            );
-
-            for (String id : commitMainlineIds) {
-                AchievementDefinition def = registry.getById(id);
-                assertThat(def.triggerEvents())
-                    .as("Achievement '%s' should have COMMIT_CREATED trigger", id)
-                    .contains(ActivityEventType.COMMIT_CREATED);
-            }
-        }
-
-        @Test
-        void getByTriggerEventReturnsCommitAchievements() {
-            List<AchievementDefinition> commitAchievements = registry.getByTriggerEvent(
-                ActivityEventType.COMMIT_CREATED
-            );
-
-            assertThat(commitAchievements)
-                .extracting(AchievementDefinition::id)
-                .contains(
                     "commit.common.1",
                     "commit.common.2",
                     "commit.uncommon.1",
@@ -92,8 +64,32 @@ class AchievementRegistryTest extends BaseUnitTest {
                     "commit.rare",
                     "commit.epic",
                     "commit.legendary",
-                    "commit.mythic"
-                );
+                    "commit.mythic");
+
+            for (String id : commitMainlineIds) {
+                AchievementDefinition def = registry.getById(id);
+                assertThat(def.triggerEvents())
+                        .as("Achievement '%s' should have COMMIT_CREATED trigger", id)
+                        .contains(ActivityEventType.COMMIT_CREATED);
+            }
+        }
+
+        @Test
+        void getByTriggerEventReturnsCommitAchievements() {
+            List<AchievementDefinition> commitAchievements =
+                    registry.getByTriggerEvent(ActivityEventType.COMMIT_CREATED);
+
+            assertThat(commitAchievements)
+                    .extracting(AchievementDefinition::id)
+                    .contains(
+                            "commit.common.1",
+                            "commit.common.2",
+                            "commit.uncommon.1",
+                            "commit.uncommon.2",
+                            "commit.rare",
+                            "commit.epic",
+                            "commit.legendary",
+                            "commit.mythic");
         }
     }
 
@@ -101,11 +97,8 @@ class AchievementRegistryTest extends BaseUnitTest {
     @DisplayName("Parent References")
     class ParentReferenceTests {
 
-        private static final Set<String> STANDALONE_SELF_REFERENCED_ACHIEVEMENTS = Set.of(
-            "issue.special.necromancer",
-            "milestone.long_time_return",
-            "milestone.all_rare"
-        );
+        private static final Set<String> STANDALONE_SELF_REFERENCED_ACHIEVEMENTS =
+                Set.of("issue.special.necromancer", "milestone.long_time_return", "milestone.all_rare");
 
         @Test
         void shouldOnlyReferenceItselfWhenAchievementIsStandalone() {
@@ -113,8 +106,8 @@ class AchievementRegistryTest extends BaseUnitTest {
                 if (def.parent() != null && !def.parent().isEmpty()) {
                     if (def.parent().equals(def.id())) {
                         assertThat(STANDALONE_SELF_REFERENCED_ACHIEVEMENTS)
-                            .as("Only standalone achievements may self-reference: '%s'", def.id())
-                            .contains(def.id());
+                                .as("Only standalone achievements may self-reference: '%s'", def.id())
+                                .contains(def.id());
                     }
                 }
             }
@@ -124,10 +117,12 @@ class AchievementRegistryTest extends BaseUnitTest {
         void shouldHaveExistingParentWhenParentIsSpecified() {
             Set<String> allIds = registry.getAchievementIds();
             for (AchievementDefinition def : registry.values()) {
-                if (def.parent() != null && !def.parent().isEmpty() && !def.parent().equals(def.id())) {
+                if (def.parent() != null
+                        && !def.parent().isEmpty()
+                        && !def.parent().equals(def.id())) {
                     assertThat(allIds)
-                        .as("Parent '%s' of achievement '%s' must exist", def.parent(), def.id())
-                        .contains(def.parent());
+                            .as("Parent '%s' of achievement '%s' must exist", def.parent(), def.id())
+                            .contains(def.parent());
                 }
             }
         }
@@ -141,8 +136,8 @@ class AchievementRegistryTest extends BaseUnitTest {
                 String current = def.parent();
                 while (current != null && !current.isEmpty() && !current.equals(def.id())) {
                     assertThat(visited.add(current))
-                        .as("Cycle detected: achievement '%s' is part of cycle through '%s'", def.id(), current)
-                        .isTrue();
+                            .as("Cycle detected: achievement '%s' is part of cycle through '%s'", def.id(), current)
+                            .isTrue();
                     AchievementDefinition parentDef = registry.getById(current);
                     if (parentDef.parent() != null && parentDef.parent().equals(current)) {
                         break;
@@ -161,14 +156,12 @@ class AchievementRegistryTest extends BaseUnitTest {
             for (AchievementDefinition def : registry.values()) {
                 if ("DummyEvaluator".equals(def.evaluatorClass())) {
                     assertThat(def.triggerEvents())
-                        .as(
-                            "DummyEvaluator achievement '%s' should have empty triggerEvents to avoid wasted work",
-                            def.id()
-                        )
-                        .satisfiesAnyOf(
-                            triggers -> assertThat(triggers).isNull(),
-                            triggers -> assertThat(triggers).isEmpty()
-                        );
+                            .as(
+                                    "DummyEvaluator achievement '%s' should have empty triggerEvents to avoid wasted work",
+                                    def.id())
+                            .satisfiesAnyOf(
+                                    triggers -> assertThat(triggers).isNull(),
+                                    triggers -> assertThat(triggers).isEmpty());
                 }
             }
         }
@@ -179,13 +172,11 @@ class AchievementRegistryTest extends BaseUnitTest {
             for (AchievementDefinition def : registry.values()) {
                 if (!"DummyEvaluator".equals(def.evaluatorClass())) {
                     assertThat(def.triggerEvents())
-                        .as(
-                            "Achievement '%s' with evaluator '%s' must have trigger events",
-                            def.id(),
-                            def.evaluatorClass()
-                        )
-                        .isNotNull()
-                        .isNotEmpty();
+                            .as(
+                                    "Achievement '%s' with evaluator '%s' must have trigger events",
+                                    def.id(), def.evaluatorClass())
+                            .isNotNull()
+                            .isNotEmpty();
                 }
             }
         }

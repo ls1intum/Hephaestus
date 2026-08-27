@@ -61,13 +61,12 @@ public class GitHubInstallationReconciler implements WorkspaceProvisioningHook {
     private final WebClient webClient;
 
     public GitHubInstallationReconciler(
-        GitHubAppTokenService gitHubAppTokenService,
-        GithubLifecycleListener githubLifecycleListener,
-        WorkspaceRepository workspaceRepository,
-        WorkspaceService workspaceService,
-        WorkspaceRepositoryMonitorService workspaceRepositoryMonitorService,
-        WorkspaceScopeFilter workspaceScopeFilter
-    ) {
+            GitHubAppTokenService gitHubAppTokenService,
+            GithubLifecycleListener githubLifecycleListener,
+            WorkspaceRepository workspaceRepository,
+            WorkspaceService workspaceService,
+            WorkspaceRepositoryMonitorService workspaceRepositoryMonitorService,
+            WorkspaceScopeFilter workspaceScopeFilter) {
         this.gitHubAppTokenService = gitHubAppTokenService;
         this.githubLifecycleListener = githubLifecycleListener;
         this.workspaceRepository = workspaceRepository;
@@ -75,11 +74,11 @@ public class GitHubInstallationReconciler implements WorkspaceProvisioningHook {
         this.workspaceRepositoryMonitorService = workspaceRepositoryMonitorService;
         this.workspaceScopeFilter = workspaceScopeFilter;
         this.webClient = WebClient.builder()
-            .clientConnector(WebClientConnectors.systemDns())
-            .baseUrl(GITHUB_API_BASE_URL)
-            .defaultHeader(HttpHeaders.ACCEPT, "application/vnd.github+json")
-            .defaultHeader("X-GitHub-Api-Version", "2022-11-28")
-            .build();
+                .clientConnector(WebClientConnectors.systemDns())
+                .baseUrl(GITHUB_API_BASE_URL)
+                .defaultHeader(HttpHeaders.ACCEPT, "application/vnd.github+json")
+                .defaultHeader("X-GitHub-Api-Version", "2022-11-28")
+                .build();
     }
 
     /**
@@ -91,9 +90,8 @@ public class GitHubInstallationReconciler implements WorkspaceProvisioningHook {
     public void ensureGitHubAppInstallations() {
         if (!gitHubAppTokenService.isConfigured()) {
             log.info(
-                "Skipped GitHub App installation processing: reason=credentialsNotConfigured, appId={}",
-                gitHubAppTokenService.getConfiguredAppId()
-            );
+                    "Skipped GitHub App installation processing: reason=credentialsNotConfigured, appId={}",
+                    gitHubAppTokenService.getConfiguredAppId());
             return;
         }
 
@@ -101,12 +99,12 @@ public class GitHubInstallationReconciler implements WorkspaceProvisioningHook {
             String appJwt = gitHubAppTokenService.generateAppJWT();
 
             AppInfoResponse appInfo = webClient
-                .get()
-                .uri("/app")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + appJwt)
-                .retrieve()
-                .bodyToMono(AppInfoResponse.class)
-                .block();
+                    .get()
+                    .uri("/app")
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + appJwt)
+                    .retrieve()
+                    .bodyToMono(AppInfoResponse.class)
+                    .block();
 
             if (appInfo == null) {
                 log.warn("Skipped GitHub App processing: reason=nullAppInfoResponse");
@@ -115,44 +113,41 @@ public class GitHubInstallationReconciler implements WorkspaceProvisioningHook {
 
             String ownerLogin = appInfo.owner() != null ? appInfo.owner().login() : "unknown";
             log.info(
-                "Authenticated as GitHub App: appName={}, appSlug={}, appId={}, ownerLogin={}",
-                appInfo.name(),
-                appInfo.slug(),
-                appInfo.id(),
-                ownerLogin
-            );
+                    "Authenticated as GitHub App: appName={}, appSlug={}, appId={}, ownerLogin={}",
+                    appInfo.name(),
+                    appInfo.slug(),
+                    appInfo.id(),
+                    ownerLogin);
 
             List<InstallationDto> installations = webClient
-                .get()
-                .uri("/app/installations")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + appJwt)
-                .retrieve()
-                .bodyToFlux(InstallationDto.class)
-                .collectList()
-                .block();
+                    .get()
+                    .uri("/app/installations")
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + appJwt)
+                    .retrieve()
+                    .bodyToFlux(InstallationDto.class)
+                    .collectList()
+                    .block();
 
             if (installations == null || installations.isEmpty()) {
                 log.warn(
-                    "Skipped GitHub App processing: reason=noInstallations, appSlug={}, appId={}",
-                    appInfo.slug(),
-                    appInfo.id()
-                );
+                        "Skipped GitHub App processing: reason=noInstallations, appSlug={}, appId={}",
+                        appInfo.slug(),
+                        appInfo.id());
                 return;
             }
 
             log.info(
-                "Ensured GitHub App installations reflected as workspaces: installationCount={}",
-                installations.size()
-            );
+                    "Ensured GitHub App installations reflected as workspaces: installationCount={}",
+                    installations.size());
 
             for (InstallationDto installation : installations) {
-                String accountLogin = installation.account() != null ? installation.account().login() : "<unknown>";
+                String accountLogin =
+                        installation.account() != null ? installation.account().login() : "<unknown>";
                 log.info(
-                    "Processed GitHub App installation: installationId={}, accountLogin={}, selection={}",
-                    installation.id(),
-                    accountLogin,
-                    installation.repositorySelection()
-                );
+                        "Processed GitHub App installation: installationId={}, accountLogin={}, selection={}",
+                        installation.id(),
+                        accountLogin,
+                        installation.repositorySelection());
                 synchronizeInstallation(installation);
             }
         } catch (Exception e) {
@@ -169,16 +164,12 @@ public class GitHubInstallationReconciler implements WorkspaceProvisioningHook {
         if (installation.suspendedAt() != null) {
             log.info("Skipped installation sync: reason=suspended, installationId={}", installation.id());
             gitHubAppTokenService.markInstallationSuspended(installation.id());
-            workspaceRepository
-                .findByInstallationId(installation.id())
-                .ifPresent(ws -> {
-                    if (ws.getStatus() != Workspace.WorkspaceStatus.SUSPENDED) {
-                        githubLifecycleListener.updateWorkspaceStatus(
-                            installation.id(),
-                            Workspace.WorkspaceStatus.SUSPENDED
-                        );
-                    }
-                });
+            workspaceRepository.findByInstallationId(installation.id()).ifPresent(ws -> {
+                if (ws.getStatus() != Workspace.WorkspaceStatus.SUSPENDED) {
+                    githubLifecycleListener.updateWorkspaceStatus(
+                            installation.id(), Workspace.WorkspaceStatus.SUSPENDED);
+                }
+            });
             return;
         }
         gitHubAppTokenService.markInstallationActive(installation.id());
@@ -187,10 +178,9 @@ public class GitHubInstallationReconciler implements WorkspaceProvisioningHook {
 
         if (workspaceScopeFilter.isActive() && !workspaceScopeFilter.isOrganizationAllowed(login)) {
             log.info(
-                "Skipped installation sync: reason=filteredByScope, installationId={}, accountLogin={}",
-                installation.id(),
-                login
-            );
+                    "Skipped installation sync: reason=filteredByScope, installationId={}, accountLogin={}",
+                    installation.id(),
+                    login);
             return;
         }
 
@@ -199,32 +189,24 @@ public class GitHubInstallationReconciler implements WorkspaceProvisioningHook {
         RepositorySelection selection = convertRepositorySelection(installation.repositorySelection());
 
         log.info(
-            "Ensured installation workspace: installationId={}, orgLogin={}, selection={}",
-            installationId,
-            login,
-            selection
-        );
+                "Ensured installation workspace: installationId={}, orgLogin={}, selection={}",
+                installationId,
+                login,
+                selection);
 
         var account = installation.account();
         IntegrationLifecycleListener.AccountKind wsAccountKind = "Organization".equalsIgnoreCase(accountType)
-            ? IntegrationLifecycleListener.AccountKind.ORGANIZATION
-            : IntegrationLifecycleListener.AccountKind.USER;
+                ? IntegrationLifecycleListener.AccountKind.ORGANIZATION
+                : IntegrationLifecycleListener.AccountKind.USER;
 
         Workspace workspace = githubLifecycleListener.createOrUpdateFromInstallation(
-            installationId,
-            account.id(),
-            login,
-            wsAccountKind,
-            account.avatarUrl(),
-            selection
-        );
+                installationId, account.id(), login, wsAccountKind, account.avatarUrl(), selection);
 
         if (workspace == null) {
             log.warn(
-                "Skipped workspace creation: reason=userNotFound, installationId={}, orgLogin={}",
-                installationId,
-                login
-            );
+                    "Skipped workspace creation: reason=userNotFound, installationId={}, orgLogin={}",
+                    installationId,
+                    login);
             return;
         }
 
@@ -253,11 +235,14 @@ public class GitHubInstallationReconciler implements WorkspaceProvisioningHook {
     private record OwnerDto(String login) {}
 
     private record InstallationDto(
-        long id,
-        AccountDto account,
-        @JsonProperty("repository_selection") String repositorySelection,
-        @JsonProperty("suspended_at") Instant suspendedAt
-    ) {}
+            long id,
+            AccountDto account,
+            @JsonProperty("repository_selection") String repositorySelection,
+            @JsonProperty("suspended_at") Instant suspendedAt) {}
 
-    private record AccountDto(Long id, String login, String type, @JsonProperty("avatar_url") String avatarUrl) {}
+    private record AccountDto(
+            Long id,
+            String login,
+            String type,
+            @JsonProperty("avatar_url") String avatarUrl) {}
 }

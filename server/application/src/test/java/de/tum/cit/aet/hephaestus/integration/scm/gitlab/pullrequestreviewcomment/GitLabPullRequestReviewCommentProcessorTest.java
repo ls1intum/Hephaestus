@@ -15,7 +15,6 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewcomment
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewcomment.PullRequestReviewCommentRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewthread.PullRequestReviewThread;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.time.Instant;
 import java.util.HashSet;
@@ -79,25 +78,29 @@ class GitLabPullRequestReviewCommentProcessorTest extends BaseUnitTest {
         @Test
         void shouldPreferNewPathWhenAvailable() {
             var data = buildDiffNoteData("new/path.ts", "old/path.ts", "ignored.ts", 10, null, null, null, null);
-            assertThat(GitLabPullRequestReviewCommentProcessor.resolvePath(data)).isEqualTo("new/path.ts");
+            assertThat(GitLabPullRequestReviewCommentProcessor.resolvePath(data))
+                    .isEqualTo("new/path.ts");
         }
 
         @Test
         void shouldFallBackToOldPathWhenNewPathIsBlank() {
             var data = buildDiffNoteData(null, "old/path.ts", "ignored.ts", null, 5, null, null, null);
-            assertThat(GitLabPullRequestReviewCommentProcessor.resolvePath(data)).isEqualTo("old/path.ts");
+            assertThat(GitLabPullRequestReviewCommentProcessor.resolvePath(data))
+                    .isEqualTo("old/path.ts");
         }
 
         @Test
         void shouldFallBackToFilePathWhenNewAndOldPathAreNull() {
             var data = buildDiffNoteData(null, null, "resolved/path.ts", 10, null, null, null, null);
-            assertThat(GitLabPullRequestReviewCommentProcessor.resolvePath(data)).isEqualTo("resolved/path.ts");
+            assertThat(GitLabPullRequestReviewCommentProcessor.resolvePath(data))
+                    .isEqualTo("resolved/path.ts");
         }
 
         @Test
         void shouldReturnEmptyStringWhenNoPathIsAvailable() {
             var data = buildDiffNoteData(null, null, null, 10, null, null, null, null);
-            assertThat(GitLabPullRequestReviewCommentProcessor.resolvePath(data)).isEmpty();
+            assertThat(GitLabPullRequestReviewCommentProcessor.resolvePath(data))
+                    .isEmpty();
         }
     }
 
@@ -108,23 +111,20 @@ class GitLabPullRequestReviewCommentProcessorTest extends BaseUnitTest {
 
         @Test
         void shouldReturnRightWhenNewLineIsPresent() {
-            assertThat(GitLabPullRequestReviewCommentProcessor.deriveSide(42, null)).isEqualTo(
-                PullRequestReviewComment.Side.RIGHT
-            );
+            assertThat(GitLabPullRequestReviewCommentProcessor.deriveSide(42, null))
+                    .isEqualTo(PullRequestReviewComment.Side.RIGHT);
         }
 
         @Test
         void shouldReturnLeftWhenOnlyOldLineIsPresent() {
-            assertThat(GitLabPullRequestReviewCommentProcessor.deriveSide(null, 7)).isEqualTo(
-                PullRequestReviewComment.Side.LEFT
-            );
+            assertThat(GitLabPullRequestReviewCommentProcessor.deriveSide(null, 7))
+                    .isEqualTo(PullRequestReviewComment.Side.LEFT);
         }
 
         @Test
         void shouldDefaultToRightWhenNeitherLineIsPresent() {
-            assertThat(GitLabPullRequestReviewCommentProcessor.deriveSide(null, null)).isEqualTo(
-                PullRequestReviewComment.Side.RIGHT
-            );
+            assertThat(GitLabPullRequestReviewCommentProcessor.deriveSide(null, null))
+                    .isEqualTo(PullRequestReviewComment.Side.RIGHT);
         }
     }
 
@@ -135,24 +135,26 @@ class GitLabPullRequestReviewCommentProcessorTest extends BaseUnitTest {
 
         @Test
         void shouldBuildSingleLineStubWhenNewLineIsPresent() {
-            assertThat(GitLabPullRequestReviewCommentProcessor.buildDiffHunkStub(null, 42)).isEqualTo(
-                "@@ -0,1 +42,1 @@"
-            );
+            assertThat(GitLabPullRequestReviewCommentProcessor.buildDiffHunkStub(null, 42))
+                    .isEqualTo("@@ -0,1 +42,1 @@");
         }
 
         @Test
         void shouldBuildSingleLineStubWhenOldLineIsPresent() {
-            assertThat(GitLabPullRequestReviewCommentProcessor.buildDiffHunkStub(7, null)).isEqualTo("@@ -7,1 +0,1 @@");
+            assertThat(GitLabPullRequestReviewCommentProcessor.buildDiffHunkStub(7, null))
+                    .isEqualTo("@@ -7,1 +0,1 @@");
         }
 
         @Test
         void shouldReturnNullWhenBothLinesAreNull() {
-            assertThat(GitLabPullRequestReviewCommentProcessor.buildDiffHunkStub(null, null)).isNull();
+            assertThat(GitLabPullRequestReviewCommentProcessor.buildDiffHunkStub(null, null))
+                    .isNull();
         }
 
         @Test
         void shouldReturnNullWhenBothLinesAreZero() {
-            assertThat(GitLabPullRequestReviewCommentProcessor.buildDiffHunkStub(0, 0)).isNull();
+            assertThat(GitLabPullRequestReviewCommentProcessor.buildDiffHunkStub(0, 0))
+                    .isNull();
         }
     }
 
@@ -163,32 +165,15 @@ class GitLabPullRequestReviewCommentProcessorTest extends BaseUnitTest {
 
         @Test
         void shouldPopulateAllPositionMetadataWhenCreatingComment() {
-            when(commentRepository.findByNativeIdAndProviderId(NOTE_NATIVE_ID, PROVIDER_ID)).thenReturn(
-                Optional.empty()
-            );
-            when(commentRepository.save(any(PullRequestReviewComment.class))).thenAnswer(inv ->
-                inv.getArgument(0, PullRequestReviewComment.class)
-            );
+            when(commentRepository.findByNativeIdAndProviderId(NOTE_NATIVE_ID, PROVIDER_ID))
+                    .thenReturn(Optional.empty());
+            when(commentRepository.save(any(PullRequestReviewComment.class)))
+                    .thenAnswer(inv -> inv.getArgument(0, PullRequestReviewComment.class));
 
             var data = buildDiffNoteData(
-                "src/Foo.ts",
-                "src/Foo.ts",
-                "src/Foo.ts",
-                42,
-                null,
-                "head-sha",
-                "base-sha",
-                "start-sha"
-            );
+                    "src/Foo.ts", "src/Foo.ts", "src/Foo.ts", 42, null, "head-sha", "base-sha", "start-sha");
             var context = new GitLabPullRequestReviewCommentProcessor.CommentContext(
-                thread,
-                pr,
-                null,
-                provider,
-                null,
-                null,
-                SCOPE_ID
-            );
+                    thread, pr, null, provider, null, null, SCOPE_ID);
 
             PullRequestReviewComment saved = processor.findOrCreateComment(data, context);
 
@@ -205,23 +190,14 @@ class GitLabPullRequestReviewCommentProcessorTest extends BaseUnitTest {
 
         @Test
         void shouldFallBackToStartShaWhenBaseShaIsNull() {
-            when(commentRepository.findByNativeIdAndProviderId(NOTE_NATIVE_ID, PROVIDER_ID)).thenReturn(
-                Optional.empty()
-            );
-            when(commentRepository.save(any(PullRequestReviewComment.class))).thenAnswer(inv ->
-                inv.getArgument(0, PullRequestReviewComment.class)
-            );
+            when(commentRepository.findByNativeIdAndProviderId(NOTE_NATIVE_ID, PROVIDER_ID))
+                    .thenReturn(Optional.empty());
+            when(commentRepository.save(any(PullRequestReviewComment.class)))
+                    .thenAnswer(inv -> inv.getArgument(0, PullRequestReviewComment.class));
 
             var data = buildDiffNoteData("src/Foo.ts", "src/Foo.ts", null, 42, null, "head-sha", null, "start-sha");
             var context = new GitLabPullRequestReviewCommentProcessor.CommentContext(
-                thread,
-                pr,
-                null,
-                provider,
-                null,
-                null,
-                SCOPE_ID
-            );
+                    thread, pr, null, provider, null, null, SCOPE_ID);
 
             PullRequestReviewComment saved = processor.findOrCreateComment(data, context);
 
@@ -231,26 +207,17 @@ class GitLabPullRequestReviewCommentProcessorTest extends BaseUnitTest {
 
         @Test
         void shouldAttachInReplyToWhenReplyContextIsProvided() {
-            when(commentRepository.findByNativeIdAndProviderId(NOTE_NATIVE_ID, PROVIDER_ID)).thenReturn(
-                Optional.empty()
-            );
-            when(commentRepository.save(any(PullRequestReviewComment.class))).thenAnswer(inv ->
-                inv.getArgument(0, PullRequestReviewComment.class)
-            );
+            when(commentRepository.findByNativeIdAndProviderId(NOTE_NATIVE_ID, PROVIDER_ID))
+                    .thenReturn(Optional.empty());
+            when(commentRepository.save(any(PullRequestReviewComment.class)))
+                    .thenAnswer(inv -> inv.getArgument(0, PullRequestReviewComment.class));
 
             PullRequestReviewComment parent = new PullRequestReviewComment();
             parent.setId(999L);
 
             var data = buildDiffNoteData("src/Foo.ts", null, null, 42, null, "head-sha", "base-sha", null);
             var context = new GitLabPullRequestReviewCommentProcessor.CommentContext(
-                thread,
-                pr,
-                null,
-                provider,
-                parent,
-                null,
-                SCOPE_ID
-            );
+                    thread, pr, null, provider, parent, null, SCOPE_ID);
 
             PullRequestReviewComment saved = processor.findOrCreateComment(data, context);
 
@@ -260,12 +227,10 @@ class GitLabPullRequestReviewCommentProcessorTest extends BaseUnitTest {
 
         @Test
         void shouldLinkReviewWhenReviewContextIsProvided() {
-            when(commentRepository.findByNativeIdAndProviderId(NOTE_NATIVE_ID, PROVIDER_ID)).thenReturn(
-                Optional.empty()
-            );
-            when(commentRepository.save(any(PullRequestReviewComment.class))).thenAnswer(inv ->
-                inv.getArgument(0, PullRequestReviewComment.class)
-            );
+            when(commentRepository.findByNativeIdAndProviderId(NOTE_NATIVE_ID, PROVIDER_ID))
+                    .thenReturn(Optional.empty());
+            when(commentRepository.save(any(PullRequestReviewComment.class)))
+                    .thenAnswer(inv -> inv.getArgument(0, PullRequestReviewComment.class));
 
             PullRequestReview review = new PullRequestReview();
             review.setId(777L);
@@ -273,14 +238,7 @@ class GitLabPullRequestReviewCommentProcessorTest extends BaseUnitTest {
 
             var data = buildDiffNoteData("src/Foo.ts", null, null, 42, null, "head-sha", "base-sha", null);
             var context = new GitLabPullRequestReviewCommentProcessor.CommentContext(
-                thread,
-                pr,
-                null,
-                provider,
-                null,
-                review,
-                SCOPE_ID
-            );
+                    thread, pr, null, provider, null, review, SCOPE_ID);
 
             PullRequestReviewComment saved = processor.findOrCreateComment(data, context);
 
@@ -291,23 +249,14 @@ class GitLabPullRequestReviewCommentProcessorTest extends BaseUnitTest {
 
         @Test
         void shouldPublishReviewCommentCreatedEventWhenNewCommentIsPersisted() {
-            when(commentRepository.findByNativeIdAndProviderId(NOTE_NATIVE_ID, PROVIDER_ID)).thenReturn(
-                Optional.empty()
-            );
-            when(commentRepository.save(any(PullRequestReviewComment.class))).thenAnswer(inv ->
-                inv.getArgument(0, PullRequestReviewComment.class)
-            );
+            when(commentRepository.findByNativeIdAndProviderId(NOTE_NATIVE_ID, PROVIDER_ID))
+                    .thenReturn(Optional.empty());
+            when(commentRepository.save(any(PullRequestReviewComment.class)))
+                    .thenAnswer(inv -> inv.getArgument(0, PullRequestReviewComment.class));
 
             var data = buildDiffNoteData("src/Foo.ts", null, null, 42, null, "head-sha", "base-sha", null);
             var context = new GitLabPullRequestReviewCommentProcessor.CommentContext(
-                thread,
-                pr,
-                null,
-                provider,
-                null,
-                null,
-                SCOPE_ID
-            );
+                    thread, pr, null, provider, null, null, SCOPE_ID);
             processor.findOrCreateComment(data, context);
 
             ArgumentCaptor<Object> captor = ArgumentCaptor.forClass(Object.class);
@@ -318,29 +267,9 @@ class GitLabPullRequestReviewCommentProcessorTest extends BaseUnitTest {
         @Test
         void shouldSkipWhenNoteGlobalIdCannotBeParsed() {
             var data = new GitLabPullRequestReviewCommentProcessor.DiffNoteData(
-                "not-a-gid",
-                "body",
-                "https://example",
-                "p",
-                1,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null
-            );
+                    "not-a-gid", "body", "https://example", "p", 1, null, null, null, null, null, null, null, null);
             var context = new GitLabPullRequestReviewCommentProcessor.CommentContext(
-                thread,
-                pr,
-                null,
-                provider,
-                null,
-                null,
-                SCOPE_ID
-            );
+                    thread, pr, null, provider, null, null, SCOPE_ID);
 
             PullRequestReviewComment saved = processor.findOrCreateComment(data, context);
 
@@ -358,19 +287,18 @@ class GitLabPullRequestReviewCommentProcessorTest extends BaseUnitTest {
         @Test
         void shouldDefaultStartShaToNullFor12ArgCallers() {
             var data = new GitLabPullRequestReviewCommentProcessor.DiffNoteData(
-                "gid://gitlab/DiffNote/1",
-                "body",
-                "https://example",
-                "src/Foo.ts",
-                10,
-                null,
-                "src/Foo.ts",
-                null,
-                "head-sha",
-                "base-sha",
-                Instant.EPOCH,
-                Instant.EPOCH
-            );
+                    "gid://gitlab/DiffNote/1",
+                    "body",
+                    "https://example",
+                    "src/Foo.ts",
+                    10,
+                    null,
+                    "src/Foo.ts",
+                    null,
+                    "head-sha",
+                    "base-sha",
+                    Instant.EPOCH,
+                    Instant.EPOCH);
             assertThat(data.startSha()).isNull();
             assertThat(data.baseSha()).isEqualTo("base-sha");
         }
@@ -379,29 +307,27 @@ class GitLabPullRequestReviewCommentProcessorTest extends BaseUnitTest {
     // Helpers
 
     private static GitLabPullRequestReviewCommentProcessor.DiffNoteData buildDiffNoteData(
-        @Nullable String newPath,
-        @Nullable String oldPath,
-        @Nullable String filePath,
-        @Nullable Integer newLine,
-        @Nullable Integer oldLine,
-        @Nullable String headSha,
-        @Nullable String baseSha,
-        @Nullable String startSha
-    ) {
+            @Nullable String newPath,
+            @Nullable String oldPath,
+            @Nullable String filePath,
+            @Nullable Integer newLine,
+            @Nullable Integer oldLine,
+            @Nullable String headSha,
+            @Nullable String baseSha,
+            @Nullable String startSha) {
         return new GitLabPullRequestReviewCommentProcessor.DiffNoteData(
-            NOTE_GLOBAL_ID,
-            "body",
-            "https://example.com/note",
-            filePath,
-            newLine,
-            oldLine,
-            newPath,
-            oldPath,
-            headSha,
-            baseSha,
-            startSha,
-            Instant.parse("2024-01-15T10:00:00Z"),
-            Instant.parse("2024-01-15T10:00:00Z")
-        );
+                NOTE_GLOBAL_ID,
+                "body",
+                "https://example.com/note",
+                filePath,
+                newLine,
+                oldLine,
+                newPath,
+                oldPath,
+                headSha,
+                baseSha,
+                startSha,
+                Instant.parse("2024-01-15T10:00:00Z"),
+                Instant.parse("2024-01-15T10:00:00Z"));
     }
 }

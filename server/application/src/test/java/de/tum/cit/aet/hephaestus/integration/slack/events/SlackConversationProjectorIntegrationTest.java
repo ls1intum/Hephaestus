@@ -56,12 +56,11 @@ class SlackConversationProjectorIntegrationTest extends BaseIntegrationTest {
 
     /** Seed a thread aggregate with an explicit participant member-id set (text array literal → bigint[]). */
     private void seedThread(
-        long workspaceId,
-        String channelId,
-        @Nullable String threadTs,
-        String lastTs,
-        String participantArrayLiteral
-    ) {
+            long workspaceId,
+            String channelId,
+            @Nullable String threadTs,
+            String lastTs,
+            String participantArrayLiteral) {
         support.seedThread(workspaceId, channelId, threadTs, lastTs, 1, participantArrayLiteral);
     }
 
@@ -126,7 +125,8 @@ class SlackConversationProjectorIntegrationTest extends BaseIntegrationTest {
 
         ObjectNode forA = projector.buildPayload(wsA, 100L);
         assertThat(conversations(forA)).hasSize(1);
-        assertThat(conversations(forA).get(0).get("messages").get(0).get("text").asString()).isEqualTo("A-only");
+        assertThat(conversations(forA).get(0).get("messages").get(0).get("text").asString())
+                .isEqualTo("A-only");
     }
 
     @Test
@@ -139,8 +139,10 @@ class SlackConversationProjectorIntegrationTest extends BaseIntegrationTest {
         seedMessage(ws, "C1", "100.5", "100.0", "reply will be deleted");
 
         // Edit the root, tombstone the reply (both via the scoped repository writes the ingest path drives).
-        assertThat(messageRepository.applyEdit(ws, "C1", "100.0", "root EDITED", java.time.Instant.now())).isEqualTo(1);
-        assertThat(messageRepository.tombstone(ws, "T1", "C1", "100.5", java.time.Instant.now())).isEqualTo(1);
+        assertThat(messageRepository.applyEdit(ws, "C1", "100.0", "root EDITED", java.time.Instant.now()))
+                .isEqualTo(1);
+        assertThat(messageRepository.tombstone(ws, "T1", "C1", "100.5", java.time.Instant.now()))
+                .isEqualTo(1);
 
         ObjectNode payload = projector.buildPayload(ws, 100L);
         ArrayNode messages = (ArrayNode) conversations(payload).get(0).get("messages");
@@ -159,28 +161,26 @@ class SlackConversationProjectorIntegrationTest extends BaseIntegrationTest {
 
         // JetStream reorder: the message_deleted for ts 100.9 is processed BEFORE its base insert (e.g. the insert
         // was NAK'd and redelivered later). The durable upsert writes a contentless tombstone for that ts.
-        assertThat(messageRepository.tombstone(ws, "T1", "C1", "100.9", java.time.Instant.now())).isEqualTo(1);
+        assertThat(messageRepository.tombstone(ws, "T1", "C1", "100.9", java.time.Instant.now()))
+                .isEqualTo(1);
 
         // The reordered base insert now arrives — ON CONFLICT DO NOTHING must NOT bring the deleted content back.
-        assertThat(
-            messageRepository.insertIfAbsent(ws, "T1", "C1", "100.9", "100.0", "U1", 100L, "resurrected?")
-        ).isZero();
+        assertThat(messageRepository.insertIfAbsent(ws, "T1", "C1", "100.9", "100.0", "U1", 100L, "resurrected?"))
+                .isZero();
 
         // The row stays a contentless tombstone: text NULL, deleted_at set.
         Map<String, @Nullable Object> row = jdbc.queryForMap(
-            "SELECT text, deleted_at FROM slack_message WHERE workspace_id = ? AND slack_channel_id = ? AND slack_ts = ?",
-            ws,
-            "C1",
-            "100.9"
-        );
+                "SELECT text, deleted_at FROM slack_message WHERE workspace_id = ? AND slack_channel_id = ? AND slack_ts = ?",
+                ws,
+                "C1",
+                "100.9");
         assertThat(row.get("text")).isNull();
         assertThat(row.get("deleted_at")).isNotNull();
     }
 
     @Test
     @DisplayName(
-        "durable edit: an edit arriving before its base insert re-ingests the EDITED text; the reordered base insert cannot clobber it"
-    )
+            "durable edit: an edit arriving before its base insert re-ingests the EDITED text; the reordered base insert cannot clobber it")
     void editBeforeInsert_isDurable() {
         long ws = newWorkspace();
         seedChannel(ws, "C1", "ACTIVE");
@@ -188,20 +188,22 @@ class SlackConversationProjectorIntegrationTest extends BaseIntegrationTest {
 
         // JetStream reorder: message_changed for ts 100.9 is processed BEFORE its base insert. The scoped UPDATE finds
         // no row (returns 0) and the row is genuinely absent — the durability primitive the service branches on.
-        assertThat(messageRepository.applyEdit(ws, "C1", "100.9", "EDITED body", java.time.Instant.now())).isZero();
-        assertThat(messageRepository.existsByWorkspaceIdAndSlackChannelIdAndSlackTs(ws, "C1", "100.9")).isFalse();
+        assertThat(messageRepository.applyEdit(ws, "C1", "100.9", "EDITED body", java.time.Instant.now()))
+                .isZero();
+        assertThat(messageRepository.existsByWorkspaceIdAndSlackChannelIdAndSlackTs(ws, "C1", "100.9"))
+                .isFalse();
 
-        // The service's durable branch re-ingests the EDITED body (through the full consent stack) and stamps edited_at.
-        assertThat(
-            messageRepository.insertIfAbsent(ws, "T1", "C1", "100.9", "100.0", "U1", 100L, "EDITED body")
-        ).isEqualTo(1);
-        assertThat(messageRepository.applyEdit(ws, "C1", "100.9", "EDITED body", java.time.Instant.now())).isEqualTo(1);
+        // The service's durable branch re-ingests the EDITED body (through the full consent stack) and stamps
+        // edited_at.
+        assertThat(messageRepository.insertIfAbsent(ws, "T1", "C1", "100.9", "100.0", "U1", 100L, "EDITED body"))
+                .isEqualTo(1);
+        assertThat(messageRepository.applyEdit(ws, "C1", "100.9", "EDITED body", java.time.Instant.now()))
+                .isEqualTo(1);
 
         // The reordered base insert now arrives carrying the ORIGINAL text — ON CONFLICT DO NOTHING must NOT clobber
         // the durably-stored edited body (this is the invariant that fails if edits regress to lossy).
-        assertThat(
-            messageRepository.insertIfAbsent(ws, "T1", "C1", "100.9", "100.0", "U1", 100L, "original base text")
-        ).isZero();
+        assertThat(messageRepository.insertIfAbsent(ws, "T1", "C1", "100.9", "100.0", "U1", 100L, "original base text"))
+                .isZero();
 
         // The projector shows the edited text with the edited flag set — the edit survived the reorder.
         ObjectNode payload = projector.buildPayload(ws, 100L);

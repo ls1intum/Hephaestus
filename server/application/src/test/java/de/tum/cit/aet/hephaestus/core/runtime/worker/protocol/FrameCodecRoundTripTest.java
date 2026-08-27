@@ -29,7 +29,7 @@ class FrameCodecRoundTripTest extends BaseUnitTest {
     void rejectsOversizedFrameOnDecode() {
         String tooLarge = "x".repeat(FrameCodec.MAX_FRAME_BYTES + 1);
         assertThatThrownBy(() -> codec.decode(tooLarge))
-            .isInstanceOf(FrameCodec.FrameCodecException.class)
-            .hasMessageContaining("exceeds " + FrameCodec.MAX_FRAME_BYTES);
+                .isInstanceOf(FrameCodec.FrameCodecException.class)
+                .hasMessageContaining("exceeds " + FrameCodec.MAX_FRAME_BYTES);
     }
 }

@@ -8,21 +8,19 @@ import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
 public record CuratedPracticeDTO(
-    @NonNull String slug,
-    @NonNull Integer position,
-    @NonNull CuratedPracticeDefinitionDTO definition,
-    @Nullable CuratedPracticeDefinitionDTO shipped,
-    @NonNull CatalogEntryStatusDTO status
-) {
+        @NonNull String slug,
+        @NonNull Integer position,
+        @NonNull CuratedPracticeDefinitionDTO definition,
+        @Nullable CuratedPracticeDefinitionDTO shipped,
+        @NonNull CatalogEntryStatusDTO status) {
     public static CuratedPracticeDTO from(CatalogEntry<PracticeDefinition> entry) {
         return new CuratedPracticeDTO(
-            entry.slug(),
-            entry.position(),
-            CuratedPracticeDefinitionDTO.from(entry.slug(), entry.effective()),
-            entry.changeKind() == CatalogChangeKind.NONE
-                ? null
-                : CuratedPracticeDefinitionDTO.from(entry.slug(), Objects.requireNonNull(entry.shipped())),
-            CatalogEntryStatusDTO.from(entry)
-        );
+                entry.slug(),
+                entry.position(),
+                CuratedPracticeDefinitionDTO.from(entry.slug(), entry.effective()),
+                entry.changeKind() == CatalogChangeKind.NONE
+                        ? null
+                        : CuratedPracticeDefinitionDTO.from(entry.slug(), Objects.requireNonNull(entry.shipped())),
+                CatalogEntryStatusDTO.from(entry));
     }
 }

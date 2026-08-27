@@ -47,16 +47,17 @@ import tools.jackson.databind.JsonNode;
  */
 @Entity
 @Table(
-    name = "agent_job",
-    indexes = {
-        @Index(name = "idx_agent_job_workspace_created", columnList = "workspace_id, created_at DESC, id DESC"),
-        @Index(
-            name = "idx_agent_job_workspace_purpose_created",
-            columnList = "workspace_id, purpose, created_at DESC, id DESC"
-        ),
-    },
-    uniqueConstraints = @UniqueConstraint(name = "uk_agent_job_token", columnNames = { "job_token" })
-)
+        name = "agent_job",
+        indexes = {
+            @Index(name = "idx_agent_job_workspace_created", columnList = "workspace_id, created_at DESC, id DESC"),
+            @Index(
+                    name = "idx_agent_job_workspace_purpose_created",
+                    columnList = "workspace_id, purpose, created_at DESC, id DESC"),
+        },
+        uniqueConstraints =
+                @UniqueConstraint(
+                        name = "uk_agent_job_token",
+                        columnNames = {"job_token"}))
 @Getter
 @Setter
 @NoArgsConstructor

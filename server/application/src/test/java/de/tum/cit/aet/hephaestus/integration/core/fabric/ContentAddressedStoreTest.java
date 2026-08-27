@@ -50,8 +50,8 @@ class ContentAddressedStoreTest extends BaseUnitTest {
         java.nio.file.Files.writeString(cas.pathFor(sha), "corrupted");
 
         assertThatThrownBy(() -> cas.get(sha))
-            .isInstanceOf(IllegalStateException.class)
-            .hasMessageContaining("digest mismatch");
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("digest mismatch");
     }
 
     @Test

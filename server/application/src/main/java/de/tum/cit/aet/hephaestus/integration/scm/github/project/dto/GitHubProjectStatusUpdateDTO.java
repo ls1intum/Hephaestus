@@ -23,18 +23,17 @@ import org.jspecify.annotations.Nullable;
 @JsonIgnoreProperties(ignoreUnknown = true)
 @Slf4j
 public record GitHubProjectStatusUpdateDTO(
-    @JsonProperty("id") @Nullable Long id,
-    @JsonProperty("database_id") @Nullable Long databaseId,
-    @JsonProperty("node_id") String nodeId,
-    @JsonProperty("body") String body,
-    @JsonProperty("body_html") String bodyHtml,
-    @JsonProperty("start_date") @Nullable LocalDate startDate,
-    @JsonProperty("target_date") @Nullable LocalDate targetDate,
-    @JsonProperty("status") @Nullable String status,
-    @JsonProperty("creator") @Nullable GitHubUserDTO creator,
-    @JsonProperty("created_at") @Nullable Instant createdAt,
-    @JsonProperty("updated_at") @Nullable Instant updatedAt
-) {
+        @JsonProperty("id") @Nullable Long id,
+        @JsonProperty("database_id") @Nullable Long databaseId,
+        @JsonProperty("node_id") String nodeId,
+        @JsonProperty("body") String body,
+        @JsonProperty("body_html") String bodyHtml,
+        @JsonProperty("start_date") @Nullable LocalDate startDate,
+        @JsonProperty("target_date") @Nullable LocalDate targetDate,
+        @JsonProperty("status") @Nullable String status,
+        @JsonProperty("creator") @Nullable GitHubUserDTO creator,
+        @JsonProperty("created_at") @Nullable Instant createdAt,
+        @JsonProperty("updated_at") @Nullable Instant updatedAt) {
     /**
      * Get the database ID, preferring databaseId over id for GraphQL responses.
      */
@@ -76,18 +75,17 @@ public record GitHubProjectStatusUpdateDTO(
         }
 
         return new GitHubProjectStatusUpdateDTO(
-            null,
-            toLong(statusUpdate.getFullDatabaseId()),
-            statusUpdate.getId(),
-            statusUpdate.getBody(),
-            statusUpdate.getBodyHTML(),
-            statusUpdate.getStartDate(),
-            statusUpdate.getTargetDate(),
-            statusToString(statusUpdate.getStatus()),
-            GitHubUserDTO.fromActor(statusUpdate.getCreator()),
-            toInstant(statusUpdate.getCreatedAt()),
-            toInstant(statusUpdate.getUpdatedAt())
-        );
+                null,
+                toLong(statusUpdate.getFullDatabaseId()),
+                statusUpdate.getId(),
+                statusUpdate.getBody(),
+                statusUpdate.getBodyHTML(),
+                statusUpdate.getStartDate(),
+                statusUpdate.getTargetDate(),
+                statusToString(statusUpdate.getStatus()),
+                GitHubUserDTO.fromActor(statusUpdate.getCreator()),
+                toInstant(statusUpdate.getCreatedAt()),
+                toInstant(statusUpdate.getUpdatedAt()));
     }
 
     // CONVERSION HELPERS

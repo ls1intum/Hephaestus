@@ -38,8 +38,7 @@ public final class JobMetadataReader {
         }
         if (!node.isNumber()) {
             throw new JobPreparationException(
-                "Expected numeric metadata field: " + field + ", got: " + node.getNodeType()
-            );
+                    "Expected numeric metadata field: " + field + ", got: " + node.getNodeType());
         }
         return node;
     }

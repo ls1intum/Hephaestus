@@ -44,12 +44,14 @@ public class OutlineAuthInfoUserService implements OAuth2UserService<OAuth2UserR
     private static final String SUBJECT_ATTRIBUTE = "id";
     private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(10);
     private static final ParameterizedTypeReference<Map<String, Object>> JSON_OBJECT =
-        new ParameterizedTypeReference<>() {};
+            new ParameterizedTypeReference<>() {};
 
     private final WebClient webClient;
 
     public OutlineAuthInfoUserService() {
-        this(WebClient.builder().clientConnector(WebClientConnectors.ssrfGuarded()).build());
+        this(WebClient.builder()
+                .clientConnector(WebClientConnectors.ssrfGuarded())
+                .build());
     }
 
     /** Test seam: inject a WebClient with a stubbed exchange function. */
@@ -59,18 +61,24 @@ public class OutlineAuthInfoUserService implements OAuth2UserService<OAuth2UserR
 
     @Override
     public OAuth2User loadUser(OAuth2UserRequest userRequest) throws OAuth2AuthenticationException {
-        String authInfoUri = userRequest.getClientRegistration().getProviderDetails().getUserInfoEndpoint().getUri();
+        String authInfoUri = userRequest
+                .getClientRegistration()
+                .getProviderDetails()
+                .getUserInfoEndpoint()
+                .getUri();
         Map<String, Object> body;
         try {
             body = webClient
-                .post()
-                .uri(authInfoUri)
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + userRequest.getAccessToken().getTokenValue())
-                .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue("{}")
-                .retrieve()
-                .bodyToMono(JSON_OBJECT)
-                .block(REQUEST_TIMEOUT);
+                    .post()
+                    .uri(authInfoUri)
+                    .header(
+                            HttpHeaders.AUTHORIZATION,
+                            "Bearer " + userRequest.getAccessToken().getTokenValue())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .bodyValue("{}")
+                    .retrieve()
+                    .bodyToMono(JSON_OBJECT)
+                    .block(REQUEST_TIMEOUT);
         } catch (RuntimeException ex) {
             // Identity IS the product of this call — unlike GitHub's best-effort email enrichment,
             // an unreachable auth.info must fail the login, not proceed with an empty principal.

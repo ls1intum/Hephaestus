@@ -7,18 +7,16 @@ import org.jspecify.annotations.Nullable;
 
 @Schema(description = "Reorder one group's practices to match the supplied list")
 public record ReorderPracticesRequestDTO(
-    @Schema(
-        description = "Slug of the group whose practices are being reordered; null reorders the unassigned bucket",
-        nullable = true,
-        example = "review-ready-work"
-    )
-    @Nullable
-    String groupSlug,
+        @Schema(
+                description =
+                        "Slug of the group whose practices are being reordered; null reorders the unassigned bucket",
+                nullable = true,
+                example = "review-ready-work")
+        @Nullable
+        String groupSlug,
 
-    @NotEmpty(message = "orderedSlugs must not be empty")
-    @Schema(
-        description = "Practice slugs in the desired display order — the complete set for the group",
-        example = "[\"describe-what-and-why\", \"ready-and-traceable-handoff\"]"
-    )
-    List<String> orderedSlugs
-) {}
+        @NotEmpty(message = "orderedSlugs must not be empty")
+        @Schema(
+                description = "Practice slugs in the desired display order — the complete set for the group",
+                example = "[\"describe-what-and-why\", \"ready-and-traceable-handoff\"]")
+        List<String> orderedSlugs) {}

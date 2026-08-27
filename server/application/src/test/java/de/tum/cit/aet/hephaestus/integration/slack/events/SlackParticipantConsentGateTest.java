@@ -28,18 +28,16 @@ class SlackParticipantConsentGateTest extends BaseUnitTest {
 
     @Test
     void optedOutPerson_isDenied() {
-        when(
-            participantConsentRepository.existsByWorkspaceIdAndSlackUserIdAndIngestionOptedOutTrue(7L, "U1")
-        ).thenReturn(true);
+        when(participantConsentRepository.existsByWorkspaceIdAndSlackUserIdAndIngestionOptedOutTrue(7L, "U1"))
+                .thenReturn(true);
 
         assertThat(gate.ingestionAllowed(7L, "U1")).isFalse();
     }
 
     @Test
     void personWithNoOptOut_isAllowed() {
-        when(
-            participantConsentRepository.existsByWorkspaceIdAndSlackUserIdAndIngestionOptedOutTrue(7L, "U1")
-        ).thenReturn(false);
+        when(participantConsentRepository.existsByWorkspaceIdAndSlackUserIdAndIngestionOptedOutTrue(7L, "U1"))
+                .thenReturn(false);
 
         assertThat(gate.ingestionAllowed(7L, "U1")).isTrue();
     }

@@ -11,7 +11,6 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.practices.curated.CatalogEntry;
 import de.tum.cit.aet.hephaestus.practices.curated.CuratedCatalogLock;
@@ -127,40 +126,36 @@ class PracticeCatalogInstallationManagerTest extends BaseUnitTest {
     private static EffectiveCatalog catalog() {
         GroupDefinition group = new GroupDefinition("Packaging work", null, null, null);
         PracticeDefinition practice = new PracticeDefinition(
-            "Small PRs",
-            PracticeTestEvidence.bindings(ArtifactKinds.PULL_REQUEST),
-            "Seed criteria",
-            null,
-            PracticeTestEvidence.forArtifact(ArtifactKinds.PULL_REQUEST),
-            "Reason",
-            null,
-            "packaging"
-        );
+                "Small PRs",
+                PracticeTestEvidence.bindings(ArtifactKinds.PULL_REQUEST),
+                "Seed criteria",
+                null,
+                PracticeTestEvidence.forArtifact(ArtifactKinds.PULL_REQUEST),
+                "Reason",
+                null,
+                "packaging");
         return new EffectiveCatalog(
-            List.of(CatalogEntry.shippedOnly("packaging", group, 0)),
-            List.of(CatalogEntry.shippedOnly("small-prs", practice, 0))
-        );
+                List.of(CatalogEntry.shippedOnly("packaging", group, 0)),
+                List.of(CatalogEntry.shippedOnly("small-prs", practice, 0)));
     }
 
     private PracticeCatalogInstallationManager manager(boolean enabled) {
         if (enabled) {
-            when(workspaceRepository.findByIdForUpdate(any())).thenAnswer(invocation ->
-                Optional.of(workspace(invocation.getArgument(0)))
-            );
+            when(workspaceRepository.findByIdForUpdate(any()))
+                    .thenAnswer(invocation -> Optional.of(workspace(invocation.getArgument(0))));
         }
         return new PracticeCatalogInstallationManager(
-            enabled,
-            groupService,
-            practiceService,
-            groupRepository,
-            practiceRepository,
-            catalogService,
-            catalogLock,
-            installationRepository,
-            workspaceRepository,
-            TransactionOperations.withoutTransaction(),
-            Clock.systemUTC()
-        );
+                enabled,
+                groupService,
+                practiceService,
+                groupRepository,
+                practiceRepository,
+                catalogService,
+                catalogLock,
+                installationRepository,
+                workspaceRepository,
+                TransactionOperations.withoutTransaction(),
+                Clock.systemUTC());
     }
 
     private static Workspace workspace(long id) {

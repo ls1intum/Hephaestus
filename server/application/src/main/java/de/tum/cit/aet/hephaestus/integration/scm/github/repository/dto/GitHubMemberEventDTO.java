@@ -13,12 +13,12 @@ import org.jspecify.annotations.Nullable;
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record GitHubMemberEventDTO(
-    @JsonProperty("action") String action,
-    @JsonProperty("member") GitHubUserDTO member,
-    @JsonProperty("repository") GitHubRepositoryRefDTO repository,
-    @JsonProperty("sender") GitHubUserDTO sender,
-    @JsonProperty("changes") Map<String, Object> changes
-) implements GitHubWebhookEvent {
+        @JsonProperty("action") String action,
+        @JsonProperty("member") GitHubUserDTO member,
+        @JsonProperty("repository") GitHubRepositoryRefDTO repository,
+        @JsonProperty("sender") GitHubUserDTO sender,
+        @JsonProperty("changes") Map<String, Object> changes)
+        implements GitHubWebhookEvent {
     @Override
     public GitHubEventAction.Member actionType() {
         return GitHubEventAction.Member.fromString(action);

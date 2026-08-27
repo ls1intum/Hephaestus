@@ -12,8 +12,5 @@ import org.jspecify.annotations.NonNull;
  */
 @Schema(description = "Transition a mirrored Outline collection to a target mirror state (pause / resume)")
 public record UpdateOutlineCollectionStateRequestDTO(
-    @NonNull
-    @NotNull
-    @Schema(description = "Target mirror state", requiredMode = Schema.RequiredMode.REQUIRED)
-    MirrorState state
-) {}
+        @NonNull @NotNull @Schema(description = "Target mirror state", requiredMode = Schema.RequiredMode.REQUIRED)
+        MirrorState state) {}

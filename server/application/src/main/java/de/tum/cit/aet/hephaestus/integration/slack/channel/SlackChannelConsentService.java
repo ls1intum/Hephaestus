@@ -78,17 +78,16 @@ public class SlackChannelConsentService {
     public record SlackChannelActivatedEvent(long workspaceId, String slackChannelId) {}
 
     public SlackChannelConsentService(
-        SlackMonitoredChannelRepository monitoredChannelRepository,
-        SlackChannelConsentEventRepository consentEventRepository,
-        SlackParticipantConsentRepository participantConsentRepository,
-        SlackIngestService ingestService,
-        SlackMessageService slackMessageService,
-        ConnectionService connectionService,
-        UserRepository userRepository,
-        SlackHephaestusUiLinks uiLinks,
-        TransactionTemplate transactionTemplate,
-        ApplicationEventPublisher eventPublisher
-    ) {
+            SlackMonitoredChannelRepository monitoredChannelRepository,
+            SlackChannelConsentEventRepository consentEventRepository,
+            SlackParticipantConsentRepository participantConsentRepository,
+            SlackIngestService ingestService,
+            SlackMessageService slackMessageService,
+            ConnectionService connectionService,
+            UserRepository userRepository,
+            SlackHephaestusUiLinks uiLinks,
+            TransactionTemplate transactionTemplate,
+            ApplicationEventPublisher eventPublisher) {
         this.monitoredChannelRepository = monitoredChannelRepository;
         this.consentEventRepository = consentEventRepository;
         this.participantConsentRepository = participantConsentRepository;
@@ -105,11 +104,9 @@ public class SlackChannelConsentService {
     @Transactional(readOnly = true)
     public List<SlackMonitoredChannelDTO> listChannels(long workspaceId) {
         long optedOutMemberCount = participantConsentRepository.countByWorkspaceIdAndIngestionOptedOutTrue(workspaceId);
-        return monitoredChannelRepository
-            .findByWorkspaceIdOrderByCreatedAtDesc(workspaceId)
-            .stream()
-            .map(channel -> SlackMonitoredChannelDTO.from(channel, optedOutMemberCount))
-            .toList();
+        return monitoredChannelRepository.findByWorkspaceIdOrderByCreatedAtDesc(workspaceId).stream()
+                .map(channel -> SlackMonitoredChannelDTO.from(channel, optedOutMemberCount))
+                .toList();
     }
 
     /** The immutable consent-transition audit trail of one channel (oldest first). */
@@ -117,13 +114,13 @@ public class SlackChannelConsentService {
     public List<SlackChannelConsentEventDTO> listConsentEvents(long workspaceId, String slackChannelId) {
         // 404 if the channel is not allow-listed in this workspace (also enforces workspace isolation).
         monitoredChannelRepository
-            .findByWorkspaceIdAndSlackChannelId(workspaceId, slackChannelId)
-            .orElseThrow(() -> new EntityNotFoundException("Slack channel", slackChannelId));
+                .findByWorkspaceIdAndSlackChannelId(workspaceId, slackChannelId)
+                .orElseThrow(() -> new EntityNotFoundException("Slack channel", slackChannelId));
         return consentEventRepository
-            .findByWorkspaceIdAndSlackChannelIdOrderByCreatedAtAscIdAsc(workspaceId, slackChannelId)
-            .stream()
-            .map(SlackChannelConsentEventDTO::from)
-            .toList();
+                .findByWorkspaceIdAndSlackChannelIdOrderByCreatedAtAscIdAsc(workspaceId, slackChannelId)
+                .stream()
+                .map(SlackChannelConsentEventDTO::from)
+                .toList();
     }
 
     /**
@@ -144,11 +141,11 @@ public class SlackChannelConsentService {
         }
 
         String teamId = connectionService
-            .findSlackNotificationConfig(workspaceId)
-            .map(ConnectionConfig.SlackConfig::teamId)
-            .filter(t -> t != null && !t.isBlank())
-            // Registration needs an ACTIVE Slack connection to know which Slack team this channel belongs to.
-            .orElseThrow(() -> new EntityNotFoundException("Slack connection", Long.toString(workspaceId)));
+                .findSlackNotificationConfig(workspaceId)
+                .map(ConnectionConfig.SlackConfig::teamId)
+                .filter(t -> t != null && !t.isBlank())
+                // Registration needs an ACTIVE Slack connection to know which Slack team this channel belongs to.
+                .orElseThrow(() -> new EntityNotFoundException("Slack connection", Long.toString(workspaceId)));
 
         var lookup = slackMessageService.lookupConversation(workspaceId, slackChannelId);
         SlackConversationInfo info = lookup == null ? null : lookup.orElse(null);
@@ -160,9 +157,9 @@ public class SlackChannelConsentService {
         return inTx(() -> {
             // Re-check inside the tx: a concurrent registration (e.g. the bot's own member_joined_channel from the
             // join above) may have created the row since the pre-tx read.
-            if (
-                monitoredChannelRepository.findByWorkspaceIdAndSlackChannelId(workspaceId, slackChannelId).isPresent()
-            ) {
+            if (monitoredChannelRepository
+                    .findByWorkspaceIdAndSlackChannelId(workspaceId, slackChannelId)
+                    .isPresent()) {
                 return applyExistingRegistrationInTx(workspaceId, slackChannelId, resolvedName);
             }
             SlackMonitoredChannel channel = new SlackMonitoredChannel();
@@ -177,22 +174,16 @@ public class SlackChannelConsentService {
     }
 
     private RegistrationOutcome applyExistingRegistration(
-        long workspaceId,
-        String slackChannelId,
-        @Nullable String resolvedName
-    ) {
+            long workspaceId, String slackChannelId, @Nullable String resolvedName) {
         return inTx(() -> applyExistingRegistrationInTx(workspaceId, slackChannelId, resolvedName));
     }
 
     /** DB-only tail of a registration that found an existing row; must run inside the caller's transaction. */
     private RegistrationOutcome applyExistingRegistrationInTx(
-        long workspaceId,
-        String slackChannelId,
-        @Nullable String resolvedName
-    ) {
+            long workspaceId, String slackChannelId, @Nullable String resolvedName) {
         SlackMonitoredChannel channel = monitoredChannelRepository
-            .findByWorkspaceIdAndSlackChannelId(workspaceId, slackChannelId)
-            .orElseThrow(() -> new EntityNotFoundException("Slack channel", slackChannelId));
+                .findByWorkspaceIdAndSlackChannelId(workspaceId, slackChannelId)
+                .orElseThrow(() -> new EntityNotFoundException("Slack channel", slackChannelId));
         boolean changed = updateChannelName(channel, resolvedName);
         if (channel.getConsentState() == ConsentState.REVOKED) {
             ConsentState from = channel.getConsentState();
@@ -218,14 +209,10 @@ public class SlackChannelConsentService {
      * @throws SlackChannelConsentViolationException if the edge is not permitted (409)
      */
     public SlackMonitoredChannelDTO transition(
-        long workspaceId,
-        String slackChannelId,
-        ConsentState target,
-        @Nullable String reason
-    ) {
+            long workspaceId, String slackChannelId, ConsentState target, @Nullable String reason) {
         SlackMonitoredChannel preRead = monitoredChannelRepository
-            .findByWorkspaceIdAndSlackChannelId(workspaceId, slackChannelId)
-            .orElseThrow(() -> new EntityNotFoundException("Slack channel", slackChannelId));
+                .findByWorkspaceIdAndSlackChannelId(workspaceId, slackChannelId)
+                .orElseThrow(() -> new EntityNotFoundException("Slack channel", slackChannelId));
 
         if (preRead.getConsentState() == target) {
             return toDTO(workspaceId, preRead);
@@ -237,13 +224,13 @@ public class SlackChannelConsentService {
         // channel stays non-ACTIVE (fails closed — an ACTIVE channel always has an announcement). If the tx below
         // fails instead, the announcement stands but the channel never activated; a retry re-announces (benign).
         Instant announcedAt = (target == ConsentState.ACTIVE && preRead.getConsentAnnouncedAt() == null)
-            ? postAnnouncementAndStamp(workspaceId, slackChannelId)
-            : null;
+                ? postAnnouncementAndStamp(workspaceId, slackChannelId)
+                : null;
 
         return inTx(() -> {
             SlackMonitoredChannel channel = monitoredChannelRepository
-                .findByWorkspaceIdAndSlackChannelId(workspaceId, slackChannelId)
-                .orElseThrow(() -> new EntityNotFoundException("Slack channel", slackChannelId));
+                    .findByWorkspaceIdAndSlackChannelId(workspaceId, slackChannelId)
+                    .orElseThrow(() -> new EntityNotFoundException("Slack channel", slackChannelId));
             ConsentState from = channel.getConsentState();
             if (from == target) {
                 return toDTO(workspaceId, channel); // raced with an identical transition
@@ -277,9 +264,9 @@ public class SlackChannelConsentService {
                     ingestService.eraseChannel(workspaceId, slackChannelId);
                     channel.setConsentState(ConsentState.REVOKED);
                 }
-                case PENDING -> throw new SlackChannelConsentViolationException(
-                    "PENDING is only reachable via discovery/registration, not a consent transition."
-                );
+                case PENDING ->
+                    throw new SlackChannelConsentViolationException(
+                            "PENDING is only reachable via discovery/registration, not a consent transition.");
             }
 
             recordAudit(workspaceId, slackChannelId, from, target, reason);
@@ -305,55 +292,44 @@ public class SlackChannelConsentService {
     private void postAnnouncement(long workspaceId, String channelId) {
         try {
             slackMessageService.sendForWorkspace(
-                workspaceId,
-                channelId,
-                SlackConsentBlocks.activationNotice(),
-                SlackConsentBlocks.activationFallbackText()
-            );
+                    workspaceId,
+                    channelId,
+                    SlackConsentBlocks.activationNotice(),
+                    SlackConsentBlocks.activationFallbackText());
         } catch (SlackSendException e) {
             log.warn(
-                "Slack consent announcement failed to post: workspaceId={}, channelId={}, error={}",
-                workspaceId,
-                channelId,
-                e.slackError()
-            );
+                    "Slack consent announcement failed to post: workspaceId={}, channelId={}, error={}",
+                    workspaceId,
+                    channelId,
+                    e.slackError());
             throw e;
         }
     }
 
     private void recordAudit(
-        long workspaceId,
-        String slackChannelId,
-        ConsentState from,
-        ConsentState to,
-        @Nullable String reason
-    ) {
+            long workspaceId, String slackChannelId, ConsentState from, ConsentState to, @Nullable String reason) {
         Long actorUserId = userRepository.getCurrentUser().map(User::getId).orElse(null);
         consentEventRepository.save(
-            new SlackChannelConsentEvent(workspaceId, slackChannelId, from, to, actorUserId, reason)
-        );
+                new SlackChannelConsentEvent(workspaceId, slackChannelId, from, to, actorUserId, reason));
     }
 
     /** Transition guard. The same-state case ({@code from == target}) is already handled as an idempotent no-op by callers. */
     private static void requireAllowed(ConsentState from, ConsentState target, String slackChannelId) {
-        boolean allowed = switch (from) {
-            case PENDING -> target == ConsentState.ACTIVE || target == ConsentState.REVOKED;
-            case ACTIVE -> target == ConsentState.PAUSED || target == ConsentState.REVOKED;
-            case PAUSED -> target == ConsentState.ACTIVE || target == ConsentState.REVOKED;
-            case REVOKED -> false; // only register() may start a fresh setup
-        };
+        boolean allowed =
+                switch (from) {
+                    case PENDING -> target == ConsentState.ACTIVE || target == ConsentState.REVOKED;
+                    case ACTIVE -> target == ConsentState.PAUSED || target == ConsentState.REVOKED;
+                    case PAUSED -> target == ConsentState.ACTIVE || target == ConsentState.REVOKED;
+                    case REVOKED -> false; // only register() may start a fresh setup
+                };
         if (!allowed) {
-            throw new SlackChannelConsentViolationException(
-                "Illegal Slack channel consent transition " + from + " → " + target + " for channel " + slackChannelId
-            );
+            throw new SlackChannelConsentViolationException("Illegal Slack channel consent transition " + from + " → "
+                    + target + " for channel " + slackChannelId);
         }
     }
 
     private @Nullable String resolveChannelName(
-        long workspaceId,
-        String slackChannelId,
-        @Nullable String fallbackName
-    ) {
+            long workspaceId, String slackChannelId, @Nullable String fallbackName) {
         var info = slackMessageService.lookupConversation(workspaceId, slackChannelId);
         return resolveName(fallbackName, info == null ? null : info.orElse(null));
     }
@@ -397,8 +373,8 @@ public class SlackChannelConsentService {
     public void pauseForPlatformEvent(long workspaceId, String slackChannelId, String reason) {
         runInTx(() -> {
             SlackMonitoredChannel channel = monitoredChannelRepository
-                .findByWorkspaceIdAndSlackChannelId(workspaceId, slackChannelId)
-                .orElse(null);
+                    .findByWorkspaceIdAndSlackChannelId(workspaceId, slackChannelId)
+                    .orElse(null);
             if (channel == null || channel.getConsentState() != ConsentState.ACTIVE) {
                 return;
             }
@@ -416,8 +392,8 @@ public class SlackChannelConsentService {
     public void revokeForPlatformEvent(long workspaceId, String slackChannelId, String reason) {
         runInTx(() -> {
             SlackMonitoredChannel channel = monitoredChannelRepository
-                .findByWorkspaceIdAndSlackChannelId(workspaceId, slackChannelId)
-                .orElse(null);
+                    .findByWorkspaceIdAndSlackChannelId(workspaceId, slackChannelId)
+                    .orElse(null);
             if (channel == null || channel.getConsentState() == ConsentState.REVOKED) {
                 return;
             }

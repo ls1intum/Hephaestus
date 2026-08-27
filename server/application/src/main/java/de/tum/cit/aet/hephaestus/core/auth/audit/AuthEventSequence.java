@@ -24,7 +24,9 @@ public class AuthEventSequence {
 
     @Transactional(propagation = Propagation.MANDATORY)
     public Long next() {
-        Object value = entityManager.createNativeQuery("SELECT nextval('auth_event_id_seq')").getSingleResult();
+        Object value = entityManager
+                .createNativeQuery("SELECT nextval('auth_event_id_seq')")
+                .getSingleResult();
         return ((Number) value).longValue();
     }
 }

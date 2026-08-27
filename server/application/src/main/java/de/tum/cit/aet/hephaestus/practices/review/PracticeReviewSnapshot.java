@@ -12,17 +12,13 @@ import org.jspecify.annotations.Nullable;
  * an override is a real change and must show in the diff rather than look like an absent key.
  */
 record PracticeReviewSnapshot(
-    @Nullable Boolean deliverToMerged,
-    @Nullable Integer cooldownMinutes,
-    @Nullable WorkspaceReviewScope reviewScope,
-    @Nullable String defaultAutonomy
-) implements ConfigAuditSnapshot {
+        @Nullable Boolean deliverToMerged,
+        @Nullable Integer cooldownMinutes,
+        @Nullable WorkspaceReviewScope reviewScope,
+        @Nullable String defaultAutonomy)
+        implements ConfigAuditSnapshot {
     static PracticeReviewSnapshot of(PracticeReviewSettings s) {
         return new PracticeReviewSnapshot(
-            s.getDeliverToMerged(),
-            s.getCooldownMinutes(),
-            s.getReviewScope(),
-            s.getDefaultAutonomy()
-        );
+                s.getDeliverToMerged(), s.getCooldownMinutes(), s.getReviewScope(), s.getDefaultAutonomy());
     }
 }

@@ -22,11 +22,8 @@ import org.springframework.data.domain.Pageable;
 
 class PendingSignalReaperTest extends BaseUnitTest {
 
-    private static final SignalLedgerProperties PROPERTIES = new SignalLedgerProperties(
-        Duration.ofHours(1),
-        Duration.ofDays(7),
-        200
-    );
+    private static final SignalLedgerProperties PROPERTIES =
+            new SignalLedgerProperties(Duration.ofHours(1), Duration.ofDays(7), 200);
 
     private final ArtifactSignalRepository repository = mock(ArtifactSignalRepository.class);
 
@@ -107,7 +104,9 @@ class PendingSignalReaperTest extends BaseUnitTest {
         ArtifactSignal failing = pendingSignal("scm.pull_request", "scm.pull_request.ready");
         ArtifactSignal following = pendingSignal("scm.pull_request", "scm.pull_request.merged");
         when(repository.findRetryablePending(any(), any(Pageable.class))).thenReturn(List.of(failing, following));
-        org.mockito.Mockito.doThrow(new IllegalStateException("boom")).when(resubmitter).resubmit(failing);
+        org.mockito.Mockito.doThrow(new IllegalStateException("boom"))
+                .when(resubmitter)
+                .resubmit(failing);
 
         reaper(resubmitter).sweep();
 
@@ -122,7 +121,9 @@ class PendingSignalReaperTest extends BaseUnitTest {
         PendingSignalResubmitter resubmitter = resubmitterFor("scm.pull_request");
         ArtifactSignal signal = pendingSignal("scm.pull_request", "scm.pull_request.ready");
         when(repository.findRetryablePending(any(), any(Pageable.class))).thenReturn(List.of(signal));
-        org.mockito.Mockito.doThrow(new IllegalStateException("boom")).when(resubmitter).resubmit(signal);
+        org.mockito.Mockito.doThrow(new IllegalStateException("boom"))
+                .when(resubmitter)
+                .resubmit(signal);
 
         reaper(resubmitter).sweep();
 

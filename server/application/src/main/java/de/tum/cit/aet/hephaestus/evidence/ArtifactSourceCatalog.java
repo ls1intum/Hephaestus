@@ -20,10 +20,7 @@ public record ArtifactSourceCatalog(SourceContractVersion version, List<Artifact
     }
 
     public Optional<ArtifactSourceContract> source(SourceKind kind) {
-        return sources
-            .stream()
-            .filter(source -> source.kind().equals(kind))
-            .findFirst();
+        return sources.stream().filter(source -> source.kind().equals(kind)).findFirst();
     }
 
     /**

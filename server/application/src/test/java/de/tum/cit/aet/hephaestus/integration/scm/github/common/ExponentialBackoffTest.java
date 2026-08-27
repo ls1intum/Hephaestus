@@ -106,22 +106,22 @@ class ExponentialBackoffTest {
     @Test
     void calculateDelay_customParams_negativeBaseDelay_throwsException() {
         assertThatThrownBy(() -> ExponentialBackoff.calculateDelay(0, -1, 60000, 1000))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("non-negative");
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("non-negative");
     }
 
     @Test
     void calculateDelay_customParams_negativeMaxDelay_throwsException() {
         assertThatThrownBy(() -> ExponentialBackoff.calculateDelay(0, 1000, -1, 1000))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("non-negative");
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("non-negative");
     }
 
     @Test
     void calculateDelay_customParams_negativeJitter_throwsException() {
         assertThatThrownBy(() -> ExponentialBackoff.calculateDelay(0, 1000, 60000, -1))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("non-negative");
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("non-negative");
     }
 
     @Test

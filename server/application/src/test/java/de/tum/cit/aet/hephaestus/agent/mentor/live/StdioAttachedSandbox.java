@@ -134,60 +134,50 @@ final class StdioAttachedSandbox implements AttachedSandbox {
 
     /** Read \n-framed JSON from stdout on a virtual thread; fan out parsed frames to subscribers. */
     private void startStdoutPump(InputStream stdout) {
-        Thread.ofVirtual()
-            .name("stdio-sandbox-stdout-" + sessionId)
-            .start(() -> {
-                // Buffered reader is fine here: pi-mentor-runner.ts already strips trailing \r, and the
-                // single-byte \n delimiter has no overlap with multibyte UTF-8 continuation bytes — the
-                // U+2028/U+2029 readline hazard called out in the runner doesn't apply to us because we
-                // never split on those code points. We do still cap line size to detect a runaway runner.
-                try (
-                    BufferedReader reader = new BufferedReader(
-                        new InputStreamReader(stdout, StandardCharsets.UTF_8),
-                        Math.min(MAX_LINE_BYTES, 64 * 1024)
-                    )
-                ) {
-                    String line;
-                    while ((line = reader.readLine()) != null) {
-                        if (line.isEmpty()) continue;
-                        lastActivity.set(Instant.now());
-                        JsonNode frame;
+        Thread.ofVirtual().name("stdio-sandbox-stdout-" + sessionId).start(() -> {
+            // Buffered reader is fine here: pi-mentor-runner.ts already strips trailing \r, and the
+            // single-byte \n delimiter has no overlap with multibyte UTF-8 continuation bytes — the
+            // U+2028/U+2029 readline hazard called out in the runner doesn't apply to us because we
+            // never split on those code points. We do still cap line size to detect a runaway runner.
+            try (BufferedReader reader = new BufferedReader(
+                    new InputStreamReader(stdout, StandardCharsets.UTF_8), Math.min(MAX_LINE_BYTES, 64 * 1024))) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    if (line.isEmpty()) continue;
+                    lastActivity.set(Instant.now());
+                    JsonNode frame;
+                    try {
+                        frame = MAPPER.readTree(line);
+                    } catch (Exception parseError) {
+                        // Skip malformed lines — the runner logs to stderr, which we surface verbatim.
+                        continue;
+                    }
+                    for (Consumer<JsonNode> listener : listeners) {
                         try {
-                            frame = MAPPER.readTree(line);
-                        } catch (Exception parseError) {
-                            // Skip malformed lines — the runner logs to stderr, which we surface verbatim.
-                            continue;
-                        }
-                        for (Consumer<JsonNode> listener : listeners) {
-                            try {
-                                listener.accept(frame);
-                            } catch (Throwable listenerError) {
-                                // A poison listener must not kill the pump for the others.
-                            }
+                            listener.accept(frame);
+                        } catch (Throwable listenerError) {
+                            // A poison listener must not kill the pump for the others.
                         }
                     }
-                } catch (IOException ignored) {
-                    // stdout pipe closes on process exit — terminal state, no work left.
                 }
-            });
+            } catch (IOException ignored) {
+                // stdout pipe closes on process exit — terminal state, no work left.
+            }
+        });
     }
 
     private void startStderrLogger(InputStream stderr) {
-        Thread.ofVirtual()
-            .name("stdio-sandbox-stderr-" + sessionId)
-            .start(() -> {
-                try (
-                    BufferedReader reader = new BufferedReader(new InputStreamReader(stderr, StandardCharsets.UTF_8))
-                ) {
-                    String line;
-                    while ((line = reader.readLine()) != null) {
-                        // Direct to stderr so JUnit surface — matches what live tests already do for
-                        // every other child-process integration in tree.
-                        System.err.println("[mentor-runner] " + line);
-                    }
-                } catch (IOException ignored) {
-                    // stderr pipe closes on process exit.
+        Thread.ofVirtual().name("stdio-sandbox-stderr-" + sessionId).start(() -> {
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(stderr, StandardCharsets.UTF_8))) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    // Direct to stderr so JUnit surface — matches what live tests already do for
+                    // every other child-process integration in tree.
+                    System.err.println("[mentor-runner] " + line);
                 }
-            });
+            } catch (IOException ignored) {
+                // stderr pipe closes on process exit.
+            }
+        });
     }
 }

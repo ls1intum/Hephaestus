@@ -89,20 +89,18 @@ class AgentJobStaleReapIntegrationTest extends BaseIntegrationTest {
     void setUp() {
         databaseTestUtils.cleanDatabase();
         sweeper = new AgentJobZombieSweeper(
-            jobRepository,
-            workerRegistryRepository,
-            agentProperties,
-            objectMapper,
-            transactionTemplate,
-            lifecycleService,
-            usageRecorder,
-            meterRegistry
-        );
+                jobRepository,
+                workerRegistryRepository,
+                agentProperties,
+                objectMapper,
+                transactionTemplate,
+                lifecycleService,
+                usageRecorder,
+                meterRegistry);
         workspace = workspaceRepository.save(TestEntities.activeWorkspace("stale-reap-ws"));
         LlmConnection connection = connectionRepository.save(LlmCatalogTestFixtures.connection("stale-reap"));
-        instanceModel = modelRepository.save(
-            LlmCatalogTestFixtures.model(connection, "stale-reap-model", "test-model")
-        );
+        instanceModel =
+                modelRepository.save(LlmCatalogTestFixtures.model(connection, "stale-reap-model", "test-model"));
     }
 
     @Test
@@ -137,8 +135,8 @@ class AgentJobStaleReapIntegrationTest extends BaseIntegrationTest {
 
         AgentJob reaped = jobRepository.findById(jobId).orElseThrow();
         assertThat(reaped.getStatus())
-            .as("an unreadable price must not cost the job its exit from RUNNING")
-            .isEqualTo(AgentJobStatus.TIMED_OUT);
+                .as("an unreadable price must not cost the job its exit from RUNNING")
+                .isEqualTo(AgentJobStatus.TIMED_OUT);
 
         LlmUsageEvent event = onlyUsageEvent();
         assertThat(event.getSourceId()).isEqualTo(jobId);
@@ -182,24 +180,23 @@ class AgentJobStaleReapIntegrationTest extends BaseIntegrationTest {
 
     private ConfigSnapshot snapshot() {
         return new ConfigSnapshot(
-            ConfigSnapshot.SCHEMA_VERSION,
-            "openai-completions",
-            "https://api.openai.com/v1",
-            "test-model",
-            null,
-            null,
-            null,
-            false,
-            FundingSource.INSTANCE,
-            instanceModel.getConnection().getId(),
-            instanceModel.getId(),
-            workspace.getId(),
-            600,
-            false,
-            null
-        ).withPriceSnapshot(
-            new LlmPriceSnapshot(FundingSource.INSTANCE, PricingState.NO_CHARGE, null, null, null, null, null, null)
-        );
+                        ConfigSnapshot.SCHEMA_VERSION,
+                        "openai-completions",
+                        "https://api.openai.com/v1",
+                        "test-model",
+                        null,
+                        null,
+                        null,
+                        false,
+                        FundingSource.INSTANCE,
+                        instanceModel.getConnection().getId(),
+                        instanceModel.getId(),
+                        workspace.getId(),
+                        600,
+                        false,
+                        null)
+                .withPriceSnapshot(new LlmPriceSnapshot(
+                        FundingSource.INSTANCE, PricingState.NO_CHARGE, null, null, null, null, null, null));
     }
 
     private UUID staleRunningJob(tools.jackson.databind.JsonNode configSnapshot, AgentJob usage) {

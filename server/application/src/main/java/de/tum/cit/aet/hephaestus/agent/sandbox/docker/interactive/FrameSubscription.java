@@ -36,12 +36,11 @@ final class FrameSubscription implements Disposable {
     private volatile @Nullable Thread dispatcherThread;
 
     FrameSubscription(
-        Consumer<JsonNode> listener,
-        int queueCapacity,
-        Counter droppedCounter,
-        Counter errorCounter,
-        Runnable onDispose
-    ) {
+            Consumer<JsonNode> listener,
+            int queueCapacity,
+            Counter droppedCounter,
+            Counter errorCounter,
+            Runnable onDispose) {
         this.listener = listener;
         this.queue = new ArrayBlockingQueue<>(queueCapacity);
         this.droppedCounter = droppedCounter;
@@ -51,9 +50,9 @@ final class FrameSubscription implements Disposable {
 
     void start() {
         Thread t = Thread.ofVirtual()
-            .name("mentor-sub-" + subscriptionId)
-            .uncaughtExceptionHandler((thread, ex) -> log.warn("Subscriber dispatcher died unexpectedly", ex))
-            .start(this::dispatchLoop);
+                .name("mentor-sub-" + subscriptionId)
+                .uncaughtExceptionHandler((thread, ex) -> log.warn("Subscriber dispatcher died unexpectedly", ex))
+                .start(this::dispatchLoop);
         this.dispatcherThread = t;
     }
 

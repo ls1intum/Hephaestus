@@ -18,13 +18,10 @@ public class RepositoryManagementNotAllowedException extends RuntimeException {
     private final String workspaceSlug;
 
     public RepositoryManagementNotAllowedException(String workspaceSlug) {
-        super(
-            "Repository management is not allowed for workspace '" +
-                workspaceSlug +
-                "'. " +
-                "This workspace is managed by a GitHub App Installation. " +
-                "Repositories are automatically synced based on the installation's configuration."
-        );
+        super("Repository management is not allowed for workspace '" + workspaceSlug
+                + "'. "
+                + "This workspace is managed by a GitHub App Installation. "
+                + "Repositories are automatically synced based on the installation's configuration.");
         this.workspaceSlug = workspaceSlug;
     }
 

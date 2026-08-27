@@ -29,8 +29,7 @@ import tools.jackson.databind.json.JsonMapper;
 @ConditionalOnServerRole
 @Component
 @WorkspaceAgnostic(
-    "Content-addressed blobs and job replay directories are shared storage regions, so retention runs globally."
-)
+        "Content-addressed blobs and job replay directories are shared storage regions, so retention runs globally.")
 public class FabricGarbageCollector {
 
     private static final Logger log = LoggerFactory.getLogger(FabricGarbageCollector.class);
@@ -41,11 +40,10 @@ public class FabricGarbageCollector {
     private final Duration retention;
 
     public FabricGarbageCollector(
-        FabricLayout layout,
-        ContentAddressedStore cas,
-        JsonMapper objectMapper,
-        @Value("${hephaestus.fabric.gc-retention-days:30}") long retentionDays
-    ) {
+            FabricLayout layout,
+            ContentAddressedStore cas,
+            JsonMapper objectMapper,
+            @Value("${hephaestus.fabric.gc-retention-days:30}") long retentionDays) {
         if (retentionDays < 1) {
             throw new IllegalArgumentException("hephaestus.fabric.gc-retention-days must be positive");
         }
@@ -56,9 +54,8 @@ public class FabricGarbageCollector {
     }
 
     @Scheduled(
-        fixedRateString = "${hephaestus.fabric.gc-rate:86400000}",
-        initialDelayString = "${hephaestus.fabric.gc-initial-delay:3600000}"
-    )
+            fixedRateString = "${hephaestus.fabric.gc-rate:86400000}",
+            initialDelayString = "${hephaestus.fabric.gc-initial-delay:3600000}")
     @SchedulerLock(name = "context-fabric-garbage-collection", lockAtMostFor = "PT1H", lockAtLeastFor = "PT30S")
     public void collect() {
         Instant cutoff = Instant.now().minus(retention);
@@ -99,30 +96,28 @@ public class FabricGarbageCollector {
 
     private ReferenceScan scanReferences() {
         Set<String> shas = new HashSet<>();
-        boolean[] complete = { true };
+        boolean[] complete = {true};
         Path jobsRoot = layout.jobsRoot();
         if (!Files.isDirectory(jobsRoot)) {
             return new ReferenceScan(shas, true);
         }
         try (Stream<Path> manifests = Files.walk(jobsRoot)) {
-            manifests
-                .filter(FabricGarbageCollector::isManifest)
-                .forEach(manifest -> {
-                    try {
-                        JsonNode root = objectMapper.readTree(Files.readAllBytes(manifest));
-                        for (JsonNode entry : root.path("entries")) {
-                            addSha(shas, entry.path("sha256"));
-                        }
-                        for (JsonNode source : root.path("sources")) {
-                            for (JsonNode artifact : source.path("artifacts")) {
-                                addSha(shas, artifact.path("sha256"));
-                            }
-                        }
-                    } catch (IOException | RuntimeException e) {
-                        complete[0] = false;
-                        log.warn("Fabric GC skipped blob sweep because manifest {} is unreadable", manifest);
+            manifests.filter(FabricGarbageCollector::isManifest).forEach(manifest -> {
+                try {
+                    JsonNode root = objectMapper.readTree(Files.readAllBytes(manifest));
+                    for (JsonNode entry : root.path("entries")) {
+                        addSha(shas, entry.path("sha256"));
                     }
-                });
+                    for (JsonNode source : root.path("sources")) {
+                        for (JsonNode artifact : source.path("artifacts")) {
+                            addSha(shas, artifact.path("sha256"));
+                        }
+                    }
+                } catch (IOException | RuntimeException e) {
+                    complete[0] = false;
+                    log.warn("Fabric GC skipped blob sweep because manifest {} is unreadable", manifest);
+                }
+            });
         } catch (IOException e) {
             log.warn("Fabric GC could not walk jobs root {}: {}", jobsRoot, e.getMessage());
             complete[0] = false;

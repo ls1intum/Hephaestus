@@ -13,21 +13,19 @@ import org.jspecify.annotations.Nullable;
  *                     "we could not look" continues to outrank "there was nothing of this kind here".
  */
 public record AutomatedReviewReadinessDecision(
-    String practiceSlug,
-    Instant decidedAt,
-    boolean ready,
-    List<AutomatedReviewReadinessReason> reasonCodes,
-    List<SourceReadinessCheck> sourceChecks,
-    @Nullable PracticeSubjectCheck subjectCheck
-) {
-    /** A decision taken before subject declarations existed, or by a practice that declares none. */
-    public AutomatedReviewReadinessDecision(
         String practiceSlug,
         Instant decidedAt,
         boolean ready,
         List<AutomatedReviewReadinessReason> reasonCodes,
-        List<SourceReadinessCheck> sourceChecks
-    ) {
+        List<SourceReadinessCheck> sourceChecks,
+        @Nullable PracticeSubjectCheck subjectCheck) {
+    /** A decision taken before subject declarations existed, or by a practice that declares none. */
+    public AutomatedReviewReadinessDecision(
+            String practiceSlug,
+            Instant decidedAt,
+            boolean ready,
+            List<AutomatedReviewReadinessReason> reasonCodes,
+            List<SourceReadinessCheck> sourceChecks) {
         this(practiceSlug, decidedAt, ready, reasonCodes, sourceChecks, null);
     }
 
@@ -45,17 +43,17 @@ public record AutomatedReviewReadinessDecision(
         if (sourceChecks.isEmpty() && reasonCodes.isEmpty()) {
             throw new IllegalArgumentException("a readiness decision needs source readiness checks or a skip reason");
         }
-        if (
-            new HashSet<>(sourceChecks.stream().map(SourceReadinessCheck::sourceKind).toList()).size() !=
-            sourceChecks.size()
-        ) {
+        if (new HashSet<>(sourceChecks.stream()
+                                .map(SourceReadinessCheck::sourceKind)
+                                .toList())
+                        .size()
+                != sourceChecks.size()) {
             throw new IllegalArgumentException("sourceChecks must contain each source kind at most once");
         }
         boolean allMeetRequirements = sourceChecks.stream().allMatch(SourceReadinessCheck::meetsRequirements);
         if (ready != (reasonCodes.isEmpty() && allMeetRequirements)) {
             throw new IllegalArgumentException(
-                "ready must equal whether the practice and every source readiness check meet their requirements"
-            );
+                    "ready must equal whether the practice and every source readiness check meet their requirements");
         }
         // The reason and the evidence for it travel together or not at all. A decision that withheld a
         // practice for want of a subject but carries no check has nothing a reader could audit, and a
@@ -64,8 +62,7 @@ public record AutomatedReviewReadinessDecision(
         boolean subjectAbsent = reasonCodes.contains(AutomatedReviewReadinessReason.SUBJECT_NOT_IN_THE_WORK);
         if (subjectAbsent != (subjectCheck != null && subjectCheck.absent())) {
             throw new IllegalArgumentException(
-                "SUBJECT_NOT_IN_THE_WORK must be recorded exactly when a subject check found the subject absent"
-            );
+                    "SUBJECT_NOT_IN_THE_WORK must be recorded exactly when a subject check found the subject absent");
         }
     }
 }

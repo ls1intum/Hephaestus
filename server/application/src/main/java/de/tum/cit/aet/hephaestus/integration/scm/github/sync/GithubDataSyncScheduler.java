@@ -115,23 +115,22 @@ public class GithubDataSyncScheduler {
     private final SyncJobService syncJobService;
 
     public GithubDataSyncScheduler(
-        SyncTargetProvider syncTargetProvider,
-        SyncContextProvider syncContextProvider,
-        GithubDataSyncService dataSyncService,
-        GitHubDeletionSweepService deletionSweepService,
-        GitHubSubIssueSyncService subIssueSyncService,
-        GitHubIssueTypeSyncService issueTypeSyncService,
-        GitHubIssueDependencySyncService issueDependencySyncService,
-        GitHubProjectSyncService projectSyncService,
-        GitHubOrganizationSyncService organizationSyncService,
-        GitHubTeamSyncService teamSyncService,
-        OrganizationRepository organizationRepository,
-        SyncSchedulerProperties syncSchedulerProperties,
-        RateLimitTracker rateLimitTracker,
-        @Qualifier("monitoringExecutor") Executor monitoringExecutor,
-        ConnectionRepository connectionRepository,
-        SyncJobService syncJobService
-    ) {
+            SyncTargetProvider syncTargetProvider,
+            SyncContextProvider syncContextProvider,
+            GithubDataSyncService dataSyncService,
+            GitHubDeletionSweepService deletionSweepService,
+            GitHubSubIssueSyncService subIssueSyncService,
+            GitHubIssueTypeSyncService issueTypeSyncService,
+            GitHubIssueDependencySyncService issueDependencySyncService,
+            GitHubProjectSyncService projectSyncService,
+            GitHubOrganizationSyncService organizationSyncService,
+            GitHubTeamSyncService teamSyncService,
+            OrganizationRepository organizationRepository,
+            SyncSchedulerProperties syncSchedulerProperties,
+            RateLimitTracker rateLimitTracker,
+            @Qualifier("monitoringExecutor") Executor monitoringExecutor,
+            ConnectionRepository connectionRepository,
+            SyncJobService syncJobService) {
         this.syncTargetProvider = syncTargetProvider;
         this.syncContextProvider = syncContextProvider;
         this.dataSyncService = dataSyncService;
@@ -157,28 +156,26 @@ public class GithubDataSyncScheduler {
     @PostConstruct
     void logSyncConfiguration() {
         log.info(
-            "Incremental sync config: runOnStartup={}, cron={}, timeframeDays={}, cooldownMinutes={} " +
-                "(syncs repos, issues, PRs, labels, milestones, teams, AND projects)",
-            syncSchedulerProperties.runOnStartup(),
-            syncSchedulerProperties.cron(),
-            syncSchedulerProperties.timeframeDays(),
-            syncSchedulerProperties.cooldownMinutes()
-        );
+                "Incremental sync config: runOnStartup={}, cron={}, timeframeDays={}, cooldownMinutes={} "
+                        + "(syncs repos, issues, PRs, labels, milestones, teams, AND projects)",
+                syncSchedulerProperties.runOnStartup(),
+                syncSchedulerProperties.cron(),
+                syncSchedulerProperties.timeframeDays(),
+                syncSchedulerProperties.cooldownMinutes());
         log.info(
-            "Historical backfill config: enabled={}, batchSize={}, intervalSeconds={} " +
-                "(backfills old issues/PRs only - does NOT affect projects)",
-            syncSchedulerProperties.backfill().enabled(),
-            syncSchedulerProperties.backfill().batchSize(),
-            syncSchedulerProperties.backfill().intervalSeconds()
-        );
+                "Historical backfill config: enabled={}, batchSize={}, intervalSeconds={} "
+                        + "(backfills old issues/PRs only - does NOT affect projects)",
+                syncSchedulerProperties.backfill().enabled(),
+                syncSchedulerProperties.backfill().batchSize(),
+                syncSchedulerProperties.backfill().intervalSeconds());
 
         var filters = syncSchedulerProperties.filters();
-        if (!filters.allowedOrganizations().isEmpty() || !filters.allowedRepositories().isEmpty()) {
+        if (!filters.allowedOrganizations().isEmpty()
+                || !filters.allowedRepositories().isEmpty()) {
             log.info(
-                "Sync filters active: allowedOrganizations={}, allowedRepositories={}",
-                filters.allowedOrganizations(),
-                filters.allowedRepositories()
-            );
+                    "Sync filters active: allowedOrganizations={}, allowedRepositories={}",
+                    filters.allowedOrganizations(),
+                    filters.allowedRepositories());
         }
     }
 
@@ -198,28 +195,25 @@ public class GithubDataSyncScheduler {
 
         if (sessions.isEmpty()) {
             log.info(
-                "No scopes to sync: totalScopes={}, skippedByStatus={}, skippedByFilter={}",
-                stats.totalScopes(),
-                stats.skippedByStatus(),
-                stats.skippedByFilter()
-            );
+                    "No scopes to sync: totalScopes={}, skippedByStatus={}, skippedByFilter={}",
+                    stats.totalScopes(),
+                    stats.skippedByStatus(),
+                    stats.skippedByFilter());
             return;
         }
 
         if (stats.filterActive()) {
             log.info(
-                "Monitoring filter active: scopesToSync={}, totalScopes={}, skippedByStatus={}, skippedByFilter={}",
-                stats.activeAndAllowed(),
-                stats.totalScopes(),
-                stats.skippedByStatus(),
-                stats.skippedByFilter()
-            );
+                    "Monitoring filter active: scopesToSync={}, totalScopes={}, skippedByStatus={}, skippedByFilter={}",
+                    stats.activeAndAllowed(),
+                    stats.totalScopes(),
+                    stats.skippedByStatus(),
+                    stats.skippedByFilter());
         } else {
             log.info(
-                "Found scopes to sync: count={}, skippedByStatus={}",
-                stats.activeAndAllowed(),
-                stats.skippedByStatus()
-            );
+                    "Found scopes to sync: count={}, skippedByStatus={}",
+                    stats.activeAndAllowed(),
+                    stats.skippedByStatus());
         }
 
         // Each workspace has its own GitHub App installation with separate rate limits, so syncing
@@ -233,40 +227,34 @@ public class GithubDataSyncScheduler {
         AtomicInteger successCount = new AtomicInteger(0);
         AtomicInteger failureCount = new AtomicInteger(0);
 
-        CompletableFuture<?>[] futures = sessions
-            .stream()
-            .map(session ->
-                CompletableFuture.runAsync(() -> syncScope(session), monitoringExecutor).whenComplete(
-                    (result, error) -> {
-                        if (error != null) {
-                            // Already logged inside syncScope
-                            failureCount.incrementAndGet();
-                        } else {
-                            successCount.incrementAndGet();
-                        }
-                    }
-                )
-            )
-            .toArray(CompletableFuture[]::new);
+        CompletableFuture<?>[] futures = sessions.stream()
+                .map(session -> CompletableFuture.runAsync(() -> syncScope(session), monitoringExecutor)
+                        .whenComplete((result, error) -> {
+                            if (error != null) {
+                                // Already logged inside syncScope
+                                failureCount.incrementAndGet();
+                            } else {
+                                successCount.incrementAndGet();
+                            }
+                        }))
+                .toArray(CompletableFuture[]::new);
 
         // Use get() instead of join() because get() throws InterruptedException,
         // allowing graceful shutdown when Ctrl+C is pressed.
         try {
             CompletableFuture.allOf(futures).get();
             log.info(
-                "Completed scheduled sync: scopeCount={}, successful={}, failed={}",
-                sessions.size(),
-                successCount.get(),
-                failureCount.get()
-            );
+                    "Completed scheduled sync: scopeCount={}, successful={}, failed={}",
+                    sessions.size(),
+                    successCount.get(),
+                    failureCount.get());
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             log.warn(
-                "Scheduled sync interrupted (shutdown requested): scopeCount={}, successful={}, failed={}",
-                sessions.size(),
-                successCount.get(),
-                failureCount.get()
-            );
+                    "Scheduled sync interrupted (shutdown requested): scopeCount={}, successful={}, failed={}",
+                    sessions.size(),
+                    successCount.get(),
+                    failureCount.get());
         } catch (ExecutionException e) {
             // Should not happen since each future handles its own exceptions via whenComplete()
             log.error("Unexpected error during scheduled sync", e);
@@ -279,12 +267,11 @@ public class GithubDataSyncScheduler {
      * @param type the job type; decides whether the body ends with a deletion sweep
      */
     public void syncWorkspaceNow(long workspaceId, SyncExecutionHandle handle, SyncJobType type) {
-        SyncSession session = syncTargetProvider
-            .getSyncSessions(IntegrationKind.GITHUB)
-            .stream()
-            .filter(candidate -> candidate.scopeId().equals(workspaceId))
-            .findFirst()
-            .orElseThrow(() -> new IllegalStateException("No active GitHub sync scope for workspace " + workspaceId));
+        SyncSession session = syncTargetProvider.getSyncSessions(IntegrationKind.GITHUB).stream()
+                .filter(candidate -> candidate.scopeId().equals(workspaceId))
+                .findFirst()
+                .orElseThrow(
+                        () -> new IllegalStateException("No active GitHub sync scope for workspace " + workspaceId));
         runScopeSyncBody(session, handle, type);
     }
 
@@ -301,11 +288,8 @@ public class GithubDataSyncScheduler {
      */
     private void syncScope(SyncSession session) {
         Optional<Connection> connection =
-            connectionRepository.findFirstByWorkspaceIdAndKindAndStateOrderByCreatedAtDesc(
-                session.scopeId(),
-                IntegrationKind.GITHUB,
-                IntegrationState.ACTIVE
-            );
+                connectionRepository.findFirstByWorkspaceIdAndKindAndStateOrderByCreatedAtDesc(
+                        session.scopeId(), IntegrationKind.GITHUB, IntegrationState.ACTIVE);
         if (connection.isEmpty()) {
             runScopeSyncBody(session, null, SyncJobType.RECONCILIATION);
             return;
@@ -313,23 +297,20 @@ public class GithubDataSyncScheduler {
 
         try {
             syncJobService.run(
-                new SyncJobRequest(
-                    session.scopeId(),
-                    connection.get().getId(),
-                    IntegrationKind.GITHUB,
-                    SyncJobType.RECONCILIATION,
-                    SyncJobTrigger.SCHEDULED,
-                    null
-                ),
-                handle -> runScopeSyncBody(session, handle, SyncJobType.RECONCILIATION)
-            );
+                    new SyncJobRequest(
+                            session.scopeId(),
+                            connection.get().getId(),
+                            IntegrationKind.GITHUB,
+                            SyncJobType.RECONCILIATION,
+                            SyncJobTrigger.SCHEDULED,
+                            null),
+                    handle -> runScopeSyncBody(session, handle, SyncJobType.RECONCILIATION));
         } catch (SyncJobConflictException e) {
             log.info(
-                "Skipped scheduled sync: reason=manualSyncAlreadyRunning, scopeId={}, scopeSlug={}, activeJobId={}",
-                session.scopeId(),
-                session.slug(),
-                e.activeJob().getId()
-            );
+                    "Skipped scheduled sync: reason=manualSyncAlreadyRunning, scopeId={}, scopeSlug={}, activeJobId={}",
+                    session.scopeId(),
+                    session.slug(),
+                    e.activeJob().getId());
         }
     }
 
@@ -344,11 +325,10 @@ public class GithubDataSyncScheduler {
             syncContextProvider.setContext(session.syncContext());
 
             log.info(
-                "Starting scope sync: scopeId={}, scopeSlug={}, accountLogin={}",
-                session.scopeId(),
-                session.slug(),
-                sanitizeForLog(session.accountLogin())
-            );
+                    "Starting scope sync: scopeId={}, scopeSlug={}, accountLogin={}",
+                    session.scopeId(),
+                    session.slug(),
+                    sanitizeForLog(session.accountLogin()));
 
             Runnable syncTask = syncContextProvider.wrapWithContext(() -> {
                 // Report every phase boundary, not just the repository loop. A reconcile spends real
@@ -376,11 +356,10 @@ public class GithubDataSyncScheduler {
                     // a job cancelled mid-run stops before the next repo rather than mid-repository.
                     if (handle != null && handle.isCancellationRequested()) {
                         log.info(
-                            "Scheduled sync cancelled between repositories: scopeId={}, reposProcessed={}, reposRemaining={}",
-                            session.scopeId(),
-                            reposProcessed,
-                            totalRepos - reposProcessed
-                        );
+                                "Scheduled sync cancelled between repositories: scopeId={}, reposProcessed={}, reposRemaining={}",
+                                session.scopeId(),
+                                reposProcessed,
+                                totalRepos - reposProcessed);
                         break;
                     }
                     // Wait for rate limit reset instead of aborting — ensures all repos
@@ -389,27 +368,23 @@ public class GithubDataSyncScheduler {
                     // incremental updates and historical backfill eligibility.
                     if (rateLimitTracker.isCritical(session.scopeId())) {
                         log.info(
-                            "Rate limit critical during scheduled sync, waiting for reset: scopeId={}, scopeSlug={}, remaining={}, totalRepos={}, reposProcessed={}, reposRemaining={}",
-                            session.scopeId(),
-                            session.slug(),
-                            rateLimitTracker.getRemaining(session.scopeId()),
-                            session.syncTargets().size(),
-                            reposProcessed,
-                            session.syncTargets().size() - reposProcessed
-                        );
+                                "Rate limit critical during scheduled sync, waiting for reset: scopeId={}, scopeSlug={}, remaining={}, totalRepos={}, reposProcessed={}, reposRemaining={}",
+                                session.scopeId(),
+                                session.slug(),
+                                rateLimitTracker.getRemaining(session.scopeId()),
+                                session.syncTargets().size(),
+                                reposProcessed,
+                                session.syncTargets().size() - reposProcessed);
                         try {
                             dataSyncService.waitForRateLimitReset(
-                                session.scopeId(),
-                                handle == null ? null : handle::isCancellationRequested
-                            );
+                                    session.scopeId(), handle == null ? null : handle::isCancellationRequested);
                         } catch (InterruptedException e) {
                             Thread.currentThread().interrupt();
                             log.info(
-                                "Scheduled sync interrupted while waiting for rate limit: scopeId={}, reposProcessed={}, reposRemaining={}",
-                                session.scopeId(),
-                                reposProcessed,
-                                session.syncTargets().size() - reposProcessed
-                            );
+                                    "Scheduled sync interrupted while waiting for rate limit: scopeId={}, reposProcessed={}, reposRemaining={}",
+                                    session.scopeId(),
+                                    reposProcessed,
+                                    session.syncTargets().size() - reposProcessed);
                             reportWarning(handle);
                             break;
                         }
@@ -420,19 +395,17 @@ public class GithubDataSyncScheduler {
                     reposProcessed++;
                     if (handle != null) {
                         handle.progress(
-                            reposProcessed,
-                            totalRepos,
-                            // Just the repository — the "N of M" is already the progress bar's own
-                            // reading (unitsCompleted/unitsTotal travel on the same record), so
-                            // repeating it in the step text renders the same fact twice.
-                            SyncProgress.ofResource(
-                                SyncPhase.REPOSITORIES,
-                                "Syncing " + target.repositoryNameWithOwner(),
-                                target.repositoryNameWithOwner(),
                                 reposProcessed,
-                                totalRepos
-                            )
-                        );
+                                totalRepos,
+                                // Just the repository — the "N of M" is already the progress bar's own
+                                // reading (unitsCompleted/unitsTotal travel on the same record), so
+                                // repeating it in the step text renders the same fact twice.
+                                SyncProgress.ofResource(
+                                        SyncPhase.REPOSITORIES,
+                                        "Syncing " + target.repositoryNameWithOwner(),
+                                        target.repositoryNameWithOwner(),
+                                        reposProcessed,
+                                        totalRepos));
                     }
                 }
 
@@ -460,20 +433,18 @@ public class GithubDataSyncScheduler {
                 // already exist; skip when rate limit is critically low to avoid wasting calls.
                 if (!rateLimitTracker.isCritical(session.scopeId())) {
                     reportPhase(
-                        handle,
-                        SyncPhase.ISSUES,
-                        "Linking sub-issues and issue dependencies",
-                        reposProcessed,
-                        totalRepos
-                    );
+                            handle,
+                            SyncPhase.ISSUES,
+                            "Linking sub-issues and issue dependencies",
+                            reposProcessed,
+                            totalRepos);
                     syncSubIssues(session, handle);
                     syncIssueDependencies(session, handle);
                 } else {
                     log.warn(
-                        "Skipped sub-issue and dependency sync: reason=rateLimitCritical, scopeId={}, remaining={}",
-                        session.scopeId(),
-                        rateLimitTracker.getRemaining(session.scopeId())
-                    );
+                            "Skipped sub-issue and dependency sync: reason=rateLimitCritical, scopeId={}, remaining={}",
+                            session.scopeId(),
+                            rateLimitTracker.getRemaining(session.scopeId()));
                     reportWarning(handle);
                 }
 
@@ -509,11 +480,10 @@ public class GithubDataSyncScheduler {
             }
         } catch (InstallationNotFoundException e) {
             log.warn(
-                "Aborting scope sync: reason=installationDeleted, scopeId={}, scopeSlug={}, installationId={}",
-                session.scopeId(),
-                session.slug(),
-                e.getInstallationId()
-            );
+                    "Aborting scope sync: reason=installationDeleted, scopeId={}, scopeSlug={}, installationId={}",
+                    session.scopeId(),
+                    session.slug(),
+                    e.getInstallationId());
             if (handle != null) {
                 throw e;
             }
@@ -537,12 +507,11 @@ public class GithubDataSyncScheduler {
      * itself is the narrative; the bar keeps one meaning start to finish.
      */
     private static void reportPhase(
-        @Nullable SyncExecutionHandle handle,
-        SyncPhase phase,
-        String currentStep,
-        int reposProcessed,
-        int totalRepos
-    ) {
+            @Nullable SyncExecutionHandle handle,
+            SyncPhase phase,
+            String currentStep,
+            int reposProcessed,
+            int totalRepos) {
         if (handle != null) {
             handle.progress(reposProcessed, totalRepos, SyncProgress.of(phase, currentStep));
         }
@@ -570,39 +539,35 @@ public class GithubDataSyncScheduler {
         // Skip if rate limit is critically low to avoid wasting API calls
         if (rateLimitTracker.isCritical(session.scopeId())) {
             log.warn(
-                "Skipped team sync: reason=rateLimitCritical, scopeId={}, remaining={}",
-                session.scopeId(),
-                rateLimitTracker.getRemaining(session.scopeId())
-            );
+                    "Skipped team sync: reason=rateLimitCritical, scopeId={}, remaining={}",
+                    session.scopeId(),
+                    rateLimitTracker.getRemaining(session.scopeId()));
             reportWarning(handle);
             return;
         }
 
         try {
             log.debug(
-                "Starting team sync: scopeId={}, scopeSlug={}, orgLogin={}",
-                session.scopeId(),
-                session.slug(),
-                sanitizeForLog(accountLogin)
-            );
+                    "Starting team sync: scopeId={}, scopeSlug={}, orgLogin={}",
+                    session.scopeId(),
+                    session.slug(),
+                    sanitizeForLog(accountLogin));
             int teamCount = teamSyncService.syncTeamsForOrganization(session.scopeId(), accountLogin);
             syncTargetProvider.updateTeamsSyncTimestamp(session.scopeId(), Instant.now());
             log.debug(
-                "Completed team sync: scopeId={}, orgLogin={}, teamCount={}",
-                session.scopeId(),
-                sanitizeForLog(accountLogin),
-                teamCount
-            );
+                    "Completed team sync: scopeId={}, orgLogin={}, teamCount={}",
+                    session.scopeId(),
+                    sanitizeForLog(accountLogin),
+                    teamCount);
         } catch (InstallationNotFoundException e) {
             throw e;
         } catch (Exception e) {
             log.error(
-                "Failed to sync teams: scopeId={}, scopeSlug={}, orgLogin={}",
-                session.scopeId(),
-                session.slug(),
-                sanitizeForLog(accountLogin),
-                e
-            );
+                    "Failed to sync teams: scopeId={}, scopeSlug={}, orgLogin={}",
+                    session.scopeId(),
+                    session.slug(),
+                    sanitizeForLog(accountLogin),
+                    e);
             reportWarning(handle);
         }
     }
@@ -629,11 +594,10 @@ public class GithubDataSyncScheduler {
             throw e;
         } catch (Exception e) {
             log.error(
-                "Failed to sync issue dependencies: scopeId={}, scopeSlug={}",
-                session.scopeId(),
-                session.slug(),
-                e
-            );
+                    "Failed to sync issue dependencies: scopeId={}, scopeSlug={}",
+                    session.scopeId(),
+                    session.slug(),
+                    e);
             reportWarning(handle);
         }
     }
@@ -642,22 +606,20 @@ public class GithubDataSyncScheduler {
         String safeAccountLogin = sanitizeForLog(session.accountLogin());
         try {
             log.debug(
-                "Starting projects sync: scopeId={}, scopeSlug={}, accountLogin={}",
-                session.scopeId(),
-                session.slug(),
-                safeAccountLogin
-            );
+                    "Starting projects sync: scopeId={}, scopeSlug={}, accountLogin={}",
+                    session.scopeId(),
+                    session.slug(),
+                    safeAccountLogin);
 
             // Ensure the organization exists locally before syncing projects
             Organization organization = organizationRepository
-                .findByLoginIgnoreCaseAndProvider_Type(session.accountLogin(), IdentityProviderType.GITHUB)
-                .orElse(null);
+                    .findByLoginIgnoreCaseAndProvider_Type(session.accountLogin(), IdentityProviderType.GITHUB)
+                    .orElse(null);
             if (organization == null) {
                 log.info(
-                    "Organization missing before project sync, attempting sync: scopeId={}, orgLogin={}",
-                    session.scopeId(),
-                    safeAccountLogin
-                );
+                        "Organization missing before project sync, attempting sync: scopeId={}, orgLogin={}",
+                        session.scopeId(),
+                        safeAccountLogin);
                 organization = organizationSyncService.syncOrganization(session.scopeId(), session.accountLogin());
             }
 
@@ -692,10 +654,9 @@ public class GithubDataSyncScheduler {
                     // If rate limited, stop processing more projects
                     if (itemResult.status() == SyncResult.Status.ABORTED_RATE_LIMIT) {
                         log.info(
-                            "Stopping project items sync: reason=rateLimited, scopeId={}, projectsProcessed={}",
-                            session.scopeId(),
-                            projectsWithItems
-                        );
+                                "Stopping project items sync: reason=rateLimited, scopeId={}, projectsProcessed={}",
+                                session.scopeId(),
+                                projectsWithItems);
                         reportWarning(handle);
                         break;
                     }
@@ -703,23 +664,21 @@ public class GithubDataSyncScheduler {
                     throw e;
                 } catch (Exception e) {
                     log.warn(
-                        "Failed to sync project items: projectId={}, scopeId={}, error={}",
-                        project.getId(),
-                        session.scopeId(),
-                        e.getMessage()
-                    );
+                            "Failed to sync project items: projectId={}, scopeId={}, error={}",
+                            project.getId(),
+                            session.scopeId(),
+                            e.getMessage());
                     reportWarning(handle);
                     // Continue with next project on error
                 }
             }
 
             log.debug(
-                "Completed projects sync: scopeId={}, orgLogin={}, projectCount={}, itemsSynced={}",
-                session.scopeId(),
-                safeAccountLogin,
-                projects.size(),
-                totalItemsSynced
-            );
+                    "Completed projects sync: scopeId={}, orgLogin={}, projectCount={}, itemsSynced={}",
+                    session.scopeId(),
+                    safeAccountLogin,
+                    projects.size(),
+                    totalItemsSynced);
         } catch (InstallationNotFoundException e) {
             throw e;
         } catch (Exception e) {

@@ -33,7 +33,9 @@ public class AccountIdentityQueryService implements AccountIdentityQuery {
         if (accountId == null) {
             return List.of();
         }
-        return identityLinkRepository.findActiveByAccountId(accountId).stream().map(this::toView).toList();
+        return identityLinkRepository.findActiveByAccountId(accountId).stream()
+                .map(this::toView)
+                .toList();
     }
 
     @Override
@@ -43,8 +45,8 @@ public class AccountIdentityQueryService implements AccountIdentityQuery {
             return Optional.empty();
         }
         return identityLinkRepository
-            .findActiveByProviderSubject(providerId, subject, teamId)
-            .map(link -> link.getAccount().getId());
+                .findActiveByProviderSubject(providerId, subject, teamId)
+                .map(link -> link.getAccount().getId());
     }
 
     @Override
@@ -53,7 +55,8 @@ public class AccountIdentityQueryService implements AccountIdentityQuery {
         if (externalActorId == null) {
             return Optional.empty();
         }
-        return identityLinkRepository.findActiveAccountIdsByExternalActorId(externalActorId).stream().findFirst();
+        return identityLinkRepository.findActiveAccountIdsByExternalActorId(externalActorId).stream()
+                .findFirst();
     }
 
     @Override
@@ -67,15 +70,14 @@ public class AccountIdentityQueryService implements AccountIdentityQuery {
 
     private IdentityLinkView toView(IdentityLink link) {
         return new IdentityLinkView(
-            link.getId(),
-            link.getProviderId(),
-            link.getSubject(),
-            link.getUsernameAtSignup(),
-            link.getDisplayName(),
-            link.getAvatarUrl(),
-            link.getProfileUrl(),
-            link.getExternalActorId(),
-            link.getTeamId()
-        );
+                link.getId(),
+                link.getProviderId(),
+                link.getSubject(),
+                link.getUsernameAtSignup(),
+                link.getDisplayName(),
+                link.getAvatarUrl(),
+                link.getProfileUrl(),
+                link.getExternalActorId(),
+                link.getTeamId());
     }
 }

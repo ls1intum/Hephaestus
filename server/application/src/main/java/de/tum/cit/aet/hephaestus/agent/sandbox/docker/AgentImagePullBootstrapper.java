@@ -28,11 +28,10 @@ public class AgentImagePullBootstrapper {
     private final AgentImageContractVerifier contractVerifier;
 
     public AgentImagePullBootstrapper(
-        DockerImageOperations imageOps,
-        AgentImageProperties properties,
-        MeterRegistry meterRegistry,
-        AgentImageContractVerifier contractVerifier
-    ) {
+            DockerImageOperations imageOps,
+            AgentImageProperties properties,
+            MeterRegistry meterRegistry,
+            AgentImageContractVerifier contractVerifier) {
         this.imageOps = imageOps;
         this.properties = properties;
         this.meterRegistry = meterRegistry;
@@ -43,13 +42,7 @@ public class AgentImagePullBootstrapper {
     @Order(0)
     public void pullOnStartup() {
         ImagePullBootstrapperSupport.applyPolicy(
-            properties.reference(),
-            properties.pullPolicy(),
-            imageOps,
-            "agent.image.pull",
-            meterRegistry,
-            log
-        );
+                properties.reference(), properties.pullPolicy(), imageOps, "agent.image.pull", meterRegistry, log);
         contractVerifier.verify(properties.reference());
     }
 }

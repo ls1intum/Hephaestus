@@ -24,15 +24,13 @@ public final class PracticeTestEvidence {
     public static PracticeAutomatedReviewPolicy forArtifact(ArtifactKind artifactKind) {
         needsFor(artifactKind); // reject an unsupported kind here rather than at the binding
         return new PracticeAutomatedReviewPolicy(
-            new SourceContractVersion("1.0.0"),
-            new PracticeAutomatedReview(
-                PracticeAutomatedReviewMode.LANGUAGE_MODEL,
-                PracticeEvidenceSufficiency.SUFFICIENT_WHEN_REQUIREMENTS_MET
-            ),
-            PracticeInsufficientEvidenceAction.SKIP_AUTOMATED_REVIEW,
-            List.of(),
-            null
-        );
+                new SourceContractVersion("1.0.0"),
+                new PracticeAutomatedReview(
+                        PracticeAutomatedReviewMode.LANGUAGE_MODEL,
+                        PracticeEvidenceSufficiency.SUFFICIENT_WHEN_REQUIREMENTS_MET),
+                PracticeInsufficientEvidenceAction.SKIP_AUTOMATED_REVIEW,
+                List.of(),
+                null);
     }
 
     /** One binding on the kind's recommended signal, reading what a practice of that kind reads. */
@@ -74,9 +72,8 @@ public final class PracticeTestEvidence {
         } else {
             throw new IllegalArgumentException("Unsupported artifact kind: " + artifactKind);
         }
-        return kinds
-            .stream()
-            .map(kind -> new PracticeEvidenceRequirement(new SourceKind(kind), EvidenceStance.REQUIRED))
-            .toList();
+        return kinds.stream()
+                .map(kind -> new PracticeEvidenceRequirement(new SourceKind(kind), EvidenceStance.REQUIRED))
+                .toList();
     }
 }

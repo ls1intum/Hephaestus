@@ -9,13 +9,12 @@ import org.jspecify.annotations.Nullable;
  * by the writer.
  */
 public record AuthEventData(
-    AuthEvent.EventType type,
-    AuthEvent.Result result,
-    @Nullable Long accountId,
-    @Nullable Long actingAccountId,
-    @Nullable String failureReason,
-    @Nullable Long gitProviderId,
-    @Nullable Long workspaceId,
-    @Nullable Long identityLinkId,
-    @Nullable String details
-) {}
+        AuthEvent.EventType type,
+        AuthEvent.Result result,
+        @Nullable Long accountId,
+        @Nullable Long actingAccountId,
+        @Nullable String failureReason,
+        @Nullable Long gitProviderId,
+        @Nullable Long workspaceId,
+        @Nullable Long identityLinkId,
+        @Nullable String details) {}

@@ -53,12 +53,11 @@ class SlackConversationNudgeServiceTest extends BaseUnitTest {
     @BeforeEach
     void setUp() {
         service = new SlackConversationNudgeService(
-            connectionService,
-            accountPreferencesQuery,
-            identityResolver,
-            slackMessageService,
-            mentorReadinessQuery
-        );
+                connectionService,
+                accountPreferencesQuery,
+                identityResolver,
+                slackMessageService,
+                mentorReadinessQuery);
     }
 
     private static ConversationFeedbackPreparedEvent event(int unitCount) {
@@ -77,9 +76,9 @@ class SlackConversationNudgeServiceTest extends BaseUnitTest {
     }
 
     private void stubRecipient(boolean practiceFeedbackDeliveryEnabled) {
-        when(accountPreferencesQuery.preferencesForUserId(RECIPIENT)).thenReturn(
-            Optional.of(new AccountPreferencesQuery.PreferencesView(false, practiceFeedbackDeliveryEnabled))
-        );
+        when(accountPreferencesQuery.preferencesForUserId(RECIPIENT))
+                .thenReturn(Optional.of(
+                        new AccountPreferencesQuery.PreferencesView(false, practiceFeedbackDeliveryEnabled)));
     }
 
     private void stubAllGuardsPass() {
@@ -97,9 +96,8 @@ class SlackConversationNudgeServiceTest extends BaseUnitTest {
 
         ArgumentCaptor<String> fallback = ArgumentCaptor.forClass(String.class);
         verify(slackMessageService).sendForWorkspace(eq(WS), eq(SLACK_USER), anyList(), fallback.capture());
-        assertThat(fallback.getValue()).isEqualTo(
-            "You have 2 new practice observations to explore — reply here to go through them."
-        );
+        assertThat(fallback.getValue())
+                .isEqualTo("You have 2 new practice observations to explore — reply here to go through them.");
     }
 
     @Test
@@ -108,12 +106,12 @@ class SlackConversationNudgeServiceTest extends BaseUnitTest {
 
         service.onConversationFeedbackPrepared(event(1));
 
-        verify(slackMessageService).sendForWorkspace(
-            eq(WS),
-            eq(SLACK_USER),
-            anyList(),
-            eq("You have 1 new practice observation to explore — reply here to go through it.")
-        );
+        verify(slackMessageService)
+                .sendForWorkspace(
+                        eq(WS),
+                        eq(SLACK_USER),
+                        anyList(),
+                        eq("You have 1 new practice observation to explore — reply here to go through it."));
     }
 
     @Test
@@ -135,7 +133,8 @@ class SlackConversationNudgeServiceTest extends BaseUnitTest {
         Connection connection = mock(Connection.class);
         when(connection.getInstanceKey()).thenReturn(otherTeam);
         when(mentorReadinessQuery.isReady(otherWorkspace)).thenReturn(true);
-        when(connectionService.findActive(otherWorkspace, IntegrationKind.SLACK)).thenReturn(Optional.of(connection));
+        when(connectionService.findActive(otherWorkspace, IntegrationKind.SLACK))
+                .thenReturn(Optional.of(connection));
         when(identityResolver.resolveSlackUserId(RECIPIENT, otherTeam)).thenReturn(Optional.of(otherSlackUser));
 
         service.onConversationFeedbackPrepared(event(WS, 2));
@@ -189,9 +188,8 @@ class SlackConversationNudgeServiceTest extends BaseUnitTest {
     @Test
     void preferenceLookupFailure_failsClosed() {
         stubActiveConnection();
-        when(accountPreferencesQuery.preferencesForUserId(RECIPIENT)).thenThrow(
-            new IllegalStateException("database unavailable")
-        );
+        when(accountPreferencesQuery.preferencesForUserId(RECIPIENT))
+                .thenThrow(new IllegalStateException("database unavailable"));
 
         service.onConversationFeedbackPrepared(event(2));
 
@@ -202,9 +200,9 @@ class SlackConversationNudgeServiceTest extends BaseUnitTest {
     void sendFailure_releasesTheCooldownWindow_soTheNextEventRetries() {
         stubAllGuardsPass();
         doThrow(new SlackSendException(WS, SLACK_USER, "transport_failure"))
-            .doNothing()
-            .when(slackMessageService)
-            .sendForWorkspace(eq(WS), eq(SLACK_USER), anyList(), anyString());
+                .doNothing()
+                .when(slackMessageService)
+                .sendForWorkspace(eq(WS), eq(SLACK_USER), anyList(), anyString());
 
         service.onConversationFeedbackPrepared(event(2));
         service.onConversationFeedbackPrepared(event(2));

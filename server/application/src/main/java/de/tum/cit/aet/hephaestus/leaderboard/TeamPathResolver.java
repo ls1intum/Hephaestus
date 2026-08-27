@@ -37,10 +37,9 @@ public class TeamPathResolver {
     private final WorkspaceTeamScopeResolver workspaceTeamScopeResolver;
 
     public TeamPathResolver(
-        TeamRepository teamRepository,
-        WorkspaceTeamSettingsService workspaceTeamSettingsService,
-        WorkspaceTeamScopeResolver workspaceTeamScopeResolver
-    ) {
+            TeamRepository teamRepository,
+            WorkspaceTeamSettingsService workspaceTeamSettingsService,
+            WorkspaceTeamScopeResolver workspaceTeamScopeResolver) {
         this.teamRepository = teamRepository;
         this.workspaceTeamSettingsService = workspaceTeamSettingsService;
         this.workspaceTeamScopeResolver = workspaceTeamScopeResolver;
@@ -67,11 +66,9 @@ public class TeamPathResolver {
 
         String[] parts = path.split(" / ");
         String leaf = parts[parts.length - 1];
-        List<Team> candidates = teamRepository
-            .findAllByNameAndProviderId(leaf, scope.providerId())
-            .stream()
-            .filter(scope::contains)
-            .toList();
+        List<Team> candidates = teamRepository.findAllByNameAndProviderId(leaf, scope.providerId()).stream()
+                .filter(scope::contains)
+                .toList();
         if (candidates.isEmpty()) {
             return Optional.empty();
         }
@@ -138,14 +135,12 @@ public class TeamPathResolver {
                 }
 
                 if (!missingIds.isEmpty()) {
-                    teamRepository
-                        .findAllById(missingIds)
-                        .forEach(parent -> {
-                            Long parentId = parent.getId();
-                            if (parentId != null && scope.contains(parent)) {
-                                cache.putIfAbsent(parentId, parent);
-                            }
-                        });
+                    teamRepository.findAllById(missingIds).forEach(parent -> {
+                        Long parentId = parent.getId();
+                        if (parentId != null && scope.contains(parent)) {
+                            cache.putIfAbsent(parentId, parent);
+                        }
+                    });
                     pendingResolution = true;
                 }
             }
@@ -178,11 +173,9 @@ public class TeamPathResolver {
             preloadAncestors(currentByCandidate.values(), cache);
             for (Long candidateId : currentByCandidate.keySet()) {
                 Team candidate = cache.get(candidateId);
-                if (
-                    candidate != null &&
-                    scope.contains(candidate) &&
-                    equalsVisiblePath(candidate, parts, cache, hiddenTeamIds)
-                ) {
+                if (candidate != null
+                        && scope.contains(candidate)
+                        && equalsVisiblePath(candidate, parts, cache, hiddenTeamIds)) {
                     return Optional.of(candidate);
                 }
             }
@@ -207,19 +200,11 @@ public class TeamPathResolver {
         if (scope == null) {
             return Collections.emptyMap();
         }
-        List<Team> all = teamRepository.findAllByOrganizationIgnoreCaseAndProviderId(
-            scope.accountLogin(),
-            scope.providerId()
-        );
-        return all
-            .stream()
-            .collect(
-                Collectors.groupingBy(
-                    t -> Optional.ofNullable(t.getParentId()).orElse(0L),
-                    HashMap::new,
-                    Collectors.toList()
-                )
-            );
+        List<Team> all =
+                teamRepository.findAllByOrganizationIgnoreCaseAndProviderId(scope.accountLogin(), scope.providerId());
+        return all.stream()
+                .collect(Collectors.groupingBy(
+                        t -> Optional.ofNullable(t.getParentId()).orElse(0L), HashMap::new, Collectors.toList()));
     }
 
     /**
@@ -275,30 +260,27 @@ public class TeamPathResolver {
     }
 
     private void preloadAncestors(Collection<Team> teams, Map<Long, Team> cache) {
-        Set<Long> pending = teams
-            .stream()
-            .map(Team::getParentId)
-            .filter(Objects::nonNull)
-            .filter(id -> !cache.containsKey(id))
-            .collect(Collectors.toSet());
+        Set<Long> pending = teams.stream()
+                .map(Team::getParentId)
+                .filter(Objects::nonNull)
+                .filter(id -> !cache.containsKey(id))
+                .collect(Collectors.toSet());
 
         while (!pending.isEmpty()) {
             Set<Long> nextRound = new HashSet<>();
-            teamRepository
-                .findAllById(pending)
-                .forEach(parent -> {
-                    Long parentId = parent.getId();
-                    if (parentId == null) {
-                        return;
-                    }
-                    if (!cache.containsKey(parentId)) {
-                        cache.put(parentId, parent);
-                    }
-                    Long ancestorId = parent.getParentId();
-                    if (ancestorId != null && !cache.containsKey(ancestorId)) {
-                        nextRound.add(ancestorId);
-                    }
-                });
+            teamRepository.findAllById(pending).forEach(parent -> {
+                Long parentId = parent.getId();
+                if (parentId == null) {
+                    return;
+                }
+                if (!cache.containsKey(parentId)) {
+                    cache.put(parentId, parent);
+                }
+                Long ancestorId = parent.getParentId();
+                if (ancestorId != null && !cache.containsKey(ancestorId)) {
+                    nextRound.add(ancestorId);
+                }
+            });
             pending = nextRound;
         }
     }

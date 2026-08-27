@@ -30,16 +30,13 @@ public class DocumentArtifactDescriptor implements ArtifactDescriptor {
      * provenance unit the framework checks a handler for. Which event raises which signal is stated only
      * in {@link DocsSignals#forOutlineEvent(String)}, to avoid a second mapping here that could drift.
      */
-    private static final EventTypeKey OUTLINE_DOCUMENT = new EventTypeKey(
-        IntegrationKind.OUTLINE,
-        OutlineWebhookMessageHandler.EVENT_TYPE
-    );
+    private static final EventTypeKey OUTLINE_DOCUMENT =
+            new EventTypeKey(IntegrationKind.OUTLINE, OutlineWebhookMessageHandler.EVENT_TYPE);
 
     private static final List<Signal> SIGNALS = List.of(
-        declare(DocsSignals.DOCUMENT_PUBLISHED, "Published", true),
-        declare(DocsSignals.DOCUMENT_UPDATED, "Content changed", true),
-        declare(DocsSignals.DOCUMENT_ARCHIVED, "Archived", false)
-    );
+            declare(DocsSignals.DOCUMENT_PUBLISHED, "Published", true),
+            declare(DocsSignals.DOCUMENT_UPDATED, "Content changed", true),
+            declare(DocsSignals.DOCUMENT_ARCHIVED, "Archived", false));
 
     @Override
     public ArtifactKind kind() {
@@ -74,15 +71,12 @@ public class DocumentArtifactDescriptor implements ArtifactDescriptor {
     @Override
     public List<ReviewLimitation> reviewLimitations() {
         return List.of(
-            new ReviewLimitation(
-                "DESCRIBED_SYSTEM_NOT_OBSERVED",
-                "Document evidence does not establish whether the system it describes behaves as written."
-            ),
-            new ReviewLimitation(
-                "READERSHIP_NOT_OBSERVED",
-                "The mirrored document does not establish whether anyone read it or relied on it."
-            )
-        );
+                new ReviewLimitation(
+                        "DESCRIBED_SYSTEM_NOT_OBSERVED",
+                        "Document evidence does not establish whether the system it describes behaves as written."),
+                new ReviewLimitation(
+                        "READERSHIP_NOT_OBSERVED",
+                        "The mirrored document does not establish whether anyone read it or relied on it."));
     }
 
     @Override

@@ -37,8 +37,7 @@ class OwnPackageImportArchTest extends HephaestusArchitectureTest {
      * {@link #stripNonCode}, which handles those instead).
      */
     private static final Pattern OWN_PACKAGE_FQN = Pattern.compile(
-        "(?<![.\\w\"])de\\.tum\\.cit\\.aet\\.hephaestus(?:\\.[a-z][a-zA-Z0-9]*)+\\.[A-Z][A-Za-z0-9]*"
-    );
+            "(?<![.\\w\"])de\\.tum\\.cit\\.aet\\.hephaestus(?:\\.[a-z][a-zA-Z0-9]*)+\\.[A-Z][A-Za-z0-9]*");
 
     private static final Pattern IMPORT_LINE = Pattern.compile("^\\s*import\\s+(static\\s+)?[\\w.]+\\s*;\\s*$");
 
@@ -46,31 +45,36 @@ class OwnPackageImportArchTest extends HephaestusArchitectureTest {
     @DisplayName("the own-package FQN detector fires on real code usages and ignores imports/comments/strings/JPQL")
     void patternMatchesRealUsagesAndIgnoresLookalikes() {
         // Self-test of the guard: these must all be flagged as violations if they appeared bare in a code body.
-        assertThat(matches("private de.tum.cit.aet.hephaestus.workspace.Workspace workspace;")).isTrue();
-        assertThat(matches("de.tum.cit.aet.hephaestus.core.auth.audit.AuthEvent.EventType t = e.type();")).isTrue();
-        assertThat(matches("@de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic(\"reason\")")).isTrue();
+        assertThat(matches("private de.tum.cit.aet.hephaestus.workspace.Workspace workspace;"))
+                .isTrue();
+        assertThat(matches("de.tum.cit.aet.hephaestus.core.auth.audit.AuthEvent.EventType t = e.type();"))
+                .isTrue();
+        assertThat(matches("@de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic(\"reason\")"))
+                .isTrue();
 
         // An import declaration is where the FQN belongs — the source scan below skips these lines outright,
         // but the raw pattern still "matches" them; that's fine since findViolations() filters by IMPORT_LINE.
-        assertThat(IMPORT_LINE.matcher("import de.tum.cit.aet.hephaestus.workspace.Workspace;").matches()).isTrue();
+        assertThat(IMPORT_LINE
+                        .matcher("import de.tum.cit.aet.hephaestus.workspace.Workspace;")
+                        .matches())
+                .isTrue();
 
         // Lookalikes that must NOT match: quoted literal, javadoc {@code}/{@link}, and a line comment.
-        assertThat(matches("String s = \"de.tum.cit.aet.hephaestus.workspace.Workspace\";")).isFalse();
+        assertThat(matches("String s = \"de.tum.cit.aet.hephaestus.workspace.Workspace\";"))
+                .isFalse();
         // A javadoc continuation line only reads as a comment WITH its block delimiters — the scanner strips
         // whole files, so the self-test must hand it the same context.
-        assertThat(
-            matches(stripNonCode("/**\n * {@link de.tum.cit.aet.hephaestus.workspace.Workspace}\n */"))
-        ).isFalse();
-        assertThat(matches(stripNonCode("// see de.tum.cit.aet.hephaestus.workspace.Workspace for details"))).isFalse();
+        assertThat(matches(stripNonCode("/**\n * {@link de.tum.cit.aet.hephaestus.workspace.Workspace}\n */")))
+                .isFalse();
+        assertThat(matches(stripNonCode("// see de.tum.cit.aet.hephaestus.workspace.Workspace for details")))
+                .isFalse();
 
         // stripNonCode must blank out a JPQL text-block enum literal (own-package, legitimately FQN — JPA
         // resolves enum constants in @Query strings, not Java imports) so it never reaches the pattern at all.
-        String jpql =
-            "@Query(\n" +
-            "    \"\"\"\n" +
-            "    WHERE e.type = de.tum.cit.aet.hephaestus.activity.ActivityEventType.COMMENT_CREATED\n" +
-            "    \"\"\"\n" +
-            ")\n";
+        String jpql = "@Query(\n" + "    \"\"\"\n"
+                + "    WHERE e.type = de.tum.cit.aet.hephaestus.activity.ActivityEventType.COMMENT_CREATED\n"
+                + "    \"\"\"\n"
+                + ")\n";
         assertThat(matches(stripNonCode(jpql))).isFalse();
     }
 
@@ -78,29 +82,22 @@ class OwnPackageImportArchTest extends HephaestusArchitectureTest {
     @DisplayName("no src/main source file uses a bare de.tum.cit.aet.hephaestus FQN in a code body")
     void mainSourcesImportOwnPackageTypesInsteadOfInliningTheFqn() {
         if (!Files.isDirectory(MAIN_DIR)) {
-            throw new IllegalStateException(
-                "Could not locate the main source directory at %s (cwd=%s)".formatted(
-                    MAIN_DIR,
-                    Path.of("").toAbsolutePath()
-                )
-            );
+            throw new IllegalStateException("Could not locate the main source directory at %s (cwd=%s)"
+                    .formatted(MAIN_DIR, Path.of("").toAbsolutePath()));
         }
         List<String> offenders;
         try (Stream<Path> paths = Files.walk(MAIN_DIR)) {
-            offenders = paths
-                .filter(p -> p.toString().endsWith(".java"))
-                .filter(p -> !p.getFileName().toString().equals("package-info.java"))
-                .flatMap(p -> findViolations(p).stream())
-                .toList();
+            offenders = paths.filter(p -> p.toString().endsWith(".java"))
+                    .filter(p -> !p.getFileName().toString().equals("package-info.java"))
+                    .flatMap(p -> findViolations(p).stream())
+                    .toList();
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
         assertThat(offenders)
-            .as(
-                "own-package FQNs are always safe to import (no third-party collision is possible) — " +
-                    "add an import and use the simple name instead"
-            )
-            .isEmpty();
+                .as("own-package FQNs are always safe to import (no third-party collision is possible) — "
+                        + "add an import and use the simple name instead")
+                .isEmpty();
     }
 
     private static List<String> findViolations(Path javaFile) {

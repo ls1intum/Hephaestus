@@ -16,7 +16,6 @@ import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
 import de.tum.cit.aet.hephaestus.agent.task.TaskEnvelopeWriter;
 import de.tum.cit.aet.hephaestus.evidence.ArtifactSourceManifest;
 import de.tum.cit.aet.hephaestus.evidence.AutomatedReviewReadinessReport;
-import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
@@ -64,26 +63,19 @@ class ConversationReviewHandlerTest extends BaseUnitTest {
     @BeforeEach
     void setUp() {
         handler = new ConversationReviewHandler(
-            objectMapper,
-            workspaceContextBuilder,
-            new TaskEnvelopeWriter(objectMapper),
-            practiceCatalogInjector,
-            new PracticeDetectionResultParser(objectMapper),
-            deliveryService,
-            eventPublisher,
-            transactionTemplate
-        );
+                objectMapper,
+                workspaceContextBuilder,
+                new TaskEnvelopeWriter(objectMapper),
+                practiceCatalogInjector,
+                new PracticeDetectionResultParser(objectMapper),
+                deliveryService,
+                eventPublisher,
+                transactionTemplate);
     }
 
     private ConversationReviewSubmissionRequest sampleRequest() {
         return new ConversationReviewSubmissionRequest(
-            555L,
-            "C0ABC",
-            "engineering",
-            "1700000000.100000",
-            42L,
-            "1700000900.500000"
-        );
+                555L, "C0ABC", "engineering", "1700000000.100000", 42L, "1700000900.500000");
     }
 
     @Nested
@@ -107,16 +99,15 @@ class ConversationReviewHandlerTest extends BaseUnitTest {
         void idempotencyKeyCooldownScopesOnThreadPlusSubjectNotFreshness() {
             // The trailing segment is the disposable freshness (lastTs) that extractCooldownKeyPrefix strips.
             JobSubmission submission = handler.createSubmission(sampleRequest());
-            assertThat(submission.idempotencyKey()).isEqualTo(
-                "conversation_review:C0ABC:1700000000.100000:42:1700000900.500000"
-            );
+            assertThat(submission.idempotencyKey())
+                    .isEqualTo("conversation_review:C0ABC:1700000000.100000:42:1700000900.500000");
         }
 
         @Test
         void rejectsWrongRequestType() {
             assertThatThrownBy(() -> handler.createSubmission(new WrongRequest()))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("Expected ConversationReviewSubmissionRequest");
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("Expected ConversationReviewSubmissionRequest");
         }
     }
 
@@ -150,23 +141,18 @@ class ConversationReviewHandlerTest extends BaseUnitTest {
             var revision = new PracticeRevision();
             ReflectionTestUtils.setField(revision, "id", 12L);
             practice.setCurrentRevision(revision);
-            when(practiceCatalogInjector.resolveEligiblePractices(job, ArtifactKinds.CONVERSATION_THREAD)).thenReturn(
-                List.of(practice)
-            );
-            when(workspaceContextBuilder.prepare(any(), any())).thenReturn(
-                new PreparedEvidence(
-                    Map.of(SandboxLayout.CONTEXT_PREFIX + "conversation_thread.json", "{\"messages\":[]}".getBytes()),
-                    org.mockito.Mockito.mock(ArtifactSourceManifest.class)
-                )
-            );
-            when(
-                workspaceContextBuilder.prepareAutomatedReviewReadiness(any(), any(), anyString(), any(), any(), any())
-            ).thenReturn(
-                new ContextManifestBuilder.PreparedAutomatedReviewReadiness(
-                    List.of(practice),
-                    mock(AutomatedReviewReadinessReport.class)
-                )
-            );
+            when(practiceCatalogInjector.resolveEligiblePractices(job, ArtifactKinds.CONVERSATION_THREAD))
+                    .thenReturn(List.of(practice));
+            when(workspaceContextBuilder.prepare(any(), any()))
+                    .thenReturn(new PreparedEvidence(
+                            Map.of(
+                                    SandboxLayout.CONTEXT_PREFIX + "conversation_thread.json",
+                                    "{\"messages\":[]}".getBytes()),
+                            org.mockito.Mockito.mock(ArtifactSourceManifest.class)));
+            when(workspaceContextBuilder.prepareAutomatedReviewReadiness(
+                            any(), any(), anyString(), any(), any(), any()))
+                    .thenReturn(new ContextManifestBuilder.PreparedAutomatedReviewReadiness(
+                            List.of(practice), mock(AutomatedReviewReadinessReport.class)));
 
             Map<String, byte[]> files = handler.prepareInputs(job).files();
 

@@ -120,7 +120,8 @@ final class ProxyStreamUsageTap implements Consumer<byte[]> {
     }
 
     private static boolean contains(byte[] line, byte[] marker) {
-        outer: for (int i = 0; i + marker.length <= line.length; i++) {
+        outer:
+        for (int i = 0; i + marker.length <= line.length; i++) {
             for (int j = 0; j < marker.length; j++) {
                 if (line[i + j] != marker[j]) {
                     continue outer;

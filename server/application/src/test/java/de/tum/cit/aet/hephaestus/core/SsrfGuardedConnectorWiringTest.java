@@ -24,32 +24,40 @@ class SsrfGuardedConnectorWiringTest extends BaseUnitTest {
 
     @Test
     void ssrfGuardedClientRefusesToConnectToLoopbackResolvingHost() {
-        WebClient client = WebClient.builder().clientConnector(WebClientConnectors.ssrfGuarded()).build();
+        WebClient client = WebClient.builder()
+                .clientConnector(WebClientConnectors.ssrfGuarded())
+                .build();
 
-        Throwable thrown = catchThrowable(() ->
-            client.get().uri(LOOPBACK_URL).retrieve().bodyToMono(String.class).block(BLOCK)
-        );
+        Throwable thrown = catchThrowable(() -> client.get()
+                .uri(LOOPBACK_URL)
+                .retrieve()
+                .bodyToMono(String.class)
+                .block(BLOCK));
 
         // The guard fires at RESOLUTION, before any socket is opened: UnknownHostException with our message.
         Throwable root = rootCause(thrown);
         assertThat(root)
-            .as("guard must reject at DNS resolution, not surface a plain connect failure")
-            .isInstanceOf(UnknownHostException.class)
-            .isNotInstanceOf(ConnectException.class);
+                .as("guard must reject at DNS resolution, not surface a plain connect failure")
+                .isInstanceOf(UnknownHostException.class)
+                .isNotInstanceOf(ConnectException.class);
         assertThat(root.getMessage())
-            .as("failure must identify the SSRF guard, distinguishing it from 'nothing listening'")
-            .contains("SSRF guard");
+                .as("failure must identify the SSRF guard, distinguishing it from 'nothing listening'")
+                .contains("SSRF guard");
     }
 
     @Test
     void systemDnsClientDoesNotApplyTheGuard() {
         // Negative control: the same loopback host through the UNGUARDED connector must NOT carry our guard
         // message — proving it is the guard, not Reactor Netty, that rejects loopback above.
-        WebClient client = WebClient.builder().clientConnector(WebClientConnectors.systemDns()).build();
+        WebClient client = WebClient.builder()
+                .clientConnector(WebClientConnectors.systemDns())
+                .build();
 
-        Throwable thrown = catchThrowable(() ->
-            client.get().uri(LOOPBACK_URL).retrieve().bodyToMono(String.class).block(BLOCK)
-        );
+        Throwable thrown = catchThrowable(() -> client.get()
+                .uri(LOOPBACK_URL)
+                .retrieve()
+                .bodyToMono(String.class)
+                .block(BLOCK));
 
         Throwable root = rootCause(thrown);
         assertThat(root).isNotInstanceOf(UnknownHostException.class);

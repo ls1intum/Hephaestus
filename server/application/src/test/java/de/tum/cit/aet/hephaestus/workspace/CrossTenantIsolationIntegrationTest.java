@@ -9,7 +9,6 @@ import de.tum.cit.aet.hephaestus.agent.AgentJobType;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
-import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.Organization;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.OrganizationRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
@@ -92,9 +91,9 @@ class CrossTenantIsolationIntegrationTest extends AbstractWorkspaceIntegrationTe
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
     private static final String SHARED_LOGIN = "shared-org";
     private static final String DIFF_EVIDENCE_JSON =
-        "{\"citations\":[{\"sourceKind\":\"scm.pull-request.diff\",\"artifactPath\":\"inputs/context/diff.patch\"," +
-        "\"path\":\"src/Main.java\",\"side\":\"NEW\",\"startLine\":42,\"endLine\":42,\"quote\":\"example\"," +
-        "\"quoteRedacted\":false}]}";
+            "{\"citations\":[{\"sourceKind\":\"scm.pull-request.diff\",\"artifactPath\":\"inputs/context/diff.patch\","
+                    + "\"path\":\"src/Main.java\",\"side\":\"NEW\",\"startLine\":42,\"endLine\":42,\"quote\":\"example\","
+                    + "\"quoteRedacted\":false}]}";
 
     @Autowired
     private WebTestClient webTestClient;
@@ -192,27 +191,25 @@ class CrossTenantIsolationIntegrationTest extends AbstractWorkspaceIntegrationTe
 
         UUID observationId = UUID.randomUUID();
         observationRepository.insertIfAbsent(
-            observationId,
-            "occ-" + observationId,
-            job.getId(),
-            practice.getId(),
-            null,
-            "scm.pull_request",
-            1L,
-            overlapUser.getId(),
-            "Finding in " + ws.getWorkspaceSlug(),
-            "PRESENT",
-            "GOOD",
-            "INFO",
-            null,
-            "reasoning",
-            null,
-            Instant.now(),
-            "LIVE"
-        );
+                observationId,
+                "occ-" + observationId,
+                job.getId(),
+                practice.getId(),
+                null,
+                "scm.pull_request",
+                1L,
+                overlapUser.getId(),
+                "Finding in " + ws.getWorkspaceSlug(),
+                "PRESENT",
+                "GOOD",
+                "INFO",
+                null,
+                "reasoning",
+                null,
+                Instant.now(),
+                "LIVE");
 
-        Feedback feedback = feedbackRepository.save(
-            Feedback.builder()
+        Feedback feedback = feedbackRepository.save(Feedback.builder()
                 .agentJobId(job.getId())
                 .workspaceId(ws.getId())
                 .artifactKind(ArtifactKinds.PULL_REQUEST)
@@ -225,8 +222,7 @@ class CrossTenantIsolationIntegrationTest extends AbstractWorkspaceIntegrationTe
                 .body("Advice in " + ws.getWorkspaceSlug())
                 .source(FeedbackSource.AGENT)
                 .createdAt(Instant.now())
-                .build()
-        );
+                .build());
 
         ChatThread thread = new ChatThread();
         thread.setId(UUID.randomUUID());
@@ -273,17 +269,17 @@ class CrossTenantIsolationIntegrationTest extends AbstractWorkspaceIntegrationTe
         @WithMentorUser
         void listReturnsOnlyOwnWorkspacePractices() {
             webTestClient
-                .get()
-                .uri("/workspaces/{slug}/practices", workspaceA.getWorkspaceSlug())
-                .headers(TestAuthUtils.withCurrentUser())
-                .exchange()
-                .expectStatus()
-                .isOk()
-                .expectBody()
-                .jsonPath("$.length()")
-                .isEqualTo(1)
-                .jsonPath("$[0].slug")
-                .isEqualTo(tenantA.practiceSlug());
+                    .get()
+                    .uri("/workspaces/{slug}/practices", workspaceA.getWorkspaceSlug())
+                    .headers(TestAuthUtils.withCurrentUser())
+                    .exchange()
+                    .expectStatus()
+                    .isOk()
+                    .expectBody()
+                    .jsonPath("$.length()")
+                    .isEqualTo(1)
+                    .jsonPath("$[0].slug")
+                    .isEqualTo(tenantA.practiceSlug());
         }
 
         @Test
@@ -302,24 +298,26 @@ class CrossTenantIsolationIntegrationTest extends AbstractWorkspaceIntegrationTe
         @WithMentorUser
         void listReturnsOnlyOwnWorkspaceFindings() {
             webTestClient
-                .get()
-                .uri("/workspaces/{slug}/practices/observations", workspaceA.getWorkspaceSlug())
-                .headers(TestAuthUtils.withCurrentUser())
-                .exchange()
-                .expectStatus()
-                .isOk()
-                .expectBody()
-                .jsonPath("$.content.length()")
-                .isEqualTo(1)
-                .jsonPath("$.content[0].summary")
-                .isEqualTo("Finding in tenant-a");
+                    .get()
+                    .uri("/workspaces/{slug}/practices/observations", workspaceA.getWorkspaceSlug())
+                    .headers(TestAuthUtils.withCurrentUser())
+                    .exchange()
+                    .expectStatus()
+                    .isOk()
+                    .expectBody()
+                    .jsonPath("$.content.length()")
+                    .isEqualTo(1)
+                    .jsonPath("$.content[0].summary")
+                    .isEqualTo("Finding in tenant-a");
         }
 
         @Test
         @WithMentorUser
         void detailIsScopedToWorkspace() {
-            expectDetailStatus("/practices/observations/{key}", tenantA.observationId()).isOk();
-            expectDetailStatus("/practices/observations/{key}", tenantB.observationId()).isNotFound();
+            expectDetailStatus("/practices/observations/{key}", tenantA.observationId())
+                    .isOk();
+            expectDetailStatus("/practices/observations/{key}", tenantB.observationId())
+                    .isNotFound();
         }
 
         /**
@@ -333,32 +331,23 @@ class CrossTenantIsolationIntegrationTest extends AbstractWorkspaceIntegrationTe
         @WithMentorUser
         void adviceOnTheDetailReadComesOnlyFromThisWorkspace() {
             bindAdvice(
-                workspaceA,
-                tenantA.observationId(),
-                "Advice in tenant A",
-                Instant.parse("2026-01-01T00:00:00Z")
-            );
+                    workspaceA, tenantA.observationId(), "Advice in tenant A", Instant.parse("2026-01-01T00:00:00Z"));
             bindAdvice(
-                workspaceB,
-                tenantA.observationId(),
-                "Advice in tenant B",
-                Instant.parse("2026-02-01T00:00:00Z")
-            );
+                    workspaceB, tenantA.observationId(), "Advice in tenant B", Instant.parse("2026-02-01T00:00:00Z"));
 
             webTestClient
-                .get()
-                .uri(
-                    "/workspaces/{slug}/practices/observations/{key}",
-                    workspaceA.getWorkspaceSlug(),
-                    tenantA.observationId()
-                )
-                .headers(TestAuthUtils.withCurrentUser())
-                .exchange()
-                .expectStatus()
-                .isOk()
-                .expectBody()
-                .jsonPath("$.deliveredFeedback")
-                .isEqualTo("Advice in tenant A");
+                    .get()
+                    .uri(
+                            "/workspaces/{slug}/practices/observations/{key}",
+                            workspaceA.getWorkspaceSlug(),
+                            tenantA.observationId())
+                    .headers(TestAuthUtils.withCurrentUser())
+                    .exchange()
+                    .expectStatus()
+                    .isOk()
+                    .expectBody()
+                    .jsonPath("$.deliveredFeedback")
+                    .isEqualTo("Advice in tenant A");
         }
     }
 
@@ -370,8 +359,7 @@ class CrossTenantIsolationIntegrationTest extends AbstractWorkspaceIntegrationTe
         job.setConfigSnapshot(OBJECT_MAPPER.valueToTree(Map.of("model", "test")));
         job = agentJobRepository.save(job);
 
-        Feedback unit = feedbackRepository.save(
-            Feedback.builder()
+        Feedback unit = feedbackRepository.save(Feedback.builder()
                 .agentJobId(job.getId())
                 .workspaceId(ws.getId())
                 .artifactKind(ArtifactKinds.PULL_REQUEST)
@@ -384,8 +372,7 @@ class CrossTenantIsolationIntegrationTest extends AbstractWorkspaceIntegrationTe
                 .body(body)
                 .source(FeedbackSource.AGENT)
                 .createdAt(createdAt)
-                .build()
-        );
+                .build());
         feedbackObservationRepository.insertIfAbsent(unit.getId(), observationId, "PRIMARY", 0);
     }
 
@@ -397,8 +384,10 @@ class CrossTenantIsolationIntegrationTest extends AbstractWorkspaceIntegrationTe
         @WithMentorUser
         void reactionsAreScopedToWorkspace() {
             // 204 = own feedback found, no reaction yet; 404 = foreign feedback not in this workspace.
-            expectDetailStatus("/practices/feedback/{key}/response", tenantA.feedbackId()).isNoContent();
-            expectDetailStatus("/practices/feedback/{key}/response", tenantB.feedbackId()).isNotFound();
+            expectDetailStatus("/practices/feedback/{key}/response", tenantA.feedbackId())
+                    .isNoContent();
+            expectDetailStatus("/practices/feedback/{key}/response", tenantB.feedbackId())
+                    .isNotFound();
         }
     }
 
@@ -418,17 +407,17 @@ class CrossTenantIsolationIntegrationTest extends AbstractWorkspaceIntegrationTe
             seedInAppUnit(workspaceB, "A habit measured in tenant B");
 
             webTestClient
-                .get()
-                .uri("/workspaces/{slug}/practices/feedback/in-app", workspaceA.getWorkspaceSlug())
-                .headers(TestAuthUtils.withCurrentUser())
-                .exchange()
-                .expectStatus()
-                .isOk()
-                .expectBody()
-                .jsonPath("$.length()")
-                .isEqualTo(1)
-                .jsonPath("$[0].headline")
-                .isEqualTo("A habit measured in tenant A");
+                    .get()
+                    .uri("/workspaces/{slug}/practices/feedback/in-app", workspaceA.getWorkspaceSlug())
+                    .headers(TestAuthUtils.withCurrentUser())
+                    .exchange()
+                    .expectStatus()
+                    .isOk()
+                    .expectBody()
+                    .jsonPath("$.length()")
+                    .isEqualTo(1)
+                    .jsonPath("$[0].headline")
+                    .isEqualTo("A habit measured in tenant A");
         }
 
         /**
@@ -442,27 +431,19 @@ class CrossTenantIsolationIntegrationTest extends AbstractWorkspaceIntegrationTe
         @WithMentorUser
         void neverRetiresACardQueuedInAnotherTenant() {
             String sharedKey = FeedbackThreadKey.forPractice(
-                "ships-tests-with-the-change",
-                overlapUser.getId(),
-                FeedbackChannel.IN_APP
-            );
+                    "ships-tests-with-the-change", overlapUser.getId(), FeedbackChannel.IN_APP);
             Feedback inA = seedInAppUnit(workspaceA, "A habit measured in tenant A", sharedKey);
             Feedback inB = seedInAppUnit(workspaceB, "A habit measured in tenant B", sharedKey);
 
-            assertThat(
-                feedbackRepository.findLatestOnThread(
-                    workspaceA.getId(),
-                    overlapUser.getId(),
-                    FeedbackChannel.IN_APP.name(),
-                    sharedKey
-                )
-            ).contains(inA.getId());
+            assertThat(feedbackRepository.findLatestOnThread(
+                            workspaceA.getId(), overlapUser.getId(), FeedbackChannel.IN_APP.name(), sharedKey))
+                    .contains(inA.getId());
             assertThat(feedbackRepository.markSuperseded(workspaceA.getId(), inB.getId()))
-                .as("tenant A cannot retire tenant B's card even holding its id")
-                .isZero();
+                    .as("tenant A cannot retire tenant B's card even holding its id")
+                    .isZero();
             assertThat(feedbackRepository.markSuperseded(workspaceB.getId(), inB.getId()))
-                .as("positive control: the card was still queued, so the refusal above was the predicate")
-                .isEqualTo(1);
+                    .as("positive control: the card was still queued, so the refusal above was the predicate")
+                    .isEqualTo(1);
         }
 
         /**
@@ -477,11 +458,11 @@ class CrossTenantIsolationIntegrationTest extends AbstractWorkspaceIntegrationTe
             Feedback inB = seedInAppUnit(workspaceB, "A habit measured in tenant B");
 
             assertThat(feedbackRepository.findHeadlinePractices(workspaceA.getId(), List.of(inA.getId(), inB.getId())))
-                .singleElement()
-                .satisfies(row -> {
-                    assertThat(row.getFeedbackId()).isEqualTo(inA.getId());
-                    assertThat(row.getPracticeSlug()).isEqualTo("in-app-" + workspaceA.getWorkspaceSlug());
-                });
+                    .singleElement()
+                    .satisfies(row -> {
+                        assertThat(row.getFeedbackId()).isEqualTo(inA.getId());
+                        assertThat(row.getPracticeSlug()).isEqualTo("in-app-" + workspaceA.getWorkspaceSlug());
+                    });
         }
     }
 
@@ -516,27 +497,25 @@ class CrossTenantIsolationIntegrationTest extends AbstractWorkspaceIntegrationTe
 
         UUID observationId = UUID.randomUUID();
         observationRepository.insertIfAbsent(
-            observationId,
-            "in-app-occ-" + observationId,
-            job.getId(),
-            practice.getId(),
-            revision.getId(),
-            "scm.pull_request",
-            2L,
-            overlapUser.getId(),
-            "In-app evidence in " + ws.getWorkspaceSlug(),
-            "ABSENT",
-            "BAD",
-            "MAJOR",
-            DIFF_EVIDENCE_JSON,
-            "reasoning",
-            null,
-            Instant.now(),
-            "LIVE"
-        );
+                observationId,
+                "in-app-occ-" + observationId,
+                job.getId(),
+                practice.getId(),
+                revision.getId(),
+                "scm.pull_request",
+                2L,
+                overlapUser.getId(),
+                "In-app evidence in " + ws.getWorkspaceSlug(),
+                "ABSENT",
+                "BAD",
+                "MAJOR",
+                DIFF_EVIDENCE_JSON,
+                "reasoning",
+                null,
+                Instant.now(),
+                "LIVE");
 
-        Feedback unit = feedbackRepository.save(
-            Feedback.builder()
+        Feedback unit = feedbackRepository.save(Feedback.builder()
                 .agentJobId(job.getId())
                 .workspaceId(ws.getId())
                 .recipientUserId(overlapUser.getId())
@@ -548,8 +527,7 @@ class CrossTenantIsolationIntegrationTest extends AbstractWorkspaceIntegrationTe
                 .source(FeedbackSource.AGENT)
                 .threadKey(threadKey)
                 .createdAt(Instant.now())
-                .build()
-        );
+                .build());
         feedbackObservationRepository.insertIfAbsent(unit.getId(), observationId, "PRIMARY", 0);
         return unit;
     }
@@ -562,17 +540,17 @@ class CrossTenantIsolationIntegrationTest extends AbstractWorkspaceIntegrationTe
         @WithMentorUser
         void listReturnsOnlyOwnWorkspaceThreads() {
             webTestClient
-                .get()
-                .uri("/workspaces/{slug}/mentor/threads", workspaceA.getWorkspaceSlug())
-                .headers(TestAuthUtils.withCurrentUser())
-                .exchange()
-                .expectStatus()
-                .isOk()
-                .expectBody()
-                .jsonPath("$.length()")
-                .isEqualTo(1)
-                .jsonPath("$[0].id")
-                .isEqualTo(tenantA.threadId().toString());
+                    .get()
+                    .uri("/workspaces/{slug}/mentor/threads", workspaceA.getWorkspaceSlug())
+                    .headers(TestAuthUtils.withCurrentUser())
+                    .exchange()
+                    .expectStatus()
+                    .isOk()
+                    .expectBody()
+                    .jsonPath("$.length()")
+                    .isEqualTo(1)
+                    .jsonPath("$[0].id")
+                    .isEqualTo(tenantA.threadId().toString());
         }
 
         @Test
@@ -615,12 +593,11 @@ class CrossTenantIsolationIntegrationTest extends AbstractWorkspaceIntegrationTe
             seedActivity(workspaceA, overlapUser, 10);
             seedActivity(workspaceB, overlapUser, 99);
 
-            Integer score = leaderboardEntries(workspaceA)
-                .stream()
-                .filter(e -> userOf(e).login().equals("mentor"))
-                .findFirst()
-                .orElseThrow()
-                .score();
+            Integer score = leaderboardEntries(workspaceA).stream()
+                    .filter(e -> userOf(e).login().equals("mentor"))
+                    .findFirst()
+                    .orElseThrow()
+                    .score();
 
             assertThat(score).isEqualTo(10);
         }
@@ -643,17 +620,17 @@ class CrossTenantIsolationIntegrationTest extends AbstractWorkspaceIntegrationTe
             seedTeam("foreign-team", 900_201L, SHARED_LOGIN, ensureGitLabProvider());
 
             webTestClient
-                .get()
-                .uri("/workspaces/{slug}/team", workspaceA.getWorkspaceSlug())
-                .headers(TestAuthUtils.withCurrentUser())
-                .exchange()
-                .expectStatus()
-                .isOk()
-                .expectBody()
-                .jsonPath("$[?(@.name=='own-team')]")
-                .exists()
-                .jsonPath("$[?(@.name=='foreign-team')]")
-                .doesNotExist();
+                    .get()
+                    .uri("/workspaces/{slug}/team", workspaceA.getWorkspaceSlug())
+                    .headers(TestAuthUtils.withCurrentUser())
+                    .exchange()
+                    .expectStatus()
+                    .isOk()
+                    .expectBody()
+                    .jsonPath("$[?(@.name=='own-team')]")
+                    .exists()
+                    .jsonPath("$[?(@.name=='foreign-team')]")
+                    .doesNotExist();
         }
 
         /**
@@ -672,17 +649,17 @@ class CrossTenantIsolationIntegrationTest extends AbstractWorkspaceIntegrationTe
             teamMembershipRepository.save(new TeamMembership(foreignTeam, overlapUser, TeamMembership.Role.MEMBER));
 
             webTestClient
-                .get()
-                .uri("/workspaces/{slug}/users", workspaceA.getWorkspaceSlug())
-                .headers(TestAuthUtils.withCurrentUser())
-                .exchange()
-                .expectStatus()
-                .isOk()
-                .expectBody()
-                .jsonPath("$[?(@.login=='mentor')].teams[?(@.name=='own-team')]")
-                .exists()
-                .jsonPath("$..teams[?(@.name=='foreign-team')]")
-                .doesNotExist();
+                    .get()
+                    .uri("/workspaces/{slug}/users", workspaceA.getWorkspaceSlug())
+                    .headers(TestAuthUtils.withCurrentUser())
+                    .exchange()
+                    .expectStatus()
+                    .isOk()
+                    .expectBody()
+                    .jsonPath("$[?(@.login=='mentor')].teams[?(@.name=='own-team')]")
+                    .exists()
+                    .jsonPath("$..teams[?(@.name=='foreign-team')]")
+                    .doesNotExist();
         }
 
         /**
@@ -711,68 +688,66 @@ class CrossTenantIsolationIntegrationTest extends AbstractWorkspaceIntegrationTe
         @WithMentorUser
         void nonMemberIsRefusedFromScopedEndpoint() {
             webTestClient
-                .get()
-                .uri("/workspaces/{slug}/practices/observations", outsiderWorkspace.getWorkspaceSlug())
-                .headers(TestAuthUtils.withCurrentUser())
-                .exchange()
-                .expectStatus()
-                .isForbidden();
+                    .get()
+                    .uri("/workspaces/{slug}/practices/observations", outsiderWorkspace.getWorkspaceSlug())
+                    .headers(TestAuthUtils.withCurrentUser())
+                    .exchange()
+                    .expectStatus()
+                    .isForbidden();
         }
 
         @Test
         @WithMentorUser
         void workspaceMembershipDoesNotGrantInstanceAdminListing() {
             webTestClient
-                .get()
-                .uri("/admin/workspaces")
-                .headers(TestAuthUtils.withCurrentUser())
-                .exchange()
-                .expectStatus()
-                .isForbidden();
+                    .get()
+                    .uri("/admin/workspaces")
+                    .headers(TestAuthUtils.withCurrentUser())
+                    .exchange()
+                    .expectStatus()
+                    .isForbidden();
         }
     }
 
     private StatusAssertions expectDetailStatus(String suffix, Object key) {
         return webTestClient
-            .get()
-            .uri("/workspaces/{slug}" + suffix, workspaceA.getWorkspaceSlug(), key)
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus();
+                .get()
+                .uri("/workspaces/{slug}" + suffix, workspaceA.getWorkspaceSlug(), key)
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus();
     }
 
     private StatusAssertions expectVisibilityWriteStatus(Long teamId) {
         return webTestClient
-            .post()
-            .uri("/workspaces/{slug}/team/{id}/visibility", workspaceA.getWorkspaceSlug(), teamId)
-            .headers(TestAuthUtils.withCurrentUser())
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(true)
-            .exchange()
-            .expectStatus();
+                .post()
+                .uri("/workspaces/{slug}/team/{id}/visibility", workspaceA.getWorkspaceSlug(), teamId)
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(true)
+                .exchange()
+                .expectStatus();
     }
 
     private void seedActivity(Workspace ws, User actor, double xp) {
         UUID id = UUID.randomUUID();
         activityEventRepository.insertIfAbsent(
-            id,
-            "evt-" + id,
-            ActivityEventType.REVIEW_COMMENTED.name(),
-            Instant.now(),
-            actor.getId(),
-            ws.getId(),
-            null,
-            "pull_request",
-            1L,
-            xp
-        );
+                id,
+                "evt-" + id,
+                ActivityEventType.REVIEW_COMMENTED.name(),
+                Instant.now(),
+                actor.getId(),
+                ws.getId(),
+                null,
+                "pull_request",
+                1L,
+                xp);
     }
 
     private List<String> leaderboardLogins(Workspace workspace) {
-        return leaderboardEntries(workspace)
-            .stream()
-            .map(e -> userOf(e).login())
-            .toList();
+        return leaderboardEntries(workspace).stream()
+                .map(e -> userOf(e).login())
+                .toList();
     }
 
     private static UserInfoDTO userOf(LeaderboardEntryDTO entry) {
@@ -783,24 +758,21 @@ class CrossTenantIsolationIntegrationTest extends AbstractWorkspaceIntegrationTe
 
     private List<LeaderboardEntryDTO> leaderboardEntries(Workspace workspace) {
         List<LeaderboardEntryDTO> entries = webTestClient
-            .get()
-            .uri(uri ->
-                uri
-                    .path("/workspaces/{slug}/leaderboard")
-                    .queryParam("after", "2020-01-01T00:00:00Z")
-                    .queryParam("before", "2100-01-01T00:00:00Z")
-                    .queryParam("team", "all")
-                    .queryParam("sort", "SCORE")
-                    .queryParam("mode", "INDIVIDUAL")
-                    .build(workspace.getWorkspaceSlug())
-            )
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBodyList(LeaderboardEntryDTO.class)
-            .returnResult()
-            .getResponseBody();
+                .get()
+                .uri(uri -> uri.path("/workspaces/{slug}/leaderboard")
+                        .queryParam("after", "2020-01-01T00:00:00Z")
+                        .queryParam("before", "2100-01-01T00:00:00Z")
+                        .queryParam("team", "all")
+                        .queryParam("sort", "SCORE")
+                        .queryParam("mode", "INDIVIDUAL")
+                        .build(workspace.getWorkspaceSlug()))
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBodyList(LeaderboardEntryDTO.class)
+                .returnResult()
+                .getResponseBody();
         assertThat(entries).isNotNull();
         return entries;
     }

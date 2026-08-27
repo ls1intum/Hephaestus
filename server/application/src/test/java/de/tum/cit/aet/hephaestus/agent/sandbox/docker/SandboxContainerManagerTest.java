@@ -40,19 +40,7 @@ class SandboxContainerManagerTest extends BaseUnitTest {
     @BeforeEach
     void setUp() {
         properties = new SandboxProperties(
-            "unix:///var/run/docker.sock",
-            false,
-            null,
-            5,
-            10,
-            60,
-            null,
-            8080,
-            null,
-            209_715_200L,
-            500_000,
-            null
-        );
+                "unix:///var/run/docker.sock", false, null, 5, 10, 60, null, 8080, null, 209_715_200L, 500_000, null);
         executor = Executors.newSingleThreadExecutor();
         manager = new SandboxContainerManager(containerOps, image -> {}, properties, executor, Duration.ofMillis(20));
     }
@@ -68,23 +56,18 @@ class SandboxContainerManagerTest extends BaseUnitTest {
         @Test
         void shouldEnsureImageIsPresentWhenCreatingContainer() {
             List<String> guarded = new ArrayList<>();
-            SandboxContainerManager guardedManager = new SandboxContainerManager(
-                containerOps,
-                guarded::add,
-                properties,
-                executor
-            );
+            SandboxContainerManager guardedManager =
+                    new SandboxContainerManager(containerOps, guarded::add, properties, executor);
             DockerOperations.ContainerSpec spec = new DockerOperations.ContainerSpec(
-                "ghcr.io/example/agent:latest",
-                List.of("true"),
-                Map.of(),
-                null,
-                null,
-                null,
-                Map.of(),
-                mock(DockerOperations.HostConfigSpec.class),
-                List.of()
-            );
+                    "ghcr.io/example/agent:latest",
+                    List.of("true"),
+                    Map.of(),
+                    null,
+                    null,
+                    null,
+                    Map.of(),
+                    mock(DockerOperations.HostConfigSpec.class),
+                    List.of());
             when(containerOps.createContainer(spec)).thenReturn(CONTAINER_ID);
 
             guardedManager.createContainer(spec);
@@ -100,10 +83,8 @@ class SandboxContainerManagerTest extends BaseUnitTest {
         void shouldReturnExitCodeOnCompletion() {
             when(containerOps.waitContainer(CONTAINER_ID)).thenReturn(new DockerOperations.WaitResult(0));
 
-            SandboxContainerManager.WaitOutcome outcome = manager.waitForCompletion(
-                CONTAINER_ID,
-                Duration.ofMinutes(5)
-            );
+            SandboxContainerManager.WaitOutcome outcome =
+                    manager.waitForCompletion(CONTAINER_ID, Duration.ofMinutes(5));
 
             assertThat(outcome.exitCode()).isZero();
             assertThat(outcome.timedOut()).isFalse();
@@ -113,10 +94,8 @@ class SandboxContainerManagerTest extends BaseUnitTest {
         void shouldReturnNonZeroExitCode() {
             when(containerOps.waitContainer(CONTAINER_ID)).thenReturn(new DockerOperations.WaitResult(42));
 
-            SandboxContainerManager.WaitOutcome outcome = manager.waitForCompletion(
-                CONTAINER_ID,
-                Duration.ofMinutes(5)
-            );
+            SandboxContainerManager.WaitOutcome outcome =
+                    manager.waitForCompletion(CONTAINER_ID, Duration.ofMinutes(5));
 
             assertThat(outcome.exitCode()).isEqualTo(42);
             assertThat(outcome.timedOut()).isFalse();
@@ -130,10 +109,8 @@ class SandboxContainerManagerTest extends BaseUnitTest {
                 return new DockerOperations.WaitResult(137);
             });
 
-            SandboxContainerManager.WaitOutcome outcome = manager.waitForCompletion(
-                CONTAINER_ID,
-                Duration.ofMillis(100)
-            );
+            SandboxContainerManager.WaitOutcome outcome =
+                    manager.waitForCompletion(CONTAINER_ID, Duration.ofMillis(100));
 
             assertThat(outcome.timedOut()).isTrue();
             verify(containerOps).stopContainer(eq(CONTAINER_ID), anyInt());
@@ -143,9 +120,8 @@ class SandboxContainerManagerTest extends BaseUnitTest {
         void shouldThrowOnExecutionError() {
             when(containerOps.waitContainer(CONTAINER_ID)).thenThrow(new SandboxException("Docker error"));
 
-            assertThatThrownBy(() -> manager.waitForCompletion(CONTAINER_ID, Duration.ofMinutes(5))).isInstanceOf(
-                SandboxException.class
-            );
+            assertThatThrownBy(() -> manager.waitForCompletion(CONTAINER_ID, Duration.ofMinutes(5)))
+                    .isInstanceOf(SandboxException.class);
         }
 
         @Test
@@ -161,14 +137,15 @@ class SandboxContainerManagerTest extends BaseUnitTest {
             var interruptor = new Thread(() -> {
                 try {
                     Thread.sleep(100);
-                } catch (InterruptedException ignored) {}
+                } catch (InterruptedException ignored) {
+                }
                 testThread.interrupt();
             });
             interruptor.start();
 
             assertThatThrownBy(() -> manager.waitForCompletion(CONTAINER_ID, Duration.ofMinutes(5)))
-                .isInstanceOf(SandboxException.class)
-                .hasMessageContaining("Interrupted");
+                    .isInstanceOf(SandboxException.class)
+                    .hasMessageContaining("Interrupted");
 
             // Thread interrupt flag should be restored
             assertThat(Thread.interrupted()).isTrue(); // also clears it
@@ -183,10 +160,8 @@ class SandboxContainerManagerTest extends BaseUnitTest {
                 return new DockerOperations.WaitResult(0);
             });
 
-            SandboxContainerManager.WaitOutcome outcome = manager.waitForCompletion(
-                CONTAINER_ID,
-                Duration.ofMillis(50)
-            );
+            SandboxContainerManager.WaitOutcome outcome =
+                    manager.waitForCompletion(CONTAINER_ID, Duration.ofMillis(50));
 
             // Should return SIGKILL exit code because post-stop wait times out
             assertThat(outcome.timedOut()).isTrue();
@@ -201,10 +176,8 @@ class SandboxContainerManagerTest extends BaseUnitTest {
             });
             doThrow(new SandboxException("stop failed")).when(containerOps).stopContainer(eq(CONTAINER_ID), anyInt());
 
-            SandboxContainerManager.WaitOutcome outcome = manager.waitForCompletion(
-                CONTAINER_ID,
-                Duration.ofMillis(50)
-            );
+            SandboxContainerManager.WaitOutcome outcome =
+                    manager.waitForCompletion(CONTAINER_ID, Duration.ofMillis(50));
 
             // Should still return timeout result even if stop failed
             assertThat(outcome.timedOut()).isTrue();
@@ -249,9 +222,9 @@ class SandboxContainerManagerTest extends BaseUnitTest {
 
         @Test
         void shouldListByManagedLabel() {
-            when(containerOps.listContainersByLabel("hephaestus.managed", "true")).thenReturn(
-                List.of(new DockerOperations.ContainerInfo("c1", "/test", Map.of(), "running", Instant.EPOCH))
-            );
+            when(containerOps.listContainersByLabel("hephaestus.managed", "true"))
+                    .thenReturn(List.of(
+                            new DockerOperations.ContainerInfo("c1", "/test", Map.of(), "running", Instant.EPOCH)));
 
             var containers = manager.listManagedContainers();
 

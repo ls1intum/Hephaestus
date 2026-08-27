@@ -58,10 +58,9 @@ class GitHubInstallationRepositoriesMessageHandlerIntegrationTest extends BaseIn
     private void setupTestWorkspace(Long installationId, String login) {
         // Create GitHub provider
         IdentityProvider gitProvider = gitProviderRepository
-            .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
-            .orElseGet(() ->
-                gitProviderRepository.save(new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com"))
-            );
+                .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
+                .orElseGet(() -> gitProviderRepository.save(
+                        new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com")));
 
         // Create organization
         Organization org = new Organization();
@@ -79,17 +78,11 @@ class GitHubInstallationRepositoriesMessageHandlerIntegrationTest extends BaseIn
         // Provider classification + installation id come from the Connection registry,
         // not from legacy Workspace columns.
         WorkspaceTestFixtures.WorkspaceBuilder builder = WorkspaceTestFixtures.installationWorkspace(
-            installationId,
-            login
-        )
-            .withSlug(login.toLowerCase())
-            .withAccountType(AccountType.ORG);
+                        installationId, login)
+                .withSlug(login.toLowerCase())
+                .withAccountType(AccountType.ORG);
         Workspace saved = WorkspaceTestFixtures.persistInstallationWorkspace(
-            workspaceRepository,
-            connectionRepository,
-            builder,
-            installationId
-        );
+                workspaceRepository, connectionRepository, builder, installationId);
         saved.setIsPubliclyViewable(true);
         saved.setOrganization(org);
         workspaceRepository.save(saved);
@@ -125,13 +118,8 @@ class GitHubInstallationRepositoriesMessageHandlerIntegrationTest extends BaseIn
     @Test
     void shouldHandleNullInstallationGracefully() {
         // Given - event with null installation
-        GitHubInstallationRepositoriesEventDTO event = new GitHubInstallationRepositoriesEventDTO(
-            "added",
-            null,
-            null,
-            null,
-            null
-        );
+        GitHubInstallationRepositoriesEventDTO event =
+                new GitHubInstallationRepositoriesEventDTO("added", null, null, null, null);
 
         // When - should not throw
         handler.handleEvent(event);
@@ -143,12 +131,11 @@ class GitHubInstallationRepositoriesMessageHandlerIntegrationTest extends BaseIn
         // Given - load a valid event and create with null lists
         GitHubInstallationRepositoriesEventDTO baseEvent = loadPayload("installation_repositories.added");
         GitHubInstallationRepositoriesEventDTO event = new GitHubInstallationRepositoriesEventDTO(
-            "added",
-            baseEvent.installation(),
-            null, // repositoriesAdded null
-            null, // repositoriesRemoved null
-            baseEvent.sender()
-        );
+                "added",
+                baseEvent.installation(),
+                null, // repositoriesAdded null
+                null, // repositoriesRemoved null
+                baseEvent.sender());
         setupTestWorkspace(required(baseEvent.installation()).id(), "HephaestusTest");
 
         // When - should not throw

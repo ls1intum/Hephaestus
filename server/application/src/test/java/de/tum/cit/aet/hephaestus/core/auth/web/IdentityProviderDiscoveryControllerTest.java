@@ -20,12 +20,12 @@ class IdentityProviderDiscoveryControllerTest extends BaseUnitTest {
 
     private static ClientRegistration registration(String authorizationUri) {
         return ClientRegistration.withRegistrationId("p")
-            .clientId("client")
-            .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
-            .redirectUri("{baseUrl}/login/oauth2/code/p")
-            .authorizationUri(authorizationUri)
-            .tokenUri("https://example.com/token")
-            .build();
+                .clientId("client")
+                .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
+                .redirectUri("{baseUrl}/login/oauth2/code/p")
+                .authorizationUri(authorizationUri)
+                .tokenUri("https://example.com/token")
+                .build();
     }
 
     @Test
@@ -77,9 +77,11 @@ class IdentityProviderDiscoveryControllerTest extends BaseUnitTest {
         ClientRegistration reg = registration("https://wiki.example.com/oauth/authorize");
         Map<String, LoginProvider.ProviderType> rows = Map.of("p", LoginProvider.ProviderType.OUTLINE);
 
-        assertThat(IdentityProviderDiscoveryController.providerTypeOf(reg, rows::get)).isEqualTo("OUTLINE");
+        assertThat(IdentityProviderDiscoveryController.providerTypeOf(reg, rows::get))
+                .isEqualTo("OUTLINE");
         // Sniff-only fallback (no row) keeps the legacy GITLAB classification.
-        assertThat(IdentityProviderDiscoveryController.providerTypeOf(reg, id -> null)).isEqualTo("GITLAB");
+        assertThat(IdentityProviderDiscoveryController.providerTypeOf(reg, id -> null))
+                .isEqualTo("GITLAB");
     }
 
     @Test

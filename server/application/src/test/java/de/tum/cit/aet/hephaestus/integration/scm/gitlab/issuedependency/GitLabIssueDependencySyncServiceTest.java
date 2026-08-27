@@ -66,12 +66,7 @@ class GitLabIssueDependencySyncServiceTest extends BaseUnitTest {
     void setUp() {
         when(webClientBuilder.build()).thenReturn(webClient);
         service = new GitLabIssueDependencySyncService(
-            issueRepository,
-            repositoryRepository,
-            tokenService,
-            rateLimitTracker,
-            webClientBuilder
-        );
+                issueRepository, repositoryRepository, tokenService, rateLimitTracker, webClientBuilder);
     }
 
     @Test

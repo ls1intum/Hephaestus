@@ -15,11 +15,9 @@ public record SourceCapture(SourceKind kind, SourceCaptureState state, List<Sour
         if (!(state instanceof SourceCaptureState.Available) && !artifacts.isEmpty()) {
             throw new IllegalArgumentException("Unavailable source cannot contain artifacts: " + kind);
         }
-        if (
-            state instanceof SourceCaptureState.Available available &&
-            available.content() == SourceContentState.NON_EMPTY &&
-            artifacts.isEmpty()
-        ) {
+        if (state instanceof SourceCaptureState.Available available
+                && available.content() == SourceContentState.NON_EMPTY
+                && artifacts.isEmpty()) {
             throw new IllegalArgumentException("Non-empty source must contain at least one artifact: " + kind);
         }
     }

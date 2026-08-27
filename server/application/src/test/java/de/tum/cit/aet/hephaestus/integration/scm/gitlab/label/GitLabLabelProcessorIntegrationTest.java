@@ -73,13 +73,12 @@ class GitLabLabelProcessorIntegrationTest extends BaseIntegrationTest {
         @Test
         void shouldCreateNewLabel() {
             GitLabLabelDTO dto = new GitLabLabelDTO(
-                "gid://gitlab/ProjectLabel/123",
-                "bug",
-                "#FF0000",
-                "Something isn't working",
-                "2026-01-15T10:00:00Z",
-                "2026-01-15T10:00:00Z"
-            );
+                    "gid://gitlab/ProjectLabel/123",
+                    "bug",
+                    "#FF0000",
+                    "Something isn't working",
+                    "2026-01-15T10:00:00Z",
+                    "2026-01-15T10:00:00Z");
 
             Label result = labelProcessor.process(dto, testRepository, testContext());
 
@@ -121,7 +120,8 @@ class GitLabLabelProcessorIntegrationTest extends BaseIntegrationTest {
             assertThat(result.getDescription()).isEqualTo("New description");
 
             assertThat(eventListener.ofType(ScmDomainEvent.LabelUpdated.class)).hasSize(1);
-            assertThat(labelRepository.findAllByRepository_Id(testRepository.getId())).hasSize(1);
+            assertThat(labelRepository.findAllByRepository_Id(testRepository.getId()))
+                    .hasSize(1);
         }
 
         @Test
@@ -132,7 +132,8 @@ class GitLabLabelProcessorIntegrationTest extends BaseIntegrationTest {
             labelProcessor.process(dto, testRepository, testContext());
             labelProcessor.process(dto, testRepository, testContext());
 
-            assertThat(labelRepository.findAllByRepository_Id(testRepository.getId())).hasSize(1);
+            assertThat(labelRepository.findAllByRepository_Id(testRepository.getId()))
+                    .hasSize(1);
         }
 
         @Test
@@ -161,27 +162,16 @@ class GitLabLabelProcessorIntegrationTest extends BaseIntegrationTest {
         @Test
         void shouldDeduplicateGroupLabels() {
             // Same label name from different sources (project vs group)
-            GitLabLabelDTO projectLabel = new GitLabLabelDTO(
-                "gid://gitlab/ProjectLabel/1",
-                "shared",
-                "#FF0000",
-                null,
-                null,
-                null
-            );
-            GitLabLabelDTO groupLabel = new GitLabLabelDTO(
-                "gid://gitlab/GroupLabel/999",
-                "shared",
-                "#FF0000",
-                null,
-                null,
-                null
-            );
+            GitLabLabelDTO projectLabel =
+                    new GitLabLabelDTO("gid://gitlab/ProjectLabel/1", "shared", "#FF0000", null, null, null);
+            GitLabLabelDTO groupLabel =
+                    new GitLabLabelDTO("gid://gitlab/GroupLabel/999", "shared", "#FF0000", null, null, null);
 
             labelProcessor.process(projectLabel, testRepository, testContext());
             labelProcessor.process(groupLabel, testRepository, testContext());
 
-            assertThat(labelRepository.findAllByRepository_Id(testRepository.getId())).hasSize(1);
+            assertThat(labelRepository.findAllByRepository_Id(testRepository.getId()))
+                    .hasSize(1);
         }
     }
 
@@ -219,10 +209,9 @@ class GitLabLabelProcessorIntegrationTest extends BaseIntegrationTest {
 
     private void setupTestData() {
         IdentityProvider provider = gitProviderRepository
-            .findByTypeAndServerUrl(IdentityProviderType.GITLAB, "https://gitlab.lrz.de")
-            .orElseGet(() ->
-                gitProviderRepository.save(new IdentityProvider(IdentityProviderType.GITLAB, "https://gitlab.lrz.de"))
-            );
+                .findByTypeAndServerUrl(IdentityProviderType.GITLAB, "https://gitlab.lrz.de")
+                .orElseGet(() -> gitProviderRepository.save(
+                        new IdentityProvider(IdentityProviderType.GITLAB, "https://gitlab.lrz.de")));
 
         Organization org = new Organization();
         org.setNativeId(1L);

@@ -16,19 +16,16 @@ class ExternalVendorImportAllowlistTest extends HephaestusArchitectureTest {
     @DisplayName("no class outside integration/ imports a vendor adapter package")
     void noExternalVendorImporter() {
         ArchRule rule = noClasses()
-            .that()
-            .resideOutsideOfPackage("de.tum.cit.aet.hephaestus.integration..")
-            .should()
-            .dependOnClassesThat()
-            .resideInAnyPackage(
-                "de.tum.cit.aet.hephaestus.integration.scm.github..",
-                "de.tum.cit.aet.hephaestus.integration.scm.gitlab..",
-                "de.tum.cit.aet.hephaestus.integration.slack.."
-            )
-            .because(
-                "External modules reach vendor adapters through SPI ports in integration.core.spi " +
-                    "or Spring ApplicationEvents — never via direct import."
-            );
+                .that()
+                .resideOutsideOfPackage("de.tum.cit.aet.hephaestus.integration..")
+                .should()
+                .dependOnClassesThat()
+                .resideInAnyPackage(
+                        "de.tum.cit.aet.hephaestus.integration.scm.github..",
+                        "de.tum.cit.aet.hephaestus.integration.scm.gitlab..",
+                        "de.tum.cit.aet.hephaestus.integration.slack..")
+                .because("External modules reach vendor adapters through SPI ports in integration.core.spi "
+                        + "or Spring ApplicationEvents — never via direct import.");
         rule.check(classes);
     }
 }

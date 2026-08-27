@@ -14,11 +14,10 @@ import org.jspecify.annotations.Nullable;
  * @param failureReason human-readable reason when registration failed or was skipped
  */
 public record WebhookSetupResult(
-    Status status,
-    @Nullable Long webhookId,
-    @Nullable Long groupId,
-    @Nullable String failureReason
-) {
+        Status status,
+        @Nullable Long webhookId,
+        @Nullable Long groupId,
+        @Nullable String failureReason) {
     public enum Status {
         SUCCESS,
         SKIPPED,

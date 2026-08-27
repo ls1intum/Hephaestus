@@ -44,17 +44,14 @@ public class GitLabTokenService {
     private final Cache<Long, ValidatedToken> validationCache;
 
     public GitLabTokenService(
-        InstallationTokenProvider tokenProvider,
-        WebClient.Builder webClientBuilder,
-        GitLabProperties properties
-    ) {
+            InstallationTokenProvider tokenProvider, WebClient.Builder webClientBuilder, GitLabProperties properties) {
         this.tokenProvider = tokenProvider;
         this.validationWebClient = webClientBuilder.build();
         this.properties = properties;
         this.validationCache = Caffeine.newBuilder()
-            .expireAfterWrite(properties.tokenValidationCacheDuration())
-            .maximumSize(1000)
-            .build();
+                .expireAfterWrite(properties.tokenValidationCacheDuration())
+                .maximumSize(1000)
+                .build();
     }
 
     /**
@@ -67,18 +64,14 @@ public class GitLabTokenService {
     public String getAccessToken(Long scopeId) {
         if (!tokenProvider.isScopeActive(scopeId)) {
             throw new IllegalStateException(
-                "Scope " + scopeId + " is not active (suspended or purged). Refusing to provide token."
-            );
+                    "Scope " + scopeId + " is not active (suspended or purged). Refusing to provide token.");
         }
 
         return tokenProvider
-            .getPersonalAccessToken(scopeId)
-            .filter(t -> !t.isBlank())
-            .orElseThrow(() ->
-                new IllegalStateException(
-                    "Scope " + scopeId + " is configured for GitLab PAT access but no token is stored."
-                )
-            );
+                .getPersonalAccessToken(scopeId)
+                .filter(t -> !t.isBlank())
+                .orElseThrow(() -> new IllegalStateException(
+                        "Scope " + scopeId + " is configured for GitLab PAT access but no token is stored."));
     }
 
     /**
@@ -92,10 +85,10 @@ public class GitLabTokenService {
      */
     public String resolveServerUrl(Long scopeId) {
         return tokenProvider
-            .getServerUrl(scopeId)
-            .filter(url -> !url.isBlank())
-            .map(GitLabTokenService::stripTrailingSlash)
-            .orElse(properties.defaultServerUrl());
+                .getServerUrl(scopeId)
+                .filter(url -> !url.isBlank())
+                .map(GitLabTokenService::stripTrailingSlash)
+                .orElse(properties.defaultServerUrl());
     }
 
     /**
@@ -126,22 +119,21 @@ public class GitLabTokenService {
 
         try {
             GitLabUserResponse user = validationWebClient
-                .get()
-                .uri(serverUrl + USER_ENDPOINT)
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
-                .retrieve()
-                .bodyToMono(GitLabUserResponse.class)
-                .block(Duration.ofSeconds(10));
+                    .get()
+                    .uri(serverUrl + USER_ENDPOINT)
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                    .retrieve()
+                    .bodyToMono(GitLabUserResponse.class)
+                    .block(Duration.ofSeconds(10));
 
             if (user != null) {
                 ValidatedToken validated = new ValidatedToken(token, user.id(), user.username(), Instant.now());
                 validationCache.put(scopeId, validated);
                 log.info(
-                    "GitLab token validated: scopeId={}, username={}, userId={}",
-                    scopeId,
-                    user.username(),
-                    user.id()
-                );
+                        "GitLab token validated: scopeId={}, username={}, userId={}",
+                        scopeId,
+                        user.username(),
+                        user.id());
                 return validated;
             }
         } catch (WebClientResponseException e) {
@@ -150,11 +142,10 @@ public class GitLabTokenService {
                 log.warn("GitLab token invalid for scope {}: status={}", scopeId, status.value());
             } else {
                 log.error(
-                    "GitLab token validation failed for scope {}: status={}, message={}",
-                    scopeId,
-                    status.value(),
-                    e.getMessage()
-                );
+                        "GitLab token validation failed for scope {}: status={}, message={}",
+                        scopeId,
+                        status.value(),
+                        e.getMessage());
             }
         } catch (Exception e) {
             log.error("GitLab token validation error for scope {}: {}", scopeId, e.getMessage());
@@ -194,15 +185,12 @@ public class GitLabTokenService {
         /** Excludes the token value to prevent accidental credential exposure in logs. */
         @Override
         public String toString() {
-            return (
-                "ValidatedToken[gitlabUserId=" +
-                gitlabUserId +
-                ", username=" +
-                username +
-                ", validatedAt=" +
-                validatedAt +
-                "]"
-            );
+            return ("ValidatedToken[gitlabUserId=" + gitlabUserId
+                    + ", username="
+                    + username
+                    + ", validatedAt="
+                    + validatedAt
+                    + "]");
         }
     }
 

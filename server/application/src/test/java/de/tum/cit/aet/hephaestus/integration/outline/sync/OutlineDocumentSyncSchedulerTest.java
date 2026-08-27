@@ -65,12 +65,8 @@ class OutlineDocumentSyncSchedulerTest extends BaseUnitTest {
 
     @BeforeEach
     void setUp() {
-        scheduler = new OutlineDocumentSyncScheduler(
-            connectionService,
-            syncService,
-            collectionRepository,
-            syncJobService
-        );
+        scheduler =
+                new OutlineDocumentSyncScheduler(connectionService, syncService, collectionRepository, syncJobService);
         lenientStub();
     }
 
@@ -81,19 +77,18 @@ class OutlineDocumentSyncSchedulerTest extends BaseUnitTest {
 
     private void runJobsSynchronously() {
         doAnswer(invocation -> {
-            Consumer<SyncJobHandle> body = invocation.getArgument(1);
-            body.accept(jobHandle);
-            return null;
-        })
-            .when(syncJobService)
-            .run(any(SyncJobRequest.class), any());
+                    Consumer<SyncJobHandle> body = invocation.getArgument(1);
+                    body.accept(jobHandle);
+                    return null;
+                })
+                .when(syncJobService)
+                .run(any(SyncJobRequest.class), any());
     }
 
     @Test
     void syncAllNow_recordsAReconciliationScheduledJob_perActiveWorkspace_andRunsTheWorkspacePass() {
-        when(connectionService.findWorkspaceIdsWithActiveConnection(IntegrationKind.OUTLINE)).thenReturn(
-            List.of(WORKSPACE_1, WORKSPACE_2)
-        );
+        when(connectionService.findWorkspaceIdsWithActiveConnection(IntegrationKind.OUTLINE))
+                .thenReturn(List.of(WORKSPACE_1, WORKSPACE_2));
         when(connectionService.findActive(WORKSPACE_1, IntegrationKind.OUTLINE)).thenReturn(Optional.of(connection1));
         when(connectionService.findActive(WORKSPACE_2, IntegrationKind.OUTLINE)).thenReturn(Optional.of(connection2));
         runJobsSynchronously();
@@ -104,35 +99,24 @@ class OutlineDocumentSyncSchedulerTest extends BaseUnitTest {
         ArgumentCaptor<SyncJobRequest> captor = ArgumentCaptor.forClass(SyncJobRequest.class);
         verify(syncJobService, times(2)).run(captor.capture(), any());
         assertThat(captor.getAllValues())
-            .extracting(
-                SyncJobRequest::workspaceId,
-                SyncJobRequest::connectionId,
-                SyncJobRequest::type,
-                SyncJobRequest::trigger
-            )
-            .containsExactlyInAnyOrder(
-                org.assertj.core.groups.Tuple.tuple(
-                    WORKSPACE_1,
-                    CONNECTION_1,
-                    SyncJobType.RECONCILIATION,
-                    SyncJobTrigger.SCHEDULED
-                ),
-                org.assertj.core.groups.Tuple.tuple(
-                    WORKSPACE_2,
-                    CONNECTION_2,
-                    SyncJobType.RECONCILIATION,
-                    SyncJobTrigger.SCHEDULED
-                )
-            );
+                .extracting(
+                        SyncJobRequest::workspaceId,
+                        SyncJobRequest::connectionId,
+                        SyncJobRequest::type,
+                        SyncJobRequest::trigger)
+                .containsExactlyInAnyOrder(
+                        org.assertj.core.groups.Tuple.tuple(
+                                WORKSPACE_1, CONNECTION_1, SyncJobType.RECONCILIATION, SyncJobTrigger.SCHEDULED),
+                        org.assertj.core.groups.Tuple.tuple(
+                                WORKSPACE_2, CONNECTION_2, SyncJobType.RECONCILIATION, SyncJobTrigger.SCHEDULED));
         verify(syncService).syncWorkspace(WORKSPACE_1, jobHandle, SyncJobType.RECONCILIATION);
         verify(syncService).syncWorkspace(WORKSPACE_2, jobHandle, SyncJobType.RECONCILIATION);
     }
 
     @Test
     void syncAllNow_oneWorkspaceHasAnActiveJobAlready_isSkipped_theOtherStillRuns() {
-        when(connectionService.findWorkspaceIdsWithActiveConnection(IntegrationKind.OUTLINE)).thenReturn(
-            List.of(WORKSPACE_1, WORKSPACE_2)
-        );
+        when(connectionService.findWorkspaceIdsWithActiveConnection(IntegrationKind.OUTLINE))
+                .thenReturn(List.of(WORKSPACE_1, WORKSPACE_2));
         when(connectionService.findActive(WORKSPACE_1, IntegrationKind.OUTLINE)).thenReturn(Optional.of(connection1));
         when(connectionService.findActive(WORKSPACE_2, IntegrationKind.OUTLINE)).thenReturn(Optional.of(connection2));
 
@@ -143,16 +127,16 @@ class OutlineDocumentSyncSchedulerTest extends BaseUnitTest {
         when(activeJob.getId()).thenReturn(999L);
 
         doAnswer(invocation -> {
-            SyncJobRequest request = invocation.getArgument(0);
-            if (request.connectionId() == CONNECTION_1) {
-                throw new SyncJobConflictException(activeJob);
-            }
-            Consumer<SyncJobHandle> body = invocation.getArgument(1);
-            body.accept(jobHandle);
-            return null;
-        })
-            .when(syncJobService)
-            .run(any(SyncJobRequest.class), any());
+                    SyncJobRequest request = invocation.getArgument(0);
+                    if (request.connectionId() == CONNECTION_1) {
+                        throw new SyncJobConflictException(activeJob);
+                    }
+                    Consumer<SyncJobHandle> body = invocation.getArgument(1);
+                    body.accept(jobHandle);
+                    return null;
+                })
+                .when(syncJobService)
+                .run(any(SyncJobRequest.class), any());
 
         assertThatCode(() -> scheduler.syncAllNow()).doesNotThrowAnyException();
 
@@ -162,9 +146,8 @@ class OutlineDocumentSyncSchedulerTest extends BaseUnitTest {
 
     @Test
     void syncAllNow_workspaceLostItsActiveConnectionMeanwhile_isSilentlySkipped() {
-        when(connectionService.findWorkspaceIdsWithActiveConnection(IntegrationKind.OUTLINE)).thenReturn(
-            List.of(WORKSPACE_1)
-        );
+        when(connectionService.findWorkspaceIdsWithActiveConnection(IntegrationKind.OUTLINE))
+                .thenReturn(List.of(WORKSPACE_1));
         when(connectionService.findActive(WORKSPACE_1, IntegrationKind.OUTLINE)).thenReturn(Optional.empty());
 
         int attempted = scheduler.syncAllNow();

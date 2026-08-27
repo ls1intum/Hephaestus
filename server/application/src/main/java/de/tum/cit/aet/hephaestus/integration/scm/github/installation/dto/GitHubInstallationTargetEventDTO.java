@@ -13,13 +13,13 @@ import org.jspecify.annotations.Nullable;
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record GitHubInstallationTargetEventDTO(
-    @JsonProperty("action") String action,
-    @JsonProperty("installation") GitHubInstallationEventDTO.@Nullable GitHubInstallationDTO installation,
-    @JsonProperty("account") GitHubInstallationEventDTO.@Nullable GitHubAccountDTO account,
-    @JsonProperty("target_type") String targetType,
-    @JsonProperty("changes") @Nullable Changes changes,
-    @JsonProperty("sender") @Nullable GitHubUserDTO sender
-) implements GitHubWebhookEvent {
+        @JsonProperty("action") String action,
+        @JsonProperty("installation") GitHubInstallationEventDTO.@Nullable GitHubInstallationDTO installation,
+        @JsonProperty("account") GitHubInstallationEventDTO.@Nullable GitHubAccountDTO account,
+        @JsonProperty("target_type") String targetType,
+        @JsonProperty("changes") @Nullable Changes changes,
+        @JsonProperty("sender") @Nullable GitHubUserDTO sender)
+        implements GitHubWebhookEvent {
     @Override
     public GitHubEventAction.InstallationTarget actionType() {
         return GitHubEventAction.InstallationTarget.fromString(action);

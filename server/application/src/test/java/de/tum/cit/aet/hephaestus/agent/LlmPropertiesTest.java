@@ -10,7 +10,6 @@ import jakarta.validation.ValidatorFactory;
 import java.util.Set;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -37,23 +36,18 @@ class LlmPropertiesTest extends BaseUnitTest {
     }
 
     private static Set<ConstraintViolation<LlmProperties>> validate(String displayCurrency) {
-        return validator.validate(
-            new LlmProperties(
-                displayCurrency,
-                new LlmProperties.Egress(false),
-                new LlmProperties.Fx(LlmProperties.ECB_DAILY_URL)
-            )
-        );
+        return validator.validate(new LlmProperties(
+                displayCurrency, new LlmProperties.Egress(false), new LlmProperties.Fx(LlmProperties.ECB_DAILY_URL)));
     }
 
     @ParameterizedTest(name = "display-currency={0} boots")
-    @CsvSource({ "'', unset — the feature stays off", "EUR, the one supported currency", "eur, case is irrelevant" })
+    @CsvSource({"'', unset — the feature stays off", "EUR, the one supported currency", "eur, case is irrelevant"})
     void acceptsOnlyEmptyOrASupportedCurrency(String configured, String why) {
         assertThat(validate(configured)).as(why).isEmpty();
     }
 
     @ParameterizedTest(name = "display-currency={0} fails startup")
-    @ValueSource(strings = { "GBP", "CHF", "USD", "EURO", "€", "eu" })
+    @ValueSource(strings = {"GBP", "CHF", "USD", "EURO", "€", "eu"})
     void refusesToBootOnAnythingItCannotConvertTo(String configured) {
         Set<ConstraintViolation<LlmProperties>> violations = validate(configured);
 

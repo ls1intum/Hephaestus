@@ -17,16 +17,12 @@ import org.junit.jupiter.api.Test;
 
 class LedgerSignalRecorderTest extends BaseUnitTest {
 
-    private static final SignalKey KEY = new SignalKey(
-        7L,
-        42L,
-        SignalName.of("scm.pull_request.ready"),
-        SignalRevision.ofHeadCommit("abc123")
-    );
+    private static final SignalKey KEY =
+            new SignalKey(7L, 42L, SignalName.of("scm.pull_request.ready"), SignalRevision.ofHeadCommit("abc123"));
 
     private final ArtifactSignalRepository repository = mock(ArtifactSignalRepository.class);
     private final io.micrometer.core.instrument.simple.SimpleMeterRegistry meterRegistry =
-        new io.micrometer.core.instrument.simple.SimpleMeterRegistry();
+            new io.micrometer.core.instrument.simple.SimpleMeterRegistry();
     private final LedgerSignalRecorder recorder = new LedgerSignalRecorder(repository, meterRegistry);
 
     @Test
@@ -51,18 +47,18 @@ class LedgerSignalRecorderTest extends BaseUnitTest {
 
     @Test
     void shouldHoldARefusalAnOperatorCanLiftAsPending() {
-        when(repository.markRefused(eq(KEY), eq("PENDING"), eq("BUDGET_EXHAUSTED"), any())).thenReturn(1);
+        when(repository.markRefused(eq(KEY), eq("PENDING"), eq("BUDGET_EXHAUSTED"), any()))
+                .thenReturn(1);
 
         recorder.markRefused(KEY, SignalStateReason.BUDGET_EXHAUSTED);
 
         verify(repository).markRefused(eq(KEY), eq("PENDING"), eq("BUDGET_EXHAUSTED"), any());
-        assertThat(
-            meterRegistry
-                .get("practice.review.refused")
-                .tags("phase", "submission", "reason", "budget_exhausted")
-                .counter()
-                .count()
-        ).isOne();
+        assertThat(meterRegistry
+                        .get("practice.review.refused")
+                        .tags("phase", "submission", "reason", "budget_exhausted")
+                        .counter()
+                        .count())
+                .isOne();
     }
 
     @Test
@@ -87,14 +83,15 @@ class LedgerSignalRecorderTest extends BaseUnitTest {
     void shouldWriteTheArtifactKindDerivedFromTheSignalName() {
         recorder.record(KEY, Instant.now(), DiscoveredVia.EVENT);
 
-        verify(repository).insertOrClaimUndecided(
-            org.mockito.ArgumentMatchers.argThat(key -> key.artifactKind().equals(ArtifactKind.of("scm.pull_request"))),
-            any(),
-            any(),
-            anyString(),
-            any(),
-            any()
-        );
+        verify(repository)
+                .insertOrClaimUndecided(
+                        org.mockito.ArgumentMatchers.argThat(
+                                key -> key.artifactKind().equals(ArtifactKind.of("scm.pull_request"))),
+                        any(),
+                        any(),
+                        anyString(),
+                        any(),
+                        any());
     }
 
     @Test
@@ -110,8 +107,7 @@ class LedgerSignalRecorderTest extends BaseUnitTest {
     void shouldRefuseToAttributeASyncDiscoveryToAPerson() {
         // A sync notices what already happened; nobody asked it to. Letting a background pass name a
         // requester would spend that person's hourly allowance on work they never commissioned.
-        assertThatThrownBy(() -> recorder.record(KEY, Instant.now(), DiscoveredVia.SYNC, 99L)).isInstanceOf(
-            IllegalArgumentException.class
-        );
+        assertThatThrownBy(() -> recorder.record(KEY, Instant.now(), DiscoveredVia.SYNC, 99L))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 }

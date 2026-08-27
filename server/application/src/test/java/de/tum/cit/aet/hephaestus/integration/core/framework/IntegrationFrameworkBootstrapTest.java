@@ -28,14 +28,12 @@ class IntegrationFrameworkBootstrapTest extends BaseUnitTest {
         // Regression: an outbound-only kind declares zero capabilities. The universal
         // credential-provider + lifecycle-listener beans are still required, but the per-capability
         // checks must be a no-op — and must not trip EnumSet.copyOf on the empty declared set.
-        IntegrationManifestRegistry registry = new IntegrationManifestRegistry(
-            List.of(manifest(IntegrationKind.SLACK, Set.of()))
-        );
+        IntegrationManifestRegistry registry =
+                new IntegrationManifestRegistry(List.of(manifest(IntegrationKind.SLACK, Set.of())));
         IntegrationFrameworkBootstrap bootstrap = bootstrap(
-            registry,
-            List.of(credentialProvider(IntegrationKind.SLACK)),
-            List.of(lifecycleListener(IntegrationKind.SLACK))
-        );
+                registry,
+                List.of(credentialProvider(IntegrationKind.SLACK)),
+                List.of(lifecycleListener(IntegrationKind.SLACK)));
 
         assertThatCode(bootstrap::validate).doesNotThrowAnyException();
     }
@@ -43,33 +41,29 @@ class IntegrationFrameworkBootstrapTest extends BaseUnitTest {
     @Test
     void declaredCapabilityWithoutItsBeanFailsLoud() {
         IntegrationManifestRegistry registry = new IntegrationManifestRegistry(
-            List.of(manifest(IntegrationKind.GITHUB, Set.of(Capability.WEBHOOK_INGEST)))
-        );
+                List.of(manifest(IntegrationKind.GITHUB, Set.of(Capability.WEBHOOK_INGEST))));
         // Universal beans present, but no WebhookSignatureVerifier backing the WEBHOOK_INGEST claim.
         IntegrationFrameworkBootstrap bootstrap = bootstrap(
-            registry,
-            List.of(credentialProvider(IntegrationKind.GITHUB)),
-            List.of(lifecycleListener(IntegrationKind.GITHUB))
-        );
+                registry,
+                List.of(credentialProvider(IntegrationKind.GITHUB)),
+                List.of(lifecycleListener(IntegrationKind.GITHUB)));
 
         assertThatThrownBy(bootstrap::validate)
-            .isInstanceOf(IllegalStateException.class)
-            .hasMessageContaining("WebhookSignatureVerifier");
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("WebhookSignatureVerifier");
     }
 
     @Test
     void webhookIngestDoesNotRequireASeparateSecretSourceBean() {
         IntegrationManifestRegistry registry = new IntegrationManifestRegistry(
-            List.of(manifest(IntegrationKind.SLACK, Set.of(Capability.WEBHOOK_INGEST)))
-        );
+                List.of(manifest(IntegrationKind.SLACK, Set.of(Capability.WEBHOOK_INGEST))));
         IntegrationFrameworkBootstrap bootstrap = bootstrap(
-            registry,
-            List.of(credentialProvider(IntegrationKind.SLACK)),
-            List.of(lifecycleListener(IntegrationKind.SLACK)),
-            List.of(webhookSignatureVerifier(IntegrationKind.SLACK)),
-            List.of(subjectKeyDeriver(IntegrationKind.SLACK)),
-            List.of(subjectParser(IntegrationKind.SLACK))
-        );
+                registry,
+                List.of(credentialProvider(IntegrationKind.SLACK)),
+                List.of(lifecycleListener(IntegrationKind.SLACK)),
+                List.of(webhookSignatureVerifier(IntegrationKind.SLACK)),
+                List.of(subjectKeyDeriver(IntegrationKind.SLACK)),
+                List.of(subjectParser(IntegrationKind.SLACK)));
 
         assertThatCode(bootstrap::validate).doesNotThrowAnyException();
     }
@@ -77,17 +71,15 @@ class IntegrationFrameworkBootstrapTest extends BaseUnitTest {
     @Test
     void webhookIngestDoesNotRequireWebhookBeansWhenWebhookRoleIsDisabled() {
         IntegrationManifestRegistry registry = new IntegrationManifestRegistry(
-            List.of(manifest(IntegrationKind.SLACK, Set.of(Capability.WEBHOOK_INGEST)))
-        );
+                List.of(manifest(IntegrationKind.SLACK, Set.of(Capability.WEBHOOK_INGEST))));
         IntegrationFrameworkBootstrap bootstrap = bootstrap(
-            registry,
-            List.of(credentialProvider(IntegrationKind.SLACK)),
-            List.of(lifecycleListener(IntegrationKind.SLACK)),
-            List.of(),
-            List.of(),
-            List.of(subjectParser(IntegrationKind.SLACK)),
-            false
-        );
+                registry,
+                List.of(credentialProvider(IntegrationKind.SLACK)),
+                List.of(lifecycleListener(IntegrationKind.SLACK)),
+                List.of(),
+                List.of(),
+                List.of(subjectParser(IntegrationKind.SLACK)),
+                false);
 
         assertThatCode(bootstrap::validate).doesNotThrowAnyException();
     }
@@ -95,80 +87,72 @@ class IntegrationFrameworkBootstrapTest extends BaseUnitTest {
     @Test
     void webhookIngestStillRequiresSubjectParserWhenWebhookRoleIsDisabled() {
         IntegrationManifestRegistry registry = new IntegrationManifestRegistry(
-            List.of(manifest(IntegrationKind.SLACK, Set.of(Capability.WEBHOOK_INGEST)))
-        );
+                List.of(manifest(IntegrationKind.SLACK, Set.of(Capability.WEBHOOK_INGEST))));
         IntegrationFrameworkBootstrap bootstrap = bootstrap(
-            registry,
-            List.of(credentialProvider(IntegrationKind.SLACK)),
-            List.of(lifecycleListener(IntegrationKind.SLACK)),
-            List.of(),
-            List.of(),
-            List.of(),
-            false
-        );
+                registry,
+                List.of(credentialProvider(IntegrationKind.SLACK)),
+                List.of(lifecycleListener(IntegrationKind.SLACK)),
+                List.of(),
+                List.of(),
+                List.of(),
+                false);
 
         assertThatThrownBy(bootstrap::validate)
-            .isInstanceOf(IllegalStateException.class)
-            .hasMessageContaining("SubjectParser");
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("SubjectParser");
     }
 
     private static IntegrationFrameworkBootstrap bootstrap(
-        IntegrationManifestRegistry registry,
-        List<ApiCredentialProvider> credentialProviders,
-        List<IntegrationLifecycleListener> lifecycleListeners
-    ) {
+            IntegrationManifestRegistry registry,
+            List<ApiCredentialProvider> credentialProviders,
+            List<IntegrationLifecycleListener> lifecycleListeners) {
         return bootstrap(registry, credentialProviders, lifecycleListeners, List.of(), List.of(), List.of());
     }
 
     private static IntegrationFrameworkBootstrap bootstrap(
-        IntegrationManifestRegistry registry,
-        List<ApiCredentialProvider> credentialProviders,
-        List<IntegrationLifecycleListener> lifecycleListeners,
-        List<WebhookSignatureVerifier> signatureVerifiers,
-        List<SubjectKeyDeriver> subjectKeyDerivers,
-        List<SubjectParser> subjectParsers
-    ) {
+            IntegrationManifestRegistry registry,
+            List<ApiCredentialProvider> credentialProviders,
+            List<IntegrationLifecycleListener> lifecycleListeners,
+            List<WebhookSignatureVerifier> signatureVerifiers,
+            List<SubjectKeyDeriver> subjectKeyDerivers,
+            List<SubjectParser> subjectParsers) {
         return bootstrap(
-            registry,
-            credentialProviders,
-            lifecycleListeners,
-            signatureVerifiers,
-            subjectKeyDerivers,
-            subjectParsers,
-            true
-        );
+                registry,
+                credentialProviders,
+                lifecycleListeners,
+                signatureVerifiers,
+                subjectKeyDerivers,
+                subjectParsers,
+                true);
     }
 
     private static IntegrationFrameworkBootstrap bootstrap(
-        IntegrationManifestRegistry registry,
-        List<ApiCredentialProvider> credentialProviders,
-        List<IntegrationLifecycleListener> lifecycleListeners,
-        List<WebhookSignatureVerifier> signatureVerifiers,
-        List<SubjectKeyDeriver> subjectKeyDerivers,
-        List<SubjectParser> subjectParsers,
-        boolean webhookRoleEnabled
-    ) {
+            IntegrationManifestRegistry registry,
+            List<ApiCredentialProvider> credentialProviders,
+            List<IntegrationLifecycleListener> lifecycleListeners,
+            List<WebhookSignatureVerifier> signatureVerifiers,
+            List<SubjectKeyDeriver> subjectKeyDerivers,
+            List<SubjectParser> subjectParsers,
+            boolean webhookRoleEnabled) {
         return new IntegrationFrameworkBootstrap(
-            registry,
-            signatureVerifiers,
-            subjectKeyDerivers,
-            subjectParsers,
-            credentialProviders,
-            List.of(), // tokenRefreshers
-            List.of(), // feedbackChannels
-            List.of(), // inlineFeedbackChannels
-            List.of(), // approvalChannels
-            lifecycleListeners,
-            // A validator over an empty world: these tests are about capability wiring, and every manifest
-            // below contributes nothing to review, so the review contract has nothing to say about them.
-            new ReviewContractValidator(
-                new ArtifactDescriptorRegistry(List.of()),
-                new IntegrationMessageHandlerRegistry(List.of()),
-                List.of(),
-                Set::of
-            ),
-            webhookRoleEnabled
-        );
+                registry,
+                signatureVerifiers,
+                subjectKeyDerivers,
+                subjectParsers,
+                credentialProviders,
+                List.of(), // tokenRefreshers
+                List.of(), // feedbackChannels
+                List.of(), // inlineFeedbackChannels
+                List.of(), // approvalChannels
+                lifecycleListeners,
+                // A validator over an empty world: these tests are about capability wiring, and every manifest
+                // below contributes nothing to review, so the review contract has nothing to say about them.
+                new ReviewContractValidator(
+                        new ArtifactDescriptorRegistry(List.of()),
+                        new IntegrationMessageHandlerRegistry(List.of()),
+                        List.of(),
+                        Set::of),
+                webhookRoleEnabled);
     }
 
     private static IntegrationManifest manifest(IntegrationKind kind, Set<Capability> capabilities) {

@@ -51,10 +51,7 @@ public class PracticeSubjectEvaluator {
 
     /** @return {@code null} when the practice has no mechanical precondition */
     public @Nullable PracticeSubjectCheck evaluate(
-        @Nullable PracticeSubject subject,
-        ArtifactSourceManifest manifest,
-        Map<String, byte[]> staged
-    ) {
+            @Nullable PracticeSubject subject, ArtifactSourceManifest manifest, Map<String, byte[]> staged) {
         if (subject == null) {
             return null;
         }
@@ -72,11 +69,7 @@ public class PracticeSubjectEvaluator {
     }
 
     private SubjectFinding find(
-        PracticeSubjectClause clause,
-        @Nullable SourceCapture capture,
-        DiffView diff,
-        Map<String, byte[]> staged
-    ) {
+            PracticeSubjectClause clause, @Nullable SourceCapture capture, DiffView diff, Map<String, byte[]> staged) {
         if (capture == null || !(capture.state() instanceof SourceCaptureState.Available available)) {
             return SubjectFinding.UNDECIDABLE;
         }
@@ -98,8 +91,11 @@ public class PracticeSubjectEvaluator {
         if (globs == null || paths == null) {
             return SubjectFinding.UNDECIDABLE;
         }
-        List<Pattern> patterns = globs.stream().map(PracticeSubjectEvaluator::globToPattern).toList();
-        boolean matched = paths.stream().anyMatch(path -> patterns.stream().anyMatch(p -> p.matcher(path).matches()));
+        List<Pattern> patterns =
+                globs.stream().map(PracticeSubjectEvaluator::globToPattern).toList();
+        boolean matched = paths.stream()
+                .anyMatch(
+                        path -> patterns.stream().anyMatch(p -> p.matcher(path).matches()));
         return matched ? SubjectFinding.FOUND : SubjectFinding.NOT_FOUND;
     }
 
@@ -112,21 +108,16 @@ public class PracticeSubjectEvaluator {
     }
 
     private SubjectFinding evidenceItems(
-        @Nullable SubjectEvidenceCollection collection,
-        SourceCapture capture,
-        Map<String, byte[]> staged
-    ) {
+            @Nullable SubjectEvidenceCollection collection, SourceCapture capture, Map<String, byte[]> staged) {
         if (collection == null) {
             return SubjectFinding.UNDECIDABLE;
         }
         String fileName = fileNameOf(collection);
-        SourceArtifact artifact = capture
-            .artifacts()
-            .stream()
-            .filter(candidate -> candidate.path().endsWith(fileName))
-            .findFirst()
-            .orElse(null);
-        byte@Nullable [] bytes = artifact == null ? null : staged.get(artifact.path());
+        SourceArtifact artifact = capture.artifacts().stream()
+                .filter(candidate -> candidate.path().endsWith(fileName))
+                .findFirst()
+                .orElse(null);
+        byte @Nullable [] bytes = artifact == null ? null : staged.get(artifact.path());
         if (bytes == null || bytes.length == 0) {
             return SubjectFinding.UNDECIDABLE;
         }

@@ -23,19 +23,17 @@ public final class WorkspaceEchoControllers {
 
     /** Echoes the resolved {@link WorkspaceContext} from a workspace-scoped controller. */
     public record ScopedEcho(
-        String requestPath,
-        @Nullable String contextSlug,
-        @Nullable Long contextId,
-        List<String> roles
-    ) {}
+            String requestPath,
+            @Nullable String contextSlug,
+            @Nullable Long contextId,
+            List<String> roles) {}
 
     /** Echoes the resolved {@link WorkspaceContext} from a plain controller under a workspace path. */
     public record WorkspaceContextSnapshot(
-        String pathSlug,
-        @Nullable String contextSlug,
-        @Nullable Long contextId,
-        List<String> roles
-    ) {}
+            String pathSlug,
+            @Nullable String contextSlug,
+            @Nullable Long contextId,
+            List<String> roles) {}
 
     @WorkspaceScopedController
     @RequestMapping("/scoped-test")
@@ -44,11 +42,10 @@ public final class WorkspaceEchoControllers {
         @GetMapping("/echo")
         ResponseEntity<ScopedEcho> echo(HttpServletRequest request, WorkspaceContext context) {
             ScopedEcho payload = new ScopedEcho(
-                request.getRequestURI(),
-                context != null ? context.slug() : null,
-                context != null ? context.id() : null,
-                context != null ? context.roles().stream().map(Enum::name).toList() : List.of()
-            );
+                    request.getRequestURI(),
+                    context != null ? context.slug() : null,
+                    context != null ? context.id() : null,
+                    context != null ? context.roles().stream().map(Enum::name).toList() : List.of());
             return ResponseEntity.ok(payload);
         }
     }
@@ -59,19 +56,16 @@ public final class WorkspaceEchoControllers {
 
         @GetMapping
         ResponseEntity<WorkspaceContextSnapshot> echo(
-            @PathVariable String workspaceSlug,
-            WorkspaceContext workspaceContext
-        ) {
+                @PathVariable String workspaceSlug, WorkspaceContext workspaceContext) {
             WorkspaceContextSnapshot snapshot;
             if (workspaceContext == null) {
                 snapshot = new WorkspaceContextSnapshot(workspaceSlug, null, null, List.of());
             } else {
                 snapshot = new WorkspaceContextSnapshot(
-                    workspaceSlug,
-                    workspaceContext.slug(),
-                    workspaceContext.id(),
-                    workspaceContext.roles().stream().map(Enum::name).toList()
-                );
+                        workspaceSlug,
+                        workspaceContext.slug(),
+                        workspaceContext.id(),
+                        workspaceContext.roles().stream().map(Enum::name).toList());
             }
             return ResponseEntity.ok(snapshot);
         }

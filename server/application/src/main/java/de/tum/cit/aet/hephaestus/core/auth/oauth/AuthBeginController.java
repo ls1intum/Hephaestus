@@ -51,12 +51,11 @@ public class AuthBeginController {
     private final String apiBasePath;
 
     public AuthBeginController(
-        LoginProviderService loginProviderService,
-        AuthIntentCookie authIntentCookie,
-        CookieBearerTokenResolver bearerTokenResolver,
-        RevocationAwareJwtDecoder jwtDecoder,
-        AuthProperties authProperties
-    ) {
+            LoginProviderService loginProviderService,
+            AuthIntentCookie authIntentCookie,
+            CookieBearerTokenResolver bearerTokenResolver,
+            RevocationAwareJwtDecoder jwtDecoder,
+            AuthProperties authProperties) {
         this.loginProviderService = loginProviderService;
         this.authIntentCookie = authIntentCookie;
         this.bearerTokenResolver = bearerTokenResolver;
@@ -69,13 +68,12 @@ public class AuthBeginController {
     @Hidden
     @Operation(summary = "Begin OAuth login flow against the given registrationId")
     public RedirectView begin(
-        @RequestParam("provider") String registrationId,
-        @RequestParam(value = "workspace", required = false) @Nullable String workspaceSlug,
-        @RequestParam(value = "returnTo", required = false) @Nullable String returnTo,
-        @RequestParam(value = "mode", required = false, defaultValue = "login") String mode,
-        HttpServletRequest request,
-        HttpServletResponse response
-    ) {
+            @RequestParam("provider") String registrationId,
+            @RequestParam(value = "workspace", required = false) @Nullable String workspaceSlug,
+            @RequestParam(value = "returnTo", required = false) @Nullable String returnTo,
+            @RequestParam(value = "mode", required = false, defaultValue = "login") String mode,
+            HttpServletRequest request,
+            HttpServletResponse response) {
         // The enabled login_provider row is the authority: it backs the ClientRegistration Spring will
         // resolve at the initiation endpoint, and its TYPE drives the link-only gate below.
         Optional<LoginProvider> provider = loginProviderService.findEnabled(registrationId);

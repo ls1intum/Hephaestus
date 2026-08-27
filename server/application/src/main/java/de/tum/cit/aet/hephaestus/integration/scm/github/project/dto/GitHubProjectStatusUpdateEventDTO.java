@@ -28,36 +28,36 @@ import org.jspecify.annotations.Nullable;
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record GitHubProjectStatusUpdateEventDTO(
-    @JsonProperty("action") String action,
-    @JsonProperty("projects_v2_status_update") StatusUpdatePayload statusUpdate,
-    @JsonProperty("organization") GitHubOrganizationEventDTO.GitHubOrganizationDTO organization,
-    @JsonProperty("repository") GitHubRepositoryRefDTO repository,
-    @JsonProperty("sender") GitHubUserDTO sender,
-    @JsonProperty("installation") InstallationRef installation
-) {
+        @JsonProperty("action") String action,
+        @JsonProperty("projects_v2_status_update") StatusUpdatePayload statusUpdate,
+        @JsonProperty("organization") GitHubOrganizationEventDTO.GitHubOrganizationDTO organization,
+        @JsonProperty("repository") GitHubRepositoryRefDTO repository,
+        @JsonProperty("sender") GitHubUserDTO sender,
+        @JsonProperty("installation") InstallationRef installation) {
     /**
      * Reference to the GitHub App installation.
      */
     @JsonIgnoreProperties(ignoreUnknown = true)
-    public record InstallationRef(@JsonProperty("id") Long id, @JsonProperty("node_id") String nodeId) {}
+    public record InstallationRef(
+            @JsonProperty("id") Long id,
+            @JsonProperty("node_id") String nodeId) {}
 
     /**
      * Payload containing the status update details.
      */
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record StatusUpdatePayload(
-        @JsonProperty("id") Long id,
-        @JsonProperty("node_id") String nodeId,
-        @JsonProperty("project_node_id") String projectNodeId,
-        @JsonProperty("creator") GitHubUserDTO creator,
-        @JsonProperty("body") String body,
-        @JsonProperty("body_html") String bodyHtml,
-        @JsonProperty("start_date") String startDate,
-        @JsonProperty("target_date") String targetDate,
-        @JsonProperty("status") String status,
-        @JsonProperty("created_at") String createdAt,
-        @JsonProperty("updated_at") String updatedAt
-    ) {}
+            @JsonProperty("id") Long id,
+            @JsonProperty("node_id") String nodeId,
+            @JsonProperty("project_node_id") String projectNodeId,
+            @JsonProperty("creator") GitHubUserDTO creator,
+            @JsonProperty("body") String body,
+            @JsonProperty("body_html") String bodyHtml,
+            @JsonProperty("start_date") String startDate,
+            @JsonProperty("target_date") String targetDate,
+            @JsonProperty("status") String status,
+            @JsonProperty("created_at") String createdAt,
+            @JsonProperty("updated_at") String updatedAt) {}
 
     /**
      * Detects the owner type from the webhook payload fields.

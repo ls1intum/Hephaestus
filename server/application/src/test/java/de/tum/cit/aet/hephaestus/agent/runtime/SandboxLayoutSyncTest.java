@@ -26,28 +26,28 @@ class SandboxLayoutSyncTest extends BaseUnitTest {
         String body = Files.readString(runner, StandardCharsets.UTF_8);
 
         assertThat(body)
-            .as("runner defaults its root to SandboxLayout.WORKSPACE_ROOT")
-            .contains("\"" + SandboxLayout.WORKSPACE_ROOT + "\"");
+                .as("runner defaults its root to SandboxLayout.WORKSPACE_ROOT")
+                .contains("\"" + SandboxLayout.WORKSPACE_ROOT + "\"");
 
         assertThat(body)
-            .as("runner reads the task envelope at SandboxLayout.TASK_ENVELOPE_FILENAME")
-            .contains("/" + SandboxLayout.TASK_ENVELOPE_FILENAME);
+                .as("runner reads the task envelope at SandboxLayout.TASK_ENVELOPE_FILENAME")
+                .contains("/" + SandboxLayout.TASK_ENVELOPE_FILENAME);
 
         assertThat(body)
-            .as("runner pins SUPPORTED_SCHEMA_VERSION to the Java SCHEMA_VERSION constant")
-            .contains("SUPPORTED_SCHEMA_VERSION = " + TaskEnvelope.SCHEMA_VERSION);
+                .as("runner pins SUPPORTED_SCHEMA_VERSION to the Java SCHEMA_VERSION constant")
+                .contains("SUPPORTED_SCHEMA_VERSION = " + TaskEnvelope.SCHEMA_VERSION);
 
         assertThat(body)
-            .as("runner pins ENVELOPE_MISMATCH_EXIT to SandboxLayout.EXIT_ENVELOPE_MISMATCH")
-            .contains("ENVELOPE_MISMATCH_EXIT = " + SandboxLayout.EXIT_ENVELOPE_MISMATCH);
+                .as("runner pins ENVELOPE_MISMATCH_EXIT to SandboxLayout.EXIT_ENVELOPE_MISMATCH")
+                .contains("ENVELOPE_MISMATCH_EXIT = " + SandboxLayout.EXIT_ENVELOPE_MISMATCH);
 
         assertThat(body)
-            .as("runner writes its output under SandboxLayout.OUTPUT_PATH")
-            .contains(SandboxLayout.OUTPUT_PATH.substring(SandboxLayout.WORKSPACE_ROOT.length()));
+                .as("runner writes its output under SandboxLayout.OUTPUT_PATH")
+                .contains(SandboxLayout.OUTPUT_PATH.substring(SandboxLayout.WORKSPACE_ROOT.length()));
 
         assertThat(body)
-            .as("runner reads the practices index under SandboxLayout.PRACTICES_PREFIX")
-            .contains("/" + SandboxLayout.PRACTICES_PREFIX + "index.json");
+                .as("runner reads the practices index under SandboxLayout.PRACTICES_PREFIX")
+                .contains("/" + SandboxLayout.PRACTICES_PREFIX + "index.json");
     }
 
     @Test
@@ -63,41 +63,40 @@ class SandboxLayoutSyncTest extends BaseUnitTest {
         String body = Files.readString(orchestrator, StandardCharsets.UTF_8);
 
         assertThat(body)
-            .as("orchestrator prompt references the repo mount at SandboxLayout.REPO_MOUNT_RELATIVE")
-            .contains(SandboxLayout.REPO_MOUNT_RELATIVE);
+                .as("orchestrator prompt references the repo mount at SandboxLayout.REPO_MOUNT_RELATIVE")
+                .contains(SandboxLayout.REPO_MOUNT_RELATIVE);
         assertThat(body).doesNotContain("evidence.locations", "evidence.location", "evidence.snippets");
     }
 
     @Test
     @DisplayName(
-        "pi-mentor-runner.ts pins MENTOR_SYSTEM_PROMPT_PATH, SESSIONS_DIR_PREFIX, PI_AGENT_DIR, and the envelope exit"
-    )
+            "pi-mentor-runner.ts pins MENTOR_SYSTEM_PROMPT_PATH, SESSIONS_DIR_PREFIX, PI_AGENT_DIR, and the envelope exit")
     void mentorRunnerLiteralsMatchAbi() throws IOException {
         Path runner = resolveResource("agent/pi-mentor-runner.ts");
         assertThat(runner).isRegularFile();
         String body = Files.readString(runner, StandardCharsets.UTF_8);
 
         assertThat(body)
-            .as("mentor runner references SandboxLayout.MENTOR_SYSTEM_PROMPT_PATH literally")
-            .contains("\"" + SandboxLayout.MENTOR_SYSTEM_PROMPT_PATH + "\"");
+                .as("mentor runner references SandboxLayout.MENTOR_SYSTEM_PROMPT_PATH literally")
+                .contains("\"" + SandboxLayout.MENTOR_SYSTEM_PROMPT_PATH + "\"");
 
         assertThat(body)
-            .as("mentor runner references SandboxLayout.SESSIONS_DIR_PREFIX dir name (.sessions)")
-            .contains("/" + SandboxLayout.SESSIONS_DIR_PREFIX.replaceFirst("/$", ""));
+                .as("mentor runner references SandboxLayout.SESSIONS_DIR_PREFIX dir name (.sessions)")
+                .contains("/" + SandboxLayout.SESSIONS_DIR_PREFIX.replaceFirst("/$", ""));
 
         assertThat(body)
-            .as("mentor runner falls back to SandboxLayout.PI_AGENT_DIR when PI_CODING_AGENT_DIR is unset")
-            .contains("\"" + SandboxLayout.PI_AGENT_DIR + "\"");
+                .as("mentor runner falls back to SandboxLayout.PI_AGENT_DIR when PI_CODING_AGENT_DIR is unset")
+                .contains("\"" + SandboxLayout.PI_AGENT_DIR + "\"");
 
         assertThat(body)
-            .as("mentor runner pins ENVELOPE_MISMATCH_EXIT to SandboxLayout.EXIT_ENVELOPE_MISMATCH")
-            .contains("ENVELOPE_MISMATCH_EXIT = " + SandboxLayout.EXIT_ENVELOPE_MISMATCH);
+                .as("mentor runner pins ENVELOPE_MISMATCH_EXIT to SandboxLayout.EXIT_ENVELOPE_MISMATCH")
+                .contains("ENVELOPE_MISMATCH_EXIT = " + SandboxLayout.EXIT_ENVELOPE_MISMATCH);
     }
 
     private static Path resolveResource(String relativePath) {
         Path candidate = Path.of("src/main/resources").resolve(relativePath);
         return Files.exists(candidate)
-            ? candidate
-            : Path.of("server/application/src/main/resources").resolve(relativePath);
+                ? candidate
+                : Path.of("server/application/src/main/resources").resolve(relativePath);
     }
 }

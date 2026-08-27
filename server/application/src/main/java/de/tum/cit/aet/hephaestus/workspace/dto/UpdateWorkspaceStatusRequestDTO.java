@@ -9,10 +9,9 @@ import jakarta.validation.constraints.NotNull;
  */
 @Schema(description = "Request to update the workspace lifecycle status")
 public record UpdateWorkspaceStatusRequestDTO(
-    @NotNull(message = "status is required")
-    @Schema(
-        description = "Target lifecycle status. PURGED is not a status transition: purge is irreversible and owner-only, so it lives at DELETE /workspaces/{workspaceSlug}.",
-        allowableValues = { "ACTIVE", "SUSPENDED" }
-    )
-    WorkspaceStatus status
-) {}
+        @NotNull(message = "status is required")
+        @Schema(
+                description =
+                        "Target lifecycle status. PURGED is not a status transition: purge is irreversible and owner-only, so it lives at DELETE /workspaces/{workspaceSlug}.",
+                allowableValues = {"ACTIVE", "SUSPENDED"})
+        WorkspaceStatus status) {}

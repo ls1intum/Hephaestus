@@ -20,22 +20,20 @@ import java.util.Objects;
  */
 @Schema(description = "What must be in a piece of work for this practice to have anything to judge")
 public record PracticeSubject(
-    @NotBlank
-    @Size(max = MAX_SENTENCE_LENGTH)
-    @Schema(description = "Sentence shown when the subject was proven absent, in the author's voice", minLength = 1)
-    String absentSays,
-    @Size(min = 1, max = MAX_CLAUSES)
-    @Schema(description = "Shapes the subject may take; the subject is present when any one is found")
-    List<PracticeSubjectClause> anyOf
-) {
+        @NotBlank
+        @Size(max = MAX_SENTENCE_LENGTH)
+        @Schema(description = "Sentence shown when the subject was proven absent, in the author's voice", minLength = 1)
+        String absentSays,
+
+        @Size(min = 1, max = MAX_CLAUSES)
+        @Schema(description = "Shapes the subject may take; the subject is present when any one is found")
+        List<PracticeSubjectClause> anyOf) {
     static final int MAX_SENTENCE_LENGTH = 300;
     static final int MAX_CLAUSES = 10;
 
     @JsonCreator
     public PracticeSubject(
-        @JsonProperty("absentSays") String absentSays,
-        @JsonProperty("anyOf") List<PracticeSubjectClause> anyOf
-    ) {
+            @JsonProperty("absentSays") String absentSays, @JsonProperty("anyOf") List<PracticeSubjectClause> anyOf) {
         this.absentSays = Objects.requireNonNull(absentSays, "absentSays");
         if (absentSays.isBlank()) {
             throw new IllegalArgumentException("A subject must say what its absence means, for the reader");

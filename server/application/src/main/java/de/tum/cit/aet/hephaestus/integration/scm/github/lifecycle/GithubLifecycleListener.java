@@ -93,26 +93,26 @@ public class GithubLifecycleListener implements IntegrationLifecycleListener {
      * profile never invokes the methods that consume this; it boots dead-code but doesn't crash.
      */
     private final ObjectProvider<IntegrationNatsConsumer> natsConsumerService;
+
     private final GitHubAppTokenService gitHubAppTokenService;
     private final OrganizationService organizationService;
     private final ConnectionService connectionService;
     private final WorkspaceLifecycleService workspaceLifecycleService;
 
     public GithubLifecycleListener(
-        NatsConnectionProperties natsProperties,
-        WorkspaceRepository workspaceRepository,
-        RepositoryToMonitorRepository repositoryToMonitorRepository,
-        RepositoryRepository repositoryRepository,
-        UserRepository userRepository,
-        IdentityProviderRepository gitProviderRepository,
-        WorkspaceSlugService workspaceSlugService,
-        WorkspaceMembershipService workspaceMembershipService,
-        ObjectProvider<IntegrationNatsConsumer> natsConsumerService,
-        GitHubAppTokenService gitHubAppTokenService,
-        OrganizationService organizationService,
-        ConnectionService connectionService,
-        WorkspaceLifecycleService workspaceLifecycleService
-    ) {
+            NatsConnectionProperties natsProperties,
+            WorkspaceRepository workspaceRepository,
+            RepositoryToMonitorRepository repositoryToMonitorRepository,
+            RepositoryRepository repositoryRepository,
+            UserRepository userRepository,
+            IdentityProviderRepository gitProviderRepository,
+            WorkspaceSlugService workspaceSlugService,
+            WorkspaceMembershipService workspaceMembershipService,
+            ObjectProvider<IntegrationNatsConsumer> natsConsumerService,
+            GitHubAppTokenService gitHubAppTokenService,
+            OrganizationService organizationService,
+            ConnectionService connectionService,
+            WorkspaceLifecycleService workspaceLifecycleService) {
         this.natsProperties = natsProperties;
         this.workspaceRepository = workspaceRepository;
         this.repositoryToMonitorRepository = repositoryToMonitorRepository;
@@ -153,13 +153,12 @@ public class GithubLifecycleListener implements IntegrationLifecycleListener {
         }
         TenantAccount account = event.account();
         createOrUpdateFromInstallationInternal(
-            installationId,
-            account != null ? parseAccountIdNullable(account.externalId()) : null,
-            account != null ? account.displayName() : null,
-            account != null ? account.kind() : AccountKind.ORGANIZATION,
-            account != null ? account.avatarUrl() : null,
-            RepositorySelection.SELECTED
-        );
+                installationId,
+                account != null ? parseAccountIdNullable(account.externalId()) : null,
+                account != null ? account.displayName() : null,
+                account != null ? account.kind() : AccountKind.ORGANIZATION,
+                account != null ? account.avatarUrl() : null,
+                RepositorySelection.SELECTED);
     }
 
     /**
@@ -186,7 +185,8 @@ public class GithubLifecycleListener implements IntegrationLifecycleListener {
     @Override
     public void onScopeChanged(IntegrationRef ref, ScopeDelta delta) {
         int added = delta.added() != null ? delta.added().size() : 0;
-        int removed = delta.removedExternalIds() != null ? delta.removedExternalIds().size() : 0;
+        int removed =
+                delta.removedExternalIds() != null ? delta.removedExternalIds().size() : 0;
         if (added == 0 && removed == 0) {
             return;
         }
@@ -228,18 +228,9 @@ public class GithubLifecycleListener implements IntegrationLifecycleListener {
      */
     @Transactional
     public @Nullable Workspace createOrUpdateFromInstallation(
-        long installationId,
-        String accountLogin,
-        @Nullable RepositorySelection repositorySelection
-    ) {
+            long installationId, String accountLogin, @Nullable RepositorySelection repositorySelection) {
         return createOrUpdateFromInstallationInternal(
-            installationId,
-            null,
-            accountLogin,
-            AccountKind.ORGANIZATION,
-            null,
-            repositorySelection
-        );
+                installationId, null, accountLogin, AccountKind.ORGANIZATION, null, repositorySelection);
     }
 
     /**
@@ -255,31 +246,23 @@ public class GithubLifecycleListener implements IntegrationLifecycleListener {
      */
     @Transactional
     public @Nullable Workspace createOrUpdateFromInstallation(
-        long installationId,
-        @Nullable Long accountId,
-        @Nullable String accountLogin,
-        AccountKind accountKind,
-        @Nullable String avatarUrl,
-        @Nullable RepositorySelection repositorySelection
-    ) {
+            long installationId,
+            @Nullable Long accountId,
+            @Nullable String accountLogin,
+            AccountKind accountKind,
+            @Nullable String avatarUrl,
+            @Nullable RepositorySelection repositorySelection) {
         return createOrUpdateFromInstallationInternal(
-            installationId,
-            accountId,
-            accountLogin,
-            accountKind,
-            avatarUrl,
-            repositorySelection
-        );
+                installationId, accountId, accountLogin, accountKind, avatarUrl, repositorySelection);
     }
 
     private @Nullable Workspace createOrUpdateFromInstallationInternal(
-        long installationId,
-        @Nullable Long accountId,
-        @Nullable String accountLogin,
-        AccountKind accountKind,
-        @Nullable String avatarUrl,
-        @Nullable RepositorySelection repositorySelection
-    ) {
+            long installationId,
+            @Nullable Long accountId,
+            @Nullable String accountLogin,
+            AccountKind accountKind,
+            @Nullable String avatarUrl,
+            @Nullable RepositorySelection repositorySelection) {
         // Check suspension before any reactivation logic: replayed NATS "created" events
         // must not reactivate a suspended workspace and re-trigger failed repository syncs.
         if (gitHubAppTokenService.isInstallationMarkedSuspended(installationId)) {
@@ -287,7 +270,9 @@ public class GithubLifecycleListener implements IntegrationLifecycleListener {
             return null;
         }
 
-        Workspace workspace = workspaceRepository.findByInstallationIdForUpdate(installationId).orElse(null);
+        Workspace workspace = workspaceRepository
+                .findByInstallationIdForUpdate(installationId)
+                .orElse(null);
         if (workspace != null && workspace.getStatus() == Workspace.WorkspaceStatus.PURGED) {
             log.info("Skipped installation event for purged workspace: installationId={}", installationId);
             return null;
@@ -296,14 +281,13 @@ public class GithubLifecycleListener implements IntegrationLifecycleListener {
         if (workspace == null && !isBlank(accountLogin)) {
             String resolvedAccountLogin = Objects.requireNonNull(accountLogin);
             Workspace existingByLogin = workspaceRepository
-                .findByAccountLoginIgnoreCaseForUpdate(resolvedAccountLogin)
-                .orElse(null);
+                    .findByAccountLoginIgnoreCaseForUpdate(resolvedAccountLogin)
+                    .orElse(null);
             if (existingByLogin != null && existingByLogin.getStatus() == Workspace.WorkspaceStatus.PURGED) {
                 log.info(
-                    "Skipped installation event for purged workspace account: accountLogin={}, installationId={}",
-                    LoggingUtils.sanitizeForLog(accountLogin),
-                    installationId
-                );
+                        "Skipped installation event for purged workspace account: accountLogin={}, installationId={}",
+                        LoggingUtils.sanitizeForLog(accountLogin),
+                        installationId);
                 return null;
             }
 
@@ -311,53 +295,52 @@ public class GithubLifecycleListener implements IntegrationLifecycleListener {
             // whose ACTIVE Connection is GITLAB/SLACK — separate tenants that happen to share
             // the account-login string.
             if (existingByLogin != null) {
-                boolean hasNonGithubActive =
-                    connectionService.findActive(existingByLogin.getId(), IntegrationKind.GITLAB).isPresent() ||
-                    connectionService.findActive(existingByLogin.getId(), IntegrationKind.SLACK).isPresent();
+                boolean hasNonGithubActive = connectionService
+                                .findActive(existingByLogin.getId(), IntegrationKind.GITLAB)
+                                .isPresent()
+                        || connectionService
+                                .findActive(existingByLogin.getId(), IntegrationKind.SLACK)
+                                .isPresent();
                 if (hasNonGithubActive) {
                     log.info(
-                        "Skipped GitHub App installation cross-attach, workspace has non-GITHUB ACTIVE Connection: workspaceId={}, accountLogin={}, installationId={}",
-                        existingByLogin.getId(),
-                        LoggingUtils.sanitizeForLog(accountLogin),
-                        installationId
-                    );
+                            "Skipped GitHub App installation cross-attach, workspace has non-GITHUB ACTIVE Connection: workspaceId={}, accountLogin={}, installationId={}",
+                            existingByLogin.getId(),
+                            LoggingUtils.sanitizeForLog(accountLogin),
+                            installationId);
                     existingByLogin = null;
                 }
             }
 
             if (existingByLogin != null) {
                 boolean isPatWorkspace = connectionService
-                    .findActiveGitHubPatConfig(existingByLogin.getId())
-                    .isPresent();
+                        .findActiveGitHubPatConfig(existingByLogin.getId())
+                        .isPresent();
                 boolean hasPatToken = connectionService
-                    .findActiveBearerToken(existingByLogin.getId(), IntegrationKind.GITHUB)
-                    .map(b -> b.token() != null && !b.token().isBlank())
-                    .orElse(false);
+                        .findActiveBearerToken(existingByLogin.getId(), IntegrationKind.GITHUB)
+                        .map(b -> b.token() != null && !b.token().isBlank())
+                        .orElse(false);
 
                 if (isPatWorkspace && hasPatToken) {
                     log.info(
-                        "Skipped GitHub App installation linking, PAT workspace has stored token: workspaceId={}, accountLogin={}, installationId={}",
-                        existingByLogin.getId(),
-                        LoggingUtils.sanitizeForLog(accountLogin),
-                        installationId
-                    );
+                            "Skipped GitHub App installation linking, PAT workspace has stored token: workspaceId={}, accountLogin={}, installationId={}",
+                            existingByLogin.getId(),
+                            LoggingUtils.sanitizeForLog(accountLogin),
+                            installationId);
                     return existingByLogin;
                 }
 
                 if (isPatWorkspace) {
                     log.info(
-                        "Promoted PAT workspace to GitHub App, no PAT token stored: workspaceId={}, accountLogin={}, installationId={}",
-                        existingByLogin.getId(),
-                        LoggingUtils.sanitizeForLog(accountLogin),
-                        installationId
-                    );
+                            "Promoted PAT workspace to GitHub App, no PAT token stored: workspaceId={}, accountLogin={}, installationId={}",
+                            existingByLogin.getId(),
+                            LoggingUtils.sanitizeForLog(accountLogin),
+                            installationId);
                 } else {
                     log.info(
-                        "Linked existing workspace to installation: workspaceId={}, accountLogin={}, installationId={}",
-                        existingByLogin.getId(),
-                        LoggingUtils.sanitizeForLog(accountLogin),
-                        installationId
-                    );
+                            "Linked existing workspace to installation: workspaceId={}, accountLogin={}, installationId={}",
+                            existingByLogin.getId(),
+                            LoggingUtils.sanitizeForLog(accountLogin),
+                            installationId);
                 }
 
                 workspace = existingByLogin;
@@ -367,47 +350,37 @@ public class GithubLifecycleListener implements IntegrationLifecycleListener {
         if (workspace == null) {
             if (isBlank(accountLogin)) {
                 throw new IllegalArgumentException(
-                    "Cannot create workspace from installation " + installationId + " without accountLogin."
-                );
+                        "Cannot create workspace from installation " + installationId + " without accountLogin.");
             }
 
             Long ownerUserId = syncGitHubUserForOwnership(
-                installationId,
-                accountId,
-                Objects.requireNonNull(accountLogin),
-                accountKind,
-                avatarUrl
-            );
+                    installationId, accountId, Objects.requireNonNull(accountLogin), accountKind, avatarUrl);
 
             if (ownerUserId == null) {
                 // Likely an old or deleted installation whose owner user can no longer be resolved.
                 log.warn(
-                    "Skipped workspace creation, cannot sync owner user: installationId={}, accountLogin={}",
-                    installationId,
-                    LoggingUtils.sanitizeForLog(accountLogin)
-                );
+                        "Skipped workspace creation, cannot sync owner user: installationId={}, accountLogin={}",
+                        installationId,
+                        LoggingUtils.sanitizeForLog(accountLogin));
                 return null;
             }
 
             AccountType wsAccountType = accountKind == AccountKind.ORGANIZATION ? AccountType.ORG : AccountType.USER;
 
             String desiredSlug = Objects.requireNonNull(workspaceSlugService.normalize(accountLogin));
-            String availableSlug = workspaceSlugService.allocate(
-                desiredSlug,
-                "install-" + installationId + "-" + accountLogin
-            );
+            String availableSlug =
+                    workspaceSlugService.allocate(desiredSlug, "install-" + installationId + "-" + accountLogin);
 
             // Do NOT redirect the desired slug to the allocated slug: the desired slug may
             // belong to another workspace, and redirecting would leak or hijack it. Callers
             // must surface the allocated slug to the user instead.
             workspace = createWorkspace(availableSlug, accountLogin, accountLogin, wsAccountType, ownerUserId);
             log.info(
-                "Created workspace from installation: workspaceSlug={}, installationId={}, ownerUserId={}, requestedSlug={}",
-                LoggingUtils.sanitizeForLog(workspace.getWorkspaceSlug()),
-                installationId,
-                ownerUserId,
-                LoggingUtils.sanitizeForLog(desiredSlug)
-            );
+                    "Created workspace from installation: workspaceSlug={}, installationId={}, ownerUserId={}, requestedSlug={}",
+                    LoggingUtils.sanitizeForLog(workspace.getWorkspaceSlug()),
+                    installationId,
+                    ownerUserId,
+                    LoggingUtils.sanitizeForLog(desiredSlug));
         }
 
         if (!isBlank(accountLogin)) {
@@ -420,34 +393,27 @@ public class GithubLifecycleListener implements IntegrationLifecycleListener {
 
         if (workspace.getStatus() != Workspace.WorkspaceStatus.ACTIVE) {
             log.info(
-                "Reactivated workspace from installation: workspaceId={}, previousStatus={}, installationId={}",
-                workspace.getId(),
-                workspace.getStatus(),
-                installationId
-            );
+                    "Reactivated workspace from installation: workspaceId={}, previousStatus={}, installationId={}",
+                    workspace.getId(),
+                    workspace.getStatus(),
+                    installationId);
             workspace.setStatus(Workspace.WorkspaceStatus.ACTIVE);
         }
 
         // Organization must exist before repositories are created so they get organization_id set.
         if (accountKind == AccountKind.ORGANIZATION && accountId != null) {
-            Long providerId = Objects.requireNonNull(
-                gitProviderRepository
+            Long providerId = Objects.requireNonNull(gitProviderRepository
                     .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
                     .orElseThrow(() -> new IllegalStateException("IdentityProvider for GitHub not found"))
-                    .getId()
-            );
-            Organization org = organizationService.upsertIdentity(
-                accountId,
-                Objects.requireNonNull(accountLogin),
-                providerId
-            );
+                    .getId());
+            Organization org =
+                    organizationService.upsertIdentity(accountId, Objects.requireNonNull(accountLogin), providerId);
             workspace.setOrganization(org);
             log.debug(
-                "Linked organization to workspace: orgId={}, orgLogin={}, workspaceId={}",
-                org.getId(),
-                LoggingUtils.sanitizeForLog(org.getLogin()),
-                workspace.getId()
-            );
+                    "Linked organization to workspace: orgId={}, orgLogin={}, workspaceId={}",
+                    org.getId(),
+                    LoggingUtils.sanitizeForLog(org.getLogin()),
+                    workspace.getId());
         }
 
         Workspace saved = workspaceRepository.save(workspace);
@@ -456,11 +422,7 @@ public class GithubLifecycleListener implements IntegrationLifecycleListener {
         // (PAT or stale App) and reuses or creates the App row. Correlation id is stable per
         // installation so webhook redelivery is idempotent.
         connectionService.upsertGitHubAppConnection(
-            saved,
-            installationId,
-            accountLogin,
-            "install-bind-" + installationId
-        );
+                saved, installationId, accountLogin, "install-bind-" + installationId);
 
         return saved;
     }
@@ -471,13 +433,11 @@ public class GithubLifecycleListener implements IntegrationLifecycleListener {
      * @param installationId the GitHub App installation ID
      */
     public void stopNatsForInstallation(long installationId) {
-        workspaceRepository
-            .findByInstallationId(installationId)
-            .ifPresent(workspace -> {
-                if (shouldUseNats(workspace)) {
-                    natsConsumerService.ifAvailable(svc -> svc.stopConsumingScope(workspace.getId()));
-                }
-            });
+        workspaceRepository.findByInstallationId(installationId).ifPresent(workspace -> {
+            if (shouldUseNats(workspace)) {
+                natsConsumerService.ifAvailable(svc -> svc.stopConsumingScope(workspace.getId()));
+            }
+        });
     }
 
     /**
@@ -486,13 +446,11 @@ public class GithubLifecycleListener implements IntegrationLifecycleListener {
      * @param installationId the GitHub App installation ID
      */
     public void startNatsForInstallation(long installationId) {
-        workspaceRepository
-            .findByInstallationId(installationId)
-            .ifPresent(workspace -> {
-                if (shouldUseNats(workspace)) {
-                    natsConsumerService.ifAvailable(svc -> svc.startConsumingScope(workspace.getId()));
-                }
-            });
+        workspaceRepository.findByInstallationId(installationId).ifPresent(workspace -> {
+            if (shouldUseNats(workspace)) {
+                natsConsumerService.ifAvailable(svc -> svc.startConsumingScope(workspace.getId()));
+            }
+        });
     }
 
     /**
@@ -535,39 +493,29 @@ public class GithubLifecycleListener implements IntegrationLifecycleListener {
         var workspaceOpt = workspaceRepository.findByInstallationIdForUpdate(installationId);
         if (workspaceOpt.isEmpty()) {
             log.warn(
-                "Skipped installation purge: reason=noWorkspaceForInstallation, installationId={}",
-                installationId
-            );
+                    "Skipped installation purge: reason=noWorkspaceForInstallation, installationId={}", installationId);
             return Optional.empty();
         }
 
         Workspace workspace = workspaceOpt.get();
-        IntegrationRef ref = new IntegrationRef(
-            IntegrationKind.GITHUB,
-            workspace.getId(),
-            Long.toString(installationId)
-        );
+        IntegrationRef ref =
+                new IntegrationRef(IntegrationKind.GITHUB, workspace.getId(), Long.toString(installationId));
         connectionService
-            .findReferenced(ref)
-            .ifPresent(connection ->
-                connectionService.transition(
-                    connection,
-                    new ConnectionService.TransitionRequest(
-                        IntegrationState.UNINSTALLED,
-                        "PROVIDER_UNINSTALLED",
-                        "PROVIDER",
-                        IntegrationKind.GITHUB.name(),
-                        "provider-uninstall-github-" + installationId,
-                        "GitHub reported the installation was deleted"
-                    )
-                )
-            );
+                .findReferenced(ref)
+                .ifPresent(connection -> connectionService.transition(
+                        connection,
+                        new ConnectionService.TransitionRequest(
+                                IntegrationState.UNINSTALLED,
+                                "PROVIDER_UNINSTALLED",
+                                "PROVIDER",
+                                IntegrationKind.GITHUB.name(),
+                                "provider-uninstall-github-" + installationId,
+                                "GitHub reported the installation was deleted")));
         Workspace purged = workspaceLifecycleService.purgeWorkspace(workspace.getWorkspaceSlug());
         log.info(
-            "Purged workspace after vendor-side uninstall: installationId={}, workspaceId={}",
-            installationId,
-            purged.getId()
-        );
+                "Purged workspace after vendor-side uninstall: installationId={}, workspaceId={}",
+                installationId,
+                purged.getId());
         return Optional.of(purged);
     }
 
@@ -587,9 +535,8 @@ public class GithubLifecycleListener implements IntegrationLifecycleListener {
     public Optional<Workspace> updateWorkspaceStatus(long installationId, Workspace.WorkspaceStatus status) {
         if (status == Workspace.WorkspaceStatus.PURGED) {
             throw new IllegalArgumentException(
-                "PURGED must go through purgeWorkspaceForInstallation so the purge contributors run: installationId=" +
-                    installationId
-            );
+                    "PURGED must go through purgeWorkspaceForInstallation so the purge contributors run: installationId="
+                            + installationId);
         }
 
         var workspaceOpt = workspaceRepository.findByInstallationIdForUpdate(installationId);
@@ -620,8 +567,8 @@ public class GithubLifecycleListener implements IntegrationLifecycleListener {
     @Transactional
     public Optional<Workspace> updateRepositorySelection(long installationId, RepositorySelection selection) {
         var workspaceOpt = workspaceRepository
-            .findByInstallationIdForUpdate(installationId)
-            .filter(workspace -> workspace.getStatus() == Workspace.WorkspaceStatus.ACTIVE);
+                .findByInstallationIdForUpdate(installationId)
+                .filter(workspace -> workspace.getStatus() == Workspace.WorkspaceStatus.ACTIVE);
         if (workspaceOpt.isEmpty() || selection == null) {
             return workspaceOpt;
         }
@@ -656,23 +603,24 @@ public class GithubLifecycleListener implements IntegrationLifecycleListener {
         }
 
         workspaceRepository
-            .findByInstallationIdForUpdate(installationId)
-            .filter(workspace -> workspace.getStatus() == Workspace.WorkspaceStatus.ACTIVE)
-            .ifPresentOrElse(
-                workspace -> {
-                    String oldLogin = !isBlank(previousLogin) ? previousLogin : workspace.getAccountLogin();
-                    if (!newLogin.equals(workspace.getAccountLogin())) {
-                        workspace.setAccountLogin(newLogin);
-                        workspaceRepository.save(workspace);
-                    }
-                    if (oldLogin != null) {
-                        retargetRepositoryMonitors(workspace, oldLogin, newLogin);
-                        renameTrackedRepositories(oldLogin, newLogin);
-                        rotateOrganizationConsumer(workspace, oldLogin, newLogin);
-                    }
-                },
-                () -> log.warn("Skipped account rename: reason=unknownInstallation, installationId={}", installationId)
-            );
+                .findByInstallationIdForUpdate(installationId)
+                .filter(workspace -> workspace.getStatus() == Workspace.WorkspaceStatus.ACTIVE)
+                .ifPresentOrElse(
+                        workspace -> {
+                            String oldLogin = !isBlank(previousLogin) ? previousLogin : workspace.getAccountLogin();
+                            if (!newLogin.equals(workspace.getAccountLogin())) {
+                                workspace.setAccountLogin(newLogin);
+                                workspaceRepository.save(workspace);
+                            }
+                            if (oldLogin != null) {
+                                retargetRepositoryMonitors(workspace, oldLogin, newLogin);
+                                renameTrackedRepositories(oldLogin, newLogin);
+                                rotateOrganizationConsumer(workspace, oldLogin, newLogin);
+                            }
+                        },
+                        () -> log.warn(
+                                "Skipped account rename: reason=unknownInstallation, installationId={}",
+                                installationId));
     }
 
     // Private helpers
@@ -683,25 +631,23 @@ public class GithubLifecycleListener implements IntegrationLifecycleListener {
         }
 
         String prefixLower = (oldLogin + "/").toLowerCase(Locale.ENGLISH);
-        repositoryToMonitorRepository
-            .findByWorkspaceId(workspace.getId())
-            .forEach(monitor -> {
-                String current = monitor.getNameWithOwner();
-                if (current == null) {
-                    return;
-                }
-                String normalized = current.toLowerCase(Locale.ENGLISH);
-                if (!normalized.startsWith(prefixLower)) {
-                    return;
-                }
-                int slashIndex = current.indexOf('/');
-                if (slashIndex < 0) {
-                    return;
-                }
-                String suffix = current.substring(slashIndex);
-                monitor.setNameWithOwner(newLogin + suffix);
-                repositoryToMonitorRepository.save(monitor);
-            });
+        repositoryToMonitorRepository.findByWorkspaceId(workspace.getId()).forEach(monitor -> {
+            String current = monitor.getNameWithOwner();
+            if (current == null) {
+                return;
+            }
+            String normalized = current.toLowerCase(Locale.ENGLISH);
+            if (!normalized.startsWith(prefixLower)) {
+                return;
+            }
+            int slashIndex = current.indexOf('/');
+            if (slashIndex < 0) {
+                return;
+            }
+            String suffix = current.substring(slashIndex);
+            monitor.setNameWithOwner(newLogin + suffix);
+            repositoryToMonitorRepository.save(monitor);
+        });
 
         if (shouldUseNats(workspace)) {
             natsConsumerService.ifAvailable(svc -> svc.updateScopeConsumer(workspace.getId()));
@@ -736,13 +682,11 @@ public class GithubLifecycleListener implements IntegrationLifecycleListener {
     }
 
     private void rotateOrganizationConsumer(Workspace workspace, String oldLogin, String newLogin) {
-        if (
-            !natsProperties.enabled() ||
-            workspace == null ||
-            isBlank(oldLogin) ||
-            isBlank(newLogin) ||
-            oldLogin.equalsIgnoreCase(newLogin)
-        ) {
+        if (!natsProperties.enabled()
+                || workspace == null
+                || isBlank(oldLogin)
+                || isBlank(newLogin)
+                || oldLogin.equalsIgnoreCase(newLogin)) {
             return;
         }
 
@@ -750,12 +694,7 @@ public class GithubLifecycleListener implements IntegrationLifecycleListener {
     }
 
     private Workspace createWorkspace(
-        String slug,
-        String displayName,
-        String accountLogin,
-        AccountType accountType,
-        Long ownerUserId
-    ) {
+            String slug, String displayName, String accountLogin, AccountType accountType, Long ownerUserId) {
         workspaceSlugService.validate(slug);
 
         Workspace workspace = new Workspace();
@@ -782,19 +721,17 @@ public class GithubLifecycleListener implements IntegrationLifecycleListener {
      * @return the user ID, or null if user could not be created
      */
     private @Nullable Long syncGitHubUserForOwnership(
-        long installationId,
-        @Nullable Long accountId,
-        String accountLogin,
-        AccountKind accountKind,
-        @Nullable String avatarUrl
-    ) {
+            long installationId,
+            @Nullable Long accountId,
+            String accountLogin,
+            AccountKind accountKind,
+            @Nullable String avatarUrl) {
         var existingUser = userRepository.findByLogin(accountLogin);
         if (existingUser.isPresent()) {
             log.info(
-                "Found existing user for workspace ownership: userLogin={}, userId={}",
-                LoggingUtils.sanitizeForLog(accountLogin),
-                existingUser.get().getId()
-            );
+                    "Found existing user for workspace ownership: userLogin={}, userId={}",
+                    LoggingUtils.sanitizeForLog(accountLogin),
+                    existingUser.get().getId());
             return existingUser.get().getId();
         }
 
@@ -803,46 +740,44 @@ public class GithubLifecycleListener implements IntegrationLifecycleListener {
         if (accountId != null) {
             String htmlUrl = "https://github.com/" + accountLogin;
             String typeStr =
-                accountKind == AccountKind.ORGANIZATION ? User.Type.ORGANIZATION.name() : User.Type.USER.name();
+                    accountKind == AccountKind.ORGANIZATION ? User.Type.ORGANIZATION.name() : User.Type.USER.name();
 
             IdentityProvider provider = gitProviderRepository
-                .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
-                .orElseThrow(() -> new IllegalStateException("IdentityProvider for GitHub not found"));
+                    .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
+                    .orElseThrow(() -> new IllegalStateException("IdentityProvider for GitHub not found"));
             Long providerId = Objects.requireNonNull(provider.getId());
 
             userRepository.acquireLoginLock(accountLogin, providerId);
             userRepository.freeLoginConflicts(accountLogin, accountId, providerId);
             userRepository.upsertUser(
-                accountId,
-                providerId,
-                accountLogin,
-                accountLogin, // Use login as fallback name
-                avatarUrl != null ? avatarUrl : "",
-                htmlUrl,
-                typeStr,
-                null, // email
-                null, // createdAt
-                null // updatedAt
-            );
+                    accountId,
+                    providerId,
+                    accountLogin,
+                    accountLogin, // Use login as fallback name
+                    avatarUrl != null ? avatarUrl : "",
+                    htmlUrl,
+                    typeStr,
+                    null, // email
+                    null, // createdAt
+                    null // updatedAt
+                    );
             log.info(
-                "Upserted user for workspace ownership: userLogin={}, userId={}, userType={}, installationId={}",
-                LoggingUtils.sanitizeForLog(accountLogin),
-                accountId,
-                typeStr,
-                installationId
-            );
+                    "Upserted user for workspace ownership: userLogin={}, userId={}, userType={}, installationId={}",
+                    LoggingUtils.sanitizeForLog(accountLogin),
+                    accountId,
+                    typeStr,
+                    installationId);
             // upsertUser is a native INSERT that doesn't return the generated id; re-fetch for the PK.
             return userRepository
-                .findByLogin(accountLogin)
-                .map(User::getId)
-                .orElseThrow(() -> new IllegalStateException("User not found after upsert: login=" + accountLogin));
+                    .findByLogin(accountLogin)
+                    .map(User::getId)
+                    .orElseThrow(() -> new IllegalStateException("User not found after upsert: login=" + accountLogin));
         }
 
         log.warn(
-            "Skipped user creation: reason=missingAccountId, userLogin={}, installationId={}",
-            LoggingUtils.sanitizeForLog(accountLogin),
-            installationId
-        );
+                "Skipped user creation: reason=missingAccountId, userLogin={}, installationId={}",
+                LoggingUtils.sanitizeForLog(accountLogin),
+                installationId);
         return null;
     }
 

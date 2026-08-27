@@ -49,14 +49,12 @@ public class GitLabTeamProcessor {
     @Transactional
     @Nullable
     public Team process(GitLabDescendantGroupResponse group, String rootFullPath, IdentityProvider provider) {
-        if (
-            group == null ||
-            group.id() == null ||
-            group.fullPath() == null ||
-            group.name() == null ||
-            group.webUrl() == null ||
-            group.name().isBlank()
-        ) {
+        if (group == null
+                || group.id() == null
+                || group.fullPath() == null
+                || group.name() == null
+                || group.webUrl() == null
+                || group.name().isBlank()) {
             log.warn("Skipped team processing: reason=nullOrMissingId");
             return null;
         }
@@ -74,18 +72,16 @@ public class GitLabTeamProcessor {
 
         // Upsert: try nativeId first, then natural key (organization + slug + provider)
         Team team = teamRepository
-            .findByNativeIdAndProviderId(nativeId, providerId)
-            .orElseGet(() ->
-                teamRepository
-                    .findByOrganizationIgnoreCaseAndSlugAndProviderId(rootFullPath, slug, providerId)
-                    .orElseGet(() -> {
-                        Team t = new Team();
-                        t.setNativeId(nativeId);
-                        t.setProvider(provider);
-                        t.setOrganization(rootFullPath);
-                        return t;
-                    })
-            );
+                .findByNativeIdAndProviderId(nativeId, providerId)
+                .orElseGet(() -> teamRepository
+                        .findByOrganizationIgnoreCaseAndSlugAndProviderId(rootFullPath, slug, providerId)
+                        .orElseGet(() -> {
+                            Team t = new Team();
+                            t.setNativeId(nativeId);
+                            t.setProvider(provider);
+                            t.setOrganization(rootFullPath);
+                            return t;
+                        }));
 
         boolean isNew = team.getId() == null;
 
@@ -129,13 +125,11 @@ public class GitLabTeamProcessor {
     @Transactional
     @Nullable
     public Team processRoot(GitLabGroupResponse group, String rootFullPath, IdentityProvider provider) {
-        if (
-            group == null ||
-            group.id() == null ||
-            group.fullPath() == null ||
-            group.name() == null ||
-            group.webUrl() == null
-        ) {
+        if (group == null
+                || group.id() == null
+                || group.fullPath() == null
+                || group.name() == null
+                || group.webUrl() == null) {
             log.warn("Skipped root team processing: reason=nullOrMissingId");
             return null;
         }
@@ -152,18 +146,16 @@ public class GitLabTeamProcessor {
         String slug = rootSlug(group.fullPath());
 
         Team team = teamRepository
-            .findByNativeIdAndProviderId(nativeId, providerId)
-            .orElseGet(() ->
-                teamRepository
-                    .findByOrganizationIgnoreCaseAndSlugAndProviderId(rootFullPath, slug, providerId)
-                    .orElseGet(() -> {
-                        Team t = new Team();
-                        t.setNativeId(nativeId);
-                        t.setProvider(provider);
-                        t.setOrganization(rootFullPath);
-                        return t;
-                    })
-            );
+                .findByNativeIdAndProviderId(nativeId, providerId)
+                .orElseGet(() -> teamRepository
+                        .findByOrganizationIgnoreCaseAndSlugAndProviderId(rootFullPath, slug, providerId)
+                        .orElseGet(() -> {
+                            Team t = new Team();
+                            t.setNativeId(nativeId);
+                            t.setProvider(provider);
+                            t.setOrganization(rootFullPath);
+                            return t;
+                        }));
 
         boolean isNew = team.getId() == null;
 
@@ -197,18 +189,16 @@ public class GitLabTeamProcessor {
             return;
         }
 
-        teamRepository
-            .findByNativeIdAndProviderId(nativeId, providerId)
-            .ifPresent(team -> {
-                Long teamId = team.getId();
-                String teamName = team.getName();
+        teamRepository.findByNativeIdAndProviderId(nativeId, providerId).ifPresent(team -> {
+            Long teamId = team.getId();
+            String teamName = team.getName();
 
-                team.clearMemberships();
-                team.clearRepoPermissions();
+            team.clearMemberships();
+            team.clearRepoPermissions();
 
-                teamRepository.delete(team);
-                log.info("Deleted GitLab team: teamId={}, name={}", teamId, teamName);
-            });
+            teamRepository.delete(team);
+            log.info("Deleted GitLab team: teamId={}, name={}", teamId, teamName);
+        });
     }
 
     /**

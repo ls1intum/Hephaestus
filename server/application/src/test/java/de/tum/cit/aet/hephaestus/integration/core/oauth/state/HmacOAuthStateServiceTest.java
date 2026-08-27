@@ -48,23 +48,19 @@ class HmacOAuthStateServiceTest extends BaseUnitTest {
     void issuedWithDifferentSecretRejected() {
         HmacOAuthStateService a = HmacOAuthStateService.withoutNonceStore(SECRET, Duration.ofMinutes(10));
         HmacOAuthStateService b = HmacOAuthStateService.withoutNonceStore(
-            "another-secret-of-equivalent-length-xx",
-            Duration.ofMinutes(10)
-        );
+                "another-secret-of-equivalent-length-xx", Duration.ofMinutes(10));
         String state = a.issue(42L, IntegrationKind.GITHUB);
         assertThatThrownBy(() -> b.consume(state))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("signature mismatch");
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("signature mismatch");
     }
 
     @Test
     void blankSecretRejectedAtConstruction() {
-        assertThatThrownBy(() -> HmacOAuthStateService.withoutNonceStore("", Duration.ofMinutes(10))).isInstanceOf(
-            IllegalStateException.class
-        );
-        assertThatThrownBy(() -> HmacOAuthStateService.withoutNonceStore(null, Duration.ofMinutes(10))).isInstanceOf(
-            IllegalStateException.class
-        );
+        assertThatThrownBy(() -> HmacOAuthStateService.withoutNonceStore("", Duration.ofMinutes(10)))
+                .isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> HmacOAuthStateService.withoutNonceStore(null, Duration.ofMinutes(10)))
+                .isInstanceOf(IllegalStateException.class);
     }
 
     @Test
@@ -139,8 +135,8 @@ class HmacOAuthStateServiceTest extends BaseUnitTest {
         // Second consume of the same state must be rejected — even though HMAC + TTL
         // still validate. This is the load-bearing replay guard.
         assertThatThrownBy(() -> svc.consume(state))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("already consumed");
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("already consumed");
     }
 
     @Test
@@ -183,8 +179,8 @@ class HmacOAuthStateServiceTest extends BaseUnitTest {
         }
 
         assertThatThrownBy(() -> svc.consume(state))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("expired");
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("expired");
         assertThat(store.consumedCount()).isEqualTo(0);
     }
 

@@ -57,10 +57,7 @@ public class JSpecifyRequiredModelConverter implements ModelConverter {
 
     @Override
     public @Nullable Schema<?> resolve(
-        AnnotatedType type,
-        ModelConverterContext context,
-        Iterator<ModelConverter> chain
-    ) {
+            AnnotatedType type, ModelConverterContext context, Iterator<ModelConverter> chain) {
         Schema<?> resolved = chain.hasNext() ? chain.next().resolve(type, context, chain) : null;
         if (resolved == null) {
             return null;
@@ -100,10 +97,8 @@ public class JSpecifyRequiredModelConverter implements ModelConverter {
 
     /** Adds an existing, not-yet-required property to the model's {@code required} list. */
     private static void markRequired(Schema<?> model, String property) {
-        if (
-            model.getProperties().containsKey(property) &&
-            (model.getRequired() == null || !model.getRequired().contains(property))
-        ) {
+        if (model.getProperties().containsKey(property)
+                && (model.getRequired() == null || !model.getRequired().contains(property))) {
             model.addRequiredItem(property);
         }
     }

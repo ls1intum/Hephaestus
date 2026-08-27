@@ -24,11 +24,10 @@ import java.util.Optional;
 public final class PracticeSignalOptionsFixture {
 
     private static final List<ArtifactDescriptor> DESCRIPTORS = List.of(
-        new PullRequestArtifactDescriptor(),
-        new IssueArtifactDescriptor(),
-        new ConversationThreadArtifactDescriptor(),
-        new DocumentArtifactDescriptor()
-    );
+            new PullRequestArtifactDescriptor(),
+            new IssueArtifactDescriptor(),
+            new ConversationThreadArtifactDescriptor(),
+            new DocumentArtifactDescriptor());
 
     private PracticeSignalOptionsFixture() {}
 
@@ -53,10 +52,9 @@ public final class PracticeSignalOptionsFixture {
 
             @Override
             public Optional<ArtifactDescriptor> descriptorFor(ArtifactKind kind) {
-                return descriptors
-                    .stream()
-                    .filter(descriptor -> descriptor.kind().equals(kind))
-                    .findFirst();
+                return descriptors.stream()
+                        .filter(descriptor -> descriptor.kind().equals(kind))
+                        .findFirst();
             }
         };
     }

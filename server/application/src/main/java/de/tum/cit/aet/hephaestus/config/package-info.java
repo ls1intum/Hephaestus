@@ -10,8 +10,7 @@
  * next to the module instead of here.
  */
 @org.springframework.modulith.ApplicationModule(
-    displayName = "Config (shared kernel)",
-    type = org.springframework.modulith.ApplicationModule.Type.OPEN
-)
+        displayName = "Config (shared kernel)",
+        type = org.springframework.modulith.ApplicationModule.Type.OPEN)
 @org.jspecify.annotations.NullMarked
 package de.tum.cit.aet.hephaestus.config;

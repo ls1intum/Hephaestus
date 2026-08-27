@@ -39,11 +39,7 @@ public class AgentControllerAdvice {
     @ExceptionHandler(ReviewSweepScheduleConflictException.class)
     ProblemDetail handleReviewSweepScheduleConflict(ReviewSweepScheduleConflictException exception) {
         return problem(
-            HttpStatus.CONFLICT,
-            "review-sweep-schedule-conflict",
-            "Review sweep schedule conflict",
-            exception
-        );
+                HttpStatus.CONFLICT, "review-sweep-schedule-conflict", "Review sweep schedule conflict", exception);
     }
 
     /**
@@ -58,11 +54,10 @@ public class AgentControllerAdvice {
     @ExceptionHandler(OptimisticLockingFailureException.class)
     ProblemDetail handleOptimisticLockingFailure(OptimisticLockingFailureException exception) {
         return problem(
-            HttpStatus.CONFLICT,
-            "concurrent-modification",
-            "Concurrent modification",
-            new IllegalStateException("The record changed while this request was being processed. Try again.")
-        );
+                HttpStatus.CONFLICT,
+                "concurrent-modification",
+                "Concurrent modification",
+                new IllegalStateException("The record changed while this request was being processed. Try again."));
     }
 
     @ExceptionHandler(AgentJobStateConflictException.class)
@@ -93,11 +88,7 @@ public class AgentControllerAdvice {
     @ExceptionHandler(LlmModelUpstreamIdConflictException.class)
     ProblemDetail handleModelUpstreamIdConflict(LlmModelUpstreamIdConflictException exception) {
         return problem(
-            HttpStatus.CONFLICT,
-            "llm-model-upstream-id-conflict",
-            "LLM model upstream id conflict",
-            exception
-        );
+                HttpStatus.CONFLICT, "llm-model-upstream-id-conflict", "LLM model upstream id conflict", exception);
     }
 
     /** The {@code type} slug is API surface clients match on — renaming one is a breaking change. */
@@ -105,12 +96,10 @@ public class AgentControllerAdvice {
         ProblemDetail problem = ProblemDetail.forStatus(status);
         problem.setType(URI.create("/problems/" + typeSlug));
         problem.setTitle(title);
-        problem.setDetail(
-            Optional.ofNullable(exception.getMessage())
+        problem.setDetail(Optional.ofNullable(exception.getMessage())
                 .map(LoggingUtils::sanitizeForLog)
                 .filter(s -> !s.isBlank())
-                .orElse("The agent request could not be processed.")
-        );
+                .orElse("The agent request could not be processed."));
         return problem;
     }
 }

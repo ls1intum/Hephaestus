@@ -9,7 +9,8 @@ import org.jspecify.annotations.NonNull;
  * (e.g., {@code "repository.issues"}, {@code "organization.repositories"},
  * {@code "installation.created"} for GitHub). One key → at most one handler.
  */
-public record EventTypeKey(@NonNull IntegrationKind kind, @NonNull String eventType) {
+public record EventTypeKey(
+        @NonNull IntegrationKind kind, @NonNull String eventType) {
     public EventTypeKey {
         if (kind == null) throw new IllegalArgumentException("kind must not be null");
         if (eventType == null || eventType.isBlank()) {

@@ -51,17 +51,18 @@ import org.jspecify.annotations.Nullable;
  */
 @Entity
 @Table(
-    name = "user_achievement",
-    uniqueConstraints = {
-        @UniqueConstraint(name = "uk_user_achievement_user_achievement", columnNames = { "user_id", "achievement_id" }),
-    },
-    indexes = {
-        // User achievements lookup: profile display, achievement progress
-        @Index(name = "idx_user_achievement_user", columnList = "user_id"),
-        // Achievement holders: leaderboard of users with specific achievement
-        @Index(name = "idx_user_achievement_achievement", columnList = "achievement_id"),
-    }
-)
+        name = "user_achievement",
+        uniqueConstraints = {
+            @UniqueConstraint(
+                    name = "uk_user_achievement_user_achievement",
+                    columnNames = {"user_id", "achievement_id"}),
+        },
+        indexes = {
+            // User achievements lookup: profile display, achievement progress
+            @Index(name = "idx_user_achievement_user", columnList = "user_id"),
+            // Achievement holders: leaderboard of users with specific achievement
+            @Index(name = "idx_user_achievement_achievement", columnList = "achievement_id"),
+        })
 @Getter
 @Setter
 @Builder

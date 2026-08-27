@@ -28,21 +28,21 @@ class FabricLayoutTest extends BaseUnitTest {
 
     @ParameterizedTest
     @NullSource
-    @ValueSource(strings = { "", "  ", "..", ".", "a/b", "a\\b", "../etc", "..\\win" })
+    @ValueSource(strings = {"", "  ", "..", ".", "a/b", "a\\b", "../etc", "..\\win"})
     void source_rejectsUnsafeConnectorId(String unsafe) {
         assertThatThrownBy(() -> layout().source(unsafe, "ok")).isInstanceOf(IllegalArgumentException.class);
     }
 
     @ParameterizedTest
     @NullSource
-    @ValueSource(strings = { "", "  ", "..", ".", "a/b", "a\\b" })
+    @ValueSource(strings = {"", "  ", "..", ".", "a/b", "a\\b"})
     void source_rejectsUnsafeExternalId(String unsafe) {
         assertThatThrownBy(() -> layout().source("scm", unsafe)).isInstanceOf(IllegalArgumentException.class);
     }
 
     @ParameterizedTest
     @NullSource
-    @ValueSource(strings = { "", "..", "a/b", "a\\b" })
+    @ValueSource(strings = {"", "..", "a/b", "a\\b"})
     void jobDir_rejectsUnsafeJobId(String unsafe) {
         assertThatThrownBy(() -> layout().jobDir(unsafe)).isInstanceOf(IllegalArgumentException.class);
     }
@@ -53,12 +53,14 @@ class FabricLayoutTest extends BaseUnitTest {
         // scm.gitlab — and an externalId that merely contains a double dot like v1..2 — are NOT traversal.
         Path resolved = layout().source("scm.gitlab", "v1..2");
 
-        assertThat(resolved).isEqualTo(root.resolve("sources").resolve("scm.gitlab").resolve("v1..2"));
+        assertThat(resolved)
+                .isEqualTo(root.resolve("sources").resolve("scm.gitlab").resolve("v1..2"));
         assertThat(resolved.startsWith(root)).isTrue();
     }
 
     @Test
     void source_legalNumericId_resolvesUnderSourcesScm() {
-        assertThat(layout().source("scm", "42")).isEqualTo(root.resolve("sources").resolve("scm").resolve("42"));
+        assertThat(layout().source("scm", "42"))
+                .isEqualTo(root.resolve("sources").resolve("scm").resolve("42"));
     }
 }

@@ -25,9 +25,9 @@ class MentorTurnPromptFactoryTest extends BaseUnitTest {
     void slackDm_wrapsMessageInStyleDirective() {
         String prompt = MentorTurnPromptFactory.forRunner(request("what's up", ThreadSurface.SLACK_DM), Map.of());
         assertThat(prompt)
-            .contains("[Surface: Slack DM")
-            .contains("what's up")
-            .contains("Visible recent mentor-thread history");
+                .contains("[Surface: Slack DM")
+                .contains("what's up")
+                .contains("Visible recent mentor-thread history");
     }
 
     @Test
@@ -39,9 +39,8 @@ class MentorTurnPromptFactoryTest extends BaseUnitTest {
     @Test
     void slackDm_includesVisibleThreadHistoryFromContext() {
         Map<String, byte[]> context = Map.of(
-            "inputs/context/current_thread_history.json",
-            "{\"messages\":[{\"role\":\"USER\",\"text\":\"hi\"}]}".getBytes(StandardCharsets.UTF_8)
-        );
+                "inputs/context/current_thread_history.json",
+                "{\"messages\":[{\"role\":\"USER\",\"text\":\"hi\"}]}".getBytes(StandardCharsets.UTF_8));
         String prompt = MentorTurnPromptFactory.forRunner(request("go on", ThreadSurface.SLACK_DM), context);
         assertThat(prompt).contains("{\"messages\":[{\"role\":\"USER\",\"text\":\"hi\"}]}");
     }

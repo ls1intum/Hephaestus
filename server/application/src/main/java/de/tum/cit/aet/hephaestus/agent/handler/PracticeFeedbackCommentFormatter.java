@@ -14,12 +14,13 @@ class PracticeFeedbackCommentFormatter {
     private final String preferencesUrl;
 
     PracticeFeedbackCommentFormatter(ApplicationProperties applicationProperties) {
-        this.preferencesUrl = UriComponentsBuilder.fromUriString(applicationProperties.webapp().url())
-            .pathSegment("settings")
-            .fragment("practice-feedback")
-            .build()
-            .encode()
-            .toUriString();
+        this.preferencesUrl = UriComponentsBuilder.fromUriString(
+                        applicationProperties.webapp().url())
+                .pathSegment("settings")
+                .fragment("practice-feedback")
+                .build()
+                .encode()
+                .toUriString();
     }
 
     String format(String sanitizedBody, AgentJob job) {
@@ -48,7 +49,9 @@ class PracticeFeedbackCommentFormatter {
     }
 
     private void appendWhyAndSettingsLink(StringBuilder sb) {
-        sb.append("<sub>[Why you're seeing this and how to stop it](").append(preferencesUrl).append(")</sub>\n");
+        sb.append("<sub>[Why you're seeing this and how to stop it](")
+                .append(preferencesUrl)
+                .append(")</sub>\n");
     }
 
     private static void appendMetadataFooter(StringBuilder sb, AgentJob job) {
@@ -59,8 +62,7 @@ class PracticeFeedbackCommentFormatter {
             sb.append(" &middot; ").append(HtmlUtils.htmlEscape(modelName));
         }
         sb.append(
-            " &middot; AI-generated and can be inaccurate. React with 👍 or 👎, or reply, to give feedback.</sub>\n"
-        );
+                " &middot; AI-generated and can be inaccurate. React with 👍 or 👎, or reply, to give feedback.</sub>\n");
     }
 
     @Nullable

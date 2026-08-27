@@ -23,8 +23,7 @@ public interface AccountRoleQuery {
      * @return true if the active account for that identity holds the flag; false otherwise (incl. errors)
      */
     boolean hasFeatureFlag(
-        long gitProviderId,
-        @org.jspecify.annotations.Nullable String subject,
-        @org.jspecify.annotations.Nullable String flag
-    );
+            long gitProviderId,
+            @org.jspecify.annotations.Nullable String subject,
+            @org.jspecify.annotations.Nullable String flag);
 }

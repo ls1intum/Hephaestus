@@ -64,15 +64,14 @@ public class GitHubIssueTypeSyncService {
     private static final int MAX_RETRY_ATTEMPTS = 3;
 
     public GitHubIssueTypeSyncService(
-        IssueTypeRepository issueTypeRepository,
-        OrganizationRepository organizationRepository,
-        SyncTargetProvider syncTargetProvider,
-        GitHubGraphQlClientProvider graphQlClientProvider,
-        GitHubSyncProperties syncProperties,
-        GitHubExceptionClassifier exceptionClassifier,
-        SyncSchedulerProperties syncSchedulerProperties,
-        GitHubGraphQlSyncCoordinator graphQlSyncHelper
-    ) {
+            IssueTypeRepository issueTypeRepository,
+            OrganizationRepository organizationRepository,
+            SyncTargetProvider syncTargetProvider,
+            GitHubGraphQlClientProvider graphQlClientProvider,
+            GitHubSyncProperties syncProperties,
+            GitHubExceptionClassifier exceptionClassifier,
+            SyncSchedulerProperties syncSchedulerProperties,
+            GitHubGraphQlSyncCoordinator graphQlSyncHelper) {
         this.issueTypeRepository = issueTypeRepository;
         this.organizationRepository = organizationRepository;
         this.syncTargetProvider = syncTargetProvider;
@@ -116,7 +115,8 @@ public class GitHubIssueTypeSyncService {
             log.warn("Organization metadata has no database ID: orgLogin={}", safeOrgLogin);
             return 0;
         }
-        Organization organization = organizationRepository.findById(organizationId).orElse(null);
+        Organization organization =
+                organizationRepository.findById(organizationId).orElse(null);
         if (organization == null) {
             log.warn("Organization not found in database: orgLogin={}", safeOrgLogin);
             return 0;
@@ -139,70 +139,55 @@ public class GitHubIssueTypeSyncService {
                 pageCount++;
                 if (pageCount >= MAX_PAGINATION_PAGES) {
                     log.warn(
-                        "Reached maximum pagination limit for issue type sync: orgLogin={}, limit={}",
-                        safeOrgLogin,
-                        MAX_PAGINATION_PAGES
-                    );
+                            "Reached maximum pagination limit for issue type sync: orgLogin={}, limit={}",
+                            safeOrgLogin,
+                            MAX_PAGINATION_PAGES);
                     break;
                 }
 
                 final String currentCursor = cursor;
                 final int currentPage = pageCount;
 
-                ClientGraphQlResponse graphQlResponse = Mono.defer(() ->
-                    client
-                        .documentName(GET_ISSUE_TYPES_DOCUMENT)
-                        .variable("login", orgLogin)
-                        .variable(
-                            "first",
-                            adaptPageSize(LARGE_PAGE_SIZE, graphQlClientProvider.getRateLimitRemaining(scopeId))
-                        )
-                        .variable("after", currentCursor)
-                        .execute()
-                )
-                    .retryWhen(
-                        Retry.backoff(TRANSPORT_MAX_RETRIES, TRANSPORT_INITIAL_BACKOFF)
-                            .maxBackoff(TRANSPORT_MAX_BACKOFF)
-                            .jitter(JITTER_FACTOR)
-                            .filter(ScmTransportErrors::isTransportError)
-                            .doBeforeRetry(signal ->
-                                log.warn(
-                                    "Retrying after transport error: context=issueTypeSync, orgLogin={}, page={}, attempt={}, error={}",
-                                    safeOrgLogin,
-                                    currentPage,
-                                    signal.totalRetries() + 1,
-                                    signal.failure().getMessage()
-                                )
-                            )
-                    )
-                    .block(syncProperties.graphqlTimeout());
+                ClientGraphQlResponse graphQlResponse = Mono.defer(() -> client.documentName(GET_ISSUE_TYPES_DOCUMENT)
+                                .variable("login", orgLogin)
+                                .variable(
+                                        "first",
+                                        adaptPageSize(
+                                                LARGE_PAGE_SIZE, graphQlClientProvider.getRateLimitRemaining(scopeId)))
+                                .variable("after", currentCursor)
+                                .execute())
+                        .retryWhen(Retry.backoff(TRANSPORT_MAX_RETRIES, TRANSPORT_INITIAL_BACKOFF)
+                                .maxBackoff(TRANSPORT_MAX_BACKOFF)
+                                .jitter(JITTER_FACTOR)
+                                .filter(ScmTransportErrors::isTransportError)
+                                .doBeforeRetry(signal -> log.warn(
+                                        "Retrying after transport error: context=issueTypeSync, orgLogin={}, page={}, attempt={}, error={}",
+                                        safeOrgLogin,
+                                        currentPage,
+                                        signal.totalRetries() + 1,
+                                        signal.failure().getMessage())))
+                        .block(syncProperties.graphqlTimeout());
 
                 if (graphQlResponse == null || !graphQlResponse.isValid()) {
                     ClassificationResult classification = graphQlSyncHelper.classifyGraphQlErrors(graphQlResponse);
                     if (classification != null) {
-                        if (
-                            graphQlSyncHelper.handleGraphQlClassification(
-                                new GraphQlClassificationContext(
-                                    classification,
-                                    retryAttempt,
-                                    MAX_RETRY_ATTEMPTS,
-                                    "issue type sync",
-                                    "orgLogin",
-                                    safeOrgLogin,
-                                    log
-                                )
-                            )
-                        ) {
+                        if (graphQlSyncHelper.handleGraphQlClassification(new GraphQlClassificationContext(
+                                classification,
+                                retryAttempt,
+                                MAX_RETRY_ATTEMPTS,
+                                "issue type sync",
+                                "orgLogin",
+                                safeOrgLogin,
+                                log))) {
                             retryAttempt++;
                             continue;
                         }
                         break;
                     }
                     log.warn(
-                        "Received invalid GraphQL response: orgLogin={}, errors={}",
-                        safeOrgLogin,
-                        graphQlResponse != null ? graphQlResponse.getErrors() : "null"
-                    );
+                            "Received invalid GraphQL response: orgLogin={}, errors={}",
+                            safeOrgLogin,
+                            graphQlResponse != null ? graphQlResponse.getErrors() : "null");
                     break;
                 }
 
@@ -211,22 +196,14 @@ public class GitHubIssueTypeSyncService {
 
                 // Check if we should pause due to rate limiting
                 if (graphQlClientProvider.isRateLimitCritical(scopeId)) {
-                    if (
-                        !graphQlSyncHelper.waitForRateLimitIfNeeded(
-                            scopeId,
-                            "issue type sync",
-                            "orgLogin",
-                            safeOrgLogin,
-                            log
-                        )
-                    ) {
+                    if (!graphQlSyncHelper.waitForRateLimitIfNeeded(
+                            scopeId, "issue type sync", "orgLogin", safeOrgLogin, log)) {
                         break;
                     }
                 }
 
-                GHIssueTypeConnection response = graphQlResponse
-                    .field("organization.issueTypes")
-                    .toEntity(GHIssueTypeConnection.class);
+                GHIssueTypeConnection response =
+                        graphQlResponse.field("organization.issueTypes").toEntity(GHIssueTypeConnection.class);
 
                 if (response == null || response.getNodes() == null) {
                     break;
@@ -252,20 +229,12 @@ public class GitHubIssueTypeSyncService {
             // totalSynced is the raw node count here (incremented per node, no filter).
             if (reportedTotalCount >= 0) {
                 GraphQlConnectionOverflowDetector.checkPaginated(
-                    "issueTypes",
-                    totalSynced,
-                    reportedTotalCount,
-                    hasNextPage,
-                    safeOrgLogin
-                );
+                        "issueTypes", totalSynced, reportedTotalCount, hasNextPage, safeOrgLogin);
             }
 
             removeDeletedIssueTypes(organization.getId(), syncedIds);
             syncTargetProvider.updateScopeSyncTimestamp(
-                scopeId,
-                SyncTargetProvider.SyncType.ISSUE_TYPES,
-                Instant.now()
-            );
+                    scopeId, SyncTargetProvider.SyncType.ISSUE_TYPES, Instant.now());
 
             log.info("Completed issue type sync: orgLogin={}, issueTypeCount={}", safeOrgLogin, totalSynced);
             return totalSynced;
@@ -274,19 +243,8 @@ public class GitHubIssueTypeSyncService {
             return 0;
         } catch (Exception e) {
             ClassificationResult classification = exceptionClassifier.classifyWithDetails(e);
-            if (
-                !graphQlSyncHelper.handleGraphQlClassification(
-                    new GraphQlClassificationContext(
-                        classification,
-                        0,
-                        MAX_RETRY_ATTEMPTS,
-                        "issue type sync",
-                        "orgLogin",
-                        safeOrgLogin,
-                        log
-                    )
-                )
-            ) {
+            if (!graphQlSyncHelper.handleGraphQlClassification(new GraphQlClassificationContext(
+                    classification, 0, MAX_RETRY_ATTEMPTS, "issue type sync", "orgLogin", safeOrgLogin, log))) {
                 return 0;
             }
             return 0;
@@ -309,13 +267,11 @@ public class GitHubIssueTypeSyncService {
     private void syncIssueType(GHIssueType graphQlType, Organization organization) {
         String id = graphQlType.getId();
 
-        IssueType issueType = issueTypeRepository
-            .findById(id)
-            .orElseGet(() -> {
-                IssueType newType = new IssueType();
-                newType.setId(id);
-                return newType;
-            });
+        IssueType issueType = issueTypeRepository.findById(id).orElseGet(() -> {
+            IssueType newType = new IssueType();
+            newType.setId(id);
+            return newType;
+        });
 
         issueType.setName(graphQlType.getName());
         issueType.setDescription(graphQlType.getDescription());
@@ -334,25 +290,22 @@ public class GitHubIssueTypeSyncService {
      */
     @Transactional
     public IssueType findOrCreateFromWebhook(
-        String nodeId,
-        String name,
-        @Nullable String description,
-        @Nullable String color,
-        boolean isEnabled,
-        Organization organization
-    ) {
-        return issueTypeRepository
-            .findById(nodeId)
-            .orElseGet(() -> {
-                IssueType newType = new IssueType();
-                newType.setId(nodeId);
-                newType.setName(name);
-                newType.setDescription(description);
-                newType.setColor(parseColor(color));
-                newType.setEnabled(isEnabled);
-                newType.setOrganization(organization);
-                return issueTypeRepository.save(newType);
-            });
+            String nodeId,
+            String name,
+            @Nullable String description,
+            @Nullable String color,
+            boolean isEnabled,
+            Organization organization) {
+        return issueTypeRepository.findById(nodeId).orElseGet(() -> {
+            IssueType newType = new IssueType();
+            newType.setId(nodeId);
+            newType.setName(name);
+            newType.setDescription(description);
+            newType.setColor(parseColor(color));
+            newType.setEnabled(isEnabled);
+            newType.setOrganization(organization);
+            return issueTypeRepository.save(newType);
+        });
     }
 
     public Optional<IssueType> findByNodeId(String nodeId) {

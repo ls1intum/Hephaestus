@@ -30,12 +30,11 @@ public class GitHubWorkspaceProvisioningAdapter implements ProvisioningListener 
     private final AsyncTaskExecutor monitoringExecutor;
 
     public GitHubWorkspaceProvisioningAdapter(
-        GithubLifecycleListener githubLifecycleListener,
-        WorkspaceRepositoryMonitorService repositoryMonitorService,
-        WorkspaceScopeFilter workspaceScopeFilter,
-        GitHubWorkspaceDataSyncTrigger dataSyncTrigger,
-        @Qualifier("monitoringExecutor") AsyncTaskExecutor monitoringExecutor
-    ) {
+            GithubLifecycleListener githubLifecycleListener,
+            WorkspaceRepositoryMonitorService repositoryMonitorService,
+            WorkspaceScopeFilter workspaceScopeFilter,
+            GitHubWorkspaceDataSyncTrigger dataSyncTrigger,
+            @Qualifier("monitoringExecutor") AsyncTaskExecutor monitoringExecutor) {
         this.githubLifecycleListener = githubLifecycleListener;
         this.repositoryMonitorService = repositoryMonitorService;
         this.workspaceScopeFilter = workspaceScopeFilter;
@@ -53,60 +52,51 @@ public class GitHubWorkspaceProvisioningAdapter implements ProvisioningListener 
         String accountLogin = installation.accountLogin();
         if (accountLogin == null || !workspaceScopeFilter.isOrganizationAllowed(accountLogin)) {
             log.debug(
-                "Skipped workspace provisioning: reason=organizationFiltered, accountLogin={}, installationId={}",
-                installation.accountLogin(),
-                installation.installationId()
-            );
+                    "Skipped workspace provisioning: reason=organizationFiltered, accountLogin={}, installationId={}",
+                    installation.accountLogin(),
+                    installation.installationId());
             return;
         }
 
         RepositorySelection selection = RepositorySelection.SELECTED;
         Workspace workspace = githubLifecycleListener.createOrUpdateFromInstallation(
-            installation.installationId(),
-            installation.accountId(),
-            installation.accountLogin(),
-            mapAccountKind(installation.accountType()),
-            installation.avatarUrl(),
-            selection
-        );
+                installation.installationId(),
+                installation.accountId(),
+                installation.accountLogin(),
+                mapAccountKind(installation.accountType()),
+                installation.avatarUrl(),
+                selection);
 
         if (workspace == null) {
             log.warn(
-                "Skipped installation event: reason=workspaceCreationFailed, installationId={}",
-                installation.installationId()
-            );
+                    "Skipped installation event: reason=workspaceCreationFailed, installationId={}",
+                    installation.installationId());
             return;
         }
 
         // GitHub includes the initial repository list on "created" events with "selected" repository
         // selection; materialise Repository entities and monitors for each from that webhook metadata.
         if (installation.repositories() != null && !installation.repositories().isEmpty()) {
-            List<RepositorySnapshot> allowedRepos = installation
-                .repositories()
-                .stream()
-                .filter(r -> workspaceScopeFilter.isRepositoryAllowed(r.nameWithOwner()))
-                .toList();
+            List<RepositorySnapshot> allowedRepos = installation.repositories().stream()
+                    .filter(r -> workspaceScopeFilter.isRepositoryAllowed(r.nameWithOwner()))
+                    .toList();
 
             if (allowedRepos.size() < installation.repositories().size()) {
                 log.debug(
-                    "Filtered initial repositories by scope: installationId={}, allowed={}, total={}",
-                    installation.installationId(),
-                    allowedRepos.size(),
-                    installation.repositories().size()
-                );
+                        "Filtered initial repositories by scope: installationId={}, allowed={}, total={}",
+                        installation.installationId(),
+                        allowedRepos.size(),
+                        installation.repositories().size());
             }
 
             if (!allowedRepos.isEmpty()) {
                 log.info(
-                    "Adding initial repositories: installationId={}, repoCount={}",
-                    installation.installationId(),
-                    allowedRepos.size()
-                );
+                        "Adding initial repositories: installationId={}, repoCount={}",
+                        installation.installationId(),
+                        allowedRepos.size());
                 for (RepositorySnapshot snapshot : allowedRepos) {
                     repositoryMonitorService.ensureRepositoryAndMonitorFromSnapshot(
-                        installation.installationId(),
-                        snapshot
-                    );
+                            installation.installationId(), snapshot);
                 }
             }
         }
@@ -134,25 +124,22 @@ public class GitHubWorkspaceProvisioningAdapter implements ProvisioningListener 
     public void onRepositoriesAdded(Long installationId, List<RepositorySnapshot> repositories) {
         if (installationId == null || repositories == null || repositories.isEmpty()) {
             log.debug(
-                "Skipped repositories added event: reason=missingData, installationId={}, hasRepositories={}",
-                installationId,
-                repositories != null && !repositories.isEmpty()
-            );
+                    "Skipped repositories added event: reason=missingData, installationId={}, hasRepositories={}",
+                    installationId,
+                    repositories != null && !repositories.isEmpty());
             return;
         }
 
-        List<RepositorySnapshot> allowedRepos = repositories
-            .stream()
-            .filter(r -> workspaceScopeFilter.isRepositoryAllowed(r.nameWithOwner()))
-            .toList();
+        List<RepositorySnapshot> allowedRepos = repositories.stream()
+                .filter(r -> workspaceScopeFilter.isRepositoryAllowed(r.nameWithOwner()))
+                .toList();
 
         if (allowedRepos.size() < repositories.size()) {
             log.debug(
-                "Filtered repositories by scope: installationId={}, allowed={}, total={}",
-                installationId,
-                allowedRepos.size(),
-                repositories.size()
-            );
+                    "Filtered repositories by scope: installationId={}, allowed={}, total={}",
+                    installationId,
+                    allowedRepos.size(),
+                    repositories.size());
         }
 
         if (allowedRepos.isEmpty()) {
@@ -170,10 +157,9 @@ public class GitHubWorkspaceProvisioningAdapter implements ProvisioningListener 
     public void onRepositoriesRemoved(Long installationId, List<String> repositoryNames) {
         if (installationId == null || repositoryNames == null || repositoryNames.isEmpty()) {
             log.debug(
-                "Skipped repositories removed event: reason=missingData, installationId={}, hasRepositories={}",
-                installationId,
-                repositoryNames != null && !repositoryNames.isEmpty()
-            );
+                    "Skipped repositories removed event: reason=missingData, installationId={}, hasRepositories={}",
+                    installationId,
+                    repositoryNames != null && !repositoryNames.isEmpty());
             return;
         }
 
@@ -181,21 +167,19 @@ public class GitHubWorkspaceProvisioningAdapter implements ProvisioningListener 
             repositoryMonitorService.removeRepositoryMonitorForInstallation(installationId, nameWithOwner);
         }
         log.info(
-            "Removed repositories from monitor: installationId={}, repoCount={}",
-            installationId,
-            repositoryNames.size()
-        );
+                "Removed repositories from monitor: installationId={}, repoCount={}",
+                installationId,
+                repositoryNames.size());
     }
 
     @Override
     public void onAccountRenamed(Long installationId, @Nullable String oldLogin, String newLogin) {
         if (installationId == null || newLogin == null || newLogin.isBlank()) {
             log.warn(
-                "Skipped account rename: reason=invalidData, installationId={}, oldLogin={}, newLogin={}",
-                installationId,
-                oldLogin,
-                newLogin
-            );
+                    "Skipped account rename: reason=invalidData, installationId={}, oldLogin={}, newLogin={}",
+                    installationId,
+                    oldLogin,
+                    newLogin);
             return;
         }
 
@@ -222,13 +206,13 @@ public class GitHubWorkspaceProvisioningAdapter implements ProvisioningListener 
         }
 
         githubLifecycleListener
-            .updateWorkspaceStatus(installationId, Workspace.WorkspaceStatus.ACTIVE)
-            .filter(workspace -> workspace.getStatus() == Workspace.WorkspaceStatus.ACTIVE)
-            .ifPresent(workspace -> {
-                Long workspaceId = workspace.getId();
-                afterCommit(() -> triggerInitialSync(installationId, workspaceId));
-                githubLifecycleListener.startNatsForInstallation(installationId);
-            });
+                .updateWorkspaceStatus(installationId, Workspace.WorkspaceStatus.ACTIVE)
+                .filter(workspace -> workspace.getStatus() == Workspace.WorkspaceStatus.ACTIVE)
+                .ifPresent(workspace -> {
+                    Long workspaceId = workspace.getId();
+                    afterCommit(() -> triggerInitialSync(installationId, workspaceId));
+                    githubLifecycleListener.startNatsForInstallation(installationId);
+                });
 
         log.info("Activated installation: installationId={}", installationId);
     }
@@ -247,26 +231,23 @@ public class GitHubWorkspaceProvisioningAdapter implements ProvisioningListener 
 
     private void triggerInitialSync(Long installationId, Long workspaceId) {
         log.info(
-            "Starting initial sync for activated installation: installationId={}, workspaceId={}",
-            installationId,
-            workspaceId
-        );
+                "Starting initial sync for activated installation: installationId={}, workspaceId={}",
+                installationId,
+                workspaceId);
 
         monitoringExecutor.execute(() -> {
             try {
                 dataSyncTrigger.syncAllRepositories(workspaceId);
                 log.info(
-                    "Completed initial sync for activated installation: installationId={}, workspaceId={}",
-                    installationId,
-                    workspaceId
-                );
+                        "Completed initial sync for activated installation: installationId={}, workspaceId={}",
+                        installationId,
+                        workspaceId);
             } catch (Exception e) {
                 log.error(
-                    "Failed initial sync for activated installation: installationId={}, workspaceId={}",
-                    installationId,
-                    workspaceId,
-                    e
-                );
+                        "Failed initial sync for activated installation: installationId={}, workspaceId={}",
+                        installationId,
+                        workspaceId,
+                        e);
             }
         });
     }

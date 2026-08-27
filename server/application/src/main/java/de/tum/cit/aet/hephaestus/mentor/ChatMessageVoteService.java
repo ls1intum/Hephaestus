@@ -32,24 +32,24 @@ public class ChatMessageVoteService {
     @Transactional
     public ChatMessageVote upsert(UUID threadId, UUID messageId, boolean isUpvoted) {
         ChatMessage message = chatMessageRepository
-            .findById(messageId)
-            .filter(m -> m.getThread() != null && m.getThread().getId().equals(threadId))
-            .orElseThrow(() -> new EntityNotFoundException("ChatMessage", messageId.toString()));
+                .findById(messageId)
+                .filter(m -> m.getThread() != null && m.getThread().getId().equals(threadId))
+                .orElseThrow(() -> new EntityNotFoundException("ChatMessage", messageId.toString()));
         chatMessageVoteRepository.upsert(message.getId(), isUpvoted);
         // findById is in the same READ_COMMITTED tx that just committed the upsert above; row
         // is now visible. Return a fresh read so the caller observes the persisted timestamps.
         return chatMessageVoteRepository
-            .findById(message.getId())
-            .orElseThrow(() -> new IllegalStateException("Upsert returned 0 rows for message " + messageId));
+                .findById(message.getId())
+                .orElseThrow(() -> new IllegalStateException("Upsert returned 0 rows for message " + messageId));
     }
 
     /** No-op if the vote does not exist (idempotent DELETE semantics). */
     @Transactional
     public void delete(UUID threadId, UUID messageId) {
         chatMessageRepository
-            .findById(messageId)
-            .filter(m -> m.getThread() != null && m.getThread().getId().equals(threadId))
-            .orElseThrow(() -> new EntityNotFoundException("ChatMessage", messageId.toString()));
+                .findById(messageId)
+                .filter(m -> m.getThread() != null && m.getThread().getId().equals(threadId))
+                .orElseThrow(() -> new EntityNotFoundException("ChatMessage", messageId.toString()));
         chatMessageVoteRepository.deleteById(messageId);
     }
 }

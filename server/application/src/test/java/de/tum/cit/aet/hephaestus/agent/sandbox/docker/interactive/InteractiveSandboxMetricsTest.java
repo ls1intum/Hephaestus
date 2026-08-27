@@ -24,28 +24,25 @@ class InteractiveSandboxMetricsTest extends BaseUnitTest {
         SimpleMeterRegistry reg = new SimpleMeterRegistry();
         new InteractiveSandboxMetrics(reg);
 
-        Set<String> meterNames = reg
-            .getMeters()
-            .stream()
-            .map(Meter::getId)
-            .map(io.micrometer.core.instrument.Meter.Id::getName)
-            .collect(Collectors.toSet());
+        Set<String> meterNames = reg.getMeters().stream()
+                .map(Meter::getId)
+                .map(io.micrometer.core.instrument.Meter.Id::getName)
+                .collect(Collectors.toSet());
 
         // Note: `mentor.session.active` and `mentor.watchdog.targets` are gauges owned by
         // InteractiveSandboxRegistry and registered there, not by this metrics object.
         List<String> expected = List.of(
-            "mentor.attach.duration",
-            "mentor.attach.failure",
-            "mentor.send.frame.bytes",
-            "mentor.send.rejected",
-            "mentor.ring.buffer.dropped",
-            "mentor.subscriber.dropped",
-            "mentor.subscriber.error",
-            "mentor.frame.parse.error",
-            "mentor.session.lifetime",
-            "mentor.session.subscribers.at.close",
-            "mentor.session.eviction"
-        );
+                "mentor.attach.duration",
+                "mentor.attach.failure",
+                "mentor.send.frame.bytes",
+                "mentor.send.rejected",
+                "mentor.ring.buffer.dropped",
+                "mentor.subscriber.dropped",
+                "mentor.subscriber.error",
+                "mentor.frame.parse.error",
+                "mentor.session.lifetime",
+                "mentor.session.subscribers.at.close",
+                "mentor.session.eviction");
         assertThat(meterNames).containsAll(expected);
     }
 
@@ -54,22 +51,19 @@ class InteractiveSandboxMetricsTest extends BaseUnitTest {
         SimpleMeterRegistry reg = new SimpleMeterRegistry();
         new InteractiveSandboxMetrics(reg);
 
-        Set<String> reasons = reg
-            .find("mentor.attach.failure")
-            .counters()
-            .stream()
-            .map(c -> c.getId().getTag("reason"))
-            .collect(Collectors.toSet());
+        Set<String> reasons = reg.find("mentor.attach.failure").counters().stream()
+                .map(c -> c.getId().getTag("reason"))
+                .collect(Collectors.toSet());
 
-        assertThat(reasons).containsExactlyInAnyOrder(
-            "image_pull_failed",
-            "container_start_failed",
-            "stdin_open_failed",
-            "first_frame_timeout",
-            "first_frame_failed",
-            "max_sessions",
-            "other"
-        );
+        assertThat(reasons)
+                .containsExactlyInAnyOrder(
+                        "image_pull_failed",
+                        "container_start_failed",
+                        "stdin_open_failed",
+                        "first_frame_timeout",
+                        "first_frame_failed",
+                        "max_sessions",
+                        "other");
     }
 
     @Test
@@ -77,12 +71,9 @@ class InteractiveSandboxMetricsTest extends BaseUnitTest {
         SimpleMeterRegistry reg = new SimpleMeterRegistry();
         new InteractiveSandboxMetrics(reg);
 
-        Set<String> reasons = reg
-            .find("mentor.send.rejected")
-            .counters()
-            .stream()
-            .map(c -> c.getId().getTag("reason"))
-            .collect(Collectors.toSet());
+        Set<String> reasons = reg.find("mentor.send.rejected").counters().stream()
+                .map(c -> c.getId().getTag("reason"))
+                .collect(Collectors.toSet());
 
         assertThat(reasons).containsExactlyInAnyOrder("queue_full", "write_timeout", "broken_pipe", "closed");
     }
@@ -93,12 +84,9 @@ class InteractiveSandboxMetricsTest extends BaseUnitTest {
         SimpleMeterRegistry reg = new SimpleMeterRegistry();
         InteractiveSandboxMetrics m = new InteractiveSandboxMetrics(reg);
 
-        Set<String> reasons = reg
-            .find("mentor.session.eviction")
-            .counters()
-            .stream()
-            .map(c -> c.getId().getTag("reason"))
-            .collect(Collectors.toSet());
+        Set<String> reasons = reg.find("mentor.session.eviction").counters().stream()
+                .map(c -> c.getId().getTag("reason"))
+                .collect(Collectors.toSet());
 
         for (EvictionReason r : EvictionReason.values()) {
             assertThat(reasons).contains(r.tag());
@@ -112,12 +100,9 @@ class InteractiveSandboxMetricsTest extends BaseUnitTest {
         SimpleMeterRegistry reg = new SimpleMeterRegistry();
         new InteractiveSandboxMetrics(reg);
 
-        Set<String> directions = reg
-            .find("mentor.send.frame.bytes")
-            .counters()
-            .stream()
-            .map(c -> c.getId().getTag("direction"))
-            .collect(Collectors.toSet());
+        Set<String> directions = reg.find("mentor.send.frame.bytes").counters().stream()
+                .map(c -> c.getId().getTag("direction"))
+                .collect(Collectors.toSet());
 
         assertThat(directions).containsExactlyInAnyOrder("in", "out");
     }

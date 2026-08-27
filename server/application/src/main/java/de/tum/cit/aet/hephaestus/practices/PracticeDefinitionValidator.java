@@ -20,18 +20,14 @@ public final class PracticeDefinitionValidator {
     private final PracticeSignalOptions signalOptions;
 
     public PracticeDefinitionValidator(
-        ArtifactSourceCatalogRegistry sourceCatalogs,
-        PracticeSignalOptions signalOptions
-    ) {
+            ArtifactSourceCatalogRegistry sourceCatalogs, PracticeSignalOptions signalOptions) {
         this.sourceCatalogs = sourceCatalogs;
         this.signalOptions = signalOptions;
     }
 
     public void validate(PracticeDefinition definition) {
-        boolean canRunAutomatedReview = definition
-            .automatedReviewPolicy()
-            .automatedReview()
-            .canAttemptAutomatedReview();
+        boolean canRunAutomatedReview =
+                definition.automatedReviewPolicy().automatedReview().canAttemptAutomatedReview();
         validateBindings(definition.bindings());
         if (!canRunAutomatedReview && definition.precomputeScript() != null) {
             throw new IllegalArgumentException("A practice Hephaestus cannot review cannot define a precompute script");
@@ -59,9 +55,8 @@ public final class PracticeDefinitionValidator {
         // do about them rather than with the kind mismatch that is a symptom of the same mistake.
         if (bindings.size() > 1) {
             throw new IllegalArgumentException(
-                "A practice is reviewed on one occasion. To read different evidence at a different moment, " +
-                    "split this into two practices."
-            );
+                    "A practice is reviewed on one occasion. To read different evidence at a different moment, "
+                            + "split this into two practices.");
         }
         ArtifactKind artifactKind = PracticeBinding.artifactKindOf(bindings);
         Set<SignalName> declared = signalOptions.eligibleFor(artifactKind);
@@ -74,17 +69,15 @@ public final class PracticeDefinitionValidator {
             // in. Attributing a result to a role the artifact cannot resolve leaves an observation about
             // nobody — or, worse, one filed against whichever person the kind happens to name.
             if (!roles.contains(binding.subject())) {
-                throw new IllegalArgumentException(
-                    "This work type cannot identify a " + binding.subject() + ", so a review of it cannot be about one"
-                );
+                throw new IllegalArgumentException("This work type cannot identify a " + binding.subject()
+                        + ", so a review of it cannot be about one");
             }
             for (SignalName signal : binding.signals()) {
                 if (signalOptions.isManualRequest(signal)) {
                     throw new IllegalArgumentException(
-                        "A review somebody asks for by hand already reviews every practice on this work type, " +
-                            "whatever state the work is in, so it is not an occasion to choose: remove " +
-                            signal
-                    );
+                            "A review somebody asks for by hand already reviews every practice on this work type, "
+                                    + "whatever state the work is in, so it is not an occasion to choose: remove "
+                                    + signal);
                 }
                 if (!declared.contains(signal)) {
                     throw new IllegalArgumentException("Choose signals declared for the selected work type");
@@ -96,8 +89,7 @@ public final class PracticeDefinitionValidator {
     private static void rejectDetectorVocabulary(String field, @Nullable String value) {
         if (value != null && DETECTOR_VOCAB.matcher(value).find()) {
             throw new IllegalArgumentException(
-                field + " is guidance for people and must not use detector result labels"
-            );
+                    field + " is guidance for people and must not use detector result labels");
         }
     }
 
@@ -111,27 +103,23 @@ public final class PracticeDefinitionValidator {
             }
             if (!definition.automatedReviewPolicy().automatedReview().canAttemptAutomatedReview()) {
                 throw new IllegalArgumentException(
-                    "A practice Hephaestus does not review cannot declare what it applies to; nothing would read it"
-                );
+                        "A practice Hephaestus does not review cannot declare what it applies to; nothing would read it");
             }
             for (PracticeSubjectClause clause : subject.anyOf()) {
                 SourceKind readFrom = clause.readsFrom();
                 if (!applicable.contains(readFrom)) {
-                    throw new IllegalArgumentException(
-                        "This work type has no " +
-                            readFrom +
-                            ", so \"" +
-                            clause.describe() +
-                            "\" could never be decided about it"
-                    );
+                    throw new IllegalArgumentException("This work type has no " + readFrom
+                            + ", so \""
+                            + clause.describe()
+                            + "\" could never be decided about it");
                 }
-                if (!sourceCatalogs.requireSource(version, readFrom).completenessPolicy().supportsComplete()) {
-                    throw new IllegalArgumentException(
-                        "Evidence source " +
-                            readFrom +
-                            " can never be captured completely, so its silence can never establish that " +
-                            "this practice does not apply"
-                    );
+                if (!sourceCatalogs
+                        .requireSource(version, readFrom)
+                        .completenessPolicy()
+                        .supportsComplete()) {
+                    throw new IllegalArgumentException("Evidence source " + readFrom
+                            + " can never be captured completely, so its silence can never establish that "
+                            + "this practice does not apply");
                 }
             }
         }
@@ -154,12 +142,11 @@ public final class PracticeDefinitionValidator {
                 // An exhaustive claim over a source that can never report a complete capture refuses
                 // every review it triggers. Caught at authoring time, because at review time
                 // "permanently refusing" and "nobody has done this yet" produce the same report.
-                if (need.stance().demandsCompleteCapture() && !contract.completenessPolicy().supportsComplete()) {
+                if (need.stance().demandsCompleteCapture()
+                        && !contract.completenessPolicy().supportsComplete()) {
                     throw new IllegalArgumentException(
-                        "Evidence source " +
-                            need.sourceKind() +
-                            " can never be captured completely, so no claim about what is absent from it can rest on it"
-                    );
+                            "Evidence source " + need.sourceKind()
+                                    + " can never be captured completely, so no claim about what is absent from it can rest on it");
                 }
             }
         }

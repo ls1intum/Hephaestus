@@ -30,21 +30,19 @@ class FeedbackLedgerOwnershipTest extends HephaestusArchitectureTest {
     @Test
     void onlyAgentAndPracticesDependOnTheFeedbackLedger() {
         ArchRule rule = noClasses()
-            .that()
-            .resideOutsideOfPackage(PRACTICES_PACKAGE)
-            .and()
-            .resideOutsideOfPackage(AGENT_PACKAGE)
-            .should()
-            .dependOnClassesThat()
-            .resideInAPackage(FEEDBACK_PACKAGE)
-            .because(
-                "the delivered-feedback ledger is a deliberate co-ownership seam (ADR 0021): practices owns " +
-                    "the schema, agent owns write-orchestration via FeedbackLedgerRecorder, and the contract is " +
-                    "repository-level by necessity (the recorder depends on agent.job/agent.handler types, so it " +
-                    "cannot move into practices without closing a practices->agent cycle). The feedback named " +
-                    "interface is open, so without this rule any module could silently start writing the ledger " +
-                    "and break the single-writer idempotency/transaction invariant the recorder depends on."
-            );
+                .that()
+                .resideOutsideOfPackage(PRACTICES_PACKAGE)
+                .and()
+                .resideOutsideOfPackage(AGENT_PACKAGE)
+                .should()
+                .dependOnClassesThat()
+                .resideInAPackage(FEEDBACK_PACKAGE)
+                .because("the delivered-feedback ledger is a deliberate co-ownership seam (ADR 0021): practices owns "
+                        + "the schema, agent owns write-orchestration via FeedbackLedgerRecorder, and the contract is "
+                        + "repository-level by necessity (the recorder depends on agent.job/agent.handler types, so it "
+                        + "cannot move into practices without closing a practices->agent cycle). The feedback named "
+                        + "interface is open, so without this rule any module could silently start writing the ledger "
+                        + "and break the single-writer idempotency/transaction invariant the recorder depends on.");
         rule.check(classes);
     }
 }

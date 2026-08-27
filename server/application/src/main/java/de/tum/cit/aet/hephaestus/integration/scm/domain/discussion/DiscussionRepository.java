@@ -25,8 +25,7 @@ public interface DiscussionRepository extends JpaRepository<Discussion, Long> {
      * @param number       the discussion number within the repository
      * @return the discussion if found
      */
-    @Query(
-        """
+    @Query("""
         SELECT d
         FROM Discussion d
         LEFT JOIN FETCH d.labels
@@ -34,12 +33,9 @@ public interface DiscussionRepository extends JpaRepository<Discussion, Long> {
         LEFT JOIN FETCH d.repository
         LEFT JOIN FETCH d.category
         WHERE d.repository.id = :repositoryId AND d.number = :number
-        """
-    )
+        """)
     Optional<Discussion> findByRepositoryIdAndNumber(
-        @Param("repositoryId") Long repositoryId,
-        @Param("number") int number
-    );
+            @Param("repositoryId") Long repositoryId, @Param("number") int number);
 
     /**
      * Check if a discussion exists by repository ID and number.
@@ -60,8 +56,7 @@ public interface DiscussionRepository extends JpaRepository<Discussion, Long> {
      */
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Transactional
-    @Query(
-        value = """
+    @Query(value = """
         INSERT INTO discussion (
             native_id, provider_id, repository_id, number, title, body, html_url, state, state_reason,
             is_locked, active_lock_reason, closed_at, answer_chosen_at, comment_count,
@@ -89,30 +84,27 @@ public interface DiscussionRepository extends JpaRepository<Discussion, Long> {
             author_id = COALESCE(EXCLUDED.author_id, discussion.author_id),
             category_id = EXCLUDED.category_id,
             answer_chosen_by_id = EXCLUDED.answer_chosen_by_id
-        """,
-        nativeQuery = true
-    )
+        """, nativeQuery = true)
     int upsertCore(
-        @Param("nativeId") Long nativeId,
-        @Param("providerId") Long providerId,
-        @Param("repositoryId") Long repositoryId,
-        @Param("number") int number,
-        @Param("title") String title,
-        @Param("body") @Nullable String body,
-        @Param("htmlUrl") @Nullable String htmlUrl,
-        @Param("state") String state,
-        @Param("stateReason") @Nullable String stateReason,
-        @Param("isLocked") boolean isLocked,
-        @Param("activeLockReason") @Nullable String activeLockReason,
-        @Param("closedAt") @Nullable Instant closedAt,
-        @Param("answerChosenAt") @Nullable Instant answerChosenAt,
-        @Param("commentCount") int commentCount,
-        @Param("upvoteCount") int upvoteCount,
-        @Param("lastSyncAt") Instant lastSyncAt,
-        @Param("createdAt") @Nullable Instant createdAt,
-        @Param("updatedAt") @Nullable Instant updatedAt,
-        @Param("authorId") @Nullable Long authorId,
-        @Param("categoryId") @Nullable String categoryId,
-        @Param("answerChosenById") @Nullable Long answerChosenById
-    );
+            @Param("nativeId") Long nativeId,
+            @Param("providerId") Long providerId,
+            @Param("repositoryId") Long repositoryId,
+            @Param("number") int number,
+            @Param("title") String title,
+            @Param("body") @Nullable String body,
+            @Param("htmlUrl") @Nullable String htmlUrl,
+            @Param("state") String state,
+            @Param("stateReason") @Nullable String stateReason,
+            @Param("isLocked") boolean isLocked,
+            @Param("activeLockReason") @Nullable String activeLockReason,
+            @Param("closedAt") @Nullable Instant closedAt,
+            @Param("answerChosenAt") @Nullable Instant answerChosenAt,
+            @Param("commentCount") int commentCount,
+            @Param("upvoteCount") int upvoteCount,
+            @Param("lastSyncAt") Instant lastSyncAt,
+            @Param("createdAt") @Nullable Instant createdAt,
+            @Param("updatedAt") @Nullable Instant updatedAt,
+            @Param("authorId") @Nullable Long authorId,
+            @Param("categoryId") @Nullable String categoryId,
+            @Param("answerChosenById") @Nullable Long answerChosenById);
 }

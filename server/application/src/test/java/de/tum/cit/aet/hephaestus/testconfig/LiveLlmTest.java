@@ -22,7 +22,7 @@ import org.junit.jupiter.api.parallel.ExecutionMode;
  * <p>Pinned to {@link ExecutionMode#SAME_THREAD} so two live tests in the same module never run
  * in parallel — keeps LLM rate limits, log interleaving, and shared temp dirs sane.
  */
-@Target({ ElementType.TYPE, ElementType.METHOD })
+@Target({ElementType.TYPE, ElementType.METHOD})
 @Retention(RetentionPolicy.RUNTIME)
 @Tag("live")
 @EnabledIfEnvironmentVariable(named = "HEPHAESTUS_LIVE_LLM_API_KEY", matches = ".+")

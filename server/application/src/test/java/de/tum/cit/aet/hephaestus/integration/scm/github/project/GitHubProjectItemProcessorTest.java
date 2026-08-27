@@ -11,7 +11,6 @@ import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
-import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.DataSource;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
@@ -19,10 +18,6 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.label.LabelRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.milestone.MilestoneRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.github.events.GitHubProjectEvent;
-import de.tum.cit.aet.hephaestus.integration.scm.github.events.GitHubProjectEventPayload;
-import de.tum.cit.aet.hephaestus.integration.scm.github.project.Project;
-import de.tum.cit.aet.hephaestus.integration.scm.github.project.ProjectItem;
-import de.tum.cit.aet.hephaestus.integration.scm.github.project.ProjectItemRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.github.project.dto.GitHubProjectItemDTO;
 import de.tum.cit.aet.hephaestus.integration.scm.github.user.GitHubUserProcessor;
 import de.tum.cit.aet.hephaestus.integration.scm.github.user.dto.GitHubUserDTO;
@@ -85,14 +80,13 @@ class GitHubProjectItemProcessorTest extends BaseUnitTest {
     @BeforeEach
     void setUp() {
         processor = new GitHubProjectItemProcessor(
-            projectItemRepository,
-            issueRepository,
-            userRepository,
-            labelRepository,
-            milestoneRepository,
-            gitHubUserProcessor,
-            eventPublisher
-        );
+                projectItemRepository,
+                issueRepository,
+                userRepository,
+                labelRepository,
+                milestoneRepository,
+                gitHubUserProcessor,
+                eventPublisher);
 
         project = new Project();
         project.setId(PROJECT_ID);
@@ -105,82 +99,72 @@ class GitHubProjectItemProcessorTest extends BaseUnitTest {
         IdentityProvider provider = new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com");
         provider.setId(PROVIDER_ID);
         context = new ProcessingContext(
-            SCOPE_ID,
-            null,
-            provider,
-            Instant.now(),
-            UUID.randomUUID().toString(),
-            null,
-            DataSource.GRAPHQL_SYNC
-        );
+                SCOPE_ID, null, provider, Instant.now(), UUID.randomUUID().toString(), null, DataSource.GRAPHQL_SYNC);
     }
 
     // Helper methods
 
     private GitHubProjectItemDTO createDraftIssueDTO() {
         return new GitHubProjectItemDTO(
-            null,
-            ITEM_DB_ID,
-            NODE_ID,
-            null,
-            "DRAFT_ISSUE",
-            null,
-            null,
-            "Draft Title",
-            "Draft Body",
-            false,
-            null,
-            Collections.emptyList(),
-            false,
-            0,
-            null,
-            Instant.parse("2025-01-01T00:00:00Z"),
-            Instant.parse("2025-01-02T00:00:00Z")
-        );
+                null,
+                ITEM_DB_ID,
+                NODE_ID,
+                null,
+                "DRAFT_ISSUE",
+                null,
+                null,
+                "Draft Title",
+                "Draft Body",
+                false,
+                null,
+                Collections.emptyList(),
+                false,
+                0,
+                null,
+                Instant.parse("2025-01-01T00:00:00Z"),
+                Instant.parse("2025-01-02T00:00:00Z"));
     }
 
     private GitHubProjectItemDTO createIssueDTO(@Nullable Long issueId) {
         return new GitHubProjectItemDTO(
-            null,
-            ITEM_DB_ID,
-            NODE_ID,
-            null,
-            "ISSUE",
-            issueId,
-            42,
-            null,
-            null,
-            false,
-            null,
-            Collections.emptyList(),
-            false,
-            0,
-            null,
-            Instant.parse("2025-01-01T00:00:00Z"),
-            Instant.parse("2025-01-02T00:00:00Z")
-        );
+                null,
+                ITEM_DB_ID,
+                NODE_ID,
+                null,
+                "ISSUE",
+                issueId,
+                42,
+                null,
+                null,
+                false,
+                null,
+                Collections.emptyList(),
+                false,
+                0,
+                null,
+                Instant.parse("2025-01-01T00:00:00Z"),
+                Instant.parse("2025-01-02T00:00:00Z"));
     }
 
     private GitHubProjectItemDTO createPullRequestDTO(Long issueId) {
         return new GitHubProjectItemDTO(
-            null,
-            ITEM_DB_ID,
-            NODE_ID,
-            null,
-            "PULL_REQUEST",
-            issueId,
-            99,
-            null,
-            null,
-            false,
-            null,
-            Collections.emptyList(),
-            false,
-            0,
-            null,
-            Instant.parse("2025-01-01T00:00:00Z"),
-            Instant.parse("2025-01-02T00:00:00Z")
-        );
+                null,
+                ITEM_DB_ID,
+                NODE_ID,
+                null,
+                "PULL_REQUEST",
+                issueId,
+                99,
+                null,
+                null,
+                false,
+                null,
+                Collections.emptyList(),
+                false,
+                0,
+                null,
+                Instant.parse("2025-01-01T00:00:00Z"),
+                Instant.parse("2025-01-02T00:00:00Z"));
     }
 
     private ProjectItem createProjectItemEntity(ProjectItem.ContentType contentType) {
@@ -202,8 +186,10 @@ class GitHubProjectItemProcessorTest extends BaseUnitTest {
      * @param entity the entity to return from findByProjectIdAndNodeId
      */
     private void stubSuccessfulProcess(boolean isNew, ProjectItem entity) {
-        when(projectItemRepository.existsByProjectIdAndNodeId(PROJECT_ID, NODE_ID)).thenReturn(!isNew);
-        when(projectItemRepository.findByProjectIdAndNodeId(PROJECT_ID, NODE_ID)).thenReturn(Optional.of(entity));
+        when(projectItemRepository.existsByProjectIdAndNodeId(PROJECT_ID, NODE_ID))
+                .thenReturn(!isNew);
+        when(projectItemRepository.findByProjectIdAndNodeId(PROJECT_ID, NODE_ID))
+                .thenReturn(Optional.of(entity));
     }
 
     // process() tests
@@ -216,44 +202,43 @@ class GitHubProjectItemProcessorTest extends BaseUnitTest {
             ProjectItem result = processor.process(null, project, context);
 
             assertThat(result).isNull();
-            verify(projectItemRepository, never()).upsertCore(
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(boolean.class),
-                any(),
-                any(),
-                any()
-            );
+            verify(projectItemRepository, never())
+                    .upsertCore(
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(boolean.class),
+                            any(),
+                            any(),
+                            any());
         }
 
         @Test
         void shouldReturnNullWhenNodeIdIsNull() {
             GitHubProjectItemDTO dto = new GitHubProjectItemDTO(
-                null,
-                ITEM_DB_ID,
-                null,
-                null,
-                "DRAFT_ISSUE",
-                null,
-                null,
-                "Title",
-                "Body",
-                false,
-                null,
-                Collections.emptyList(),
-                false,
-                0,
-                null,
-                Instant.now(),
-                Instant.now()
-            );
+                    null,
+                    ITEM_DB_ID,
+                    null,
+                    null,
+                    "DRAFT_ISSUE",
+                    null,
+                    null,
+                    "Title",
+                    "Body",
+                    false,
+                    null,
+                    Collections.emptyList(),
+                    false,
+                    0,
+                    null,
+                    Instant.now(),
+                    Instant.now());
 
             ProjectItem result = processor.process(dto, project, context);
 
@@ -263,24 +248,23 @@ class GitHubProjectItemProcessorTest extends BaseUnitTest {
         @Test
         void shouldReturnNullWhenNodeIdIsBlank() {
             GitHubProjectItemDTO dto = new GitHubProjectItemDTO(
-                null,
-                ITEM_DB_ID,
-                "  ",
-                null,
-                "DRAFT_ISSUE",
-                null,
-                null,
-                "Title",
-                "Body",
-                false,
-                null,
-                Collections.emptyList(),
-                false,
-                0,
-                null,
-                Instant.now(),
-                Instant.now()
-            );
+                    null,
+                    ITEM_DB_ID,
+                    "  ",
+                    null,
+                    "DRAFT_ISSUE",
+                    null,
+                    null,
+                    "Title",
+                    "Body",
+                    false,
+                    null,
+                    Collections.emptyList(),
+                    false,
+                    0,
+                    null,
+                    Instant.now(),
+                    Instant.now());
 
             ProjectItem result = processor.process(dto, project, context);
 
@@ -291,24 +275,23 @@ class GitHubProjectItemProcessorTest extends BaseUnitTest {
         void shouldReturnNullWhenDatabaseIdIsNull() {
             // Arrange — both `id` and `databaseId` are null so getDatabaseId() returns null
             GitHubProjectItemDTO dto = new GitHubProjectItemDTO(
-                null,
-                null,
-                NODE_ID,
-                null,
-                "DRAFT_ISSUE",
-                null,
-                null,
-                "Title",
-                "Body",
-                false,
-                null,
-                Collections.emptyList(),
-                false,
-                0,
-                null,
-                Instant.now(),
-                Instant.now()
-            );
+                    null,
+                    null,
+                    NODE_ID,
+                    null,
+                    "DRAFT_ISSUE",
+                    null,
+                    null,
+                    "Title",
+                    "Body",
+                    false,
+                    null,
+                    Collections.emptyList(),
+                    false,
+                    0,
+                    null,
+                    Instant.now(),
+                    Instant.now());
 
             ProjectItem result = processor.process(dto, project, context);
 
@@ -318,43 +301,42 @@ class GitHubProjectItemProcessorTest extends BaseUnitTest {
         @Test
         void shouldReturnNullWhenContentTypeIsUnknown() {
             GitHubProjectItemDTO dto = new GitHubProjectItemDTO(
-                null,
-                ITEM_DB_ID,
-                NODE_ID,
-                null,
-                "UNKNOWN_TYPE",
-                null,
-                null,
-                null,
-                null,
-                false,
-                null,
-                Collections.emptyList(),
-                false,
-                0,
-                null,
-                Instant.now(),
-                Instant.now()
-            );
+                    null,
+                    ITEM_DB_ID,
+                    NODE_ID,
+                    null,
+                    "UNKNOWN_TYPE",
+                    null,
+                    null,
+                    null,
+                    null,
+                    false,
+                    null,
+                    Collections.emptyList(),
+                    false,
+                    0,
+                    null,
+                    Instant.now(),
+                    Instant.now());
 
             ProjectItem result = processor.process(dto, project, context);
 
             assertThat(result).isNull();
-            verify(projectItemRepository, never()).upsertCore(
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(boolean.class),
-                any(),
-                any(),
-                any()
-            );
+            verify(projectItemRepository, never())
+                    .upsertCore(
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(boolean.class),
+                            any(),
+                            any(),
+                            any());
         }
 
         @Test
@@ -372,29 +354,28 @@ class GitHubProjectItemProcessorTest extends BaseUnitTest {
             assertThat(result.getContentType()).isEqualTo(ProjectItem.ContentType.DRAFT_ISSUE);
 
             // Verify upsert was called with correct params
-            verify(projectItemRepository).upsertCore(
-                eq(ITEM_DB_ID),
-                eq(PROVIDER_ID),
-                eq(NODE_ID),
-                eq(PROJECT_ID),
-                eq("DRAFT_ISSUE"),
-                isNull(), // issueId — not resolved for DRAFT_ISSUE
-                isNull(), // contentDatabaseId — not set for DRAFT_ISSUE
-                eq("Draft Title"),
-                eq("Draft Body"),
-                eq(false),
-                isNull(), // creatorId — no creator in DTO
-                eq(Instant.parse("2025-01-01T00:00:00Z")),
-                eq(Instant.parse("2025-01-02T00:00:00Z"))
-            );
+            verify(projectItemRepository)
+                    .upsertCore(
+                            eq(ITEM_DB_ID),
+                            eq(PROVIDER_ID),
+                            eq(NODE_ID),
+                            eq(PROJECT_ID),
+                            eq("DRAFT_ISSUE"),
+                            isNull(), // issueId — not resolved for DRAFT_ISSUE
+                            isNull(), // contentDatabaseId — not set for DRAFT_ISSUE
+                            eq("Draft Title"),
+                            eq("Draft Body"),
+                            eq(false),
+                            isNull(), // creatorId — no creator in DTO
+                            eq(Instant.parse("2025-01-01T00:00:00Z")),
+                            eq(Instant.parse("2025-01-02T00:00:00Z")));
 
             // Verify no issue lookup was attempted
             verify(issueRepository, never()).existsById(any());
 
             // Verify created event was published
-            ArgumentCaptor<GitHubProjectEvent.ProjectItemCreated> eventCaptor = ArgumentCaptor.forClass(
-                GitHubProjectEvent.ProjectItemCreated.class
-            );
+            ArgumentCaptor<GitHubProjectEvent.ProjectItemCreated> eventCaptor =
+                    ArgumentCaptor.forClass(GitHubProjectEvent.ProjectItemCreated.class);
             verify(eventPublisher).publishEvent(eventCaptor.capture());
             assertThat(eventCaptor.getValue().projectId()).isEqualTo(PROJECT_ID);
         }
@@ -412,21 +393,21 @@ class GitHubProjectItemProcessorTest extends BaseUnitTest {
             assertNotNull(result);
 
             // Verify upsert was called with ISSUE content type and resolved issueId
-            verify(projectItemRepository).upsertCore(
-                eq(ITEM_DB_ID),
-                eq(PROVIDER_ID),
-                eq(NODE_ID),
-                eq(PROJECT_ID),
-                eq("ISSUE"),
-                eq(issueId), // issueId resolved because issue exists locally
-                eq(issueId), // contentDatabaseId set from dto.issueId()
-                isNull(), // no draftTitle for ISSUE
-                isNull(), // no draftBody for ISSUE
-                eq(false),
-                isNull(),
-                any(Instant.class),
-                any(Instant.class)
-            );
+            verify(projectItemRepository)
+                    .upsertCore(
+                            eq(ITEM_DB_ID),
+                            eq(PROVIDER_ID),
+                            eq(NODE_ID),
+                            eq(PROJECT_ID),
+                            eq("ISSUE"),
+                            eq(issueId), // issueId resolved because issue exists locally
+                            eq(issueId), // contentDatabaseId set from dto.issueId()
+                            isNull(), // no draftTitle for ISSUE
+                            isNull(), // no draftBody for ISSUE
+                            eq(false),
+                            isNull(),
+                            any(Instant.class),
+                            any(Instant.class));
         }
 
         @Test
@@ -440,21 +421,21 @@ class GitHubProjectItemProcessorTest extends BaseUnitTest {
             ProjectItem result = processor.process(dto, project, context);
 
             assertNotNull(result);
-            verify(projectItemRepository).upsertCore(
-                eq(ITEM_DB_ID),
-                eq(PROVIDER_ID),
-                eq(NODE_ID),
-                eq(PROJECT_ID),
-                eq("PULL_REQUEST"),
-                eq(prIssueId),
-                eq(prIssueId),
-                isNull(),
-                isNull(),
-                eq(false),
-                isNull(),
-                any(Instant.class),
-                any(Instant.class)
-            );
+            verify(projectItemRepository)
+                    .upsertCore(
+                            eq(ITEM_DB_ID),
+                            eq(PROVIDER_ID),
+                            eq(NODE_ID),
+                            eq(PROJECT_ID),
+                            eq("PULL_REQUEST"),
+                            eq(prIssueId),
+                            eq(prIssueId),
+                            isNull(),
+                            isNull(),
+                            eq(false),
+                            isNull(),
+                            any(Instant.class),
+                            any(Instant.class));
         }
 
         @Test
@@ -470,21 +451,21 @@ class GitHubProjectItemProcessorTest extends BaseUnitTest {
             assertNotNull(result);
             // issueId should be null because issue doesn't exist locally
             // contentDatabaseId should still be set for orphan relinking
-            verify(projectItemRepository).upsertCore(
-                eq(ITEM_DB_ID),
-                eq(PROVIDER_ID),
-                eq(NODE_ID),
-                eq(PROJECT_ID),
-                eq("ISSUE"),
-                isNull(), // issueId null — issue not in local DB
-                eq(nonExistentIssueId), // contentDatabaseId still set for relinking
-                isNull(),
-                isNull(),
-                eq(false),
-                isNull(),
-                any(Instant.class),
-                any(Instant.class)
-            );
+            verify(projectItemRepository)
+                    .upsertCore(
+                            eq(ITEM_DB_ID),
+                            eq(PROVIDER_ID),
+                            eq(NODE_ID),
+                            eq(PROJECT_ID),
+                            eq("ISSUE"),
+                            isNull(), // issueId null — issue not in local DB
+                            eq(nonExistentIssueId), // contentDatabaseId still set for relinking
+                            isNull(),
+                            isNull(),
+                            eq(false),
+                            isNull(),
+                            any(Instant.class),
+                            any(Instant.class));
         }
 
         @Test
@@ -497,21 +478,21 @@ class GitHubProjectItemProcessorTest extends BaseUnitTest {
             ProjectItem result = processor.process(dto, project, context);
 
             assertNotNull(result);
-            verify(projectItemRepository).upsertCore(
-                eq(ITEM_DB_ID),
-                eq(PROVIDER_ID),
-                eq(NODE_ID),
-                eq(PROJECT_ID),
-                eq("ISSUE"),
-                isNull(), // issueId null — contentDatabaseId was null
-                isNull(), // contentDatabaseId null
-                isNull(),
-                isNull(),
-                eq(false),
-                isNull(),
-                any(Instant.class),
-                any(Instant.class)
-            );
+            verify(projectItemRepository)
+                    .upsertCore(
+                            eq(ITEM_DB_ID),
+                            eq(PROVIDER_ID),
+                            eq(NODE_ID),
+                            eq(PROJECT_ID),
+                            eq("ISSUE"),
+                            isNull(), // issueId null — contentDatabaseId was null
+                            isNull(), // contentDatabaseId null
+                            isNull(),
+                            isNull(),
+                            eq(false),
+                            isNull(),
+                            any(Instant.class),
+                            any(Instant.class));
             // Should not attempt issue lookup when contentDatabaseId is null
             verify(issueRepository, never()).existsById(any());
         }
@@ -521,24 +502,23 @@ class GitHubProjectItemProcessorTest extends BaseUnitTest {
             Long creatorId = 200L;
             GitHubUserDTO creatorDTO = new GitHubUserDTO(creatorId, null, "testuser", null, null, null, null);
             GitHubProjectItemDTO dto = new GitHubProjectItemDTO(
-                null,
-                ITEM_DB_ID,
-                NODE_ID,
-                null,
-                "DRAFT_ISSUE",
-                null,
-                null,
-                "Title",
-                "Body",
-                false,
-                creatorDTO,
-                Collections.emptyList(),
-                false,
-                0,
-                null,
-                Instant.now(),
-                Instant.now()
-            );
+                    null,
+                    ITEM_DB_ID,
+                    NODE_ID,
+                    null,
+                    "DRAFT_ISSUE",
+                    null,
+                    null,
+                    "Title",
+                    "Body",
+                    false,
+                    creatorDTO,
+                    Collections.emptyList(),
+                    false,
+                    0,
+                    null,
+                    Instant.now(),
+                    Instant.now());
             ProjectItem entity = createProjectItemEntity(ProjectItem.ContentType.DRAFT_ISSUE);
             stubSuccessfulProcess(true, entity);
             when(userRepository.existsById(creatorId)).thenReturn(true);
@@ -546,21 +526,21 @@ class GitHubProjectItemProcessorTest extends BaseUnitTest {
             ProjectItem result = processor.process(dto, project, context);
 
             assertNotNull(result);
-            verify(projectItemRepository).upsertCore(
-                eq(ITEM_DB_ID),
-                eq(PROVIDER_ID),
-                eq(NODE_ID),
-                eq(PROJECT_ID),
-                eq("DRAFT_ISSUE"),
-                isNull(),
-                isNull(),
-                eq("Title"),
-                eq("Body"),
-                eq(false),
-                eq(creatorId), // creatorId resolved
-                any(Instant.class),
-                any(Instant.class)
-            );
+            verify(projectItemRepository)
+                    .upsertCore(
+                            eq(ITEM_DB_ID),
+                            eq(PROVIDER_ID),
+                            eq(NODE_ID),
+                            eq(PROJECT_ID),
+                            eq("DRAFT_ISSUE"),
+                            isNull(),
+                            isNull(),
+                            eq("Title"),
+                            eq("Body"),
+                            eq(false),
+                            eq(creatorId), // creatorId resolved
+                            any(Instant.class),
+                            any(Instant.class));
         }
 
         @Test
@@ -568,45 +548,44 @@ class GitHubProjectItemProcessorTest extends BaseUnitTest {
             Long creatorId = 300L;
             GitHubUserDTO creatorDTO = new GitHubUserDTO(creatorId, null, "unknown", null, null, null, null);
             GitHubProjectItemDTO dto = new GitHubProjectItemDTO(
-                null,
-                ITEM_DB_ID,
-                NODE_ID,
-                null,
-                "DRAFT_ISSUE",
-                null,
-                null,
-                "Title",
-                null,
-                false,
-                creatorDTO,
-                Collections.emptyList(),
-                false,
-                0,
-                null,
-                Instant.now(),
-                Instant.now()
-            );
+                    null,
+                    ITEM_DB_ID,
+                    NODE_ID,
+                    null,
+                    "DRAFT_ISSUE",
+                    null,
+                    null,
+                    "Title",
+                    null,
+                    false,
+                    creatorDTO,
+                    Collections.emptyList(),
+                    false,
+                    0,
+                    null,
+                    Instant.now(),
+                    Instant.now());
             ProjectItem entity = createProjectItemEntity(ProjectItem.ContentType.DRAFT_ISSUE);
             stubSuccessfulProcess(true, entity);
             when(userRepository.existsById(creatorId)).thenReturn(false);
 
             processor.process(dto, project, context);
 
-            verify(projectItemRepository).upsertCore(
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(boolean.class),
-                isNull(), // creatorId null because user doesn't exist locally
-                any(),
-                any()
-            );
+            verify(projectItemRepository)
+                    .upsertCore(
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(boolean.class),
+                            isNull(), // creatorId null because user doesn't exist locally
+                            any(),
+                            any());
         }
 
         @Test
@@ -617,44 +596,43 @@ class GitHubProjectItemProcessorTest extends BaseUnitTest {
 
             processor.process(dto, project, context);
 
-            verify(projectItemRepository).upsertCore(
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(boolean.class),
-                isNull(), // creatorId null because creator DTO is null
-                any(),
-                any()
-            );
+            verify(projectItemRepository)
+                    .upsertCore(
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(boolean.class),
+                            isNull(), // creatorId null because creator DTO is null
+                            any(),
+                            any());
         }
 
         @Test
         void shouldPassArchivedFlagThroughToUpsert() {
             GitHubProjectItemDTO dto = new GitHubProjectItemDTO(
-                null,
-                ITEM_DB_ID,
-                NODE_ID,
-                null,
-                "DRAFT_ISSUE",
-                null,
-                null,
-                "Title",
-                null,
-                true,
-                null,
-                Collections.emptyList(),
-                false,
-                0,
-                null,
-                Instant.now(),
-                Instant.now()
-            );
+                    null,
+                    ITEM_DB_ID,
+                    NODE_ID,
+                    null,
+                    "DRAFT_ISSUE",
+                    null,
+                    null,
+                    "Title",
+                    null,
+                    true,
+                    null,
+                    Collections.emptyList(),
+                    false,
+                    0,
+                    null,
+                    Instant.now(),
+                    Instant.now());
             ProjectItem entity = createProjectItemEntity(ProjectItem.ContentType.DRAFT_ISSUE);
             entity.setArchived(true);
             stubSuccessfulProcess(false, entity);
@@ -662,21 +640,21 @@ class GitHubProjectItemProcessorTest extends BaseUnitTest {
             processor.process(dto, project, context);
 
             // Assert — verify archived=true is passed to upsert
-            verify(projectItemRepository).upsertCore(
-                eq(ITEM_DB_ID),
-                eq(PROVIDER_ID),
-                eq(NODE_ID),
-                eq(PROJECT_ID),
-                eq("DRAFT_ISSUE"),
-                isNull(),
-                isNull(),
-                eq("Title"),
-                isNull(),
-                eq(true), // archived = true
-                isNull(),
-                any(Instant.class),
-                any(Instant.class)
-            );
+            verify(projectItemRepository)
+                    .upsertCore(
+                            eq(ITEM_DB_ID),
+                            eq(PROVIDER_ID),
+                            eq(NODE_ID),
+                            eq(PROJECT_ID),
+                            eq("DRAFT_ISSUE"),
+                            isNull(),
+                            isNull(),
+                            eq("Title"),
+                            isNull(),
+                            eq(true), // archived = true
+                            isNull(),
+                            any(Instant.class),
+                            any(Instant.class));
         }
 
         @Test
@@ -699,9 +677,8 @@ class GitHubProjectItemProcessorTest extends BaseUnitTest {
 
             processor.process(dto, project, context);
 
-            ArgumentCaptor<GitHubProjectEvent.ProjectItemCreated> captor = ArgumentCaptor.forClass(
-                GitHubProjectEvent.ProjectItemCreated.class
-            );
+            ArgumentCaptor<GitHubProjectEvent.ProjectItemCreated> captor =
+                    ArgumentCaptor.forClass(GitHubProjectEvent.ProjectItemCreated.class);
             verify(eventPublisher).publishEvent(captor.capture());
             GitHubProjectEvent.ProjectItemCreated event = captor.getValue();
             assertThat(event.projectId()).isEqualTo(PROJECT_ID);
@@ -717,9 +694,8 @@ class GitHubProjectItemProcessorTest extends BaseUnitTest {
 
             processor.process(dto, project, context);
 
-            ArgumentCaptor<GitHubProjectEvent.ProjectItemUpdated> captor = ArgumentCaptor.forClass(
-                GitHubProjectEvent.ProjectItemUpdated.class
-            );
+            ArgumentCaptor<GitHubProjectEvent.ProjectItemUpdated> captor =
+                    ArgumentCaptor.forClass(GitHubProjectEvent.ProjectItemUpdated.class);
             verify(eventPublisher).publishEvent(captor.capture());
             GitHubProjectEvent.ProjectItemUpdated event = captor.getValue();
             assertThat(event.projectId()).isEqualTo(PROJECT_ID);
@@ -731,24 +707,23 @@ class GitHubProjectItemProcessorTest extends BaseUnitTest {
             // Arrange — databaseId is null but id is set
             Long fallbackId = 5555L;
             GitHubProjectItemDTO dto = new GitHubProjectItemDTO(
-                fallbackId,
-                null,
-                NODE_ID,
-                null,
-                "DRAFT_ISSUE",
-                null,
-                null,
-                "Title",
-                null,
-                false,
-                null,
-                Collections.emptyList(),
-                false,
-                0,
-                null,
-                Instant.now(),
-                Instant.now()
-            );
+                    fallbackId,
+                    null,
+                    NODE_ID,
+                    null,
+                    "DRAFT_ISSUE",
+                    null,
+                    null,
+                    "Title",
+                    null,
+                    false,
+                    null,
+                    Collections.emptyList(),
+                    false,
+                    0,
+                    null,
+                    Instant.now(),
+                    Instant.now());
             ProjectItem entity = createProjectItemEntity(ProjectItem.ContentType.DRAFT_ISSUE);
             entity.setId(fallbackId);
             stubSuccessfulProcess(true, entity);
@@ -756,21 +731,21 @@ class GitHubProjectItemProcessorTest extends BaseUnitTest {
             ProjectItem result = processor.process(dto, project, context);
 
             assertNotNull(result);
-            verify(projectItemRepository).upsertCore(
-                eq(fallbackId), // getDatabaseId() falls back to id
-                eq(PROVIDER_ID),
-                eq(NODE_ID),
-                eq(PROJECT_ID),
-                eq("DRAFT_ISSUE"),
-                isNull(),
-                isNull(),
-                eq("Title"),
-                isNull(),
-                eq(false),
-                isNull(),
-                any(Instant.class),
-                any(Instant.class)
-            );
+            verify(projectItemRepository)
+                    .upsertCore(
+                            eq(fallbackId), // getDatabaseId() falls back to id
+                            eq(PROVIDER_ID),
+                            eq(NODE_ID),
+                            eq(PROJECT_ID),
+                            eq("DRAFT_ISSUE"),
+                            isNull(),
+                            isNull(),
+                            eq("Title"),
+                            isNull(),
+                            eq(false),
+                            isNull(),
+                            any(Instant.class),
+                            any(Instant.class));
         }
     }
 
@@ -791,59 +766,43 @@ class GitHubProjectItemProcessorTest extends BaseUnitTest {
         @Test
         void shouldDeleteStaleDraftIssuesNotInSyncedList() {
             List<String> syncedNodeIds = List.of("PVTI_1", "PVTI_2");
-            when(
-                projectItemRepository.deleteByProjectIdAndContentTypeAndNodeIdNotIn(
-                    eq(PROJECT_ID),
-                    eq(ProjectItem.ContentType.DRAFT_ISSUE),
-                    eq(syncedNodeIds)
-                )
-            ).thenReturn(2);
+            when(projectItemRepository.deleteByProjectIdAndContentTypeAndNodeIdNotIn(
+                            eq(PROJECT_ID), eq(ProjectItem.ContentType.DRAFT_ISSUE), eq(syncedNodeIds)))
+                    .thenReturn(2);
 
             int result = processor.removeStaleDraftIssues(PROJECT_ID, syncedNodeIds, context);
 
             assertThat(result).isEqualTo(2);
-            verify(projectItemRepository).deleteByProjectIdAndContentTypeAndNodeIdNotIn(
-                eq(PROJECT_ID),
-                eq(ProjectItem.ContentType.DRAFT_ISSUE),
-                eq(syncedNodeIds)
-            );
+            verify(projectItemRepository)
+                    .deleteByProjectIdAndContentTypeAndNodeIdNotIn(
+                            eq(PROJECT_ID), eq(ProjectItem.ContentType.DRAFT_ISSUE), eq(syncedNodeIds));
         }
 
         @Test
         void shouldDeleteAllDraftIssuesWhenSyncedListIsEmpty() {
-            when(
-                projectItemRepository.deleteByProjectIdAndContentType(
-                    eq(PROJECT_ID),
-                    eq(ProjectItem.ContentType.DRAFT_ISSUE)
-                )
-            ).thenReturn(3);
+            when(projectItemRepository.deleteByProjectIdAndContentType(
+                            eq(PROJECT_ID), eq(ProjectItem.ContentType.DRAFT_ISSUE)))
+                    .thenReturn(3);
 
             int result = processor.removeStaleDraftIssues(PROJECT_ID, List.of(), context);
 
             assertThat(result).isEqualTo(3);
-            verify(projectItemRepository).deleteByProjectIdAndContentType(
-                eq(PROJECT_ID),
-                eq(ProjectItem.ContentType.DRAFT_ISSUE)
-            );
+            verify(projectItemRepository)
+                    .deleteByProjectIdAndContentType(eq(PROJECT_ID), eq(ProjectItem.ContentType.DRAFT_ISSUE));
             verify(projectItemRepository, never()).deleteByProjectIdAndContentTypeAndNodeIdNotIn(any(), any(), any());
         }
 
         @Test
         void shouldDeleteAllDraftIssuesWhenSyncedListIsNull() {
-            when(
-                projectItemRepository.deleteByProjectIdAndContentType(
-                    eq(PROJECT_ID),
-                    eq(ProjectItem.ContentType.DRAFT_ISSUE)
-                )
-            ).thenReturn(1);
+            when(projectItemRepository.deleteByProjectIdAndContentType(
+                            eq(PROJECT_ID), eq(ProjectItem.ContentType.DRAFT_ISSUE)))
+                    .thenReturn(1);
 
             int result = processor.removeStaleDraftIssues(PROJECT_ID, null, context);
 
             assertThat(result).isEqualTo(1);
-            verify(projectItemRepository).deleteByProjectIdAndContentType(
-                eq(PROJECT_ID),
-                eq(ProjectItem.ContentType.DRAFT_ISSUE)
-            );
+            verify(projectItemRepository)
+                    .deleteByProjectIdAndContentType(eq(PROJECT_ID), eq(ProjectItem.ContentType.DRAFT_ISSUE));
         }
 
         @Test
@@ -852,23 +811,17 @@ class GitHubProjectItemProcessorTest extends BaseUnitTest {
             // so archived Draft Issues are never removed. We verify the correct
             // repository method is called, whose query definition already filters archived items.
             List<String> syncedNodeIds = List.of("PVTI_1");
-            when(
-                projectItemRepository.deleteByProjectIdAndContentTypeAndNodeIdNotIn(
-                    eq(PROJECT_ID),
-                    eq(ProjectItem.ContentType.DRAFT_ISSUE),
-                    eq(syncedNodeIds)
-                )
-            ).thenReturn(0);
+            when(projectItemRepository.deleteByProjectIdAndContentTypeAndNodeIdNotIn(
+                            eq(PROJECT_ID), eq(ProjectItem.ContentType.DRAFT_ISSUE), eq(syncedNodeIds)))
+                    .thenReturn(0);
 
             int result = processor.removeStaleDraftIssues(PROJECT_ID, syncedNodeIds, context);
 
             assertThat(result).isZero();
             // Key assertion: the method called is the archived-aware one
-            verify(projectItemRepository).deleteByProjectIdAndContentTypeAndNodeIdNotIn(
-                eq(PROJECT_ID),
-                eq(ProjectItem.ContentType.DRAFT_ISSUE),
-                eq(syncedNodeIds)
-            );
+            verify(projectItemRepository)
+                    .deleteByProjectIdAndContentTypeAndNodeIdNotIn(
+                            eq(PROJECT_ID), eq(ProjectItem.ContentType.DRAFT_ISSUE), eq(syncedNodeIds));
         }
     }
 
@@ -889,26 +842,18 @@ class GitHubProjectItemProcessorTest extends BaseUnitTest {
         @Test
         void shouldDeleteNonArchivedItemsNotInSyncedList() {
             List<String> syncedNodeIds = List.of("PVTI_1", "PVTI_2");
-            List<ProjectItem.ContentType> expectedTypes = List.of(
-                ProjectItem.ContentType.ISSUE,
-                ProjectItem.ContentType.PULL_REQUEST
-            );
-            when(
-                projectItemRepository.deleteByProjectIdAndContentTypeInAndNodeIdNotIn(
-                    eq(PROJECT_ID),
-                    eq(expectedTypes),
-                    eq(syncedNodeIds)
-                )
-            ).thenReturn(3);
+            List<ProjectItem.ContentType> expectedTypes =
+                    List.of(ProjectItem.ContentType.ISSUE, ProjectItem.ContentType.PULL_REQUEST);
+            when(projectItemRepository.deleteByProjectIdAndContentTypeInAndNodeIdNotIn(
+                            eq(PROJECT_ID), eq(expectedTypes), eq(syncedNodeIds)))
+                    .thenReturn(3);
 
             int result = processor.removeStaleIssuePrItems(PROJECT_ID, syncedNodeIds, context);
 
             assertThat(result).isEqualTo(3);
-            verify(projectItemRepository).deleteByProjectIdAndContentTypeInAndNodeIdNotIn(
-                eq(PROJECT_ID),
-                eq(expectedTypes),
-                eq(syncedNodeIds)
-            );
+            verify(projectItemRepository)
+                    .deleteByProjectIdAndContentTypeInAndNodeIdNotIn(
+                            eq(PROJECT_ID), eq(expectedTypes), eq(syncedNodeIds));
         }
 
         @Test
@@ -917,38 +862,27 @@ class GitHubProjectItemProcessorTest extends BaseUnitTest {
             // excluded from deletion. We verify the correct repository method is called, which
             // by its JPQL definition only targets non-archived items.
             List<String> syncedNodeIds = List.of("PVTI_1");
-            List<ProjectItem.ContentType> expectedTypes = List.of(
-                ProjectItem.ContentType.ISSUE,
-                ProjectItem.ContentType.PULL_REQUEST
-            );
+            List<ProjectItem.ContentType> expectedTypes =
+                    List.of(ProjectItem.ContentType.ISSUE, ProjectItem.ContentType.PULL_REQUEST);
             // Repository returns 0 — the "missing" items were archived and excluded by the query
-            when(
-                projectItemRepository.deleteByProjectIdAndContentTypeInAndNodeIdNotIn(
-                    eq(PROJECT_ID),
-                    eq(expectedTypes),
-                    eq(syncedNodeIds)
-                )
-            ).thenReturn(0);
+            when(projectItemRepository.deleteByProjectIdAndContentTypeInAndNodeIdNotIn(
+                            eq(PROJECT_ID), eq(expectedTypes), eq(syncedNodeIds)))
+                    .thenReturn(0);
 
             int result = processor.removeStaleIssuePrItems(PROJECT_ID, syncedNodeIds, context);
 
             assertThat(result).isZero();
-            verify(projectItemRepository).deleteByProjectIdAndContentTypeInAndNodeIdNotIn(
-                eq(PROJECT_ID),
-                eq(expectedTypes),
-                eq(syncedNodeIds)
-            );
+            verify(projectItemRepository)
+                    .deleteByProjectIdAndContentTypeInAndNodeIdNotIn(
+                            eq(PROJECT_ID), eq(expectedTypes), eq(syncedNodeIds));
         }
 
         @Test
         void shouldCallDeleteByContentTypeInWhenSyncedListIsNull() {
-            List<ProjectItem.ContentType> expectedTypes = List.of(
-                ProjectItem.ContentType.ISSUE,
-                ProjectItem.ContentType.PULL_REQUEST
-            );
-            when(projectItemRepository.deleteByProjectIdAndContentTypeIn(eq(PROJECT_ID), eq(expectedTypes))).thenReturn(
-                5
-            );
+            List<ProjectItem.ContentType> expectedTypes =
+                    List.of(ProjectItem.ContentType.ISSUE, ProjectItem.ContentType.PULL_REQUEST);
+            when(projectItemRepository.deleteByProjectIdAndContentTypeIn(eq(PROJECT_ID), eq(expectedTypes)))
+                    .thenReturn(5);
 
             int result = processor.removeStaleIssuePrItems(PROJECT_ID, null, context);
 
@@ -959,13 +893,10 @@ class GitHubProjectItemProcessorTest extends BaseUnitTest {
 
         @Test
         void shouldCallDeleteByContentTypeInWhenSyncedListIsEmpty() {
-            List<ProjectItem.ContentType> expectedTypes = List.of(
-                ProjectItem.ContentType.ISSUE,
-                ProjectItem.ContentType.PULL_REQUEST
-            );
-            when(projectItemRepository.deleteByProjectIdAndContentTypeIn(eq(PROJECT_ID), eq(expectedTypes))).thenReturn(
-                2
-            );
+            List<ProjectItem.ContentType> expectedTypes =
+                    List.of(ProjectItem.ContentType.ISSUE, ProjectItem.ContentType.PULL_REQUEST);
+            when(projectItemRepository.deleteByProjectIdAndContentTypeIn(eq(PROJECT_ID), eq(expectedTypes)))
+                    .thenReturn(2);
 
             int result = processor.removeStaleIssuePrItems(PROJECT_ID, List.of(), context);
 
@@ -978,17 +909,11 @@ class GitHubProjectItemProcessorTest extends BaseUnitTest {
         void shouldReturnZeroWhenNoStaleItemsExist() {
             // Arrange — all items in the DB are in the synced list
             List<String> syncedNodeIds = List.of("PVTI_1", "PVTI_2", "PVTI_3");
-            List<ProjectItem.ContentType> expectedTypes = List.of(
-                ProjectItem.ContentType.ISSUE,
-                ProjectItem.ContentType.PULL_REQUEST
-            );
-            when(
-                projectItemRepository.deleteByProjectIdAndContentTypeInAndNodeIdNotIn(
-                    eq(PROJECT_ID),
-                    eq(expectedTypes),
-                    eq(syncedNodeIds)
-                )
-            ).thenReturn(0);
+            List<ProjectItem.ContentType> expectedTypes =
+                    List.of(ProjectItem.ContentType.ISSUE, ProjectItem.ContentType.PULL_REQUEST);
+            when(projectItemRepository.deleteByProjectIdAndContentTypeInAndNodeIdNotIn(
+                            eq(PROJECT_ID), eq(expectedTypes), eq(syncedNodeIds)))
+                    .thenReturn(0);
 
             int result = processor.removeStaleIssuePrItems(PROJECT_ID, syncedNodeIds, context);
 
@@ -1014,21 +939,21 @@ class GitHubProjectItemProcessorTest extends BaseUnitTest {
             assertNotNull(result);
 
             // Verify that archived=true was forced via withArchived(true)
-            verify(projectItemRepository).upsertCore(
-                eq(ITEM_DB_ID),
-                eq(PROVIDER_ID),
-                eq(NODE_ID),
-                eq(PROJECT_ID),
-                eq("DRAFT_ISSUE"),
-                isNull(),
-                isNull(),
-                eq("Draft Title"),
-                eq("Draft Body"),
-                eq(true), // archived forced to true
-                isNull(),
-                any(Instant.class),
-                any(Instant.class)
-            );
+            verify(projectItemRepository)
+                    .upsertCore(
+                            eq(ITEM_DB_ID),
+                            eq(PROVIDER_ID),
+                            eq(NODE_ID),
+                            eq(PROJECT_ID),
+                            eq("DRAFT_ISSUE"),
+                            isNull(),
+                            isNull(),
+                            eq("Draft Title"),
+                            eq("Draft Body"),
+                            eq(true), // archived forced to true
+                            isNull(),
+                            any(Instant.class),
+                            any(Instant.class));
 
             // Verify both the base event (Updated) and the Archived event are published
             // process() publishes Updated (since !isNew), then processArchived publishes Archived
@@ -1040,9 +965,8 @@ class GitHubProjectItemProcessorTest extends BaseUnitTest {
             assertThat(events.get(0)).isInstanceOf(GitHubProjectEvent.ProjectItemUpdated.class);
             assertThat(events.get(1)).isInstanceOf(GitHubProjectEvent.ProjectItemArchived.class);
 
-            GitHubProjectEvent.ProjectItemArchived archivedEvent = (GitHubProjectEvent.ProjectItemArchived) events.get(
-                1
-            );
+            GitHubProjectEvent.ProjectItemArchived archivedEvent =
+                    (GitHubProjectEvent.ProjectItemArchived) events.get(1);
             assertThat(archivedEvent.projectId()).isEqualTo(PROJECT_ID);
             assertThat(archivedEvent.item().id()).isEqualTo(ITEM_DB_ID);
         }
@@ -1070,9 +994,8 @@ class GitHubProjectItemProcessorTest extends BaseUnitTest {
             ArgumentCaptor<Object> eventCaptor = ArgumentCaptor.forClass(Object.class);
             verify(eventPublisher, Mockito.times(2)).publishEvent(eventCaptor.capture());
 
-            GitHubProjectEvent.ProjectItemArchived archivedEvent = (GitHubProjectEvent.ProjectItemArchived) eventCaptor
-                .getAllValues()
-                .get(1);
+            GitHubProjectEvent.ProjectItemArchived archivedEvent = (GitHubProjectEvent.ProjectItemArchived)
+                    eventCaptor.getAllValues().get(1);
             assertThat(archivedEvent.item().actorId()).isEqualTo(actorId);
         }
     }
@@ -1086,24 +1009,23 @@ class GitHubProjectItemProcessorTest extends BaseUnitTest {
         void shouldForceArchivedFalseAndPublishRestoredEvent() {
             // Arrange — DTO has archived=true (from existing state)
             GitHubProjectItemDTO dto = new GitHubProjectItemDTO(
-                null,
-                ITEM_DB_ID,
-                NODE_ID,
-                null,
-                "DRAFT_ISSUE",
-                null,
-                null,
-                "Title",
-                null,
-                true,
-                null,
-                Collections.emptyList(),
-                false,
-                0,
-                null,
-                Instant.parse("2025-01-01T00:00:00Z"),
-                Instant.parse("2025-01-02T00:00:00Z")
-            );
+                    null,
+                    ITEM_DB_ID,
+                    NODE_ID,
+                    null,
+                    "DRAFT_ISSUE",
+                    null,
+                    null,
+                    "Title",
+                    null,
+                    true,
+                    null,
+                    Collections.emptyList(),
+                    false,
+                    0,
+                    null,
+                    Instant.parse("2025-01-01T00:00:00Z"),
+                    Instant.parse("2025-01-02T00:00:00Z"));
             ProjectItem entity = createProjectItemEntity(ProjectItem.ContentType.DRAFT_ISSUE);
             entity.setArchived(false);
             stubSuccessfulProcess(false, entity);
@@ -1113,21 +1035,21 @@ class GitHubProjectItemProcessorTest extends BaseUnitTest {
             assertNotNull(result);
 
             // Verify that archived=false was forced via withArchived(false)
-            verify(projectItemRepository).upsertCore(
-                eq(ITEM_DB_ID),
-                eq(PROVIDER_ID),
-                eq(NODE_ID),
-                eq(PROJECT_ID),
-                eq("DRAFT_ISSUE"),
-                isNull(),
-                isNull(),
-                eq("Title"),
-                isNull(),
-                eq(false), // archived forced to false
-                isNull(),
-                any(Instant.class),
-                any(Instant.class)
-            );
+            verify(projectItemRepository)
+                    .upsertCore(
+                            eq(ITEM_DB_ID),
+                            eq(PROVIDER_ID),
+                            eq(NODE_ID),
+                            eq(PROJECT_ID),
+                            eq("DRAFT_ISSUE"),
+                            isNull(),
+                            isNull(),
+                            eq("Title"),
+                            isNull(),
+                            eq(false), // archived forced to false
+                            isNull(),
+                            any(Instant.class),
+                            any(Instant.class));
 
             // Verify both base event (Updated) and Restored event are published
             ArgumentCaptor<Object> eventCaptor = ArgumentCaptor.forClass(Object.class);
@@ -1138,9 +1060,8 @@ class GitHubProjectItemProcessorTest extends BaseUnitTest {
             assertThat(events.get(0)).isInstanceOf(GitHubProjectEvent.ProjectItemUpdated.class);
             assertThat(events.get(1)).isInstanceOf(GitHubProjectEvent.ProjectItemRestored.class);
 
-            GitHubProjectEvent.ProjectItemRestored restoredEvent = (GitHubProjectEvent.ProjectItemRestored) events.get(
-                1
-            );
+            GitHubProjectEvent.ProjectItemRestored restoredEvent =
+                    (GitHubProjectEvent.ProjectItemRestored) events.get(1);
             assertThat(restoredEvent.projectId()).isEqualTo(PROJECT_ID);
             assertThat(restoredEvent.item().id()).isEqualTo(ITEM_DB_ID);
         }
@@ -1167,9 +1088,8 @@ class GitHubProjectItemProcessorTest extends BaseUnitTest {
             ArgumentCaptor<Object> eventCaptor = ArgumentCaptor.forClass(Object.class);
             verify(eventPublisher, Mockito.times(2)).publishEvent(eventCaptor.capture());
 
-            GitHubProjectEvent.ProjectItemRestored restoredEvent = (GitHubProjectEvent.ProjectItemRestored) eventCaptor
-                .getAllValues()
-                .get(1);
+            GitHubProjectEvent.ProjectItemRestored restoredEvent = (GitHubProjectEvent.ProjectItemRestored)
+                    eventCaptor.getAllValues().get(1);
             assertThat(restoredEvent.item().actorId()).isEqualTo(actorId);
         }
 
@@ -1184,21 +1104,10 @@ class GitHubProjectItemProcessorTest extends BaseUnitTest {
 
             assertNotNull(result);
             // Verify archived=false is passed
-            verify(projectItemRepository).upsertCore(
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                eq(false),
-                any(),
-                any(),
-                any()
-            );
+            verify(projectItemRepository)
+                    .upsertCore(
+                            any(), any(), any(), any(), any(), any(), any(), any(), any(), eq(false), any(), any(),
+                            any());
         }
     }
 }

@@ -18,9 +18,8 @@ class WorkspaceSummaryQueryAdapter implements WorkspaceSummaryQuery {
     @Transactional(readOnly = true)
     public Optional<WorkspaceSummary> findById(long workspaceId) {
         return workspaceRepository
-            .findById(workspaceId)
-            .map(workspace ->
-                new WorkspaceSummary(workspace.getId(), workspace.getWorkspaceSlug(), workspace.getDisplayName())
-            );
+                .findById(workspaceId)
+                .map(workspace -> new WorkspaceSummary(
+                        workspace.getId(), workspace.getWorkspaceSlug(), workspace.getDisplayName()));
     }
 }

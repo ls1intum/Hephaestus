@@ -40,9 +40,8 @@ public record WorkspaceReviewScope(List<String> targetBranches, List<String> rep
     /** Explicit property names: the stored JSON must not depend on the {@code -parameters} compile flag. */
     @JsonCreator
     public WorkspaceReviewScope(
-        @JsonProperty("targetBranches") @Nullable List<String> targetBranches,
-        @JsonProperty("repositories") @Nullable List<String> repositories
-    ) {
+            @JsonProperty("targetBranches") @Nullable List<String> targetBranches,
+            @JsonProperty("repositories") @Nullable List<String> repositories) {
         this.targetBranches = normalize(targetBranches);
         this.repositories = normalize(repositories);
     }
@@ -51,12 +50,11 @@ public record WorkspaceReviewScope(List<String> targetBranches, List<String> rep
         if (values == null) {
             return List.of();
         }
-        return values
-            .stream()
-            .filter(value -> value != null && !value.isBlank())
-            .map(String::trim)
-            .distinct()
-            .toList();
+        return values.stream()
+                .filter(value -> value != null && !value.isBlank())
+                .map(String::trim)
+                .distinct()
+                .toList();
     }
 
     @JsonIgnore

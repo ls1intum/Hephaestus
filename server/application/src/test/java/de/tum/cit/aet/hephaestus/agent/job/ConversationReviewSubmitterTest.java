@@ -58,19 +58,15 @@ class ConversationReviewSubmitterTest extends BaseUnitTest {
     @BeforeEach
     @SuppressWarnings("unchecked")
     void setUp() {
-        submitter = new ConversationReviewSubmitter(
-            candidateSource,
-            agentJobService,
-            signalRecorder,
-            transactionTemplate
-        );
+        submitter =
+                new ConversationReviewSubmitter(candidateSource, agentJobService, signalRecorder, transactionTemplate);
         lenient()
-            .doAnswer(invocation -> {
-                ((Consumer<TransactionStatus>) invocation.getArgument(0)).accept(mock(TransactionStatus.class));
-                return null;
-            })
-            .when(transactionTemplate)
-            .executeWithoutResult(any());
+                .doAnswer(invocation -> {
+                    ((Consumer<TransactionStatus>) invocation.getArgument(0)).accept(mock(TransactionStatus.class));
+                    return null;
+                })
+                .when(transactionTemplate)
+                .executeWithoutResult(any());
     }
 
     /**
@@ -85,12 +81,8 @@ class ConversationReviewSubmitterTest extends BaseUnitTest {
         long started = submitter.submitAndSettle(candidate(11L, 12L, 13L), key());
 
         assertThat(started).isEqualTo(3);
-        verify(agentJobService, times(3)).submitWithOutcome(
-            eq(WORKSPACE_ID),
-            eq(AgentJobType.CONVERSATION_REVIEW),
-            any(),
-            eq(null)
-        );
+        verify(agentJobService, times(3))
+                .submitWithOutcome(eq(WORKSPACE_ID), eq(AgentJobType.CONVERSATION_REVIEW), any(), eq(null));
         verify(signalRecorder).markTriggered(eq(key()), any());
         verify(signalRecorder, never()).markRefused(any(), any());
     }
@@ -98,9 +90,8 @@ class ConversationReviewSubmitterTest extends BaseUnitTest {
     /** A refused occurrence gets its reason on the row, which is what the reaper later reads. */
     @Test
     void anOccurrenceNothingRanForIsRefusedWithTheReasonThatStoppedIt() {
-        when(agentJobService.submitWithOutcome(anyLong(), any(), any(), any())).thenReturn(
-            SubmissionOutcome.refused(SignalStateReason.BUDGET_EXHAUSTED)
-        );
+        when(agentJobService.submitWithOutcome(anyLong(), any(), any(), any()))
+                .thenReturn(SubmissionOutcome.refused(SignalStateReason.BUDGET_EXHAUSTED));
 
         long started = submitter.submitAndSettle(candidate(11L), key());
 
@@ -117,10 +108,8 @@ class ConversationReviewSubmitterTest extends BaseUnitTest {
     void aPartialFanOutStillCountsAsAnOccurrenceThatWasReviewed() {
         AgentJob job = new AgentJob();
         job.setId(UUID.randomUUID());
-        when(agentJobService.submitWithOutcome(anyLong(), any(), any(), any())).thenReturn(
-            SubmissionOutcome.refused(SignalStateReason.SUBJECT_UNLINKED),
-            SubmissionOutcome.of(job)
-        );
+        when(agentJobService.submitWithOutcome(anyLong(), any(), any(), any()))
+                .thenReturn(SubmissionOutcome.refused(SignalStateReason.SUBJECT_UNLINKED), SubmissionOutcome.of(job));
 
         assertThat(submitter.submitAndSettle(candidate(11L, 12L), key())).isEqualTo(1);
         verify(signalRecorder).markTriggered(key(), job.getId());
@@ -182,15 +171,14 @@ class ConversationReviewSubmitterTest extends BaseUnitTest {
 
     private static ConversationThreadCandidate candidate(long... participants) {
         return new ConversationThreadCandidate(
-            WORKSPACE_ID,
-            THREAD_ID,
-            "C123",
-            "#design",
-            "1700000000.000100",
-            "1700000600.000200",
-            null,
-            participants
-        );
+                WORKSPACE_ID,
+                THREAD_ID,
+                "C123",
+                "#design",
+                "1700000000.000100",
+                "1700000600.000200",
+                null,
+                participants);
     }
 
     private static ArtifactSignal pendingSignal() {

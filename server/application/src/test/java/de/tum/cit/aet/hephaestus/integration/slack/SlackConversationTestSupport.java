@@ -3,7 +3,6 @@ package de.tum.cit.aet.hephaestus.integration.slack;
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
-import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
@@ -19,7 +18,6 @@ import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import java.time.Instant;
-import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
@@ -60,23 +58,20 @@ public final class SlackConversationTestSupport {
      */
     public void ensureUnmappedSlackThreadColumns() {
         jdbc.execute(
-            "ALTER TABLE slack_thread ADD COLUMN IF NOT EXISTS participant_member_ids BIGINT[] NOT NULL DEFAULT '{}'"
-        );
+                "ALTER TABLE slack_thread ADD COLUMN IF NOT EXISTS participant_member_ids BIGINT[] NOT NULL DEFAULT '{}'");
         jdbc.execute("ALTER TABLE slack_thread ADD COLUMN IF NOT EXISTS last_reviewed_ts VARCHAR(32)");
         jdbc.execute(
-            "CREATE INDEX IF NOT EXISTS idx_slack_thread_participants ON slack_thread USING GIN (participant_member_ids)"
-        );
+                "CREATE INDEX IF NOT EXISTS idx_slack_thread_participants ON slack_thread USING GIN (participant_member_ids)");
     }
 
     /** Seed one monitored channel with an explicit consent state. */
     public void seedChannel(long workspaceId, String channelId, String consentState) {
         jdbc.update(
-            "INSERT INTO slack_monitored_channel (workspace_id, slack_team_id, slack_channel_id, channel_name, consent_state, created_at) " +
-                "VALUES (?, 'T1', ?, 'engineering', ?, now())",
-            workspaceId,
-            channelId,
-            consentState
-        );
+                "INSERT INTO slack_monitored_channel (workspace_id, slack_team_id, slack_channel_id, channel_name, consent_state, created_at) "
+                        + "VALUES (?, 'T1', ?, 'engineering', ?, now())",
+                workspaceId,
+                channelId,
+                consentState);
     }
 
     /**
@@ -85,37 +80,34 @@ public final class SlackConversationTestSupport {
      * @param participantArrayLiteral e.g. {@code "{100,101}"}
      */
     public void seedThread(
-        long workspaceId,
-        String channelId,
-        @Nullable String threadTs,
-        String lastTs,
-        int messageCount,
-        String participantArrayLiteral
-    ) {
+            long workspaceId,
+            String channelId,
+            @Nullable String threadTs,
+            String lastTs,
+            int messageCount,
+            String participantArrayLiteral) {
         jdbc.update(
-            "INSERT INTO slack_thread (workspace_id, slack_channel_id, slack_thread_ts, first_ts, last_ts, message_count, participant_member_ids, created_at) " +
-                "VALUES (?, ?, ?, ?, ?, ?, CAST(? AS bigint[]), now())",
-            workspaceId,
-            channelId,
-            threadTs,
-            threadTs,
-            lastTs,
-            messageCount,
-            participantArrayLiteral
-        );
+                "INSERT INTO slack_thread (workspace_id, slack_channel_id, slack_thread_ts, first_ts, last_ts, message_count, participant_member_ids, created_at) "
+                        + "VALUES (?, ?, ?, ?, ?, ?, CAST(? AS bigint[]), now())",
+                workspaceId,
+                channelId,
+                threadTs,
+                threadTs,
+                lastTs,
+                messageCount,
+                participantArrayLiteral);
     }
 
     /** Seed one non-tombstoned message (author {@code U1}). */
     public void seedMessage(long workspaceId, String channelId, String ts, @Nullable String threadTs, String text) {
         jdbc.update(
-            "INSERT INTO slack_message (workspace_id, slack_team_id, slack_channel_id, slack_ts, slack_thread_ts, author_slack_user_id, text, ingested_at) " +
-                "VALUES (?, 'T1', ?, ?, ?, 'U1', ?, now())",
-            workspaceId,
-            channelId,
-            ts,
-            threadTs,
-            text
-        );
+                "INSERT INTO slack_message (workspace_id, slack_team_id, slack_channel_id, slack_ts, slack_thread_ts, author_slack_user_id, text, ingested_at) "
+                        + "VALUES (?, 'T1', ?, ?, ?, 'U1', ?, now())",
+                workspaceId,
+                channelId,
+                ts,
+                threadTs,
+                text);
     }
 
     private static final ObjectMapper OM = new ObjectMapper();
@@ -155,37 +147,34 @@ public final class SlackConversationTestSupport {
      * erasure paths (person opt-out, channel revoke) must sweep.
      */
     public static BoundConversation seedBoundConversation(
-        ObservationRepository observationRepository,
-        FeedbackRepository feedbackRepository,
-        FeedbackObservationRepository feedbackObservationRepository,
-        long workspaceId,
-        UUID jobId,
-        long practiceId,
-        long threadId,
-        long aboutUserId
-    ) {
+            ObservationRepository observationRepository,
+            FeedbackRepository feedbackRepository,
+            FeedbackObservationRepository feedbackObservationRepository,
+            long workspaceId,
+            UUID jobId,
+            long practiceId,
+            long threadId,
+            long aboutUserId) {
         UUID observationId = UUID.randomUUID();
         observationRepository.insertIfAbsent(
-            observationId,
-            "occ-" + observationId,
-            jobId,
-            practiceId,
-            null,
-            ArtifactKinds.CONVERSATION_THREAD.value(),
-            threadId,
-            aboutUserId,
-            "Observation title",
-            "ABSENT",
-            "BAD",
-            "MAJOR",
-            null,
-            null,
-            null,
-            Instant.now(),
-            "LIVE"
-        );
-        Feedback feedback = feedbackRepository.save(
-            Feedback.builder()
+                observationId,
+                "occ-" + observationId,
+                jobId,
+                practiceId,
+                null,
+                ArtifactKinds.CONVERSATION_THREAD.value(),
+                threadId,
+                aboutUserId,
+                "Observation title",
+                "ABSENT",
+                "BAD",
+                "MAJOR",
+                null,
+                null,
+                null,
+                Instant.now(),
+                "LIVE");
+        Feedback feedback = feedbackRepository.save(Feedback.builder()
                 .agentJobId(jobId)
                 .workspaceId(workspaceId)
                 .artifactKind(ArtifactKinds.CONVERSATION_THREAD)
@@ -197,8 +186,7 @@ public final class SlackConversationTestSupport {
                 .deliveryState(FeedbackDeliveryState.PREPARED)
                 .source(FeedbackSource.AGENT)
                 .createdAt(Instant.now())
-                .build()
-        );
+                .build());
         feedbackObservationRepository.insertIfAbsent(feedback.getId(), observationId, EvidenceRole.PRIMARY.name(), 0);
         return new BoundConversation(observationId, feedback.getId());
     }

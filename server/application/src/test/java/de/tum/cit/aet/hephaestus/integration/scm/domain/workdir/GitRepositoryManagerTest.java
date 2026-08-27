@@ -49,13 +49,12 @@ class GitRepositoryManagerTest extends BaseUnitTest {
     @AfterEach
     void tearDown() throws IOException {
         if (Files.exists(storagePath)) {
-            Files.walk(storagePath)
-                .sorted(Comparator.reverseOrder())
-                .forEach(path -> {
-                    try {
-                        Files.deleteIfExists(path);
-                    } catch (IOException ignored) {}
-                });
+            Files.walk(storagePath).sorted(Comparator.reverseOrder()).forEach(path -> {
+                try {
+                    Files.deleteIfExists(path);
+                } catch (IOException ignored) {
+                }
+            });
         }
     }
 
@@ -64,23 +63,18 @@ class GitRepositoryManagerTest extends BaseUnitTest {
     }
 
     private GitRepositoryManager createManager(
-        boolean enabled,
-        int maxFiles,
-        DataSize maxTotalSize,
-        DataSize maxFileSize
-    ) {
+            boolean enabled, int maxFiles, DataSize maxTotalSize, DataSize maxFileSize) {
         GitRepositoryProperties properties = new GitRepositoryProperties(enabled, maxFiles, maxTotalSize, maxFileSize);
         return new GitRepositoryManager(properties, lockManager, new FabricLayout(storagePath.toString()));
     }
 
     private String commit(Git git, String message) throws GitAPIException {
-        return git
-            .commit()
-            .setMessage(message)
-            .setAuthor(new PersonIdent("Test Author", "author@test.com"))
-            .setCommitter(new PersonIdent("Test Committer", "committer@test.com"))
-            .call()
-            .getName();
+        return git.commit()
+                .setMessage(message)
+                .setAuthor(new PersonIdent("Test Author", "author@test.com"))
+                .setCommitter(new PersonIdent("Test Committer", "committer@test.com"))
+                .call()
+                .getName();
     }
 
     private Git createSourceRepo() throws GitAPIException, IOException {
@@ -88,12 +82,11 @@ class GitRepositoryManagerTest extends BaseUnitTest {
         Path file = sourceRepoPath.resolve("README.md");
         Files.writeString(file, "# Test Repository\n");
         git.add().addFilepattern("README.md").call();
-        git
-            .commit()
-            .setMessage("Initial commit")
-            .setAuthor(new PersonIdent("Test Author", "author@test.com"))
-            .setCommitter(new PersonIdent("Test Committer", "committer@test.com"))
-            .call();
+        git.commit()
+                .setMessage("Initial commit")
+                .setAuthor(new PersonIdent("Test Author", "author@test.com"))
+                .setCommitter(new PersonIdent("Test Committer", "committer@test.com"))
+                .call();
         return git;
     }
 
@@ -121,7 +114,8 @@ class GitRepositoryManagerTest extends BaseUnitTest {
             manager = createManager(false);
             Path path = manager.getRepositoryPath(42L);
 
-            assertThat(path).isEqualTo(storagePath.resolve("sources").resolve("scm").resolve("42"));
+            assertThat(path)
+                    .isEqualTo(storagePath.resolve("sources").resolve("scm").resolve("42"));
         }
     }
 
@@ -152,17 +146,19 @@ class GitRepositoryManagerTest extends BaseUnitTest {
             manager = createManager(false);
 
             assertThatThrownBy(() -> manager.ensureRepository(1L, "https://example.com/repo.git", null))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("not enabled");
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("not enabled");
         }
 
         @Test
         void shouldCloneRepositoryOnFirstCall() throws Exception {
             manager = createManager(true);
             try (Git sourceGit = createSourceRepo()) {
-                Path result = manager.ensureRepository(1L, sourceRepoPath.toUri().toString(), null);
+                Path result =
+                        manager.ensureRepository(1L, sourceRepoPath.toUri().toString(), null);
 
-                assertThat(result).isEqualTo(storagePath.resolve("sources").resolve("scm").resolve("1"));
+                assertThat(result)
+                        .isEqualTo(storagePath.resolve("sources").resolve("scm").resolve("1"));
                 assertThat(Files.exists(result.resolve(".git").resolve("HEAD"))).isTrue();
             }
         }
@@ -177,16 +173,18 @@ class GitRepositoryManagerTest extends BaseUnitTest {
                 Files.writeString(file, "content");
                 sourceGit.add().addFilepattern("file2.txt").call();
                 String newSha = sourceGit
-                    .commit()
-                    .setMessage("Second commit")
-                    .setAuthor(new PersonIdent("Test Author", "author@test.com"))
-                    .setCommitter(new PersonIdent("Test Committer", "committer@test.com"))
-                    .call()
-                    .getName();
+                        .commit()
+                        .setMessage("Second commit")
+                        .setAuthor(new PersonIdent("Test Author", "author@test.com"))
+                        .setCommitter(new PersonIdent("Test Committer", "committer@test.com"))
+                        .call()
+                        .getName();
 
-                Path result = manager.ensureRepository(1L, sourceRepoPath.toUri().toString(), null);
+                Path result =
+                        manager.ensureRepository(1L, sourceRepoPath.toUri().toString(), null);
 
-                assertThat(result).isEqualTo(storagePath.resolve("sources").resolve("scm").resolve("1"));
+                assertThat(result)
+                        .isEqualTo(storagePath.resolve("sources").resolve("scm").resolve("1"));
                 List<GitRepositoryManager.CommitInfo> commits = manager.walkCommits(1L, null, newSha);
                 assertThat(commits).hasSize(2);
             }
@@ -202,26 +200,27 @@ class GitRepositoryManagerTest extends BaseUnitTest {
                 Path replacementPath = tempDir.resolve("replacement-repo");
                 Files.createDirectories(replacementPath);
                 String replacementHead;
-                try (Git replacement = Git.init().setDirectory(replacementPath.toFile()).call()) {
+                try (Git replacement =
+                        Git.init().setDirectory(replacementPath.toFile()).call()) {
                     Files.writeString(replacementPath.resolve("replacement.txt"), "replacement\n");
                     replacement.add().addFilepattern("replacement.txt").call();
                     replacementHead = replacement
-                        .commit()
-                        .setMessage("Replacement repository")
-                        .setAuthor(new PersonIdent("Test Author", "author@test.com"))
-                        .setCommitter(new PersonIdent("Test Committer", "committer@test.com"))
-                        .call()
-                        .getName();
+                            .commit()
+                            .setMessage("Replacement repository")
+                            .setAuthor(new PersonIdent("Test Author", "author@test.com"))
+                            .setCommitter(new PersonIdent("Test Committer", "committer@test.com"))
+                            .call()
+                            .getName();
                 }
 
-                Path result = manager.ensureRepository(1L, replacementPath.toUri().toString(), null);
+                Path result =
+                        manager.ensureRepository(1L, replacementPath.toUri().toString(), null);
 
                 assertThat(manager.commitExists(1L, replacementHead)).isTrue();
                 assertThat(manager.commitExists(1L, oldHead)).isFalse();
                 try (Git clone = Git.open(result.toFile())) {
-                    assertThat(clone.getRepository().getConfig().getString("remote", "origin", "url")).isEqualTo(
-                        replacementPath.toUri().toString()
-                    );
+                    assertThat(clone.getRepository().getConfig().getString("remote", "origin", "url"))
+                            .isEqualTo(replacementPath.toUri().toString());
                 }
             }
         }
@@ -236,7 +235,8 @@ class GitRepositoryManagerTest extends BaseUnitTest {
             try (Git ignored = createSourceRepo()) {
                 manager.ensureRepository(1L, sourceRepoPath.toUri().toString(), null);
 
-                assertThat(manager.commitExists(1L, "0000000000000000000000000000000000000001")).isFalse();
+                assertThat(manager.commitExists(1L, "0000000000000000000000000000000000000001"))
+                        .isFalse();
             }
         }
     }
@@ -252,20 +252,20 @@ class GitRepositoryManagerTest extends BaseUnitTest {
 
                 Files.writeString(sourceRepoPath.resolve("review.txt"), "review\n");
                 source.add().addFilepattern("review.txt").call();
-                String reviewHead = source
-                    .commit()
-                    .setMessage("Review head")
-                    .setAuthor(new PersonIdent("Test Author", "author@test.com"))
-                    .setCommitter(new PersonIdent("Test Committer", "committer@test.com"))
-                    .call()
-                    .getName();
+                String reviewHead = source.commit()
+                        .setMessage("Review head")
+                        .setAuthor(new PersonIdent("Test Author", "author@test.com"))
+                        .setCommitter(new PersonIdent("Test Committer", "committer@test.com"))
+                        .call()
+                        .getName();
                 var update = source.getRepository().updateRef("refs/merge-requests/7/head");
                 update.setNewObjectId(ObjectId.fromString(reviewHead));
                 update.update();
 
                 assertThat(manager.commitExists(1L, reviewHead)).isFalse();
 
-                assertThat(manager.fetchRemoteCommit(1L, "refs/merge-requests/7/head", reviewHead, null)).isTrue();
+                assertThat(manager.fetchRemoteCommit(1L, "refs/merge-requests/7/head", reviewHead, null))
+                        .isTrue();
                 assertThat(manager.commitExists(1L, reviewHead)).isTrue();
             }
         }
@@ -307,30 +307,30 @@ class GitRepositoryManagerTest extends BaseUnitTest {
                 Files.writeString(file2, "content2");
                 sourceGit.add().addFilepattern("file2.txt").call();
                 sourceGit
-                    .commit()
-                    .setMessage("Second commit")
-                    .setAuthor(new PersonIdent("Test Author", "author@test.com"))
-                    .setCommitter(new PersonIdent("Test Committer", "committer@test.com"))
-                    .call();
+                        .commit()
+                        .setMessage("Second commit")
+                        .setAuthor(new PersonIdent("Test Author", "author@test.com"))
+                        .setCommitter(new PersonIdent("Test Committer", "committer@test.com"))
+                        .call();
 
                 Path file3 = sourceRepoPath.resolve("file3.txt");
                 Files.writeString(file3, "content3");
                 sourceGit.add().addFilepattern("file3.txt").call();
                 String thirdSha = sourceGit
-                    .commit()
-                    .setMessage("Third commit")
-                    .setAuthor(new PersonIdent("Test Author", "author@test.com"))
-                    .setCommitter(new PersonIdent("Test Committer", "committer@test.com"))
-                    .call()
-                    .getName();
+                        .commit()
+                        .setMessage("Third commit")
+                        .setAuthor(new PersonIdent("Test Author", "author@test.com"))
+                        .setCommitter(new PersonIdent("Test Committer", "committer@test.com"))
+                        .call()
+                        .getName();
 
                 manager.ensureRepository(1L, sourceRepoPath.toUri().toString(), null);
                 List<GitRepositoryManager.CommitInfo> commits = manager.walkCommits(1L, firstSha, thirdSha);
 
                 assertThat(commits).hasSize(2);
                 assertThat(commits)
-                    .extracting(GitRepositoryManager.CommitInfo::message)
-                    .containsExactly("Third commit", "Second commit");
+                        .extracting(GitRepositoryManager.CommitInfo::message)
+                        .containsExactly("Third commit", "Second commit");
             }
         }
 
@@ -341,8 +341,8 @@ class GitRepositoryManagerTest extends BaseUnitTest {
                 manager.ensureRepository(1L, sourceRepoPath.toUri().toString(), null);
 
                 assertThatThrownBy(() -> manager.walkCommits(1L, null, "0000000000000000000000000000000000000000"))
-                    .isInstanceOf(GitRepositoryManager.GitOperationException.class)
-                    .hasMessageContaining("Failed to walk commits");
+                        .isInstanceOf(GitRepositoryManager.GitOperationException.class)
+                        .hasMessageContaining("Failed to walk commits");
             }
         }
 
@@ -359,7 +359,8 @@ class GitRepositoryManagerTest extends BaseUnitTest {
                 GitRepositoryManager.CommitInfo commit = commits.get(0);
 
                 assertThat(commit.fileChanges()).hasSize(1);
-                GitRepositoryManager.FileChange fileChange = commit.fileChanges().get(0);
+                GitRepositoryManager.FileChange fileChange =
+                        commit.fileChanges().get(0);
                 assertThat(fileChange.filename()).isEqualTo("README.md");
                 assertThat(fileChange.changeType()).isEqualTo(GitRepositoryManager.ChangeType.ADDED);
                 assertThat(fileChange.additions()).isPositive();
@@ -395,18 +396,19 @@ class GitRepositoryManagerTest extends BaseUnitTest {
                 Files.writeString(readme, "# Updated\nNew content\n");
                 sourceGit.add().addFilepattern("README.md").call();
                 String secondSha = sourceGit
-                    .commit()
-                    .setMessage("Update README")
-                    .setAuthor(new PersonIdent("Test Author", "author@test.com"))
-                    .setCommitter(new PersonIdent("Test Committer", "committer@test.com"))
-                    .call()
-                    .getName();
+                        .commit()
+                        .setMessage("Update README")
+                        .setAuthor(new PersonIdent("Test Author", "author@test.com"))
+                        .setCommitter(new PersonIdent("Test Committer", "committer@test.com"))
+                        .call()
+                        .getName();
 
                 manager.ensureRepository(1L, sourceRepoPath.toUri().toString(), null);
                 List<GitRepositoryManager.CommitInfo> commits = manager.walkCommits(1L, firstSha, secondSha);
 
                 assertThat(commits).hasSize(1);
-                GitRepositoryManager.FileChange change = commits.get(0).fileChanges().get(0);
+                GitRepositoryManager.FileChange change =
+                        commits.get(0).fileChanges().get(0);
                 assertThat(change.filename()).isEqualTo("README.md");
                 assertThat(change.changeType()).isEqualTo(GitRepositoryManager.ChangeType.MODIFIED);
             }
@@ -421,18 +423,19 @@ class GitRepositoryManagerTest extends BaseUnitTest {
                 Files.delete(sourceRepoPath.resolve("README.md"));
                 sourceGit.rm().addFilepattern("README.md").call();
                 String secondSha = sourceGit
-                    .commit()
-                    .setMessage("Remove README")
-                    .setAuthor(new PersonIdent("Test Author", "author@test.com"))
-                    .setCommitter(new PersonIdent("Test Committer", "committer@test.com"))
-                    .call()
-                    .getName();
+                        .commit()
+                        .setMessage("Remove README")
+                        .setAuthor(new PersonIdent("Test Author", "author@test.com"))
+                        .setCommitter(new PersonIdent("Test Committer", "committer@test.com"))
+                        .call()
+                        .getName();
 
                 manager.ensureRepository(1L, sourceRepoPath.toUri().toString(), null);
                 List<GitRepositoryManager.CommitInfo> commits = manager.walkCommits(1L, firstSha, secondSha);
 
                 assertThat(commits).hasSize(1);
-                GitRepositoryManager.FileChange change = commits.get(0).fileChanges().get(0);
+                GitRepositoryManager.FileChange change =
+                        commits.get(0).fileChanges().get(0);
                 assertThat(change.filename()).isEqualTo("README.md");
                 assertThat(change.changeType()).isEqualTo(GitRepositoryManager.ChangeType.REMOVED);
             }
@@ -490,12 +493,12 @@ class GitRepositoryManagerTest extends BaseUnitTest {
                 Files.writeString(file, "content");
                 sourceGit.add().addFilepattern("file2.txt").call();
                 String newSha = sourceGit
-                    .commit()
-                    .setMessage("Second commit")
-                    .setAuthor(new PersonIdent("Test Author", "author@test.com"))
-                    .setCommitter(new PersonIdent("Test Committer", "committer@test.com"))
-                    .call()
-                    .getName();
+                        .commit()
+                        .setMessage("Second commit")
+                        .setAuthor(new PersonIdent("Test Author", "author@test.com"))
+                        .setCommitter(new PersonIdent("Test Committer", "committer@test.com"))
+                        .call()
+                        .getName();
 
                 manager.ensureRepository(1L, sourceRepoPath.toUri().toString(), null);
                 String result = manager.resolveDefaultBranchHead(1L, "master");
@@ -534,8 +537,8 @@ class GitRepositoryManagerTest extends BaseUnitTest {
             manager = createManager(false);
 
             assertThatThrownBy(() -> manager.readTreeSnapshot(1L, "abc123"))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("checkout is disabled");
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("checkout is disabled");
         }
 
         @Test
@@ -549,9 +552,8 @@ class GitRepositoryManagerTest extends BaseUnitTest {
                     Map<String, Path> files = snapshot.files();
 
                     assertThat(files).containsKey("README.md");
-                    assertThat(Files.readString(files.get("README.md"), StandardCharsets.UTF_8)).isEqualTo(
-                        "# Test Repository\n"
-                    );
+                    assertThat(Files.readString(files.get("README.md"), StandardCharsets.UTF_8))
+                            .isEqualTo("# Test Repository\n");
                 }
             }
         }
@@ -579,11 +581,11 @@ class GitRepositoryManagerTest extends BaseUnitTest {
                 Files.writeString(file2, "second file content");
                 sourceGit.add().addFilepattern("file2.txt").call();
                 sourceGit
-                    .commit()
-                    .setMessage("Add file2")
-                    .setAuthor(new PersonIdent("Test Author", "author@test.com"))
-                    .setCommitter(new PersonIdent("Test Committer", "committer@test.com"))
-                    .call();
+                        .commit()
+                        .setMessage("Add file2")
+                        .setAuthor(new PersonIdent("Test Author", "author@test.com"))
+                        .setCommitter(new PersonIdent("Test Committer", "committer@test.com"))
+                        .call();
 
                 manager.ensureRepository(1L, sourceRepoPath.toUri().toString(), null);
 
@@ -602,12 +604,12 @@ class GitRepositoryManagerTest extends BaseUnitTest {
                 Files.createSymbolicLink(sourceRepoPath.resolve("escape.txt"), Path.of("../../../etc/passwd"));
                 sourceGit.add().addFilepattern("escape.txt").call();
                 String sha = sourceGit
-                    .commit()
-                    .setMessage("Add a symlink pointing out of the repository")
-                    .setAuthor(new PersonIdent("Test Author", "author@test.com"))
-                    .setCommitter(new PersonIdent("Test Committer", "committer@test.com"))
-                    .call()
-                    .getName();
+                        .commit()
+                        .setMessage("Add a symlink pointing out of the repository")
+                        .setAuthor(new PersonIdent("Test Author", "author@test.com"))
+                        .setCommitter(new PersonIdent("Test Committer", "committer@test.com"))
+                        .call()
+                        .getName();
 
                 manager.ensureRepository(1L, sourceRepoPath.toUri().toString(), null);
 
@@ -728,8 +730,8 @@ class GitRepositoryManagerTest extends BaseUnitTest {
                 manager.ensureRepository(1L, sourceRepoPath.toUri().toString(), null);
 
                 assertThatThrownBy(() -> manager.readTreeSnapshot(1L, "0000000000000000000000000000000000000000"))
-                    .isInstanceOf(GitRepositoryManager.GitOperationException.class)
-                    .hasMessageContaining("Failed to read files at commit");
+                        .isInstanceOf(GitRepositoryManager.GitOperationException.class)
+                        .hasMessageContaining("Failed to read files at commit");
             }
         }
     }
@@ -759,11 +761,11 @@ class GitRepositoryManagerTest extends BaseUnitTest {
                 Files.writeString(file, "public class NewFile {}\n");
                 sourceGit.add().addFilepattern("new-file.java").call();
                 sourceGit
-                    .commit()
-                    .setMessage("Add new file on feature branch")
-                    .setAuthor(new PersonIdent("Test Author", "author@test.com"))
-                    .setCommitter(new PersonIdent("Test Committer", "committer@test.com"))
-                    .call();
+                        .commit()
+                        .setMessage("Add new file on feature branch")
+                        .setAuthor(new PersonIdent("Test Author", "author@test.com"))
+                        .setCommitter(new PersonIdent("Test Committer", "committer@test.com"))
+                        .call();
 
                 manager.ensureRepository(1L, sourceRepoPath.toUri().toString(), null);
 

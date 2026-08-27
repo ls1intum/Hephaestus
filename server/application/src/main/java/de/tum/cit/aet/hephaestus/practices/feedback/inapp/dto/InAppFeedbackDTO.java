@@ -26,21 +26,39 @@ import org.jspecify.annotations.Nullable;
  */
 @Schema(description = "A process-level message on the developer's own practice pages")
 public record InAppFeedbackDTO(
-    @NonNull UUID id,
-    @NonNull @Schema(description = "Short headline naming the habit, never the person") String headline,
-    @NonNull @Schema(description = "The message, as Markdown; ends with the habit to try next") String body,
-    @NonNull @Schema(description = "Practice this habit belongs to") String practiceSlug,
-    @NonNull String practiceName,
-    @Schema(description = "Group the practice sits in; null when the practice has none") @Nullable String groupSlug,
-    @Schema(description = "Group display name; null when the practice has none") @Nullable String groupName,
-    @Schema(description = "Why this practice matters, in the developer's framing") @Nullable String whyItMatters,
-    @Schema(description = "What good looks like, in the developer's framing") @Nullable String whatGoodLooksLike,
-    @NonNull
-    @Schema(description = "The pieces of work the habit was observed on, newest first")
-    List<InAppEvidenceDTO> evidence,
-    @NonNull
-    @Schema(description = "How many pieces of work carry it — the length of the evidence list")
-    Integer occurrenceCount,
-    @NonNull @Schema(description = "When the message was composed") Instant preparedAt,
-    @Schema(description = "When this developer first opened it; null until they have") @Nullable Instant readAt
-) {}
+        @NonNull UUID id,
+
+        @NonNull @Schema(description = "Short headline naming the habit, never the person")
+        String headline,
+
+        @NonNull @Schema(description = "The message, as Markdown; ends with the habit to try next")
+        String body,
+
+        @NonNull @Schema(description = "Practice this habit belongs to")
+        String practiceSlug,
+
+        @NonNull String practiceName,
+
+        @Schema(description = "Group the practice sits in; null when the practice has none") @Nullable
+        String groupSlug,
+
+        @Schema(description = "Group display name; null when the practice has none") @Nullable
+        String groupName,
+
+        @Schema(description = "Why this practice matters, in the developer's framing") @Nullable
+        String whyItMatters,
+
+        @Schema(description = "What good looks like, in the developer's framing") @Nullable
+        String whatGoodLooksLike,
+
+        @NonNull @Schema(description = "The pieces of work the habit was observed on, newest first")
+        List<InAppEvidenceDTO> evidence,
+
+        @NonNull @Schema(description = "How many pieces of work carry it — the length of the evidence list")
+        Integer occurrenceCount,
+
+        @NonNull @Schema(description = "When the message was composed")
+        Instant preparedAt,
+
+        @Schema(description = "When this developer first opened it; null until they have") @Nullable
+        Instant readAt) {}

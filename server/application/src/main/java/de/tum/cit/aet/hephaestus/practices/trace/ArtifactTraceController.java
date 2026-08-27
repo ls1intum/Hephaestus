@@ -48,62 +48,54 @@ public class ArtifactTraceController {
 
     @GetMapping
     @Operation(
-        summary = "List work this workspace recorded something about",
-        description = "Built from the signal ledger, so it includes work that was never reviewed — which is " +
-            "exactly what a listing derived from review runs cannot show. Most recently signalled first.",
-        operationId = "listTracedArtifacts"
-    )
+            summary = "List work this workspace recorded something about",
+            description = "Built from the signal ledger, so it includes work that was never reviewed — which is "
+                    + "exactly what a listing derived from review runs cannot show. Most recently signalled first.",
+            operationId = "listTracedArtifacts")
     @ApiResponse(responseCode = "200", description = "Paginated artifacts returned")
     @ApiResponse(
-        responseCode = "400",
-        description = "Unknown artifact kind or invalid pagination",
-        content = @Content(
-            mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
-            schema = @Schema(implementation = ProblemDetail.class)
-        )
-    )
+            responseCode = "400",
+            description = "Unknown artifact kind or invalid pagination",
+            content =
+                    @Content(
+                            mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+                            schema = @Schema(implementation = ProblemDetail.class)))
     public ResponseEntity<PagedModel<TracedArtifactDTO>> listTracedArtifacts(
-        WorkspaceContext workspaceContext,
-        @RequestParam(defaultValue = "0") @Min(0) int page,
-        @RequestParam(defaultValue = "25") @Min(1) @Max(100) int size,
-        @Parameter(description = "Restrict to one kind of work, e.g. scm.pull_request") @RequestParam(
-            required = false
-        ) @Nullable String artifactKind
-    ) {
+            WorkspaceContext workspaceContext,
+            @RequestParam(defaultValue = "0") @Min(0) int page,
+            @RequestParam(defaultValue = "25") @Min(1) @Max(100) int size,
+            @Parameter(description = "Restrict to one kind of work, e.g. scm.pull_request")
+                    @RequestParam(required = false)
+                    @Nullable
+                    String artifactKind) {
         requireMembership(workspaceContext);
-        return ResponseEntity.ok(
-            new PagedModel<>(
-                queryService.list(workspaceContext.id(), parseKind(artifactKind), PageRequest.of(page, size))
-            )
-        );
+        return ResponseEntity.ok(new PagedModel<>(
+                queryService.list(workspaceContext.id(), parseKind(artifactKind), PageRequest.of(page, size))));
     }
 
     @GetMapping("/{artifactKind}/{artifactId}")
     @Operation(
-        summary = "Explain what every practice did about one piece of work",
-        description = "Every practice the workspace runs against this kind of work appears, including the ones " +
-            "that did nothing, each with the recorded reason. 404 means nothing about this artifact was ever " +
-            "recorded here — not that the trace is unavailable.",
-        operationId = "getArtifactTrace"
-    )
+            summary = "Explain what every practice did about one piece of work",
+            description = "Every practice the workspace runs against this kind of work appears, including the ones "
+                    + "that did nothing, each with the recorded reason. 404 means nothing about this artifact was ever "
+                    + "recorded here — not that the trace is unavailable.",
+            operationId = "getArtifactTrace")
     @ApiResponse(
-        responseCode = "200",
-        description = "Trace returned",
-        content = @Content(schema = @Schema(implementation = ArtifactTraceDTO.class))
-    )
+            responseCode = "200",
+            description = "Trace returned",
+            content = @Content(schema = @Schema(implementation = ArtifactTraceDTO.class)))
     @ApiResponse(
-        responseCode = "404",
-        description = "Nothing recorded about this artifact in this workspace",
-        content = @Content(
-            mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
-            schema = @Schema(implementation = ProblemDetail.class)
-        )
-    )
+            responseCode = "404",
+            description = "Nothing recorded about this artifact in this workspace",
+            content =
+                    @Content(
+                            mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+                            schema = @Schema(implementation = ProblemDetail.class)))
     public ResponseEntity<ArtifactTraceDTO> getArtifactTrace(
-        WorkspaceContext workspaceContext,
-        @Parameter(description = "Kind of work, e.g. scm.pull_request") @PathVariable String artifactKind,
-        @Parameter(description = "The artifact's identifier as the ledger stores it") @PathVariable Long artifactId
-    ) {
+            WorkspaceContext workspaceContext,
+            @Parameter(description = "Kind of work, e.g. scm.pull_request") @PathVariable String artifactKind,
+            @Parameter(description = "The artifact's identifier as the ledger stores it") @PathVariable
+                    Long artifactId) {
         requireMembership(workspaceContext);
         ArtifactKind kind = parseKind(artifactKind);
         if (kind == null) {

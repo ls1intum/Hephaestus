@@ -50,10 +50,9 @@ public class JwtPrincipalFactory {
     private final AccountFeatureRepository accountFeatureRepository;
 
     public JwtPrincipalFactory(
-        AccountRepository accountRepository,
-        IdentityLinkRepository identityLinkRepository,
-        AccountFeatureRepository accountFeatureRepository
-    ) {
+            AccountRepository accountRepository,
+            IdentityLinkRepository identityLinkRepository,
+            AccountFeatureRepository accountFeatureRepository) {
         this.accountRepository = accountRepository;
         this.identityLinkRepository = identityLinkRepository;
         this.accountFeatureRepository = accountFeatureRepository;
@@ -62,8 +61,8 @@ public class JwtPrincipalFactory {
     @Transactional(readOnly = true)
     public JwtPrincipal forAccountId(Long accountId) {
         Account account = accountRepository
-            .findById(accountId)
-            .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "account not found"));
+                .findById(accountId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "account not found"));
         return createPrincipal(account);
     }
 
@@ -107,13 +106,12 @@ public class JwtPrincipalFactory {
      * account whose provider returned no username (account-level, {@code sub}-based resolution still works).
      */
     private String resolveLogin(Long accountId) {
-        return identityLinkRepository
-            .findActiveByAccountId(accountId)
-            .stream()
-            .filter(il -> il.getUsernameAtSignup() != null && !il.getUsernameAtSignup().isBlank())
-            .max(JwtPrincipalFactory::byLastLogin)
-            .map(IdentityLink::getUsernameAtSignup)
-            .orElse("account:" + accountId);
+        return identityLinkRepository.findActiveByAccountId(accountId).stream()
+                .filter(il -> il.getUsernameAtSignup() != null
+                        && !il.getUsernameAtSignup().isBlank())
+                .max(JwtPrincipalFactory::byLastLogin)
+                .map(IdentityLink::getUsernameAtSignup)
+                .orElse("account:" + accountId);
     }
 
     private static int byLastLogin(IdentityLink a, IdentityLink b) {

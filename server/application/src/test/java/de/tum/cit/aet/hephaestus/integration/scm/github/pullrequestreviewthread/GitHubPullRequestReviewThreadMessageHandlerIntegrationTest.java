@@ -14,7 +14,6 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewthread.
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewthread.PullRequestReviewThreadRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
-import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubEventType;
 import de.tum.cit.aet.hephaestus.integration.scm.github.pullrequestreviewthread.dto.GitHubPullRequestReviewThreadEventDTO;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
@@ -74,10 +73,9 @@ class GitHubPullRequestReviewThreadMessageHandlerIntegrationTest extends BaseInt
     private void setupTestData() {
         // Create GitHub provider
         gitProvider = gitProviderRepository
-            .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
-            .orElseGet(() ->
-                gitProviderRepository.save(new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com"))
-            );
+                .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
+                .orElseGet(() -> gitProviderRepository.save(
+                        new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com")));
 
         // Create organization - use ID from fixture
         Organization org = new Organization();
@@ -140,7 +138,9 @@ class GitHubPullRequestReviewThreadMessageHandlerIntegrationTest extends BaseInt
         GitHubPullRequestReviewThreadEventDTO event = loadPayload("pull_request_review_thread.resolved");
 
         // Create the PR that the thread belongs to
-        createTestPullRequest(required(event.pullRequest().getDatabaseId()), event.pullRequest().number());
+        createTestPullRequest(
+                required(event.pullRequest().getDatabaseId()),
+                event.pullRequest().number());
 
         // The thread ID is derived from the first comment's ID in the webhook payload.
         // This matches how threads are stored during sync (first comment's databaseId = thread ID).
@@ -162,17 +162,17 @@ class GitHubPullRequestReviewThreadMessageHandlerIntegrationTest extends BaseInt
 
         // Verify initial state
         assertThat(threadRepository.findById(thread.getId()))
-            .isPresent()
-            .get()
-            .satisfies(t -> assertThat(t.getState()).isEqualTo(PullRequestReviewThread.State.UNRESOLVED));
+                .isPresent()
+                .get()
+                .satisfies(t -> assertThat(t.getState()).isEqualTo(PullRequestReviewThread.State.UNRESOLVED));
 
         handler.handleEvent(event);
 
         // Then - thread should be resolved
         assertThat(threadRepository.findById(thread.getId()))
-            .isPresent()
-            .get()
-            .satisfies(t -> assertThat(t.getState()).isEqualTo(PullRequestReviewThread.State.RESOLVED));
+                .isPresent()
+                .get()
+                .satisfies(t -> assertThat(t.getState()).isEqualTo(PullRequestReviewThread.State.RESOLVED));
     }
 
     @Test
@@ -180,7 +180,9 @@ class GitHubPullRequestReviewThreadMessageHandlerIntegrationTest extends BaseInt
         GitHubPullRequestReviewThreadEventDTO event = loadPayload("pull_request_review_thread.unresolved");
 
         // Create the PR that the thread belongs to
-        createTestPullRequest(required(event.pullRequest().getDatabaseId()), event.pullRequest().number());
+        createTestPullRequest(
+                required(event.pullRequest().getDatabaseId()),
+                event.pullRequest().number());
 
         // The thread ID is derived from the first comment's ID in the webhook payload.
         Long threadId = required(event.thread().getFirstCommentId());
@@ -201,17 +203,17 @@ class GitHubPullRequestReviewThreadMessageHandlerIntegrationTest extends BaseInt
 
         // Verify initial state
         assertThat(threadRepository.findById(thread.getId()))
-            .isPresent()
-            .get()
-            .satisfies(t -> assertThat(t.getState()).isEqualTo(PullRequestReviewThread.State.RESOLVED));
+                .isPresent()
+                .get()
+                .satisfies(t -> assertThat(t.getState()).isEqualTo(PullRequestReviewThread.State.RESOLVED));
 
         handler.handleEvent(event);
 
         // Then - thread should be unresolved
         assertThat(threadRepository.findById(thread.getId()))
-            .isPresent()
-            .get()
-            .satisfies(t -> assertThat(t.getState()).isEqualTo(PullRequestReviewThread.State.UNRESOLVED));
+                .isPresent()
+                .get()
+                .satisfies(t -> assertThat(t.getState()).isEqualTo(PullRequestReviewThread.State.UNRESOLVED));
     }
 
     @Test
@@ -232,9 +234,9 @@ class GitHubPullRequestReviewThreadMessageHandlerIntegrationTest extends BaseInt
 
         // Verify initial state
         assertThat(threadRepository.findById(thread.getId()))
-            .isPresent()
-            .get()
-            .satisfies(t -> assertThat(t.getState()).isEqualTo(PullRequestReviewThread.State.UNRESOLVED));
+                .isPresent()
+                .get()
+                .satisfies(t -> assertThat(t.getState()).isEqualTo(PullRequestReviewThread.State.UNRESOLVED));
 
         // When - directly call repository method (simulating proper thread ID resolution)
         thread.setState(PullRequestReviewThread.State.RESOLVED);
@@ -244,9 +246,9 @@ class GitHubPullRequestReviewThreadMessageHandlerIntegrationTest extends BaseInt
         // Note: GitHub only provides isResolved (boolean), not a timestamp.
         // The state enum (RESOLVED/UNRESOLVED) is sufficient.
         assertThat(threadRepository.findById(thread.getId()))
-            .isPresent()
-            .get()
-            .satisfies(t -> assertThat(t.getState()).isEqualTo(PullRequestReviewThread.State.RESOLVED));
+                .isPresent()
+                .get()
+                .satisfies(t -> assertThat(t.getState()).isEqualTo(PullRequestReviewThread.State.RESOLVED));
     }
 
     private GitHubPullRequestReviewThreadEventDTO loadPayload(String filename) throws IOException {

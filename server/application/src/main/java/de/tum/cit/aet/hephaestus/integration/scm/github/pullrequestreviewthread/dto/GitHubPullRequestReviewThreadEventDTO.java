@@ -15,12 +15,12 @@ import org.jspecify.annotations.Nullable;
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record GitHubPullRequestReviewThreadEventDTO(
-    @JsonProperty("action") String action,
-    @JsonProperty("thread") GitHubThreadDTO thread,
-    @JsonProperty("pull_request") GitHubPullRequestDTO pullRequest,
-    @JsonProperty("repository") GitHubRepositoryRefDTO repository,
-    @JsonProperty("sender") GitHubUserDTO sender
-) implements GitHubWebhookEvent {
+        @JsonProperty("action") String action,
+        @JsonProperty("thread") GitHubThreadDTO thread,
+        @JsonProperty("pull_request") GitHubPullRequestDTO pullRequest,
+        @JsonProperty("repository") GitHubRepositoryRefDTO repository,
+        @JsonProperty("sender") GitHubUserDTO sender)
+        implements GitHubWebhookEvent {
     @Override
     public GitHubEventAction.PullRequestReviewThread actionType() {
         return GitHubEventAction.PullRequestReviewThread.fromString(action);
@@ -41,13 +41,12 @@ public record GitHubPullRequestReviewThreadEventDTO(
      */
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record GitHubThreadDTO(
-        @JsonProperty("node_id") String nodeId,
-        @JsonProperty("comments") List<GitHubThreadCommentDTO> comments,
-        @JsonProperty("diff_side") String diffSide,
-        @JsonProperty("line") Integer line,
-        @JsonProperty("start_line") Integer startLine,
-        @JsonProperty("path") String path
-    ) {
+            @JsonProperty("node_id") String nodeId,
+            @JsonProperty("comments") List<GitHubThreadCommentDTO> comments,
+            @JsonProperty("diff_side") String diffSide,
+            @JsonProperty("line") Integer line,
+            @JsonProperty("start_line") Integer startLine,
+            @JsonProperty("path") String path) {
         /**
          * Gets the ID of the first comment in the thread, which serves as the thread's
          * primary key in Hephaestus. This matches how threads are stored during sync

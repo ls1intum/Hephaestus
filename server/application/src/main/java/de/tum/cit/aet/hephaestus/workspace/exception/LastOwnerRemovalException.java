@@ -19,13 +19,10 @@ public class LastOwnerRemovalException extends RuntimeException {
     private final String workspaceSlug;
 
     public LastOwnerRemovalException(String workspaceSlug) {
-        super(
-            String.format(
-                "Cannot remove the last OWNER from workspace '%s'. " +
-                    "Assign another user as OWNER before removing this one.",
-                workspaceSlug
-            )
-        );
+        super(String.format(
+                "Cannot remove the last OWNER from workspace '%s'. "
+                        + "Assign another user as OWNER before removing this one.",
+                workspaceSlug));
         this.workspaceSlug = workspaceSlug;
     }
 

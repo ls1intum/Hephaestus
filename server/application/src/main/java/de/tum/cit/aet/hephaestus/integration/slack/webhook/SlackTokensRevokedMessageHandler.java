@@ -26,9 +26,7 @@ public class SlackTokensRevokedMessageHandler extends AbstractSlackEnvelopeHandl
     private final SlackUninstallService uninstallService;
 
     public SlackTokensRevokedMessageHandler(
-        SlackUninstallService uninstallService,
-        NatsMessageDeserializer deserializer
-    ) {
+            SlackUninstallService uninstallService, NatsMessageDeserializer deserializer) {
         super("tokens_revoked", deserializer);
         this.uninstallService = uninstallService;
     }
@@ -38,11 +36,11 @@ public class SlackTokensRevokedMessageHandler extends AbstractSlackEnvelopeHandl
         JsonNode botTokens = root.path("event").path("tokens").path("bot");
         if (!botTokens.isArray() || botTokens.isEmpty()) {
             log.info(
-                "Slack tokens_revoked for team {} revoked no bot token — skipping workspace teardown",
-                teamId(root)
-            );
+                    "Slack tokens_revoked for team {} revoked no bot token — skipping workspace teardown",
+                    teamId(root));
             return;
         }
-        uninstallService.onUninstall(teamId(root), "tokens_revoked", root.path("event_id").asString(""));
+        uninstallService.onUninstall(
+                teamId(root), "tokens_revoked", root.path("event_id").asString(""));
     }
 }

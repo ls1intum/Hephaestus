@@ -30,49 +30,39 @@ class DiffNotePoster {
     private final Map<IntegrationKind, InlineFeedbackChannel> channels;
 
     DiffNotePoster(
-        PullRequestCommentPoster commentPoster,
-        PracticeFeedbackCommentFormatter commentFormatter,
-        List<InlineFeedbackChannel> inlineFeedbackChannels
-    ) {
+            PullRequestCommentPoster commentPoster,
+            PracticeFeedbackCommentFormatter commentFormatter,
+            List<InlineFeedbackChannel> inlineFeedbackChannels) {
         this.commentPoster = commentPoster;
         this.commentFormatter = commentFormatter;
         EnumMap<IntegrationKind, InlineFeedbackChannel> map = new EnumMap<>(IntegrationKind.class);
         for (InlineFeedbackChannel channel : inlineFeedbackChannels) {
             InlineFeedbackChannel previous = map.putIfAbsent(channel.kind(), channel);
             if (previous != null) {
-                throw new IllegalStateException(
-                    "Duplicate InlineFeedbackChannel for kind " +
-                        channel.kind() +
-                        ": " +
-                        previous.getClass().getName() +
-                        " conflicts with " +
-                        channel.getClass().getName()
-                );
+                throw new IllegalStateException("Duplicate InlineFeedbackChannel for kind " + channel.kind()
+                        + ": "
+                        + previous.getClass().getName()
+                        + " conflicts with "
+                        + channel.getClass().getName());
             }
         }
         this.channels = map;
     }
 
     DiffNoteResult reconcileInlineNotes(AgentJob job, List<DiffNote> diffNotes) {
-        IntegrationKind kind = Objects.requireNonNull(
-            job.getIntegrationKind(),
-            "AgentJob.integrationKind must not be null"
-        );
+        IntegrationKind kind =
+                Objects.requireNonNull(job.getIntegrationKind(), "AgentJob.integrationKind must not be null");
         InlineFeedbackChannel channel = channels.get(kind);
         if (channel == null) {
-            throw new JobDeliveryException(
-                "No InlineFeedbackChannel wired for kind " +
-                    kind +
-                    " — check that the vendor integration is enabled and its channel bean is registered"
-            );
+            throw new JobDeliveryException("No InlineFeedbackChannel wired for kind " + kind
+                    + " — check that the vendor integration is enabled and its channel bean is registered");
         }
 
-        SummaryChannel.FeedbackTarget target = commentPoster.buildTarget(job, kind, job.getWorkspace().getId());
+        SummaryChannel.FeedbackTarget target =
+                commentPoster.buildTarget(job, kind, job.getWorkspace().getId());
 
-        List<InlineFeedbackChannel.InlineFeedback> observations = mapObservations(
-            job,
-            diffNotes == null ? List.of() : diffNotes
-        );
+        List<InlineFeedbackChannel.InlineFeedback> observations =
+                mapObservations(job, diffNotes == null ? List.of() : diffNotes);
 
         // Clearing on an empty run removes inline feedback that no longer recurs.
         if (observations.isEmpty()) {
@@ -82,11 +72,10 @@ class DiffNotePoster {
                 throw new JobDeliverySuppressedException(e.toString(), e);
             } catch (RuntimeException e) {
                 log.warn(
-                    "Stale inline-note clear failed (best-effort), continuing: kind={}, jobId={}, error={}",
-                    kind,
-                    job.getId(),
-                    e.getMessage()
-                );
+                        "Stale inline-note clear failed (best-effort), continuing: kind={}, jobId={}, error={}",
+                        kind,
+                        job.getId(),
+                        e.getMessage());
             }
             return new DiffNoteResult(0, 0, List.of());
         }
@@ -94,19 +83,17 @@ class DiffNotePoster {
         try {
             InlineFeedbackChannel.InlineResult result = channel.postInlineFeedback(target, observations);
             log.debug(
-                "Inline observation delivery: kind={}, posted={}, failed={}, jobId={}",
-                kind,
-                result.posted(),
-                result.failed(),
-                job.getId()
-            );
+                    "Inline observation delivery: kind={}, posted={}, failed={}, jobId={}",
+                    kind,
+                    result.posted(),
+                    result.failed(),
+                    job.getId());
             return new DiffNoteResult(
-                result.posted(),
-                result.failed(),
-                result.signals(),
-                result.suppressed(),
-                result.suppressedRecurrenceKeys()
-            );
+                    result.posted(),
+                    result.failed(),
+                    result.signals(),
+                    result.suppressed(),
+                    result.suppressedRecurrenceKeys());
         } catch (OutboundEgressSuppressedException e) {
             throw new JobDeliverySuppressedException(e.toString(), e);
         } catch (FeedbackDeliveryException e) {
@@ -125,27 +112,23 @@ class DiffNotePoster {
             Integer endLine = note.endLine();
             boolean isMultiLine = endLine != null && endLine > note.startLine();
             FeedbackAnchor.DiffAnchor anchor = isMultiLine
-                ? new FeedbackAnchor.DiffAnchor(note.filePath(), Objects.requireNonNull(endLine), note.startLine())
-                : new FeedbackAnchor.DiffAnchor(note.filePath(), note.startLine(), null);
-            observations.add(
-                new InlineFeedbackChannel.InlineFeedback(
+                    ? new FeedbackAnchor.DiffAnchor(note.filePath(), Objects.requireNonNull(endLine), note.startLine())
+                    : new FeedbackAnchor.DiffAnchor(note.filePath(), note.startLine(), null);
+            observations.add(new InlineFeedbackChannel.InlineFeedback(
                     anchor,
                     commentFormatter.appendInlineFeedbackPrompt(sanitized),
                     HEPHAESTUS_MARKER,
-                    note.recurrenceKey()
-                )
-            );
+                    note.recurrenceKey()));
         }
         return observations;
     }
 
     record DiffNoteResult(
-        int posted,
-        int failed,
-        List<InlineFeedbackChannel.DeliveredSignal> signals,
-        boolean suppressed,
-        List<String> suppressedRecurrenceKeys
-    ) {
+            int posted,
+            int failed,
+            List<InlineFeedbackChannel.DeliveredSignal> signals,
+            boolean suppressed,
+            List<String> suppressedRecurrenceKeys) {
         DiffNoteResult(int posted, int failed, List<InlineFeedbackChannel.DeliveredSignal> signals) {
             this(posted, failed, signals, false, List.of());
         }

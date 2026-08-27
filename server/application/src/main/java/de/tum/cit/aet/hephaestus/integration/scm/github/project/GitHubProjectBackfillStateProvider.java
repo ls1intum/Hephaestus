@@ -30,23 +30,19 @@ public class GitHubProjectBackfillStateProvider {
 
     @Transactional
     public void updateProjectItemSyncCursor(Long projectId, String cursor) {
-        projectRepository
-            .findById(projectId)
-            .ifPresent(project -> {
-                project.setItemSyncCursor(cursor);
-                projectRepository.save(project);
-            });
+        projectRepository.findById(projectId).ifPresent(project -> {
+            project.setItemSyncCursor(cursor);
+            projectRepository.save(project);
+        });
     }
 
     @Transactional
     public void updateProjectItemsSyncedAt(Long projectId, Instant syncedAt) {
-        projectRepository
-            .findById(projectId)
-            .ifPresent(project -> {
-                project.setItemsSyncedAt(syncedAt);
-                project.setItemSyncCursor(null);
-                projectRepository.save(project);
-            });
+        projectRepository.findById(projectId).ifPresent(project -> {
+            project.setItemsSyncedAt(syncedAt);
+            project.setItemSyncCursor(null);
+            projectRepository.save(project);
+        });
     }
 
     @Transactional(readOnly = true)
@@ -63,23 +59,19 @@ public class GitHubProjectBackfillStateProvider {
 
     @Transactional
     public void updateProjectFieldSyncCursor(Long projectId, String cursor) {
-        projectRepository
-            .findById(projectId)
-            .ifPresent(project -> {
-                project.setFieldSyncCursor(cursor);
-                projectRepository.save(project);
-            });
+        projectRepository.findById(projectId).ifPresent(project -> {
+            project.setFieldSyncCursor(cursor);
+            projectRepository.save(project);
+        });
     }
 
     @Transactional
     public void updateProjectFieldsSyncedAt(Long projectId, Instant syncedAt) {
-        projectRepository
-            .findById(projectId)
-            .ifPresent(project -> {
-                project.setFieldsSyncedAt(syncedAt);
-                project.setFieldSyncCursor(null);
-                projectRepository.save(project);
-            });
+        projectRepository.findById(projectId).ifPresent(project -> {
+            project.setFieldsSyncedAt(syncedAt);
+            project.setFieldSyncCursor(null);
+            projectRepository.save(project);
+        });
     }
 
     @Transactional(readOnly = true)
@@ -96,23 +88,19 @@ public class GitHubProjectBackfillStateProvider {
 
     @Transactional
     public void updateProjectStatusUpdateSyncCursor(Long projectId, String cursor) {
-        projectRepository
-            .findById(projectId)
-            .ifPresent(project -> {
-                project.setStatusUpdateSyncCursor(cursor);
-                projectRepository.save(project);
-            });
+        projectRepository.findById(projectId).ifPresent(project -> {
+            project.setStatusUpdateSyncCursor(cursor);
+            projectRepository.save(project);
+        });
     }
 
     @Transactional
     public void updateProjectStatusUpdatesSyncedAt(Long projectId, Instant syncedAt) {
-        projectRepository
-            .findById(projectId)
-            .ifPresent(project -> {
-                project.setStatusUpdatesSyncedAt(syncedAt);
-                project.setStatusUpdateSyncCursor(null);
-                projectRepository.save(project);
-            });
+        projectRepository.findById(projectId).ifPresent(project -> {
+            project.setStatusUpdatesSyncedAt(syncedAt);
+            project.setStatusUpdateSyncCursor(null);
+            projectRepository.save(project);
+        });
     }
 
     @Transactional(readOnly = true)

@@ -25,9 +25,8 @@ class ProvenanceDigestTest extends BaseUnitTest {
         insertionOrder.put("a/first.md", bytes("aaa"));
         Map<String, byte[]> sortedOrder = new TreeMap<>(insertionOrder);
 
-        assertThat(ProvenanceDigest.rootDigestHex(insertionOrder)).isEqualTo(
-            ProvenanceDigest.rootDigestHex(sortedOrder)
-        );
+        assertThat(ProvenanceDigest.rootDigestHex(insertionOrder))
+                .isEqualTo(ProvenanceDigest.rootDigestHex(sortedOrder));
     }
 
     @Test
@@ -60,9 +59,8 @@ class ProvenanceDigestTest extends BaseUnitTest {
     @Test
     void sha256Hex_matchesKnownVector() {
         // Pins the algorithm and its wire format: SHA-256("abc") is a published test vector (FIPS 180-2).
-        assertThat(ProvenanceDigest.sha256Hex(bytes("abc"))).isEqualTo(
-            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
-        );
+        assertThat(ProvenanceDigest.sha256Hex(bytes("abc")))
+                .isEqualTo("ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
     }
 
     @Test
@@ -74,10 +72,8 @@ class ProvenanceDigestTest extends BaseUnitTest {
         UUID second = UUID.fromString("00000000-0000-4000-8000-000000000002");
 
         String a = ProvenanceDigest.inputsDigestHex(Map.of("task.json", bytes("{\"jobId\":\"" + first + "\"}")), first);
-        String b = ProvenanceDigest.inputsDigestHex(
-            Map.of("task.json", bytes("{\"jobId\":\"" + second + "\"}")),
-            second
-        );
+        String b =
+                ProvenanceDigest.inputsDigestHex(Map.of("task.json", bytes("{\"jobId\":\"" + second + "\"}")), second);
 
         assertThat(a).isEqualTo(b);
     }
@@ -90,9 +86,8 @@ class ProvenanceDigestTest extends BaseUnitTest {
         Map<String, byte[]> bracedId = Map.of("a.md", bytes("{" + jobId + "}"));
         Map<String, byte[]> literalPlaceholder = Map.of("a.md", bytes("{jobId}"));
 
-        assertThat(ProvenanceDigest.inputsDigestHex(bracedId, jobId)).isNotEqualTo(
-            ProvenanceDigest.inputsDigestHex(literalPlaceholder, jobId)
-        );
+        assertThat(ProvenanceDigest.inputsDigestHex(bracedId, jobId))
+                .isNotEqualTo(ProvenanceDigest.inputsDigestHex(literalPlaceholder, jobId));
     }
 
     @Test
@@ -104,26 +99,20 @@ class ProvenanceDigestTest extends BaseUnitTest {
         Map<String, byte[]> idFirst = Map.of("a.md", bytes(jobId + "ab"));
         Map<String, byte[]> idMiddle = Map.of("a.md", bytes("a" + jobId + "b"));
 
-        assertThat(ProvenanceDigest.inputsDigestHex(idFirst, jobId)).isNotEqualTo(
-            ProvenanceDigest.inputsDigestHex(idMiddle, jobId)
-        );
+        assertThat(ProvenanceDigest.inputsDigestHex(idFirst, jobId))
+                .isNotEqualTo(ProvenanceDigest.inputsDigestHex(idMiddle, jobId));
     }
 
     @Test
     void inputsDigest_stillSeesEverythingBesideTheJobId() {
         // Elision must not become a blind spot: the prompt travels in the same file as the job id.
         UUID jobId = UUID.fromString("00000000-0000-4000-8000-000000000001");
-        Map<String, byte[]> reviewPr7 = Map.of(
-            "task.json",
-            bytes("{\"jobId\":\"" + jobId + "\",\"prompt\":\"review PR 7\"}")
-        );
-        Map<String, byte[]> reviewPr8 = Map.of(
-            "task.json",
-            bytes("{\"jobId\":\"" + jobId + "\",\"prompt\":\"review PR 8\"}")
-        );
+        Map<String, byte[]> reviewPr7 =
+                Map.of("task.json", bytes("{\"jobId\":\"" + jobId + "\",\"prompt\":\"review PR 7\"}"));
+        Map<String, byte[]> reviewPr8 =
+                Map.of("task.json", bytes("{\"jobId\":\"" + jobId + "\",\"prompt\":\"review PR 8\"}"));
 
-        assertThat(ProvenanceDigest.inputsDigestHex(reviewPr7, jobId)).isNotEqualTo(
-            ProvenanceDigest.inputsDigestHex(reviewPr8, jobId)
-        );
+        assertThat(ProvenanceDigest.inputsDigestHex(reviewPr7, jobId))
+                .isNotEqualTo(ProvenanceDigest.inputsDigestHex(reviewPr8, jobId));
     }
 }

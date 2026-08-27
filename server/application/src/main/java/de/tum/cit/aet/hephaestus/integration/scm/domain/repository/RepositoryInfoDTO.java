@@ -23,46 +23,52 @@ import org.jspecify.annotations.Nullable;
 @JsonInclude(JsonInclude.Include.NON_EMPTY)
 @Schema(description = "Information about a git repository")
 public record RepositoryInfoDTO(
-    @NonNull @Schema(description = "Unique identifier of the repository") Long id,
-    @NonNull @Schema(description = "Name of the repository") String name,
-    @NonNull @Schema(description = "Full name including owner (e.g., 'owner/repo')") String nameWithOwner,
-    @Nullable @Schema(description = "Description of the repository") String description,
-    @NonNull @Schema(description = "URL to the repository on the git provider") String htmlUrl,
-    @Nullable @Schema(description = "Labels defined in the repository") List<LabelInfoDTO> labels,
-    /**
-     * Whether contributions from this repository are hidden from leaderboard calculations.
-     * <p>
-     * <b>Note:</b> This field is scope-specific business logic and should be moved
-     * to a workspace-specific DTO during ETL extraction.
-     */
-    @NonNull
-    @Schema(description = "Whether contributions from this repository are hidden from leaderboard calculations")
-    Boolean hiddenFromContributions
-) {
+        @NonNull @Schema(description = "Unique identifier of the repository")
+        Long id,
+
+        @NonNull @Schema(description = "Name of the repository")
+        String name,
+
+        @NonNull @Schema(description = "Full name including owner (e.g., 'owner/repo')")
+        String nameWithOwner,
+
+        @Nullable @Schema(description = "Description of the repository")
+        String description,
+
+        @NonNull @Schema(description = "URL to the repository on the git provider")
+        String htmlUrl,
+
+        @Nullable @Schema(description = "Labels defined in the repository")
+        List<LabelInfoDTO> labels,
+        /**
+         * Whether contributions from this repository are hidden from leaderboard calculations.
+         * <p>
+         * <b>Note:</b> This field is scope-specific business logic and should be moved
+         * to a workspace-specific DTO during ETL extraction.
+         */
+        @NonNull
+        @Schema(description = "Whether contributions from this repository are hidden from leaderboard calculations")
+        Boolean hiddenFromContributions) {
     @Nullable
     public static RepositoryInfoDTO fromRepository(@Nullable Repository repository) {
         if (repository == null) {
             return null;
         }
         // Avoid circular references by setting the nested repository reference in LabelInfoDTO to null
-        final List<LabelInfoDTO> labelDtos =
-            repository.getLabels() != null
-                ? repository
-                      .getLabels()
-                      .stream()
-                      .map(l -> new LabelInfoDTO(l.getId(), l.getName(), l.getColor(), null))
-                      .toList()
+        final List<LabelInfoDTO> labelDtos = repository.getLabels() != null
+                ? repository.getLabels().stream()
+                        .map(l -> new LabelInfoDTO(l.getId(), l.getName(), l.getColor(), null))
+                        .toList()
                 : List.of();
 
         return new RepositoryInfoDTO(
-            repository.getId(),
-            repository.getName(),
-            repository.getNameWithOwner(),
-            repository.getDescription(),
-            repository.getHtmlUrl(),
-            labelDtos,
-            Boolean.FALSE
-        );
+                repository.getId(),
+                repository.getName(),
+                repository.getNameWithOwner(),
+                repository.getDescription(),
+                repository.getHtmlUrl(),
+                labelDtos,
+                Boolean.FALSE);
     }
 
     /**
@@ -77,9 +83,7 @@ public record RepositoryInfoDTO(
      */
     @Nullable
     public static RepositoryInfoDTO fromPermissionWithScopeSettings(
-        @Nullable TeamRepositoryPermission permission,
-        boolean hiddenFromContributions
-    ) {
+            @Nullable TeamRepositoryPermission permission, boolean hiddenFromContributions) {
         if (permission == null) {
             return null;
         }
@@ -88,23 +92,19 @@ public record RepositoryInfoDTO(
             return null;
         }
         // Avoid circular references by setting the nested repository reference in LabelInfoDTO to null
-        final List<LabelInfoDTO> labelDtos =
-            repository.getLabels() != null
-                ? repository
-                      .getLabels()
-                      .stream()
-                      .map(l -> new LabelInfoDTO(l.getId(), l.getName(), l.getColor(), null))
-                      .toList()
+        final List<LabelInfoDTO> labelDtos = repository.getLabels() != null
+                ? repository.getLabels().stream()
+                        .map(l -> new LabelInfoDTO(l.getId(), l.getName(), l.getColor(), null))
+                        .toList()
                 : List.of();
 
         return new RepositoryInfoDTO(
-            repository.getId(),
-            repository.getName(),
-            repository.getNameWithOwner(),
-            repository.getDescription(),
-            repository.getHtmlUrl(),
-            labelDtos,
-            hiddenFromContributions
-        );
+                repository.getId(),
+                repository.getName(),
+                repository.getNameWithOwner(),
+                repository.getDescription(),
+                repository.getHtmlUrl(),
+                labelDtos,
+                hiddenFromContributions);
     }
 }

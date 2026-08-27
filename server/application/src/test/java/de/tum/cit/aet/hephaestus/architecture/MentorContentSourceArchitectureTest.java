@@ -32,47 +32,43 @@ class MentorContentSourceArchitectureTest extends HephaestusArchitectureTest {
     @Test
     void contributeIsTransactional() {
         ArchRule rule = methods()
-            .that()
-            .areDeclaredInClassesThat()
-            .resideInAPackage(MENTOR_PROVIDERS_PACKAGE)
-            .and()
-            .areDeclaredInClassesThat()
-            .haveSimpleNameEndingWith("ContentSource")
-            .and()
-            .haveName("contribute")
-            .should()
-            .beAnnotatedWith(Transactional.class)
-            .because(
-                "contribute() is the external entry point WorkspaceContextBuilder calls through the " +
-                    "Spring proxy. Removing @Transactional from here OR moving it to a helper would " +
-                    "silently drop the tx (self-invocation bypasses the proxy) and re-introduce a " +
-                    "LazyInitializationException risk on the SSE wire."
-            )
-            // Fail loudly if the providers package/method is renamed away from contribute(): the package
-            // is populated, so zero matches means the rule stopped guarding the providers, not that the
-            // condition is vacuously satisfied.
-            .allowEmptyShould(false);
+                .that()
+                .areDeclaredInClassesThat()
+                .resideInAPackage(MENTOR_PROVIDERS_PACKAGE)
+                .and()
+                .areDeclaredInClassesThat()
+                .haveSimpleNameEndingWith("ContentSource")
+                .and()
+                .haveName("contribute")
+                .should()
+                .beAnnotatedWith(Transactional.class)
+                .because("contribute() is the external entry point WorkspaceContextBuilder calls through the "
+                        + "Spring proxy. Removing @Transactional from here OR moving it to a helper would "
+                        + "silently drop the tx (self-invocation bypasses the proxy) and re-introduce a "
+                        + "LazyInitializationException risk on the SSE wire.")
+                // Fail loudly if the providers package/method is renamed away from contribute(): the package
+                // is populated, so zero matches means the rule stopped guarding the providers, not that the
+                // condition is vacuously satisfied.
+                .allowEmptyShould(false);
         rule.check(classes);
     }
 
     @Test
     void buildPayloadIsNotTransactional() {
         ArchRule rule = noMethods()
-            .that()
-            .areDeclaredInClassesThat()
-            .resideInAPackage(MENTOR_PROVIDERS_PACKAGE)
-            .and()
-            .areDeclaredInClassesThat()
-            .haveSimpleNameEndingWith("ContentSource")
-            .and()
-            .haveName("buildPayload")
-            .should()
-            .beAnnotatedWith(Transactional.class)
-            .because(
-                "buildPayload() is only ever invoked via this.buildPayload(...) from contribute(). " +
-                    "Spring AOP cannot intercept self-invocations, so @Transactional here is silently " +
-                    "dropped — the comment lies about the safety net. Annotation belongs on contribute()."
-            );
+                .that()
+                .areDeclaredInClassesThat()
+                .resideInAPackage(MENTOR_PROVIDERS_PACKAGE)
+                .and()
+                .areDeclaredInClassesThat()
+                .haveSimpleNameEndingWith("ContentSource")
+                .and()
+                .haveName("buildPayload")
+                .should()
+                .beAnnotatedWith(Transactional.class)
+                .because("buildPayload() is only ever invoked via this.buildPayload(...) from contribute(). "
+                        + "Spring AOP cannot intercept self-invocations, so @Transactional here is silently "
+                        + "dropped — the comment lies about the safety net. Annotation belongs on contribute().");
         rule.check(classes);
     }
 }

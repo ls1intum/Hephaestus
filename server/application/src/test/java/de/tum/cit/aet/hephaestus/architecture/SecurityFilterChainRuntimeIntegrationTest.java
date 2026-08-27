@@ -2,16 +2,13 @@ package de.tum.cit.aet.hephaestus.architecture;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.tum.cit.aet.hephaestus.agent.proxy.JobTokenAuthenticationFilter;
 import de.tum.cit.aet.hephaestus.core.auth.ratelimit.AuthRateLimitFilter;
 import de.tum.cit.aet.hephaestus.core.security.CsrfCookieFilter;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
-import jakarta.servlet.Filter;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.csrf.CsrfFilter;
 
 class SecurityFilterChainRuntimeIntegrationTest extends BaseIntegrationTest {
@@ -32,13 +29,13 @@ class SecurityFilterChainRuntimeIntegrationTest extends BaseIntegrationTest {
             boolean hasCsrf = chain.getFilters().stream().anyMatch(CsrfFilter.class::isInstance);
             boolean hasCsrfCookie = chain.getFilters().stream().anyMatch(CsrfCookieFilter.class::isInstance);
             assertThat(hasCsrf)
-                .as("only the cookie app chain (with CsrfCookieFilter) may carry a CsrfFilter: %s", chain)
-                .isEqualTo(hasCsrfCookie);
+                    .as("only the cookie app chain (with CsrfCookieFilter) may carry a CsrfFilter: %s", chain)
+                    .isEqualTo(hasCsrfCookie);
         }
         // Guard against an accidental global CSRF disable: the cookie app chain must still enforce it.
         assertThat(filterChains)
-            .as("the cookie app chain must enforce CSRF")
-            .anyMatch(chain -> chain.getFilters().stream().anyMatch(CsrfFilter.class::isInstance));
+                .as("the cookie app chain must enforce CSRF")
+                .anyMatch(chain -> chain.getFilters().stream().anyMatch(CsrfFilter.class::isInstance));
     }
 
     @Test
@@ -47,8 +44,8 @@ class SecurityFilterChainRuntimeIntegrationTest extends BaseIntegrationTest {
         // regression removing addFilterBefore(authRateLimitFilter, AuthorizationFilter.class) — disabling
         // auth rate limiting entirely in prod — would otherwise be invisible. Assert it is actually wired.
         assertThat(filterChains)
-            .as("at least one security chain must install AuthRateLimitFilter")
-            .anyMatch(chain -> chain.getFilters().stream().anyMatch(AuthRateLimitFilter.class::isInstance));
+                .as("at least one security chain must install AuthRateLimitFilter")
+                .anyMatch(chain -> chain.getFilters().stream().anyMatch(AuthRateLimitFilter.class::isInstance));
     }
 
     // The proxy beans are gated on the job-execution capability (worker role + hephaestus.agent.enabled),

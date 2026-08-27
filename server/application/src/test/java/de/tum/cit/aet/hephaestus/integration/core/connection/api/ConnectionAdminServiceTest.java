@@ -64,13 +64,12 @@ class ConnectionAdminServiceTest extends BaseUnitTest {
         // Real converter so the encrypt/round-trip behaviour is exercised end-to-end.
         credentialConverter = new CredentialBundleConverter("a".repeat(32), "dev");
         service = new ConnectionAdminService(
-            connectionRepository,
-            auditRepository,
-            connectionService,
-            workspaceRepository,
-            manifests,
-            credentialConverter
-        );
+                connectionRepository,
+                auditRepository,
+                connectionService,
+                workspaceRepository,
+                manifests,
+                credentialConverter);
     }
 
     @Test
@@ -86,11 +85,7 @@ class ConnectionAdminServiceTest extends BaseUnitTest {
         Workspace ws = new Workspace();
         ws.setId(workspaceId);
         Connection c = new Connection(
-            ws,
-            IntegrationKind.GITHUB,
-            "100",
-            new ConnectionConfig.GitHubAppConfig(100L, null, null, Set.of())
-        );
+                ws, IntegrationKind.GITHUB, "100", new ConnectionConfig.GitHubAppConfig(100L, null, null, Set.of()));
         when(connectionRepository.findById(42L)).thenReturn(Optional.of(c));
 
         assertThat(service.findInWorkspaceOrThrow(workspaceId, 42L)).isSameAs(c);
@@ -107,11 +102,7 @@ class ConnectionAdminServiceTest extends BaseUnitTest {
         Workspace ws = new Workspace();
         ws.setId(1L);
         Connection c = new Connection(
-            ws,
-            IntegrationKind.GITHUB,
-            "100",
-            new ConnectionConfig.GitHubAppConfig(100L, null, null, Set.of())
-        );
+                ws, IntegrationKind.GITHUB, "100", new ConnectionConfig.GitHubAppConfig(100L, null, null, Set.of()));
         when(connectionRepository.findById(42L)).thenReturn(Optional.of(c));
 
         // requested workspace 999 != actual 1
@@ -122,16 +113,13 @@ class ConnectionAdminServiceTest extends BaseUnitTest {
     void auditForConnection_appliesLimit() {
         Workspace ws = new Workspace();
         Connection c = new Connection(
-            ws,
-            IntegrationKind.GITHUB,
-            "100",
-            new ConnectionConfig.GitHubAppConfig(100L, null, null, Set.of())
-        );
+                ws, IntegrationKind.GITHUB, "100", new ConnectionConfig.GitHubAppConfig(100L, null, null, Set.of()));
         List<ConnectionAudit> entries = List.of(
-            new ConnectionAudit(c, "A", null, IntegrationState.ACTIVE, "ADMIN", "x", "1", null),
-            new ConnectionAudit(c, "B", IntegrationState.ACTIVE, IntegrationState.SUSPENDED, "ADMIN", "x", "2", null),
-            new ConnectionAudit(c, "C", IntegrationState.SUSPENDED, IntegrationState.ACTIVE, "ADMIN", "x", "3", null)
-        );
+                new ConnectionAudit(c, "A", null, IntegrationState.ACTIVE, "ADMIN", "x", "1", null),
+                new ConnectionAudit(
+                        c, "B", IntegrationState.ACTIVE, IntegrationState.SUSPENDED, "ADMIN", "x", "2", null),
+                new ConnectionAudit(
+                        c, "C", IntegrationState.SUSPENDED, IntegrationState.ACTIVE, "ADMIN", "x", "3", null));
         when(auditRepository.findByConnectionIdOrderByOccurredAtDesc(7L)).thenReturn(entries);
 
         assertThat(service.auditForConnection(7L, 2)).hasSize(2);
@@ -149,20 +137,20 @@ class ConnectionAdminServiceTest extends BaseUnitTest {
             setId(saved, 99L);
             return saved;
         });
-        when(connectionService.transition(any(Connection.class), any(TransitionRequest.class))).thenAnswer(inv -> {
-            Connection conn = inv.getArgument(0);
-            conn.setState(IntegrationState.ACTIVE);
-            return conn;
-        });
+        when(connectionService.transition(any(Connection.class), any(TransitionRequest.class)))
+                .thenAnswer(inv -> {
+                    Connection conn = inv.getArgument(0);
+                    conn.setState(IntegrationState.ACTIVE);
+                    return conn;
+                });
 
         Connection result = service.createInlineConnection(
-            workspaceId,
-            IntegrationKind.GITLAB,
-            "200",
-            new BearerToken("glpat-test", null),
-            Map.of("server_url", "https://gitlab.example.com"),
-            "alice"
-        );
+                workspaceId,
+                IntegrationKind.GITLAB,
+                "200",
+                new BearerToken("glpat-test", null),
+                Map.of("server_url", "https://gitlab.example.com"),
+                "alice");
 
         assertThat(result.getId()).isEqualTo(99L);
         assertThat(result.getKind()).isEqualTo(IntegrationKind.GITLAB);
@@ -187,16 +175,9 @@ class ConnectionAdminServiceTest extends BaseUnitTest {
     @Test
     void createInlineConnection_missingWorkspace_throws() {
         when(workspaceRepository.findById(99L)).thenReturn(Optional.empty());
-        assertThatThrownBy(() ->
-            service.createInlineConnection(
-                99L,
-                IntegrationKind.GITLAB,
-                "x",
-                new BearerToken("t", null),
-                Map.of(),
-                "alice"
-            )
-        ).isInstanceOf(EntityNotFoundException.class);
+        assertThatThrownBy(() -> service.createInlineConnection(
+                        99L, IntegrationKind.GITLAB, "x", new BearerToken("t", null), Map.of(), "alice"))
+                .isInstanceOf(EntityNotFoundException.class);
     }
 
     private static void setId(Connection c, long id) {

@@ -9,7 +9,5 @@ import org.jspecify.annotations.NonNull;
  */
 @Schema(description = "The instance LLM policy as it applies to this workspace (read-only)")
 public record WorkspaceLlmSettingsDTO(
-    @NonNull
-    @Schema(description = "Whether this workspace may register its own LLM provider connections")
-    Boolean ownProviderAllowed
-) {}
+        @NonNull @Schema(description = "Whether this workspace may register its own LLM provider connections")
+        Boolean ownProviderAllowed) {}

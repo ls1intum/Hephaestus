@@ -73,25 +73,22 @@ class PracticeStandingServiceTest extends BaseUnitTest {
     void setUp() {
         when(currentDeveloperLookup.currentDeveloperId()).thenReturn(Optional.of(USER_ID));
         when(clock.instant()).thenReturn(NOW);
+        lenient().when(visibilityPolicy.permitsAll(anyLong(), any(), any())).thenAnswer(invocation -> {
+            Collection<Observation> observations = invocation.getArgument(1);
+            return observations.stream().map(Observation::getId).collect(Collectors.toSet());
+        });
         lenient()
-            .when(visibilityPolicy.permitsAll(anyLong(), any(), any()))
-            .thenAnswer(invocation -> {
-                Collection<Observation> observations = invocation.getArgument(1);
-                return observations.stream().map(Observation::getId).collect(Collectors.toSet());
-            });
-        lenient()
-            .when(workspaceReviewDefaultsProvider.forWorkspace(WORKSPACE_ID))
-            .thenReturn(WorkspaceReviewDefaults.UNSET);
+                .when(workspaceReviewDefaultsProvider.forWorkspace(WORKSPACE_ID))
+                .thenReturn(WorkspaceReviewDefaults.UNSET);
         practiceStandingService = new PracticeStandingService(
-            observationRepository,
-            feedbackObservationRepository,
-            currentDeveloperLookup,
-            visibilityPolicy,
-            practiceRepository,
-            workspaceReviewDefaultsProvider,
-            new PracticeTrendService(new TrendProperties(), clock),
-            clock
-        );
+                observationRepository,
+                feedbackObservationRepository,
+                currentDeveloperLookup,
+                visibilityPolicy,
+                practiceRepository,
+                workspaceReviewDefaultsProvider,
+                new PracticeTrendService(new TrendProperties(), clock),
+                clock);
     }
 
     private Observation bad(Practice practice, @org.jspecify.annotations.Nullable Severity severity) {
@@ -103,39 +100,38 @@ class PracticeStandingServiceTest extends BaseUnitTest {
     }
 
     private Observation bad(
-        Practice practice,
-        @org.jspecify.annotations.Nullable Severity severity,
-        long artifactId,
-        @org.jspecify.annotations.Nullable String recurrenceKey
-    ) {
+            Practice practice,
+            @org.jspecify.annotations.Nullable Severity severity,
+            long artifactId,
+            @org.jspecify.annotations.Nullable String recurrenceKey) {
         return Observation.builder()
-            .id(UUID.randomUUID())
-            .practice(practice)
-            .artifactKind(ArtifactKinds.PULL_REQUEST)
-            .artifactId(artifactId)
-            .agentJobId(runOf(artifactId))
-            .observedAt(observedAtOf(artifactId))
-            .summary("a problem")
-            .presence(Presence.ABSENT)
-            .assessment(Assessment.BAD)
-            .severity(severity)
-            .recurrenceKey(recurrenceKey)
-            .build();
+                .id(UUID.randomUUID())
+                .practice(practice)
+                .artifactKind(ArtifactKinds.PULL_REQUEST)
+                .artifactId(artifactId)
+                .agentJobId(runOf(artifactId))
+                .observedAt(observedAtOf(artifactId))
+                .summary("a problem")
+                .presence(Presence.ABSENT)
+                .assessment(Assessment.BAD)
+                .severity(severity)
+                .recurrenceKey(recurrenceKey)
+                .build();
     }
 
     /** A problem-free review of one piece of reviewed work: what a recovered practice looks like in the evidence. */
     private Observation good(Practice practice, long artifactId) {
         return Observation.builder()
-            .id(UUID.randomUUID())
-            .practice(practice)
-            .artifactKind(ArtifactKinds.PULL_REQUEST)
-            .artifactId(artifactId)
-            .agentJobId(runOf(artifactId))
-            .observedAt(observedAtOf(artifactId))
-            .summary("a strength")
-            .presence(Presence.PRESENT)
-            .assessment(Assessment.GOOD)
-            .build();
+                .id(UUID.randomUUID())
+                .practice(practice)
+                .artifactKind(ArtifactKinds.PULL_REQUEST)
+                .artifactId(artifactId)
+                .agentJobId(runOf(artifactId))
+                .observedAt(observedAtOf(artifactId))
+                .summary("a strength")
+                .presence(Presence.PRESENT)
+                .assessment(Assessment.GOOD)
+                .build();
     }
 
     /**
@@ -162,18 +158,11 @@ class PracticeStandingServiceTest extends BaseUnitTest {
     @DisplayName("two clean newer pieces of reviewed work restore STRENGTH even though an older review found a problem")
     void recentCleanEvidenceOutweighsTheOlderRecord() {
         Practice practice = practice("robust-error-handling");
-        when(
-            observationRepository.findRecentByDeveloperAndWorkspace(
-                eq(USER_ID),
-                eq(WORKSPACE_ID),
-                any(Instant.class),
-                anyBoolean(),
-                any(Pageable.class)
-            )
-        ).thenReturn(List.of(bad(practice, Severity.MAJOR, 41L), good(practice, 42L), good(practice, 43L)));
-        when(feedbackObservationRepository.findLatestFeedbackBodiesByObservationIds(any(), any(), any())).thenReturn(
-            List.of()
-        );
+        when(observationRepository.findRecentByDeveloperAndWorkspace(
+                        eq(USER_ID), eq(WORKSPACE_ID), any(Instant.class), anyBoolean(), any(Pageable.class)))
+                .thenReturn(List.of(bad(practice, Severity.MAJOR, 41L), good(practice, 42L), good(practice, 43L)));
+        when(feedbackObservationRepository.findLatestFeedbackBodiesByObservationIds(any(), any(), any()))
+                .thenReturn(List.of());
 
         List<PracticeStandingDTO> standings = practiceStandingService.getStandings(WORKSPACE_ID);
 
@@ -186,18 +175,11 @@ class PracticeStandingServiceTest extends BaseUnitTest {
     @DisplayName("one clean piece of reviewed work after a problem does not outweigh it — the standing stays MIXED")
     void singleCleanOpportunityDoesNotRestoreStrength() {
         Practice practice = practice("robust-error-handling");
-        when(
-            observationRepository.findRecentByDeveloperAndWorkspace(
-                eq(USER_ID),
-                eq(WORKSPACE_ID),
-                any(Instant.class),
-                anyBoolean(),
-                any(Pageable.class)
-            )
-        ).thenReturn(List.of(bad(practice, Severity.MAJOR, 41L), good(practice, 42L)));
-        when(feedbackObservationRepository.findLatestFeedbackBodiesByObservationIds(any(), any(), any())).thenReturn(
-            List.of()
-        );
+        when(observationRepository.findRecentByDeveloperAndWorkspace(
+                        eq(USER_ID), eq(WORKSPACE_ID), any(Instant.class), anyBoolean(), any(Pageable.class)))
+                .thenReturn(List.of(bad(practice, Severity.MAJOR, 41L), good(practice, 42L)));
+        when(feedbackObservationRepository.findLatestFeedbackBodiesByObservationIds(any(), any(), any()))
+                .thenReturn(List.of());
 
         List<PracticeStandingDTO> standings = practiceStandingService.getStandings(WORKSPACE_ID);
 
@@ -209,20 +191,15 @@ class PracticeStandingServiceTest extends BaseUnitTest {
     @DisplayName("one problem on the newest piece of reviewed work moves the standing to MIXED, but does not condemn")
     void aSingleFreshProblemDoesNotCondemn() {
         Practice practice = practice("robust-error-handling");
-        when(
-            observationRepository.findRecentByDeveloperAndWorkspace(
-                eq(USER_ID),
-                eq(WORKSPACE_ID),
-                any(Instant.class),
-                anyBoolean(),
-                any(Pageable.class)
-            )
-        ).thenReturn(
-            List.of(good(practice, 41L), good(practice, 42L), good(practice, 43L), bad(practice, Severity.MAJOR, 44L))
-        );
-        when(feedbackObservationRepository.findLatestFeedbackBodiesByObservationIds(any(), any(), any())).thenReturn(
-            List.of()
-        );
+        when(observationRepository.findRecentByDeveloperAndWorkspace(
+                        eq(USER_ID), eq(WORKSPACE_ID), any(Instant.class), anyBoolean(), any(Pageable.class)))
+                .thenReturn(List.of(
+                        good(practice, 41L),
+                        good(practice, 42L),
+                        good(practice, 43L),
+                        bad(practice, Severity.MAJOR, 44L)));
+        when(feedbackObservationRepository.findLatestFeedbackBodiesByObservationIds(any(), any(), any()))
+                .thenReturn(List.of());
 
         List<PracticeStandingDTO> standings = practiceStandingService.getStandings(WORKSPACE_ID);
 
@@ -234,25 +211,15 @@ class PracticeStandingServiceTest extends BaseUnitTest {
     @DisplayName("two problems in a row do condemn — the mirror of two clean ones restoring a strength")
     void twoFreshProblemsInARowDropToDeveloping() {
         Practice practice = practice("robust-error-handling");
-        when(
-            observationRepository.findRecentByDeveloperAndWorkspace(
-                eq(USER_ID),
-                eq(WORKSPACE_ID),
-                any(Instant.class),
-                anyBoolean(),
-                any(Pageable.class)
-            )
-        ).thenReturn(
-            List.of(
-                good(practice, 41L),
-                good(practice, 42L),
-                bad(practice, Severity.MAJOR, 43L),
-                bad(practice, Severity.MAJOR, 44L)
-            )
-        );
-        when(feedbackObservationRepository.findLatestFeedbackBodiesByObservationIds(any(), any(), any())).thenReturn(
-            List.of()
-        );
+        when(observationRepository.findRecentByDeveloperAndWorkspace(
+                        eq(USER_ID), eq(WORKSPACE_ID), any(Instant.class), anyBoolean(), any(Pageable.class)))
+                .thenReturn(List.of(
+                        good(practice, 41L),
+                        good(practice, 42L),
+                        bad(practice, Severity.MAJOR, 43L),
+                        bad(practice, Severity.MAJOR, 44L)));
+        when(feedbackObservationRepository.findLatestFeedbackBodiesByObservationIds(any(), any(), any()))
+                .thenReturn(List.of());
 
         List<PracticeStandingDTO> standings = practiceStandingService.getStandings(WORKSPACE_ID);
 
@@ -264,30 +231,20 @@ class PracticeStandingServiceTest extends BaseUnitTest {
     @DisplayName("only the newest four pieces of reviewed work decide the standing, however long the older record is")
     void olderWorkItemsFallOutOfTheStandingWindow() {
         Practice practice = practice("robust-error-handling");
-        when(
-            observationRepository.findRecentByDeveloperAndWorkspace(
-                eq(USER_ID),
-                eq(WORKSPACE_ID),
-                any(Instant.class),
-                anyBoolean(),
-                any(Pageable.class)
-            )
-        ).thenReturn(
-            List.of(
-                bad(practice, Severity.MAJOR, 31L),
-                bad(practice, Severity.MAJOR, 32L),
-                bad(practice, Severity.MAJOR, 33L),
-                bad(practice, Severity.MAJOR, 34L),
-                bad(practice, Severity.MAJOR, 35L),
-                good(practice, 41L),
-                good(practice, 42L),
-                good(practice, 43L),
-                good(practice, 44L)
-            )
-        );
-        when(feedbackObservationRepository.findLatestFeedbackBodiesByObservationIds(any(), any(), any())).thenReturn(
-            List.of()
-        );
+        when(observationRepository.findRecentByDeveloperAndWorkspace(
+                        eq(USER_ID), eq(WORKSPACE_ID), any(Instant.class), anyBoolean(), any(Pageable.class)))
+                .thenReturn(List.of(
+                        bad(practice, Severity.MAJOR, 31L),
+                        bad(practice, Severity.MAJOR, 32L),
+                        bad(practice, Severity.MAJOR, 33L),
+                        bad(practice, Severity.MAJOR, 34L),
+                        bad(practice, Severity.MAJOR, 35L),
+                        good(practice, 41L),
+                        good(practice, 42L),
+                        good(practice, 43L),
+                        good(practice, 44L)));
+        when(feedbackObservationRepository.findLatestFeedbackBodiesByObservationIds(any(), any(), any()))
+                .thenReturn(List.of());
 
         List<PracticeStandingDTO> standings = practiceStandingService.getStandings(WORKSPACE_ID);
 
@@ -304,28 +261,17 @@ class PracticeStandingServiceTest extends BaseUnitTest {
         practice.setName("Handling failure robustly");
         practice.setCriteria("ordinary criteria"); // not a defect-detector
 
-        when(
-            observationRepository.findRecentByDeveloperAndWorkspace(
-                eq(USER_ID),
-                eq(WORKSPACE_ID),
-                any(Instant.class),
-                anyBoolean(),
-                any(Pageable.class)
-            )
-        ).thenReturn(List.of(bad(practice, null), bad(practice, Severity.CRITICAL)));
-        when(feedbackObservationRepository.findLatestFeedbackBodiesByObservationIds(any(), any(), any())).thenReturn(
-            List.of()
-        );
+        when(observationRepository.findRecentByDeveloperAndWorkspace(
+                        eq(USER_ID), eq(WORKSPACE_ID), any(Instant.class), anyBoolean(), any(Pageable.class)))
+                .thenReturn(List.of(bad(practice, null), bad(practice, Severity.CRITICAL)));
+        when(feedbackObservationRepository.findLatestFeedbackBodiesByObservationIds(any(), any(), any()))
+                .thenReturn(List.of());
 
         List<PracticeStandingDTO> standings = practiceStandingService.getStandings(WORKSPACE_ID);
 
         assertThat(standings).hasSize(1);
-        List<Severity> order = standings
-            .get(0)
-            .toWorkOn()
-            .stream()
-            .map(i -> i.severity())
-            .toList();
+        List<Severity> order =
+                standings.get(0).toWorkOn().stream().map(i -> i.severity()).toList();
         assertThat(order).containsExactly(Severity.CRITICAL, null);
     }
 
@@ -336,56 +282,38 @@ class PracticeStandingServiceTest extends BaseUnitTest {
         Observation critical = bad(practice, Severity.CRITICAL, 42L);
         Observation minor = bad(practice, Severity.MINOR, 42L);
 
-        when(
-            observationRepository.findRecentByDeveloperAndWorkspace(
-                eq(USER_ID),
-                eq(WORKSPACE_ID),
-                any(Instant.class),
-                anyBoolean(),
-                any(Pageable.class)
-            )
-        ).thenReturn(List.of(minor, critical));
-        when(feedbackObservationRepository.findLatestFeedbackBodiesByObservationIds(any(), any(), any())).thenReturn(
-            List.of()
-        );
+        when(observationRepository.findRecentByDeveloperAndWorkspace(
+                        eq(USER_ID), eq(WORKSPACE_ID), any(Instant.class), anyBoolean(), any(Pageable.class)))
+                .thenReturn(List.of(minor, critical));
+        when(feedbackObservationRepository.findLatestFeedbackBodiesByObservationIds(any(), any(), any()))
+                .thenReturn(List.of());
 
         List<PracticeStandingDTO> standings = practiceStandingService.getStandings(WORKSPACE_ID);
 
         assertThat(standings).hasSize(1);
         List<PracticeStandingObservationDTO> observations = standings.get(0).toWorkOn();
-        assertThat(observations.stream().map(PracticeStandingObservationDTO::observationId)).containsExactly(
-            critical.getId(),
-            minor.getId()
-        );
+        assertThat(observations.stream().map(PracticeStandingObservationDTO::observationId))
+                .containsExactly(critical.getId(), minor.getId());
     }
 
     @Test
     @DisplayName(
-        "every problem in the window reaches the standing, whichever locus or piece of reviewed work it came from"
-    )
+            "every problem in the window reaches the standing, whichever locus or piece of reviewed work it came from")
     void unrelatedProblemsAcrossLociAreAllListed() {
         Practice practice = practice("robust-error-handling");
         Observation locusA = bad(practice, Severity.CRITICAL, 42L, "locus-A");
         Observation locusB = bad(practice, Severity.MINOR, 43L, "locus-B");
 
-        when(
-            observationRepository.findRecentByDeveloperAndWorkspace(
-                eq(USER_ID),
-                eq(WORKSPACE_ID),
-                any(Instant.class),
-                anyBoolean(),
-                any(Pageable.class)
-            )
-        ).thenReturn(List.of(locusA, locusB));
-        when(feedbackObservationRepository.findLatestFeedbackBodiesByObservationIds(any(), any(), any())).thenReturn(
-            List.of()
-        );
+        when(observationRepository.findRecentByDeveloperAndWorkspace(
+                        eq(USER_ID), eq(WORKSPACE_ID), any(Instant.class), anyBoolean(), any(Pageable.class)))
+                .thenReturn(List.of(locusA, locusB));
+        when(feedbackObservationRepository.findLatestFeedbackBodiesByObservationIds(any(), any(), any()))
+                .thenReturn(List.of());
 
         List<PracticeStandingDTO> standings = practiceStandingService.getStandings(WORKSPACE_ID);
 
         assertThat(standings).hasSize(1);
-        assertThat(
-            standings.get(0).toWorkOn().stream().map(PracticeStandingObservationDTO::observationId)
-        ).containsExactlyInAnyOrder(locusA.getId(), locusB.getId());
+        assertThat(standings.get(0).toWorkOn().stream().map(PracticeStandingObservationDTO::observationId))
+                .containsExactlyInAnyOrder(locusA.getId(), locusB.getId());
     }
 }

@@ -18,7 +18,7 @@ public @interface WithMentorUser {
     /**
      * The authorities/roles for the mock mentor user.
      */
-    String[] authorities() default { "mentor_access" };
+    String[] authorities() default {"mentor_access"};
 
     /**
      * The user ID for the mock mentor user.

@@ -43,18 +43,15 @@ class GraphQlConnectionOverflowDetectorTest extends BaseUnitTest {
     @Test
     void paginated_gapAfterFullPagination_logsDebug_returnsFalse() {
         // e.g. reviewThreads where resolved threads contributed no comments, or GitHub over-reports
-        boolean overflow = GraphQlConnectionOverflowDetector.checkPaginated(
-            "reviewThreads",
-            3,
-            5,
-            false,
-            "prNumber=42"
-        );
+        boolean overflow =
+                GraphQlConnectionOverflowDetector.checkPaginated("reviewThreads", 3, 5, false, "prNumber=42");
 
         assertThat(overflow).isFalse();
         assertThat(appender.list).hasSize(1);
         assertThat(appender.list.get(0).getLevel()).isEqualTo(Level.DEBUG);
-        assertThat(appender.list.get(0).getFormattedMessage()).contains("benign").contains("reviewThreads");
+        assertThat(appender.list.get(0).getFormattedMessage())
+                .contains("benign")
+                .contains("reviewThreads");
     }
 
     @Test
@@ -99,8 +96,10 @@ class GraphQlConnectionOverflowDetectorTest extends BaseUnitTest {
 
     @Test
     void embedded_noOverflow_logsNothing_returnsFalse() {
-        assertThat(GraphQlConnectionOverflowDetector.check("assignees", 5, 5, "PR #7")).isFalse();
-        assertThat(GraphQlConnectionOverflowDetector.check("labels", 5, false, "issue #3")).isFalse();
+        assertThat(GraphQlConnectionOverflowDetector.check("assignees", 5, 5, "PR #7"))
+                .isFalse();
+        assertThat(GraphQlConnectionOverflowDetector.check("labels", 5, false, "issue #3"))
+                .isFalse();
         assertThat(appender.list).isEmpty();
     }
 }

@@ -35,13 +35,11 @@ public interface ReviewBackfillRunRepository extends JpaRepository<ReviewBackfil
      * Active campaigns least-recently-touched first, so one long run cannot starve a newer one and a
      * restart resumes in roughly the order it stopped.
      */
-    @Query(
-        """
+    @Query("""
         SELECT r FROM ReviewBackfillRun r
         JOIN FETCH r.workspace
         WHERE r.status IN :statuses
         ORDER BY r.updatedAt ASC
-        """
-    )
+        """)
     List<ReviewBackfillRun> findByStatusIn(Collection<ReviewBackfillStatus> statuses, Pageable pageable);
 }

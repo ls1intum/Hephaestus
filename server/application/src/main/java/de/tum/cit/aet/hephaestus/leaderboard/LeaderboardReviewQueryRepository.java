@@ -35,8 +35,7 @@ public interface LeaderboardReviewQueryRepository extends JpaRepository<PullRequ
      * @param workspaceId the workspace to scope to
      * @return reviews in the timeframe for monitored repositories by the specified actors
      */
-    @Query(
-        value = """
+    @Query(value = """
         SELECT prr
         FROM PullRequestReview prr
         LEFT JOIN FETCH prr.author
@@ -49,14 +48,12 @@ public interface LeaderboardReviewQueryRepository extends JpaRepository<PullRequ
             AND prr.author.type = de.tum.cit.aet.hephaestus.integration.scm.domain.user.User$Type.USER
             AND rtm.workspace.id = :workspaceId
         ORDER BY prr.submittedAt DESC
-        """
-    )
+        """)
     List<PullRequestReview> findAllInTimeframeByActors(
-        @Param("since") Instant since,
-        @Param("until") Instant until,
-        @Param("actorIds") Collection<Long> actorIds,
-        @Param("workspaceId") Long workspaceId
-    );
+            @Param("since") Instant since,
+            @Param("until") Instant until,
+            @Param("actorIds") Collection<Long> actorIds,
+            @Param("workspaceId") Long workspaceId);
 
     /**
      * Finds all reviews in a timeframe for specific actors and teams, excluding hidden repositories.
@@ -78,8 +75,7 @@ public interface LeaderboardReviewQueryRepository extends JpaRepository<PullRequ
      * @param workspaceId the workspace to scope to
      * @return reviews in the timeframe for the specified actors, excluding hidden repositories
      */
-    @Query(
-        value = """
+    @Query(value = """
         SELECT prr
         FROM PullRequestReview prr
         LEFT JOIN FETCH prr.author
@@ -123,13 +119,11 @@ public interface LeaderboardReviewQueryRepository extends JpaRepository<PullRequ
                 )
             )
         ORDER BY prr.submittedAt DESC
-        """
-    )
+        """)
     List<PullRequestReview> findAllInTimeframeByActorsOfTeams(
-        @Param("since") Instant since,
-        @Param("until") Instant until,
-        @Param("actorIds") Collection<Long> actorIds,
-        @Param("teamIds") Collection<Long> teamIds,
-        @Param("workspaceId") Long workspaceId
-    );
+            @Param("since") Instant since,
+            @Param("until") Instant until,
+            @Param("actorIds") Collection<Long> actorIds,
+            @Param("teamIds") Collection<Long> teamIds,
+            @Param("workspaceId") Long workspaceId);
 }

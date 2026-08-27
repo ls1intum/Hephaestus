@@ -24,37 +24,38 @@ class HandlerArchitectureTest extends HephaestusArchitectureTest {
         @Test
         void spiShouldNotDependOnSpring() {
             noClasses()
-                .that()
-                .resideInAPackage("..agent.handler.spi..")
-                .should()
-                .dependOnClassesThat()
-                .resideInAPackage("org.springframework..")
-                .because("SPI types must be framework-agnostic — no Spring annotations or imports")
-                .check(classes);
+                    .that()
+                    .resideInAPackage("..agent.handler.spi..")
+                    .should()
+                    .dependOnClassesThat()
+                    .resideInAPackage("org.springframework..")
+                    .because("SPI types must be framework-agnostic — no Spring annotations or imports")
+                    .check(classes);
         }
 
         @Test
         void spiShouldNotDependOnGitProvider() {
             noClasses()
-                .that()
-                .resideInAPackage("..agent.handler.spi..")
-                .should()
-                .dependOnClassesThat()
-                .resideInAPackage("..integration.scm..")
-                .because("SPI types must remain domain-agnostic — handler implementations bridge to integration.scm")
-                .check(classes);
+                    .that()
+                    .resideInAPackage("..agent.handler.spi..")
+                    .should()
+                    .dependOnClassesThat()
+                    .resideInAPackage("..integration.scm..")
+                    .because(
+                            "SPI types must remain domain-agnostic — handler implementations bridge to integration.scm")
+                    .check(classes);
         }
 
         @Test
         void spiShouldNotDependOnHandlerImpl() {
             noClasses()
-                .that()
-                .resideInAPackage("..agent.handler.spi..")
-                .should()
-                .dependOnClassesThat()
-                .resideInAPackage("..agent.handler")
-                .because("SPI must not reference implementation details")
-                .check(classes);
+                    .that()
+                    .resideInAPackage("..agent.handler.spi..")
+                    .should()
+                    .dependOnClassesThat()
+                    .resideInAPackage("..agent.handler")
+                    .because("SPI must not reference implementation details")
+                    .check(classes);
         }
     }
 
@@ -64,25 +65,25 @@ class HandlerArchitectureTest extends HephaestusArchitectureTest {
         @Test
         void handlersShouldNotDependOnDockerInternals() {
             noClasses()
-                .that()
-                .resideInAPackage("..agent.handler..")
-                .should()
-                .dependOnClassesThat()
-                .resideInAPackage("..agent.sandbox.docker..")
-                .because("Handlers prepare context but never interact with Docker directly")
-                .check(classes);
+                    .that()
+                    .resideInAPackage("..agent.handler..")
+                    .should()
+                    .dependOnClassesThat()
+                    .resideInAPackage("..agent.sandbox.docker..")
+                    .because("Handlers prepare context but never interact with Docker directly")
+                    .check(classes);
         }
 
         @Test
         void handlersShouldNotDependOnPracticeAgent() {
             noClasses()
-                .that()
-                .resideInAPackage("..agent.handler..")
-                .should()
-                .dependOnClassesThat()
-                .resideInAPackage("..agent.practice..")
-                .because("Handlers and the practice agent are independent modules — the executor bridges them")
-                .check(classes);
+                    .that()
+                    .resideInAPackage("..agent.handler..")
+                    .should()
+                    .dependOnClassesThat()
+                    .resideInAPackage("..agent.practice..")
+                    .because("Handlers and the practice agent are independent modules — the executor bridges them")
+                    .check(classes);
         }
     }
 }

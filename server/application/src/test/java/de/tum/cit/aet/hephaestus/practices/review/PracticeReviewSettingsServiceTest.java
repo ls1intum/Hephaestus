@@ -76,9 +76,7 @@ class PracticeReviewSettingsServiceTest extends BaseUnitTest {
         writesWorkspace();
 
         PracticeReviewSettingsDTO view = service.updatePracticeReview(
-            context,
-            new UpdatePracticeReviewSettingsRequestDTO(true, 30, null, null, null)
-        );
+                context, new UpdatePracticeReviewSettingsRequestDTO(true, 30, null, null, null));
 
         assertThat(workspace.getReviewSettings().getDeliverToMerged()).isTrue();
         assertThat(workspace.getReviewSettings().getCooldownMinutes()).isEqualTo(30);
@@ -92,15 +90,9 @@ class PracticeReviewSettingsServiceTest extends BaseUnitTest {
         workspace.getReviewSettings().applyScope(new WorkspaceReviewScope(List.of("main", "develop"), List.of()));
 
         PracticeReviewSettingsDTO view = service.updatePracticeReview(
-            context,
-            new UpdatePracticeReviewSettingsRequestDTO(
-                null,
-                null,
-                new WorkspaceReviewScope(List.of("main"), List.of()),
-                null,
-                null
-            )
-        );
+                context,
+                new UpdatePracticeReviewSettingsRequestDTO(
+                        null, null, new WorkspaceReviewScope(List.of("main"), List.of()), null, null));
 
         // Replaced, not merged: the lists ARE the setting, so dropping "develop" has to be expressible.
         assertThat(view.reviewScope().targetBranches()).containsExactly("main");
@@ -112,9 +104,8 @@ class PracticeReviewSettingsServiceTest extends BaseUnitTest {
         workspace.getReviewSettings().applyScope(new WorkspaceReviewScope(List.of("main"), List.of()));
 
         PracticeReviewSettingsDTO view = service.updatePracticeReview(
-            context,
-            new UpdatePracticeReviewSettingsRequestDTO(null, null, WorkspaceReviewScope.UNRESTRICTED, null, null)
-        );
+                context,
+                new UpdatePracticeReviewSettingsRequestDTO(null, null, WorkspaceReviewScope.UNRESTRICTED, null, null));
 
         assertThat(view.reviewScope().isUnrestricted()).isTrue();
         // Stored as null rather than an empty object: "never configured" and "configured to nothing" are
@@ -128,9 +119,9 @@ class PracticeReviewSettingsServiceTest extends BaseUnitTest {
         workspace.getReviewSettings().applyScope(new WorkspaceReviewScope(List.of("main"), List.of()));
 
         service.updatePracticeReview(
-            context,
-            new UpdatePracticeReviewSettingsRequestDTO(null, null, null, null, Set.of(PracticeReviewField.REVIEW_SCOPE))
-        );
+                context,
+                new UpdatePracticeReviewSettingsRequestDTO(
+                        null, null, null, null, Set.of(PracticeReviewField.REVIEW_SCOPE)));
 
         assertThat(workspace.getReviewSettings().getReviewScope()).isNull();
     }

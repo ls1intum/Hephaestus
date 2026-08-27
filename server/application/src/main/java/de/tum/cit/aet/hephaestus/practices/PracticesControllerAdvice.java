@@ -26,75 +26,66 @@ public class PracticesControllerAdvice {
     @ExceptionHandler(PracticeSlugConflictException.class)
     ProblemDetail handleSlugConflict(PracticeSlugConflictException exception) {
         return problem(
-            HttpStatus.CONFLICT,
-            "Practice slug conflict",
-            Objects.toString(exception.getMessage(), "Request failed")
-        );
+                HttpStatus.CONFLICT,
+                "Practice slug conflict",
+                Objects.toString(exception.getMessage(), "Request failed"));
     }
 
     @ExceptionHandler(PracticeGroupSlugConflictException.class)
     ProblemDetail handleGroupSlugConflict(PracticeGroupSlugConflictException exception) {
         return problem(
-            HttpStatus.CONFLICT,
-            "Practice group slug conflict",
-            Objects.toString(exception.getMessage(), "Request failed")
-        );
+                HttpStatus.CONFLICT,
+                "Practice group slug conflict",
+                Objects.toString(exception.getMessage(), "Request failed"));
     }
 
     @ExceptionHandler(CuratedCatalogConflictException.class)
     ProblemDetail handleCuratedConflict(CuratedCatalogConflictException exception) {
         return problem(
-            HttpStatus.CONFLICT,
-            "Practice catalog conflict",
-            Objects.toString(exception.getMessage(), "Request failed")
-        );
+                HttpStatus.CONFLICT,
+                "Practice catalog conflict",
+                Objects.toString(exception.getMessage(), "Request failed"));
     }
 
     @ExceptionHandler(StaleCuratedEntryException.class)
     ProblemDetail handleStaleCuratedEntry(StaleCuratedEntryException exception) {
         return problem(
-            HttpStatus.PRECONDITION_FAILED,
-            "Practice catalog changed",
-            Objects.toString(exception.getMessage(), "Request failed")
-        );
+                HttpStatus.PRECONDITION_FAILED,
+                "Practice catalog changed",
+                Objects.toString(exception.getMessage(), "Request failed"));
     }
 
     @ExceptionHandler(CuratedPreconditionRequiredException.class)
     ProblemDetail handleCuratedPreconditionRequired(CuratedPreconditionRequiredException exception) {
         return problem(
-            HttpStatus.PRECONDITION_REQUIRED,
-            "Practice catalog version required",
-            Objects.toString(exception.getMessage(), "Request failed")
-        );
+                HttpStatus.PRECONDITION_REQUIRED,
+                "Practice catalog version required",
+                Objects.toString(exception.getMessage(), "Request failed"));
     }
 
     @ExceptionHandler(StaleCatalogAdoptionPlanException.class)
     ProblemDetail handleStaleAdoptionPlan(StaleCatalogAdoptionPlanException exception) {
         return problem(
-            HttpStatus.PRECONDITION_FAILED,
-            "Practice adoption preview changed",
-            Objects.toString(exception.getMessage(), "Request failed")
-        );
+                HttpStatus.PRECONDITION_FAILED,
+                "Practice adoption preview changed",
+                Objects.toString(exception.getMessage(), "Request failed"));
     }
 
     @ExceptionHandler(CatalogAdoptionPreconditionRequiredException.class)
     ProblemDetail handleAdoptionPreconditionRequired(CatalogAdoptionPreconditionRequiredException exception) {
         return problem(
-            HttpStatus.PRECONDITION_REQUIRED,
-            "Practice adoption preview required",
-            Objects.toString(exception.getMessage(), "Request failed")
-        );
+                HttpStatus.PRECONDITION_REQUIRED,
+                "Practice adoption preview required",
+                Objects.toString(exception.getMessage(), "Request failed"));
     }
 
     private ProblemDetail problem(HttpStatus status, String title, String detail) {
         ProblemDetail problem = ProblemDetail.forStatus(status);
         problem.setTitle(title);
-        problem.setDetail(
-            Optional.ofNullable(detail)
+        problem.setDetail(Optional.ofNullable(detail)
                 .map(LoggingUtils::sanitizeForLog)
                 .filter(s -> !s.isBlank())
-                .orElse("The practice request could not be processed.")
-        );
+                .orElse("The practice request could not be processed."));
         return problem;
     }
 }

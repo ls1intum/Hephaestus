@@ -42,13 +42,12 @@ final class ReviewBackfillSignals {
             signal = ScmSignals.PULL_REQUEST_READY;
         }
         return ScmSignals.pullRequestKey(
-            workspaceId,
-            pullRequest.getId(),
-            signal,
-            pullRequest.getHeadRefOid(),
-            pullRequest.getTitle(),
-            pullRequest.getBody()
-        );
+                workspaceId,
+                pullRequest.getId(),
+                signal,
+                pullRequest.getHeadRefOid(),
+                pullRequest.getTitle(),
+                pullRequest.getBody());
     }
 
     static Optional<SignalKey> keyFor(long workspaceId, Issue issue) {

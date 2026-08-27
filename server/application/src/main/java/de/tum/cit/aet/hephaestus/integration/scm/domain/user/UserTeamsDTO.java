@@ -9,14 +9,13 @@ import java.util.stream.Collectors;
 import org.jspecify.annotations.NonNull;
 
 public record UserTeamsDTO(
-    @NonNull Long id,
-    @NonNull String login,
-    String email,
-    @NonNull String name,
-    @NonNull String url,
-    @NonNull Set<TeamSummaryDTO> teams,
-    boolean hidden
-) {
+        @NonNull Long id,
+        @NonNull String login,
+        String email,
+        @NonNull String name,
+        @NonNull String url,
+        @NonNull Set<TeamSummaryDTO> teams,
+        boolean hidden) {
     /**
      * Creates a UserTeamsDTO from a User entity using scope-specific settings.
      *
@@ -32,26 +31,20 @@ public record UserTeamsDTO(
      * @return the DTO with scope-specific settings applied
      */
     public static UserTeamsDTO fromUserWithScopeSettings(
-        User user,
-        Set<Long> hiddenTeamIds,
-        boolean hidden,
-        Predicate<Team> inScope
-    ) {
+            User user, Set<Long> hiddenTeamIds, boolean hidden, Predicate<Team> inScope) {
         return new UserTeamsDTO(
-            user.getId(),
-            user.getLogin(),
-            user.getEmail(),
-            user.getName() != null ? user.getName() : user.getLogin(),
-            user.getHtmlUrl(),
-            user
-                .getTeamMemberships()
-                .stream()
-                .map(m -> m.getTeam())
-                .filter(t -> t != null)
-                .filter(inScope)
-                .map(team -> TeamSummaryDTO.fromTeamWithScopeSettings(team, hiddenTeamIds.contains(team.getId())))
-                .collect(Collectors.toCollection(LinkedHashSet::new)),
-            hidden
-        );
+                user.getId(),
+                user.getLogin(),
+                user.getEmail(),
+                user.getName() != null ? user.getName() : user.getLogin(),
+                user.getHtmlUrl(),
+                user.getTeamMemberships().stream()
+                        .map(m -> m.getTeam())
+                        .filter(t -> t != null)
+                        .filter(inScope)
+                        .map(team ->
+                                TeamSummaryDTO.fromTeamWithScopeSettings(team, hiddenTeamIds.contains(team.getId())))
+                        .collect(Collectors.toCollection(LinkedHashSet::new)),
+                hidden);
     }
 }

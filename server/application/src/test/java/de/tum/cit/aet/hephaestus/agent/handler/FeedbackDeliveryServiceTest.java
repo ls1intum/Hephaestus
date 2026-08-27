@@ -17,7 +17,6 @@ import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliverySuppressedExceptio
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.config.ApplicationProperties;
 import de.tum.cit.aet.hephaestus.core.auth.spi.AccountPreferencesQuery;
-import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackAnchor;
 import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFeedbackChannel;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
@@ -98,42 +97,35 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
         silentModeEngaged = false;
         reviewProperties = reviewProperties(false);
         commentFormatter = new PracticeFeedbackCommentFormatter(
-            new ApplicationProperties(null, new ApplicationProperties.Webapp(APP_BASE_URL))
-        );
+                new ApplicationProperties(null, new ApplicationProperties.Webapp(APP_BASE_URL)));
         service = new FeedbackDeliveryService(
-            commentPoster,
-            diffNotePoster,
-            new PracticeFeedbackDeliveryPolicy(
-                issueRepository,
-                pullRequestRepository,
-                repositoryToMonitorRepository,
-                workspaceRepository,
-                accountPreferencesQuery,
+                commentPoster,
+                diffNotePoster,
+                new PracticeFeedbackDeliveryPolicy(
+                        issueRepository,
+                        pullRequestRepository,
+                        repositoryToMonitorRepository,
+                        workspaceRepository,
+                        accountPreferencesQuery,
+                        reviewProperties,
+                        () -> silentModeEngaged),
                 reviewProperties,
-                () -> silentModeEngaged
-            ),
-            reviewProperties,
-            feedbackLedgerRecorder,
-            observationTrendService,
-            commentFormatter
-        );
+                feedbackLedgerRecorder,
+                observationTrendService,
+                commentFormatter);
         org.mockito.Mockito.lenient()
-            .when(
-                diffNotePoster.reconcileInlineNotes(
-                    org.mockito.ArgumentMatchers.any(),
-                    org.mockito.ArgumentMatchers.any()
-                )
-            )
-            .thenReturn(new DiffNotePoster.DiffNoteResult(0, 0, List.of()));
+                .when(diffNotePoster.reconcileInlineNotes(
+                        org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
+                .thenReturn(new DiffNotePoster.DiffNoteResult(0, 0, List.of()));
         org.mockito.Mockito.lenient()
-            .when(repositoryToMonitorRepository.existsByWorkspaceIdAndNameWithOwner(WORKSPACE_ID, "owner/repo"))
-            .thenReturn(true);
+                .when(repositoryToMonitorRepository.existsByWorkspaceIdAndNameWithOwner(WORKSPACE_ID, "owner/repo"))
+                .thenReturn(true);
         org.mockito.Mockito.lenient()
-            .when(workspaceRepository.findById(WORKSPACE_ID))
-            .thenReturn(Optional.of(activePracticeWorkspace()));
+                .when(workspaceRepository.findById(WORKSPACE_ID))
+                .thenReturn(Optional.of(activePracticeWorkspace()));
         org.mockito.Mockito.lenient()
-            .when(accountPreferencesQuery.preferencesForUserId(AUTHOR_ID))
-            .thenReturn(Optional.of(new AccountPreferencesQuery.PreferencesView(false, true)));
+                .when(accountPreferencesQuery.preferencesForUserId(AUTHOR_ID))
+                .thenReturn(Optional.of(new AccountPreferencesQuery.PreferencesView(false, true)));
     }
 
     private Workspace activePracticeWorkspace() {
@@ -176,9 +168,8 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
     }
 
     private void stubOpenPr() {
-        when(pullRequestRepository.findByIdWithAuthorAndRepository(PULL_REQUEST_ID)).thenReturn(
-            Optional.of(createOpenPr())
-        );
+        when(pullRequestRepository.findByIdWithAuthorAndRepository(PULL_REQUEST_ID))
+                .thenReturn(Optional.of(createOpenPr()));
     }
 
     @Nested
@@ -189,9 +180,8 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             AgentJob job = createJob();
             stubOpenPr();
             when(commentPoster.postFormattedBody(eq(job), any(String.class))).thenReturn("IC_comment123");
-            when(diffNotePoster.reconcileInlineNotes(eq(job), any())).thenReturn(
-                new DiffNotePoster.DiffNoteResult(1, 0, List.of())
-            );
+            when(diffNotePoster.reconcileInlineNotes(eq(job), any()))
+                    .thenReturn(new DiffNotePoster.DiffNoteResult(1, 0, List.of()));
 
             var diffNotes = List.of(new DiffNote("src/Foo.java", 10, null, "Fix this"));
             var delivery = new DeliveryContent("Fix the tests.", diffNotes, List.of());
@@ -219,15 +209,16 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             AgentJob job = createJob();
             stubOpenPr();
             when(commentPoster.postFormattedBody(eq(job), any(String.class))).thenReturn("IC_new");
-            when(
-                observationTrendService.computeForTarget(ArtifactKinds.PULL_REQUEST, PULL_REQUEST_ID, WORKSPACE_ID)
-            ).thenReturn(Optional.of(resolvedTrend()));
+            when(observationTrendService.computeForTarget(ArtifactKinds.PULL_REQUEST, PULL_REQUEST_ID, WORKSPACE_ID))
+                    .thenReturn(Optional.of(resolvedTrend()));
 
             footerService.deliverFeedback(job, new DeliveryContent("Re-reviewed.", List.of(), List.of()));
 
             var body = ArgumentCaptor.forClass(String.class);
             verify(commentPoster).postFormattedBody(eq(job), body.capture());
-            assertThat(body.getValue()).contains("Progress since your last review").contains("Resolved");
+            assertThat(body.getValue())
+                    .contains("Progress since your last review")
+                    .contains("Resolved");
             verify(commentPoster, never()).updateFormattedBody(any(), any(), any());
         }
 
@@ -262,17 +253,15 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             AgentJob job = createJob();
             var pr = createOpenPr();
             pr.setState(Issue.State.CLOSED);
-            when(pullRequestRepository.findByIdWithAuthorAndRepository(PULL_REQUEST_ID)).thenReturn(Optional.of(pr));
+            when(pullRequestRepository.findByIdWithAuthorAndRepository(PULL_REQUEST_ID))
+                    .thenReturn(Optional.of(pr));
 
             var delivery = new DeliveryContent("Fix stuff.", List.of(), List.of());
             service.deliverFeedback(job, delivery);
 
             verifyNoInteractions(commentPoster);
-            verify(feedbackLedgerRecorder).recordSuppressedUnit(
-                eq(job),
-                eq(delivery),
-                eq(FeedbackSuppressionReason.ARTIFACT_CLOSED)
-            );
+            verify(feedbackLedgerRecorder)
+                    .recordSuppressedUnit(eq(job), eq(delivery), eq(FeedbackSuppressionReason.ARTIFACT_CLOSED));
         }
 
         @Test
@@ -284,11 +273,8 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             service.deliverFeedback(job, delivery);
 
             verifyNoInteractions(commentPoster);
-            verify(feedbackLedgerRecorder).recordSuppressedUnit(
-                eq(job),
-                eq(delivery),
-                eq(FeedbackSuppressionReason.INSTANCE_SILENCED)
-            );
+            verify(feedbackLedgerRecorder)
+                    .recordSuppressedUnit(eq(job), eq(delivery), eq(FeedbackSuppressionReason.INSTANCE_SILENCED));
             verifyNoInteractions(pullRequestRepository);
         }
 
@@ -297,17 +283,13 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             AgentJob job = createJob();
             stubOpenPr();
             var delivery = new DeliveryContent("Fix stuff.", List.of(), List.of());
-            when(commentPoster.postFormattedBody(eq(job), any(String.class))).thenThrow(
-                new JobDeliverySuppressedException("Silent Mode engaged", new IllegalStateException())
-            );
+            when(commentPoster.postFormattedBody(eq(job), any(String.class)))
+                    .thenThrow(new JobDeliverySuppressedException("Silent Mode engaged", new IllegalStateException()));
 
             service.deliverFeedback(job, delivery);
 
-            verify(feedbackLedgerRecorder).recordSuppressedUnit(
-                job,
-                delivery,
-                FeedbackSuppressionReason.INSTANCE_SILENCED
-            );
+            verify(feedbackLedgerRecorder)
+                    .recordSuppressedUnit(job, delivery, FeedbackSuppressionReason.INSTANCE_SILENCED);
             verify(feedbackLedgerRecorder, never()).recordUndelivered(any(), any());
         }
 
@@ -316,31 +298,17 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             AgentJob job = createJob();
             stubOpenPr();
             var delivery = new DeliveryContent(
-                "summary",
-                List.of(new DiffNote("src/Foo.java", 10, null, "inline", "key")),
-                List.of()
-            );
+                    "summary", List.of(new DiffNote("src/Foo.java", 10, null, "inline", "key")), List.of());
             when(commentPoster.postFormattedBody(eq(job), any(String.class))).thenReturn("IC_landed");
-            when(diffNotePoster.reconcileInlineNotes(eq(job), any())).thenThrow(
-                new JobDeliverySuppressedException("Silent Mode engaged", new IllegalStateException())
-            );
+            when(diffNotePoster.reconcileInlineNotes(eq(job), any()))
+                    .thenThrow(new JobDeliverySuppressedException("Silent Mode engaged", new IllegalStateException()));
 
             service.deliverFeedback(job, delivery);
 
-            verify(feedbackLedgerRecorder).recordWithoutConversation(
-                job,
-                delivery,
-                ArtifactKinds.PULL_REQUEST,
-                List.of(),
-                true,
-                false
-            );
-            verify(feedbackLedgerRecorder).recordSuppressedRemainder(
-                job,
-                delivery,
-                FeedbackSuppressionReason.INSTANCE_SILENCED,
-                List.of()
-            );
+            verify(feedbackLedgerRecorder)
+                    .recordWithoutConversation(job, delivery, ArtifactKinds.PULL_REQUEST, List.of(), true, false);
+            verify(feedbackLedgerRecorder)
+                    .recordSuppressedRemainder(job, delivery, FeedbackSuppressionReason.INSTANCE_SILENCED, List.of());
         }
 
         @Test
@@ -348,41 +316,28 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             AgentJob job = createJob();
             stubOpenPr();
             var delivery = new DeliveryContent(
-                "summary",
-                List.of(
-                    new DiffNote("src/Foo.java", 10, null, "inline", "key-1"),
-                    new DiffNote("src/Bar.java", 20, null, "suppressed", "key-2")
-                ),
-                List.of()
-            );
+                    "summary",
+                    List.of(
+                            new DiffNote("src/Foo.java", 10, null, "inline", "key-1"),
+                            new DiffNote("src/Bar.java", 20, null, "suppressed", "key-2")),
+                    List.of());
             InlineFeedbackChannel.DeliveredSignal signal = new InlineFeedbackChannel.DeliveredSignal(
-                "key-1",
-                new FeedbackAnchor.DiffAnchor("src/Foo.java", 10, null),
-                InlineFeedbackChannel.Disposition.POSTED,
-                "note-1",
-                "discussion-1"
-            );
+                    "key-1",
+                    new FeedbackAnchor.DiffAnchor("src/Foo.java", 10, null),
+                    InlineFeedbackChannel.Disposition.POSTED,
+                    "note-1",
+                    "discussion-1");
             when(commentPoster.postFormattedBody(eq(job), any(String.class))).thenReturn("IC_landed");
-            when(diffNotePoster.reconcileInlineNotes(eq(job), any())).thenReturn(
-                new DiffNotePoster.DiffNoteResult(1, 0, List.of(signal), true, List.of("key-2"))
-            );
+            when(diffNotePoster.reconcileInlineNotes(eq(job), any()))
+                    .thenReturn(new DiffNotePoster.DiffNoteResult(1, 0, List.of(signal), true, List.of("key-2")));
 
             service.deliverFeedback(job, delivery);
 
-            verify(feedbackLedgerRecorder).recordWithoutConversation(
-                job,
-                delivery,
-                ArtifactKinds.PULL_REQUEST,
-                List.of(signal),
-                true,
-                true
-            );
-            verify(feedbackLedgerRecorder).recordSuppressedRemainder(
-                job,
-                delivery,
-                FeedbackSuppressionReason.INSTANCE_SILENCED,
-                List.of("key-2")
-            );
+            verify(feedbackLedgerRecorder)
+                    .recordWithoutConversation(job, delivery, ArtifactKinds.PULL_REQUEST, List.of(signal), true, true);
+            verify(feedbackLedgerRecorder)
+                    .recordSuppressedRemainder(
+                            job, delivery, FeedbackSuppressionReason.INSTANCE_SILENCED, List.of("key-2"));
         }
 
         @Test
@@ -390,17 +345,15 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             AgentJob job = createJob();
             var pr = createOpenPr();
             pr.setState(Issue.State.MERGED);
-            when(pullRequestRepository.findByIdWithAuthorAndRepository(PULL_REQUEST_ID)).thenReturn(Optional.of(pr));
+            when(pullRequestRepository.findByIdWithAuthorAndRepository(PULL_REQUEST_ID))
+                    .thenReturn(Optional.of(pr));
 
             var delivery = new DeliveryContent("Fix stuff.", List.of(), List.of());
             service.deliverFeedback(job, delivery);
 
             verifyNoInteractions(commentPoster);
-            verify(feedbackLedgerRecorder).recordSuppressedUnit(
-                eq(job),
-                eq(delivery),
-                eq(FeedbackSuppressionReason.ARTIFACT_MERGED)
-            );
+            verify(feedbackLedgerRecorder)
+                    .recordSuppressedUnit(eq(job), eq(delivery), eq(FeedbackSuppressionReason.ARTIFACT_MERGED));
         }
 
         @Test
@@ -408,7 +361,8 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             AgentJob job = createJob();
             var pr = createOpenPr();
             pr.setState(Issue.State.MERGED);
-            when(pullRequestRepository.findByIdWithAuthorAndRepository(PULL_REQUEST_ID)).thenReturn(Optional.of(pr));
+            when(pullRequestRepository.findByIdWithAuthorAndRepository(PULL_REQUEST_ID))
+                    .thenReturn(Optional.of(pr));
 
             Workspace ws = activePracticeWorkspace();
             ws.getReviewSettings().setDeliverToMerged(true);
@@ -430,7 +384,8 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             AgentJob job = createJob();
             var pr = createOpenPr();
             pr.setDraft(true);
-            when(pullRequestRepository.findByIdWithAuthorAndRepository(PULL_REQUEST_ID)).thenReturn(Optional.of(pr));
+            when(pullRequestRepository.findByIdWithAuthorAndRepository(PULL_REQUEST_ID))
+                    .thenReturn(Optional.of(pr));
             when(commentPoster.postFormattedBody(eq(job), any(String.class))).thenReturn("IC_draft123");
 
             var delivery = new DeliveryContent("Fix stuff.", List.of(), List.of());
@@ -446,19 +401,15 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
         void skipsWhenPracticeFeedbackDeliveryDisabled() {
             AgentJob job = createJob();
             stubOpenPr();
-            when(accountPreferencesQuery.preferencesForUserId(AUTHOR_ID)).thenReturn(
-                Optional.of(new AccountPreferencesQuery.PreferencesView(false, false))
-            );
+            when(accountPreferencesQuery.preferencesForUserId(AUTHOR_ID))
+                    .thenReturn(Optional.of(new AccountPreferencesQuery.PreferencesView(false, false)));
 
             var delivery = new DeliveryContent("Fix stuff.", List.of(), List.of());
             service.deliverFeedback(job, delivery);
 
             verifyNoInteractions(commentPoster);
-            verify(feedbackLedgerRecorder).recordSuppressedUnit(
-                eq(job),
-                eq(delivery),
-                eq(FeedbackSuppressionReason.RECIPIENT_OPTED_OUT)
-            );
+            verify(feedbackLedgerRecorder)
+                    .recordSuppressedUnit(eq(job), eq(delivery), eq(FeedbackSuppressionReason.RECIPIENT_OPTED_OUT));
         }
 
         @Test
@@ -466,76 +417,65 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             AgentJob job = createJob();
             var pr = createOpenPr();
             pr.setAuthor(null);
-            when(pullRequestRepository.findByIdWithAuthorAndRepository(PULL_REQUEST_ID)).thenReturn(Optional.of(pr));
+            when(pullRequestRepository.findByIdWithAuthorAndRepository(PULL_REQUEST_ID))
+                    .thenReturn(Optional.of(pr));
 
             var delivery = new DeliveryContent("Fix stuff.", List.of(), List.of());
             service.deliverFeedback(job, delivery);
 
             verifyNoInteractions(commentPoster);
             verifyNoInteractions(accountPreferencesQuery);
-            verify(feedbackLedgerRecorder).recordSuppressedUnit(
-                eq(job),
-                eq(delivery),
-                eq(FeedbackSuppressionReason.ARTIFACT_GONE)
-            );
+            verify(feedbackLedgerRecorder)
+                    .recordSuppressedUnit(eq(job), eq(delivery), eq(FeedbackSuppressionReason.ARTIFACT_GONE));
         }
 
         @Test
         void skipsWhenLivePullRequestDoesNotMatchDeliveryTarget() {
             AgentJob job = createJob();
             var pr = createOpenPr();
-            ObjectNode metadata = org.junit.jupiter.api.Assertions.assertInstanceOf(
-                ObjectNode.class,
-                job.getMetadata()
-            );
+            ObjectNode metadata =
+                    org.junit.jupiter.api.Assertions.assertInstanceOf(ObjectNode.class, job.getMetadata());
             metadata.put("repository_id", 999L);
-            when(pullRequestRepository.findByIdWithAuthorAndRepository(PULL_REQUEST_ID)).thenReturn(Optional.of(pr));
+            when(pullRequestRepository.findByIdWithAuthorAndRepository(PULL_REQUEST_ID))
+                    .thenReturn(Optional.of(pr));
 
             var delivery = new DeliveryContent("Fix stuff.", List.of(), List.of());
             service.deliverFeedback(job, delivery);
 
             verifyNoInteractions(commentPoster);
             verifyNoInteractions(accountPreferencesQuery);
-            verify(feedbackLedgerRecorder).recordSuppressedUnit(
-                eq(job),
-                eq(delivery),
-                eq(FeedbackSuppressionReason.ARTIFACT_GONE)
-            );
+            verify(feedbackLedgerRecorder)
+                    .recordSuppressedUnit(eq(job), eq(delivery), eq(FeedbackSuppressionReason.ARTIFACT_GONE));
         }
 
         @Test
         void skipsWhenWorkspaceNoLongerMonitorsRepository() {
             AgentJob job = createJob();
             stubOpenPr();
-            when(
-                repositoryToMonitorRepository.existsByWorkspaceIdAndNameWithOwner(WORKSPACE_ID, "owner/repo")
-            ).thenReturn(false);
+            when(repositoryToMonitorRepository.existsByWorkspaceIdAndNameWithOwner(WORKSPACE_ID, "owner/repo"))
+                    .thenReturn(false);
 
             var delivery = new DeliveryContent("Fix stuff.", List.of(), List.of());
             service.deliverFeedback(job, delivery);
 
             verifyNoInteractions(commentPoster);
             verifyNoInteractions(accountPreferencesQuery);
-            verify(feedbackLedgerRecorder).recordSuppressedUnit(
-                eq(job),
-                eq(delivery),
-                eq(FeedbackSuppressionReason.ARTIFACT_GONE)
-            );
+            verify(feedbackLedgerRecorder)
+                    .recordSuppressedUnit(eq(job), eq(delivery), eq(FeedbackSuppressionReason.ARTIFACT_GONE));
         }
 
         @Test
         void preferenceLookupFailureFailsJobWithoutConversationalEscalation() {
             AgentJob job = createJob();
             stubOpenPr();
-            when(accountPreferencesQuery.preferencesForUserId(AUTHOR_ID)).thenThrow(
-                new IllegalStateException("db down")
-            );
+            when(accountPreferencesQuery.preferencesForUserId(AUTHOR_ID))
+                    .thenThrow(new IllegalStateException("db down"));
 
             var delivery = new DeliveryContent("Fix stuff.", List.of(), List.of());
 
             assertThatThrownBy(() -> service.deliverFeedback(job, delivery))
-                .isInstanceOf(RuntimeException.class)
-                .hasMessageContaining("db down");
+                    .isInstanceOf(RuntimeException.class)
+                    .hasMessageContaining("db down");
             verifyNoInteractions(commentPoster);
             verify(feedbackLedgerRecorder, never()).recordUndelivered(any(), any());
         }
@@ -544,15 +484,14 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
         void workspacePolicyLookupFailureFailsJobWithoutConversationalEscalation() {
             AgentJob job = createJob();
             stubOpenPr();
-            when(
-                repositoryToMonitorRepository.existsByWorkspaceIdAndNameWithOwner(WORKSPACE_ID, "owner/repo")
-            ).thenThrow(new IllegalStateException("db down"));
+            when(repositoryToMonitorRepository.existsByWorkspaceIdAndNameWithOwner(WORKSPACE_ID, "owner/repo"))
+                    .thenThrow(new IllegalStateException("db down"));
 
             var delivery = new DeliveryContent("Fix stuff.", List.of(), List.of());
 
             assertThatThrownBy(() -> service.deliverFeedback(job, delivery))
-                .isInstanceOf(RuntimeException.class)
-                .hasMessageContaining("db down");
+                    .isInstanceOf(RuntimeException.class)
+                    .hasMessageContaining("db down");
             verifyNoInteractions(commentPoster);
             verify(feedbackLedgerRecorder, never()).recordUndelivered(any(), any());
         }
@@ -568,27 +507,22 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             service.deliverFeedback(job, delivery);
 
             verifyNoInteractions(pullRequestRepository, commentPoster, accountPreferencesQuery);
-            verify(feedbackLedgerRecorder).recordSuppressedUnit(
-                job,
-                delivery,
-                FeedbackSuppressionReason.WORKSPACE_DISABLED
-            );
+            verify(feedbackLedgerRecorder)
+                    .recordSuppressedUnit(job, delivery, FeedbackSuppressionReason.WORKSPACE_DISABLED);
         }
 
         @Test
         void skipsWhenPrNotFound() {
             AgentJob job = createJob();
-            when(pullRequestRepository.findByIdWithAuthorAndRepository(PULL_REQUEST_ID)).thenReturn(Optional.empty());
+            when(pullRequestRepository.findByIdWithAuthorAndRepository(PULL_REQUEST_ID))
+                    .thenReturn(Optional.empty());
 
             var delivery = new DeliveryContent("Fix stuff.", List.of(), List.of());
             service.deliverFeedback(job, delivery);
 
             verifyNoInteractions(commentPoster);
-            verify(feedbackLedgerRecorder).recordSuppressedUnit(
-                eq(job),
-                eq(delivery),
-                eq(FeedbackSuppressionReason.ARTIFACT_GONE)
-            );
+            verify(feedbackLedgerRecorder)
+                    .recordSuppressedUnit(eq(job), eq(delivery), eq(FeedbackSuppressionReason.ARTIFACT_GONE));
         }
 
         @Test
@@ -600,19 +534,16 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             service.deliverFeedback(job, delivery);
 
             verify(commentPoster, never()).postFormattedBody(any(), any());
-            verify(feedbackLedgerRecorder).recordSuppressedUnit(
-                eq(job),
-                eq(delivery),
-                eq(FeedbackSuppressionReason.EMPTY_AFTER_SANITIZE)
-            );
-            verify(feedbackLedgerRecorder, never()).record(
-                any(),
-                any(),
-                any(),
-                any(),
-                org.mockito.ArgumentMatchers.anyBoolean(),
-                org.mockito.ArgumentMatchers.anyBoolean()
-            );
+            verify(feedbackLedgerRecorder)
+                    .recordSuppressedUnit(eq(job), eq(delivery), eq(FeedbackSuppressionReason.EMPTY_AFTER_SANITIZE));
+            verify(feedbackLedgerRecorder, never())
+                    .record(
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            org.mockito.ArgumentMatchers.anyBoolean(),
+                            org.mockito.ArgumentMatchers.anyBoolean());
         }
 
         @Test
@@ -621,27 +552,25 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             stubOpenPr();
             var note = new DiffNote("src/Foo.java", 10, null, "Fix this", "ck-foo");
             var signal = new InlineFeedbackChannel.DeliveredSignal(
-                "ck-foo",
-                new FeedbackAnchor.DiffAnchor("src/Foo.java", 10, null),
-                InlineFeedbackChannel.Disposition.POSTED,
-                "note-1",
-                "disc-1"
-            );
-            when(diffNotePoster.reconcileInlineNotes(any(), any())).thenReturn(
-                new DiffNotePoster.DiffNoteResult(1, 0, List.of(signal))
-            );
+                    "ck-foo",
+                    new FeedbackAnchor.DiffAnchor("src/Foo.java", 10, null),
+                    InlineFeedbackChannel.Disposition.POSTED,
+                    "note-1",
+                    "disc-1");
+            when(diffNotePoster.reconcileInlineNotes(any(), any()))
+                    .thenReturn(new DiffNotePoster.DiffNoteResult(1, 0, List.of(signal)));
 
             var delivery = new DeliveryContent("", List.of(note), List.of());
             service.deliverFeedback(job, delivery);
 
-            verify(feedbackLedgerRecorder).record(
-                eq(job),
-                eq(delivery),
-                eq(ArtifactKinds.PULL_REQUEST),
-                eq(List.of(signal)),
-                eq(false),
-                eq(true)
-            );
+            verify(feedbackLedgerRecorder)
+                    .record(
+                            eq(job),
+                            eq(delivery),
+                            eq(ArtifactKinds.PULL_REQUEST),
+                            eq(List.of(signal)),
+                            eq(false),
+                            eq(true));
             verify(feedbackLedgerRecorder, never()).recordSuppressedUnit(any(), any(), any());
         }
 
@@ -653,9 +582,8 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
 
             var delivery = new DeliveryContent("A real, non-blank summary body.", List.of(), List.of());
 
-            assertThatThrownBy(() -> service.deliverFeedback(job, delivery)).isInstanceOf(
-                de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException.class
-            );
+            assertThatThrownBy(() -> service.deliverFeedback(job, delivery))
+                    .isInstanceOf(de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException.class);
             assertThat(job.getDeliveryCommentId()).isNull();
             verify(feedbackLedgerRecorder).recordUndelivered(eq(job), eq(delivery));
         }
@@ -665,18 +593,14 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             AgentJob job = createJob();
             stubOpenPr();
             when(commentPoster.postFormattedBody(any(), any())).thenReturn("IC_summary_1");
-            when(diffNotePoster.reconcileInlineNotes(eq(job), any())).thenThrow(
-                new de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException("no inline channel wired")
-            );
+            when(diffNotePoster.reconcileInlineNotes(eq(job), any()))
+                    .thenThrow(new de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException(
+                            "no inline channel wired"));
 
-            var delivery = new DeliveryContent(
-                "Summary.",
-                List.of(new DiffNote("src/Foo.java", 3, null, "x")),
-                List.of()
-            );
-            assertThatThrownBy(() -> service.deliverFeedback(job, delivery)).isInstanceOf(
-                de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException.class
-            );
+            var delivery =
+                    new DeliveryContent("Summary.", List.of(new DiffNote("src/Foo.java", 3, null, "x")), List.of());
+            assertThatThrownBy(() -> service.deliverFeedback(job, delivery))
+                    .isInstanceOf(de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException.class);
             assertThat(job.getDeliveryCommentId()).isEqualTo("IC_summary_1");
             verify(feedbackLedgerRecorder, never()).recordUndelivered(any(), any());
         }
@@ -699,39 +623,35 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             AgentJob job = createJob();
             stubOpenPr();
             var firstSignal = new InlineFeedbackChannel.DeliveredSignal(
-                "ck-foo",
-                new FeedbackAnchor.DiffAnchor("src/Foo.java", 10, null),
-                InlineFeedbackChannel.Disposition.POSTED,
-                "note-1",
-                "disc-1"
-            );
+                    "ck-foo",
+                    new FeedbackAnchor.DiffAnchor("src/Foo.java", 10, null),
+                    InlineFeedbackChannel.Disposition.POSTED,
+                    "note-1",
+                    "disc-1");
             var secondSignal = new InlineFeedbackChannel.DeliveredSignal(
-                "ck-bar",
-                new FeedbackAnchor.DiffAnchor("src/Bar.java", 20, null),
-                InlineFeedbackChannel.Disposition.POSTED,
-                "note-2",
-                "disc-2"
-            );
-            when(diffNotePoster.reconcileInlineNotes(eq(job), any())).thenReturn(
-                new DiffNotePoster.DiffNoteResult(2, 0, List.of(firstSignal, secondSignal))
-            );
+                    "ck-bar",
+                    new FeedbackAnchor.DiffAnchor("src/Bar.java", 20, null),
+                    InlineFeedbackChannel.Disposition.POSTED,
+                    "note-2",
+                    "disc-2");
+            when(diffNotePoster.reconcileInlineNotes(eq(job), any()))
+                    .thenReturn(new DiffNotePoster.DiffNoteResult(2, 0, List.of(firstSignal, secondSignal)));
 
             var diffNotes = List.of(
-                new DiffNote("src/Foo.java", 10, null, "Fix this", "ck-foo"),
-                new DiffNote("src/Bar.java", 20, null, "And this", "ck-bar")
-            );
+                    new DiffNote("src/Foo.java", 10, null, "Fix this", "ck-foo"),
+                    new DiffNote("src/Bar.java", 20, null, "And this", "ck-bar"));
             var delivery = new DeliveryContent(null, diffNotes, List.of());
             service.deliverFeedback(job, delivery);
 
             verify(diffNotePoster).reconcileInlineNotes(eq(job), eq(diffNotes));
-            verify(feedbackLedgerRecorder).record(
-                eq(job),
-                eq(delivery),
-                eq(ArtifactKinds.PULL_REQUEST),
-                eq(List.of(firstSignal, secondSignal)),
-                eq(false),
-                eq(true)
-            );
+            verify(feedbackLedgerRecorder)
+                    .record(
+                            eq(job),
+                            eq(delivery),
+                            eq(ArtifactKinds.PULL_REQUEST),
+                            eq(List.of(firstSignal, secondSignal)),
+                            eq(false),
+                            eq(true));
             verify(feedbackLedgerRecorder, never()).recordSuppressedUnit(any(), any(), any());
         }
 
@@ -763,7 +683,8 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             AgentJob job = createJob();
             var pr = createOpenPr();
             pr.setState(Issue.State.CLOSED);
-            when(pullRequestRepository.findByIdWithAuthorAndRepository(PULL_REQUEST_ID)).thenReturn(Optional.of(pr));
+            when(pullRequestRepository.findByIdWithAuthorAndRepository(PULL_REQUEST_ID))
+                    .thenReturn(Optional.of(pr));
 
             service.deliverFeedback(job, new DeliveryContent("Summary.", List.of(), List.of()));
 
@@ -800,22 +721,20 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
     private FeedbackDeliveryService serviceWithProgressFooter() {
         var props = reviewProperties(true);
         return new FeedbackDeliveryService(
-            commentPoster,
-            diffNotePoster,
-            new PracticeFeedbackDeliveryPolicy(
-                issueRepository,
-                pullRequestRepository,
-                repositoryToMonitorRepository,
-                workspaceRepository,
-                accountPreferencesQuery,
+                commentPoster,
+                diffNotePoster,
+                new PracticeFeedbackDeliveryPolicy(
+                        issueRepository,
+                        pullRequestRepository,
+                        repositoryToMonitorRepository,
+                        workspaceRepository,
+                        accountPreferencesQuery,
+                        props,
+                        () -> silentModeEngaged),
                 props,
-                () -> silentModeEngaged
-            ),
-            props,
-            feedbackLedgerRecorder,
-            observationTrendService,
-            commentFormatter
-        );
+                feedbackLedgerRecorder,
+                observationTrendService,
+                commentFormatter);
     }
 
     private static PracticeReviewProperties reviewProperties(boolean progressFooter) {
@@ -824,22 +743,20 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
 
     private static TrendDelta resolvedTrend() {
         var resolved = new TrendDelta.LocusTransition(
-            "k1",
-            TrendDelta.TransitionStatus.RESOLVED,
-            "code-hygiene",
-            "Unused import removed",
-            Assessment.BAD, // priorAssessment — the gap the student last saw (RESOLVED ⇒ currentAssessment null)
-            null,
-            Severity.MINOR
-        );
+                "k1",
+                TrendDelta.TransitionStatus.RESOLVED,
+                "code-hygiene",
+                "Unused import removed",
+                Assessment.BAD, // priorAssessment — the gap the student last saw (RESOLVED ⇒ currentAssessment null)
+                null,
+                Severity.MINOR);
         return new TrendDelta(
-            ArtifactKinds.PULL_REQUEST,
-            PULL_REQUEST_ID,
-            UUID.randomUUID(),
-            UUID.randomUUID(),
-            Instant.parse("2026-06-15T10:00:00Z"),
-            Instant.parse("2026-06-14T10:00:00Z"),
-            List.of(resolved)
-        );
+                ArtifactKinds.PULL_REQUEST,
+                PULL_REQUEST_ID,
+                UUID.randomUUID(),
+                UUID.randomUUID(),
+                Instant.parse("2026-06-15T10:00:00Z"),
+                Instant.parse("2026-06-14T10:00:00Z"),
+                List.of(resolved));
     }
 }

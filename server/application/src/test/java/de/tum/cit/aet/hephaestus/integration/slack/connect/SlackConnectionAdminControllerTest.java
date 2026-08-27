@@ -42,10 +42,9 @@ class SlackConnectionAdminControllerTest extends BaseUnitTest {
         controller = new SlackConnectionAdminController(connectionService, slackMessageService);
         // lenient: the channel-override test deliberately never reads the persisted config.
         lenient()
-            .when(connectionService.findSlackNotificationConfig(anyLong()))
-            .thenReturn(
-                Optional.of(new ConnectionConfig.SlackConfig("T1", "Acme", "C123456789", "core-team", null, Set.of()))
-            );
+                .when(connectionService.findSlackNotificationConfig(anyLong()))
+                .thenReturn(Optional.of(
+                        new ConnectionConfig.SlackConfig("T1", "Acme", "C123456789", "core-team", null, Set.of())));
     }
 
     @Test
@@ -59,10 +58,8 @@ class SlackConnectionAdminControllerTest extends BaseUnitTest {
 
     @Test
     void sendTestMessage_overrideChannel_testsTypedChannelWithoutReadingPersisted() {
-        SlackTestMessageResponseDTO result = controller.sendTestMessage(
-            ctx(1L),
-            new SlackTestMessageRequestDTO("C999999999")
-        );
+        SlackTestMessageResponseDTO result =
+                controller.sendTestMessage(ctx(1L), new SlackTestMessageRequestDTO("C999999999"));
 
         assertThat(result.ok()).isTrue();
         assertThat(result.channelId()).isEqualTo("C999999999");
@@ -91,11 +88,11 @@ class SlackConnectionAdminControllerTest extends BaseUnitTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = { "channel_not_found", "not_in_channel", "missing_scope", "rate_limited", "internal_error" })
+    @ValueSource(strings = {"channel_not_found", "not_in_channel", "missing_scope", "rate_limited", "internal_error"})
     void sendTestMessage_slackRejection_isProbeFailureCarryingTheErrorCode(String slackError) {
         doThrow(new SlackSendException(1L, "C123456789", slackError))
-            .when(slackMessageService)
-            .sendForWorkspace(anyLong(), anyString(), any(), anyString());
+                .when(slackMessageService)
+                .sendForWorkspace(anyLong(), anyString(), any(), anyString());
 
         SlackTestMessageResponseDTO result = controller.sendTestMessage(ctx(1L), null);
 
@@ -106,14 +103,13 @@ class SlackConnectionAdminControllerTest extends BaseUnitTest {
 
     private static WorkspaceContext ctx(long workspaceId) {
         return new WorkspaceContext(
-            workspaceId,
-            "ws-" + workspaceId,
-            "Workspace " + workspaceId,
-            AccountType.ORG,
-            null,
-            false,
-            false,
-            Set.of(WorkspaceRole.ADMIN)
-        );
+                workspaceId,
+                "ws-" + workspaceId,
+                "Workspace " + workspaceId,
+                AccountType.ORG,
+                null,
+                false,
+                false,
+                Set.of(WorkspaceRole.ADMIN));
     }
 }

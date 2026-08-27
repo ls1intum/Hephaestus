@@ -26,10 +26,10 @@ class HexEncodingArchTest extends HephaestusArchitectureTest {
 
     private static ArchRule rejectToHexString(Class<?> boxed, Class<?> primitive) {
         return noClasses()
-            .that()
-            .resideInAPackage(WEBHOOK_PACKAGE)
-            .should()
-            .callMethod(boxed, "toHexString", primitive)
-            .because(boxed.getSimpleName() + ".toHexString drops leading zeros — use HexFormat.of()");
+                .that()
+                .resideInAPackage(WEBHOOK_PACKAGE)
+                .should()
+                .callMethod(boxed, "toHexString", primitive)
+                .because(boxed.getSimpleName() + ".toHexString drops leading zeros — use HexFormat.of()");
     }
 }

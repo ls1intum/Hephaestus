@@ -65,34 +65,34 @@ class OutlineDocumentProjectorTest extends BaseUnitTest {
     @BeforeEach
     void setUp() {
         projector = new OutlineDocumentProjector(
-            documentRepository,
-            collectionRepository,
-            connectionService,
-            identityResolver,
-            documentSelector,
-            new OutlineOriginPolicy(Set.of(SERVER_URL))
-        );
+                documentRepository,
+                collectionRepository,
+                connectionService,
+                identityResolver,
+                documentSelector,
+                new OutlineOriginPolicy(Set.of(SERVER_URL)));
         lenient()
-            .when(connectionService.findActiveOutlineConfig(WORKSPACE_ID))
-            .thenReturn(Optional.of(new ConnectionConfig.OutlineConfig(SERVER_URL, null, null, Set.of())));
+                .when(connectionService.findActiveOutlineConfig(WORKSPACE_ID))
+                .thenReturn(Optional.of(new ConnectionConfig.OutlineConfig(SERVER_URL, null, null, Set.of())));
         lenient()
-            .when(connectionService.findActive(WORKSPACE_ID, IntegrationKind.OUTLINE))
-            .thenReturn(Optional.of(activeConnection()));
+                .when(connectionService.findActive(WORKSPACE_ID, IntegrationKind.OUTLINE))
+                .thenReturn(Optional.of(activeConnection()));
         lenient()
-            .when(identityResolver.resolveMemberId(anyLong(), anyString(), any(), anyString()))
-            .thenReturn(Optional.empty());
-        lenient().when(collectionRepository.findByWorkspaceIdOrderByCreatedAtAsc(WORKSPACE_ID)).thenReturn(List.of());
+                .when(identityResolver.resolveMemberId(anyLong(), anyString(), any(), anyString()))
+                .thenReturn(Optional.empty());
+        lenient()
+                .when(collectionRepository.findByWorkspaceIdOrderByCreatedAtAsc(WORKSPACE_ID))
+                .thenReturn(List.of());
     }
 
     private static Connection activeConnection() {
         Workspace workspace = new Workspace();
         workspace.setId(WORKSPACE_ID);
         return new Connection(
-            workspace,
-            IntegrationKind.OUTLINE,
-            TEAM_ID,
-            new ConnectionConfig.OutlineConfig(SERVER_URL, null, null, Set.of())
-        );
+                workspace,
+                IntegrationKind.OUTLINE,
+                TEAM_ID,
+                new ConnectionConfig.OutlineConfig(SERVER_URL, null, null, Set.of()));
     }
 
     private static final Instant CREATED = Instant.parse("2025-11-01T00:00:00Z");
@@ -159,42 +159,36 @@ class OutlineDocumentProjectorTest extends BaseUnitTest {
     @Test
     @DisplayName("documentsForWorkspace maps entity fields onto the projected document")
     void documentsForWorkspace_mapsFieldsCorrectly() {
-        when(documentRepository.findForProjection(eq(WORKSPACE_ID), any(Pageable.class))).thenReturn(
-            List.of(liveDocument())
-        );
+        when(documentRepository.findForProjection(eq(WORKSPACE_ID), any(Pageable.class)))
+                .thenReturn(List.of(liveDocument()));
 
         List<ProjectedDocument> result = projector.documentsForWorkspace(WORKSPACE_ID);
 
-        assertThat(result)
-            .singleElement()
-            .satisfies(projected -> {
-                assertThat(projected.collectionSlug()).isEqualTo("architecture");
-                assertThat(projected.slug()).isEqualTo("design-doc");
-                assertThat(projected.title()).isEqualTo("Design Doc");
-                assertThat(projected.bodyMarkdown()).isEqualTo("# Design\n\nContent.");
-                assertThat(projected.deleted()).isFalse();
-                // Vendor-neutral names on the SPI; the vendor prefix stays on the entity columns.
-                assertThat(projected.createdAt()).isEqualTo(CREATED);
-                assertThat(projected.updatedAt()).isEqualTo(UPDATED);
-            });
+        assertThat(result).singleElement().satisfies(projected -> {
+            assertThat(projected.collectionSlug()).isEqualTo("architecture");
+            assertThat(projected.slug()).isEqualTo("design-doc");
+            assertThat(projected.title()).isEqualTo("Design Doc");
+            assertThat(projected.bodyMarkdown()).isEqualTo("# Design\n\nContent.");
+            assertThat(projected.deleted()).isFalse();
+            // Vendor-neutral names on the SPI; the vendor prefix stays on the entity columns.
+            assertThat(projected.createdAt()).isEqualTo(CREATED);
+            assertThat(projected.updatedAt()).isEqualTo(UPDATED);
+        });
     }
 
     @Test
     @DisplayName("a tombstoned row projects as deleted=true with a null body")
     void documentsForWorkspace_tombstonedRowIsDeletedWithNullBody() {
-        when(documentRepository.findForProjection(eq(WORKSPACE_ID), any(Pageable.class))).thenReturn(
-            List.of(tombstonedDocument())
-        );
+        when(documentRepository.findForProjection(eq(WORKSPACE_ID), any(Pageable.class)))
+                .thenReturn(List.of(tombstonedDocument()));
 
         List<ProjectedDocument> result = projector.documentsForWorkspace(WORKSPACE_ID);
 
-        assertThat(result)
-            .singleElement()
-            .satisfies(projected -> {
-                assertThat(projected.deleted()).isTrue();
-                assertThat(projected.bodyMarkdown()).isNull();
-                assertThat(projected.slug()).isEqualTo("removed-doc");
-            });
+        assertThat(result).singleElement().satisfies(projected -> {
+            assertThat(projected.deleted()).isTrue();
+            assertThat(projected.bodyMarkdown()).isNull();
+            assertThat(projected.slug()).isEqualTo("removed-doc");
+        });
     }
 
     // --- archived flag + collection name ---
@@ -202,69 +196,61 @@ class OutlineDocumentProjectorTest extends BaseUnitTest {
     @Test
     @DisplayName("an archived (soft, recoverable) row projects archived=true and keeps its body, unlike a tombstone")
     void documentsForWorkspace_archivedRowProjectsArchivedTrueWithBodyIntact() {
-        when(documentRepository.findForProjection(eq(WORKSPACE_ID), any(Pageable.class))).thenReturn(
-            List.of(archivedDocument())
-        );
+        when(documentRepository.findForProjection(eq(WORKSPACE_ID), any(Pageable.class)))
+                .thenReturn(List.of(archivedDocument()));
 
         List<ProjectedDocument> result = projector.documentsForWorkspace(WORKSPACE_ID);
 
-        assertThat(result)
-            .singleElement()
-            .satisfies(projected -> {
-                assertThat(projected.archived()).isTrue();
-                assertThat(projected.deleted()).isFalse();
-                assertThat(projected.bodyMarkdown()).isEqualTo("# Design\n\nContent.");
-            });
+        assertThat(result).singleElement().satisfies(projected -> {
+            assertThat(projected.archived()).isTrue();
+            assertThat(projected.deleted()).isFalse();
+            assertThat(projected.bodyMarkdown()).isEqualTo("# Design\n\nContent.");
+        });
     }
 
     @Test
     @DisplayName("a live (never-archived) row projects archived=false")
     void documentsForWorkspace_liveRowProjectsArchivedFalse() {
-        when(documentRepository.findForProjection(eq(WORKSPACE_ID), any(Pageable.class))).thenReturn(
-            List.of(liveDocument())
-        );
+        when(documentRepository.findForProjection(eq(WORKSPACE_ID), any(Pageable.class)))
+                .thenReturn(List.of(liveDocument()));
 
         List<ProjectedDocument> result = projector.documentsForWorkspace(WORKSPACE_ID);
 
         assertThat(result)
-            .singleElement()
-            .satisfies(projected -> assertThat(projected.archived()).isFalse());
+                .singleElement()
+                .satisfies(projected -> assertThat(projected.archived()).isFalse());
     }
 
     @Test
     @DisplayName("collectionName resolves from the registered collection's captured name, keyed by collection id")
     void documentsForWorkspace_resolvesCollectionNameFromTheRegistry() {
-        when(documentRepository.findForProjection(eq(WORKSPACE_ID), any(Pageable.class))).thenReturn(
-            List.of(liveDocument())
-        );
-        when(collectionRepository.findByWorkspaceIdOrderByCreatedAtAsc(WORKSPACE_ID)).thenReturn(
-            List.of(registeredCollection("col-uuid-1", "Architecture"))
-        );
+        when(documentRepository.findForProjection(eq(WORKSPACE_ID), any(Pageable.class)))
+                .thenReturn(List.of(liveDocument()));
+        when(collectionRepository.findByWorkspaceIdOrderByCreatedAtAsc(WORKSPACE_ID))
+                .thenReturn(List.of(registeredCollection("col-uuid-1", "Architecture")));
 
         List<ProjectedDocument> result = projector.documentsForWorkspace(WORKSPACE_ID);
 
-        assertThat(result)
-            .singleElement()
-            .satisfies(projected -> {
-                // collectionSlug (path identity) stays distinct from collectionName (display label).
-                assertThat(projected.collectionSlug()).isEqualTo("architecture");
-                assertThat(projected.collectionName()).isEqualTo("Architecture");
-            });
+        assertThat(result).singleElement().satisfies(projected -> {
+            // collectionSlug (path identity) stays distinct from collectionName (display label).
+            assertThat(projected.collectionSlug()).isEqualTo("architecture");
+            assertThat(projected.collectionName()).isEqualTo("Architecture");
+        });
     }
 
     @Test
     @DisplayName("an unregistered/unnamed collection degrades to a null collectionName")
     void documentsForWorkspace_unknownCollection_collectionNameIsNull() {
-        when(documentRepository.findForProjection(eq(WORKSPACE_ID), any(Pageable.class))).thenReturn(
-            List.of(liveDocument())
-        );
-        when(collectionRepository.findByWorkspaceIdOrderByCreatedAtAsc(WORKSPACE_ID)).thenReturn(List.of());
+        when(documentRepository.findForProjection(eq(WORKSPACE_ID), any(Pageable.class)))
+                .thenReturn(List.of(liveDocument()));
+        when(collectionRepository.findByWorkspaceIdOrderByCreatedAtAsc(WORKSPACE_ID))
+                .thenReturn(List.of());
 
         List<ProjectedDocument> result = projector.documentsForWorkspace(WORKSPACE_ID);
 
         assertThat(result)
-            .singleElement()
-            .satisfies(projected -> assertThat(projected.collectionName()).isNull());
+                .singleElement()
+                .satisfies(projected -> assertThat(projected.collectionName()).isNull());
     }
 
     // --- authorship projection ---
@@ -273,22 +259,20 @@ class OutlineDocumentProjectorTest extends BaseUnitTest {
     @DisplayName("author substrate projects and a linked author resolves to their workspace member id")
     void authorFields_projectedAndResolved() {
         OutlineDocument doc = authoredDocument("doc-uuid-1", "0aa1bb2c-user", "Ada Lovelace");
-        when(documentRepository.findForProjection(eq(WORKSPACE_ID), any(Pageable.class))).thenReturn(List.of(doc));
-        when(identityResolver.resolveMemberId(WORKSPACE_ID, SERVER_URL, TEAM_ID, "0aa1bb2c-user")).thenReturn(
-            Optional.of(555L)
-        );
+        when(documentRepository.findForProjection(eq(WORKSPACE_ID), any(Pageable.class)))
+                .thenReturn(List.of(doc));
+        when(identityResolver.resolveMemberId(WORKSPACE_ID, SERVER_URL, TEAM_ID, "0aa1bb2c-user"))
+                .thenReturn(Optional.of(555L));
 
         List<ProjectedDocument> result = projector.documentsForWorkspace(WORKSPACE_ID);
 
-        assertThat(result)
-            .singleElement()
-            .satisfies(projected -> {
-                assertThat(projected.createdByName()).isEqualTo("Ada Lovelace");
-                assertThat(projected.createdBySubject()).isEqualTo("0aa1bb2c-user");
-                assertThat(projected.createdByMemberId()).isEqualTo(555L);
-                assertThat(projected.updatedByName()).isEqualTo("Ada Lovelace");
-                assertThat(projected.updatedByMemberId()).isEqualTo(555L);
-            });
+        assertThat(result).singleElement().satisfies(projected -> {
+            assertThat(projected.createdByName()).isEqualTo("Ada Lovelace");
+            assertThat(projected.createdBySubject()).isEqualTo("0aa1bb2c-user");
+            assertThat(projected.createdByMemberId()).isEqualTo(555L);
+            assertThat(projected.updatedByName()).isEqualTo("Ada Lovelace");
+            assertThat(projected.updatedByMemberId()).isEqualTo(555L);
+        });
     }
 
     @Test
@@ -298,9 +282,8 @@ class OutlineDocumentProjectorTest extends BaseUnitTest {
         OutlineDocument first = authoredDocument("doc-uuid-1", "0aa1bb2c-user", "Ada Lovelace");
         OutlineDocument second = authoredDocument("doc-uuid-2", "0aa1bb2c-user", "Ada Lovelace");
         second.setSlug("second-doc");
-        when(documentRepository.findForProjection(eq(WORKSPACE_ID), any(Pageable.class))).thenReturn(
-            List.of(first, second)
-        );
+        when(documentRepository.findForProjection(eq(WORKSPACE_ID), any(Pageable.class)))
+                .thenReturn(List.of(first, second));
 
         projector.documentsForWorkspace(WORKSPACE_ID);
 
@@ -311,36 +294,34 @@ class OutlineDocumentProjectorTest extends BaseUnitTest {
     @DisplayName("an unlinked author degrades to name-only (memberId null) — the graceful floor")
     void unlinkedAuthor_degradesToNameOnly() {
         OutlineDocument doc = authoredDocument("doc-uuid-1", "0aa1bb2c-user", "Ada Lovelace");
-        when(documentRepository.findForProjection(eq(WORKSPACE_ID), any(Pageable.class))).thenReturn(List.of(doc));
-        when(identityResolver.resolveMemberId(WORKSPACE_ID, SERVER_URL, TEAM_ID, "0aa1bb2c-user")).thenReturn(
-            Optional.empty()
-        );
+        when(documentRepository.findForProjection(eq(WORKSPACE_ID), any(Pageable.class)))
+                .thenReturn(List.of(doc));
+        when(identityResolver.resolveMemberId(WORKSPACE_ID, SERVER_URL, TEAM_ID, "0aa1bb2c-user"))
+                .thenReturn(Optional.empty());
 
         List<ProjectedDocument> result = projector.documentsForWorkspace(WORKSPACE_ID);
 
-        assertThat(result)
-            .singleElement()
-            .satisfies(projected -> {
-                assertThat(projected.createdByName()).isEqualTo("Ada Lovelace");
-                assertThat(projected.createdByMemberId()).isNull();
-            });
+        assertThat(result).singleElement().satisfies(projected -> {
+            assertThat(projected.createdByName()).isEqualTo("Ada Lovelace");
+            assertThat(projected.createdByMemberId()).isNull();
+        });
     }
 
     @Test
     @DisplayName("without an ACTIVE Outline connection authors degrade to name-only and the resolver is never called")
     void noActiveConnection_skipsResolution() {
-        when(connectionService.findActive(WORKSPACE_ID, IntegrationKind.OUTLINE)).thenReturn(Optional.empty());
+        when(connectionService.findActive(WORKSPACE_ID, IntegrationKind.OUTLINE))
+                .thenReturn(Optional.empty());
         OutlineDocument doc = authoredDocument("doc-uuid-1", "0aa1bb2c-user", "Ada Lovelace");
-        when(documentRepository.findForProjection(eq(WORKSPACE_ID), any(Pageable.class))).thenReturn(List.of(doc));
+        when(documentRepository.findForProjection(eq(WORKSPACE_ID), any(Pageable.class)))
+                .thenReturn(List.of(doc));
 
         List<ProjectedDocument> result = projector.documentsForWorkspace(WORKSPACE_ID);
 
-        assertThat(result)
-            .singleElement()
-            .satisfies(projected -> {
-                assertThat(projected.createdByName()).isEqualTo("Ada Lovelace");
-                assertThat(projected.createdByMemberId()).isNull();
-            });
+        assertThat(result).singleElement().satisfies(projected -> {
+            assertThat(projected.createdByName()).isEqualTo("Ada Lovelace");
+            assertThat(projected.createdByMemberId()).isNull();
+        });
         verify(identityResolver, never()).resolveMemberId(anyLong(), anyString(), any(), anyString());
     }
 
@@ -349,30 +330,27 @@ class OutlineDocumentProjectorTest extends BaseUnitTest {
     void collaborators_projectWithResolvedMemberIds() {
         OutlineDocument doc = authoredDocument("doc-uuid-1", "0aa1bb2c-user", "Ada Lovelace");
         doc.setCollaboratorSubjects(List.of("0aa1bb2c-user", "9dd8ee7f-user", "0aa1bb2c-user"));
-        when(documentRepository.findForProjection(eq(WORKSPACE_ID), any(Pageable.class))).thenReturn(List.of(doc));
-        when(identityResolver.resolveMemberId(WORKSPACE_ID, SERVER_URL, TEAM_ID, "0aa1bb2c-user")).thenReturn(
-            Optional.of(555L)
-        );
-        when(identityResolver.resolveMemberId(WORKSPACE_ID, SERVER_URL, TEAM_ID, "9dd8ee7f-user")).thenReturn(
-            Optional.empty()
-        );
+        when(documentRepository.findForProjection(eq(WORKSPACE_ID), any(Pageable.class)))
+                .thenReturn(List.of(doc));
+        when(identityResolver.resolveMemberId(WORKSPACE_ID, SERVER_URL, TEAM_ID, "0aa1bb2c-user"))
+                .thenReturn(Optional.of(555L));
+        when(identityResolver.resolveMemberId(WORKSPACE_ID, SERVER_URL, TEAM_ID, "9dd8ee7f-user"))
+                .thenReturn(Optional.empty());
 
         List<ProjectedDocument> result = projector.documentsForWorkspace(WORKSPACE_ID);
 
-        assertThat(result)
-            .singleElement()
-            .satisfies(projected -> {
-                // Duplicate subjects collapse; insertion order holds.
-                assertThat(projected.collaborators()).hasSize(2);
-                assertThat(projected.collaborators().get(0).subject()).isEqualTo("0aa1bb2c-user");
-                // Creator/last-editor collaborator carries the known display name + resolved member.
-                assertThat(projected.collaborators().get(0).name()).isEqualTo("Ada Lovelace");
-                assertThat(projected.collaborators().get(0).memberId()).isEqualTo(555L);
-                // A middle editor has no name in the list payload — subject (+ member id if linked) only.
-                assertThat(projected.collaborators().get(1).subject()).isEqualTo("9dd8ee7f-user");
-                assertThat(projected.collaborators().get(1).name()).isNull();
-                assertThat(projected.collaborators().get(1).memberId()).isNull();
-            });
+        assertThat(result).singleElement().satisfies(projected -> {
+            // Duplicate subjects collapse; insertion order holds.
+            assertThat(projected.collaborators()).hasSize(2);
+            assertThat(projected.collaborators().get(0).subject()).isEqualTo("0aa1bb2c-user");
+            // Creator/last-editor collaborator carries the known display name + resolved member.
+            assertThat(projected.collaborators().get(0).name()).isEqualTo("Ada Lovelace");
+            assertThat(projected.collaborators().get(0).memberId()).isEqualTo(555L);
+            // A middle editor has no name in the list payload — subject (+ member id if linked) only.
+            assertThat(projected.collaborators().get(1).subject()).isEqualTo("9dd8ee7f-user");
+            assertThat(projected.collaborators().get(1).name()).isNull();
+            assertThat(projected.collaborators().get(1).memberId()).isNull();
+        });
         // The memo covers collaborators too: the shared subject resolves once for author + collaborator slots.
         verify(identityResolver, times(1)).resolveMemberId(WORKSPACE_ID, SERVER_URL, TEAM_ID, "0aa1bb2c-user");
     }
@@ -380,13 +358,12 @@ class OutlineDocumentProjectorTest extends BaseUnitTest {
     @Test
     @DisplayName("a row without collaborator subjects projects an empty collaborator list")
     void noCollaborators_projectsEmptyList() {
-        when(documentRepository.findForProjection(eq(WORKSPACE_ID), any(Pageable.class))).thenReturn(
-            List.of(liveDocument())
-        );
+        when(documentRepository.findForProjection(eq(WORKSPACE_ID), any(Pageable.class)))
+                .thenReturn(List.of(liveDocument()));
 
         assertThat(projector.documentsForWorkspace(WORKSPACE_ID))
-            .singleElement()
-            .satisfies(projected -> assertThat(projected.collaborators()).isEmpty());
+                .singleElement()
+                .satisfies(projected -> assertThat(projected.collaborators()).isEmpty());
     }
 
     // --- extractReferences (the vendor link grammar behind the vendor-neutral SPI) ---
@@ -394,17 +371,15 @@ class OutlineDocumentProjectorTest extends BaseUnitTest {
     @Test
     @DisplayName("extractReferences pulls doc and share links out of free text, capped and insertion-ordered")
     void extractReferences_findsOutlineLinks() {
-        String text =
-            "See https://wiki.example.com/doc/onboarding-guide-a1b2c3 and the share " +
-            "https://wiki.example.com/s/shareId9 (twice: https://wiki.example.com/doc/onboarding-guide-a1b2c3). " +
-            "Not a doc link: https://example.com/blog/post-1.";
+        String text = "See https://wiki.example.com/doc/onboarding-guide-a1b2c3 and the share "
+                + "https://wiki.example.com/s/shareId9 (twice: https://wiki.example.com/doc/onboarding-guide-a1b2c3). "
+                + "Not a doc link: https://example.com/blog/post-1.";
 
         Set<String> refs = projector.extractReferences(text);
 
-        assertThat(refs).containsExactly(
-            "https://wiki.example.com/doc/onboarding-guide-a1b2c3",
-            "https://wiki.example.com/s/shareId9"
-        );
+        assertThat(refs)
+                .containsExactly(
+                        "https://wiki.example.com/doc/onboarding-guide-a1b2c3", "https://wiki.example.com/s/shareId9");
     }
 
     @Test
@@ -423,21 +398,15 @@ class OutlineDocumentProjectorTest extends BaseUnitTest {
     @Test
     @DisplayName("documentsByReference expands a URL reference to its trailing path segment before querying")
     void documentsByReference_expandsUrlToTrailingSegment() {
-        when(documentRepository.findByWorkspaceIdAndReferenceIn(eq(WORKSPACE_ID), refsCaptor.capture())).thenReturn(
-            List.of(liveDocument())
-        );
+        when(documentRepository.findByWorkspaceIdAndReferenceIn(eq(WORKSPACE_ID), refsCaptor.capture()))
+                .thenReturn(List.of(liveDocument()));
 
         List<ProjectedDocument> result = projector.documentsByReference(
-            WORKSPACE_ID,
-            List.of("https://outline.example.com/doc/design-doc", "doc-uuid-1")
-        );
+                WORKSPACE_ID, List.of("https://outline.example.com/doc/design-doc", "doc-uuid-1"));
 
         assertThat(result).hasSize(1);
-        assertThat(refsCaptor.getValue()).contains(
-            "https://outline.example.com/doc/design-doc",
-            "design-doc",
-            "doc-uuid-1"
-        );
+        assertThat(refsCaptor.getValue())
+                .contains("https://outline.example.com/doc/design-doc", "design-doc", "doc-uuid-1");
     }
 
     @Test
@@ -447,24 +416,19 @@ class OutlineDocumentProjectorTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName(
-        "documentsByReference resolves a full-URL reference even when a webhook-synced row stored " +
-            "only the short Outline urlId as its slug, not the full title-slug"
-    )
+    @DisplayName("documentsByReference resolves a full-URL reference even when a webhook-synced row stored "
+            + "only the short Outline urlId as its slug, not the full title-slug")
     void documentsByReference_legacyShortSlugRow_stillResolvesAgainstFullUrlReference() {
         OutlineDocument legacyRow = liveDocument();
         // A webhook targeted-refresh row's slug may be the bare urlId instead of the full
         // "<title>-<urlId>" segment full reconcile derives from the document tree; reference
         // matching must handle both forms.
         legacyRow.setSlug("psUl8qCles");
-        when(documentRepository.findByWorkspaceIdAndReferenceIn(eq(WORKSPACE_ID), refsCaptor.capture())).thenReturn(
-            List.of(legacyRow)
-        );
+        when(documentRepository.findByWorkspaceIdAndReferenceIn(eq(WORKSPACE_ID), refsCaptor.capture()))
+                .thenReturn(List.of(legacyRow));
 
         List<ProjectedDocument> result = projector.documentsByReference(
-            WORKSPACE_ID,
-            List.of("https://wiki.example.com/doc/setup-guide-psUl8qCles")
-        );
+                WORKSPACE_ID, List.of("https://wiki.example.com/doc/setup-guide-psUl8qCles"));
 
         assertThat(result).hasSize(1);
         // The trailing "-<urlId>" segment is derived and included as a candidate token.
@@ -474,9 +438,8 @@ class OutlineDocumentProjectorTest extends BaseUnitTest {
     @Test
     @DisplayName("documentsByReference does not derive a urlId candidate from a short trailing segment")
     void documentsByReference_shortTrailingSegment_noUrlIdCandidateDerived() {
-        when(documentRepository.findByWorkspaceIdAndReferenceIn(eq(WORKSPACE_ID), refsCaptor.capture())).thenReturn(
-            List.of()
-        );
+        when(documentRepository.findByWorkspaceIdAndReferenceIn(eq(WORKSPACE_ID), refsCaptor.capture()))
+                .thenReturn(List.of());
 
         projector.documentsByReference(WORKSPACE_ID, List.of("https://wiki.example.com/doc/design-doc"));
 
@@ -490,9 +453,8 @@ class OutlineDocumentProjectorTest extends BaseUnitTest {
         OutlineDocument second = liveDocument();
         second.setDocumentId("doc-uuid-9");
         second.setSlug("runbook");
-        when(documentSelector.select(WORKSPACE_ID, "deploy OR rollback", 5)).thenReturn(
-            List.of(liveDocument(), second)
-        );
+        when(documentSelector.select(WORKSPACE_ID, "deploy OR rollback", 5))
+                .thenReturn(List.of(liveDocument(), second));
 
         List<ProjectedDocument> result = projector.searchDocuments(WORKSPACE_ID, "deploy OR rollback", 5);
 
@@ -511,13 +473,12 @@ class OutlineDocumentProjectorTest extends BaseUnitTest {
     @Test
     void documentsForWorkspace_withholdsMirrorAfterOriginApprovalIsRemoved() {
         OutlineDocumentProjector denied = new OutlineDocumentProjector(
-            documentRepository,
-            collectionRepository,
-            connectionService,
-            identityResolver,
-            documentSelector,
-            new OutlineOriginPolicy(Set.of())
-        );
+                documentRepository,
+                collectionRepository,
+                connectionService,
+                identityResolver,
+                documentSelector,
+                new OutlineOriginPolicy(Set.of()));
 
         assertThat(denied.documentsForWorkspace(WORKSPACE_ID)).isEmpty();
         verify(documentRepository, never()).findForProjection(anyLong(), any());

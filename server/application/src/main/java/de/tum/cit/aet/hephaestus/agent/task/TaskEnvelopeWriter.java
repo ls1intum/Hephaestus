@@ -16,8 +16,8 @@ public class TaskEnvelopeWriter {
 
     public TaskEnvelopeWriter(JsonMapper baseObjectMapper) {
         this.writer = baseObjectMapper
-            .writer(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS)
-            .withDefaultPrettyPrinter();
+                .writer(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS)
+                .withDefaultPrettyPrinter();
     }
 
     public byte[] write(TaskEnvelope envelope) {

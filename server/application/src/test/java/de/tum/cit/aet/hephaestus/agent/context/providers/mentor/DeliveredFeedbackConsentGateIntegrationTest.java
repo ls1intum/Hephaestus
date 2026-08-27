@@ -18,7 +18,6 @@ import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepositor
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSource;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
-import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeRevision;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
@@ -130,9 +129,7 @@ class DeliveredFeedbackConsentGateIntegrationTest extends AbstractSlackConsentGa
     private JsonNode contribute() {
         Map<String, byte[]> files = new HashMap<>();
         contentSource.contribute(
-            new ContextRequest.MentorChatRequest(workspace.getId(), recipient.getId(), UUID.randomUUID()),
-            files
-        );
+                new ContextRequest.MentorChatRequest(workspace.getId(), recipient.getId(), UUID.randomUUID()), files);
         return objectMapper.readTree(files.get(DeliveredFeedbackContentSource.OUTPUT_KEY));
     }
 
@@ -148,26 +145,24 @@ class DeliveredFeedbackConsentGateIntegrationTest extends AbstractSlackConsentGa
         Instant now = Instant.now();
         UUID observationId = UUID.randomUUID();
         observationRepository.insertIfAbsent(
-            observationId,
-            "observation-" + nextPosition,
-            job.getId(),
-            practice.getId(),
-            practice.getCurrentRevision().getId(),
-            artifactKind.value(),
-            artifactId,
-            recipient.getId(),
-            "Observation title",
-            "ABSENT",
-            "BAD",
-            "MAJOR",
-            evidence(artifactKind),
-            null,
-            null,
-            now,
-            "LIVE"
-        );
-        Feedback feedback = feedbackRepository.save(
-            Feedback.builder()
+                observationId,
+                "observation-" + nextPosition,
+                job.getId(),
+                practice.getId(),
+                practice.getCurrentRevision().getId(),
+                artifactKind.value(),
+                artifactId,
+                recipient.getId(),
+                "Observation title",
+                "ABSENT",
+                "BAD",
+                "MAJOR",
+                evidence(artifactKind),
+                null,
+                null,
+                now,
+                "LIVE");
+        Feedback feedback = feedbackRepository.save(Feedback.builder()
                 .agentJobId(job.getId())
                 .workspaceId(workspace.getId())
                 .artifactKind(artifactKind)
@@ -181,15 +176,14 @@ class DeliveredFeedbackConsentGateIntegrationTest extends AbstractSlackConsentGa
                 .body(body)
                 .createdAt(now)
                 .deliveredAt(now)
-                .build()
-        );
+                .build());
         feedbackObservationRepository.insertIfAbsent(feedback.getId(), observationId, EvidenceRole.PRIMARY.name(), 0);
     }
 
     private static String evidence(ArtifactKind artifactKind) {
         String sourceKind = ArtifactKinds.CONVERSATION_THREAD.equals(artifactKind)
-            ? "slack.conversation.thread"
-            : "scm.pull-request.core";
+                ? "slack.conversation.thread"
+                : "scm.pull-request.core";
         return """
         {"citations":[{"sourceKind":"%s","artifactPath":"inputs/context/source.json",\
         "path":"source.json","startLine":1,"endLine":1,"quote":"evidence",\

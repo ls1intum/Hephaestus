@@ -21,10 +21,9 @@ public class WorkspaceMembershipAutoSeeder {
     private final boolean enabled;
 
     public WorkspaceMembershipAutoSeeder(
-        WorkspaceMembershipRepository membershipRepository,
-        WorkspaceMembershipService membershipService,
-        @Value("${hephaestus.workspace.auto-seed-membership:false}") boolean enabled
-    ) {
+            WorkspaceMembershipRepository membershipRepository,
+            WorkspaceMembershipService membershipService,
+            @Value("${hephaestus.workspace.auto-seed-membership:false}") boolean enabled) {
         this.membershipRepository = membershipRepository;
         this.membershipService = membershipService;
         this.enabled = enabled;
@@ -34,10 +33,9 @@ public class WorkspaceMembershipAutoSeeder {
         if (!enabled) {
             return Optional.empty();
         }
-        Optional<User> firstUser = users
-            .stream()
-            .filter(user -> user != null && user.getId() != null)
-            .findFirst();
+        Optional<User> firstUser = users.stream()
+                .filter(user -> user != null && user.getId() != null)
+                .findFirst();
         if (firstUser.isEmpty() || membershipRepository.countByWorkspace_Id(workspace.getId()) != 0) {
             return Optional.empty();
         }

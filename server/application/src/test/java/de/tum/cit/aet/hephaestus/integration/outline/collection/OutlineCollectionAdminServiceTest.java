@@ -74,24 +74,25 @@ class OutlineCollectionAdminServiceTest extends BaseUnitTest {
     private OutlineCollectionAdminService service() {
         lenient().when(connection.getId()).thenReturn(CONNECTION_ID);
         lenient()
-            .when(connection.getConfig())
-            .thenReturn(new ConnectionConfig.OutlineConfig(SERVER_URL, null, null, Set.of()));
-        lenient().when(connectionService.findActive(WS, IntegrationKind.OUTLINE)).thenReturn(Optional.of(connection));
+                .when(connection.getConfig())
+                .thenReturn(new ConnectionConfig.OutlineConfig(SERVER_URL, null, null, Set.of()));
         lenient()
-            .when(connectionService.findActiveBearerToken(WS, IntegrationKind.OUTLINE))
-            .thenReturn(Optional.of(new BearerToken(TOKEN, null)));
+                .when(connectionService.findActive(WS, IntegrationKind.OUTLINE))
+                .thenReturn(Optional.of(connection));
         lenient()
-            .when(collectionRepository.save(org.mockito.ArgumentMatchers.any(OutlineCollection.class)))
-            .thenAnswer(invocation -> invocation.getArgument(0));
+                .when(connectionService.findActiveBearerToken(WS, IntegrationKind.OUTLINE))
+                .thenReturn(Optional.of(new BearerToken(TOKEN, null)));
+        lenient()
+                .when(collectionRepository.save(org.mockito.ArgumentMatchers.any(OutlineCollection.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
         return new OutlineCollectionAdminService(
-            connectionService,
-            collectionRepository,
-            documentRepository,
-            outlineApiClient,
-            syncScheduler,
-            new TaskExecutorAdapter(Runnable::run),
-            eventPublisher
-        );
+                connectionService,
+                collectionRepository,
+                documentRepository,
+                outlineApiClient,
+                syncScheduler,
+                new TaskExecutorAdapter(Runnable::run),
+                eventPublisher);
     }
 
     private OutlineCollection registeredRow(MirrorState state, SyncStatus syncStatus) {
@@ -117,12 +118,10 @@ class OutlineCollectionAdminServiceTest extends BaseUnitTest {
     @Test
     void register_verifiesAgainstLiveList_capturesCatalogFields_andKicksTargetedSync() {
         OutlineCollectionAdminService service = service();
-        when(
-            collectionRepository.findByWorkspaceIdAndConnectionIdAndCollectionId(WS, CONNECTION_ID, COLLECTION_ID)
-        ).thenReturn(Optional.empty());
+        when(collectionRepository.findByWorkspaceIdAndConnectionIdAndCollectionId(WS, CONNECTION_ID, COLLECTION_ID))
+                .thenReturn(Optional.empty());
         stubLiveCollections(
-            OutlineClientModels.collection(COLLECTION_ID, "Design", "col1", "#F00", "ruler", "Design team docs")
-        );
+                OutlineClientModels.collection(COLLECTION_ID, "Design", "col1", "#F00", "ruler", "Design team docs"));
 
         OutlineCollectionAdminService.RegistrationOutcome outcome = service.register(WS, COLLECTION_ID);
 
@@ -149,16 +148,11 @@ class OutlineCollectionAdminServiceTest extends BaseUnitTest {
     @Test
     void register_existingRow_isIdempotent_noLiveCallNoSaveNoKick() {
         OutlineCollectionAdminService service = service();
-        when(
-            collectionRepository.findByWorkspaceIdAndConnectionIdAndCollectionId(WS, CONNECTION_ID, COLLECTION_ID)
-        ).thenReturn(Optional.of(registeredRow(MirrorState.ENABLED, SyncStatus.COMPLETE)));
-        when(
-            documentRepository.countByWorkspaceIdAndConnectionIdAndCollectionIdAndDeletedAtIsNull(
-                WS,
-                CONNECTION_ID,
-                COLLECTION_ID
-            )
-        ).thenReturn(5L);
+        when(collectionRepository.findByWorkspaceIdAndConnectionIdAndCollectionId(WS, CONNECTION_ID, COLLECTION_ID))
+                .thenReturn(Optional.of(registeredRow(MirrorState.ENABLED, SyncStatus.COMPLETE)));
+        when(documentRepository.countByWorkspaceIdAndConnectionIdAndCollectionIdAndDeletedAtIsNull(
+                        WS, CONNECTION_ID, COLLECTION_ID))
+                .thenReturn(5L);
 
         OutlineCollectionAdminService.RegistrationOutcome outcome = service.register(WS, COLLECTION_ID);
 
@@ -172,14 +166,12 @@ class OutlineCollectionAdminServiceTest extends BaseUnitTest {
     @Test
     void register_unknownCollectionId_throws422Shape_andCreatesNothing() {
         OutlineCollectionAdminService service = service();
-        when(
-            collectionRepository.findByWorkspaceIdAndConnectionIdAndCollectionId(WS, CONNECTION_ID, COLLECTION_ID)
-        ).thenReturn(Optional.empty());
+        when(collectionRepository.findByWorkspaceIdAndConnectionIdAndCollectionId(WS, CONNECTION_ID, COLLECTION_ID))
+                .thenReturn(Optional.empty());
         stubLiveCollections(OutlineClientModels.collection("other-id", "Other", null, null, null, null));
 
-        assertThatThrownBy(() -> service.register(WS, COLLECTION_ID)).isInstanceOf(
-            UnknownOutlineCollectionException.class
-        );
+        assertThatThrownBy(() -> service.register(WS, COLLECTION_ID))
+                .isInstanceOf(UnknownOutlineCollectionException.class);
         verify(collectionRepository, never()).save(org.mockito.ArgumentMatchers.any());
         verify(syncScheduler, never()).syncCollectionNow(eq(WS), anyString());
     }
@@ -189,13 +181,11 @@ class OutlineCollectionAdminServiceTest extends BaseUnitTest {
         // outline_collection.description is 2048 chars wide; a live description past that must be
         // clamped, not rejected or silently widened.
         OutlineCollectionAdminService service = service();
-        when(
-            collectionRepository.findByWorkspaceIdAndConnectionIdAndCollectionId(WS, CONNECTION_ID, COLLECTION_ID)
-        ).thenReturn(Optional.empty());
+        when(collectionRepository.findByWorkspaceIdAndConnectionIdAndCollectionId(WS, CONNECTION_ID, COLLECTION_ID))
+                .thenReturn(Optional.empty());
         String overLongDescription = "d".repeat(2100);
         stubLiveCollections(
-            OutlineClientModels.collection(COLLECTION_ID, "Design", "col1", null, null, overLongDescription)
-        );
+                OutlineClientModels.collection(COLLECTION_ID, "Design", "col1", null, null, overLongDescription));
 
         service.register(WS, COLLECTION_ID);
 
@@ -216,9 +206,8 @@ class OutlineCollectionAdminServiceTest extends BaseUnitTest {
     @Test
     void pause_freezesWithoutKick_andKeepsSyncStatus() {
         OutlineCollectionAdminService service = service();
-        when(
-            collectionRepository.findByWorkspaceIdAndConnectionIdAndCollectionId(WS, CONNECTION_ID, COLLECTION_ID)
-        ).thenReturn(Optional.of(registeredRow(MirrorState.ENABLED, SyncStatus.COMPLETE)));
+        when(collectionRepository.findByWorkspaceIdAndConnectionIdAndCollectionId(WS, CONNECTION_ID, COLLECTION_ID))
+                .thenReturn(Optional.of(registeredRow(MirrorState.ENABLED, SyncStatus.COMPLETE)));
 
         OutlineCollectionDTO dto = service.updateState(WS, COLLECTION_ID, MirrorState.PAUSED);
 
@@ -233,18 +222,16 @@ class OutlineCollectionAdminServiceTest extends BaseUnitTest {
         // inline would let it read the row before the ENABLED write commits — it would see PAUSED, no-op, and
         // the collection would stay frozen. The kick must therefore be an event, not a call.
         OutlineCollectionAdminService service = service();
-        when(
-            collectionRepository.findByWorkspaceIdAndConnectionIdAndCollectionId(WS, CONNECTION_ID, COLLECTION_ID)
-        ).thenReturn(Optional.of(registeredRow(MirrorState.PAUSED, SyncStatus.COMPLETE)));
+        when(collectionRepository.findByWorkspaceIdAndConnectionIdAndCollectionId(WS, CONNECTION_ID, COLLECTION_ID))
+                .thenReturn(Optional.of(registeredRow(MirrorState.PAUSED, SyncStatus.COMPLETE)));
 
         OutlineCollectionDTO dto = service.updateState(WS, COLLECTION_ID, MirrorState.ENABLED);
 
         assertThat(dto.state()).isEqualTo(MirrorState.ENABLED);
         assertThat(dto.syncStatus()).isEqualTo(SyncStatus.PENDING);
         verify(syncScheduler, never()).syncCollectionNow(eq(WS), anyString());
-        verify(eventPublisher).publishEvent(
-            new OutlineCollectionAdminService.OutlineCollectionResumedEvent(WS, COLLECTION_ID)
-        );
+        verify(eventPublisher)
+                .publishEvent(new OutlineCollectionAdminService.OutlineCollectionResumedEvent(WS, COLLECTION_ID));
     }
 
     @Test
@@ -255,10 +242,10 @@ class OutlineCollectionAdminServiceTest extends BaseUnitTest {
 
         verify(syncScheduler).syncCollectionNow(WS, COLLECTION_ID);
         // Pin the AFTER_COMMIT phase, not just that an event exists — the phase is what defers the kick past commit.
-        TransactionalEventListener listener = OutlineCollectionAdminService.class.getDeclaredMethod(
-            "onCollectionResumed",
-            OutlineCollectionAdminService.OutlineCollectionResumedEvent.class
-        ).getAnnotation(TransactionalEventListener.class);
+        TransactionalEventListener listener = OutlineCollectionAdminService.class
+                .getDeclaredMethod(
+                        "onCollectionResumed", OutlineCollectionAdminService.OutlineCollectionResumedEvent.class)
+                .getAnnotation(TransactionalEventListener.class);
         assertThat(listener).isNotNull();
         assertThat(listener.phase()).isEqualTo(TransactionPhase.AFTER_COMMIT);
     }
@@ -266,9 +253,8 @@ class OutlineCollectionAdminServiceTest extends BaseUnitTest {
     @Test
     void updateState_sameState_isIdempotentNoSaveNoKick() {
         OutlineCollectionAdminService service = service();
-        when(
-            collectionRepository.findByWorkspaceIdAndConnectionIdAndCollectionId(WS, CONNECTION_ID, COLLECTION_ID)
-        ).thenReturn(Optional.of(registeredRow(MirrorState.PAUSED, SyncStatus.COMPLETE)));
+        when(collectionRepository.findByWorkspaceIdAndConnectionIdAndCollectionId(WS, CONNECTION_ID, COLLECTION_ID))
+                .thenReturn(Optional.of(registeredRow(MirrorState.PAUSED, SyncStatus.COMPLETE)));
 
         OutlineCollectionDTO dto = service.updateState(WS, COLLECTION_ID, MirrorState.PAUSED);
 
@@ -281,22 +267,19 @@ class OutlineCollectionAdminServiceTest extends BaseUnitTest {
     @Test
     void updateState_unknownCollection_isNotFound() {
         OutlineCollectionAdminService service = service();
-        when(
-            collectionRepository.findByWorkspaceIdAndConnectionIdAndCollectionId(WS, CONNECTION_ID, COLLECTION_ID)
-        ).thenReturn(Optional.empty());
+        when(collectionRepository.findByWorkspaceIdAndConnectionIdAndCollectionId(WS, CONNECTION_ID, COLLECTION_ID))
+                .thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.updateState(WS, COLLECTION_ID, MirrorState.PAUSED)).isInstanceOf(
-            EntityNotFoundException.class
-        );
+        assertThatThrownBy(() -> service.updateState(WS, COLLECTION_ID, MirrorState.PAUSED))
+                .isInstanceOf(EntityNotFoundException.class);
     }
 
     @Test
     void delete_erasesTheCollectionsDocuments_andTheRegistryRow() {
         OutlineCollectionAdminService service = service();
         OutlineCollection row = registeredRow(MirrorState.ENABLED, SyncStatus.COMPLETE);
-        when(
-            collectionRepository.findByWorkspaceIdAndConnectionIdAndCollectionId(WS, CONNECTION_ID, COLLECTION_ID)
-        ).thenReturn(Optional.of(row));
+        when(collectionRepository.findByWorkspaceIdAndConnectionIdAndCollectionId(WS, CONNECTION_ID, COLLECTION_ID))
+                .thenReturn(Optional.of(row));
 
         service.delete(WS, COLLECTION_ID);
 
@@ -307,13 +290,11 @@ class OutlineCollectionAdminServiceTest extends BaseUnitTest {
     @Test
     void candidates_flagAlreadyMirroredRows() {
         OutlineCollectionAdminService service = service();
-        when(collectionRepository.findByWorkspaceIdOrderByCreatedAtAsc(WS)).thenReturn(
-            List.of(registeredRow(MirrorState.ENABLED, SyncStatus.COMPLETE))
-        );
+        when(collectionRepository.findByWorkspaceIdOrderByCreatedAtAsc(WS))
+                .thenReturn(List.of(registeredRow(MirrorState.ENABLED, SyncStatus.COMPLETE)));
         stubCandidateCollections(
-            OutlineClientModels.collection(COLLECTION_ID, "Design", "col1", null, null, null),
-            OutlineClientModels.collection("col-2", "Archive", "col2", null, null, null)
-        );
+                OutlineClientModels.collection(COLLECTION_ID, "Design", "col1", null, null, null),
+                OutlineClientModels.collection("col-2", "Archive", "col2", null, null, null));
 
         List<OutlineCollectionCandidateDTO> candidates = service.listCandidates(WS);
 
@@ -343,16 +324,11 @@ class OutlineCollectionAdminServiceTest extends BaseUnitTest {
     @Test
     void getCollection_returnsTheRegisteredRowWithItsLiveCount() {
         OutlineCollectionAdminService service = service();
-        when(
-            collectionRepository.findByWorkspaceIdAndConnectionIdAndCollectionId(WS, CONNECTION_ID, COLLECTION_ID)
-        ).thenReturn(Optional.of(registeredRow(MirrorState.ENABLED, SyncStatus.COMPLETE)));
-        when(
-            documentRepository.countByWorkspaceIdAndConnectionIdAndCollectionIdAndDeletedAtIsNull(
-                WS,
-                CONNECTION_ID,
-                COLLECTION_ID
-            )
-        ).thenReturn(3L);
+        when(collectionRepository.findByWorkspaceIdAndConnectionIdAndCollectionId(WS, CONNECTION_ID, COLLECTION_ID))
+                .thenReturn(Optional.of(registeredRow(MirrorState.ENABLED, SyncStatus.COMPLETE)));
+        when(documentRepository.countByWorkspaceIdAndConnectionIdAndCollectionIdAndDeletedAtIsNull(
+                        WS, CONNECTION_ID, COLLECTION_ID))
+                .thenReturn(3L);
 
         OutlineCollectionDTO dto = service.getCollection(WS, COLLECTION_ID);
 
@@ -364,9 +340,8 @@ class OutlineCollectionAdminServiceTest extends BaseUnitTest {
     @Test
     void getCollection_unknownId_isNotFound() {
         OutlineCollectionAdminService service = service();
-        when(
-            collectionRepository.findByWorkspaceIdAndConnectionIdAndCollectionId(WS, CONNECTION_ID, COLLECTION_ID)
-        ).thenReturn(Optional.empty());
+        when(collectionRepository.findByWorkspaceIdAndConnectionIdAndCollectionId(WS, CONNECTION_ID, COLLECTION_ID))
+                .thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.getCollection(WS, COLLECTION_ID)).isInstanceOf(EntityNotFoundException.class);
     }

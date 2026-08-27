@@ -56,12 +56,7 @@ class GitHubDiscussionMessageHandlerRoutingTest extends BaseUnitTest {
     @BeforeEach
     void setUp() {
         handler = new GitHubDiscussionMessageHandler(
-            contextFactory,
-            discussionProcessor,
-            syncSchedulerProperties,
-            deserializer,
-            new TransactionTemplate()
-        );
+                contextFactory, discussionProcessor, syncSchedulerProperties, deserializer, new TransactionTemplate());
     }
 
     @Test
@@ -108,11 +103,9 @@ class GitHubDiscussionMessageHandlerRoutingTest extends BaseUnitTest {
     }
 
     private static GitHubDiscussionEventDTO event(String action) throws Exception {
-        String json =
-            "{\"action\":\"" +
-            action +
-            "\",\"discussion\":{\"number\":7,\"database_id\":123}," +
-            "\"repository\":{\"full_name\":\"acme/widgets\"}}";
+        String json = "{\"action\":\"" + action
+                + "\",\"discussion\":{\"number\":7,\"database_id\":123},"
+                + "\"repository\":{\"full_name\":\"acme/widgets\"}}";
         return JSON.readValue(json, GitHubDiscussionEventDTO.class);
     }
 }

@@ -5,7 +5,6 @@ import static org.hamcrest.Matchers.hasItem;
 
 import de.tum.cit.aet.hephaestus.testconfig.RealAuthIntegrationTest;
 import java.util.Map;
-import java.util.Objects;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -34,33 +33,33 @@ class DevLoginIntegrationTest extends RealAuthIntegrationTest {
     void devLoginMintsAcceptedCookie_andGetUserReturnsTheDevAccount() {
         // No XSRF token is sent: success here also proves the CSRF carve-out for the pre-auth POST.
         var responseCookie = webTestClient
-            .post()
-            .uri("/auth/dev-login")
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue("{\"username\":\"alice\",\"displayName\":\"Alice Dev\",\"admin\":false}")
-            .exchange()
-            .expectStatus()
-            .isNoContent()
-            .expectCookie()
-            .exists(cookieName)
-            .returnResult(Void.class)
-            .getResponseCookies()
-            .getFirst(cookieName);
+                .post()
+                .uri("/auth/dev-login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("{\"username\":\"alice\",\"displayName\":\"Alice Dev\",\"admin\":false}")
+                .exchange()
+                .expectStatus()
+                .isNoContent()
+                .expectCookie()
+                .exists(cookieName)
+                .returnResult(Void.class)
+                .getResponseCookies()
+                .getFirst(cookieName);
         org.junit.jupiter.api.Assertions.assertNotNull(responseCookie);
         String cookie = responseCookie.getValue();
 
         webTestClient
-            .get()
-            .uri("/user")
-            .header(HttpHeaders.COOKIE, cookieName + "=" + cookie)
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody()
-            .jsonPath("$.displayName")
-            .isEqualTo("Alice Dev")
-            .jsonPath("$.appRole")
-            .isEqualTo("USER");
+                .get()
+                .uri("/user")
+                .header(HttpHeaders.COOKIE, cookieName + "=" + cookie)
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$.displayName")
+                .isEqualTo("Alice Dev")
+                .jsonPath("$.appRole")
+                .isEqualTo("USER");
     }
 
     @Test
@@ -68,17 +67,17 @@ class DevLoginIntegrationTest extends RealAuthIntegrationTest {
         String cookie = devLogin("{\"username\":\"root\",\"admin\":true}");
 
         webTestClient
-            .get()
-            .uri("/user")
-            .header(HttpHeaders.COOKIE, cookieName + "=" + cookie)
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody()
-            .jsonPath("$.appRole")
-            .isEqualTo("APP_ADMIN")
-            .jsonPath("$.roles")
-            .value(hasItem("app_admin"));
+                .get()
+                .uri("/user")
+                .header(HttpHeaders.COOKIE, cookieName + "=" + cookie)
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$.appRole")
+                .isEqualTo("APP_ADMIN")
+                .jsonPath("$.roles")
+                .value(hasItem("app_admin"));
     }
 
     @Test
@@ -91,43 +90,43 @@ class DevLoginIntegrationTest extends RealAuthIntegrationTest {
     @Test
     void discoveryAdvertisesTheDevRowWhenEnabled() {
         webTestClient
-            .get()
-            .uri("/identity-providers")
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody()
-            .jsonPath("$[?(@.registrationId == 'dev')].providerType")
-            .isEqualTo("DEV");
+                .get()
+                .uri("/identity-providers")
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$[?(@.registrationId == 'dev')].providerType")
+                .isEqualTo("DEV");
     }
 
     private String devLogin(String json) {
         var cookie = webTestClient
-            .post()
-            .uri("/auth/dev-login")
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(json)
-            .exchange()
-            .expectStatus()
-            .isNoContent()
-            .returnResult(Void.class)
-            .getResponseCookies()
-            .getFirst(cookieName);
+                .post()
+                .uri("/auth/dev-login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(json)
+                .exchange()
+                .expectStatus()
+                .isNoContent()
+                .returnResult(Void.class)
+                .getResponseCookies()
+                .getFirst(cookieName);
         org.junit.jupiter.api.Assertions.assertNotNull(cookie);
         return cookie.getValue();
     }
 
     private long accountIdFrom(String cookie) {
         Map<?, ?> body = webTestClient
-            .get()
-            .uri("/user")
-            .header(HttpHeaders.COOKIE, cookieName + "=" + cookie)
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody(Map.class)
-            .returnResult()
-            .getResponseBody();
+                .get()
+                .uri("/user")
+                .header(HttpHeaders.COOKIE, cookieName + "=" + cookie)
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody(Map.class)
+                .returnResult()
+                .getResponseBody();
         org.junit.jupiter.api.Assertions.assertNotNull(body);
         Object id = body.get("id");
         org.junit.jupiter.api.Assertions.assertNotNull(id);

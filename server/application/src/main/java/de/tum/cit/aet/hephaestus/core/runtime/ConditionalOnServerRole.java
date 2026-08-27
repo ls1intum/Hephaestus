@@ -20,7 +20,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
  * <p>See {@link RuntimeRole#SERVER_PROPERTY} and {@code RuntimeRoleBoundaryTest}, which enforces that
  * every {@code core.auth} stereotype bean carries this gate.
  */
-@Target({ ElementType.TYPE, ElementType.METHOD })
+@Target({ElementType.TYPE, ElementType.METHOD})
 @Retention(RetentionPolicy.RUNTIME)
 @Documented
 @ConditionalOnProperty(name = RuntimeRole.SERVER_PROPERTY, havingValue = "true", matchIfMissing = true)

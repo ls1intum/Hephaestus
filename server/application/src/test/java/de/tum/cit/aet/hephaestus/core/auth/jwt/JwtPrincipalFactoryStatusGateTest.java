@@ -22,10 +22,7 @@ import org.springframework.web.server.ResponseStatusException;
 class JwtPrincipalFactoryStatusGateTest extends BaseUnitTest {
 
     private final JwtPrincipalFactory factory = new JwtPrincipalFactory(
-        mock(AccountRepository.class),
-        mock(IdentityLinkRepository.class),
-        mock(AccountFeatureRepository.class)
-    );
+            mock(AccountRepository.class), mock(IdentityLinkRepository.class), mock(AccountFeatureRepository.class));
 
     @Test
     void rejectsSuspendedAccount() {
@@ -46,7 +43,7 @@ class JwtPrincipalFactoryStatusGateTest extends BaseUnitTest {
         Account account = new Account("Test Account");
         account.setStatus(status);
         assertThatThrownBy(() -> factory.forAccount(account))
-            .isInstanceOf(ResponseStatusException.class)
-            .hasMessageContaining("not active");
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("not active");
     }
 }

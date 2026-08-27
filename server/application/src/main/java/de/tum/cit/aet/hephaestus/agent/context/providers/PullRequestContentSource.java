@@ -70,9 +70,8 @@ public class PullRequestContentSource implements EvidenceSource, ReviewContextBu
     @Override
     public SourceKind sourceKindFor(String path) {
         if (path.endsWith("comments.json")) return COMMENTS;
-        if (
-            path.endsWith("diff.patch") || path.endsWith("diff_stat.txt") || path.endsWith("diff_summary.md")
-        ) return DIFF;
+        if (path.endsWith("diff.patch") || path.endsWith("diff_stat.txt") || path.endsWith("diff_summary.md"))
+            return DIFF;
         return CORE;
     }
 
@@ -93,14 +92,13 @@ public class PullRequestContentSource implements EvidenceSource, ReviewContextBu
     private final Map<IntegrationKind, ScmTokenSource> tokenSources;
 
     public PullRequestContentSource(
-        ObjectMapper objectMapper,
-        GitRepositoryManager gitRepositoryManager,
-        PullRequestRepository pullRequestRepository,
-        PullRequestReviewCommentRepository reviewCommentRepository,
-        GitDiffOperations gitDiffOperations,
-        ConnectionService connectionService,
-        List<ScmTokenSource> tokenSourceList
-    ) {
+            ObjectMapper objectMapper,
+            GitRepositoryManager gitRepositoryManager,
+            PullRequestRepository pullRequestRepository,
+            PullRequestReviewCommentRepository reviewCommentRepository,
+            GitDiffOperations gitDiffOperations,
+            ConnectionService connectionService,
+            List<ScmTokenSource> tokenSourceList) {
         this.objectMapper = objectMapper;
         this.gitRepositoryManager = gitRepositoryManager;
         this.pullRequestRepository = pullRequestRepository;
@@ -149,10 +147,8 @@ public class PullRequestContentSource implements EvidenceSource, ReviewContextBu
 
     private EvidenceContribution captureSelected(ContextRequest request, Set<SourceKind> selectedKinds) {
         if (!(request instanceof ContextRequest.PracticeReviewRequest practiceReview)) {
-            throw new IllegalStateException(
-                "PullRequestContentSource.contribute called with unsupported variant: " +
-                    request.getClass().getSimpleName()
-            );
+            throw new IllegalStateException("PullRequestContentSource.contribute called with unsupported variant: "
+                    + request.getClass().getSimpleName());
         }
         AgentJob job = practiceReview.job();
         JsonNode metadata = job.getMetadata();
@@ -170,12 +166,14 @@ public class PullRequestContentSource implements EvidenceSource, ReviewContextBu
         boolean headVerified = false;
         if (selectedKinds.contains(DIFF)) {
             ensureRepositoryAvailable(repositoryId);
-            String headSha = metadata.has("commit_sha") ? metadata.get("commit_sha").asString() : null;
+            String headSha =
+                    metadata.has("commit_sha") ? metadata.get("commit_sha").asString() : null;
             headVerified =
-                headSha != null && !headSha.isBlank() && gitRepositoryManager.commitExists(repositoryId, headSha);
+                    headSha != null && !headSha.isBlank() && gitRepositoryManager.commitExists(repositoryId, headSha);
         }
         if (selectedKinds.contains(CORE)) {
-            PullRequest pullRequest = pullRequestRepository.findByIdWithAllForGate(pullRequestId).orElse(null);
+            PullRequest pullRequest =
+                    pullRequestRepository.findByIdWithAllForGate(pullRequestId).orElse(null);
             storeMetadata(files, pullRequest, metadata);
             completeness.put(CORE, pullRequest == null ? SourceCompleteness.PARTIAL : SourceCompleteness.COMPLETE);
             if (pullRequest != null && pullRequest.getLastSyncAt() != null) {
@@ -187,9 +185,7 @@ public class PullRequestContentSource implements EvidenceSource, ReviewContextBu
             storeComments(files, comments.comments());
             completeness.put(COMMENTS, comments.complete() ? SourceCompleteness.COMPLETE : SourceCompleteness.PARTIAL);
             contentStates.put(
-                COMMENTS,
-                comments.comments().isEmpty() ? SourceContentState.EMPTY : SourceContentState.NON_EMPTY
-            );
+                    COMMENTS, comments.comments().isEmpty() ? SourceContentState.EMPTY : SourceContentState.NON_EMPTY);
         }
         if (selectedKinds.contains(DIFF)) {
             computeAndStoreDiff(files, repositoryId, metadata, headVerified);
@@ -199,9 +195,7 @@ public class PullRequestContentSource implements EvidenceSource, ReviewContextBu
             if (!headSha.isBlank()) identities.put(DIFF, headSha);
             byte[] diff = files.get(OUTPUT_PREFIX + "diff.patch");
             contentStates.put(
-                DIFF,
-                diff == null || diff.length == 0 ? SourceContentState.EMPTY : SourceContentState.NON_EMPTY
-            );
+                    DIFF, diff == null || diff.length == 0 ? SourceContentState.EMPTY : SourceContentState.NON_EMPTY);
         }
         return new EvidenceContribution(files, completeness, identities, observedAt, Map.of(), contentStates);
     }
@@ -209,13 +203,11 @@ public class PullRequestContentSource implements EvidenceSource, ReviewContextBu
     private void ensureRepositoryAvailable(long repositoryId) {
         if (!gitRepositoryManager.isEnabled()) {
             throw new JobPreparationException(
-                "Git local storage is disabled but required for repository evidence: repoId=" + repositoryId
-            );
+                    "Git local storage is disabled but required for repository evidence: repoId=" + repositoryId);
         }
         if (!gitRepositoryManager.isRepositoryCloned(repositoryId)) {
             throw new JobPreparationException(
-                "Repository is not available locally for evidence capture: repoId=" + repositoryId
-            );
+                    "Repository is not available locally for evidence capture: repoId=" + repositoryId);
         }
     }
 
@@ -226,8 +218,7 @@ public class PullRequestContentSource implements EvidenceSource, ReviewContextBu
         }
 
         var workspace = job.getWorkspace();
-        var kind =
-            workspace == null
+        var kind = workspace == null
                 ? Optional.<IntegrationKind>empty()
                 : connectionService.findActiveProviderKind(workspace.getId());
         ScmTokenSource source = kind.map(tokenSources::get).orElse(null);
@@ -240,8 +231,7 @@ public class PullRequestContentSource implements EvidenceSource, ReviewContextBu
                 serverUrl = source.serverUrl(scopeId).orElse(null);
                 String token = source.accessToken(scopeId).orElse(null);
                 JsonNode metadata = job.getMetadata();
-                String repoFullName =
-                    metadata != null && metadata.has("repository_full_name")
+                String repoFullName = metadata != null && metadata.has("repository_full_name")
                         ? metadata.get("repository_full_name").asString()
                         : null;
                 if (serverUrl != null && token != null && repoFullName != null) {
@@ -249,17 +239,11 @@ public class PullRequestContentSource implements EvidenceSource, ReviewContextBu
                     gitRepositoryManager.ensureRepository(repositoryId, cloneUrl, token);
                     fetched = true;
                     long pullRequestNumber = requireLong(
-                        Objects.requireNonNull(metadata, "pull request job metadata is required"),
-                        "pr_number"
-                    );
+                            Objects.requireNonNull(metadata, "pull request job metadata is required"), "pr_number");
                     Optional<String> reviewHeadRef = source.reviewHeadRef(pullRequestNumber);
                     if (headSha != null && !headSha.isBlank() && reviewHeadRef.isPresent()) {
                         boolean pinnedHeadFetched = gitRepositoryManager.fetchRemoteCommit(
-                            repositoryId,
-                            reviewHeadRef.get(),
-                            headSha,
-                            token
-                        );
+                                repositoryId, reviewHeadRef.get(), headSha, token);
                         if (!pinnedHeadFetched) {
                             log.warn("Remote review ref did not match the pinned commit: repoId={}", repositoryId);
                         }
@@ -269,28 +253,25 @@ public class PullRequestContentSource implements EvidenceSource, ReviewContextBu
             }
         } catch (Exception e) {
             log.warn(
-                "Pre-diff fetch failed: repoId={}, kind={}, serverUrl={}",
-                repositoryId,
-                kind.orElse(null),
-                serverUrl,
-                e
-            );
+                    "Pre-diff fetch failed: repoId={}, kind={}, serverUrl={}",
+                    repositoryId,
+                    kind.orElse(null),
+                    serverUrl,
+                    e);
         }
 
         if (headSha != null && !headSha.isBlank()) {
             boolean exists = gitRepositoryManager.commitExists(repositoryId, headSha);
             if (!exists && fetched) {
                 log.error(
-                    "Head commit {} not found in local clone after successful fetch. repoId={}",
-                    headSha,
-                    repositoryId
-                );
+                        "Head commit {} not found in local clone after successful fetch. repoId={}",
+                        headSha,
+                        repositoryId);
             } else if (!exists) {
                 log.warn(
-                    "Head commit {} not found locally (no fetch possible). Diff may fail. repoId={}",
-                    headSha,
-                    repositoryId
-                );
+                        "Head commit {} not found locally (no fetch possible). Diff may fail. repoId={}",
+                        headSha,
+                        repositoryId);
             }
             return exists;
         }
@@ -301,9 +282,8 @@ public class PullRequestContentSource implements EvidenceSource, ReviewContextBu
         ObjectNode pullRequestMetadata = buildPullRequestMetadata(pullRequest, metadata);
         try {
             files.put(
-                OUTPUT_PREFIX + "metadata.json",
-                objectMapper.writerWithDefaultPrettyPrinter().writeValueAsBytes(pullRequestMetadata)
-            );
+                    OUTPUT_PREFIX + "metadata.json",
+                    objectMapper.writerWithDefaultPrettyPrinter().writeValueAsBytes(pullRequestMetadata));
         } catch (JacksonException e) {
             throw new JobPreparationException("Failed to serialize pull request metadata", e);
         }
@@ -313,9 +293,8 @@ public class PullRequestContentSource implements EvidenceSource, ReviewContextBu
         JsonNode serialized = buildReviewComments(comments);
         try {
             files.put(
-                OUTPUT_PREFIX + "comments.json",
-                objectMapper.writerWithDefaultPrettyPrinter().writeValueAsBytes(serialized)
-            );
+                    OUTPUT_PREFIX + "comments.json",
+                    objectMapper.writerWithDefaultPrettyPrinter().writeValueAsBytes(serialized));
         } catch (JacksonException e) {
             throw new JobPreparationException("Failed to serialize review comments", e);
         }
@@ -353,23 +332,15 @@ public class PullRequestContentSource implements EvidenceSource, ReviewContextBu
     }
 
     private CommentCapture loadComments(long pullRequestId) {
-        var comments = new ArrayList<>(
-            reviewCommentRepository.findRecentByPullRequestIdWithAuthor(
-                pullRequestId,
-                PageRequest.of(0, MAX_COMMENTS + 1)
-            )
-        );
+        var comments = new ArrayList<>(reviewCommentRepository.findRecentByPullRequestIdWithAuthor(
+                pullRequestId, PageRequest.of(0, MAX_COMMENTS + 1)));
         if (comments.size() > MAX_COMMENTS + 1) {
             comments = new ArrayList<>(comments.subList(0, MAX_COMMENTS + 1));
         }
         boolean complete = comments.size() <= MAX_COMMENTS;
         if (!complete) comments.remove(comments.size() - 1);
-        comments.sort(
-            Comparator.comparing(
-                PullRequestReviewComment::getCreatedAt,
-                Comparator.nullsLast(Comparator.naturalOrder())
-            )
-        );
+        comments.sort(Comparator.comparing(
+                PullRequestReviewComment::getCreatedAt, Comparator.nullsLast(Comparator.naturalOrder())));
         return new CommentCapture(comments, complete);
     }
 
@@ -398,11 +369,7 @@ public class PullRequestContentSource implements EvidenceSource, ReviewContextBu
     private record CommentCapture(List<PullRequestReviewComment> comments, boolean complete) {}
 
     private void computeAndStoreDiff(
-        Map<String, byte[]> files,
-        long repositoryId,
-        JsonNode metadata,
-        boolean headVerified
-    ) {
+            Map<String, byte[]> files, long repositoryId, JsonNode metadata, boolean headVerified) {
         String headSha = metadata.has("commit_sha") ? metadata.get("commit_sha").asString() : null;
         if (headSha == null || headSha.isBlank()) {
             throw new JobPreparationException("Cannot compute diff because commit_sha is missing");
@@ -415,20 +382,17 @@ public class PullRequestContentSource implements EvidenceSource, ReviewContextBu
             String[] range = gitDiffOperations.resolveDiffRange(repoPath, targetBranch, sourceBranch, headSha);
             if (range == null) {
                 String reason = headVerified
-                    ? "all resolution strategies failed"
-                    : "the pinned head commit is unavailable after repository refresh";
-                throw new JobPreparationException(
-                    "Cannot compute diff because " +
-                        reason +
-                        ". headSha=" +
-                        headSha +
-                        ", targetBranch=" +
-                        targetBranch +
-                        ", sourceBranch=" +
-                        sourceBranch +
-                        ", repoId=" +
-                        repositoryId
-                );
+                        ? "all resolution strategies failed"
+                        : "the pinned head commit is unavailable after repository refresh";
+                throw new JobPreparationException("Cannot compute diff because " + reason
+                        + ". headSha="
+                        + headSha
+                        + ", targetBranch="
+                        + targetBranch
+                        + ", sourceBranch="
+                        + sourceBranch
+                        + ", repoId="
+                        + repositoryId);
             }
             String diffStat = gitDiffOperations.diffStat(repoPath, range[0], range[1]);
             String diff = gitDiffOperations.diff(repoPath, range[0], range[1]);
@@ -436,16 +400,13 @@ public class PullRequestContentSource implements EvidenceSource, ReviewContextBu
             // empty diff: storing zero bytes would report a change that was never read as AVAILABLE,
             // EMPTY and COMPLETE.
             if (diff == null) {
-                throw new JobPreparationException(
-                    "Diff could not be read for range=" +
-                        range[0] +
-                        ".." +
-                        range[1] +
-                        ", headSha=" +
-                        headSha +
-                        ", repoId=" +
-                        repositoryId
-                );
+                throw new JobPreparationException("Diff could not be read for range=" + range[0]
+                        + ".."
+                        + range[1]
+                        + ", headSha="
+                        + headSha
+                        + ", repoId="
+                        + repositoryId);
             }
             if (!diff.isBlank()) {
                 String annotatedDiff = GitDiffOperations.annotateDiffWithLineNumbers(diff);
@@ -462,16 +423,15 @@ public class PullRequestContentSource implements EvidenceSource, ReviewContextBu
                 }
                 String strategyUsed = range[1].equals(headSha) ? "SHA-based" : "branch-based";
                 log.info(
-                    "Pre-computed diff: strategy={}, range={}..{}, +{}/-{} lines, {} bytes (annotated: {} bytes), headSha={}",
-                    strategyUsed,
-                    range[0],
-                    range[1],
-                    addedLines,
-                    removedLines,
-                    diff.length(),
-                    annotatedDiff.length(),
-                    headSha
-                );
+                        "Pre-computed diff: strategy={}, range={}..{}, +{}/-{} lines, {} bytes (annotated: {} bytes), headSha={}",
+                        strategyUsed,
+                        range[0],
+                        range[1],
+                        addedLines,
+                        removedLines,
+                        diff.length(),
+                        annotatedDiff.length(),
+                        headSha);
             } else {
                 files.put(OUTPUT_PREFIX + "diff.patch", new byte[0]);
                 files.put(OUTPUT_PREFIX + "diff_stat.txt", new byte[0]);
@@ -527,14 +487,13 @@ public class PullRequestContentSource implements EvidenceSource, ReviewContextBu
         summary.append("|---|------|--------|\n");
         for (int i = 0; i < filePaths.size(); i++) {
             int added = countAddedLines(fileDiffs.get(i));
-            summary
-                .append("| ")
-                .append(i + 1)
-                .append(" | `")
-                .append(filePaths.get(i))
-                .append("` | +")
-                .append(added)
-                .append(" |\n");
+            summary.append("| ")
+                    .append(i + 1)
+                    .append(" | `")
+                    .append(filePaths.get(i))
+                    .append("` | +")
+                    .append(added)
+                    .append(" |\n");
         }
 
         // Deliberately an index, not the diffs themselves: this copy carries no [L<n>] line markers, so

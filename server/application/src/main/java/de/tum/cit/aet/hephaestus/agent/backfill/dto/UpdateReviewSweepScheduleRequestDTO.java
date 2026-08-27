@@ -15,15 +15,13 @@ import org.jspecify.annotations.NonNull;
  * The artifact kind is not among them; a schedule for a different kind of work is a different schedule.
  */
 public record UpdateReviewSweepScheduleRequestDTO(
-    @NonNull @NotNull @Schema(description = "How often the sweep runs") ReviewSweepCadence cadence,
-    @NonNull
-    @NotNull
-    @Min(1)
-    @Max(7)
-    @Schema(description = "How far back each sweep looks, in days", example = "2")
-    Integer lookbackDays,
-    @NonNull
-    @NotNull
-    @Schema(description = "Whether the scheduler acts on this row; a disabled schedule keeps its terms")
-    Boolean enabled
-) {}
+        @NonNull @NotNull @Schema(description = "How often the sweep runs")
+        ReviewSweepCadence cadence,
+
+        @NonNull @NotNull @Min(1) @Max(7) @Schema(description = "How far back each sweep looks, in days", example = "2")
+        Integer lookbackDays,
+
+        @NonNull
+        @NotNull
+        @Schema(description = "Whether the scheduler acts on this row; a disabled schedule keeps its terms")
+        Boolean enabled) {}

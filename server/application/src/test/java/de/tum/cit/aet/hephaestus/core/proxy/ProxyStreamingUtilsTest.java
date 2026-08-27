@@ -142,20 +142,16 @@ class ProxyStreamingUtilsTest extends BaseUnitTest {
             HttpHeaders upstreamHeaders = new HttpHeaders();
             upstreamHeaders.setContentType(MediaType.APPLICATION_JSON);
 
-            ClientResponse clientResponse = mockClientResponse(
-                200,
-                upstreamHeaders,
-                MediaType.APPLICATION_JSON,
-                expectedBody
-            );
+            ClientResponse clientResponse =
+                    mockClientResponse(200, upstreamHeaders, MediaType.APPLICATION_JSON, expectedBody);
 
             StepVerifier.create(ProxyStreamingUtils.consumeResponse(clientResponse))
-                .assertNext(result -> {
-                    assertThat(result.status()).isEqualTo(200);
-                    assertThat(result.body()).isEqualTo(expectedBody);
-                    assertThat(result.sseBody()).isNull();
-                })
-                .verifyComplete();
+                    .assertNext(result -> {
+                        assertThat(result.status()).isEqualTo(200);
+                        assertThat(result.body()).isEqualTo(expectedBody);
+                        assertThat(result.sseBody()).isNull();
+                    })
+                    .verifyComplete();
         }
 
         @Test
@@ -170,12 +166,12 @@ class ProxyStreamingUtilsTest extends BaseUnitTest {
             ClientResponse clientResponse = mockClientResponseWithSseFlux(200, upstreamHeaders, sseFlux);
 
             StepVerifier.create(ProxyStreamingUtils.consumeResponse(clientResponse))
-                .assertNext(result -> {
-                    assertThat(result.status()).isEqualTo(200);
-                    assertThat(result.body()).isNull();
-                    assertThat(result.sseBody()).isNotNull();
-                })
-                .verifyComplete();
+                    .assertNext(result -> {
+                        assertThat(result.status()).isEqualTo(200);
+                        assertThat(result.body()).isNull();
+                        assertThat(result.sseBody()).isNotNull();
+                    })
+                    .verifyComplete();
         }
 
         @Test
@@ -186,12 +182,12 @@ class ProxyStreamingUtilsTest extends BaseUnitTest {
             ClientResponse clientResponse = mockClientResponseEmpty(204, upstreamHeaders);
 
             StepVerifier.create(ProxyStreamingUtils.consumeResponse(clientResponse))
-                .assertNext(result -> {
-                    assertThat(result.status()).isEqualTo(204);
-                    assertThat(result.body()).isEmpty();
-                    assertThat(result.sseBody()).isNull();
-                })
-                .verifyComplete();
+                    .assertNext(result -> {
+                        assertThat(result.status()).isEqualTo(204);
+                        assertThat(result.body()).isEmpty();
+                        assertThat(result.sseBody()).isNull();
+                    })
+                    .verifyComplete();
         }
 
         @Test
@@ -202,20 +198,17 @@ class ProxyStreamingUtilsTest extends BaseUnitTest {
             upstreamHeaders.set(HttpHeaders.TRANSFER_ENCODING, "chunked");
             upstreamHeaders.set("X-Request-Id", "abc123");
 
-            ClientResponse clientResponse = mockClientResponse(
-                200,
-                upstreamHeaders,
-                MediaType.APPLICATION_JSON,
-                "{}".getBytes()
-            );
+            ClientResponse clientResponse =
+                    mockClientResponse(200, upstreamHeaders, MediaType.APPLICATION_JSON, "{}".getBytes());
 
             StepVerifier.create(ProxyStreamingUtils.consumeResponse(clientResponse))
-                .assertNext(result -> {
-                    assertThat(result.headers().get(HttpHeaders.CONNECTION)).isNull();
-                    assertThat(result.headers().get(HttpHeaders.TRANSFER_ENCODING)).isNull();
-                    assertThat(result.headers().getFirst("X-Request-Id")).isEqualTo("abc123");
-                })
-                .verifyComplete();
+                    .assertNext(result -> {
+                        assertThat(result.headers().get(HttpHeaders.CONNECTION)).isNull();
+                        assertThat(result.headers().get(HttpHeaders.TRANSFER_ENCODING))
+                                .isNull();
+                        assertThat(result.headers().getFirst("X-Request-Id")).isEqualTo("abc123");
+                    })
+                    .verifyComplete();
         }
 
         @Test
@@ -224,19 +217,15 @@ class ProxyStreamingUtilsTest extends BaseUnitTest {
             HttpHeaders upstreamHeaders = new HttpHeaders();
             upstreamHeaders.setContentType(MediaType.APPLICATION_JSON);
 
-            ClientResponse clientResponse = mockClientResponse(
-                429,
-                upstreamHeaders,
-                MediaType.APPLICATION_JSON,
-                errorBody
-            );
+            ClientResponse clientResponse =
+                    mockClientResponse(429, upstreamHeaders, MediaType.APPLICATION_JSON, errorBody);
 
             StepVerifier.create(ProxyStreamingUtils.consumeResponse(clientResponse))
-                .assertNext(result -> {
-                    assertThat(result.status()).isEqualTo(429);
-                    assertThat(result.body()).isEqualTo(errorBody);
-                })
-                .verifyComplete();
+                    .assertNext(result -> {
+                        assertThat(result.status()).isEqualTo(429);
+                        assertThat(result.body()).isEqualTo(errorBody);
+                    })
+                    .verifyComplete();
         }
 
         @Test
@@ -252,11 +241,11 @@ class ProxyStreamingUtilsTest extends BaseUnitTest {
             ClientResponse clientResponse = mockClientResponseWithSseFlux(200, upstreamHeaders, sseFlux);
 
             StepVerifier.create(ProxyStreamingUtils.consumeResponse(clientResponse))
-                .assertNext(result -> {
-                    assertThat(result.sseBody()).isNotNull();
-                    assertThat(result.body()).isNull();
-                })
-                .verifyComplete();
+                    .assertNext(result -> {
+                        assertThat(result.sseBody()).isNotNull();
+                        assertThat(result.body()).isNull();
+                    })
+                    .verifyComplete();
         }
 
         @Test
@@ -266,19 +255,15 @@ class ProxyStreamingUtilsTest extends BaseUnitTest {
             ClientResponse clientResponse = mockClientResponse(200, upstreamHeaders, null, "plain text".getBytes());
 
             StepVerifier.create(ProxyStreamingUtils.consumeResponse(clientResponse))
-                .assertNext(result -> {
-                    assertThat(result.sseBody()).isNull();
-                    assertThat(result.body()).isEqualTo("plain text".getBytes());
-                })
-                .verifyComplete();
+                    .assertNext(result -> {
+                        assertThat(result.sseBody()).isNull();
+                        assertThat(result.body()).isEqualTo("plain text".getBytes());
+                    })
+                    .verifyComplete();
         }
 
         private ClientResponse mockClientResponse(
-            int status,
-            HttpHeaders headers,
-            @Nullable MediaType contentType,
-            byte[] body
-        ) {
+                int status, HttpHeaders headers, @Nullable MediaType contentType, byte[] body) {
             ClientResponse resp = mock(ClientResponse.class);
             ClientResponse.Headers respHeaders = mock(ClientResponse.Headers.class);
             when(resp.headers()).thenReturn(respHeaders);
@@ -290,10 +275,7 @@ class ProxyStreamingUtilsTest extends BaseUnitTest {
         }
 
         private ClientResponse mockClientResponseWithSseFlux(
-            int status,
-            HttpHeaders headers,
-            Flux<DataBuffer> sseFlux
-        ) {
+                int status, HttpHeaders headers, Flux<DataBuffer> sseFlux) {
             MediaType ct = headers.getContentType() != null ? headers.getContentType() : MediaType.TEXT_EVENT_STREAM;
             ClientResponse resp = mock(ClientResponse.class);
             ClientResponse.Headers respHeaders = mock(ClientResponse.Headers.class);
@@ -420,9 +402,8 @@ class ProxyStreamingUtilsTest extends BaseUnitTest {
             var buf2 = bufferFactory.allocateBuffer(16);
             buf2.write("data: ok2\n\n".getBytes(StandardCharsets.UTF_8));
 
-            Flux<DataBuffer> dataFlux = Flux.just((DataBuffer) buf1, (DataBuffer) buf2).concatWith(
-                Flux.error(new RuntimeException("mid-stream failure"))
-            );
+            Flux<DataBuffer> dataFlux = Flux.just((DataBuffer) buf1, (DataBuffer) buf2)
+                    .concatWith(Flux.error(new RuntimeException("mid-stream failure")));
 
             MockHttpServletResponse response = new MockHttpServletResponse();
             HttpHeaders headers = new HttpHeaders();
@@ -435,9 +416,8 @@ class ProxyStreamingUtilsTest extends BaseUnitTest {
 
         @Test
         void shouldWriteEventsInOrder() throws IOException {
-            Flux<DataBuffer> dataFlux = Flux.range(1, 5).map(i ->
-                bufferFactory.wrap(("data: event-" + i + "\n\n").getBytes(StandardCharsets.UTF_8))
-            );
+            Flux<DataBuffer> dataFlux = Flux.range(1, 5)
+                    .map(i -> bufferFactory.wrap(("data: event-" + i + "\n\n").getBytes(StandardCharsets.UTF_8)));
 
             MockHttpServletResponse response = new MockHttpServletResponse();
             HttpHeaders headers = new HttpHeaders();
@@ -471,15 +451,17 @@ class ProxyStreamingUtilsTest extends BaseUnitTest {
         @DisplayName("the tap sees exactly the bytes the client received")
         void tapObservesEveryChunkTheClientGets() throws IOException {
             Flux<DataBuffer> dataFlux = Flux.just(
-                bufferFactory.wrap("data: one\n\n".getBytes(StandardCharsets.UTF_8)),
-                bufferFactory.wrap("data: two\n\n".getBytes(StandardCharsets.UTF_8))
-            );
+                    bufferFactory.wrap("data: one\n\n".getBytes(StandardCharsets.UTF_8)),
+                    bufferFactory.wrap("data: two\n\n".getBytes(StandardCharsets.UTF_8)));
             MockHttpServletResponse response = new MockHttpServletResponse();
             StringBuilder tapped = new StringBuilder();
 
-            ProxyStreamingUtils.streamSseToResponse(dataFlux, new HttpHeaders(), response, 200, bytes ->
-                tapped.append(new String(bytes, StandardCharsets.UTF_8))
-            );
+            ProxyStreamingUtils.streamSseToResponse(
+                    dataFlux,
+                    new HttpHeaders(),
+                    response,
+                    200,
+                    bytes -> tapped.append(new String(bytes, StandardCharsets.UTF_8)));
 
             assertThat(tapped.toString()).isEqualTo(response.getContentAsString());
             assertThat(tapped.toString()).isEqualTo("data: one\n\ndata: two\n\n");
@@ -489,9 +471,8 @@ class ProxyStreamingUtilsTest extends BaseUnitTest {
         @DisplayName("a tap that throws does not interrupt the stream to the client")
         void aThrowingTapCannotBreakTheStream() throws IOException {
             Flux<DataBuffer> dataFlux = Flux.just(
-                bufferFactory.wrap("data: one\n\n".getBytes(StandardCharsets.UTF_8)),
-                bufferFactory.wrap("data: two\n\n".getBytes(StandardCharsets.UTF_8))
-            );
+                    bufferFactory.wrap("data: one\n\n".getBytes(StandardCharsets.UTF_8)),
+                    bufferFactory.wrap("data: two\n\n".getBytes(StandardCharsets.UTF_8)));
             MockHttpServletResponse response = new MockHttpServletResponse();
 
             ProxyStreamingUtils.streamSseToResponse(dataFlux, new HttpHeaders(), response, 200, bytes -> {
@@ -505,14 +486,17 @@ class ProxyStreamingUtilsTest extends BaseUnitTest {
         @DisplayName("the tap keeps what it saw when the stream errors mid-flight")
         void tapKeepsWhatItSawBeforeAMidStreamError() {
             Flux<DataBuffer> dataFlux = Flux.<DataBuffer>just(
-                bufferFactory.wrap("data: delivered\n\n".getBytes(StandardCharsets.UTF_8))
-            ).concatWith(Flux.error(new RuntimeException("upstream died")));
+                            bufferFactory.wrap("data: delivered\n\n".getBytes(StandardCharsets.UTF_8)))
+                    .concatWith(Flux.error(new RuntimeException("upstream died")));
             MockHttpServletResponse response = new MockHttpServletResponse();
             StringBuilder tapped = new StringBuilder();
 
-            ProxyStreamingUtils.streamSseToResponse(dataFlux, new HttpHeaders(), response, 200, bytes ->
-                tapped.append(new String(bytes, StandardCharsets.UTF_8))
-            );
+            ProxyStreamingUtils.streamSseToResponse(
+                    dataFlux,
+                    new HttpHeaders(),
+                    response,
+                    200,
+                    bytes -> tapped.append(new String(bytes, StandardCharsets.UTF_8)));
 
             assertThat(tapped.toString()).isEqualTo("data: delivered\n\n");
         }

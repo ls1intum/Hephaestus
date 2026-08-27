@@ -69,7 +69,9 @@ public class OutlineClientConfig {
      * <p>Exposed so tests that deserialize real fixtures exercise the exact same policy as the running client.
      */
     public static JsonMapper tolerantMapper(JsonMapper base) {
-        return base.rebuild().configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false).build();
+        return base.rebuild()
+                .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
+                .build();
     }
 
     @Bean
@@ -81,18 +83,18 @@ public class OutlineClientConfig {
         decoder.setMaxInMemorySize(MAX_BUFFER_SIZE);
 
         ExchangeStrategies strategies = ExchangeStrategies.builder()
-            .codecs(config -> {
-                config.defaultCodecs().maxInMemorySize(MAX_BUFFER_SIZE);
-                config.customCodecs().register(new JacksonJsonEncoder(tolerantMapper));
-                config.customCodecs().register(decoder);
-            })
-            .build();
+                .codecs(config -> {
+                    config.defaultCodecs().maxInMemorySize(MAX_BUFFER_SIZE);
+                    config.customCodecs().register(new JacksonJsonEncoder(tolerantMapper));
+                    config.customCodecs().register(decoder);
+                })
+                .build();
 
         return WebClient.builder()
-            .clientConnector(WebClientConnectors.ssrfGuarded())
-            .exchangeStrategies(strategies)
-            .filter(rateLimitTrackingFilter())
-            .build();
+                .clientConnector(WebClientConnectors.ssrfGuarded())
+                .exchangeStrategies(strategies)
+                .filter(rateLimitTrackingFilter())
+                .build();
     }
 
     /**
@@ -100,14 +102,9 @@ public class OutlineClientConfig {
      * origin. A non-blocking {@code doOnNext} side effect — it never alters the response or fails the call.
      */
     private ExchangeFilterFunction rateLimitTrackingFilter() {
-        return (request, next) ->
-            next
-                .exchange(request)
-                .doOnNext(response ->
-                    rateLimitTracker.updateFromHeaders(
+        return (request, next) -> next.exchange(request)
+                .doOnNext(response -> rateLimitTracker.updateFromHeaders(
                         OutlineRateLimitTracker.scopeOf(request.url().toString()),
-                        response.headers().asHttpHeaders()
-                    )
-                );
+                        response.headers().asHttpHeaders()));
     }
 }

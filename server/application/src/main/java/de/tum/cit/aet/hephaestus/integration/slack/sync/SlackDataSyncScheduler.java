@@ -57,14 +57,13 @@ public class SlackDataSyncScheduler {
     private final AsyncTaskExecutor taskExecutor;
 
     public SlackDataSyncScheduler(
-        SlackMonitoredChannelRepository monitoredChannelRepository,
-        SlackChannelMetadataRefresher metadataRefresher,
-        SlackChannelHistorySyncService historySyncService,
-        ConnectionService connectionService,
-        SyncJobService syncJobService,
-        SlackSyncProperties properties,
-        @Qualifier("applicationTaskExecutor") AsyncTaskExecutor taskExecutor
-    ) {
+            SlackMonitoredChannelRepository monitoredChannelRepository,
+            SlackChannelMetadataRefresher metadataRefresher,
+            SlackChannelHistorySyncService historySyncService,
+            ConnectionService connectionService,
+            SyncJobService syncJobService,
+            SlackSyncProperties properties,
+            @Qualifier("applicationTaskExecutor") AsyncTaskExecutor taskExecutor) {
         this.monitoredChannelRepository = monitoredChannelRepository;
         this.metadataRefresher = metadataRefresher;
         this.historySyncService = historySyncService;
@@ -110,37 +109,33 @@ public class SlackDataSyncScheduler {
         Optional<Connection> connection = connectionService.findActive(workspaceId, IntegrationKind.SLACK);
         if (connection.isEmpty()) {
             log.debug(
-                "slack.sync: workspaceId={} has no ACTIVE Slack connection — skipping tick (unrecorded)",
-                workspaceId
-            );
+                    "slack.sync: workspaceId={} has no ACTIVE Slack connection — skipping tick (unrecorded)",
+                    workspaceId);
             return;
         }
         syncJobService.run(
-            new SyncJobRequest(
-                workspaceId,
-                connection.get().getId(),
-                IntegrationKind.SLACK,
-                SyncJobType.RECONCILIATION,
-                SyncJobTrigger.SCHEDULED,
-                null
-            ),
-            handle -> {
-                SlackChannelHistorySyncService.WorkspaceSyncSummary summary = syncWorkspaceNow(workspaceId, handle);
-                // Same reporting as the manual runner — a scheduled reconcile and a hand-triggered one
-                // are the same work, so they must not tell the admin different stories about it.
-                handle.progress(
-                    summary.synced() + summary.skipped(),
-                    summary.channels(),
-                    SlackIntegrationSyncRunner.progressDetail(summary)
-                );
-                if (summary.failed() > 0 || summary.budgetExhausted()) {
-                    handle.reportWarnings();
-                }
-                if (handle.isCancellationRequested()) {
-                    handle.reportCancelled();
-                }
-            }
-        );
+                new SyncJobRequest(
+                        workspaceId,
+                        connection.get().getId(),
+                        IntegrationKind.SLACK,
+                        SyncJobType.RECONCILIATION,
+                        SyncJobTrigger.SCHEDULED,
+                        null),
+                handle -> {
+                    SlackChannelHistorySyncService.WorkspaceSyncSummary summary = syncWorkspaceNow(workspaceId, handle);
+                    // Same reporting as the manual runner — a scheduled reconcile and a hand-triggered one
+                    // are the same work, so they must not tell the admin different stories about it.
+                    handle.progress(
+                            summary.synced() + summary.skipped(),
+                            summary.channels(),
+                            SlackIntegrationSyncRunner.progressDetail(summary));
+                    if (summary.failed() > 0 || summary.budgetExhausted()) {
+                        handle.reportWarnings();
+                    }
+                    if (handle.isCancellationRequested()) {
+                        handle.reportCancelled();
+                    }
+                });
     }
 
     /**
@@ -164,11 +159,10 @@ public class SlackDataSyncScheduler {
                 syncChannelNow(event.workspaceId(), event.slackChannelId());
             } catch (RuntimeException e) {
                 log.warn(
-                    "slack.sync: initial history sync kick failed for workspaceId={} channelId={}: {}",
-                    event.workspaceId(),
-                    event.slackChannelId(),
-                    e.toString()
-                );
+                        "slack.sync: initial history sync kick failed for workspaceId={} channelId={}: {}",
+                        event.workspaceId(),
+                        event.slackChannelId(),
+                        e.toString());
             }
         });
     }
@@ -185,23 +179,19 @@ public class SlackDataSyncScheduler {
     public SlackChannelHistorySyncService.WorkspaceSyncSummary syncChannelNow(long workspaceId, String channelId) {
         if (connectionService.findActive(workspaceId, IntegrationKind.SLACK).isEmpty()) {
             log.debug(
-                "slack.sync: workspaceId={} has no ACTIVE Slack connection — skipping initial channel sync",
-                workspaceId
-            );
+                    "slack.sync: workspaceId={} has no ACTIVE Slack connection — skipping initial channel sync",
+                    workspaceId);
             return SlackChannelHistorySyncService.WorkspaceSyncSummary.notConnected();
         }
-        SlackChannelHistorySyncService.WorkspaceSyncSummary summary = historySyncService.syncChannel(
-            workspaceId,
-            channelId
-        );
+        SlackChannelHistorySyncService.WorkspaceSyncSummary summary =
+                historySyncService.syncChannel(workspaceId, channelId);
         log.info(
-            "slack.sync: initial channel sync workspaceId={} channelId={} synced={} ingested={} requests={}",
-            workspaceId,
-            channelId,
-            summary.synced(),
-            summary.ingested(),
-            summary.requestsUsed()
-        );
+                "slack.sync: initial channel sync workspaceId={} channelId={} synced={} ingested={} requests={}",
+                workspaceId,
+                channelId,
+                summary.synced(),
+                summary.ingested(),
+                summary.requestsUsed());
         return summary;
     }
 
@@ -218,14 +208,10 @@ public class SlackDataSyncScheduler {
     }
 
     public SlackChannelHistorySyncService.WorkspaceSyncSummary syncWorkspaceNow(
-        long workspaceId,
-        @Nullable SyncExecutionHandle handle
-    ) {
+            long workspaceId, @Nullable SyncExecutionHandle handle) {
         if (connectionService.findActive(workspaceId, IntegrationKind.SLACK).isEmpty()) {
             log.debug(
-                "slack.sync: workspaceId={} has no ACTIVE Slack connection — skipping reconciliation",
-                workspaceId
-            );
+                    "slack.sync: workspaceId={} has no ACTIVE Slack connection — skipping reconciliation", workspaceId);
             return SlackChannelHistorySyncService.WorkspaceSyncSummary.notConnected();
         }
         // One BooleanSupplier for both halves of the pass: the metadata refresh runs first and is itself
@@ -235,21 +221,18 @@ public class SlackDataSyncScheduler {
         if (properties.metadataEnabled()) {
             metadataRefresher.refreshWorkspace(workspaceId, cancelled);
         }
-        SlackChannelHistorySyncService.WorkspaceSyncSummary summary = historySyncService.syncWorkspace(
-            workspaceId,
-            cancelled
-        );
+        SlackChannelHistorySyncService.WorkspaceSyncSummary summary =
+                historySyncService.syncWorkspace(workspaceId, cancelled);
         log.info(
-            "slack.sync: workspaceId={} channels={} synced={} skipped={} failed={} ingested={} requests={} budgetExhausted={}",
-            workspaceId,
-            summary.channels(),
-            summary.synced(),
-            summary.skipped(),
-            summary.failed(),
-            summary.ingested(),
-            summary.requestsUsed(),
-            summary.budgetExhausted()
-        );
+                "slack.sync: workspaceId={} channels={} synced={} skipped={} failed={} ingested={} requests={} budgetExhausted={}",
+                workspaceId,
+                summary.channels(),
+                summary.synced(),
+                summary.skipped(),
+                summary.failed(),
+                summary.ingested(),
+                summary.requestsUsed(),
+                summary.budgetExhausted());
         return summary;
     }
 }

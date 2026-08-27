@@ -34,9 +34,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 class SyncJobActiveIndexIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
-    private static final String CREATE_PARTIAL_INDEX =
-        "CREATE UNIQUE INDEX IF NOT EXISTS ux_sync_job_active " +
-        "ON sync_job (connection_id) WHERE status IN ('PENDING', 'RUNNING')";
+    private static final String CREATE_PARTIAL_INDEX = "CREATE UNIQUE INDEX IF NOT EXISTS ux_sync_job_active "
+            + "ON sync_job (connection_id) WHERE status IN ('PENDING', 'RUNNING')";
 
     @Autowired
     private SyncJobService syncJobService;
@@ -63,20 +62,16 @@ class SyncJobActiveIndexIntegrationTest extends AbstractWorkspaceIntegrationTest
 
         User owner = persistUser("sync-index-owner-" + System.nanoTime());
         workspace = createWorkspace(
-            "sync-index-ws-" + System.nanoTime(),
-            "Sync Active Index Test",
-            "sync-index-org",
-            AccountType.ORG,
-            owner
-        );
-        connection = connectionRepository.save(
-            new Connection(
+                "sync-index-ws-" + System.nanoTime(),
+                "Sync Active Index Test",
+                "sync-index-org",
+                AccountType.ORG,
+                owner);
+        connection = connectionRepository.save(new Connection(
                 workspace,
                 IntegrationKind.GITHUB,
                 "200",
-                new ConnectionConfig.GitHubAppConfig(200L, "sync-index-org", null, Set.of())
-            )
-        );
+                new ConnectionConfig.GitHubAppConfig(200L, "sync-index-org", null, Set.of())));
         connection.setState(IntegrationState.ACTIVE);
         connection = connectionRepository.save(connection);
     }
@@ -89,22 +84,17 @@ class SyncJobActiveIndexIntegrationTest extends AbstractWorkspaceIntegrationTest
 
     @Test
     void partialIndex_rejectsSecondActiveRowForSameConnection_atDbLevel() {
-        syncJobRepository.saveAndFlush(
-            new SyncJob(workspace, connection, IntegrationKind.GITHUB, SyncJobType.INITIAL, SyncJobTrigger.MANUAL, null)
-        );
+        syncJobRepository.saveAndFlush(new SyncJob(
+                workspace, connection, IntegrationKind.GITHUB, SyncJobType.INITIAL, SyncJobTrigger.MANUAL, null));
 
-        assertThatThrownBy(() ->
-            syncJobRepository.saveAndFlush(
-                new SyncJob(
-                    workspace,
-                    connection,
-                    IntegrationKind.GITHUB,
-                    SyncJobType.RECONCILIATION,
-                    SyncJobTrigger.MANUAL,
-                    null
-                )
-            )
-        ).isInstanceOf(DataIntegrityViolationException.class);
+        assertThatThrownBy(() -> syncJobRepository.saveAndFlush(new SyncJob(
+                        workspace,
+                        connection,
+                        IntegrationKind.GITHUB,
+                        SyncJobType.RECONCILIATION,
+                        SyncJobTrigger.MANUAL,
+                        null)))
+                .isInstanceOf(DataIntegrityViolationException.class);
     }
 
     @Test
@@ -119,28 +109,23 @@ class SyncJobActiveIndexIntegrationTest extends AbstractWorkspaceIntegrationTest
         try {
             List<Future<?>> futures = new java.util.ArrayList<>();
             for (int i = 0; i < threads; i++) {
-                futures.add(
-                    pool.submit(() -> {
-                        try {
-                            barrier.await(5, TimeUnit.SECONDS);
-                            syncJobService.beginJob(
-                                new SyncJobRequest(
-                                    workspace.getId(),
-                                    connection.getId(),
-                                    IntegrationKind.GITHUB,
-                                    SyncJobType.RECONCILIATION,
-                                    SyncJobTrigger.MANUAL,
-                                    null
-                                )
-                            );
-                            successes.incrementAndGet();
-                        } catch (SyncJobConflictException e) {
-                            conflicts.incrementAndGet();
-                        } catch (Throwable t) {
-                            unexpected.add(t);
-                        }
-                    })
-                );
+                futures.add(pool.submit(() -> {
+                    try {
+                        barrier.await(5, TimeUnit.SECONDS);
+                        syncJobService.beginJob(new SyncJobRequest(
+                                workspace.getId(),
+                                connection.getId(),
+                                IntegrationKind.GITHUB,
+                                SyncJobType.RECONCILIATION,
+                                SyncJobTrigger.MANUAL,
+                                null));
+                        successes.incrementAndGet();
+                    } catch (SyncJobConflictException e) {
+                        conflicts.incrementAndGet();
+                    } catch (Throwable t) {
+                        unexpected.add(t);
+                    }
+                }));
             }
             for (Future<?> f : futures) {
                 f.get(10, TimeUnit.SECONDS);
@@ -150,20 +135,21 @@ class SyncJobActiveIndexIntegrationTest extends AbstractWorkspaceIntegrationTest
         }
 
         assertThat(unexpected)
-            .as("no DataIntegrityViolationException or other 500-class error should escape beginJob")
-            .isEmpty();
-        assertThat(successes.get()).as("exactly one concurrent trigger created a job").isEqualTo(1);
-        assertThat(conflicts.get()).as("the other concurrent trigger was absorbed as a conflict").isEqualTo(1);
+                .as("no DataIntegrityViolationException or other 500-class error should escape beginJob")
+                .isEmpty();
+        assertThat(successes.get())
+                .as("exactly one concurrent trigger created a job")
+                .isEqualTo(1);
+        assertThat(conflicts.get())
+                .as("the other concurrent trigger was absorbed as a conflict")
+                .isEqualTo(1);
 
         long activeRows = syncJobRepository
-            .findByConnection_IdAndWorkspace_Id(
-                connection.getId(),
-                workspace.getId(),
-                org.springframework.data.domain.Pageable.unpaged()
-            )
-            .stream()
-            .filter(j -> SyncJobStatus.ACTIVE.contains(j.getStatus()))
-            .count();
+                .findByConnection_IdAndWorkspace_Id(
+                        connection.getId(), workspace.getId(), org.springframework.data.domain.Pageable.unpaged())
+                .stream()
+                .filter(j -> SyncJobStatus.ACTIVE.contains(j.getStatus()))
+                .count();
         assertThat(activeRows).isEqualTo(1);
     }
 
@@ -171,26 +157,24 @@ class SyncJobActiveIndexIntegrationTest extends AbstractWorkspaceIntegrationTest
     void adminDisconnectRefusesToCrossLifecycleBoundaryWhileSyncJobIsActive() {
         SyncJob active = activeJob();
 
-        assertThatThrownBy(() ->
-            connectionService.disconnect(
-                connection,
-                new ConnectionService.TransitionRequest(
-                    IntegrationState.UNINSTALLED,
-                    "DISCONNECT",
-                    "ADMIN",
-                    "test-admin",
-                    "disconnect-race-test",
-                    "disconnect"
-                ),
-                () -> {}
-            )
-        )
-            .isInstanceOf(ConnectionBusyException.class)
-            .hasMessageContaining("active sync job");
+        assertThatThrownBy(() -> connectionService.disconnect(
+                        connection,
+                        new ConnectionService.TransitionRequest(
+                                IntegrationState.UNINSTALLED,
+                                "DISCONNECT",
+                                "ADMIN",
+                                "test-admin",
+                                "disconnect-race-test",
+                                "disconnect"),
+                        () -> {}))
+                .isInstanceOf(ConnectionBusyException.class)
+                .hasMessageContaining("active sync job");
 
-        assertThat(connectionRepository.findById(connection.getId()).orElseThrow().getState()).isEqualTo(
-            IntegrationState.ACTIVE
-        );
+        assertThat(connectionRepository
+                        .findById(connection.getId())
+                        .orElseThrow()
+                        .getState())
+                .isEqualTo(IntegrationState.ACTIVE);
         SyncJob afterFence = syncJobRepository.findById(active.getId()).orElseThrow();
         assertThat(afterFence.getStatus()).isEqualTo(SyncJobStatus.PENDING);
         // The escape hatch, proven against real Postgres: the 409 rolls back the transition but NOT the
@@ -207,82 +191,65 @@ class SyncJobActiveIndexIntegrationTest extends AbstractWorkspaceIntegrationTest
         SyncJob active = activeJob();
 
         connectionService.transition(
-            connection,
-            new ConnectionService.TransitionRequest(
-                IntegrationState.UNINSTALLED,
-                "WORKSPACE_PURGED",
-                "SYSTEM",
-                "workspace-purge",
-                "purge-with-active-job",
-                "Cascade from workspace PURGE"
-            )
-        );
+                connection,
+                new ConnectionService.TransitionRequest(
+                        IntegrationState.UNINSTALLED,
+                        "WORKSPACE_PURGED",
+                        "SYSTEM",
+                        "workspace-purge",
+                        "purge-with-active-job",
+                        "Cascade from workspace PURGE"));
 
-        assertThat(connectionRepository.findById(connection.getId()).orElseThrow().getState()).isEqualTo(
-            IntegrationState.UNINSTALLED
-        );
+        assertThat(connectionRepository
+                        .findById(connection.getId())
+                        .orElseThrow()
+                        .getState())
+                .isEqualTo(IntegrationState.UNINSTALLED);
         // The job is left to fail on its own terms rather than blocking the erasure.
-        assertThat(syncJobRepository.findById(active.getId()).orElseThrow().getStatus()).isEqualTo(
-            SyncJobStatus.PENDING
-        );
+        assertThat(syncJobRepository.findById(active.getId()).orElseThrow().getStatus())
+                .isEqualTo(SyncJobStatus.PENDING);
     }
 
     private SyncJob activeJob() {
-        return syncJobRepository.saveAndFlush(
-            new SyncJob(
+        return syncJobRepository.saveAndFlush(new SyncJob(
                 workspace,
                 connection,
                 IntegrationKind.GITHUB,
                 SyncJobType.RECONCILIATION,
                 SyncJobTrigger.MANUAL,
-                null
-            )
-        );
+                null));
     }
 
     @Test
     @Transactional
     void terminalTransition_isCompareAndSet_andPersistsProgressJson() {
-        SyncJob job = syncJobRepository.saveAndFlush(
-            new SyncJob(
+        SyncJob job = syncJobRepository.saveAndFlush(new SyncJob(
                 workspace,
                 connection,
                 IntegrationKind.GITHUB,
                 SyncJobType.RECONCILIATION,
                 SyncJobTrigger.MANUAL,
-                null
-            )
-        );
+                null));
         assertThat(syncJobRepository.markRunning(job.getId())).isEqualTo(1);
 
         int completed = syncJobRepository.completeActiveJob(
-            job.getId(),
-            SyncJobStatus.SUCCEEDED_WITH_WARNINGS,
-            null,
-            3,
-            5,
-            Map.of("warnings", 1),
-            SyncJobStatus.ACTIVE
-        );
+                job.getId(),
+                SyncJobStatus.SUCCEEDED_WITH_WARNINGS,
+                null,
+                3,
+                5,
+                Map.of("warnings", 1),
+                SyncJobStatus.ACTIVE);
 
         assertThat(completed).isEqualTo(1);
         SyncJob persisted = syncJobRepository.findById(job.getId()).orElseThrow();
         assertThat(persisted.getStatus()).isEqualTo(SyncJobStatus.SUCCEEDED_WITH_WARNINGS);
         assertThat(persisted.getProgress()).containsEntry("warnings", 1);
-        assertThat(
-            syncJobRepository.completeActiveJob(
-                job.getId(),
-                SyncJobStatus.FAILED,
-                "late writer",
-                0,
-                5,
-                Map.of(),
-                SyncJobStatus.ACTIVE
-            )
-        ).isZero();
-        assertThat(syncJobRepository.findById(job.getId()).orElseThrow().getStatus()).isEqualTo(
-            SyncJobStatus.SUCCEEDED_WITH_WARNINGS
-        );
+        assertThat(syncJobRepository.completeActiveJob(
+                        job.getId(), SyncJobStatus.FAILED, "late writer", 0, 5, Map.of(), SyncJobStatus.ACTIVE))
+                .isZero();
+        assertThat(syncJobRepository.findById(job.getId()).orElseThrow().getStatus())
+                .isEqualTo(SyncJobStatus.SUCCEEDED_WITH_WARNINGS);
     }
 
     /**
@@ -295,28 +262,19 @@ class SyncJobActiveIndexIntegrationTest extends AbstractWorkspaceIntegrationTest
     @Test
     @Transactional
     void terminalTransition_ignoresACancelRequestTheRunnerNeverHonored() {
-        SyncJob job = syncJobRepository.saveAndFlush(
-            new SyncJob(
+        SyncJob job = syncJobRepository.saveAndFlush(new SyncJob(
                 workspace,
                 connection,
                 IntegrationKind.GITHUB,
                 SyncJobType.RECONCILIATION,
                 SyncJobTrigger.MANUAL,
-                null
-            )
-        );
+                null));
         assertThat(syncJobRepository.markRunning(job.getId())).isEqualTo(1);
-        assertThat(syncJobRepository.markCancelRequested(job.getId(), SyncJobStatus.ACTIVE)).isEqualTo(1);
+        assertThat(syncJobRepository.markCancelRequested(job.getId(), SyncJobStatus.ACTIVE))
+                .isEqualTo(1);
 
         int completed = syncJobRepository.completeActiveJob(
-            job.getId(),
-            SyncJobStatus.SUCCEEDED,
-            null,
-            10,
-            10,
-            Map.of(),
-            SyncJobStatus.ACTIVE
-        );
+                job.getId(), SyncJobStatus.SUCCEEDED, null, 10, 10, Map.of(), SyncJobStatus.ACTIVE);
 
         assertThat(completed).isEqualTo(1);
         SyncJob persisted = syncJobRepository.findById(job.getId()).orElseThrow();
@@ -334,44 +292,34 @@ class SyncJobActiveIndexIntegrationTest extends AbstractWorkspaceIntegrationTest
     @Test
     @Transactional
     void lateCompletion_cannotOverwriteAlreadyTerminalRow() {
-        SyncJob job = syncJobRepository.saveAndFlush(
-            new SyncJob(
+        SyncJob job = syncJobRepository.saveAndFlush(new SyncJob(
                 workspace,
                 connection,
                 IntegrationKind.GITHUB,
                 SyncJobType.RECONCILIATION,
                 SyncJobTrigger.MANUAL,
-                null
-            )
-        );
+                null));
         assertThat(syncJobRepository.markRunning(job.getId())).isEqualTo(1);
 
         // The real winner completes the row.
-        assertThat(
-            syncJobRepository.completeActiveJob(
-                job.getId(),
-                SyncJobStatus.SUCCEEDED,
-                null,
-                8,
-                8,
-                Map.of(),
-                SyncJobStatus.ACTIVE
-            )
-        ).isEqualTo(1);
+        assertThat(syncJobRepository.completeActiveJob(
+                        job.getId(), SyncJobStatus.SUCCEEDED, null, 8, 8, Map.of(), SyncJobStatus.ACTIVE))
+                .isEqualTo(1);
 
         // A stale/late writer tries to complete the same row again — it must not match, and must not
         // rewrite the terminal outcome.
         int lateWrite = syncJobRepository.completeActiveJob(
-            job.getId(),
-            SyncJobStatus.FAILED,
-            "stale late completion",
-            0,
-            8,
-            Map.of("late", true),
-            SyncJobStatus.ACTIVE
-        );
+                job.getId(),
+                SyncJobStatus.FAILED,
+                "stale late completion",
+                0,
+                8,
+                Map.of("late", true),
+                SyncJobStatus.ACTIVE);
 
-        assertThat(lateWrite).as("a late completion must not match an already-terminal row").isZero();
+        assertThat(lateWrite)
+                .as("a late completion must not match an already-terminal row")
+                .isZero();
         SyncJob persisted = syncJobRepository.findById(job.getId()).orElseThrow();
         assertThat(persisted.getStatus()).isEqualTo(SyncJobStatus.SUCCEEDED);
         assertThat(persisted.getErrorSummary()).isNull();
@@ -381,23 +329,23 @@ class SyncJobActiveIndexIntegrationTest extends AbstractWorkspaceIntegrationTest
     @Test
     @Transactional
     void reaperUpdate_rechecksLeaseAfterSelectingCandidate() {
-        SyncJob job = syncJobRepository.saveAndFlush(
-            new SyncJob(
+        SyncJob job = syncJobRepository.saveAndFlush(new SyncJob(
                 workspace,
                 connection,
                 IntegrationKind.GITHUB,
                 SyncJobType.RECONCILIATION,
                 SyncJobTrigger.MANUAL,
-                null
-            )
-        );
+                null));
         assertThat(syncJobRepository.markRunning(job.getId())).isEqualTo(1);
         jdbcTemplate.update("UPDATE sync_job SET heartbeat_at = now() - interval '1 hour' WHERE id = ?", job.getId());
-        assertThat(syncJobRepository.findAbandoned(900)).extracting(SyncJob::getId).contains(job.getId());
+        assertThat(syncJobRepository.findAbandoned(900))
+                .extracting(SyncJob::getId)
+                .contains(job.getId());
 
         jdbcTemplate.update("UPDATE sync_job SET heartbeat_at = now() WHERE id = ?", job.getId());
 
         assertThat(syncJobRepository.markAbandoned(job.getId(), "stale", 900)).isZero();
-        assertThat(syncJobRepository.findById(job.getId()).orElseThrow().getStatus()).isEqualTo(SyncJobStatus.RUNNING);
+        assertThat(syncJobRepository.findById(job.getId()).orElseThrow().getStatus())
+                .isEqualTo(SyncJobStatus.RUNNING);
     }
 }

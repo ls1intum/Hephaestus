@@ -6,8 +6,4 @@ import org.jspecify.annotations.NonNull;
 
 @Schema(description = "A page of visible review runs")
 public record PracticeGroupReviewRunsPageDTO(
-    @NonNull List<PracticeGroupReviewRunDTO> content,
-    int page,
-    int size,
-    boolean hasNext
-) {}
+        @NonNull List<PracticeGroupReviewRunDTO> content, int page, int size, boolean hasNext) {}

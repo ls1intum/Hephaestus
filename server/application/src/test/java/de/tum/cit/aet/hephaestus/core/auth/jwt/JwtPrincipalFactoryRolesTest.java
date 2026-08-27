@@ -24,11 +24,8 @@ class JwtPrincipalFactoryRolesTest extends BaseUnitTest {
     private final AccountRepository accountRepository = mock(AccountRepository.class);
     private final IdentityLinkRepository identityLinkRepository = mock(IdentityLinkRepository.class);
     private final AccountFeatureRepository featureRepository = mock(AccountFeatureRepository.class);
-    private final JwtPrincipalFactory factory = new JwtPrincipalFactory(
-        accountRepository,
-        identityLinkRepository,
-        featureRepository
-    );
+    private final JwtPrincipalFactory factory =
+            new JwtPrincipalFactory(accountRepository, identityLinkRepository, featureRepository);
 
     private Account active(long id, Account.AppRole role) {
         when(featureRepository.findFlagsByAccountId(any())).thenReturn(List.of());
@@ -42,8 +39,8 @@ class JwtPrincipalFactoryRolesTest extends BaseUnitTest {
     @Test
     void appAdminGetsNamespacedAppAdminAuthorityNotLegacyAdmin() {
         assertThat(factory.forAccount(active(1L, Account.AppRole.APP_ADMIN)).roles())
-            .contains("app_admin")
-            .doesNotContain("admin");
+                .contains("app_admin")
+                .doesNotContain("admin");
     }
 
     @Test

@@ -31,10 +31,9 @@ public class PracticeReviewSettingsController {
     @GetMapping
     @Operation(summary = "Get the workspace's practice-review policy")
     @ApiResponse(
-        responseCode = "200",
-        description = "Policy returned",
-        content = @Content(schema = @Schema(implementation = PracticeReviewSettingsDTO.class))
-    )
+            responseCode = "200",
+            description = "Policy returned",
+            content = @Content(schema = @Schema(implementation = PracticeReviewSettingsDTO.class)))
     @RequireAtLeastWorkspaceAdmin
     public ResponseEntity<PracticeReviewSettingsDTO> getPracticeReviewSettings(WorkspaceContext workspaceContext) {
         return ResponseEntity.ok(practiceReviewSettingsService.getSettings(workspaceContext));
@@ -43,16 +42,13 @@ public class PracticeReviewSettingsController {
     @PatchMapping
     @Operation(summary = "Update the workspace's practice-review policy")
     @ApiResponse(
-        responseCode = "200",
-        description = "Policy updated",
-        content = @Content(schema = @Schema(implementation = PracticeReviewSettingsDTO.class))
-    )
+            responseCode = "200",
+            description = "Policy updated",
+            content = @Content(schema = @Schema(implementation = PracticeReviewSettingsDTO.class)))
     @RequireAtLeastWorkspaceAdmin
     @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "PRACTICE_REVIEW_SETTINGS")
     public ResponseEntity<PracticeReviewSettingsDTO> updatePracticeReviewSettings(
-        WorkspaceContext workspaceContext,
-        @Valid @RequestBody UpdatePracticeReviewSettingsRequestDTO request
-    ) {
+            WorkspaceContext workspaceContext, @Valid @RequestBody UpdatePracticeReviewSettingsRequestDTO request) {
         return ResponseEntity.ok(practiceReviewSettingsService.updatePracticeReview(workspaceContext, request));
     }
 }

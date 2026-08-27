@@ -46,13 +46,12 @@ public class ProxyUsageAccumulator {
         UUID jobId = attempt.sourceId();
         try {
             int rows = agentJobRepository.accumulateLlmUsage(
-                jobId,
-                attempt.number(),
-                usage.billableInputTokens(),
-                usage.outputTokens(),
-                usage.reasoningTokens(),
-                usage.cacheReadTokens()
-            );
+                    jobId,
+                    attempt.number(),
+                    usage.billableInputTokens(),
+                    usage.outputTokens(),
+                    usage.reasoningTokens(),
+                    usage.cacheReadTokens());
             if (rows == 0) {
                 recordSuperseded(attempt);
             }
@@ -69,11 +68,10 @@ public class ProxyUsageAccumulator {
      */
     private void recordSuperseded(BilledAttempt attempt) {
         log.warn(
-            "Dropping proxy usage from a superseded attempt — job {} is no longer running attempt {}; " +
-                "this call goes unbilled rather than being charged to whoever owns the row now",
-            attempt.sourceId(),
-            attempt.number()
-        );
+                "Dropping proxy usage from a superseded attempt — job {} is no longer running attempt {}; "
+                        + "this call goes unbilled rather than being charged to whoever owns the row now",
+                attempt.sourceId(),
+                attempt.number());
         meterRegistry.counter("llm.proxy.usage.accumulate.superseded").increment();
     }
 }

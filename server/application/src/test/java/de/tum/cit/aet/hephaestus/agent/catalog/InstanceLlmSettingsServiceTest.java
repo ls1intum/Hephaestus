@@ -46,25 +46,23 @@ class InstanceLlmSettingsServiceTest extends BaseUnitTest {
             InstanceLlmSettings existing = new InstanceLlmSettings();
             existing.setAllowWorkspaceConnections(true);
             when(llmSettingsAuditProvider.getIfAvailable()).thenReturn(llmSettingsAudit);
-            when(settingsRepository.findByIdForUpdate(InstanceLlmSettingsService.SINGLETON_ID)).thenReturn(
-                Optional.of(existing)
-            );
+            when(settingsRepository.findByIdForUpdate(InstanceLlmSettingsService.SINGLETON_ID))
+                    .thenReturn(Optional.of(existing));
             when(settingsRepository.save(any(InstanceLlmSettings.class))).thenAnswer(inv -> inv.getArgument(0));
 
-            InstanceLlmSettings saved = settingsService.update(
-                new UpdateInstanceLlmSettingsRequestDTO("api.openai.com", null)
-            );
+            InstanceLlmSettings saved =
+                    settingsService.update(new UpdateInstanceLlmSettingsRequestDTO("api.openai.com", null));
 
             assertThat(saved.getAllowedEgressHosts()).isEqualTo("api.openai.com");
             assertThat(saved.isAllowWorkspaceConnections())
-                .as("a patch that omits the flag must leave it alone")
-                .isTrue();
+                    .as("a patch that omits the flag must leave it alone")
+                    .isTrue();
 
             ArgumentCaptor<Boolean> audited = ArgumentCaptor.forClass(Boolean.class);
             verify(llmSettingsAudit).settingsChanged(audited.capture());
             assertThat(audited.getValue())
-                .as("the audit trail records the state the instance is now in")
-                .isEqualTo(saved.isAllowWorkspaceConnections());
+                    .as("the audit trail records the state the instance is now in")
+                    .isEqualTo(saved.isAllowWorkspaceConnections());
         }
 
         @Test
@@ -72,9 +70,8 @@ class InstanceLlmSettingsServiceTest extends BaseUnitTest {
             // The worker/webhook shape: LlmSettingsAudit's sole impl is @ConditionalOnServerRole, so a
             // role that still loads this (ungated) service must degrade to "no audit" rather than NPE.
             when(llmSettingsAuditProvider.getIfAvailable()).thenReturn(null);
-            when(settingsRepository.findByIdForUpdate(InstanceLlmSettingsService.SINGLETON_ID)).thenReturn(
-                Optional.of(new InstanceLlmSettings())
-            );
+            when(settingsRepository.findByIdForUpdate(InstanceLlmSettingsService.SINGLETON_ID))
+                    .thenReturn(Optional.of(new InstanceLlmSettings()));
             when(settingsRepository.save(any(InstanceLlmSettings.class))).thenAnswer(inv -> inv.getArgument(0));
 
             InstanceLlmSettings result = settingsService.update(request());

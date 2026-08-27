@@ -27,24 +27,22 @@ public interface ActivityRecorder {
      * @see de.tum.cit.aet.hephaestus.activity.ActivityEventService#record(Long, ActivityEventType, Instant, User, Repository, ActivityTargetType, Long, double)
      */
     boolean record(
-        Long workspaceId,
-        ActivityEventType eventType,
-        Instant occurredAt,
-        @Nullable User actor,
-        @Nullable Repository repository,
-        ActivityTargetType targetType,
-        Long targetId,
-        double xp
-    );
+            Long workspaceId,
+            ActivityEventType eventType,
+            Instant occurredAt,
+            @Nullable User actor,
+            @Nullable Repository repository,
+            ActivityTargetType targetType,
+            Long targetId,
+            double xp);
 
     /**
      * @see de.tum.cit.aet.hephaestus.activity.ActivityEventService#recordDeleted(Long, ActivityEventType, Instant, ActivityTargetType, Long)
      */
     boolean recordDeleted(
-        Long workspaceId,
-        ActivityEventType eventType,
-        Instant occurredAt,
-        ActivityTargetType targetType,
-        Long targetId
-    );
+            Long workspaceId,
+            ActivityEventType eventType,
+            Instant occurredAt,
+            ActivityTargetType targetType,
+            Long targetId);
 }

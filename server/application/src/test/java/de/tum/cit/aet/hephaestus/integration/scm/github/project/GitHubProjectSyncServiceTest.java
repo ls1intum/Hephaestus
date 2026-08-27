@@ -36,16 +36,11 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHPageInfo
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHProjectV2;
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHProjectV2Connection;
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHProjectV2Field;
-import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHProjectV2FieldConfigurationConnection;
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHProjectV2Item;
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHProjectV2ItemConnection;
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHProjectV2ItemFieldTextValue;
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHProjectV2ItemFieldValueConnection;
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHProjectV2ItemType;
-import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHProjectV2StatusUpdateConnection;
-import de.tum.cit.aet.hephaestus.integration.scm.github.project.Project;
-import de.tum.cit.aet.hephaestus.integration.scm.github.project.ProjectItem;
-import de.tum.cit.aet.hephaestus.integration.scm.github.project.ProjectRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.github.project.dto.GitHubProjectDTO;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.math.BigInteger;
@@ -130,62 +125,59 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
     @BeforeEach
     void setUp() {
         syncProperties = new GitHubSyncProperties(
-            Duration.ofSeconds(30), // graphqlTimeout
-            Duration.ofSeconds(60), // extendedGraphqlTimeout
-            Duration.ofSeconds(120), // backfillGraphqlTimeout
-            Duration.ZERO, // paginationThrottle - zero to avoid Thread.sleep
-            true, // incrementalSyncEnabled
-            Duration.ofMinutes(5), // incrementalSyncBuffer
-            10 // backfillPrPageSize
-        );
+                Duration.ofSeconds(30), // graphqlTimeout
+                Duration.ofSeconds(60), // extendedGraphqlTimeout
+                Duration.ofSeconds(120), // backfillGraphqlTimeout
+                Duration.ZERO, // paginationThrottle - zero to avoid Thread.sleep
+                true, // incrementalSyncEnabled
+                Duration.ofMinutes(5), // incrementalSyncBuffer
+                10 // backfillPrPageSize
+                );
 
         syncSchedulerProperties = new SyncSchedulerProperties(
-            true, // runOnStartup
-            7, // timeframeDays
-            "0 0 3 * * *", // cron
-            15, // cooldownMinutes
-            new BackfillProperties(false, 50, 100, 60),
-            new FilterProperties(Set.of(), Set.of(), Set.of()), // empty = all allowed
-            null,
-            new SyncSchedulerProperties.ProjectsProperties(true) // projects enabled for these tests
-        );
+                true, // runOnStartup
+                7, // timeframeDays
+                "0 0 3 * * *", // cron
+                15, // cooldownMinutes
+                new BackfillProperties(false, 50, 100, 60),
+                new FilterProperties(Set.of(), Set.of(), Set.of()), // empty = all allowed
+                null,
+                new SyncSchedulerProperties.ProjectsProperties(true) // projects enabled for these tests
+                );
 
         // TransactionTemplate mocking: execute callbacks immediately
+        lenient().when(transactionTemplate.execute(any())).thenAnswer(invocation -> {
+            TransactionCallback<?> callback = invocation.getArgument(0);
+            return callback.doInTransaction(mock(TransactionStatus.class));
+        });
         lenient()
-            .when(transactionTemplate.execute(any()))
-            .thenAnswer(invocation -> {
-                TransactionCallback<?> callback = invocation.getArgument(0);
-                return callback.doInTransaction(mock(TransactionStatus.class));
-            });
-        lenient()
-            .doAnswer(invocation -> {
-                Consumer<TransactionStatus> callback = invocation.getArgument(0);
-                callback.accept(mock(TransactionStatus.class));
-                return null;
-            })
-            .when(transactionTemplate)
-            .executeWithoutResult(any());
+                .doAnswer(invocation -> {
+                    Consumer<TransactionStatus> callback = invocation.getArgument(0);
+                    callback.accept(mock(TransactionStatus.class));
+                    return null;
+                })
+                .when(transactionTemplate)
+                .executeWithoutResult(any());
         lenient().when(transactionTemplate.getTransactionManager()).thenReturn(transactionManager);
 
         // Default exception classifier stub to prevent NPEs on unexpected exceptions
         lenient()
-            .when(exceptionClassifier.classifyWithDetails(any()))
-            .thenReturn(ClassificationResult.of(Category.UNKNOWN, "test error"));
+                .when(exceptionClassifier.classifyWithDetails(any()))
+                .thenReturn(ClassificationResult.of(Category.UNKNOWN, "test error"));
 
         service = new GitHubProjectSyncService(
-            projectRepository,
-            organizationRepository,
-            graphQlClientProvider,
-            projectProcessor,
-            itemProcessor,
-            statusUpdateProcessor,
-            fieldValueSyncService,
-            backfillStateProvider,
-            transactionTemplate,
-            syncProperties,
-            syncSchedulerProperties,
-            exceptionClassifier
-        );
+                projectRepository,
+                organizationRepository,
+                graphQlClientProvider,
+                projectProcessor,
+                itemProcessor,
+                statusUpdateProcessor,
+                fieldValueSyncService,
+                backfillStateProvider,
+                transactionTemplate,
+                syncProperties,
+                syncSchedulerProperties,
+                exceptionClassifier);
     }
 
     // Helper methods
@@ -303,9 +295,8 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
 
         @Test
         void shouldReturnCompletedZeroWhenOrganizationNotFound() {
-            when(
-                organizationRepository.findByLoginIgnoreCaseAndProvider_Type(ORG_LOGIN, IdentityProviderType.GITHUB)
-            ).thenReturn(Optional.empty());
+            when(organizationRepository.findByLoginIgnoreCaseAndProvider_Type(ORG_LOGIN, IdentityProviderType.GITHUB))
+                    .thenReturn(Optional.empty());
 
             SyncResult result = service.syncProjectsForOrganization(SCOPE_ID, ORG_LOGIN);
 
@@ -316,9 +307,8 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
         @Test
         void shouldSyncSinglePageOfProjectsSuccessfully() {
             Organization org = createOrganization();
-            when(
-                organizationRepository.findByLoginIgnoreCaseAndProvider_Type(ORG_LOGIN, IdentityProviderType.GITHUB)
-            ).thenReturn(Optional.of(org));
+            when(organizationRepository.findByLoginIgnoreCaseAndProvider_Type(ORG_LOGIN, IdentityProviderType.GITHUB))
+                    .thenReturn(Optional.of(org));
             mockGraphQlClientForScope();
             mockGraphQlRequestChain("GetOrganizationProjects");
 
@@ -329,35 +319,32 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
 
             Project processedProject = createProject(100L, "PVT_node1", 1);
             when(projectRepository.findById(100L)).thenReturn(Optional.empty());
-            when(
-                projectProcessor.process(
-                    any(GitHubProjectDTO.class),
-                    eq(Project.OwnerType.ORGANIZATION),
-                    eq(ORG_DB_ID),
-                    any(ProcessingContext.class)
-                )
-            ).thenReturn(processedProject);
+            when(projectProcessor.process(
+                            any(GitHubProjectDTO.class),
+                            eq(Project.OwnerType.ORGANIZATION),
+                            eq(ORG_DB_ID),
+                            any(ProcessingContext.class)))
+                    .thenReturn(processedProject);
             when(projectRepository.save(any(Project.class))).thenReturn(processedProject);
 
             SyncResult result = service.syncProjectsForOrganization(SCOPE_ID, ORG_LOGIN);
 
             assertThat(result.status()).isEqualTo(SyncResult.Status.COMPLETED);
             assertThat(result.count()).isEqualTo(1);
-            verify(projectProcessor).process(
-                any(GitHubProjectDTO.class),
-                eq(Project.OwnerType.ORGANIZATION),
-                eq(ORG_DB_ID),
-                any(ProcessingContext.class)
-            );
+            verify(projectProcessor)
+                    .process(
+                            any(GitHubProjectDTO.class),
+                            eq(Project.OwnerType.ORGANIZATION),
+                            eq(ORG_DB_ID),
+                            any(ProcessingContext.class));
             verify(projectRepository).save(any(Project.class));
         }
 
         @Test
         void shouldSkipProjectsWithinCooldownPeriod() {
             Organization org = createOrganization();
-            when(
-                organizationRepository.findByLoginIgnoreCaseAndProvider_Type(ORG_LOGIN, IdentityProviderType.GITHUB)
-            ).thenReturn(Optional.of(org));
+            when(organizationRepository.findByLoginIgnoreCaseAndProvider_Type(ORG_LOGIN, IdentityProviderType.GITHUB))
+                    .thenReturn(Optional.of(org));
             mockGraphQlClientForScope();
             mockGraphQlRequestChain("GetOrganizationProjects");
 
@@ -381,9 +368,8 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
         @Test
         void shouldAbortWhenRateLimitCritical() throws InterruptedException {
             Organization org = createOrganization();
-            when(
-                organizationRepository.findByLoginIgnoreCaseAndProvider_Type(ORG_LOGIN, IdentityProviderType.GITHUB)
-            ).thenReturn(Optional.of(org));
+            when(organizationRepository.findByLoginIgnoreCaseAndProvider_Type(ORG_LOGIN, IdentityProviderType.GITHUB))
+                    .thenReturn(Optional.of(org));
             mockGraphQlClientForScope();
             mockGraphQlRequestChain("GetOrganizationProjects");
 
@@ -405,9 +391,8 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
         @Test
         void shouldAbortWhenGraphQlResponseInvalid() {
             Organization org = createOrganization();
-            when(
-                organizationRepository.findByLoginIgnoreCaseAndProvider_Type(ORG_LOGIN, IdentityProviderType.GITHUB)
-            ).thenReturn(Optional.of(org));
+            when(organizationRepository.findByLoginIgnoreCaseAndProvider_Type(ORG_LOGIN, IdentityProviderType.GITHUB))
+                    .thenReturn(Optional.of(org));
             mockGraphQlClientForScope();
             mockGraphQlRequestChain("GetOrganizationProjects");
 
@@ -423,25 +408,22 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
         @Test
         void shouldRethrowInstallationNotFoundException() {
             Organization org = createOrganization();
-            when(
-                organizationRepository.findByLoginIgnoreCaseAndProvider_Type(ORG_LOGIN, IdentityProviderType.GITHUB)
-            ).thenReturn(Optional.of(org));
+            when(organizationRepository.findByLoginIgnoreCaseAndProvider_Type(ORG_LOGIN, IdentityProviderType.GITHUB))
+                    .thenReturn(Optional.of(org));
             mockGraphQlClientForScope();
             mockGraphQlRequestChain("GetOrganizationProjects");
 
             when(requestSpec.execute()).thenReturn(Mono.error(new InstallationNotFoundException(SCOPE_ID)));
 
-            assertThatThrownBy(() -> service.syncProjectsForOrganization(SCOPE_ID, ORG_LOGIN)).isInstanceOf(
-                InstallationNotFoundException.class
-            );
+            assertThatThrownBy(() -> service.syncProjectsForOrganization(SCOPE_ID, ORG_LOGIN))
+                    .isInstanceOf(InstallationNotFoundException.class);
         }
 
         @Test
         void shouldRemoveStaleProjectsOnCompleteSync() {
             Organization org = createOrganization();
-            when(
-                organizationRepository.findByLoginIgnoreCaseAndProvider_Type(ORG_LOGIN, IdentityProviderType.GITHUB)
-            ).thenReturn(Optional.of(org));
+            when(organizationRepository.findByLoginIgnoreCaseAndProvider_Type(ORG_LOGIN, IdentityProviderType.GITHUB))
+                    .thenReturn(Optional.of(org));
             mockGraphQlClientForScope();
             mockGraphQlRequestChain("GetOrganizationProjects");
 
@@ -453,16 +435,14 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
 
             Project processedProject = createProject(100L, "PVT_node1", 1);
             when(projectRepository.findById(100L)).thenReturn(Optional.empty());
-            when(projectProcessor.process(any(GitHubProjectDTO.class), any(), any(), any())).thenReturn(
-                processedProject
-            );
+            when(projectProcessor.process(any(GitHubProjectDTO.class), any(), any(), any()))
+                    .thenReturn(processedProject);
             when(projectRepository.save(any(Project.class))).thenReturn(processedProject);
 
             // Database has a stale project that was not returned by GraphQL
             Project staleProject = createProject(999L, "PVT_stale", 99);
-            when(projectRepository.findAllByOwnerTypeAndOwnerId(Project.OwnerType.ORGANIZATION, ORG_DB_ID)).thenReturn(
-                List.of(processedProject, staleProject)
-            );
+            when(projectRepository.findAllByOwnerTypeAndOwnerId(Project.OwnerType.ORGANIZATION, ORG_DB_ID))
+                    .thenReturn(List.of(processedProject, staleProject));
 
             SyncResult result = service.syncProjectsForOrganization(SCOPE_ID, ORG_LOGIN);
 
@@ -474,9 +454,8 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
         @Test
         void shouldNotRemoveStaleProjectsOnAbortedSync() throws InterruptedException {
             Organization org = createOrganization();
-            when(
-                organizationRepository.findByLoginIgnoreCaseAndProvider_Type(ORG_LOGIN, IdentityProviderType.GITHUB)
-            ).thenReturn(Optional.of(org));
+            when(organizationRepository.findByLoginIgnoreCaseAndProvider_Type(ORG_LOGIN, IdentityProviderType.GITHUB))
+                    .thenReturn(Optional.of(org));
             mockGraphQlClientForScope();
             mockGraphQlRequestChain("GetOrganizationProjects");
 
@@ -497,17 +476,15 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
         @Test
         void shouldAbortRateLimitOnRateLimitedException() {
             Organization org = createOrganization();
-            when(
-                organizationRepository.findByLoginIgnoreCaseAndProvider_Type(ORG_LOGIN, IdentityProviderType.GITHUB)
-            ).thenReturn(Optional.of(org));
+            when(organizationRepository.findByLoginIgnoreCaseAndProvider_Type(ORG_LOGIN, IdentityProviderType.GITHUB))
+                    .thenReturn(Optional.of(org));
             mockGraphQlClientForScope();
             mockGraphQlRequestChain("GetOrganizationProjects");
 
             RuntimeException rateLimitEx = new RuntimeException("Rate limited");
             when(requestSpec.execute()).thenReturn(Mono.error(rateLimitEx));
-            when(exceptionClassifier.classifyWithDetails(rateLimitEx)).thenReturn(
-                ClassificationResult.of(Category.RATE_LIMITED, "Rate limited")
-            );
+            when(exceptionClassifier.classifyWithDetails(rateLimitEx))
+                    .thenReturn(ClassificationResult.of(Category.RATE_LIMITED, "Rate limited"));
 
             SyncResult result = service.syncProjectsForOrganization(SCOPE_ID, ORG_LOGIN);
 
@@ -517,34 +494,31 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
         @Test
         void shouldFilterProjectsBasedOnAllowedProjectsConfig() {
             syncSchedulerProperties = new SyncSchedulerProperties(
-                true,
-                7,
-                "0 0 3 * * *",
-                15,
-                new BackfillProperties(false, 50, 100, 60),
-                new FilterProperties(Set.of(), Set.of(), Set.of("test-org/1")), // Only project #1
-                null,
-                new SyncSchedulerProperties.ProjectsProperties(true)
-            );
+                    true,
+                    7,
+                    "0 0 3 * * *",
+                    15,
+                    new BackfillProperties(false, 50, 100, 60),
+                    new FilterProperties(Set.of(), Set.of(), Set.of("test-org/1")), // Only project #1
+                    null,
+                    new SyncSchedulerProperties.ProjectsProperties(true));
             service = new GitHubProjectSyncService(
-                projectRepository,
-                organizationRepository,
-                graphQlClientProvider,
-                projectProcessor,
-                itemProcessor,
-                statusUpdateProcessor,
-                fieldValueSyncService,
-                backfillStateProvider,
-                transactionTemplate,
-                syncProperties,
-                syncSchedulerProperties,
-                exceptionClassifier
-            );
+                    projectRepository,
+                    organizationRepository,
+                    graphQlClientProvider,
+                    projectProcessor,
+                    itemProcessor,
+                    statusUpdateProcessor,
+                    fieldValueSyncService,
+                    backfillStateProvider,
+                    transactionTemplate,
+                    syncProperties,
+                    syncSchedulerProperties,
+                    exceptionClassifier);
 
             Organization org = createOrganization();
-            when(
-                organizationRepository.findByLoginIgnoreCaseAndProvider_Type(ORG_LOGIN, IdentityProviderType.GITHUB)
-            ).thenReturn(Optional.of(org));
+            when(organizationRepository.findByLoginIgnoreCaseAndProvider_Type(ORG_LOGIN, IdentityProviderType.GITHUB))
+                    .thenReturn(Optional.of(org));
             mockGraphQlClientForScope();
             mockGraphQlRequestChain("GetOrganizationProjects");
 
@@ -556,9 +530,8 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
 
             Project processedProject = createProject(100L, "PVT_node1", 1);
             when(projectRepository.findById(100L)).thenReturn(Optional.empty());
-            when(projectProcessor.process(any(GitHubProjectDTO.class), any(), any(), any())).thenReturn(
-                processedProject
-            );
+            when(projectProcessor.process(any(GitHubProjectDTO.class), any(), any(), any()))
+                    .thenReturn(processedProject);
             when(projectRepository.save(any(Project.class))).thenReturn(processedProject);
 
             SyncResult result = service.syncProjectsForOrganization(SCOPE_ID, ORG_LOGIN);
@@ -570,27 +543,25 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
         @Test
         void shouldRethrowWhenExceptionClassifiedAsAuthError() {
             Organization org = createOrganization();
-            when(
-                organizationRepository.findByLoginIgnoreCaseAndProvider_Type(ORG_LOGIN, IdentityProviderType.GITHUB)
-            ).thenReturn(Optional.of(org));
+            when(organizationRepository.findByLoginIgnoreCaseAndProvider_Type(ORG_LOGIN, IdentityProviderType.GITHUB))
+                    .thenReturn(Optional.of(org));
             mockGraphQlClientForScope();
             mockGraphQlRequestChain("GetOrganizationProjects");
 
             RuntimeException authEx = new RuntimeException("Bad credentials");
             when(requestSpec.execute()).thenReturn(Mono.error(authEx));
-            when(exceptionClassifier.classifyWithDetails(authEx)).thenReturn(
-                ClassificationResult.of(Category.AUTH_ERROR, "Auth failed")
-            );
+            when(exceptionClassifier.classifyWithDetails(authEx))
+                    .thenReturn(ClassificationResult.of(Category.AUTH_ERROR, "Auth failed"));
 
-            assertThatThrownBy(() -> service.syncProjectsForOrganization(SCOPE_ID, ORG_LOGIN)).isSameAs(authEx);
+            assertThatThrownBy(() -> service.syncProjectsForOrganization(SCOPE_ID, ORG_LOGIN))
+                    .isSameAs(authEx);
         }
 
         @Test
         void shouldProcessMultiplePagesOfProjects() {
             Organization org = createOrganization();
-            when(
-                organizationRepository.findByLoginIgnoreCaseAndProvider_Type(ORG_LOGIN, IdentityProviderType.GITHUB)
-            ).thenReturn(Optional.of(org));
+            when(organizationRepository.findByLoginIgnoreCaseAndProvider_Type(ORG_LOGIN, IdentityProviderType.GITHUB))
+                    .thenReturn(Optional.of(org));
             mockGraphQlClientForScope();
             mockGraphQlRequestChain("GetOrganizationProjects");
 
@@ -611,8 +582,8 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
             when(projectRepository.findById(100L)).thenReturn(Optional.empty());
             when(projectRepository.findById(200L)).thenReturn(Optional.empty());
             when(projectProcessor.process(any(GitHubProjectDTO.class), any(), any(), any()))
-                .thenReturn(p1)
-                .thenReturn(p2);
+                    .thenReturn(p1)
+                    .thenReturn(p2);
             when(projectRepository.save(any(Project.class))).thenAnswer(inv -> inv.getArgument(0));
 
             SyncResult result = service.syncProjectsForOrganization(SCOPE_ID, ORG_LOGIN);
@@ -662,9 +633,9 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
             ClientGraphQlResponse itemsResponse = mockValidGraphQlResponse("node.items", null);
 
             when(requestSpec.execute())
-                .thenReturn(Mono.just(fieldsResponse))
-                .thenReturn(Mono.just(statusUpdatesResponse))
-                .thenReturn(Mono.just(itemsResponse));
+                    .thenReturn(Mono.just(fieldsResponse))
+                    .thenReturn(Mono.just(statusUpdatesResponse))
+                    .thenReturn(Mono.just(itemsResponse));
 
             when(backfillStateProvider.getProjectItemSyncCursor(10L)).thenReturn(Optional.empty());
             when(backfillStateProvider.getProjectItemsSyncedAt(10L)).thenReturn(Optional.empty());
@@ -690,9 +661,9 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
             ClientGraphQlResponse itemsResponse = mockValidGraphQlResponse("node.items", null);
 
             when(requestSpec.execute())
-                .thenReturn(Mono.just(invalidFieldsResponse))
-                .thenReturn(Mono.just(statusUpdatesResponse))
-                .thenReturn(Mono.just(itemsResponse));
+                    .thenReturn(Mono.just(invalidFieldsResponse))
+                    .thenReturn(Mono.just(statusUpdatesResponse))
+                    .thenReturn(Mono.just(itemsResponse));
 
             when(backfillStateProvider.getProjectItemSyncCursor(10L)).thenReturn(Optional.empty());
             when(backfillStateProvider.getProjectItemsSyncedAt(10L)).thenReturn(Optional.empty());
@@ -708,13 +679,12 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
          * Creates a GHProjectV2Item of ISSUE type with optional field values.
          */
         private GHProjectV2Item createIssueItem(
-            String nodeId,
-            long fullDbId,
-            OffsetDateTime updatedAt,
-            List<GHProjectV2ItemFieldTextValue> fieldValues,
-            boolean hasNextPage,
-            @Nullable String endCursor
-        ) {
+                String nodeId,
+                long fullDbId,
+                OffsetDateTime updatedAt,
+                List<GHProjectV2ItemFieldTextValue> fieldValues,
+                boolean hasNextPage,
+                @Nullable String endCursor) {
             GHIssue ghIssue = new GHIssue();
             ghIssue.setFullDatabaseId(BigInteger.valueOf(fullDbId));
             ghIssue.setNumber(42);
@@ -783,9 +753,9 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
             ClientGraphQlResponse itemsResponse = mockValidGraphQlResponse("node.items", itemsConnection);
 
             when(requestSpec.execute())
-                .thenReturn(Mono.just(fieldsResponse))
-                .thenReturn(Mono.just(statusUpdatesResponse))
-                .thenReturn(Mono.just(itemsResponse));
+                    .thenReturn(Mono.just(fieldsResponse))
+                    .thenReturn(Mono.just(statusUpdatesResponse))
+                    .thenReturn(Mono.just(itemsResponse));
 
             when(backfillStateProvider.getProjectItemSyncCursor(projectId)).thenReturn(Optional.empty());
             when(backfillStateProvider.getProjectItemsSyncedAt(projectId)).thenReturn(Optional.empty());
@@ -797,14 +767,8 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
             Project project = createProject(projectId, "PVT_node10", 1);
 
             GHProjectV2ItemFieldTextValue textFv = createTextFieldValue("PVTF_status", "In Progress");
-            GHProjectV2Item issueItem = createIssueItem(
-                "PVTI_issue1",
-                12345L,
-                OffsetDateTime.now(),
-                List.of(textFv),
-                false,
-                null
-            );
+            GHProjectV2Item issueItem =
+                    createIssueItem("PVTI_issue1", 12345L, OffsetDateTime.now(), List.of(textFv), false, null);
 
             GHProjectV2ItemConnection itemsConnection = createItemConnection(List.of(issueItem));
             mockThreePhasesWithItems(projectId, itemsConnection);
@@ -819,9 +783,8 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
             when(itemProcessor.process(any(), eq(project), any(), isNull())).thenReturn(processedItem);
 
             // processFieldValues is now delegated to fieldValueSyncService
-            when(fieldValueSyncService.processFieldValues(eq(500L), any(), eq(false), isNull())).thenReturn(
-                List.of("PVTF_status")
-            );
+            when(fieldValueSyncService.processFieldValues(eq(500L), any(), eq(false), isNull()))
+                    .thenReturn(List.of("PVTF_status"));
 
             SyncResult result = service.syncProjectItems(SCOPE_ID, project);
 
@@ -839,13 +802,12 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
 
             // Item updated 2 hours ago — will be before the threshold
             GHProjectV2Item oldItem = createIssueItem(
-                "PVTI_old_issue",
-                12345L,
-                OffsetDateTime.now().minusHours(2),
-                List.of(createTextFieldValue("PVTF_field1", "value")),
-                false,
-                null
-            );
+                    "PVTI_old_issue",
+                    12345L,
+                    OffsetDateTime.now().minusHours(2),
+                    List.of(createTextFieldValue("PVTF_field1", "value")),
+                    false,
+                    null);
 
             GHProjectV2ItemConnection itemsConnection = createItemConnection(List.of(oldItem));
             mockGraphQlClientForScope();
@@ -856,16 +818,15 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
             ClientGraphQlResponse itemsResponse = mockValidGraphQlResponse("node.items", itemsConnection);
 
             when(requestSpec.execute())
-                .thenReturn(Mono.just(fieldsResponse))
-                .thenReturn(Mono.just(statusUpdatesResponse))
-                .thenReturn(Mono.just(itemsResponse));
+                    .thenReturn(Mono.just(fieldsResponse))
+                    .thenReturn(Mono.just(statusUpdatesResponse))
+                    .thenReturn(Mono.just(itemsResponse));
 
             when(backfillStateProvider.getProjectItemSyncCursor(projectId)).thenReturn(Optional.empty());
             // Previous sync was 10 minutes ago → threshold = 10min - 5min buffer = 5 min ago
             // Item updated 2 hours ago → well before threshold → should be skipped
-            when(backfillStateProvider.getProjectItemsSyncedAt(projectId)).thenReturn(
-                Optional.of(Instant.now().minusSeconds(10 * 60))
-            );
+            when(backfillStateProvider.getProjectItemsSyncedAt(projectId))
+                    .thenReturn(Optional.of(Instant.now().minusSeconds(10 * 60)));
 
             when(projectRepository.findById(projectId)).thenReturn(Optional.of(project));
 
@@ -883,13 +844,12 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
             Project project = createProject(projectId, "PVT_node10", 1);
 
             GHProjectV2Item recentItem = createIssueItem(
-                "PVTI_recent",
-                12345L,
-                OffsetDateTime.now(),
-                List.of(createTextFieldValue("PVTF_field1", "value")),
-                false,
-                null
-            );
+                    "PVTI_recent",
+                    12345L,
+                    OffsetDateTime.now(),
+                    List.of(createTextFieldValue("PVTF_field1", "value")),
+                    false,
+                    null);
 
             GHProjectV2ItemConnection itemsConnection = createItemConnection(List.of(recentItem));
             mockGraphQlClientForScope();
@@ -900,15 +860,14 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
             ClientGraphQlResponse itemsResponse = mockValidGraphQlResponse("node.items", itemsConnection);
 
             when(requestSpec.execute())
-                .thenReturn(Mono.just(fieldsResponse))
-                .thenReturn(Mono.just(statusUpdatesResponse))
-                .thenReturn(Mono.just(itemsResponse));
+                    .thenReturn(Mono.just(fieldsResponse))
+                    .thenReturn(Mono.just(statusUpdatesResponse))
+                    .thenReturn(Mono.just(itemsResponse));
 
             when(backfillStateProvider.getProjectItemSyncCursor(projectId)).thenReturn(Optional.empty());
             // Previous sync was 10 minutes ago → filterQuery should be set with a date
-            when(backfillStateProvider.getProjectItemsSyncedAt(projectId)).thenReturn(
-                Optional.of(Instant.now().minusSeconds(10 * 60))
-            );
+            when(backfillStateProvider.getProjectItemsSyncedAt(projectId))
+                    .thenReturn(Optional.of(Instant.now().minusSeconds(10 * 60)));
 
             when(projectRepository.findById(projectId)).thenReturn(Optional.of(project));
 
@@ -917,9 +876,8 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
             processedItem.setNodeId("PVTI_recent");
             when(itemProcessor.process(any(), eq(project), any(), isNull())).thenReturn(processedItem);
 
-            when(fieldValueSyncService.processFieldValues(eq(800L), any(), eq(false), isNull())).thenReturn(
-                List.of("PVTF_field1")
-            );
+            when(fieldValueSyncService.processFieldValues(eq(800L), any(), eq(false), isNull()))
+                    .thenReturn(List.of("PVTF_field1"));
 
             service.syncProjectItems(SCOPE_ID, project);
 
@@ -939,13 +897,12 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
             Project project = createProject(projectId, "PVT_node10", 1);
 
             GHProjectV2Item recentItem = createIssueItem(
-                "PVTI_recent",
-                12345L,
-                OffsetDateTime.now(),
-                List.of(createTextFieldValue("PVTF_field1", "value")),
-                false,
-                null
-            );
+                    "PVTI_recent",
+                    12345L,
+                    OffsetDateTime.now(),
+                    List.of(createTextFieldValue("PVTF_field1", "value")),
+                    false,
+                    null);
 
             GHProjectV2ItemConnection itemsConnection = createItemConnection(List.of(recentItem));
             mockGraphQlClientForScope();
@@ -956,15 +913,14 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
             ClientGraphQlResponse itemsResponse = mockValidGraphQlResponse("node.items", itemsConnection);
 
             when(requestSpec.execute())
-                .thenReturn(Mono.just(fieldsResponse))
-                .thenReturn(Mono.just(statusUpdatesResponse))
-                .thenReturn(Mono.just(itemsResponse));
+                    .thenReturn(Mono.just(fieldsResponse))
+                    .thenReturn(Mono.just(statusUpdatesResponse))
+                    .thenReturn(Mono.just(itemsResponse));
 
             when(backfillStateProvider.getProjectItemSyncCursor(projectId)).thenReturn(Optional.empty());
             // Set previous sync timestamp → triggers server-side filtering
-            when(backfillStateProvider.getProjectItemsSyncedAt(projectId)).thenReturn(
-                Optional.of(Instant.now().minusSeconds(10 * 60))
-            );
+            when(backfillStateProvider.getProjectItemsSyncedAt(projectId))
+                    .thenReturn(Optional.of(Instant.now().minusSeconds(10 * 60)));
 
             when(projectRepository.findById(projectId)).thenReturn(Optional.of(project));
 
@@ -973,9 +929,8 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
             processedItem.setNodeId("PVTI_recent");
             when(itemProcessor.process(any(), eq(project), any(), isNull())).thenReturn(processedItem);
 
-            when(fieldValueSyncService.processFieldValues(eq(900L), any(), eq(false), isNull())).thenReturn(
-                List.of("PVTF_field1")
-            );
+            when(fieldValueSyncService.processFieldValues(eq(900L), any(), eq(false), isNull()))
+                    .thenReturn(List.of("PVTF_field1"));
 
             SyncResult result = service.syncProjectItems(SCOPE_ID, project);
 
@@ -991,13 +946,12 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
             Project project = createProject(projectId, "PVT_node10", 1);
 
             GHProjectV2Item item = createIssueItem(
-                "PVTI_item1",
-                12345L,
-                OffsetDateTime.now(),
-                List.of(createTextFieldValue("PVTF_field1", "value")),
-                false,
-                null
-            );
+                    "PVTI_item1",
+                    12345L,
+                    OffsetDateTime.now(),
+                    List.of(createTextFieldValue("PVTF_field1", "value")),
+                    false,
+                    null);
 
             GHProjectV2ItemConnection itemsConnection = createItemConnection(List.of(item));
             mockThreePhasesWithItems(projectId, itemsConnection);
@@ -1009,9 +963,8 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
             processedItem.setNodeId("PVTI_item1");
             when(itemProcessor.process(any(), eq(project), any(), isNull())).thenReturn(processedItem);
 
-            when(fieldValueSyncService.processFieldValues(eq(1000L), any(), eq(false), isNull())).thenReturn(
-                List.of("PVTF_field1")
-            );
+            when(fieldValueSyncService.processFieldValues(eq(1000L), any(), eq(false), isNull()))
+                    .thenReturn(List.of("PVTF_field1"));
 
             SyncResult result = service.syncProjectItems(SCOPE_ID, project);
 
@@ -1029,13 +982,12 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
 
             // Item with truncated field values (hasNextPage=true, endCursor set)
             GHProjectV2Item truncatedItem = createIssueItem(
-                "PVTI_truncated",
-                12345L,
-                OffsetDateTime.now(),
-                List.of(createTextFieldValue("PVTF_field1", "value1")),
-                true, // truncated
-                "cursor_fv_page2"
-            );
+                    "PVTI_truncated",
+                    12345L,
+                    OffsetDateTime.now(),
+                    List.of(createTextFieldValue("PVTF_field1", "value1")),
+                    true, // truncated
+                    "cursor_fv_page2");
 
             GHProjectV2ItemConnection itemsConnection = createItemConnection(List.of(truncatedItem));
             mockThreePhasesWithItems(projectId, itemsConnection);
@@ -1048,9 +1000,8 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
             processedItem.setNodeId("PVTI_truncated");
             when(itemProcessor.process(any(), eq(project), any(), isNull())).thenReturn(processedItem);
 
-            when(fieldValueSyncService.processFieldValues(eq(600L), any(), eq(true), isNull())).thenReturn(
-                List.of("PVTF_field1")
-            );
+            when(fieldValueSyncService.processFieldValues(eq(600L), any(), eq(true), isNull()))
+                    .thenReturn(List.of("PVTF_field1"));
 
             SyncResult result = service.syncProjectItems(SCOPE_ID, project);
 
@@ -1063,13 +1014,13 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
             // Only 3 execute() calls happen from the main service: fields, statusUpdates, items.
             // The follow-up pagination is handled inside fieldValueSyncService (which is mocked).
             verify(requestSpec, times(3)).execute();
-            verify(fieldValueSyncService).syncRemainingFieldValues(
-                eq(SCOPE_ID),
-                eq("PVTI_truncated"),
-                eq(600L),
-                eq("cursor_fv_page2"),
-                eq(List.of("PVTF_field1"))
-            );
+            verify(fieldValueSyncService)
+                    .syncRemainingFieldValues(
+                            eq(SCOPE_ID),
+                            eq("PVTI_truncated"),
+                            eq(600L),
+                            eq("cursor_fv_page2"),
+                            eq(List.of("PVTF_field1")));
         }
 
         @Test
@@ -1078,13 +1029,12 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
             Project project = createProject(projectId, "PVT_node10", 1);
 
             GHProjectV2Item newItem = createIssueItem(
-                "PVTI_not_synced",
-                99999L,
-                OffsetDateTime.now(),
-                List.of(createTextFieldValue("PVTF_field1", "value")),
-                false,
-                null
-            );
+                    "PVTI_not_synced",
+                    99999L,
+                    OffsetDateTime.now(),
+                    List.of(createTextFieldValue("PVTF_field1", "value")),
+                    false,
+                    null);
 
             GHProjectV2ItemConnection itemsConnection = createItemConnection(List.of(newItem));
             mockThreePhasesWithItems(projectId, itemsConnection);
@@ -1097,9 +1047,8 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
             createdItem.setNodeId("PVTI_not_synced");
             when(itemProcessor.process(any(), eq(project), any(), isNull())).thenReturn(createdItem);
 
-            when(fieldValueSyncService.processFieldValues(eq(700L), any(), eq(false), isNull())).thenReturn(
-                List.of("PVTF_field1")
-            );
+            when(fieldValueSyncService.processFieldValues(eq(700L), any(), eq(false), isNull()))
+                    .thenReturn(List.of("PVTF_field1"));
 
             SyncResult result = service.syncProjectItems(SCOPE_ID, project);
 
@@ -1121,41 +1070,30 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
             Long organizationId = 42L;
             Project project1 = createProject(1L, "PVT_1", 1);
             Project project2 = createProject(2L, "PVT_2", 2);
-            when(
-                projectRepository.findProjectsNeedingItemSync(
-                    eq(Project.OwnerType.ORGANIZATION),
-                    eq(organizationId),
-                    any(Instant.class)
-                )
-            ).thenReturn(List.of(project1, project2));
+            when(projectRepository.findProjectsNeedingItemSync(
+                            eq(Project.OwnerType.ORGANIZATION), eq(organizationId), any(Instant.class)))
+                    .thenReturn(List.of(project1, project2));
 
             List<Project> result = service.getProjectsNeedingItemSync(organizationId);
 
             assertThat(result).hasSize(2);
             var instantCaptor = ArgumentCaptor.forClass(Instant.class);
-            verify(projectRepository).findProjectsNeedingItemSync(
-                eq(Project.OwnerType.ORGANIZATION),
-                eq(organizationId),
-                instantCaptor.capture()
-            );
+            verify(projectRepository)
+                    .findProjectsNeedingItemSync(
+                            eq(Project.OwnerType.ORGANIZATION), eq(organizationId), instantCaptor.capture());
             Instant capturedThreshold = instantCaptor.getValue();
             // The threshold should be approximately now minus the cooldown period
             assertThat(capturedThreshold).isBefore(Instant.now());
-            assertThat(capturedThreshold).isAfter(
-                Instant.now().minusSeconds(syncSchedulerProperties.cooldownMinutes() * 60L + 5)
-            );
+            assertThat(capturedThreshold)
+                    .isAfter(Instant.now().minusSeconds(syncSchedulerProperties.cooldownMinutes() * 60L + 5));
         }
 
         @Test
         void shouldReturnEmptyListWhenNoProjectsNeedSync() {
             Long organizationId = 42L;
-            when(
-                projectRepository.findProjectsNeedingItemSync(
-                    eq(Project.OwnerType.ORGANIZATION),
-                    eq(organizationId),
-                    any(Instant.class)
-                )
-            ).thenReturn(List.of());
+            when(projectRepository.findProjectsNeedingItemSync(
+                            eq(Project.OwnerType.ORGANIZATION), eq(organizationId), any(Instant.class)))
+                    .thenReturn(List.of());
 
             List<Project> result = service.getProjectsNeedingItemSync(organizationId);
 

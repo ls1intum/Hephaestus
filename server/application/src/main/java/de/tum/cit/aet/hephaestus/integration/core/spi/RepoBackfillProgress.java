@@ -19,9 +19,8 @@ import org.jspecify.annotations.Nullable;
  * @param remaining                total items still to backfill (issues + pull requests)
  */
 public record RepoBackfillProgress(
-    boolean initialized,
-    boolean complete,
-    @Nullable Integer issueHighWaterMark,
-    @Nullable Integer pullRequestHighWaterMark,
-    int remaining
-) {}
+        boolean initialized,
+        boolean complete,
+        @Nullable Integer issueHighWaterMark,
+        @Nullable Integer pullRequestHighWaterMark,
+        int remaining) {}

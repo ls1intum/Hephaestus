@@ -167,23 +167,21 @@ public class ContentAddressedStore {
         if (!Files.isDirectory(casRoot)) {
             return 0;
         }
-        int[] removed = { 0 };
+        int[] removed = {0};
         try (Stream<Path> blobs = Files.walk(casRoot)) {
-            blobs
-                .filter(Files::isRegularFile)
-                .forEach(blob -> {
-                    Path parent = Objects.requireNonNull(blob.getParent());
-                    String candidate = parent.getFileName() + blob.getFileName().toString();
-                    if (isShaHex(candidate) && !liveShas.contains(candidate)) {
-                        try (BlobLock ignored = lockBlob(candidate)) {
-                            if (lastModifiedBefore(blob, createdBefore)) {
-                                if (Files.deleteIfExists(blob)) removed[0]++;
-                            }
-                        } catch (IOException | UncheckedIOException e) {
-                            log.warn("CAS sweep could not delete {}: {}", blob, e.getMessage());
+            blobs.filter(Files::isRegularFile).forEach(blob -> {
+                Path parent = Objects.requireNonNull(blob.getParent());
+                String candidate = parent.getFileName() + blob.getFileName().toString();
+                if (isShaHex(candidate) && !liveShas.contains(candidate)) {
+                    try (BlobLock ignored = lockBlob(candidate)) {
+                        if (lastModifiedBefore(blob, createdBefore)) {
+                            if (Files.deleteIfExists(blob)) removed[0]++;
                         }
+                    } catch (IOException | UncheckedIOException e) {
+                        log.warn("CAS sweep could not delete {}: {}", blob, e.getMessage());
                     }
-                });
+                }
+            });
         } catch (IOException e) {
             log.warn("CAS sweep failed to walk {}: {}", casRoot, e.getMessage());
         }
@@ -209,17 +207,15 @@ public class ContentAddressedStore {
             return;
         }
         try (Stream<Path> fanout = Files.list(sha256Root)) {
-            fanout
-                .filter(Files::isDirectory)
-                .forEach(dir -> {
-                    try (Stream<Path> entries = Files.list(dir)) {
-                        if (entries.findAny().isEmpty()) {
-                            Files.delete(dir);
-                        }
-                    } catch (IOException e) {
-                        log.debug("CAS sweep left fan-out dir {}: {}", dir, e.getMessage());
+            fanout.filter(Files::isDirectory).forEach(dir -> {
+                try (Stream<Path> entries = Files.list(dir)) {
+                    if (entries.findAny().isEmpty()) {
+                        Files.delete(dir);
                     }
-                });
+                } catch (IOException e) {
+                    log.debug("CAS sweep left fan-out dir {}: {}", dir, e.getMessage());
+                }
+            });
         } catch (IOException e) {
             log.debug("CAS sweep could not list {}: {}", sha256Root, e.getMessage());
         }
@@ -251,11 +247,8 @@ public class ContentAddressedStore {
         }
     }
 
-    private record BlobLock(
-        ReentrantLock processLock,
-        FileChannel channel,
-        FileLock fileLock
-    ) implements AutoCloseable {
+    private record BlobLock(ReentrantLock processLock, FileChannel channel, FileLock fileLock)
+            implements AutoCloseable {
         @Override
         public void close() throws IOException {
             try {
@@ -286,8 +279,8 @@ public class ContentAddressedStore {
 
     /** True iff {@code s} is a 64-character lowercase-hex string (a sha-256 digest). */
     private static boolean isShaHex(String s) {
-        return (
-            s != null && s.length() == 64 && s.chars().allMatch(c -> (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f'))
-        );
+        return (s != null
+                && s.length() == 64
+                && s.chars().allMatch(c -> (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')));
     }
 }

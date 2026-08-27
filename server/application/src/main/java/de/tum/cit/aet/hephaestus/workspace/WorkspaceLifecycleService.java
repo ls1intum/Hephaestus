@@ -52,19 +52,18 @@ public class WorkspaceLifecycleService {
     private final List<WorkspacePurgeContributor> purgeContributors;
 
     public WorkspaceLifecycleService(
-        NatsConnectionProperties natsProperties,
-        WorkspaceRepository workspaceRepository,
-        ObjectProvider<IntegrationNatsConsumer> natsConsumerService,
-        RepositoryToMonitorRepository repositoryToMonitorRepository,
-        WorkspaceMembershipRepository workspaceMembershipRepository,
-        WorkspaceTeamSettingsRepository workspaceTeamSettingsRepository,
-        WorkspaceTeamLabelFilterRepository workspaceTeamLabelFilterRepository,
-        WorkspaceTeamRepositorySettingsRepository workspaceTeamRepositorySettingsRepository,
-        WorkspaceSlugHistoryRepository workspaceSlugHistoryRepository,
-        List<WorkspacePurgeGuard> purgeGuards,
-        List<WorkspacePurgeContributor> purgeContributors,
-        ConfigAuditPort configAudit
-    ) {
+            NatsConnectionProperties natsProperties,
+            WorkspaceRepository workspaceRepository,
+            ObjectProvider<IntegrationNatsConsumer> natsConsumerService,
+            RepositoryToMonitorRepository repositoryToMonitorRepository,
+            WorkspaceMembershipRepository workspaceMembershipRepository,
+            WorkspaceTeamSettingsRepository workspaceTeamSettingsRepository,
+            WorkspaceTeamLabelFilterRepository workspaceTeamLabelFilterRepository,
+            WorkspaceTeamRepositorySettingsRepository workspaceTeamRepositorySettingsRepository,
+            WorkspaceSlugHistoryRepository workspaceSlugHistoryRepository,
+            List<WorkspacePurgeGuard> purgeGuards,
+            List<WorkspacePurgeContributor> purgeContributors,
+            ConfigAuditPort configAudit) {
         this.configAudit = configAudit;
         this.natsProperties = natsProperties;
         this.workspaceRepository = workspaceRepository;
@@ -95,8 +94,8 @@ public class WorkspaceLifecycleService {
 
     private Workspace suspendWorkspaceInTransaction(String workspaceSlug) {
         Workspace workspace = workspaceRepository
-            .findByWorkspaceSlug(workspaceSlug)
-            .orElseThrow(() -> new EntityNotFoundException("Workspace", workspaceSlug));
+                .findByWorkspaceSlug(workspaceSlug)
+                .orElseThrow(() -> new EntityNotFoundException("Workspace", workspaceSlug));
 
         if (workspace.getStatus() == WorkspaceStatus.PURGED) {
             throw new WorkspaceLifecycleViolationException("Cannot suspend a purged workspace: " + workspaceSlug);
@@ -135,8 +134,8 @@ public class WorkspaceLifecycleService {
 
     private Workspace resumeWorkspaceInTransaction(String workspaceSlug) {
         Workspace workspace = workspaceRepository
-            .findByWorkspaceSlug(workspaceSlug)
-            .orElseThrow(() -> new EntityNotFoundException("Workspace", workspaceSlug));
+                .findByWorkspaceSlug(workspaceSlug)
+                .orElseThrow(() -> new EntityNotFoundException("Workspace", workspaceSlug));
 
         if (workspace.getStatus() == WorkspaceStatus.PURGED) {
             throw new WorkspaceLifecycleViolationException("Cannot resume a purged workspace: " + workspaceSlug);
@@ -167,14 +166,13 @@ public class WorkspaceLifecycleService {
 
     private Workspace purgeWorkspaceInTransaction(String workspaceSlug) {
         Workspace workspace = workspaceRepository
-            .findByWorkspaceSlugForUpdate(workspaceSlug)
-            .orElseThrow(() -> new EntityNotFoundException("Workspace", workspaceSlug));
+                .findByWorkspaceSlugForUpdate(workspaceSlug)
+                .orElseThrow(() -> new EntityNotFoundException("Workspace", workspaceSlug));
 
         if (workspace.getStatus() == WorkspaceStatus.PURGED) {
             log.debug(
-                "Skipped workspace purge: reason=alreadyPurged, workspaceSlug={}",
-                LoggingUtils.sanitizeForLog(workspaceSlug)
-            );
+                    "Skipped workspace purge: reason=alreadyPurged, workspaceSlug={}",
+                    LoggingUtils.sanitizeForLog(workspaceSlug));
             return workspace;
         }
 
@@ -191,10 +189,9 @@ public class WorkspaceLifecycleService {
 
         workspaceMembershipRepository.deleteAllByWorkspaceId(workspaceId);
 
-        purgeContributors
-            .stream()
-            .sorted(Comparator.comparingInt(WorkspacePurgeContributor::getOrder))
-            .forEach(contributor -> contributor.deleteWorkspaceData(workspaceId));
+        purgeContributors.stream()
+                .sorted(Comparator.comparingInt(WorkspacePurgeContributor::getOrder))
+                .forEach(contributor -> contributor.deleteWorkspaceData(workspaceId));
 
         // Bulk deletion would leave these managed children queued for a second orphan-removal delete.
         workspace.getRepositoriesToMonitor().clear();
@@ -232,8 +229,8 @@ public class WorkspaceLifecycleService {
      */
     public WorkspaceStatus getWorkspaceStatus(String workspaceSlug) {
         Workspace workspace = workspaceRepository
-            .findByWorkspaceSlug(workspaceSlug)
-            .orElseThrow(() -> new EntityNotFoundException("Workspace", workspaceSlug));
+                .findByWorkspaceSlug(workspaceSlug)
+                .orElseThrow(() -> new EntityNotFoundException("Workspace", workspaceSlug));
         return workspace.getStatus();
     }
 
@@ -256,9 +253,9 @@ public class WorkspaceLifecycleService {
         return switch (targetStatus) {
             case ACTIVE -> resumeWorkspaceInTransaction(workspaceSlug);
             case SUSPENDED -> suspendWorkspaceInTransaction(workspaceSlug);
-            case PURGED -> throw new WorkspaceLifecycleViolationException(
-                "Workspaces cannot be purged via the status endpoint. Use DELETE /workspaces/{workspaceSlug} (requires the OWNER role)."
-            );
+            case PURGED ->
+                throw new WorkspaceLifecycleViolationException(
+                        "Workspaces cannot be purged via the status endpoint. Use DELETE /workspaces/{workspaceSlug} (requires the OWNER role).");
         };
     }
 
@@ -317,14 +314,11 @@ public class WorkspaceLifecycleService {
     }
 
     private void recordStatusChange(Workspace workspace, WorkspaceStatus from, WorkspaceStatus to) {
-        configAudit.record(
-            ConfigAuditEntry.updated(
+        configAudit.record(ConfigAuditEntry.updated(
                 ConfigAuditEntityType.WORKSPACE_STATUS,
                 workspace.getId(),
                 workspace.getId(),
                 new WorkspaceAuditSnapshots.StatusSnapshot(from == null ? null : from.name()),
-                new WorkspaceAuditSnapshots.StatusSnapshot(to == null ? null : to.name())
-            )
-        );
+                new WorkspaceAuditSnapshots.StatusSnapshot(to == null ? null : to.name())));
     }
 }

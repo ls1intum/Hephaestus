@@ -13,27 +13,26 @@ class SandboxEnvBlocklistTest extends BaseUnitTest {
 
     @ParameterizedTest(name = "blocks exact: {0}")
     @ValueSource(
-        strings = {
-            "LD_PRELOAD",
-            "LD_LIBRARY_PATH",
-            "PATH",
-            "NODE_OPTIONS",
-            "GIT_SSH_COMMAND",
-            "GIT_PAGER",
-            "HTTPS_PROXY",
-            "http_proxy",
-            "BASH_ENV",
-            "JAVA_TOOL_OPTIONS",
-            "_JAVA_OPTIONS",
-            "PYTHONPATH",
-            "PYTHONSTARTUP",
-            "PERL5OPT",
-            "RUBYOPT",
-            "OPENSSL_CONF",
-            "CURL_CA_BUNDLE",
-            "SSL_CERT_FILE",
-        }
-    )
+            strings = {
+                "LD_PRELOAD",
+                "LD_LIBRARY_PATH",
+                "PATH",
+                "NODE_OPTIONS",
+                "GIT_SSH_COMMAND",
+                "GIT_PAGER",
+                "HTTPS_PROXY",
+                "http_proxy",
+                "BASH_ENV",
+                "JAVA_TOOL_OPTIONS",
+                "_JAVA_OPTIONS",
+                "PYTHONPATH",
+                "PYTHONSTARTUP",
+                "PERL5OPT",
+                "RUBYOPT",
+                "OPENSSL_CONF",
+                "CURL_CA_BUNDLE",
+                "SSL_CERT_FILE",
+            })
     void blocksExactByName(String name) {
         assertThat(SandboxEnvBlocklist.isBlocked(name)).isTrue();
     }
@@ -41,38 +40,35 @@ class SandboxEnvBlocklistTest extends BaseUnitTest {
     @Test
     @DisplayName("static blocklist sets are unmodifiable")
     void blocklistIsImmutable() {
-        Assertions.assertThatThrownBy(() -> SandboxEnvBlocklist.BLOCKED_NAMES.add("INJECT")).isInstanceOf(
-            UnsupportedOperationException.class
-        );
-        Assertions.assertThatThrownBy(() -> SandboxEnvBlocklist.ALLOWED_PREFIX_EXCEPTIONS.add("BYPASS")).isInstanceOf(
-            UnsupportedOperationException.class
-        );
+        Assertions.assertThatThrownBy(() -> SandboxEnvBlocklist.BLOCKED_NAMES.add("INJECT"))
+                .isInstanceOf(UnsupportedOperationException.class);
+        Assertions.assertThatThrownBy(() -> SandboxEnvBlocklist.ALLOWED_PREFIX_EXCEPTIONS.add("BYPASS"))
+                .isInstanceOf(UnsupportedOperationException.class);
     }
 
     @ParameterizedTest(name = "blocks prefix: {0}")
     @ValueSource(
-        strings = { "AWS_ROLE_ARN", "GOOGLE_CLOUD_PROJECT", "AZURE_CLIENT_SECRET", "DOCKER_HOST", "GIT_CONFIG_KEY_0" }
-    )
+            strings = {"AWS_ROLE_ARN", "GOOGLE_CLOUD_PROJECT", "AZURE_CLIENT_SECRET", "DOCKER_HOST", "GIT_CONFIG_KEY_0"
+            })
     void blocksByPrefix(String name) {
         assertThat(SandboxEnvBlocklist.isBlocked(name)).isTrue();
     }
 
     @ParameterizedTest(name = "permits prefix exception: {0}")
-    @ValueSource(strings = { "AZURE_OPENAI_DEPLOYMENT_NAME_MAP", "AZURE_OPENAI_BASE_URL", "AZURE_OPENAI_API_VERSION" })
+    @ValueSource(strings = {"AZURE_OPENAI_DEPLOYMENT_NAME_MAP", "AZURE_OPENAI_BASE_URL", "AZURE_OPENAI_API_VERSION"})
     void allowsPrefixExceptions(String name) {
         assertThat(SandboxEnvBlocklist.isBlocked(name)).isFalse();
     }
 
     @ParameterizedTest(name = "permits unrelated: {0}")
-    @ValueSource(strings = { "MY_APP_KEY", "FOO", "PI_AGENT_BUDGET_MS", "HOME" })
+    @ValueSource(strings = {"MY_APP_KEY", "FOO", "PI_AGENT_BUDGET_MS", "HOME"})
     void allowsUnrelated(String name) {
         assertThat(SandboxEnvBlocklist.isBlocked(name)).isFalse();
     }
 
     @ParameterizedTest(name = "case-insensitive: {0}")
     @ValueSource(
-        strings = { "ld_preload", "Node_Options", "aws_access_key_id", "Google_Cloud_Project", "git_config_key_0" }
-    )
+            strings = {"ld_preload", "Node_Options", "aws_access_key_id", "Google_Cloud_Project", "git_config_key_0"})
     void caseInsensitive(String name) {
         assertThat(SandboxEnvBlocklist.isBlocked(name)).isTrue();
     }

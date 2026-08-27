@@ -67,14 +67,13 @@ class SlackDataSyncSchedulerTest extends BaseUnitTest {
     @BeforeEach
     void setUp() {
         scheduler = new SlackDataSyncScheduler(
-            monitoredChannelRepository,
-            metadataRefresher,
-            historySyncService,
-            connectionService,
-            syncJobService,
-            new SlackSyncProperties("0 0 4 * * *", 10, 15, Duration.ZERO, true, 5, true),
-            inlineExecutor()
-        );
+                monitoredChannelRepository,
+                metadataRefresher,
+                historySyncService,
+                connectionService,
+                syncJobService,
+                new SlackSyncProperties("0 0 4 * * *", 10, 15, Duration.ZERO, true, 5, true),
+                inlineExecutor());
     }
 
     /**
@@ -106,9 +105,8 @@ class SlackDataSyncSchedulerTest extends BaseUnitTest {
     @Test
     void connectedWorkspace_refreshesMetadataThenReconcilesHistory() {
         when(connectionService.findActive(WS, IntegrationKind.SLACK)).thenReturn(Optional.of(mock(Connection.class)));
-        when(historySyncService.syncWorkspace(eq(WS), any(BooleanSupplier.class))).thenReturn(
-            new SlackChannelHistorySyncService.WorkspaceSyncSummary(2, 2, 0, 5L, 3, false, 0)
-        );
+        when(historySyncService.syncWorkspace(eq(WS), any(BooleanSupplier.class)))
+                .thenReturn(new SlackChannelHistorySyncService.WorkspaceSyncSummary(2, 2, 0, 5L, 3, false, 0));
 
         var summary = scheduler.syncWorkspaceNow(WS);
 
@@ -119,7 +117,8 @@ class SlackDataSyncSchedulerTest extends BaseUnitTest {
 
     @Test
     void cron_isolatesAFailingWorkspaceFromTheRest() {
-        when(monitoredChannelRepository.findDistinctWorkspaceIdsByConsentState("ACTIVE")).thenReturn(List.of(1L, 2L));
+        when(monitoredChannelRepository.findDistinctWorkspaceIdsByConsentState("ACTIVE"))
+                .thenReturn(List.of(1L, 2L));
         when(connectionService.findActive(1L, IntegrationKind.SLACK)).thenThrow(new IllegalStateException("boom"));
         when(connectionService.findActive(2L, IntegrationKind.SLACK)).thenReturn(Optional.empty());
 
@@ -130,7 +129,8 @@ class SlackDataSyncSchedulerTest extends BaseUnitTest {
 
     @Test
     void cron_workspaceWithNoActiveConnection_recordsNoJobAndTouchesNothing() {
-        when(monitoredChannelRepository.findDistinctWorkspaceIdsByConsentState("ACTIVE")).thenReturn(List.of(WS));
+        when(monitoredChannelRepository.findDistinctWorkspaceIdsByConsentState("ACTIVE"))
+                .thenReturn(List.of(WS));
         when(connectionService.findActive(WS, IntegrationKind.SLACK)).thenReturn(Optional.empty());
 
         scheduler.syncDataCron();
@@ -144,11 +144,11 @@ class SlackDataSyncSchedulerTest extends BaseUnitTest {
     void cron_connectedWorkspace_recordsAReconciliationJobWhoseBodyRunsTheHistorySync() {
         Connection connection = mock(Connection.class);
         when(connection.getId()).thenReturn(CONNECTION_ID);
-        when(monitoredChannelRepository.findDistinctWorkspaceIdsByConsentState("ACTIVE")).thenReturn(List.of(WS));
+        when(monitoredChannelRepository.findDistinctWorkspaceIdsByConsentState("ACTIVE"))
+                .thenReturn(List.of(WS));
         when(connectionService.findActive(WS, IntegrationKind.SLACK)).thenReturn(Optional.of(connection));
-        when(historySyncService.syncWorkspace(eq(WS), any(BooleanSupplier.class))).thenReturn(
-            new SlackChannelHistorySyncService.WorkspaceSyncSummary(2, 2, 0, 4L, 2, false, 0)
-        );
+        when(historySyncService.syncWorkspace(eq(WS), any(BooleanSupplier.class)))
+                .thenReturn(new SlackChannelHistorySyncService.WorkspaceSyncSummary(2, 2, 0, 4L, 2, false, 0));
 
         scheduler.syncDataCron();
 
@@ -179,9 +179,8 @@ class SlackDataSyncSchedulerTest extends BaseUnitTest {
 
         // Two workspaces: the conflict must be contained to the first one. With a single workspace this
         // test would pass even if the try/catch were hoisted outside the loop, aborting the whole cron.
-        when(monitoredChannelRepository.findDistinctWorkspaceIdsByConsentState("ACTIVE")).thenReturn(
-            List.of(WS, OTHER_WS)
-        );
+        when(monitoredChannelRepository.findDistinctWorkspaceIdsByConsentState("ACTIVE"))
+                .thenReturn(List.of(WS, OTHER_WS));
         when(connectionService.findActive(WS, IntegrationKind.SLACK)).thenReturn(Optional.of(busyConnection));
         when(connectionService.findActive(OTHER_WS, IntegrationKind.SLACK)).thenReturn(Optional.of(freeConnection));
 
@@ -189,16 +188,16 @@ class SlackDataSyncSchedulerTest extends BaseUnitTest {
         when(activeJob.getConnection()).thenReturn(busyConnection);
         ArgumentCaptor<SyncJobRequest> requestCaptor = ArgumentCaptor.forClass(SyncJobRequest.class);
         doThrow(new SyncJobConflictException(activeJob))
-            .when(syncJobService)
-            .run(argThat(request -> request != null && request.workspaceId() == WS), any());
+                .when(syncJobService)
+                .run(argThat(request -> request != null && request.workspaceId() == WS), any());
 
         assertThatCode(() -> scheduler.syncDataCron()).doesNotThrowAnyException();
 
         // The un-conflicted workspace still got its job — the conflict did not abort the fan-out.
         verify(syncJobService, times(2)).run(requestCaptor.capture(), any());
         assertThat(requestCaptor.getAllValues())
-            .extracting(SyncJobRequest::workspaceId)
-            .containsExactlyInAnyOrder(WS, OTHER_WS);
+                .extracting(SyncJobRequest::workspaceId)
+                .containsExactlyInAnyOrder(WS, OTHER_WS);
     }
 
     /**
@@ -209,9 +208,8 @@ class SlackDataSyncSchedulerTest extends BaseUnitTest {
     @Test
     void channelActivation_kicksThatChannelsHistorySync_notTheWholeWorkspace() {
         when(connectionService.findActive(WS, IntegrationKind.SLACK)).thenReturn(Optional.of(mock(Connection.class)));
-        when(historySyncService.syncChannel(WS, "C1")).thenReturn(
-            new SlackChannelHistorySyncService.WorkspaceSyncSummary(1, 1, 0, 12L, 2, false, 0)
-        );
+        when(historySyncService.syncChannel(WS, "C1"))
+                .thenReturn(new SlackChannelHistorySyncService.WorkspaceSyncSummary(1, 1, 0, 12L, 2, false, 0));
 
         scheduler.onChannelConsentActivated(new SlackChannelConsentService.SlackChannelActivatedEvent(WS, "C1"));
 
@@ -239,8 +237,8 @@ class SlackDataSyncSchedulerTest extends BaseUnitTest {
         when(connectionService.findActive(WS, IntegrationKind.SLACK)).thenReturn(Optional.of(mock(Connection.class)));
         when(historySyncService.syncChannel(WS, "C1")).thenThrow(new IllegalStateException("slack down"));
 
-        assertThatCode(() ->
-            scheduler.onChannelConsentActivated(new SlackChannelConsentService.SlackChannelActivatedEvent(WS, "C1"))
-        ).doesNotThrowAnyException();
+        assertThatCode(() -> scheduler.onChannelConsentActivated(
+                        new SlackChannelConsentService.SlackChannelActivatedEvent(WS, "C1")))
+                .doesNotThrowAnyException();
     }
 }

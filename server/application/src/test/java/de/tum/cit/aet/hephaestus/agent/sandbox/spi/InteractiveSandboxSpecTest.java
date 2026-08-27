@@ -19,49 +19,47 @@ class InteractiveSandboxSpecTest extends BaseUnitTest {
 
     private static InteractiveSandboxSpec spec(Map<String, String> env) {
         return new InteractiveSandboxSpec(
-            UUID.randomUUID(),
-            "u1",
-            "w1",
-            "ghcr.io/example/agent:latest",
-            List.of("bun", "/run.ts"),
-            env,
-            new NetworkPolicy(true, null, null),
-            new ResourceLimits(256 * 1024 * 1024, 0.5, 64, Duration.ofMinutes(1)),
-            SecurityProfile.DEFAULT,
-            Map.of(),
-            Map.of()
-        );
+                UUID.randomUUID(),
+                "u1",
+                "w1",
+                "ghcr.io/example/agent:latest",
+                List.of("bun", "/run.ts"),
+                env,
+                new NetworkPolicy(true, null, null),
+                new ResourceLimits(256 * 1024 * 1024, 0.5, 64, Duration.ofMinutes(1)),
+                SecurityProfile.DEFAULT,
+                Map.of(),
+                Map.of());
     }
 
     @ParameterizedTest(name = "accepts well-formed env key: {0}")
-    @ValueSource(strings = { "FOO", "FOO_BAR", "_LEADING_UNDERSCORE", "x", "MIXED_case_42", "A0" })
+    @ValueSource(strings = {"FOO", "FOO_BAR", "_LEADING_UNDERSCORE", "x", "MIXED_case_42", "A0"})
     void acceptsValidKeys(String key) {
         assertThatNoException().isThrownBy(() -> spec(Map.of(key, "v")));
     }
 
     @ParameterizedTest(name = "rejects ill-formed env key: {0}")
     @ValueSource(
-        strings = { "", " ", "0LEADING_DIGIT", "with space", "FOO-BAR", "FOO.BAR", "--privileged", "-it", "=val" }
-    )
+            strings = {"", " ", "0LEADING_DIGIT", "with space", "FOO-BAR", "FOO.BAR", "--privileged", "-it", "=val"})
     void rejectsInvalidKeys(String key) {
         assertThatThrownBy(() -> spec(Map.of(key, "v")))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("Invalid env var name");
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Invalid env var name");
     }
 
     @Test
     void rejectsNulInValue() {
         assertThatThrownBy(() -> spec(Map.of("FOO", "a\0b")))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("NUL");
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("NUL");
     }
 
     @ParameterizedTest(name = "rejects unsafe control char in env value: {0}")
-    @ValueSource(strings = { "a\nb", "a\rb" })
+    @ValueSource(strings = {"a\nb", "a\rb"})
     void rejectsLfCrInValue(String value) {
         assertThatThrownBy(() -> spec(Map.of("FOO", value)))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("NUL/LF/CR");
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("NUL/LF/CR");
     }
 
     @Test
@@ -78,18 +76,17 @@ class InteractiveSandboxSpecTest extends BaseUnitTest {
     void commandIsCopied() {
         List<String> cmd = new ArrayList<>(List.of("bun", "/run.ts"));
         InteractiveSandboxSpec s = new InteractiveSandboxSpec(
-            UUID.randomUUID(),
-            "u1",
-            "w1",
-            "ghcr.io/example/agent:latest",
-            cmd,
-            Map.of(),
-            new NetworkPolicy(true, null, null),
-            new ResourceLimits(256 * 1024 * 1024, 0.5, 64, Duration.ofMinutes(1)),
-            SecurityProfile.DEFAULT,
-            Map.of(),
-            Map.of()
-        );
+                UUID.randomUUID(),
+                "u1",
+                "w1",
+                "ghcr.io/example/agent:latest",
+                cmd,
+                Map.of(),
+                new NetworkPolicy(true, null, null),
+                new ResourceLimits(256 * 1024 * 1024, 0.5, 64, Duration.ofMinutes(1)),
+                SecurityProfile.DEFAULT,
+                Map.of(),
+                Map.of());
         cmd.set(0, "/bin/sh");
         cmd.add("-c");
         cmd.add("rm -rf /");

@@ -47,11 +47,11 @@ public class AchievementRegistry {
         // matched by Java identifier (e.g. PULL_REQUEST_MERGED), so disable toString-based
         // enum reading.
         this.yamlMapper = YAMLMapper.builder()
-            .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
-            .disable(DeserializationFeature.FAIL_ON_NULL_FOR_PRIMITIVES)
-            .disable(EnumFeature.READ_ENUMS_USING_TO_STRING)
-            .enable(MapperFeature.ACCEPT_CASE_INSENSITIVE_ENUMS)
-            .build();
+                .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
+                .disable(DeserializationFeature.FAIL_ON_NULL_FOR_PRIMITIVES)
+                .disable(EnumFeature.READ_ENUMS_USING_TO_STRING)
+                .enable(MapperFeature.ACCEPT_CASE_INSENSITIVE_ENUMS)
+                .build();
     }
 
     @PostConstruct
@@ -79,9 +79,7 @@ public class AchievementRegistry {
                 File submoduleSourceFile = new File("server/" + sourcePath);
                 if (submoduleSourceFile.exists()) {
                     log.info(
-                        "Found source file at {}, using it for hot-reload.",
-                        submoduleSourceFile.getAbsolutePath()
-                    );
+                            "Found source file at {}, using it for hot-reload.", submoduleSourceFile.getAbsolutePath());
                     resource = new FileSystemResource(submoduleSourceFile);
                 } else {
                     log.info("Loading achievements from classpath: {}", ACHIEVEMENTS_FILE_PATH);
@@ -117,10 +115,9 @@ public class AchievementRegistry {
                         while (current != null && !current.isEmpty()) {
                             if (!visiting.add(current)) {
                                 log.error(
-                                    "Achievement '{}' has a circular dependency in its parent chain: {}",
-                                    definition.id(),
-                                    visiting
-                                );
+                                        "Achievement '{}' has a circular dependency in its parent chain: {}",
+                                        definition.id(),
+                                        visiting);
                                 hasErrors = true;
                                 break;
                             }
@@ -142,43 +139,41 @@ public class AchievementRegistry {
                     String evalClass = definition.evaluatorClass();
                     if (!evalClass.isEmpty()) {
                         String fqn = evalClass.contains(".")
-                            ? evalClass
-                            : "de.tum.cit.aet.hephaestus.achievement.evaluator." + evalClass;
+                                ? evalClass
+                                : "de.tum.cit.aet.hephaestus.achievement.evaluator." + evalClass;
                         try {
                             Class.forName(fqn);
                         } catch (ClassNotFoundException e) {
                             log.error(
-                                "Achievement '{}' references unknown evaluator class: '{}'",
-                                definition.id(),
-                                evalClass
-                            );
+                                    "Achievement '{}' references unknown evaluator class: '{}'",
+                                    definition.id(),
+                                    evalClass);
                             hasErrors = true;
                         }
                     }
 
                     // Normalize evaluator class name for DummyEvaluator check
                     boolean isDummy = isDummyEvaluator(definition.evaluatorClass());
-                    boolean hasTriggers = definition.triggerEvents() != null && !definition.triggerEvents().isEmpty();
+                    boolean hasTriggers = definition.triggerEvents() != null
+                            && !definition.triggerEvents().isEmpty();
 
                     // Non-DummyEvaluator with empty triggerEvents = achievement can never be evaluated
                     if (!isDummy && !hasTriggers) {
                         log.error(
-                            "Achievement '{}' uses evaluator {} but has no triggerEvents - " +
-                                "it will never be evaluated",
-                            definition.id(),
-                            definition.evaluatorClass()
-                        );
+                                "Achievement '{}' uses evaluator {} but has no triggerEvents - "
+                                        + "it will never be evaluated",
+                                definition.id(),
+                                definition.evaluatorClass());
                         hasErrors = true;
                     }
 
                     // DummyEvaluator with non-empty triggerEvents = wasted work on every event
                     if (isDummy && hasTriggers) {
                         log.warn(
-                            "Achievement '{}' uses DummyEvaluator but has active triggerEvents {} - " +
-                                "this causes wasted DB work on every qualifying event",
-                            definition.id(),
-                            definition.triggerEvents()
-                        );
+                                "Achievement '{}' uses DummyEvaluator but has active triggerEvents {} - "
+                                        + "this causes wasted DB work on every qualifying event",
+                                definition.id(),
+                                definition.triggerEvents());
                     }
                 }
 
@@ -219,10 +214,9 @@ public class AchievementRegistry {
      * @return list of achievements
      */
     public List<AchievementDefinition> getByTriggerEvent(ActivityEventType eventType) {
-        return allAchievements
-            .stream()
-            .filter(a -> a.triggerEvents() != null && a.triggerEvents().contains(eventType))
-            .toList();
+        return allAchievements.stream()
+                .filter(a -> a.triggerEvents() != null && a.triggerEvents().contains(eventType))
+                .toList();
     }
 
     /**

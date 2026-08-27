@@ -11,31 +11,40 @@ class IntegrationStateTest extends BaseUnitTest {
 
     @Test
     void pendingCanTransitionToActiveOrUninstalled() {
-        assertThat(IntegrationState.PENDING.canTransitionTo(IntegrationState.ACTIVE)).isTrue();
-        assertThat(IntegrationState.PENDING.canTransitionTo(IntegrationState.UNINSTALLED)).isTrue();
-        assertThat(IntegrationState.PENDING.canTransitionTo(IntegrationState.SUSPENDED)).isFalse();
+        assertThat(IntegrationState.PENDING.canTransitionTo(IntegrationState.ACTIVE))
+                .isTrue();
+        assertThat(IntegrationState.PENDING.canTransitionTo(IntegrationState.UNINSTALLED))
+                .isTrue();
+        assertThat(IntegrationState.PENDING.canTransitionTo(IntegrationState.SUSPENDED))
+                .isFalse();
     }
 
     @Test
     void activeCanTransitionToSuspendedOrUninstalled() {
-        assertThat(IntegrationState.ACTIVE.canTransitionTo(IntegrationState.SUSPENDED)).isTrue();
-        assertThat(IntegrationState.ACTIVE.canTransitionTo(IntegrationState.UNINSTALLED)).isTrue();
-        assertThat(IntegrationState.ACTIVE.canTransitionTo(IntegrationState.PENDING)).isFalse();
+        assertThat(IntegrationState.ACTIVE.canTransitionTo(IntegrationState.SUSPENDED))
+                .isTrue();
+        assertThat(IntegrationState.ACTIVE.canTransitionTo(IntegrationState.UNINSTALLED))
+                .isTrue();
+        assertThat(IntegrationState.ACTIVE.canTransitionTo(IntegrationState.PENDING))
+                .isFalse();
     }
 
     @Test
     void suspendedCanReactivateOrUninstall() {
-        assertThat(IntegrationState.SUSPENDED.canTransitionTo(IntegrationState.ACTIVE)).isTrue();
-        assertThat(IntegrationState.SUSPENDED.canTransitionTo(IntegrationState.UNINSTALLED)).isTrue();
-        assertThat(IntegrationState.SUSPENDED.canTransitionTo(IntegrationState.PENDING)).isFalse();
+        assertThat(IntegrationState.SUSPENDED.canTransitionTo(IntegrationState.ACTIVE))
+                .isTrue();
+        assertThat(IntegrationState.SUSPENDED.canTransitionTo(IntegrationState.UNINSTALLED))
+                .isTrue();
+        assertThat(IntegrationState.SUSPENDED.canTransitionTo(IntegrationState.PENDING))
+                .isFalse();
     }
 
     @Test
     void uninstalledIsTerminalForGenericTransitions() {
         for (IntegrationState next : IntegrationState.values()) {
             assertThat(IntegrationState.UNINSTALLED.canTransitionTo(next))
-                .as("UNINSTALLED should not transition generically to %s", next)
-                .isFalse();
+                    .as("UNINSTALLED should not transition generically to %s", next)
+                    .isFalse();
         }
     }
 }

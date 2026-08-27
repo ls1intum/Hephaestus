@@ -38,37 +38,32 @@ public class PracticeReviewSummaryController {
 
     @GetMapping
     @Operation(
-        summary = "List practice reviews with observation and feedback outcomes",
-        description = "Results are ordered newest first.",
-        operationId = "listPracticeReviews"
-    )
+            summary = "List practice reviews with observation and feedback outcomes",
+            description = "Results are ordered newest first.",
+            operationId = "listPracticeReviews")
     @ApiResponse(responseCode = "200", description = "Paginated review summaries returned")
     @ApiResponse(
-        responseCode = "400",
-        description = "Invalid filter or pagination",
-        content = @Content(
-            mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
-            schema = @Schema(implementation = ProblemDetail.class)
-        )
-    )
+            responseCode = "400",
+            description = "Invalid filter or pagination",
+            content =
+                    @Content(
+                            mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+                            schema = @Schema(implementation = ProblemDetail.class)))
     public ResponseEntity<PagedModel<ReviewRunSummaryDTO>> listReviews(
-        WorkspaceContext workspaceContext,
-        @RequestParam(defaultValue = "0") @Min(0) int page,
-        @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size,
-        @Valid @ParameterObject ReviewRunFilterParams filter
-    ) {
+            WorkspaceContext workspaceContext,
+            @RequestParam(defaultValue = "0") @Min(0) int page,
+            @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size,
+            @Valid @ParameterObject ReviewRunFilterParams filter) {
         PageRequest pageable = PageRequest.of(page, size, Sort.by(Sort.Order.desc("createdAt"), Sort.Order.desc("id")));
         return ResponseEntity.ok(
-            new PagedModel<>(queryService.list(workspaceContext.id(), filter.validated(), pageable))
-        );
+                new PagedModel<>(queryService.list(workspaceContext.id(), filter.validated(), pageable)));
     }
 
     @GetMapping("/evidence-outcomes")
     @Operation(
-        summary = "Summarize how each practice's evidence requirements turned out on recent reviews",
-        description = "One entry per practice that recent reviews considered, with the sources that skipped it.",
-        operationId = "listPracticeEvidenceOutcomes"
-    )
+            summary = "Summarize how each practice's evidence requirements turned out on recent reviews",
+            description = "One entry per practice that recent reviews considered, with the sources that skipped it.",
+            operationId = "listPracticeEvidenceOutcomes")
     @ApiResponse(responseCode = "200", description = "Evidence outcomes returned")
     public ResponseEntity<List<PracticeEvidenceOutcomeDTO>> listEvidenceOutcomes(WorkspaceContext workspaceContext) {
         return ResponseEntity.ok(evidenceOutcomeService.recentOutcomes(workspaceContext.id()));

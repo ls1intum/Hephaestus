@@ -65,10 +65,10 @@ class WorkspaceRegistryControllerTest {
     void shouldRejectNonAdminWhenCreationPolicyIsAdminOnly() {
         authenticate(List.of());
 
-        assertThatThrownBy(() -> controller.createWorkspace(request(IntegrationKind.GITHUB))).isInstanceOfSatisfying(
-            ResponseStatusException.class,
-            exception -> assertThat(exception.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN)
-        );
+        assertThatThrownBy(() -> controller.createWorkspace(request(IntegrationKind.GITHUB)))
+                .isInstanceOfSatisfying(
+                        ResponseStatusException.class,
+                        exception -> assertThat(exception.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN));
         verifyNoInteractions(workspaceService, workspaceProvisioningService);
     }
 
@@ -98,47 +98,39 @@ class WorkspaceRegistryControllerTest {
     void shouldRejectGitLabWorkspaceWhenFeatureIsDisabled() {
         controller = controller(WorkspaceProperties.CreationPolicy.SELF_SERVICE);
         authenticate(List.of());
-        when(featureFlagService.isEnabled(FeatureFlag.GITLAB_WORKSPACE_CREATION)).thenReturn(false);
+        when(featureFlagService.isEnabled(FeatureFlag.GITLAB_WORKSPACE_CREATION))
+                .thenReturn(false);
 
-        assertThatThrownBy(() -> controller.createWorkspace(request(IntegrationKind.GITLAB))).isInstanceOfSatisfying(
-            ResponseStatusException.class,
-            exception -> assertThat(exception.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN)
-        );
+        assertThatThrownBy(() -> controller.createWorkspace(request(IntegrationKind.GITLAB)))
+                .isInstanceOfSatisfying(
+                        ResponseStatusException.class,
+                        exception -> assertThat(exception.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN));
         verifyNoInteractions(workspaceService, workspaceProvisioningService);
     }
 
     private WorkspaceRegistryController controller(WorkspaceProperties.CreationPolicy policy) {
         return new WorkspaceRegistryController(
-            workspaceService,
-            workspaceQueryService,
-            workspaceProvisioningService,
-            featureFlagService,
-            new WorkspaceProperties(false, null, false, null, policy)
-        );
+                workspaceService,
+                workspaceQueryService,
+                workspaceProvisioningService,
+                featureFlagService,
+                new WorkspaceProperties(false, null, false, null, policy));
     }
 
     private static CreateWorkspaceRequestDTO request(IntegrationKind kind) {
         return new CreateWorkspaceRequestDTO(
-            "test-workspace",
-            "Test Workspace",
-            "test-org",
-            AccountType.ORG,
-            1L,
-            kind,
-            "test-token",
-            null
-        );
+                "test-workspace", "Test Workspace", "test-org", AccountType.ORG, 1L, kind, "test-token", null);
     }
 
     private static void authenticate(List<String> roles) {
         Instant issuedAt = Instant.now();
         Jwt jwt = Jwt.withTokenValue("token")
-            .header("alg", "none")
-            .subject("1")
-            .issuedAt(issuedAt)
-            .expiresAt(issuedAt.plusSeconds(60))
-            .claim("roles", roles)
-            .build();
+                .header("alg", "none")
+                .subject("1")
+                .issuedAt(issuedAt)
+                .expiresAt(issuedAt.plusSeconds(60))
+                .claim("roles", roles)
+                .build();
         SecurityContextHolder.getContext().setAuthentication(new JwtAuthenticationToken(jwt));
     }
 }

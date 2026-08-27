@@ -55,22 +55,20 @@ public class GitHubTeamMessageHandler extends AbstractIntegrationMessageHandler<
     private final TeamRepositoryPermissionRepository permissionRepository;
 
     GitHubTeamMessageHandler(
-        GitHubTeamProcessor teamProcessor,
-        ScopeIdResolver scopeIdResolver,
-        IdentityProviderRepository gitProviderRepository,
-        TeamRepository teamRepository,
-        RepositoryRepository repositoryRepository,
-        TeamRepositoryPermissionRepository permissionRepository,
-        NatsMessageDeserializer deserializer,
-        TransactionTemplate transactionTemplate
-    ) {
+            GitHubTeamProcessor teamProcessor,
+            ScopeIdResolver scopeIdResolver,
+            IdentityProviderRepository gitProviderRepository,
+            TeamRepository teamRepository,
+            RepositoryRepository repositoryRepository,
+            TeamRepositoryPermissionRepository permissionRepository,
+            NatsMessageDeserializer deserializer,
+            TransactionTemplate transactionTemplate) {
         super(
-            IntegrationKind.GITHUB,
-            "organization." + GitHubEventType.TEAM.getValue(),
-            GitHubTeamEventDTO.class,
-            deserializer,
-            transactionTemplate
-        );
+                IntegrationKind.GITHUB,
+                "organization." + GitHubEventType.TEAM.getValue(),
+                GitHubTeamEventDTO.class,
+                deserializer,
+                transactionTemplate);
         this.teamProcessor = teamProcessor;
         this.scopeIdResolver = scopeIdResolver;
         this.gitProviderRepository = gitProviderRepository;
@@ -105,11 +103,10 @@ public class GitHubTeamMessageHandler extends AbstractIntegrationMessageHandler<
         }
 
         log.debug(
-            "Received team event: action={}, teamName={}, orgLogin={}",
-            event.action(),
-            sanitizeForLog(teamDto.name()),
-            orgLogin != null ? sanitizeForLog(orgLogin) : "unknown"
-        );
+                "Received team event: action={}, teamName={}, orgLogin={}",
+                event.action(),
+                sanitizeForLog(teamDto.name()),
+                orgLogin != null ? sanitizeForLog(orgLogin) : "unknown");
 
         Long scopeId = scopeIdResolver.findScopeIdByOrgLogin(orgLogin).orElse(null);
         if (scopeId == null) {
@@ -117,17 +114,14 @@ public class GitHubTeamMessageHandler extends AbstractIntegrationMessageHandler<
             return;
         }
         IdentityProvider gitHubProvider = gitProviderRepository
-            .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
-            .orElseThrow(() -> new IllegalStateException("GitHub provider not configured"));
+                .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
+                .orElseThrow(() -> new IllegalStateException("GitHub provider not configured"));
         ProcessingContext context = ProcessingContext.forWebhook(scopeId, gitHubProvider, event.action());
 
         switch (event.actionType()) {
             case GitHubEventAction.Team.DELETED -> teamProcessor.delete(teamDto.id(), context);
-            case GitHubEventAction.Team.CREATED, GitHubEventAction.Team.EDITED -> teamProcessor.process(
-                teamDto,
-                orgLogin,
-                context
-            );
+            case GitHubEventAction.Team.CREATED, GitHubEventAction.Team.EDITED ->
+                teamProcessor.process(teamDto, orgLogin, context);
             case GitHubEventAction.Team.ADDED_TO_REPOSITORY -> handleAddedToRepository(event, gitHubProvider);
             case GitHubEventAction.Team.REMOVED_FROM_REPOSITORY -> handleRemovedFromRepository(event, gitHubProvider);
             default -> log.debug("Skipped team event: reason=unhandledAction, action={}", event.action());
@@ -148,20 +142,18 @@ public class GitHubTeamMessageHandler extends AbstractIntegrationMessageHandler<
         var teamOpt = teamRepository.findByNativeIdAndProviderId(Objects.requireNonNull(teamDto.id()), providerId);
         if (teamOpt.isEmpty()) {
             log.debug(
-                "Skipped added_to_repository: reason=teamNotFound, teamNativeId={}, teamName={}",
-                teamDto.id(),
-                sanitizeForLog(teamDto.name())
-            );
+                    "Skipped added_to_repository: reason=teamNotFound, teamNativeId={}, teamName={}",
+                    teamDto.id(),
+                    sanitizeForLog(teamDto.name()));
             return;
         }
 
         var repoOpt = repositoryRepository.findByNativeIdAndProviderId(repoRef.id(), providerId);
         if (repoOpt.isEmpty()) {
             log.debug(
-                "Skipped added_to_repository: reason=repoNotMonitored, repoNativeId={}, repoName={}",
-                repoRef.id(),
-                sanitizeForLog(repoRef.fullName())
-            );
+                    "Skipped added_to_repository: reason=repoNotMonitored, repoNativeId={}, repoName={}",
+                    repoRef.id(),
+                    sanitizeForLog(repoRef.fullName()));
             return;
         }
 
@@ -177,21 +169,19 @@ public class GitHubTeamMessageHandler extends AbstractIntegrationMessageHandler<
                 existing.setPermission(level);
                 permissionRepository.save(existing);
                 log.info(
-                    "Updated team repo permission: teamName={}, repoName={}, permission={}",
-                    sanitizeForLog(team.getName()),
-                    sanitizeForLog(repo.getNameWithOwner()),
-                    level
-                );
+                        "Updated team repo permission: teamName={}, repoName={}, permission={}",
+                        sanitizeForLog(team.getName()),
+                        sanitizeForLog(repo.getNameWithOwner()),
+                        level);
             }
         } else {
             TeamRepositoryPermission permission = new TeamRepositoryPermission(team, repo, level);
             permissionRepository.save(permission);
             log.info(
-                "Created team repo permission: teamName={}, repoName={}, permission={}",
-                sanitizeForLog(team.getName()),
-                sanitizeForLog(repo.getNameWithOwner()),
-                level
-            );
+                    "Created team repo permission: teamName={}, repoName={}, permission={}",
+                    sanitizeForLog(team.getName()),
+                    sanitizeForLog(repo.getNameWithOwner()),
+                    level);
         }
     }
 
@@ -201,9 +191,8 @@ public class GitHubTeamMessageHandler extends AbstractIntegrationMessageHandler<
 
         if (repoRef == null || repoRef.id() == null) {
             log.warn(
-                "Skipped removed_from_repository: reason=noRepository, teamName={}",
-                sanitizeForLog(teamDto.name())
-            );
+                    "Skipped removed_from_repository: reason=noRepository, teamName={}",
+                    sanitizeForLog(teamDto.name()));
             return;
         }
 
@@ -212,20 +201,18 @@ public class GitHubTeamMessageHandler extends AbstractIntegrationMessageHandler<
         var teamOpt = teamRepository.findByNativeIdAndProviderId(Objects.requireNonNull(teamDto.id()), providerId);
         if (teamOpt.isEmpty()) {
             log.debug(
-                "Skipped removed_from_repository: reason=teamNotFound, teamNativeId={}, teamName={}",
-                teamDto.id(),
-                sanitizeForLog(teamDto.name())
-            );
+                    "Skipped removed_from_repository: reason=teamNotFound, teamNativeId={}, teamName={}",
+                    teamDto.id(),
+                    sanitizeForLog(teamDto.name()));
             return;
         }
 
         var repoOpt = repositoryRepository.findByNativeIdAndProviderId(repoRef.id(), providerId);
         if (repoOpt.isEmpty()) {
             log.debug(
-                "Skipped removed_from_repository: reason=repoNotMonitored, repoNativeId={}, repoName={}",
-                repoRef.id(),
-                sanitizeForLog(repoRef.fullName())
-            );
+                    "Skipped removed_from_repository: reason=repoNotMonitored, repoNativeId={}, repoName={}",
+                    repoRef.id(),
+                    sanitizeForLog(repoRef.fullName()));
             return;
         }
 
@@ -233,23 +220,19 @@ public class GitHubTeamMessageHandler extends AbstractIntegrationMessageHandler<
         Repository repo = repoOpt.get();
 
         permissionRepository
-            .findByTeam_IdAndRepository_Id(team.getId(), repo.getId())
-            .ifPresentOrElse(
-                permission -> {
-                    permissionRepository.delete(permission);
-                    log.info(
-                        "Deleted team repo permission: teamName={}, repoName={}",
-                        sanitizeForLog(team.getName()),
-                        sanitizeForLog(repo.getNameWithOwner())
-                    );
-                },
-                () ->
-                    log.debug(
-                        "Skipped removed_from_repository: reason=permissionNotFound, teamName={}, repoName={}",
-                        sanitizeForLog(team.getName()),
-                        sanitizeForLog(repo.getNameWithOwner())
-                    )
-            );
+                .findByTeam_IdAndRepository_Id(team.getId(), repo.getId())
+                .ifPresentOrElse(
+                        permission -> {
+                            permissionRepository.delete(permission);
+                            log.info(
+                                    "Deleted team repo permission: teamName={}, repoName={}",
+                                    sanitizeForLog(team.getName()),
+                                    sanitizeForLog(repo.getNameWithOwner()));
+                        },
+                        () -> log.debug(
+                                "Skipped removed_from_repository: reason=permissionNotFound, teamName={}, repoName={}",
+                                sanitizeForLog(team.getName()),
+                                sanitizeForLog(repo.getNameWithOwner())));
     }
 
     /**

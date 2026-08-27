@@ -14,16 +14,15 @@ import org.jspecify.annotations.Nullable;
  * workspace-relative; {@code volumeMounts} are bind-mounted read-only.
  */
 public record PracticeSandboxSpec(
-    String image,
-    List<String> command,
-    Map<String, String> environment,
-    Map<String, byte[]> inputFiles,
-    String outputPath,
-    @Nullable SecurityProfile securityProfile,
-    @Nullable NetworkPolicy networkPolicy,
-    Map<String, String> volumeMounts,
-    @Nullable String promptDigest
-) {
+        String image,
+        List<String> command,
+        Map<String, String> environment,
+        Map<String, byte[]> inputFiles,
+        String outputPath,
+        @Nullable SecurityProfile securityProfile,
+        @Nullable NetworkPolicy networkPolicy,
+        Map<String, String> volumeMounts,
+        @Nullable String promptDigest) {
     public PracticeSandboxSpec {
         Objects.requireNonNull(image, "image must not be null");
         if (image.isBlank()) {

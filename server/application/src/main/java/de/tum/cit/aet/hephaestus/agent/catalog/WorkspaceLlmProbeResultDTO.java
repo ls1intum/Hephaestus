@@ -10,10 +10,14 @@ import org.jspecify.annotations.Nullable;
  */
 @Schema(description = "Result of testing your AI provider connection")
 public record WorkspaceLlmProbeResultDTO(
-    @NonNull @Schema(description = "Whether the provider answered") Boolean reachable,
-    @NonNull @Schema(description = "How many models the provider listed (0 if unreachable)") Integer modelCount,
-    @Nullable @Schema(description = "Human-readable diagnostic when not reachable") String message
-) {
+        @NonNull @Schema(description = "Whether the provider answered")
+        Boolean reachable,
+
+        @NonNull @Schema(description = "How many models the provider listed (0 if unreachable)")
+        Integer modelCount,
+
+        @Nullable @Schema(description = "Human-readable diagnostic when not reachable")
+        String message) {
     static WorkspaceLlmProbeResultDTO from(LlmProbeResultDTO raw) {
         if (!raw.reachable()) {
             return new WorkspaceLlmProbeResultDTO(false, 0, raw.message());

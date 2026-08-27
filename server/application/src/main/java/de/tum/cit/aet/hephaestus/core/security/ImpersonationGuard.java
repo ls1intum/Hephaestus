@@ -71,10 +71,9 @@ public class ImpersonationGuard extends OncePerRequestFilter {
      * {@code POST /auth/impersonate} (begin) is deliberately NOT listed, so it stays guarded.
      */
     public static final RequestMatcher LIFECYCLE_ESCAPE = new OrRequestMatcher(
-        PathPatternRequestMatcher.withDefaults().matcher(HttpMethod.POST, "/auth/impersonate:exit"),
-        PathPatternRequestMatcher.withDefaults().matcher(HttpMethod.POST, "/auth/logout"),
-        PathPatternRequestMatcher.withDefaults().matcher(HttpMethod.POST, "/auth/refresh")
-    );
+            PathPatternRequestMatcher.withDefaults().matcher(HttpMethod.POST, "/auth/impersonate:exit"),
+            PathPatternRequestMatcher.withDefaults().matcher(HttpMethod.POST, "/auth/logout"),
+            PathPatternRequestMatcher.withDefaults().matcher(HttpMethod.POST, "/auth/refresh"));
 
     private static final Logger log = LoggerFactory.getLogger(ImpersonationGuard.class);
 
@@ -86,17 +85,14 @@ public class ImpersonationGuard extends OncePerRequestFilter {
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
-        throws ServletException, IOException {
+            throws ServletException, IOException {
         if (isImpersonating() && !isSafe(request) && !writesAllowed(request) && !LIFECYCLE_ESCAPE.matches(request)) {
             log.warn(
-                "auth.impersonation: blocked {} {} — impersonation session is read-only (no allow-writes header)",
-                request.getMethod(),
-                request.getRequestURI()
-            );
+                    "auth.impersonation: blocked {} {} — impersonation session is read-only (no allow-writes header)",
+                    request.getMethod(),
+                    request.getRequestURI());
             ProblemDetail problem = ProblemDetail.forStatusAndDetail(
-                HttpStatus.FORBIDDEN,
-                "Impersonation sessions are read-only. Enable writes explicitly to proceed."
-            );
+                    HttpStatus.FORBIDDEN, "Impersonation sessions are read-only. Enable writes explicitly to proceed.");
             problem.setTitle("Forbidden");
             problem.setProperty("code", "impersonation_read_only");
             problem.setInstance(URI.create(request.getRequestURI()));
@@ -120,9 +116,9 @@ public class ImpersonationGuard extends OncePerRequestFilter {
 
     private static boolean isSafe(HttpServletRequest request) {
         String method = request.getMethod();
-        return (
-            HttpMethod.GET.matches(method) || HttpMethod.HEAD.matches(method) || HttpMethod.OPTIONS.matches(method)
-        );
+        return (HttpMethod.GET.matches(method)
+                || HttpMethod.HEAD.matches(method)
+                || HttpMethod.OPTIONS.matches(method));
     }
 
     private static boolean writesAllowed(HttpServletRequest request) {

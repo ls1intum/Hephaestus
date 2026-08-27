@@ -64,9 +64,8 @@ public class LinkedWorkItemContentSource implements EvidenceSource {
      * Closing-keyword reference, e.g. {@code closes #42} / {@code Fixes #7}. Case-insensitive.
      * Group 2 captures the issue number.
      */
-    private static final Pattern CLOSING_REF = Pattern.compile(
-        "(?i)\\b(close[sd]?|fix(e[sd])?|resolve[sd]?)\\b\\s*:?\\s*#(\\d+)"
-    );
+    private static final Pattern CLOSING_REF =
+            Pattern.compile("(?i)\\b(close[sd]?|fix(e[sd])?|resolve[sd]?)\\b\\s*:?\\s*#(\\d+)");
 
     /**
      * Bare {@code #N} mention. Group 1 captures the issue number. The trailing boundary
@@ -93,12 +92,11 @@ public class LinkedWorkItemContentSource implements EvidenceSource {
     private final GitDiffOperations gitDiffOperations;
 
     public LinkedWorkItemContentSource(
-        ObjectMapper objectMapper,
-        PullRequestRepository pullRequestRepository,
-        IssueRepository issueRepository,
-        GitRepositoryManager gitRepositoryManager,
-        GitDiffOperations gitDiffOperations
-    ) {
+            ObjectMapper objectMapper,
+            PullRequestRepository pullRequestRepository,
+            IssueRepository issueRepository,
+            GitRepositoryManager gitRepositoryManager,
+            GitDiffOperations gitDiffOperations) {
         this.objectMapper = objectMapper;
         this.pullRequestRepository = pullRequestRepository;
         this.issueRepository = issueRepository;
@@ -142,14 +140,15 @@ public class LinkedWorkItemContentSource implements EvidenceSource {
                 throw new EvidenceCollectionException("Linked-work-item repository id is missing", null);
             }
 
-            PullRequest pullRequest =
-                pullRequestId == null ? null : pullRequestRepository.findByIdWithAllForGate(pullRequestId).orElse(null);
+            PullRequest pullRequest = pullRequestId == null
+                    ? null
+                    : pullRequestRepository
+                            .findByIdWithAllForGate(pullRequestId)
+                            .orElse(null);
 
             String body = pullRequest != null ? pullRequest.getBody() : null;
             String sourceBranch = firstNonBlank(
-                MetaJson.optString(m, "source_branch"),
-                pullRequest != null ? pullRequest.getHeadRefName() : null
-            );
+                    MetaJson.optString(m, "source_branch"), pullRequest != null ? pullRequest.getHeadRefName() : null);
 
             Refs refs = new Refs();
 
@@ -191,15 +190,14 @@ public class LinkedWorkItemContentSource implements EvidenceSource {
             Map<String, byte[]> files = Map.of(OUTPUT_FILE, objectMapper.writeValueAsBytes(root));
             log.info("Linked work items: wrote {} item(s), resolvedFrom={}", items.size(), refs.resolvedFrom);
             return new EvidenceContribution(
-                files,
-                // Always partial: links are scanned out of the description, branch name and commit
-                // subjects, and no such scan can establish there is no link the work never mentioned.
-                Map.of(KIND, SourceCompleteness.PARTIAL),
-                Map.of(),
-                Map.of(),
-                Map.of(),
-                Map.of(KIND, items.isEmpty() ? SourceContentState.EMPTY : SourceContentState.NON_EMPTY)
-            );
+                    files,
+                    // Always partial: links are scanned out of the description, branch name and commit
+                    // subjects, and no such scan can establish there is no link the work never mentioned.
+                    Map.of(KIND, SourceCompleteness.PARTIAL),
+                    Map.of(),
+                    Map.of(),
+                    Map.of(),
+                    Map.of(KIND, items.isEmpty() ? SourceContentState.EMPTY : SourceContentState.NON_EMPTY));
         } catch (EvidenceCollectionException e) {
             throw e;
         } catch (Exception e) {
@@ -321,13 +319,10 @@ public class LinkedWorkItemContentSource implements EvidenceSource {
             if (range == null) {
                 return;
             }
-            List<GitRepositoryManager.CommitInfo> ahead = gitRepositoryManager.walkCommits(
-                repositoryId,
-                range[0],
-                range[1],
-                MAX_COMMITS_SCANNED + 1
-            );
-            for (GitRepositoryManager.CommitInfo commit : ahead.stream().limit(MAX_COMMITS_SCANNED).toList()) {
+            List<GitRepositoryManager.CommitInfo> ahead =
+                    gitRepositoryManager.walkCommits(repositoryId, range[0], range[1], MAX_COMMITS_SCANNED + 1);
+            for (GitRepositoryManager.CommitInfo commit :
+                    ahead.stream().limit(MAX_COMMITS_SCANNED).toList()) {
                 String subject = commit.message();
                 if (subject == null || subject.isBlank()) {
                     continue;

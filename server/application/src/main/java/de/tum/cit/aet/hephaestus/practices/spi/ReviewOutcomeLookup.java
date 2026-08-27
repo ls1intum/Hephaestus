@@ -26,11 +26,10 @@ public interface ReviewOutcomeLookup {
      *                             practice absent here was never considered, not considered and refused
      */
     record ReviewOutcome(
-        @NonNull ReviewRunState state,
-        boolean insufficientEvidence,
-        @Nullable Instant decidedAt,
-        @NonNull Map<String, PracticeReadinessOutcome> readinessByPracticeSlug
-    ) {}
+            @NonNull ReviewRunState state,
+            boolean insufficientEvidence,
+            @Nullable Instant decidedAt,
+            @NonNull Map<String, PracticeReadinessOutcome> readinessByPracticeSlug) {}
 
     /**
      * @param blockers      already-rendered phrases naming what could not be read, so no consumer has to
@@ -41,7 +40,10 @@ public interface ReviewOutcomeLookup {
      *                      fact about the work, and telling somebody "we could not look" when we looked
      *                      and there was nothing of this kind to see sends them to the wrong fix
      */
-    record PracticeReadinessOutcome(boolean ready, @NonNull List<String> blockers, @Nullable String notApplicable) {}
+    record PracticeReadinessOutcome(
+            boolean ready,
+            @NonNull List<String> blockers,
+            @Nullable String notApplicable) {}
 
     /**
      * Deliberately coarser than the orchestrator's job status: a trace has nothing different to say

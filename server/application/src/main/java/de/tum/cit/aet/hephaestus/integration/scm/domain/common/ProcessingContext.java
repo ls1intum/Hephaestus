@@ -43,14 +43,13 @@ import org.jspecify.annotations.Nullable;
  * @param source         Whether data came from sync or webhook
  */
 public record ProcessingContext(
-    @Nullable Long scopeId,
-    @Nullable Repository repository,
-    @Nullable IdentityProvider provider,
-    Instant startedAt,
-    String correlationId,
-    @Nullable String webhookAction,
-    DataSource source
-) {
+        @Nullable Long scopeId,
+        @Nullable Repository repository,
+        @Nullable IdentityProvider provider,
+        Instant startedAt,
+        String correlationId,
+        @Nullable String webhookAction,
+        DataSource source) {
     /**
      * Returns the provider's database ID for use in upsert queries.
      */
@@ -63,14 +62,13 @@ public record ProcessingContext(
      */
     public static ProcessingContext forSync(@Nullable Long scopeId, @Nullable Repository repository) {
         return new ProcessingContext(
-            scopeId,
-            repository,
-            repository != null ? repository.getProvider() : null,
-            Instant.now(),
-            UUID.randomUUID().toString(),
-            null,
-            DataSource.GRAPHQL_SYNC
-        );
+                scopeId,
+                repository,
+                repository != null ? repository.getProvider() : null,
+                Instant.now(),
+                UUID.randomUUID().toString(),
+                null,
+                DataSource.GRAPHQL_SYNC);
     }
 
     /**
@@ -79,14 +77,7 @@ public record ProcessingContext(
      */
     public static ProcessingContext forSync(@Nullable Long scopeId, IdentityProvider provider) {
         return new ProcessingContext(
-            scopeId,
-            null,
-            provider,
-            Instant.now(),
-            UUID.randomUUID().toString(),
-            null,
-            DataSource.GRAPHQL_SYNC
-        );
+                scopeId, null, provider, Instant.now(), UUID.randomUUID().toString(), null, DataSource.GRAPHQL_SYNC);
     }
 
     /**
@@ -94,14 +85,13 @@ public record ProcessingContext(
      */
     public static ProcessingContext forWebhook(@Nullable Long scopeId, Repository repository, String action) {
         return new ProcessingContext(
-            scopeId,
-            repository,
-            repository != null ? repository.getProvider() : null,
-            Instant.now(),
-            UUID.randomUUID().toString(),
-            action,
-            DataSource.WEBHOOK
-        );
+                scopeId,
+                repository,
+                repository != null ? repository.getProvider() : null,
+                Instant.now(),
+                UUID.randomUUID().toString(),
+                action,
+                DataSource.WEBHOOK);
     }
 
     /**
@@ -110,14 +100,7 @@ public record ProcessingContext(
      */
     public static ProcessingContext forWebhook(@Nullable Long scopeId, IdentityProvider provider, String action) {
         return new ProcessingContext(
-            scopeId,
-            null,
-            provider,
-            Instant.now(),
-            UUID.randomUUID().toString(),
-            action,
-            DataSource.WEBHOOK
-        );
+                scopeId, null, provider, Instant.now(), UUID.randomUUID().toString(), action, DataSource.WEBHOOK);
     }
 
     /**

@@ -18,11 +18,10 @@ public class AgentImagePinGuard {
         String reference = properties.reference();
         if (reference == null || !DIGEST.matcher(reference).matches()) {
             throw new IllegalStateException(
-                "hephaestus.agent.image.reference must be digest-pinned (ending in @sha256:<64 lowercase hex>) " +
-                    "when hephaestus.agent.image.require-digest=true. Got: " +
-                    Objects.requireNonNullElse(reference, "<not set>") +
-                    ". See docs/admin/agent-image-digests.md."
-            );
+                    "hephaestus.agent.image.reference must be digest-pinned (ending in @sha256:<64 lowercase hex>) "
+                            + "when hephaestus.agent.image.require-digest=true. Got: "
+                            + Objects.requireNonNullElse(reference, "<not set>")
+                            + ". See docs/admin/agent-image-digests.md.");
         }
     }
 }

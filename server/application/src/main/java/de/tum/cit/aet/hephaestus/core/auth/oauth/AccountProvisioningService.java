@@ -45,15 +45,14 @@ public class AccountProvisioningService {
     private final Clock clock;
 
     public AccountProvisioningService(
-        AccountRepository accountRepository,
-        IdentityLinkRepository identityLinkRepository,
-        GitProviderRegistry gitProviderRegistry,
-        LoginProviderRepository loginProviderRepository,
-        VerifiedEmailResolver verifiedEmailResolver,
-        AccountJitCreator accountJitCreator,
-        AdminBootstrapPolicy adminBootstrapPolicy,
-        Clock clock
-    ) {
+            AccountRepository accountRepository,
+            IdentityLinkRepository identityLinkRepository,
+            GitProviderRegistry gitProviderRegistry,
+            LoginProviderRepository loginProviderRepository,
+            VerifiedEmailResolver verifiedEmailResolver,
+            AccountJitCreator accountJitCreator,
+            AdminBootstrapPolicy adminBootstrapPolicy,
+            Clock clock) {
         this.accountRepository = accountRepository;
         this.identityLinkRepository = identityLinkRepository;
         this.gitProviderRegistry = gitProviderRegistry;
@@ -78,13 +77,10 @@ public class AccountProvisioningService {
      */
     @Transactional
     public ProvisionResult resolveOrProvision(
-        String registrationId,
-        String subject,
-        OAuth2User principal,
-        AuthIntentCookie.@Nullable Intent intent
-    ) {
+            String registrationId, String subject, OAuth2User principal, AuthIntentCookie.@Nullable Intent intent) {
         LoginProvider provider = requireLoginProvider(registrationId);
-        long providerId = gitProviderRegistry.resolveProviderId(provider.getType().name(), provider.getBaseUrl());
+        long providerId =
+                gitProviderRegistry.resolveProviderId(provider.getType().name(), provider.getBaseUrl());
         AuthIntentCookie.Intent.Mode mode = (intent != null) ? intent.mode() : AuthIntentCookie.Intent.Mode.LOGIN;
         // Link-only providers (Slack, Outline) may only ATTACH an identity to an authenticated account —
         // never act as a primary login. AuthBeginController rejects these at flow begin; this is the
@@ -100,32 +96,28 @@ public class AccountProvisioningService {
         }
 
         IdentityLink link = identityLinkRepository
-            .findActiveByProviderSubject(providerId, subject, teamId)
-            .orElse(null);
+                .findActiveByProviderSubject(providerId, subject, teamId)
+                .orElse(null);
 
         if (link != null) {
             // Collision guard (secure account linking): if this identity is already an ACTIVE link, a
             // LINK-mode flow may only re-affirm it for the SAME account. Returning a DIFFERENT account
             // here would log the operator into someone else's account (or rebind a victim's identity) —
             // an account-takeover vector. LOGIN mode is unaffected (the identity owns the account).
-            if (
-                mode == AuthIntentCookie.Intent.Mode.LINK &&
-                intent != null &&
-                intent.linkingAccountId() != null &&
-                !Objects.requireNonNull(link.getAccount().getId()).equals(intent.linkingAccountId())
-            ) {
-                throw new AccountLinkConflictException(registrationId, subject, link.getAccount().getId());
+            if (mode == AuthIntentCookie.Intent.Mode.LINK
+                    && intent != null
+                    && intent.linkingAccountId() != null
+                    && !Objects.requireNonNull(link.getAccount().getId()).equals(intent.linkingAccountId())) {
+                throw new AccountLinkConflictException(
+                        registrationId, subject, link.getAccount().getId());
             }
             identityLinkRepository.touchLastLogin(link.getId(), clock.instant());
             log.info(
-                "auth.success: returning login provider={} accountId={}",
-                registrationId,
-                link.getAccount().getId()
-            );
+                    "auth.success: returning login provider={} accountId={}",
+                    registrationId,
+                    link.getAccount().getId());
             return new ProvisionResult(
-                promoteIfBootstrapAdmin(link.getAccount(), registrationId, subject, loginOf(principal)),
-                false
-            );
+                    promoteIfBootstrapAdmin(link.getAccount(), registrationId, subject, loginOf(principal)), false);
         }
 
         if (mode == AuthIntentCookie.Intent.Mode.LINK) {
@@ -136,10 +128,9 @@ public class AccountProvisioningService {
                 throw new IllegalStateException("auth.link: link mode requires an authenticated account binding");
             }
             Account account = accountRepository
-                .findById(intent.linkingAccountId())
-                .orElseThrow(() ->
-                    new IllegalStateException("auth.link: linkingAccountId=" + intent.linkingAccountId() + " not found")
-                );
+                    .findById(intent.linkingAccountId())
+                    .orElseThrow(() -> new IllegalStateException(
+                            "auth.link: linkingAccountId=" + intent.linkingAccountId() + " not found"));
             IdentityLink linked = newIdentityLink(account, providerId, subject, teamId, principal);
             linked.setLinkedVia(IdentityLink.LinkedVia.MANUAL_LINK);
             identityLinkRepository.save(linked);
@@ -163,11 +154,10 @@ public class AccountProvisioningService {
             // read-after-conflict below.
             Account created = accountJitCreator.create(account, newLink);
             log.info(
-                "auth.success: JIT created accountId={} via provider={} emailVerified={}",
-                created.getId(),
-                registrationId,
-                resolvedEmail.verified()
-            );
+                    "auth.success: JIT created accountId={} via provider={} emailVerified={}",
+                    created.getId(),
+                    registrationId,
+                    resolvedEmail.verified());
             String login = loginOf(principal);
             Account result = promoteIfBootstrapAdmin(created, registrationId, subject, login);
             if (result.getAppRole() != Account.AppRole.APP_ADMIN && adminBootstrapPolicy.isConfigured()) {
@@ -175,13 +165,12 @@ public class AccountProvisioningService {
                 // Logs the exact identity so a mis-listed first admin can self-diagnose in one line
                 // instead of silently landing as a plain USER with no Admin nav.
                 log.info(
-                    "auth.bootstrap: new accountId={} did NOT match bootstrap-admins (provider={} subject={} username=@{}). " +
-                        "Add 'provider:@username' or 'provider:subject' to grant APP_ADMIN.",
-                    result.getId(),
-                    registrationId,
-                    subject,
-                    login
-                );
+                        "auth.bootstrap: new accountId={} did NOT match bootstrap-admins (provider={} subject={} username=@{}). "
+                                + "Add 'provider:@username' or 'provider:subject' to grant APP_ADMIN.",
+                        result.getId(),
+                        registrationId,
+                        subject,
+                        login);
             }
             return new ProvisionResult(result, false); // fresh JIT login, not a link onto an existing account
         } catch (DataIntegrityViolationException e) {
@@ -189,29 +178,22 @@ public class AccountProvisioningService {
             // uq_identity_link_provider_subject_team insert. Fail closed by reading the now-existing
             // active link and returning the winner's account — never a second orphan account.
             return identityLinkRepository
-                .findActiveByProviderSubject(providerId, subject, teamId)
-                .map(IdentityLink::getAccount)
-                .map(winner -> {
-                    log.info(
-                        "auth.success: JIT race resolved — reused concurrently-created accountId={} via provider={}",
-                        winner.getId(),
-                        registrationId
-                    );
-                    return new ProvisionResult(
-                        promoteIfBootstrapAdmin(winner, registrationId, subject, loginOf(principal)),
-                        false
-                    );
-                })
-                .orElseThrow(() ->
-                    new IllegalStateException(
-                        "auth.success: JIT create lost the race for provider=" +
-                            registrationId +
-                            " subject=" +
-                            subject +
-                            " but no active link is visible (constraint/transaction anomaly)",
-                        e
-                    )
-                );
+                    .findActiveByProviderSubject(providerId, subject, teamId)
+                    .map(IdentityLink::getAccount)
+                    .map(winner -> {
+                        log.info(
+                                "auth.success: JIT race resolved — reused concurrently-created accountId={} via provider={}",
+                                winner.getId(),
+                                registrationId);
+                        return new ProvisionResult(
+                                promoteIfBootstrapAdmin(winner, registrationId, subject, loginOf(principal)), false);
+                    })
+                    .orElseThrow(() -> new IllegalStateException(
+                            "auth.success: JIT create lost the race for provider=" + registrationId
+                                    + " subject="
+                                    + subject
+                                    + " but no active link is visible (constraint/transaction anomaly)",
+                            e));
         }
     }
 
@@ -222,8 +204,8 @@ public class AccountProvisioningService {
      */
     private LoginProvider requireLoginProvider(String registrationId) {
         return loginProviderRepository
-            .findByRegistrationId(registrationId)
-            .orElseThrow(() -> new IllegalArgumentException("unknown login registrationId: " + registrationId));
+                .findByRegistrationId(registrationId)
+                .orElseThrow(() -> new IllegalArgumentException("unknown login registrationId: " + registrationId));
     }
 
     /**
@@ -234,22 +216,15 @@ public class AccountProvisioningService {
      * deliberate {@code /admin/users} action.
      */
     private Account promoteIfBootstrapAdmin(
-        Account account,
-        String registrationId,
-        String subject,
-        @Nullable String login
-    ) {
-        if (
-            account.getAppRole() != Account.AppRole.APP_ADMIN &&
-            adminBootstrapPolicy.shouldPromote(registrationId, subject, login)
-        ) {
+            Account account, String registrationId, String subject, @Nullable String login) {
+        if (account.getAppRole() != Account.AppRole.APP_ADMIN
+                && adminBootstrapPolicy.shouldPromote(registrationId, subject, login)) {
             account.setAppRole(Account.AppRole.APP_ADMIN);
             accountRepository.save(account);
             log.info(
-                "auth.bootstrap: promoted accountId={} to APP_ADMIN via bootstrap-admins allowlist (provider={})",
-                account.getId(),
-                registrationId
-            );
+                    "auth.bootstrap: promoted accountId={} to APP_ADMIN via bootstrap-admins allowlist (provider={})",
+                    account.getId(),
+                    registrationId);
         }
         return account;
     }
@@ -260,12 +235,7 @@ public class AccountProvisioningService {
     }
 
     private IdentityLink newIdentityLink(
-        Account account,
-        long providerId,
-        String subject,
-        @Nullable String teamId,
-        OAuth2User principal
-    ) {
+            Account account, long providerId, String subject, @Nullable String teamId, OAuth2User principal) {
         IdentityLink link = new IdentityLink();
         link.setAccount(account);
         link.setProviderId(providerId);

@@ -104,24 +104,18 @@ class GitLabIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
     void shouldAddUpdatedAtToChangedFieldsWhenUpdatedAtDivergesOnUpsert() {
         // Insert a comment whose updatedAt initially equals createdAt.
         processor.processFromSync(
-            buildData("Original body", CREATED_AT, UPDATED_AT_SAME),
-            testIssue,
-            providerId,
-            testWorkspace.getId()
-        );
+                buildData("Original body", CREATED_AT, UPDATED_AT_SAME), testIssue, providerId, testWorkspace.getId());
         eventListener.clear();
 
         // Re-sync with a later updatedAt (body unchanged — tests the divergence path in isolation).
         IssueComment saved = processor.processFromSync(
-            buildData("Original body", CREATED_AT, UPDATED_AT_LATER),
-            testIssue,
-            providerId,
-            testWorkspace.getId()
-        );
+                buildData("Original body", CREATED_AT, UPDATED_AT_LATER), testIssue, providerId, testWorkspace.getId());
 
         assertThat(saved).isNotNull();
-        assertThat(saved.getUpdatedAt()).isEqualTo(OffsetDateTime.parse(UPDATED_AT_LATER).toInstant());
-        assertThat(saved.getCreatedAt()).isEqualTo(OffsetDateTime.parse(CREATED_AT).toInstant());
+        assertThat(saved.getUpdatedAt())
+                .isEqualTo(OffsetDateTime.parse(UPDATED_AT_LATER).toInstant());
+        assertThat(saved.getCreatedAt())
+                .isEqualTo(OffsetDateTime.parse(CREATED_AT).toInstant());
         assertThat(saved.getUpdatedAt()).isNotEqualTo(saved.getCreatedAt());
 
         List<ScmDomainEvent.CommentUpdated> updates = eventListener.ofType(ScmDomainEvent.CommentUpdated.class);
@@ -137,11 +131,7 @@ class GitLabIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
 
         // Re-sync with identical body and identical updatedAt — no-op.
         IssueComment saved = processor.processFromSync(
-            buildData("Body", CREATED_AT, UPDATED_AT_LATER),
-            testIssue,
-            providerId,
-            testWorkspace.getId()
-        );
+                buildData("Body", CREATED_AT, UPDATED_AT_LATER), testIssue, providerId, testWorkspace.getId());
 
         assertThat(saved).isNotNull();
         assertThat(eventListener.ofType(ScmDomainEvent.CommentUpdated.class)).isEmpty();
@@ -153,24 +143,17 @@ class GitLabIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
         // Seed with a real divergent updatedAt so we can prove the null branch does
         // not overwrite the stored value with createdAt.
         processor.processFromSync(
-            buildData("Body", CREATED_AT, UPDATED_AT_LATER),
-            testIssue,
-            providerId,
-            testWorkspace.getId()
-        );
+                buildData("Body", CREATED_AT, UPDATED_AT_LATER), testIssue, providerId, testWorkspace.getId());
         eventListener.clear();
 
         IssueComment saved = processor.processFromSync(
-            buildData("Body", CREATED_AT, null),
-            testIssue,
-            providerId,
-            testWorkspace.getId()
-        );
+                buildData("Body", CREATED_AT, null), testIssue, providerId, testWorkspace.getId());
 
         assertThat(saved).isNotNull();
         // updatedAt must remain the previously persisted value — not silently
         // collapsed to createdAt when the feed omits the field.
-        assertThat(saved.getUpdatedAt()).isEqualTo(OffsetDateTime.parse(UPDATED_AT_LATER).toInstant());
+        assertThat(saved.getUpdatedAt())
+                .isEqualTo(OffsetDateTime.parse(UPDATED_AT_LATER).toInstant());
         assertThat(saved.getUpdatedAt()).isNotEqualTo(saved.getCreatedAt());
     }
 
@@ -179,15 +162,16 @@ class GitLabIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
         // Fresh scheduler run, comment already edited on GitLab. The created event must
         // not lie about updatedAt — the first insert path is responsible for the initial value.
         IssueComment saved = processor.processFromSync(
-            buildData("Edited before we saw it", CREATED_AT, UPDATED_AT_LATER_AGAIN),
-            testIssue,
-            providerId,
-            testWorkspace.getId()
-        );
+                buildData("Edited before we saw it", CREATED_AT, UPDATED_AT_LATER_AGAIN),
+                testIssue,
+                providerId,
+                testWorkspace.getId());
 
         assertThat(saved).isNotNull();
-        assertThat(saved.getUpdatedAt()).isEqualTo(OffsetDateTime.parse(UPDATED_AT_LATER_AGAIN).toInstant());
-        assertThat(saved.getCreatedAt()).isEqualTo(OffsetDateTime.parse(CREATED_AT).toInstant());
+        assertThat(saved.getUpdatedAt())
+                .isEqualTo(OffsetDateTime.parse(UPDATED_AT_LATER_AGAIN).toInstant());
+        assertThat(saved.getCreatedAt())
+                .isEqualTo(OffsetDateTime.parse(CREATED_AT).toInstant());
         assertThat(eventListener.ofType(ScmDomainEvent.CommentCreated.class)).hasSize(1);
         // First-seen comment must not produce a spurious CommentUpdated event.
         assertThat(eventListener.ofType(ScmDomainEvent.CommentUpdated.class)).isEmpty();
@@ -196,30 +180,25 @@ class GitLabIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
     // Helpers
 
     private GitLabIssueCommentProcessor.SyncNoteData buildData(
-        String body,
-        String createdAt,
-        @Nullable String updatedAt
-    ) {
+            String body, String createdAt, @Nullable String updatedAt) {
         return new GitLabIssueCommentProcessor.SyncNoteData(
-            NATIVE_NOTE_ID,
-            body,
-            "https://gitlab.lrz.de/hephaestustest/demo-repository/-/issues/5#note_" + NATIVE_NOTE_ID,
-            "gid://gitlab/User/18024",
-            "ga84xah",
-            "Felix Dietrich",
-            "https://gitlab.lrz.de/uploads/-/system/user/avatar/18024/avatar.png",
-            "https://gitlab.lrz.de/ga84xah",
-            createdAt,
-            updatedAt
-        );
+                NATIVE_NOTE_ID,
+                body,
+                "https://gitlab.lrz.de/hephaestustest/demo-repository/-/issues/5#note_" + NATIVE_NOTE_ID,
+                "gid://gitlab/User/18024",
+                "ga84xah",
+                "Felix Dietrich",
+                "https://gitlab.lrz.de/uploads/-/system/user/avatar/18024/avatar.png",
+                "https://gitlab.lrz.de/ga84xah",
+                createdAt,
+                updatedAt);
     }
 
     private void setupTestData() {
         gitlabProvider = gitProviderRepository
-            .findByTypeAndServerUrl(IdentityProviderType.GITLAB, "https://gitlab.lrz.de")
-            .orElseGet(() ->
-                gitProviderRepository.save(new IdentityProvider(IdentityProviderType.GITLAB, "https://gitlab.lrz.de"))
-            );
+                .findByTypeAndServerUrl(IdentityProviderType.GITLAB, "https://gitlab.lrz.de")
+                .orElseGet(() -> gitProviderRepository.save(
+                        new IdentityProvider(IdentityProviderType.GITLAB, "https://gitlab.lrz.de")));
         Long savedProviderId = gitlabProvider.getId();
         assertNotNull(savedProviderId);
         providerId = savedProviderId;

@@ -10,7 +10,8 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * host with a {@code ?status=error} query when unset.
  */
 @ConfigurationProperties(prefix = "hephaestus.integration.oauth")
-public record OAuthCallbackProperties(String successRedirect, @Nullable String failureRedirect) {
+public record OAuthCallbackProperties(
+        String successRedirect, @Nullable String failureRedirect) {
     public OAuthCallbackProperties {
         if (successRedirect == null || successRedirect.isBlank()) {
             successRedirect = "/integrations?status=success";

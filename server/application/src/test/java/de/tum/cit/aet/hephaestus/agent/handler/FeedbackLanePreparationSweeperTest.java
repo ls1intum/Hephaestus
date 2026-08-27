@@ -60,7 +60,8 @@ class FeedbackLanePreparationSweeperTest extends BaseUnitTest {
     }
 
     private void pending(UnpreparedFeedbackLanes... jobs) {
-        when(agentJobRepository.findUnpreparedFeedbackLanes(any(), any(), any())).thenReturn(List.of(jobs));
+        when(agentJobRepository.findUnpreparedFeedbackLanes(any(), any(), any()))
+                .thenReturn(List.of(jobs));
     }
 
     private double counter(String name, String lane) {

@@ -12,15 +12,19 @@ import org.jspecify.annotations.Nullable;
  */
 @Schema(description = "Draft connection probe using a supplied (never-persisted) credential")
 public record ProbeLlmConnectionRequestDTO(
-    @NonNull @NotBlank @Schema(description = "Provider base URL") String baseUrl,
-    @NonNull
-    @NotBlank
-    @Pattern(
-        regexp = "openai-completions|openai-responses",
-        message = "apiProtocol must be one of openai-completions, openai-responses"
-    )
-    @Schema(description = "Wire protocol")
-    String apiProtocol,
-    @Nullable @Schema(description = "Credential shape (default BEARER)") LlmAuthMode authMode,
-    @Nullable @Schema(description = "API key used only for this probe") String apiKey
-) {}
+        @NonNull @NotBlank @Schema(description = "Provider base URL")
+        String baseUrl,
+
+        @NonNull
+        @NotBlank
+        @Pattern(
+                regexp = "openai-completions|openai-responses",
+                message = "apiProtocol must be one of openai-completions, openai-responses")
+        @Schema(description = "Wire protocol")
+        String apiProtocol,
+
+        @Nullable @Schema(description = "Credential shape (default BEARER)")
+        LlmAuthMode authMode,
+
+        @Nullable @Schema(description = "API key used only for this probe")
+        String apiKey) {}

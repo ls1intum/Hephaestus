@@ -28,18 +28,16 @@ public class GitHubPullRequestMessageHandler extends AbstractIntegrationMessageH
     private final GitHubPullRequestProcessor prProcessor;
 
     public GitHubPullRequestMessageHandler(
-        ProcessingContextFactory contextFactory,
-        GitHubPullRequestProcessor prProcessor,
-        NatsMessageDeserializer deserializer,
-        TransactionTemplate transactionTemplate
-    ) {
+            ProcessingContextFactory contextFactory,
+            GitHubPullRequestProcessor prProcessor,
+            NatsMessageDeserializer deserializer,
+            TransactionTemplate transactionTemplate) {
         super(
-            IntegrationKind.GITHUB,
-            "repository." + GitHubEventType.PULL_REQUEST.getValue(),
-            GitHubPullRequestEventDTO.class,
-            deserializer,
-            transactionTemplate
-        );
+                IntegrationKind.GITHUB,
+                "repository." + GitHubEventType.PULL_REQUEST.getValue(),
+                GitHubPullRequestEventDTO.class,
+                deserializer,
+                transactionTemplate);
         this.contextFactory = contextFactory;
         this.prProcessor = prProcessor;
     }
@@ -54,11 +52,10 @@ public class GitHubPullRequestMessageHandler extends AbstractIntegrationMessageH
         }
 
         log.debug(
-            "Received pull_request event: action={}, prNumber={}, repoName={}",
-            event.action(),
-            prDto.number(),
-            event.repository() != null ? sanitizeForLog(event.repository().fullName()) : "unknown"
-        );
+                "Received pull_request event: action={}, prNumber={}, repoName={}",
+                event.action(),
+                prDto.number(),
+                event.repository() != null ? sanitizeForLog(event.repository().fullName()) : "unknown");
 
         ProcessingContext context = contextFactory.forWebhookEvent(event).orElse(null);
         if (context == null) {
@@ -69,31 +66,25 @@ public class GitHubPullRequestMessageHandler extends AbstractIntegrationMessageH
     }
 
     private void routeToProcessor(
-        GitHubPullRequestEventDTO event,
-        GitHubPullRequestDTO prDto,
-        ProcessingContext context
-    ) {
+            GitHubPullRequestEventDTO event, GitHubPullRequestDTO prDto, ProcessingContext context) {
         switch (event.actionType()) {
-            case
-                GitHubEventAction.PullRequest.OPENED,
-                GitHubEventAction.PullRequest.EDITED,
-                GitHubEventAction.PullRequest.ASSIGNED,
-                GitHubEventAction.PullRequest.UNASSIGNED,
-                GitHubEventAction.PullRequest.MILESTONED,
-                GitHubEventAction.PullRequest.DEMILESTONED,
-                GitHubEventAction.PullRequest.AUTO_MERGE_ENABLED,
-                GitHubEventAction.PullRequest.AUTO_MERGE_DISABLED,
-                GitHubEventAction.PullRequest.REVIEW_REQUEST_REMOVED,
-                GitHubEventAction.PullRequest.ENQUEUED,
-                GitHubEventAction.PullRequest.DEQUEUED,
-                GitHubEventAction.PullRequest.REVIEW_REQUESTED -> prProcessor.process(prDto, context);
+            case GitHubEventAction.PullRequest.OPENED,
+                    GitHubEventAction.PullRequest.EDITED,
+                    GitHubEventAction.PullRequest.ASSIGNED,
+                    GitHubEventAction.PullRequest.UNASSIGNED,
+                    GitHubEventAction.PullRequest.MILESTONED,
+                    GitHubEventAction.PullRequest.DEMILESTONED,
+                    GitHubEventAction.PullRequest.AUTO_MERGE_ENABLED,
+                    GitHubEventAction.PullRequest.AUTO_MERGE_DISABLED,
+                    GitHubEventAction.PullRequest.REVIEW_REQUEST_REMOVED,
+                    GitHubEventAction.PullRequest.ENQUEUED,
+                    GitHubEventAction.PullRequest.DEQUEUED,
+                    GitHubEventAction.PullRequest.REVIEW_REQUESTED -> prProcessor.process(prDto, context);
             case GitHubEventAction.PullRequest.REOPENED -> prProcessor.processReopened(prDto, context);
             case GitHubEventAction.PullRequest.CLOSED -> prProcessor.processClosed(prDto, context);
             case GitHubEventAction.PullRequest.READY_FOR_REVIEW -> prProcessor.processReadyForReview(prDto, context);
-            case GitHubEventAction.PullRequest.CONVERTED_TO_DRAFT -> prProcessor.processConvertedToDraft(
-                prDto,
-                context
-            );
+            case GitHubEventAction.PullRequest.CONVERTED_TO_DRAFT ->
+                prProcessor.processConvertedToDraft(prDto, context);
             case GitHubEventAction.PullRequest.SYNCHRONIZE -> prProcessor.processSynchronize(prDto, context);
             case GitHubEventAction.PullRequest.LABELED -> {
                 if (event.label() != null) {

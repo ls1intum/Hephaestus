@@ -2,11 +2,8 @@ package de.tum.cit.aet.hephaestus.agent.usage.fx;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
@@ -40,7 +37,8 @@ import org.springframework.dao.DataAccessResourceFailureException;
 class FxRateFetchSchedulerTest extends BaseUnitTest {
 
     private static final LocalDate TODAY = LocalDate.of(2026, 7, 24);
-    private static final Clock CLOCK = Clock.fixed(TODAY.atStartOfDay(ZoneOffset.UTC).toInstant(), ZoneOffset.UTC);
+    private static final Clock CLOCK =
+            Clock.fixed(TODAY.atStartOfDay(ZoneOffset.UTC).toInstant(), ZoneOffset.UTC);
     private static final EcbDailyRate FETCHED = new EcbDailyRate(TODAY, new BigDecimal("1.1377"));
 
     @Mock
@@ -65,10 +63,7 @@ class FxRateFetchSchedulerTest extends BaseUnitTest {
             }
             case "findByRateDate" -> {
                 LocalDate date = invocation.getArgument(0);
-                return table
-                    .stream()
-                    .filter(r -> r.getRateDate().equals(date))
-                    .findFirst();
+                return table.stream().filter(r -> r.getRateDate().equals(date)).findFirst();
             }
             case "findAll" -> {
                 return List.copyOf(table);
@@ -143,9 +138,8 @@ class FxRateFetchSchedulerTest extends BaseUnitTest {
     void shouldIgnoreRateWhenDatedAfterToday() {
         FxRate yesterday = storedRate(TODAY.minusDays(1), "1.1000");
         when(lookup.isEnabled()).thenReturn(true);
-        when(client.fetchLatestUsdRate()).thenReturn(
-            Optional.of(new EcbDailyRate(TODAY.plusDays(5), new BigDecimal("1.1377")))
-        );
+        when(client.fetchLatestUsdRate())
+                .thenReturn(Optional.of(new EcbDailyRate(TODAY.plusDays(5), new BigDecimal("1.1377"))));
 
         scheduler().fetchDaily();
 
@@ -160,9 +154,8 @@ class FxRateFetchSchedulerTest extends BaseUnitTest {
     void shouldMakeNoOutboundRequestOnStartupWhenAUsableRateIsAlreadyStored() {
         FxRate existing = storedRate(TODAY, "1.1377");
         when(lookup.isEnabled()).thenReturn(true);
-        when(lookup.latest()).thenReturn(
-            Optional.of(FxRateInfoDTO.fromEcbRate("EUR", new BigDecimal("1.1377"), TODAY))
-        );
+        when(lookup.latest())
+                .thenReturn(Optional.of(FxRateInfoDTO.fromEcbRate("EUR", new BigDecimal("1.1377"), TODAY)));
 
         scheduler().fetchOnStartupIfMissing();
 
@@ -191,12 +184,9 @@ class FxRateFetchSchedulerTest extends BaseUnitTest {
 
     static Stream<Arguments> everyFetchEntryPoint() {
         return Stream.of(
-            Arguments.of("the daily tick", (Consumer<FxRateFetchScheduler>) FxRateFetchScheduler::fetchDaily),
-            Arguments.of(
-                "the boot catch-up",
-                (Consumer<FxRateFetchScheduler>) FxRateFetchScheduler::fetchOnStartupIfMissing
-            )
-        );
+                Arguments.of("the daily tick", (Consumer<FxRateFetchScheduler>) FxRateFetchScheduler::fetchDaily),
+                Arguments.of("the boot catch-up", (Consumer<FxRateFetchScheduler>)
+                        FxRateFetchScheduler::fetchOnStartupIfMissing));
     }
 
     /**
@@ -209,7 +199,9 @@ class FxRateFetchSchedulerTest extends BaseUnitTest {
     @MethodSource("everyFetchEntryPoint")
     void shouldStayInertUnderTheDefaultConfiguration(String entryPoint, Consumer<FxRateFetchScheduler> fetch) {
         FxRateLookup realLookup = new FxRateLookup(repository, CLOCK, defaultProperties());
-        assertThat(realLookup.isEnabled()).as("the shipped default must leave the feature off").isFalse();
+        assertThat(realLookup.isEnabled())
+                .as("the shipped default must leave the feature off")
+                .isFalse();
 
         fetch.accept(new FxRateFetchScheduler(client, repository, realLookup, CLOCK));
 
@@ -220,40 +212,35 @@ class FxRateFetchSchedulerTest extends BaseUnitTest {
     /** Exactly what Spring binds when {@code hephaestus.llm} is absent from the configuration. */
     private static LlmProperties defaultProperties() {
         return new LlmProperties(
-            "",
-            new LlmProperties.Egress(false),
-            new LlmProperties.Fx(LlmProperties.ECB_DAILY_URL)
-        );
+                "", new LlmProperties.Egress(false), new LlmProperties.Fx(LlmProperties.ECB_DAILY_URL));
     }
 
     private ApplicationContextRunner contextRunner() {
         return new ApplicationContextRunner()
-            .withBean(EcbFxRateClient.class, () -> mock(EcbFxRateClient.class))
-            .withBean(FxRateRepository.class, () -> mock(FxRateRepository.class))
-            .withBean(FxRateLookup.class, () -> mock(FxRateLookup.class))
-            .withBean(Clock.class, () -> CLOCK)
-            .withUserConfiguration(FxRateFetchScheduler.class);
+                .withBean(EcbFxRateClient.class, () -> mock(EcbFxRateClient.class))
+                .withBean(FxRateRepository.class, () -> mock(FxRateRepository.class))
+                .withBean(FxRateLookup.class, () -> mock(FxRateLookup.class))
+                .withBean(Clock.class, () -> CLOCK)
+                .withUserConfiguration(FxRateFetchScheduler.class);
     }
 
     static Stream<Arguments> roleGating() {
         return Stream.of(
-            Arguments.of(new String[] { RuntimeRole.SERVER_PROPERTY + "=false" }, false, "server role explicitly off"),
-            // matchIfMissing=true — zero env vars still boots a full monolith (ADR 0005).
-            Arguments.of(new String[0], true, "default single-JVM deployment")
-        );
+                Arguments.of(
+                        new String[] {RuntimeRole.SERVER_PROPERTY + "=false"}, false, "server role explicitly off"),
+                // matchIfMissing=true — zero env vars still boots a full monolith (ADR 0005).
+                Arguments.of(new String[0], true, "default single-JVM deployment"));
     }
 
     @ParameterizedTest(name = "{2}")
     @MethodSource("roleGating")
     void shouldRegisterTheSchedulerOnlyOnTheServerRole(String[] properties, boolean expectBean, String why) {
-        contextRunner()
-            .withPropertyValues(properties)
-            .run(context -> {
-                if (expectBean) {
-                    assertThat(context).as(why).hasSingleBean(FxRateFetchScheduler.class);
-                } else {
-                    assertThat(context).as(why).doesNotHaveBean(FxRateFetchScheduler.class);
-                }
-            });
+        contextRunner().withPropertyValues(properties).run(context -> {
+            if (expectBean) {
+                assertThat(context).as(why).hasSingleBean(FxRateFetchScheduler.class);
+            } else {
+                assertThat(context).as(why).doesNotHaveBean(FxRateFetchScheduler.class);
+            }
+        });
     }
 }

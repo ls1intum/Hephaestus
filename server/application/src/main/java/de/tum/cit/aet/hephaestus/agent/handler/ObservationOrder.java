@@ -48,17 +48,17 @@ public final class ObservationOrder {
      */
     public static Comparator<Observation> worstFirst() {
         return Comparator.comparingInt((Observation o) -> severityOrdinal(o.getSeverity()))
-            .thenComparing(Comparator.comparingInt((Observation o) -> evidenceBreadth(o.getEvidence())).reversed())
-            .thenComparing(o -> o.getId().toString());
+                .thenComparing(Comparator.comparingInt((Observation o) -> evidenceBreadth(o.getEvidence()))
+                        .reversed())
+                .thenComparing(o -> o.getId().toString());
     }
 
     /** This run's observations, worst first: severity, then evidence breadth, then practice + title. */
     public static Comparator<ValidatedObservation> worstFirstUnstored() {
         return Comparator.comparingInt((ValidatedObservation f) -> severityOrdinal(f.severity()))
-            .thenComparing(
-                Comparator.comparingInt((ValidatedObservation f) -> evidenceBreadth(f.evidence())).reversed()
-            )
-            .thenComparing(ObservationOrder::identityKey);
+                .thenComparing(Comparator.comparingInt((ValidatedObservation f) -> evidenceBreadth(f.evidence()))
+                        .reversed())
+                .thenComparing(ObservationOrder::identityKey);
     }
 
     /**
@@ -69,8 +69,8 @@ public final class ObservationOrder {
      */
     public static Comparator<ValidatedObservation> bestAttestedFirst() {
         return Comparator.comparingInt((ValidatedObservation f) -> evidenceBreadth(f.evidence()))
-            .reversed()
-            .thenComparing(ObservationOrder::identityKey);
+                .reversed()
+                .thenComparing(ObservationOrder::identityKey);
     }
 
     /**
@@ -92,15 +92,13 @@ public final class ObservationOrder {
             if (path.isBlank()) {
                 continue;
             }
-            loci.add(
-                path +
-                    ':' +
-                    citation.path("side").asString("") +
-                    ':' +
-                    citation.path("startLine").asInt(0) +
-                    '-' +
-                    citation.path("endLine").asInt(citation.path("startLine").asInt(0))
-            );
+            loci.add(path
+                    + ':'
+                    + citation.path("side").asString("")
+                    + ':'
+                    + citation.path("startLine").asInt(0)
+                    + '-'
+                    + citation.path("endLine").asInt(citation.path("startLine").asInt(0)));
         }
         return loci.size();
     }

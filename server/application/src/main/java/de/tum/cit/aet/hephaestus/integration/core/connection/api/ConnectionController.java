@@ -74,41 +74,28 @@ public class ConnectionController {
     private final Map<IntegrationKind, ConnectionStrategy> strategies;
 
     public ConnectionController(
-        ConnectionAdminService admin,
-        ConnectionService connectionService,
-        ObjectMapper objectMapper,
-        List<ConnectionStrategy> strategyBeans
-    ) {
+            ConnectionAdminService admin,
+            ConnectionService connectionService,
+            ObjectMapper objectMapper,
+            List<ConnectionStrategy> strategyBeans) {
         this.admin = admin;
         this.connectionService = connectionService;
         this.objectMapper = objectMapper;
-        this.strategies = strategyBeans
-            .stream()
-            .collect(
-                Collectors.toUnmodifiableMap(
-                    ConnectionStrategy::kind,
-                    s -> s,
-                    (a, b) -> {
-                        throw new IllegalStateException(
-                            "Duplicate ConnectionStrategy for kind=" +
-                                a.kind() +
-                                ": " +
-                                a.getClass() +
-                                " vs " +
-                                b.getClass()
-                        );
-                    }
-                )
-            );
+        this.strategies = strategyBeans.stream()
+                .collect(Collectors.toUnmodifiableMap(ConnectionStrategy::kind, s -> s, (a, b) -> {
+                    throw new IllegalStateException("Duplicate ConnectionStrategy for kind=" + a.kind()
+                            + ": "
+                            + a.getClass()
+                            + " vs "
+                            + b.getClass());
+                }));
     }
 
     @GetMapping
     public ResponseEntity<List<ConnectionSummaryDTO>> list(WorkspaceContext workspace) {
-        List<ConnectionSummaryDTO> summaries = admin
-            .listForWorkspace(workspace.id())
-            .stream()
-            .map(c -> ConnectionSummaryDTO.from(c, admin.manifests()))
-            .toList();
+        List<ConnectionSummaryDTO> summaries = admin.listForWorkspace(workspace.id()).stream()
+                .map(c -> ConnectionSummaryDTO.from(c, admin.manifests()))
+                .toList();
         return ResponseEntity.ok(summaries);
     }
 
@@ -121,10 +108,9 @@ public class ConnectionController {
     @PostMapping
     @Audited(ledger = AuditLedger.CONNECTION_AUDIT)
     public ResponseEntity<InitiateConnectionResponseDTO> initiate(
-        WorkspaceContext workspace,
-        @Valid @RequestBody @NotNull InitiateConnectionRequestDTO body,
-        @Nullable Authentication authentication
-    ) {
+            WorkspaceContext workspace,
+            @Valid @RequestBody @NotNull InitiateConnectionRequestDTO body,
+            @Nullable Authentication authentication) {
         Long workspaceId = workspace.id();
         if (body == null || body.kind() == null) {
             throw new IllegalArgumentException("kind is required");
@@ -139,22 +125,19 @@ public class ConnectionController {
         // IllegalArgumentException → 400 ProblemDetail via GlobalControllerAdvice.
         Map<String, String> userInput = body.userInput() == null ? Map.of() : body.userInput();
         ConnectInitiation initiation = strategy.initiate(
-            new ConnectionStrategy.InitiateRequest(workspaceId, body.kind(), userInput, actorRef(authentication))
-        );
+                new ConnectionStrategy.InitiateRequest(workspaceId, body.kind(), userInput, actorRef(authentication)));
 
         return switch (initiation) {
-            case ConnectInitiation.RedirectToVendor r -> ResponseEntity.ok(
-                InitiateConnectionResponseDTO.redirect(r.vendorUrl())
-            );
+            case ConnectInitiation.RedirectToVendor r ->
+                ResponseEntity.ok(InitiateConnectionResponseDTO.redirect(r.vendorUrl()));
             case ConnectInitiation.AcceptInline inline -> {
                 Connection connection = admin.createInlineConnection(
-                    workspaceId,
-                    body.kind(),
-                    inline.instanceKey(),
-                    inline.credentials(),
-                    userInput,
-                    actorRef(authentication)
-                );
+                        workspaceId,
+                        body.kind(),
+                        inline.instanceKey(),
+                        inline.credentials(),
+                        userInput,
+                        actorRef(authentication));
                 yield ResponseEntity.ok(InitiateConnectionResponseDTO.linked(connection.getId()));
             }
         };
@@ -170,31 +153,25 @@ public class ConnectionController {
     @Operation(operationId = "updateConnectionStatus")
     @Audited(ledger = AuditLedger.CONNECTION_AUDIT)
     public ResponseEntity<ConnectionSummaryDTO> updateStatus(
-        WorkspaceContext workspace,
-        @PathVariable Long id,
-        @RequestBody @Valid @NotNull UpdateConnectionStatusRequestDTO body,
-        @Nullable Authentication authentication
-    ) {
+            WorkspaceContext workspace,
+            @PathVariable Long id,
+            @RequestBody @Valid @NotNull UpdateConnectionStatusRequestDTO body,
+            @Nullable Authentication authentication) {
         Connection connection = admin.findInWorkspaceOrThrow(workspace.id(), id);
         IntegrationState target = body.state();
-        String eventType = switch (target) {
-            case ACTIVE -> "REACTIVATE";
-            case SUSPENDED -> "SUSPEND";
-            case UNINSTALLED -> "DISCONNECT";
-            case PENDING -> throw new IllegalArgumentException("PENDING is not an admin-settable connection state");
-        };
+        String eventType =
+                switch (target) {
+                    case ACTIVE -> "REACTIVATE";
+                    case SUSPENDED -> "SUSPEND";
+                    case UNINSTALLED -> "DISCONNECT";
+                    case PENDING ->
+                        throw new IllegalArgumentException("PENDING is not an admin-settable connection state");
+                };
 
         String correlationId = eventType.toLowerCase(Locale.ROOT) + "-" + connection.getId() + "-" + UUID.randomUUID();
         TransitionRequest request = new TransitionRequest(
-            target,
-            eventType,
-            "ADMIN",
-            actorRef(authentication),
-            correlationId,
-            body.reason()
-        );
-        Connection updated =
-            target == IntegrationState.UNINSTALLED
+                target, eventType, "ADMIN", actorRef(authentication), correlationId, body.reason());
+        Connection updated = target == IntegrationState.UNINSTALLED
                 ? connectionService.disconnect(connection, request, () -> revokeBestEffort(connection))
                 : connectionService.transition(connection, request);
         return ResponseEntity.ok(ConnectionSummaryDTO.from(updated, admin.manifests()));
@@ -216,10 +193,9 @@ public class ConnectionController {
         ConnectionStrategy strategy = strategies.get(connection.getKind());
         if (strategy == null) {
             log.warn(
-                "No ConnectionStrategy registered for kind={} on disconnect of connection={} — local transition only",
-                connection.getKind(),
-                connection.getId()
-            );
+                    "No ConnectionStrategy registered for kind={} on disconnect of connection={} — local transition only",
+                    connection.getKind(),
+                    connection.getId());
             return;
         }
         strategy.revoke(connection.toRef());
@@ -230,11 +206,9 @@ public class ConnectionController {
         // findInWorkspaceOrThrow enforces the workspace scope before we expose audit history,
         // so cross-workspace audit reads return 404 rather than leaking a partial trail.
         admin.findInWorkspaceOrThrow(workspace.id(), id);
-        List<ConnectionAuditEntryDTO> entries = admin
-            .auditForConnection(id, AUDIT_PAGE_CAP)
-            .stream()
-            .map(ConnectionAuditEntryDTO::from)
-            .toList();
+        List<ConnectionAuditEntryDTO> entries = admin.auditForConnection(id, AUDIT_PAGE_CAP).stream()
+                .map(ConnectionAuditEntryDTO::from)
+                .toList();
         return ResponseEntity.ok(entries);
     }
 

@@ -53,14 +53,13 @@ class SlackConnectionStrategyTest extends BaseUnitTest {
     @BeforeEach
     void setUp() {
         strategy = new SlackConnectionStrategy(
-            oauthStateService,
-            connectionService,
-            oauthClient,
-            credentialProvider,
-            workspaceContentEraser,
-            "client-id",
-            "https://app.test/oauth/callback/slack"
-        );
+                oauthStateService,
+                connectionService,
+                oauthClient,
+                credentialProvider,
+                workspaceContentEraser,
+                "client-id",
+                "https://app.test/oauth/callback/slack");
     }
 
     private static IntegrationRef ref() {
@@ -79,16 +78,14 @@ class SlackConnectionStrategyTest extends BaseUnitTest {
 
     @Test
     void finalize_rotationFields_rejectsWithExplicitMessage() {
-        when(oauthClient.exchangeCode(eq("c"), any())).thenReturn(
-            new OAuthV2Access(
-                true,
-                null,
-                "xoxe-abc",
-                new OAuthV2Access.Team("T1", "Acme"),
-                /* expiresIn */ 43200,
-                /* refreshToken */ "xoxe-refresh"
-            )
-        );
+        when(oauthClient.exchangeCode(eq("c"), any()))
+                .thenReturn(new OAuthV2Access(
+                        true,
+                        null,
+                        "xoxe-abc",
+                        new OAuthV2Access.Team("T1", "Acme"),
+                        /* expiresIn */ 43200,
+                        /* refreshToken */ "xoxe-refresh"));
 
         ConnectFinalization r = strategy.finalizeConnect(ref(), Map.of("code", "c"));
 
@@ -98,9 +95,8 @@ class SlackConnectionStrategyTest extends BaseUnitTest {
 
     @Test
     void finalize_missingTeam_returnsFailed() {
-        when(oauthClient.exchangeCode(eq("c"), any())).thenReturn(
-            new OAuthV2Access(true, null, "xoxb", null, null, null)
-        );
+        when(oauthClient.exchangeCode(eq("c"), any()))
+                .thenReturn(new OAuthV2Access(true, null, "xoxb", null, null, null));
 
         ConnectFinalization r = strategy.finalizeConnect(ref(), Map.of("code", "c"));
 
@@ -110,9 +106,9 @@ class SlackConnectionStrategyTest extends BaseUnitTest {
 
     @Test
     void finalize_happyPath_returnsCompletedWithTeamConfigAndBearerToken() {
-        when(oauthClient.exchangeCode(eq("c"), eq("https://app.test/oauth/callback/slack"))).thenReturn(
-            new OAuthV2Access(true, null, "xoxb-abc", new OAuthV2Access.Team("T9", "Hephaestus Test"), null, null)
-        );
+        when(oauthClient.exchangeCode(eq("c"), eq("https://app.test/oauth/callback/slack")))
+                .thenReturn(new OAuthV2Access(
+                        true, null, "xoxb-abc", new OAuthV2Access.Team("T9", "Hephaestus Test"), null, null));
 
         ConnectFinalization r = strategy.finalizeConnect(ref(), Map.of("code", "c"));
 
@@ -134,11 +130,11 @@ class SlackConnectionStrategyTest extends BaseUnitTest {
     void initiate_buildsAuthorizeUrlWithLockedScopes() {
         // The initiating admin's actorRef must be woven into the OAuth state so the post-callback
         // connection audit row attributes the connect to them.
-        when(oauthStateService.issue(42L, IntegrationKind.SLACK, "admin@example.com")).thenReturn("state-abc");
+        when(oauthStateService.issue(42L, IntegrationKind.SLACK, "admin@example.com"))
+                .thenReturn("state-abc");
 
-        var initiation = strategy.initiate(
-            new InitiateRequest(42L, IntegrationKind.SLACK, Map.of(), "admin@example.com")
-        );
+        var initiation =
+                strategy.initiate(new InitiateRequest(42L, IntegrationKind.SLACK, Map.of(), "admin@example.com"));
 
         verify(oauthStateService).issue(42L, IntegrationKind.SLACK, "admin@example.com");
 
@@ -221,19 +217,17 @@ class SlackConnectionStrategyTest extends BaseUnitTest {
     @Test
     void initiate_withoutRedirectUri_failsFast() {
         SlackConnectionStrategy misconfigured = new SlackConnectionStrategy(
-            oauthStateService,
-            connectionService,
-            oauthClient,
-            credentialProvider,
-            workspaceContentEraser,
-            "client-id",
-            ""
-        );
+                oauthStateService,
+                connectionService,
+                oauthClient,
+                credentialProvider,
+                workspaceContentEraser,
+                "client-id",
+                "");
 
-        assertThatThrownBy(() ->
-            misconfigured.initiate(new InitiateRequest(42L, IntegrationKind.SLACK, Map.of(), "admin@example.com"))
-        )
-            .isInstanceOf(IllegalStateException.class)
-            .hasMessageContaining("redirect URI");
+        assertThatThrownBy(() -> misconfigured.initiate(
+                        new InitiateRequest(42L, IntegrationKind.SLACK, Map.of(), "admin@example.com")))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("redirect URI");
     }
 }

@@ -32,9 +32,9 @@ class SecurityUtilsTest extends BaseUnitTest {
 
     private static void authenticateWithJwt(@Nullable String subject, Map<String, Object> extraClaims) {
         Jwt.Builder builder = Jwt.withTokenValue("t")
-            .header("alg", "ES256")
-            .issuedAt(Instant.now())
-            .expiresAt(Instant.now().plusSeconds(60));
+                .header("alg", "ES256")
+                .issuedAt(Instant.now())
+                .expiresAt(Instant.now().plusSeconds(60));
         if (subject != null) {
             builder.subject(subject);
         } else {
@@ -63,9 +63,9 @@ class SecurityUtilsTest extends BaseUnitTest {
     @Test
     @DisplayName("getCurrentAccountId is empty for a non-Jwt principal")
     void accountId_emptyForNonJwtPrincipal() {
-        SecurityContextHolder.getContext().setAuthentication(
-            new UsernamePasswordAuthenticationToken("alice", "pw", AuthorityUtils.NO_AUTHORITIES)
-        );
+        SecurityContextHolder.getContext()
+                .setAuthentication(
+                        new UsernamePasswordAuthenticationToken("alice", "pw", AuthorityUtils.NO_AUTHORITIES));
         assertThat(SecurityUtils.getCurrentAccountId()).isEmpty();
     }
 
@@ -121,9 +121,9 @@ class SecurityUtilsTest extends BaseUnitTest {
     void superAdmin_falseWhenUnauthenticatedOrNonJwt() {
         assertThat(SecurityUtils.isSuperAdmin()).isFalse();
 
-        SecurityContextHolder.getContext().setAuthentication(
-            new UsernamePasswordAuthenticationToken("alice", "pw", AuthorityUtils.NO_AUTHORITIES)
-        );
+        SecurityContextHolder.getContext()
+                .setAuthentication(
+                        new UsernamePasswordAuthenticationToken("alice", "pw", AuthorityUtils.NO_AUTHORITIES));
         assertThat(SecurityUtils.isSuperAdmin()).isFalse();
     }
 }

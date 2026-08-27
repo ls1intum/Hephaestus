@@ -57,22 +57,23 @@ public class LeaderboardController {
      */
     @GetMapping
     @Operation(
-        summary = "Generate leaderboard",
-        description = "Creates a ranked contributor list for the specified time range"
-    )
+            summary = "Generate leaderboard",
+            description = "Creates a ranked contributor list for the specified time range")
     @SecurityRequirements
     public ResponseEntity<List<LeaderboardEntryDTO>> getLeaderboard(
-        WorkspaceContext workspaceContext,
-        @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant after,
-        @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant before,
-        @Parameter(
-            description = "Team filter to apply in INDIVIDUAL mode; ignored when mode is TEAM."
-        ) @RequestParam @NotBlank String team,
-        @Parameter(
-            description = "Determines the ranking metric. In TEAM mode SCORE uses summed contribution scores; LEAGUE_POINTS uses total league points."
-        ) @RequestParam LeaderboardSortType sort,
-        @RequestParam LeaderboardMode mode
-    ) {
+            WorkspaceContext workspaceContext,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant after,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant before,
+            @Parameter(description = "Team filter to apply in INDIVIDUAL mode; ignored when mode is TEAM.")
+                    @RequestParam
+                    @NotBlank
+                    String team,
+            @Parameter(
+                            description =
+                                    "Determines the ranking metric. In TEAM mode SCORE uses summed contribution scores; LEAGUE_POINTS uses total league points.")
+                    @RequestParam
+                    LeaderboardSortType sort,
+            @RequestParam LeaderboardMode mode) {
         Workspace workspace = workspaceResolver.requireWorkspace(workspaceContext);
         log.info("Received leaderboard request: workspaceId={}, mode={}", workspace.getId(), mode);
         return ResponseEntity.ok(leaderboardService.createLeaderboard(workspace, after, before, team, sort, mode));
@@ -95,22 +96,19 @@ public class LeaderboardController {
      */
     @GetMapping("/users/{login}/league-stats")
     @Operation(
-        summary = "Calculate user league stats",
-        description = "Computes projected league point changes for a specific user using the global leaderboard"
-    )
+            summary = "Calculate user league stats",
+            description = "Computes projected league point changes for a specific user using the global leaderboard")
     @SecurityRequirements
     public ResponseEntity<LeagueChangeDTO> computeUserLeagueStats(
-        WorkspaceContext workspaceContext,
-        @PathVariable String login,
-        @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant after,
-        @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant before
-    ) {
+            WorkspaceContext workspaceContext,
+            @PathVariable String login,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant after,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant before) {
         Workspace workspace = workspaceResolver.requireWorkspace(workspaceContext);
         log.info(
-            "Received league stats request: workspaceId={}, userLogin={}",
-            workspace.getId(),
-            LoggingUtils.sanitizeForLog(login)
-        );
+                "Received league stats request: workspaceId={}, userLogin={}",
+                workspace.getId(),
+                LoggingUtils.sanitizeForLog(login));
         return ResponseEntity.ok(leaderboardService.computeUserLeagueStats(workspace, login, after, before));
     }
 }

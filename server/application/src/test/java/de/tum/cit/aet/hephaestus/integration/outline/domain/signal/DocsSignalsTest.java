@@ -35,9 +35,8 @@ class DocsSignalsTest {
         assertThat(DocsSignals.revisionScheme(DocsSignals.DOCUMENT_PUBLISHED)).isEqualTo(RevisionScheme.CONTENT_DIGEST);
         assertThat(DocsSignals.revisionScheme(DocsSignals.DOCUMENT_UPDATED)).isEqualTo(RevisionScheme.CONTENT_DIGEST);
         assertThat(DocsSignals.revisionScheme(DocsSignals.DOCUMENT_ARCHIVED)).isEqualTo(RevisionScheme.TERMINAL_STATE);
-        assertThatIllegalArgumentException().isThrownBy(() ->
-            DocsSignals.revisionScheme(SignalName.of("docs.document.invented"))
-        );
+        assertThatIllegalArgumentException()
+                .isThrownBy(() -> DocsSignals.revisionScheme(SignalName.of("docs.document.invented")));
     }
 
     @Test
@@ -58,17 +57,19 @@ class DocsSignalsTest {
     @Test
     @DisplayName("no hash means no key — an evicted body cannot be keyed, and a made-up revision is worse")
     void refusesToInventARevisionForAnEvictedBody() {
-        assertThat(DocsSignals.documentKey(1L, 7L, DocsSignals.DOCUMENT_PUBLISHED, null, "Title")).isEmpty();
-        assertThat(DocsSignals.documentKey(1L, 7L, DocsSignals.DOCUMENT_PUBLISHED, "  ", "Title")).isEmpty();
+        assertThat(DocsSignals.documentKey(1L, 7L, DocsSignals.DOCUMENT_PUBLISHED, null, "Title"))
+                .isEmpty();
+        assertThat(DocsSignals.documentKey(1L, 7L, DocsSignals.DOCUMENT_PUBLISHED, "  ", "Title"))
+                .isEmpty();
 
         // Archiving happened once whatever the body says, so it keys without one.
-        assertThat(DocsSignals.documentKey(1L, 7L, DocsSignals.DOCUMENT_ARCHIVED, null, "Title")).isPresent();
+        assertThat(DocsSignals.documentKey(1L, 7L, DocsSignals.DOCUMENT_ARCHIVED, null, "Title"))
+                .isPresent();
     }
 
     @Test
     void refusesASignalThatIsNotAboutADocument() {
-        assertThat(
-            DocsSignals.documentKey(1L, 7L, SignalName.of("scm.pull_request.merged"), "hash-a", "Title")
-        ).isEmpty();
+        assertThat(DocsSignals.documentKey(1L, 7L, SignalName.of("scm.pull_request.merged"), "hash-a", "Title"))
+                .isEmpty();
     }
 }

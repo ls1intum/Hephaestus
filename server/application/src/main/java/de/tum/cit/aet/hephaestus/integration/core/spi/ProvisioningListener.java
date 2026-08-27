@@ -30,13 +30,12 @@ public interface ProvisioningListener {
     record RepositorySnapshot(long id, String nameWithOwner, String name, boolean isPrivate) {}
 
     record InstallationData(
-        Long installationId,
-        @Nullable Long accountId,
-        @Nullable String accountLogin,
-        AccountType accountType,
-        @Nullable String avatarUrl,
-        List<RepositorySnapshot> repositories
-    ) {}
+            Long installationId,
+            @Nullable Long accountId,
+            @Nullable String accountLogin,
+            AccountType accountType,
+            @Nullable String avatarUrl,
+            List<RepositorySnapshot> repositories) {}
 
     enum AccountType {
         ORGANIZATION,

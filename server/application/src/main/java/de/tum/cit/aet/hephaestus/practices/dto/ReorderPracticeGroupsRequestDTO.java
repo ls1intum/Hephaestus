@@ -6,10 +6,8 @@ import java.util.List;
 
 @Schema(description = "Reorder practice groups to match the supplied list")
 public record ReorderPracticeGroupsRequestDTO(
-    @NotEmpty(message = "orderedSlugs must not be empty")
-    @Schema(
-        description = "Group slugs in the desired display order",
-        example = "[\"review-ready-work\", \"acting-on-review-feedback\"]"
-    )
-    List<String> orderedSlugs
-) {}
+        @NotEmpty(message = "orderedSlugs must not be empty")
+        @Schema(
+                description = "Group slugs in the desired display order",
+                example = "[\"review-ready-work\", \"acting-on-review-feedback\"]")
+        List<String> orderedSlugs) {}

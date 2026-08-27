@@ -56,19 +56,17 @@ public class WorkspaceAccessService {
         // Super admins with membership are automatically elevated to ADMIN level (but not OWNER)
         if (requiredRole != WorkspaceRole.OWNER && SecurityUtils.isSuperAdmin()) {
             log.debug(
-                "Granted role check: reason=superAdminElevation, requiredRole={}, workspaceSlug={}",
-                requiredRole,
-                context.slug()
-            );
+                    "Granted role check: reason=superAdminElevation, requiredRole={}, workspaceSlug={}",
+                    requiredRole,
+                    context.slug());
             return true;
         }
 
         log.debug(
-            "Denied role check: reason=insufficientRole, userRoles={}, requiredRole={}, workspaceSlug={}",
-            userRoles,
-            requiredRole,
-            context.slug()
-        );
+                "Denied role check: reason=insufficientRole, userRoles={}, requiredRole={}, workspaceSlug={}",
+                userRoles,
+                requiredRole,
+                context.slug());
         return false;
     }
 

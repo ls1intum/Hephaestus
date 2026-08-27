@@ -129,19 +129,18 @@ class GitRepositoryLockManagerTest extends BaseUnitTest {
             CountDownLatch allStarted = new CountDownLatch(2);
             CountDownLatch proceed = new CountDownLatch(1);
 
-            Runnable readOp = () ->
-                lockManager.withReadLock(1L, () -> {
-                    int current = concurrentReaders.incrementAndGet();
-                    maxConcurrentReaders.updateAndGet(max -> Math.max(max, current));
-                    allStarted.countDown();
-                    try {
-                        proceed.await(5, TimeUnit.SECONDS);
-                    } catch (InterruptedException e) {
-                        Thread.currentThread().interrupt();
-                    }
-                    concurrentReaders.decrementAndGet();
-                    return null;
-                });
+            Runnable readOp = () -> lockManager.withReadLock(1L, () -> {
+                int current = concurrentReaders.incrementAndGet();
+                maxConcurrentReaders.updateAndGet(max -> Math.max(max, current));
+                allStarted.countDown();
+                try {
+                    proceed.await(5, TimeUnit.SECONDS);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+                concurrentReaders.decrementAndGet();
+                return null;
+            });
 
             Thread t1 = new Thread(readOp);
             Thread t2 = new Thread(readOp);
@@ -262,17 +261,15 @@ class GitRepositoryLockManagerTest extends BaseUnitTest {
             CountDownLatch readerAttempted = new CountDownLatch(1);
 
             // Writer thread: acquire write lock, signal, then hold it
-            Thread writer = new Thread(() ->
-                lockManager.withWriteLock(1L, () -> {
-                    writerHoldsLock.countDown();
-                    try {
-                        // Hold the lock long enough for the reader to attempt
-                        readerAttempted.await(5, TimeUnit.SECONDS);
-                    } catch (InterruptedException e) {
-                        Thread.currentThread().interrupt();
-                    }
-                })
-            );
+            Thread writer = new Thread(() -> lockManager.withWriteLock(1L, () -> {
+                writerHoldsLock.countDown();
+                try {
+                    // Hold the lock long enough for the reader to attempt
+                    readerAttempted.await(5, TimeUnit.SECONDS);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            }));
 
             // Reader thread: wait for writer to hold lock, then try to read
             Thread reader = new Thread(() -> {
@@ -299,8 +296,8 @@ class GitRepositoryLockManagerTest extends BaseUnitTest {
             reader.join(10_000);
 
             assertThat(readerEnteredCriticalSection.get())
-                .as("Reader should NOT enter critical section while writer holds lock")
-                .isFalse();
+                    .as("Reader should NOT enter critical section while writer holds lock")
+                    .isFalse();
         }
 
         @Test
@@ -309,16 +306,14 @@ class GitRepositoryLockManagerTest extends BaseUnitTest {
             CountDownLatch firstWriterHoldsLock = new CountDownLatch(1);
             CountDownLatch secondWriterAttempted = new CountDownLatch(1);
 
-            Thread firstWriter = new Thread(() ->
-                lockManager.withWriteLock(1L, () -> {
-                    firstWriterHoldsLock.countDown();
-                    try {
-                        secondWriterAttempted.await(5, TimeUnit.SECONDS);
-                    } catch (InterruptedException e) {
-                        Thread.currentThread().interrupt();
-                    }
-                })
-            );
+            Thread firstWriter = new Thread(() -> lockManager.withWriteLock(1L, () -> {
+                firstWriterHoldsLock.countDown();
+                try {
+                    secondWriterAttempted.await(5, TimeUnit.SECONDS);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            }));
 
             Thread secondWriter = new Thread(() -> {
                 try {
@@ -343,8 +338,8 @@ class GitRepositoryLockManagerTest extends BaseUnitTest {
             secondWriter.join(10_000);
 
             assertThat(secondWriterEnteredCriticalSection.get())
-                .as("Second writer should NOT enter critical section while first writer holds lock")
-                .isFalse();
+                    .as("Second writer should NOT enter critical section while first writer holds lock")
+                    .isFalse();
         }
     }
 }

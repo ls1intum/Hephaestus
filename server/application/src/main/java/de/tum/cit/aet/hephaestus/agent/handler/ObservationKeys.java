@@ -11,4 +11,6 @@ package de.tum.cit.aet.hephaestus.agent.handler;
  *     many-to-one: several observations of one practice in one file collapse to it, so it can never stand in
  *     for {@code occurrenceKey}.
  */
-public record ObservationKeys(String occurrenceKey, @org.jspecify.annotations.Nullable String recurrenceKey) {}
+public record ObservationKeys(
+        String occurrenceKey,
+        @org.jspecify.annotations.Nullable String recurrenceKey) {}

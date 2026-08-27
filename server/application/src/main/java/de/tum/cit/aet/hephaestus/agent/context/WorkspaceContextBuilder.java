@@ -53,10 +53,9 @@ public class WorkspaceContextBuilder {
     private final ReentrantLock[] repoLockStripes;
 
     public WorkspaceContextBuilder(
-        List<ContentSource> providers,
-        MeterRegistry meterRegistry,
-        @Nullable ContextManifestBuilder manifestBuilder
-    ) {
+            List<ContentSource> providers,
+            MeterRegistry meterRegistry,
+            @Nullable ContextManifestBuilder manifestBuilder) {
         List<ContentSource> sorted = new ArrayList<>(providers);
         AnnotationAwareOrderComparator.sort(sorted);
         this.providers = List.copyOf(sorted);
@@ -70,12 +69,9 @@ public class WorkspaceContextBuilder {
             repoLockStripes[i] = new ReentrantLock();
         }
         log.info(
-            "WorkspaceContextBuilder registered {} provider(s): {}",
-            this.providers.size(),
-            this.providers.stream()
-                .map(p -> p.getClass().getSimpleName())
-                .toList()
-        );
+                "WorkspaceContextBuilder registered {} provider(s): {}",
+                this.providers.size(),
+                this.providers.stream().map(p -> p.getClass().getSimpleName()).toList());
     }
 
     public Map<String, byte[]> build(ContextRequest request) {
@@ -100,8 +96,10 @@ public class WorkspaceContextBuilder {
                 lock.unlock();
             }
             meterRegistry
-                .timer(METRIC_BUILD + ".duration", Tags.of("kind", request.getClass().getSimpleName()))
-                .record(System.nanoTime() - startNs, TimeUnit.NANOSECONDS);
+                    .timer(
+                            METRIC_BUILD + ".duration",
+                            Tags.of("kind", request.getClass().getSimpleName()))
+                    .record(System.nanoTime() - startNs, TimeUnit.NANOSECONDS);
         }
     }
 
@@ -110,24 +108,17 @@ public class WorkspaceContextBuilder {
      *               evidence rather than put to the model; pass {@link PreparedEvidence#files()}
      */
     public ContextManifestBuilder.PreparedAutomatedReviewReadiness prepareAutomatedReviewReadiness(
-        ArtifactSourceManifest manifest,
-        List<Practice> practices,
-        String jobId,
-        Instant temporalAnchor,
-        @Nullable SignalName signal,
-        Map<String, byte[]> staged
-    ) {
+            ArtifactSourceManifest manifest,
+            List<Practice> practices,
+            String jobId,
+            Instant temporalAnchor,
+            @Nullable SignalName signal,
+            Map<String, byte[]> staged) {
         if (manifestBuilder == null) {
             throw new IllegalStateException("Evidence readiness requires a manifest builder");
         }
         return manifestBuilder.prepareAutomatedReviewReadiness(
-            manifest,
-            practices,
-            jobId,
-            temporalAnchor,
-            signal,
-            staged
-        );
+                manifest, practices, jobId, temporalAnchor, signal, staged);
     }
 
     private Map<String, byte[]> buildWithoutManifest(ContextRequest request) {
@@ -140,8 +131,10 @@ public class WorkspaceContextBuilder {
         } finally {
             if (lock != null) lock.unlock();
             meterRegistry
-                .timer(METRIC_BUILD + ".duration", Tags.of("kind", request.getClass().getSimpleName()))
-                .record(System.nanoTime() - startNs, TimeUnit.NANOSECONDS);
+                    .timer(
+                            METRIC_BUILD + ".duration",
+                            Tags.of("kind", request.getClass().getSimpleName()))
+                    .record(System.nanoTime() - startNs, TimeUnit.NANOSECONDS);
         }
     }
 
@@ -151,11 +144,10 @@ public class WorkspaceContextBuilder {
     }
 
     private record BuildResult(
-        Map<String, byte[]> files,
-        Map<String, java.nio.file.Path> filesOnDisk,
-        List<AutoCloseable> cleanups,
-        @Nullable ArtifactSourceManifest manifest
-    ) {}
+            Map<String, byte[]> files,
+            Map<String, java.nio.file.Path> filesOnDisk,
+            List<AutoCloseable> cleanups,
+            @Nullable ArtifactSourceManifest manifest) {}
 
     private BuildResult buildLocked(ContextRequest request, @Nullable EvidencePlan evidencePlan) {
         // Every source the contract says applies to this artifact kind — not a subset chosen for the
@@ -187,9 +179,8 @@ public class WorkspaceContextBuilder {
                 continue;
             }
             if (evidencePlan != null && !(provider instanceof EvidenceSource)) {
-                throw new IllegalStateException(
-                    "Detector context provider must declare source kinds: " + provider.getClass().getSimpleName()
-                );
+                throw new IllegalStateException("Detector context provider must declare source kinds: "
+                        + provider.getClass().getSimpleName());
             }
             String providerName = provider.getClass().getSimpleName();
             Map<String, byte[]> contributionFiles;
@@ -201,22 +192,21 @@ public class WorkspaceContextBuilder {
                     continue;
                 }
                 contributionFiles = captureIndependently(
-                    request,
-                    evidencePlan,
-                    stagedSources,
-                    evidenceSource,
-                    providerName,
-                    completeness,
-                    contentStates,
-                    immutableIdentities,
-                    observedAt,
-                    sourceEffectiveAt,
-                    stateOverrides,
-                    captureLimitations,
-                    attemptedKinds,
-                    filesOnDisk,
-                    cleanups
-                );
+                        request,
+                        evidencePlan,
+                        stagedSources,
+                        evidenceSource,
+                        providerName,
+                        completeness,
+                        contentStates,
+                        immutableIdentities,
+                        observedAt,
+                        sourceEffectiveAt,
+                        stateOverrides,
+                        captureLimitations,
+                        attemptedKinds,
+                        filesOnDisk,
+                        cleanups);
             } else {
                 try {
                     Map<String, byte[]> localFiles = new LinkedHashMap<>();
@@ -227,7 +217,9 @@ public class WorkspaceContextBuilder {
                 } catch (RuntimeException e) {
                     if (!(e instanceof EvidenceCollectionException)) throw e;
                     if (provider.required()) {
-                        meterRegistry.counter(METRIC_REQUIRED_FAILURE, Tags.of("provider", providerName)).increment();
+                        meterRegistry
+                                .counter(METRIC_REQUIRED_FAILURE, Tags.of("provider", providerName))
+                                .increment();
                         throw new JobPreparationException("Required content provider failed: " + providerName, e);
                     }
                     log.warn("Optional content provider failed, continuing: {} — {}", providerName, e.getMessage());
@@ -243,32 +235,26 @@ public class WorkspaceContextBuilder {
             for (String key : contributedKeys) {
                 byte[] value = contributionFiles.get(key);
                 if (files.containsKey(key)) {
-                    throw new IllegalStateException(
-                        "Duplicate workspace key " +
-                            key +
-                            ": written by both " +
-                            keyOwner.get(key) +
-                            " and " +
-                            providerName
-                    );
+                    throw new IllegalStateException("Duplicate workspace key " + key
+                            + ": written by both "
+                            + keyOwner.get(key)
+                            + " and "
+                            + providerName);
                 }
                 if (!provider.ownsPath(key)) {
                     throw new IllegalStateException(
-                        providerName + " wrote file outside its declared input namespace: " + key
-                    );
+                            providerName + " wrote file outside its declared input namespace: " + key);
                 }
                 keyOwner.put(key, providerName);
                 if (provider instanceof EvidenceSource evidenceSource) {
                     SourceKind kind = evidenceSource.sourceKindFor(key);
                     if (!evidenceSource.sourceKinds().contains(kind)) {
                         throw new IllegalStateException(
-                            providerName + " mapped output to undeclared source kind " + kind
-                        );
+                                providerName + " mapped output to undeclared source kind " + kind);
                     }
                     if (evidencePlan != null && !stagedSources.contains(kind)) {
-                        throw new IllegalStateException(
-                            providerName + " emitted source kind " + kind + ", which does not apply to this artifact"
-                        );
+                        throw new IllegalStateException(providerName + " emitted source kind " + kind
+                                + ", which does not apply to this artifact");
                     }
                     keySourceKind.put(key, kind);
                 } else if (evidencePlan != null) {
@@ -287,50 +273,46 @@ public class WorkspaceContextBuilder {
             AgentJob job = reviewJob(request);
             if (job != null) {
                 manifest = manifestBuilder.augment(
-                    files,
-                    filesOnDisk,
-                    keySourceKind,
-                    String.valueOf(job.getId()),
-                    evidencePlan,
-                    new ContextManifestBuilder.CaptureMetadata(
-                        completeness,
-                        contentStates,
-                        immutableIdentities,
-                        observedAt,
-                        sourceEffectiveAt,
-                        stateOverrides,
-                        captureLimitations,
-                        attemptedKinds
-                    )
-                );
+                        files,
+                        filesOnDisk,
+                        keySourceKind,
+                        String.valueOf(job.getId()),
+                        evidencePlan,
+                        new ContextManifestBuilder.CaptureMetadata(
+                                completeness,
+                                contentStates,
+                                immutableIdentities,
+                                observedAt,
+                                sourceEffectiveAt,
+                                stateOverrides,
+                                captureLimitations,
+                                attemptedKinds));
             }
         }
         log.debug(
-            "Workspace context built: {} files ({} staged from disk) from {} provider(s)",
-            files.size() + filesOnDisk.size(),
-            filesOnDisk.size(),
-            contributed
-        );
+                "Workspace context built: {} files ({} staged from disk) from {} provider(s)",
+                files.size() + filesOnDisk.size(),
+                filesOnDisk.size(),
+                contributed);
         return new BuildResult(files, filesOnDisk, cleanups, manifest);
     }
 
     private Map<String, byte[]> captureIndependently(
-        ContextRequest request,
-        EvidencePlan plan,
-        Set<SourceKind> stagedSources,
-        EvidenceSource source,
-        String providerName,
-        Map<SourceKind, SourceCompleteness> completeness,
-        Map<SourceKind, SourceContentState> contentStates,
-        Map<SourceKind, String> immutableIdentities,
-        Map<SourceKind, Instant> observedAt,
-        Map<SourceKind, Instant> sourceEffectiveAt,
-        Map<SourceKind, SourceCaptureState> stateOverrides,
-        Map<SourceKind, List<String>> captureLimitations,
-        Set<SourceKind> attemptedKinds,
-        Map<String, java.nio.file.Path> filesOnDisk,
-        List<AutoCloseable> cleanups
-    ) {
+            ContextRequest request,
+            EvidencePlan plan,
+            Set<SourceKind> stagedSources,
+            EvidenceSource source,
+            String providerName,
+            Map<SourceKind, SourceCompleteness> completeness,
+            Map<SourceKind, SourceContentState> contentStates,
+            Map<SourceKind, String> immutableIdentities,
+            Map<SourceKind, Instant> observedAt,
+            Map<SourceKind, Instant> sourceEffectiveAt,
+            Map<SourceKind, SourceCaptureState> stateOverrides,
+            Map<SourceKind, List<String>> captureLimitations,
+            Set<SourceKind> attemptedKinds,
+            Map<String, java.nio.file.Path> filesOnDisk,
+            List<AutoCloseable> cleanups) {
         Map<String, byte[]> files = new LinkedHashMap<>();
         Set<SourceKind> selectedKinds = new HashSet<>(source.sourceKinds());
         selectedKinds.retainAll(stagedSources);
@@ -338,9 +320,7 @@ public class WorkspaceContextBuilder {
             for (SourceKind kind : Set.copyOf(selectedKinds)) {
                 if (!manifestBuilder.isSourceUsePermitted(plan.contractVersion(), kind)) {
                     stateOverrides.put(
-                        kind,
-                        new SourceCaptureState.NotCollected(SourceAbsenceReason.GOVERNANCE_NOT_EFFECTIVE)
-                    );
+                            kind, new SourceCaptureState.NotCollected(SourceAbsenceReason.GOVERNANCE_NOT_EFFECTIVE));
                     selectedKinds.remove(kind);
                 }
             }
@@ -358,30 +338,27 @@ public class WorkspaceContextBuilder {
                 // for this job. Only failures raised by the collector are absorbed here — the checks
                 // below still propagate.
                 stateOverrides.put(kind, new SourceCaptureState.CollectionError(SourceAbsenceReason.PROVIDER_FAILURE));
-                meterRegistry.counter(METRIC_REQUIRED_FAILURE, Tags.of("provider", providerName)).increment();
+                meterRegistry
+                        .counter(METRIC_REQUIRED_FAILURE, Tags.of("provider", providerName))
+                        .increment();
                 log.warn(
-                    "Evidence source failed; recording collection error: {} {} — {}",
-                    providerName,
-                    kind,
-                    e.getMessage()
-                );
+                        "Evidence source failed; recording collection error: {} {} — {}",
+                        providerName,
+                        kind,
+                        e.getMessage());
                 continue;
             }
             validateContribution(source, Set.of(kind), contribution);
-            contribution
-                .files()
-                .forEach((path, bytes) -> {
-                    if (files.put(path, bytes) != null) {
-                        throw new IllegalStateException(providerName + " emitted duplicate file " + path);
-                    }
-                });
-            contribution
-                .filesOnDisk()
-                .forEach((path, file) -> {
-                    if (filesOnDisk.put(path, file) != null || files.containsKey(path)) {
-                        throw new IllegalStateException(providerName + " emitted duplicate file " + path);
-                    }
-                });
+            contribution.files().forEach((path, bytes) -> {
+                if (files.put(path, bytes) != null) {
+                    throw new IllegalStateException(providerName + " emitted duplicate file " + path);
+                }
+            });
+            contribution.filesOnDisk().forEach((path, file) -> {
+                if (filesOnDisk.put(path, file) != null || files.containsKey(path)) {
+                    throw new IllegalStateException(providerName + " emitted duplicate file " + path);
+                }
+            });
             if (contribution.cleanup() != null) {
                 cleanups.add(contribution.cleanup());
             }
@@ -397,11 +374,9 @@ public class WorkspaceContextBuilder {
     }
 
     private static void validateContribution(
-        EvidenceSource source,
-        Set<SourceKind> allowedKinds,
-        EvidenceContribution contribution
-    ) {
-        Set<SourceKind> reportedKinds = new HashSet<>(contribution.completeness().keySet());
+            EvidenceSource source, Set<SourceKind> allowedKinds, EvidenceContribution contribution) {
+        Set<SourceKind> reportedKinds =
+                new HashSet<>(contribution.completeness().keySet());
         reportedKinds.addAll(contribution.contentStates().keySet());
         reportedKinds.addAll(contribution.immutableIdentities().keySet());
         reportedKinds.addAll(contribution.observedAt().keySet());
@@ -409,23 +384,16 @@ public class WorkspaceContextBuilder {
         reportedKinds.addAll(contribution.captureLimitations().keySet());
         reportedKinds.removeAll(allowedKinds);
         if (!reportedKinds.isEmpty()) {
-            throw new IllegalStateException(
-                source.getClass().getSimpleName() +
-                    " reported facts for undeclared or unselected sources: " +
-                    reportedKinds
-            );
+            throw new IllegalStateException(source.getClass().getSimpleName()
+                    + " reported facts for undeclared or unselected sources: " + reportedKinds);
         }
-        Set<SourceKind> emittedKinds = contribution
-            .files()
-            .keySet()
-            .stream()
-            .map(source::sourceKindFor)
-            .filter(kind -> !allowedKinds.contains(kind))
-            .collect(java.util.stream.Collectors.toSet());
+        Set<SourceKind> emittedKinds = contribution.files().keySet().stream()
+                .map(source::sourceKindFor)
+                .filter(kind -> !allowedKinds.contains(kind))
+                .collect(java.util.stream.Collectors.toSet());
         if (!emittedKinds.isEmpty()) {
-            throw new IllegalStateException(
-                source.getClass().getSimpleName() + " emitted files for sources outside this capture: " + emittedKinds
-            );
+            throw new IllegalStateException(source.getClass().getSimpleName()
+                    + " emitted files for sources outside this capture: " + emittedKinds);
         }
     }
 
@@ -453,7 +421,9 @@ public class WorkspaceContextBuilder {
             return null;
         }
         JsonNode meta = job.getMetadata();
-        if (meta != null && meta.has("repository_id") && meta.get("repository_id").isNumber()) {
+        if (meta != null
+                && meta.has("repository_id")
+                && meta.get("repository_id").isNumber()) {
             return meta.get("repository_id").asLong();
         }
         return null;

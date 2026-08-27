@@ -1,8 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.handler.conversation;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.assertj.core.api.Assertions.tuple;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
@@ -16,18 +14,13 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.agent.handler.FeedbackLedgerRecorder;
 import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
 import de.tum.cit.aet.hephaestus.integration.core.egress.OutboundEgressGuard;
-import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackPlacement;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackPlacementRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
 import de.tum.cit.aet.hephaestus.practices.feedback.PlacementType;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
@@ -109,22 +102,21 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
     @BeforeEach
     void authorizeEvidenceDelivery() {
         lenient()
-            .when(observationRepository.findAllByIdInAndWorkspaceId(any(), anyLong()))
-            .thenAnswer(invocation -> {
-                Collection<UUID> ids = invocation.getArgument(0);
-                // Real instances, not mocks: building a mock inside an Answer would stub one mock from
-                // inside another's invocation, which is how Mockito's ongoing-stubbing state gets corrupted.
-                return ids
-                    .stream()
-                    .map(id -> Observation.builder().id(id).build())
-                    .toList();
-            });
+                .when(observationRepository.findAllByIdInAndWorkspaceId(any(), anyLong()))
+                .thenAnswer(invocation -> {
+                    Collection<UUID> ids = invocation.getArgument(0);
+                    // Real instances, not mocks: building a mock inside an Answer would stub one mock from
+                    // inside another's invocation, which is how Mockito's ongoing-stubbing state gets corrupted.
+                    return ids.stream()
+                            .map(id -> Observation.builder().id(id).build())
+                            .toList();
+                });
         lenient()
-            .when(visibilityPolicy.permitsAll(anyLong(), any(), eq(SourceUsePurpose.CONVERSATIONAL_MENTORING)))
-            .thenAnswer(invocation -> {
-                Collection<Observation> observations = invocation.getArgument(1);
-                return observations.stream().map(Observation::getId).collect(Collectors.toSet());
-            });
+                .when(visibilityPolicy.permitsAll(anyLong(), any(), eq(SourceUsePurpose.CONVERSATIONAL_MENTORING)))
+                .thenAnswer(invocation -> {
+                    Collection<Observation> observations = invocation.getArgument(1);
+                    return observations.stream().map(Observation::getId).collect(Collectors.toSet());
+                });
     }
 
     private FeedbackChannelRouter router() {
@@ -136,23 +128,21 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
         when(feedbackRepository.existsByAgentJobIdAndPosition(any(), anyInt())).thenReturn(false);
         when(feedbackRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         return new ConversationalFeedbackPreparer(
-            feedbackRepository,
-            feedbackObservationRepository,
-            observationRepository,
-            supersession,
-            eventPublisher,
-            egressGuard
-        );
+                feedbackRepository,
+                feedbackObservationRepository,
+                observationRepository,
+                supersession,
+                eventPublisher,
+                egressGuard);
     }
 
     private ConversationalDeliveryReconciler reconciler() {
         return new ConversationalDeliveryReconciler(
-            feedbackRepository,
-            feedbackObservationRepository,
-            feedbackPlacementRepository,
-            observationRepository,
-            visibilityPolicy
-        );
+                feedbackRepository,
+                feedbackObservationRepository,
+                feedbackPlacementRepository,
+                observationRepository,
+                visibilityPolicy);
     }
 
     @Test
@@ -178,49 +168,46 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
 
     static Stream<Arguments> routerCases() {
         return Stream.of(
-            arguments(ObsKind.PROBLEM_NO_ANCHOR, false, ConversationRoutingDecision.ADMIT),
-            arguments(ObsKind.PROBLEM_NO_ANCHOR, true, ConversationRoutingDecision.REVIEWER_DEFERRED),
-            arguments(ObsKind.STRENGTH, false, ConversationRoutingDecision.NOT_DELIVERABLE),
-            arguments(ObsKind.NOT_APPLICABLE, false, ConversationRoutingDecision.NOT_DELIVERABLE),
-            arguments(ObsKind.PROBLEM_FILE_ANCHOR, false, ConversationRoutingDecision.HAS_INLINE_ANCHOR),
-            arguments(ObsKind.PROBLEM_NON_DIFF_LOCATION, false, ConversationRoutingDecision.ADMIT),
-            arguments(ObsKind.ALREADY_DELIVERED, false, ConversationRoutingDecision.ALREADY_DELIVERED_IN_CONTEXT)
-        );
+                arguments(ObsKind.PROBLEM_NO_ANCHOR, false, ConversationRoutingDecision.ADMIT),
+                arguments(ObsKind.PROBLEM_NO_ANCHOR, true, ConversationRoutingDecision.REVIEWER_DEFERRED),
+                arguments(ObsKind.STRENGTH, false, ConversationRoutingDecision.NOT_DELIVERABLE),
+                arguments(ObsKind.NOT_APPLICABLE, false, ConversationRoutingDecision.NOT_DELIVERABLE),
+                arguments(ObsKind.PROBLEM_FILE_ANCHOR, false, ConversationRoutingDecision.HAS_INLINE_ANCHOR),
+                arguments(ObsKind.PROBLEM_NON_DIFF_LOCATION, false, ConversationRoutingDecision.ADMIT),
+                arguments(ObsKind.ALREADY_DELIVERED, false, ConversationRoutingDecision.ALREADY_DELIVERED_IN_CONTEXT));
     }
 
     @ParameterizedTest
     @MethodSource("routerCases")
     void routerMapsObservationToDecision(ObsKind kind, boolean reviewer, ConversationRoutingDecision expected) {
         RoutingContext ctx = reviewer ? RoutingContext.reviewer() : RoutingContext.author();
-        Observation obs = switch (kind) {
-            case PROBLEM_NO_ANCHOR -> problem(null, null);
-            case PROBLEM_FILE_ANCHOR -> {
-                ObjectNode evidence = MAPPER.createObjectNode();
-                evidence
-                    .putArray("citations")
-                    .addObject()
-                    .put("sourceKind", "scm.pull-request.diff")
-                    .put("path", "src/Main.java");
-                yield problem(evidence, null);
-            }
-            case PROBLEM_NON_DIFF_LOCATION -> {
-                ObjectNode evidence = MAPPER.createObjectNode();
-                evidence
-                    .putArray("citations")
-                    .addObject()
-                    .put("sourceKind", "scm.pull-request.core")
-                    .put("path", "pull-request.json");
-                yield problem(evidence, null);
-            }
-            case STRENGTH -> strength();
-            case NOT_APPLICABLE -> notApplicable();
-            case ALREADY_DELIVERED -> {
-                when(feedbackRepository.existsDeliveredInContextForRecurrenceKey(WS, RECIPIENT, "rk-1")).thenReturn(
-                    true
-                );
-                yield problem(null, "rk-1");
-            }
-        };
+        Observation obs =
+                switch (kind) {
+                    case PROBLEM_NO_ANCHOR -> problem(null, null);
+                    case PROBLEM_FILE_ANCHOR -> {
+                        ObjectNode evidence = MAPPER.createObjectNode();
+                        evidence.putArray("citations")
+                                .addObject()
+                                .put("sourceKind", "scm.pull-request.diff")
+                                .put("path", "src/Main.java");
+                        yield problem(evidence, null);
+                    }
+                    case PROBLEM_NON_DIFF_LOCATION -> {
+                        ObjectNode evidence = MAPPER.createObjectNode();
+                        evidence.putArray("citations")
+                                .addObject()
+                                .put("sourceKind", "scm.pull-request.core")
+                                .put("path", "pull-request.json");
+                        yield problem(evidence, null);
+                    }
+                    case STRENGTH -> strength();
+                    case NOT_APPLICABLE -> notApplicable();
+                    case ALREADY_DELIVERED -> {
+                        when(feedbackRepository.existsDeliveredInContextForRecurrenceKey(WS, RECIPIENT, "rk-1"))
+                                .thenReturn(true);
+                        yield problem(null, "rk-1");
+                    }
+                };
 
         assertThat(router().route(obs, PracticeAutonomy.AUTOMATIC, WS, ctx)).isEqualTo(expected);
     }
@@ -235,9 +222,8 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
         Observation obs = problem(null, null);
         lenient().when(obs.getOrigin()).thenReturn(ObservationOrigin.BACKFILL);
 
-        assertThat(router().route(obs, PracticeAutonomy.AUTOMATIC, WS, RoutingContext.author())).isEqualTo(
-            ConversationRoutingDecision.BACKFILL_QUIET
-        );
+        assertThat(router().route(obs, PracticeAutonomy.AUTOMATIC, WS, RoutingContext.author()))
+                .isEqualTo(ConversationRoutingDecision.BACKFILL_QUIET);
     }
 
     @Test
@@ -274,9 +260,8 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
         UUID c = UUID.randomUUID();
         UUID fidA = UUID.randomUUID();
         UUID msg = UUID.randomUUID();
-        when(
-            feedbackObservationRepository.findPreparedConversationFeedbackIdsByObservation(WS, RECIPIENT, a)
-        ).thenReturn(List.of(fidA));
+        when(feedbackObservationRepository.findPreparedConversationFeedbackIdsByObservation(WS, RECIPIENT, a))
+                .thenReturn(List.of(fidA));
         when(feedbackRepository.markConversationDelivered(eq(fidA), any())).thenReturn(1);
         when(feedbackRepository.getReferenceById(fidA)).thenReturn(mock(Feedback.class));
 
@@ -285,11 +270,8 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
         assertThat(flips).isEqualTo(1);
         verify(feedbackRepository, times(1)).markConversationDelivered(eq(fidA), any());
         // one-per-turn cap: b/c are never even looked up after the first winning flip.
-        verify(feedbackObservationRepository, never()).findPreparedConversationFeedbackIdsByObservation(
-            WS,
-            RECIPIENT,
-            b
-        );
+        verify(feedbackObservationRepository, never())
+                .findPreparedConversationFeedbackIdsByObservation(WS, RECIPIENT, b);
         ArgumentCaptor<FeedbackPlacement> placement = ArgumentCaptor.forClass(FeedbackPlacement.class);
         verify(feedbackPlacementRepository, times(1)).save(placement.capture());
         assertThat(placement.getValue().getPlacementType()).isEqualTo(PlacementType.CONVERSATION_TURN);
@@ -300,9 +282,8 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
     void reconcilerReRunIsNoOpWhenAlreadyDelivered() {
         UUID a = UUID.randomUUID();
         UUID fidA = UUID.randomUUID();
-        when(
-            feedbackObservationRepository.findPreparedConversationFeedbackIdsByObservation(WS, RECIPIENT, a)
-        ).thenReturn(List.of(fidA));
+        when(feedbackObservationRepository.findPreparedConversationFeedbackIdsByObservation(WS, RECIPIENT, a))
+                .thenReturn(List.of(fidA));
         when(feedbackRepository.markConversationDelivered(eq(fidA), any())).thenReturn(0);
 
         int flips = reconciler().reconcile(WS, RECIPIENT, UUID.randomUUID(), List.of(a));
@@ -316,14 +297,14 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
         UUID observationId = UUID.randomUUID();
         UUID feedbackId = UUID.randomUUID();
         Observation observation = problem(null, null, observationId);
-        when(
-            feedbackObservationRepository.findPreparedConversationFeedbackIdsByObservation(WS, RECIPIENT, observationId)
-        ).thenReturn(List.of(feedbackId));
+        when(feedbackObservationRepository.findPreparedConversationFeedbackIdsByObservation(
+                        WS, RECIPIENT, observationId))
+                .thenReturn(List.of(feedbackId));
         doReturn(List.of(observation)).when(observationRepository).findAllByIdInAndWorkspaceId(any(), anyLong());
         // Withheld = absent from the permitted set. Nothing else in the batch says so.
         doReturn(Set.of())
-            .when(visibilityPolicy)
-            .permitsAll(anyLong(), any(), eq(SourceUsePurpose.CONVERSATIONAL_MENTORING));
+                .when(visibilityPolicy)
+                .permitsAll(anyLong(), any(), eq(SourceUsePurpose.CONVERSATIONAL_MENTORING));
 
         int flips = reconciler().reconcile(WS, RECIPIENT, UUID.randomUUID(), List.of(observationId));
 
@@ -343,13 +324,13 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
         UUID observationId = UUID.randomUUID();
         UUID feedbackId = UUID.randomUUID();
         Observation observation = problem(null, null, observationId);
-        when(
-            feedbackObservationRepository.findPreparedConversationFeedbackIdsByObservation(WS, RECIPIENT, observationId)
-        ).thenReturn(List.of(feedbackId));
+        when(feedbackObservationRepository.findPreparedConversationFeedbackIdsByObservation(
+                        WS, RECIPIENT, observationId))
+                .thenReturn(List.of(feedbackId));
         doReturn(List.of(observation)).when(observationRepository).findAllByIdInAndWorkspaceId(any(), anyLong());
         doReturn(Set.of())
-            .when(visibilityPolicy)
-            .permitsAll(anyLong(), any(), eq(SourceUsePurpose.CONVERSATIONAL_MENTORING));
+                .when(visibilityPolicy)
+                .permitsAll(anyLong(), any(), eq(SourceUsePurpose.CONVERSATIONAL_MENTORING));
 
         int suppressed = reconciler().suppressForSilentMode(WS, RECIPIENT, List.of(observationId));
 
@@ -361,10 +342,11 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
     void silentModeSuppressesOnePreparedUnitWithoutPlacement() {
         UUID observationId = UUID.randomUUID();
         UUID feedbackId = UUID.randomUUID();
-        when(
-            feedbackObservationRepository.findPreparedConversationFeedbackIdsByObservation(WS, RECIPIENT, observationId)
-        ).thenReturn(List.of(feedbackId));
-        when(feedbackRepository.markConversationSuppressedBySilentMode(feedbackId)).thenReturn(1);
+        when(feedbackObservationRepository.findPreparedConversationFeedbackIdsByObservation(
+                        WS, RECIPIENT, observationId))
+                .thenReturn(List.of(feedbackId));
+        when(feedbackRepository.markConversationSuppressedBySilentMode(feedbackId))
+                .thenReturn(1);
 
         int suppressed = reconciler().suppressForSilentMode(WS, RECIPIENT, List.of(observationId));
 
@@ -380,14 +362,12 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
         // recurrence_key in-context, the flip must be skipped (no double-delivery) — the stale unit ages out.
         UUID a = UUID.randomUUID();
         UUID fidA = UUID.randomUUID();
-        when(
-            feedbackObservationRepository.findPreparedConversationFeedbackIdsByObservation(WS, RECIPIENT, a)
-        ).thenReturn(List.of(fidA));
+        when(feedbackObservationRepository.findPreparedConversationFeedbackIdsByObservation(WS, RECIPIENT, a))
+                .thenReturn(List.of(fidA));
         Observation obs = problem(null, "rk-delivered", a);
         doReturn(List.of(obs)).when(observationRepository).findAllByIdInAndWorkspaceId(any(), anyLong());
-        when(feedbackRepository.existsDeliveredInContextForRecurrenceKey(WS, RECIPIENT, "rk-delivered")).thenReturn(
-            true
-        );
+        when(feedbackRepository.existsDeliveredInContextForRecurrenceKey(WS, RECIPIENT, "rk-delivered"))
+                .thenReturn(true);
 
         int flips = reconciler().reconcile(WS, RECIPIENT, UUID.randomUUID(), List.of(a));
 
@@ -399,12 +379,12 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
     void reconcilerStillFlips_whenLocusHasKeyButWasNotDeliveredInContext() {
         UUID a = UUID.randomUUID();
         UUID fidA = UUID.randomUUID();
-        when(
-            feedbackObservationRepository.findPreparedConversationFeedbackIdsByObservation(WS, RECIPIENT, a)
-        ).thenReturn(List.of(fidA));
+        when(feedbackObservationRepository.findPreparedConversationFeedbackIdsByObservation(WS, RECIPIENT, a))
+                .thenReturn(List.of(fidA));
         Observation obs = problem(null, "rk-fresh", a);
         doReturn(List.of(obs)).when(observationRepository).findAllByIdInAndWorkspaceId(any(), anyLong());
-        when(feedbackRepository.existsDeliveredInContextForRecurrenceKey(WS, RECIPIENT, "rk-fresh")).thenReturn(false);
+        when(feedbackRepository.existsDeliveredInContextForRecurrenceKey(WS, RECIPIENT, "rk-fresh"))
+                .thenReturn(false);
         when(feedbackRepository.markConversationDelivered(eq(fidA), any())).thenReturn(1);
         when(feedbackRepository.getReferenceById(fidA)).thenReturn(mock(Feedback.class));
 
@@ -419,33 +399,31 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
     void routerAppliesAutonomyBeforeAnythingElse(PracticeAutonomy autonomy, ConversationRoutingDecision expected) {
         Observation observation = problem(null, null);
 
-        assertThat(router().route(observation, autonomy, WS, RoutingContext.author())).isEqualTo(expected);
+        assertThat(router().route(observation, autonomy, WS, RoutingContext.author()))
+                .isEqualTo(expected);
     }
 
     static Stream<Arguments> autonomyRoutingCases() {
         return Stream.of(
-            arguments(PracticeAutonomy.OFF, ConversationRoutingDecision.PRACTICE_REQUIRES_APPROVAL),
-            arguments(PracticeAutonomy.HUMAN_APPROVAL, ConversationRoutingDecision.PRACTICE_REQUIRES_APPROVAL),
-            arguments(PracticeAutonomy.AUTOMATIC, ConversationRoutingDecision.ADMIT)
-        );
+                arguments(PracticeAutonomy.OFF, ConversationRoutingDecision.PRACTICE_REQUIRES_APPROVAL),
+                arguments(PracticeAutonomy.HUMAN_APPROVAL, ConversationRoutingDecision.PRACTICE_REQUIRES_APPROVAL),
+                arguments(PracticeAutonomy.AUTOMATIC, ConversationRoutingDecision.ADMIT));
     }
 
     @Test
     void autonomyIsAppliedBeforeReviewerDeferral() {
         Observation observation = problem(null, null);
 
-        assertThat(
-            router().route(observation, PracticeAutonomy.HUMAN_APPROVAL, WS, RoutingContext.reviewer())
-        ).isEqualTo(ConversationRoutingDecision.PRACTICE_REQUIRES_APPROVAL);
+        assertThat(router().route(observation, PracticeAutonomy.HUMAN_APPROVAL, WS, RoutingContext.reviewer()))
+                .isEqualTo(ConversationRoutingDecision.PRACTICE_REQUIRES_APPROVAL);
     }
 
     @Test
     void anUnresolvedAutonomyFailsClosed() {
         Observation observation = problem(null, null);
 
-        assertThat(router().route(observation, null, WS, RoutingContext.author())).isEqualTo(
-            ConversationRoutingDecision.PRACTICE_REQUIRES_APPROVAL
-        );
+        assertThat(router().route(observation, null, WS, RoutingContext.author()))
+                .isEqualTo(ConversationRoutingDecision.PRACTICE_REQUIRES_APPROVAL);
     }
 
     private Observation problem(@Nullable ObjectNode evidence, @Nullable String recurrenceKey) {

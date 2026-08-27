@@ -27,12 +27,11 @@ public class ProxyAccounting {
     private final ObjectMapper objectMapper;
 
     ProxyAccounting(
-        ProxyBudgetGate budgetGate,
-        ProxyUsageAccumulator usageAccumulator,
-        MentorTurnUsageAccumulator mentorTurnUsageAccumulator,
-        MeterRegistry meterRegistry,
-        ObjectMapper objectMapper
-    ) {
+            ProxyBudgetGate budgetGate,
+            ProxyUsageAccumulator usageAccumulator,
+            MentorTurnUsageAccumulator mentorTurnUsageAccumulator,
+            MeterRegistry meterRegistry,
+            ObjectMapper objectMapper) {
         this.budgetGate = budgetGate;
         this.usageAccumulator = usageAccumulator;
         this.mentorTurnUsageAccumulator = mentorTurnUsageAccumulator;
@@ -48,7 +47,9 @@ public class ProxyAccounting {
         if (!budgetGate.isBlocked(routing)) {
             return false;
         }
-        meterRegistry.counter("llm.proxy.budget.blocked", "apiProtocol", routing.apiProtocol()).increment();
+        meterRegistry
+                .counter("llm.proxy.budget.blocked", "apiProtocol", routing.apiProtocol())
+                .increment();
         return true;
     }
 
@@ -57,7 +58,9 @@ public class ProxyAccounting {
      * usage statistic: a sandbox is calling outside the window its turn owns.
      */
     public void recordUnbillableRefusal(String apiProtocol) {
-        meterRegistry.counter("llm.proxy.unbillable.refused", "apiProtocol", apiProtocol).increment();
+        meterRegistry
+                .counter("llm.proxy.unbillable.refused", "apiProtocol", apiProtocol)
+                .increment();
     }
 
     /**
@@ -71,7 +74,12 @@ public class ProxyAccounting {
             recordUsage(attempt, ProxyTokenUsage.from(parsed, responsesProtocol));
         } catch (Exception e) {
             log.warn("Could not parse upstream usage for {} — this call's tokens go unbilled", attempt.sourceId(), e);
-            meterRegistry.counter("llm.proxy.usage.unparseable", "sourceType", attempt.sourceType().name()).increment();
+            meterRegistry
+                    .counter(
+                            "llm.proxy.usage.unparseable",
+                            "sourceType",
+                            attempt.sourceType().name())
+                    .increment();
         }
     }
 
@@ -91,12 +99,10 @@ public class ProxyAccounting {
     }
 
     public void stopTimer(Timer.Sample sample, String apiProtocol) {
-        sample.stop(
-            Timer.builder("llm.proxy.duration")
+        sample.stop(Timer.builder("llm.proxy.duration")
                 .description("LLM proxy request duration")
                 .tag("apiProtocol", apiProtocol)
-                .register(meterRegistry)
-        );
+                .register(meterRegistry));
     }
 
     public void recordError(String apiProtocol) {
@@ -108,6 +114,8 @@ public class ProxyAccounting {
      * the stream. A sustained rate means every streamed call on that connection is under-billed.
      */
     public void recordStreamUsageUnsupported(String apiProtocol) {
-        meterRegistry.counter("llm.proxy.stream.usage.unsupported", "apiProtocol", apiProtocol).increment();
+        meterRegistry
+                .counter("llm.proxy.stream.usage.unsupported", "apiProtocol", apiProtocol)
+                .increment();
     }
 }

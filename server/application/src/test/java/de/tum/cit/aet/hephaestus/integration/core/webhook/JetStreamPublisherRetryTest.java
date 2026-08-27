@@ -26,51 +26,40 @@ import org.junit.jupiter.api.Test;
 class JetStreamPublisherRetryTest extends BaseUnitTest {
 
     private final WebhookProperties properties = new WebhookProperties(
-        null,
-        null,
-        new WebhookProperties.TokenRotation(7, 90),
-        new WebhookProperties.Publish(Duration.ofSeconds(2), 3, Duration.ofMillis(10)),
-        WebhookPropertiesFixture.stream(),
-        new WebhookProperties.Shutdown(Duration.ofSeconds(15)),
-        new WebhookProperties.Http(26_214_400L)
-    );
+            null,
+            null,
+            new WebhookProperties.TokenRotation(7, 90),
+            new WebhookProperties.Publish(Duration.ofSeconds(2), 3, Duration.ofMillis(10)),
+            WebhookPropertiesFixture.stream(),
+            new WebhookProperties.Shutdown(Duration.ofSeconds(15)),
+            new WebhookProperties.Http(26_214_400L));
 
     @Test
     void exhaustsRetriesThenThrowsPublishFailedException() throws Exception {
         JetStream jetStream = mock(JetStream.class);
         // Each retry attempt fails synchronously through the async future.
-        CompletableFuture<io.nats.client.api.PublishAck> failed = CompletableFuture.failedFuture(
-            new IOException("upstream NATS broker error")
-        );
-        when(
-            jetStream.publishAsync(any(String.class), any(Headers.class), any(byte[].class), any(PublishOptions.class))
-        ).thenReturn(failed);
+        CompletableFuture<io.nats.client.api.PublishAck> failed =
+                CompletableFuture.failedFuture(new IOException("upstream NATS broker error"));
+        when(jetStream.publishAsync(
+                        any(String.class), any(Headers.class), any(byte[].class), any(PublishOptions.class)))
+                .thenReturn(failed);
 
         Retry retry = Retry.of(
-            "test-fast",
-            RetryConfig.custom()
-                .maxAttempts(properties.publish().maxRetries())
-                .intervalFunction(IntervalFunction.of(Duration.ofMillis(1)))
-                .failAfterMaxAttempts(true)
-                .build()
-        );
+                "test-fast",
+                RetryConfig.custom()
+                        .maxAttempts(properties.publish().maxRetries())
+                        .intervalFunction(IntervalFunction.of(Duration.ofMillis(1)))
+                        .failAfterMaxAttempts(true)
+                        .build());
         JetStreamPublisher publisher = new JetStreamPublisher(jetStream, retry, properties, new SimpleMeterRegistry());
         PublishRequest request = new PublishRequest(
-            "gitlab.org.repo.push",
-            "gitlab-x",
-            Map.of("Nats-Msg-Id", "gitlab-x"),
-            new byte[] { 1 }
-        );
+                "gitlab.org.repo.push", "gitlab-x", Map.of("Nats-Msg-Id", "gitlab-x"), new byte[] {1});
 
         assertThatThrownBy(() -> publisher.publish(request))
-            .isInstanceOf(JetStreamPublisher.PublishFailedException.class)
-            .hasMessageContaining("gitlab.org.repo.push");
+                .isInstanceOf(JetStreamPublisher.PublishFailedException.class)
+                .hasMessageContaining("gitlab.org.repo.push");
 
-        verify(jetStream, times(properties.publish().maxRetries())).publishAsync(
-            any(String.class),
-            any(Headers.class),
-            any(byte[].class),
-            any(PublishOptions.class)
-        );
+        verify(jetStream, times(properties.publish().maxRetries()))
+                .publishAsync(any(String.class), any(Headers.class), any(byte[].class), any(PublishOptions.class));
     }
 }

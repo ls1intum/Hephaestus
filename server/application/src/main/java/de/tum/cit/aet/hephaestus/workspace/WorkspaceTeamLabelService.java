@@ -49,12 +49,11 @@ public class WorkspaceTeamLabelService {
     private final WorkspaceTeamScopeResolver workspaceTeamScopeResolver;
 
     public WorkspaceTeamLabelService(
-        WorkspaceRepository workspaceRepository,
-        TeamRepository teamRepository,
-        WorkspaceMembershipRepository workspaceMembershipRepository,
-        WorkspaceTeamSettingsService workspaceTeamSettingsService,
-        WorkspaceTeamScopeResolver workspaceTeamScopeResolver
-    ) {
+            WorkspaceRepository workspaceRepository,
+            TeamRepository teamRepository,
+            WorkspaceMembershipRepository workspaceMembershipRepository,
+            WorkspaceTeamSettingsService workspaceTeamSettingsService,
+            WorkspaceTeamScopeResolver workspaceTeamScopeResolver) {
         this.workspaceRepository = workspaceRepository;
         this.teamRepository = teamRepository;
         this.workspaceMembershipRepository = workspaceMembershipRepository;
@@ -76,27 +75,19 @@ public class WorkspaceTeamLabelService {
     public List<UserTeamsDTO> getUsersWithTeams(String slug) {
         Workspace workspace = requireWorkspace(slug);
         log.debug(
-            "Retrieved users with teams: workspaceId={}, workspaceSlug={}",
-            workspace.getId(),
-            LoggingUtils.sanitizeForLog(slug)
-        );
+                "Retrieved users with teams: workspaceId={}, workspaceSlug={}",
+                workspace.getId(),
+                LoggingUtils.sanitizeForLog(slug));
         List<User> users = workspaceMembershipRepository.findHumanUsersWithTeamsByWorkspaceId(workspace.getId());
         Set<Long> hiddenTeamIds = workspaceTeamSettingsService.getHiddenTeamIds(workspace.getId());
         Set<Long> hiddenMemberIds = workspaceMembershipRepository.findHiddenUserIdsByWorkspaceId(workspace.getId());
         // The roster is workspace-scoped, but a User is global: its fetched memberships span every tenant
         // it belongs to, so the teams must be scoped separately.
         Predicate<Team> inScope = inScope(workspace);
-        return users
-            .stream()
-            .map(user ->
-                UserTeamsDTO.fromUserWithScopeSettings(
-                    user,
-                    hiddenTeamIds,
-                    hiddenMemberIds.contains(user.getId()),
-                    inScope
-                )
-            )
-            .toList();
+        return users.stream()
+                .map(user -> UserTeamsDTO.fromUserWithScopeSettings(
+                        user, hiddenTeamIds, hiddenMemberIds.contains(user.getId()), inScope))
+                .toList();
     }
 
     public List<UserTeamsDTO> getUsersWithTeams(WorkspaceContext workspaceContext) {
@@ -118,43 +109,33 @@ public class WorkspaceTeamLabelService {
     public Optional<TeamInfoDTO> addLabelToTeam(String slug, Long teamId, Long repositoryId, String label) {
         Workspace workspace = requireWorkspace(slug);
         log.debug(
-            "Adding label to team: labelName={}, repositoryId={}, teamId={}, workspaceId={}",
-            LoggingUtils.sanitizeForLog(label),
-            repositoryId,
-            teamId,
-            workspace.getId()
-        );
+                "Adding label to team: labelName={}, repositoryId={}, teamId={}, workspaceId={}",
+                LoggingUtils.sanitizeForLog(label),
+                repositoryId,
+                teamId,
+                workspace.getId());
 
         // Use workspace-scoped label filter settings
-        Optional<WorkspaceTeamLabelFilter> filterOpt = workspaceTeamSettingsService.addLabelFilterByName(
-            workspace,
-            teamId,
-            repositoryId,
-            label
-        );
+        Optional<WorkspaceTeamLabelFilter> filterOpt =
+                workspaceTeamSettingsService.addLabelFilterByName(workspace, teamId, repositoryId, label);
 
         if (filterOpt.isEmpty()) {
             log.warn(
-                "Skipped label filter addition: reason=teamOrLabelNotFound, teamId={}, labelName={}",
-                teamId,
-                LoggingUtils.sanitizeForLog(label)
-            );
+                    "Skipped label filter addition: reason=teamOrLabelNotFound, teamId={}, labelName={}",
+                    teamId,
+                    LoggingUtils.sanitizeForLog(label));
             return Optional.empty();
         }
 
         // Return updated team info with workspace-scoped settings
         return teamRepository
-            .findWithCollectionsById(teamId)
-            .filter(inScope(workspace))
-            .map(team -> createTeamInfoDTOWithWorkspaceSettings(workspace, team));
+                .findWithCollectionsById(teamId)
+                .filter(inScope(workspace))
+                .map(team -> createTeamInfoDTOWithWorkspaceSettings(workspace, team));
     }
 
     public Optional<TeamInfoDTO> addLabelToTeam(
-        WorkspaceContext workspaceContext,
-        Long teamId,
-        Long repositoryId,
-        String label
-    ) {
+            WorkspaceContext workspaceContext, Long teamId, Long repositoryId, String label) {
         return addLabelToTeam(requireSlug(workspaceContext), teamId, repositoryId, label);
     }
 
@@ -170,11 +151,7 @@ public class WorkspaceTeamLabelService {
     public Optional<TeamInfoDTO> removeLabelFromTeam(String slug, Long teamId, Long labelId) {
         Workspace workspace = requireWorkspace(slug);
         log.debug(
-            "Removing label from team: labelId={}, teamId={}, workspaceId={}",
-            labelId,
-            teamId,
-            workspace.getId()
-        );
+                "Removing label from team: labelId={}, teamId={}, workspaceId={}", labelId, teamId, workspace.getId());
 
         // Use workspace-scoped label filter settings
         boolean removed = workspaceTeamSettingsService.removeLabelFilter(workspace, teamId, labelId);
@@ -182,9 +159,9 @@ public class WorkspaceTeamLabelService {
 
         // Return updated team info with workspace-scoped settings
         return teamRepository
-            .findWithCollectionsById(teamId)
-            .filter(inScope(workspace))
-            .map(team -> createTeamInfoDTOWithWorkspaceSettings(workspace, team));
+                .findWithCollectionsById(teamId)
+                .filter(inScope(workspace))
+                .map(team -> createTeamInfoDTOWithWorkspaceSettings(workspace, team));
     }
 
     public Optional<TeamInfoDTO> removeLabelFromTeam(WorkspaceContext workspaceContext, Long teamId, Long labelId) {
@@ -211,8 +188,8 @@ public class WorkspaceTeamLabelService {
             throw new IllegalArgumentException("Workspace slug must not be blank.");
         }
         return workspaceRepository
-            .findByWorkspaceSlug(slug)
-            .orElseThrow(() -> new EntityNotFoundException("Workspace", slug));
+                .findByWorkspaceSlug(slug)
+                .orElseThrow(() -> new EntityNotFoundException("Workspace", slug));
     }
 
     private String requireSlug(WorkspaceContext workspaceContext) {

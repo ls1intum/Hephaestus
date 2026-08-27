@@ -71,28 +71,30 @@ class AccountControllerIntegrationTest extends RealAuthIntegrationTest {
         SeededIdentity seeded = seedGitLabLoginAccount();
 
         webTestClient
-            .get()
-            .uri("/user/settings")
-            .headers(headers -> headers.setBearerAuth(seeded.token()))
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody()
-            .jsonPath("$.practiceFeedbackDeliveryEnabled")
-            .isEqualTo(true)
-            .jsonPath("$.participateInResearch")
-            .isEqualTo(true);
+                .get()
+                .uri("/user/settings")
+                .headers(headers -> headers.setBearerAuth(seeded.token()))
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$.practiceFeedbackDeliveryEnabled")
+                .isEqualTo(true)
+                .jsonPath("$.participateInResearch")
+                .isEqualTo(true);
 
         var provisionedUser = userRepository.findByLogin(GITLAB_LOGIN).orElseThrow();
         assertThat(provisionedUser.getNativeId()).isEqualTo(GITLAB_NATIVE_ID);
         // The provider FK is lazy on the detached User; resolve it eagerly via the repository to
         // assert type / server URL without an open session.
-        IdentityProvider provider = gitProviderRepository.findById(seeded.gitProviderId()).orElseThrow();
+        IdentityProvider provider =
+                gitProviderRepository.findById(seeded.gitProviderId()).orElseThrow();
         assertThat(provider.getType()).isEqualTo(IdentityProviderType.GITLAB);
         assertThat(provider.getServerUrl()).isEqualTo(gitLabProperties.defaultServerUrl());
 
         // The IdentityLink → ExternalActor wiring gap is closed: the link now points at the mirror.
-        IdentityLink link = identityLinkRepository.findById(seeded.identityLinkId()).orElseThrow();
+        IdentityLink link =
+                identityLinkRepository.findById(seeded.identityLinkId()).orElseThrow();
         assertThat(link.getExternalActorId()).isEqualTo(provisionedUser.getId());
     }
 
@@ -100,12 +102,9 @@ class AccountControllerIntegrationTest extends RealAuthIntegrationTest {
 
     private SeededIdentity seedGitLabLoginAccount() {
         IdentityProvider provider = gitProviderRepository
-            .findByTypeAndServerUrl(IdentityProviderType.GITLAB, gitLabProperties.defaultServerUrl())
-            .orElseGet(() ->
-                gitProviderRepository.save(
-                    new IdentityProvider(IdentityProviderType.GITLAB, gitLabProperties.defaultServerUrl())
-                )
-            );
+                .findByTypeAndServerUrl(IdentityProviderType.GITLAB, gitLabProperties.defaultServerUrl())
+                .orElseGet(() -> gitProviderRepository.save(
+                        new IdentityProvider(IdentityProviderType.GITLAB, gitLabProperties.defaultServerUrl())));
 
         Long providerId = Objects.requireNonNull(provider.getId(), "Persisted identity provider must have an ID");
         Account account = accountRepository.save(new Account("GitLab User"));
@@ -120,9 +119,8 @@ class AccountControllerIntegrationTest extends RealAuthIntegrationTest {
 
         HephaestusJwtIssuer.Token token = jwtIssuer.issue(principalFactory.forAccount(account), null, null);
         return new SeededIdentity(
-            token.value(),
-            Objects.requireNonNull(link.getId(), "Persisted identity link must have an ID"),
-            providerId
-        );
+                token.value(),
+                Objects.requireNonNull(link.getId(), "Persisted identity link must have an ID"),
+                providerId);
     }
 }

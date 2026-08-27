@@ -32,15 +32,14 @@ class SubscribeOrderingPropertyTest extends BaseUnitTest {
         CountDownLatch listenerCalledOnce = new CountDownLatch(1);
         FrameSubscription[] holder = new FrameSubscription[1];
         FrameSubscription sub = new FrameSubscription(
-            frame -> {
-                received.add(frame.intValue());
-                listenerCalledOnce.countDown();
-            },
-            4096,
-            reg.counter("test.sub.dropped"),
-            reg.counter("test.sub.error"),
-            () -> {}
-        );
+                frame -> {
+                    received.add(frame.intValue());
+                    listenerCalledOnce.countDown();
+                },
+                4096,
+                reg.counter("test.sub.dropped"),
+                reg.counter("test.sub.error"),
+                () -> {});
         holder[0] = sub;
 
         // Producer mimics the pump's fan-out path under the same lock as subscribe.
@@ -66,9 +65,8 @@ class SubscribeOrderingPropertyTest extends BaseUnitTest {
         }
         producer.join();
 
-        await()
-            .atMost(Duration.ofSeconds(5))
-            .untilAsserted(() -> assertThat(received.size()).isGreaterThan(1000));
+        await().atMost(Duration.ofSeconds(5))
+                .untilAsserted(() -> assertThat(received.size()).isGreaterThan(1000));
 
         // Strict monotonicity: a live frame ahead of any snapshot frame would dip the sequence.
         for (int i = 1; i < received.size(); i++) {

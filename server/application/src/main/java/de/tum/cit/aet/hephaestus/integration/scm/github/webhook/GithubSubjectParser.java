@@ -45,8 +45,7 @@ public class GithubSubjectParser implements SubjectParser {
         String[] parts = fullSubject.split("\\.", -1);
         if (parts.length < 4) {
             throw new IllegalArgumentException(
-                "subject must have >= 4 dot-separated components, got " + parts.length + ": " + fullSubject
-            );
+                    "subject must have >= 4 dot-separated components, got " + parts.length + ": " + fullSubject);
         }
         // parts[0] = "github", parts[1] = org, parts[2] = repo, parts[3..] = event (may carry suffixes).
         String org = parts[1];

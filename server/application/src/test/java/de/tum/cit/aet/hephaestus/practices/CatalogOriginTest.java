@@ -3,7 +3,6 @@ package de.tum.cit.aet.hephaestus.practices;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
-import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
 import de.tum.cit.aet.hephaestus.practices.curated.CatalogEntry;
 import de.tum.cit.aet.hephaestus.practices.curated.EffectiveCatalog;
@@ -23,7 +22,8 @@ class CatalogOriginTest extends BaseUnitTest {
 
     @Test
     void aPracticeTheWorkspaceWroteItselfHasNoOrigin() {
-        assertThat(CatalogOrigin.of(practice("Seed criteria", null), catalog("Seed criteria"))).isNull();
+        assertThat(CatalogOrigin.of(practice("Seed criteria", null), catalog("Seed criteria")))
+                .isNull();
     }
 
     @Test
@@ -61,20 +61,9 @@ class CatalogOriginTest extends BaseUnitTest {
     void aCopyWhoseCatalogEntryIsNoLongerOfferedSaysSoWithoutChanging() {
         Practice copy = practice("Seed criteria", fingerprintOf("Seed criteria"));
         EffectiveCatalog retired = new EffectiveCatalog(
-            List.of(),
-            List.of(
-                new CatalogEntry<>(
-                    SLUG,
-                    definition("Seed criteria"),
-                    definition("Seed criteria"),
-                    null,
-                    null,
-                    true,
-                    0,
-                    null
-                )
-            )
-        );
+                List.of(),
+                List.of(new CatalogEntry<>(
+                        SLUG, definition("Seed criteria"), definition("Seed criteria"), null, null, true, 0, null)));
 
         var origin = CatalogOrigin.of(copy, retired);
         assertNotNull(origin);
@@ -87,34 +76,31 @@ class CatalogOriginTest extends BaseUnitTest {
         Practice copy = practice("Seed criteria", fingerprintOf("Seed criteria"));
         GroupDefinition group = new GroupDefinition("Quality", null, null, null);
         PracticeDefinition practice = new PracticeDefinition(
-            "Small PRs",
-            PracticeTestEvidence.bindings(ArtifactKinds.PULL_REQUEST),
-            "Seed criteria",
-            null,
-            PracticeTestEvidence.forArtifact(ArtifactKinds.PULL_REQUEST),
-            "Reason",
-            null,
-            "quality"
-        );
+                "Small PRs",
+                PracticeTestEvidence.bindings(ArtifactKinds.PULL_REQUEST),
+                "Seed criteria",
+                null,
+                PracticeTestEvidence.forArtifact(ArtifactKinds.PULL_REQUEST),
+                "Reason",
+                null,
+                "quality");
         EffectiveCatalog catalog = new EffectiveCatalog(
-            List.of(new CatalogEntry<>("quality", group, group, null, null, true, 0, null)),
-            List.of(CatalogEntry.shippedOnly(SLUG, practice, 0))
-        );
+                List.of(new CatalogEntry<>("quality", group, group, null, null, true, 0, null)),
+                List.of(CatalogEntry.shippedOnly(SLUG, practice, 0)));
 
         assertThat(origin(copy, catalog).sourceOffered()).isFalse();
     }
 
     private static PracticeDefinition definition(String criteria) {
         return new PracticeDefinition(
-            "Small PRs",
-            PracticeTestEvidence.bindings(ArtifactKinds.PULL_REQUEST),
-            criteria,
-            null,
-            PracticeTestEvidence.forArtifact(ArtifactKinds.PULL_REQUEST),
-            "Reason",
-            null,
-            null
-        );
+                "Small PRs",
+                PracticeTestEvidence.bindings(ArtifactKinds.PULL_REQUEST),
+                criteria,
+                null,
+                PracticeTestEvidence.forArtifact(ArtifactKinds.PULL_REQUEST),
+                "Reason",
+                null,
+                null);
     }
 
     private static String fingerprintOf(String criteria) {

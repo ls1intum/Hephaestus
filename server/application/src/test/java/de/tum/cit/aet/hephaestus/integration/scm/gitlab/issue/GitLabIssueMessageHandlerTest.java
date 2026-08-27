@@ -12,7 +12,6 @@ import static org.mockito.Mockito.when;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.NatsMessageDeserializer;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
-import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabEventType;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabWebhookContextResolver;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.dto.GitLabWebhookLabel;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.dto.GitLabWebhookProject;
@@ -53,20 +52,20 @@ class GitLabIssueMessageHandlerTest extends BaseUnitTest {
     void setUp() {
         transactionTemplate = mock(TransactionTemplate.class);
         lenient()
-            .doAnswer(invocation -> {
-                @SuppressWarnings("unchecked")
-                Consumer<TransactionStatus> callback = invocation.getArgument(0);
-                callback.accept(null);
-                return null;
-            })
-            .when(transactionTemplate)
-            .executeWithoutResult(any());
+                .doAnswer(invocation -> {
+                    @SuppressWarnings("unchecked")
+                    Consumer<TransactionStatus> callback = invocation.getArgument(0);
+                    callback.accept(null);
+                    return null;
+                })
+                .when(transactionTemplate)
+                .executeWithoutResult(any());
 
         handler = new GitLabIssueMessageHandler(issueProcessor, contextResolver, deserializer, transactionTemplate);
 
         lenient()
-            .when(contextResolver.resolve(eq(PROJECT_PATH), any(), any()))
-            .thenReturn(ProcessingContext.forWebhook(1L, setupRepository(), "open"));
+                .when(contextResolver.resolve(eq(PROJECT_PATH), any(), any()))
+                .thenReturn(ProcessingContext.forWebhook(1L, setupRepository(), "open"));
     }
 
     @Test
@@ -147,31 +146,29 @@ class GitLabIssueMessageHandlerTest extends BaseUnitTest {
             // A genuinely malformed payload omits object_attributes.action entirely (null), not a bogus
             // string. actionType() guards null → UNKNOWN → the default/skip branch, so no processor runs.
             var attrs = new GitLabIssueEventDTO.ObjectAttributes(
-                422296L,
-                5,
-                "Title",
-                "desc",
-                "opened",
-                null,
-                false,
-                18024L,
-                null,
-                null,
-                "2026-01-31 19:03:35 +0100",
-                "2026-01-31 19:03:35 +0100",
-                null,
-                "https://gitlab.lrz.de/hephaestustest/demo-repository/-/issues/5"
-            );
+                    422296L,
+                    5,
+                    "Title",
+                    "desc",
+                    "opened",
+                    null,
+                    false,
+                    18024L,
+                    null,
+                    null,
+                    "2026-01-31 19:03:35 +0100",
+                    "2026-01-31 19:03:35 +0100",
+                    null,
+                    "https://gitlab.lrz.de/hephaestustest/demo-repository/-/issues/5");
             GitLabIssueEventDTO event = new GitLabIssueEventDTO(
-                "issue",
-                "issue",
-                createUser(),
-                createProject(),
-                attrs,
-                List.of(new GitLabWebhookLabel(85907L, "enhancement", "#a2eeef")),
-                null,
-                null
-            );
+                    "issue",
+                    "issue",
+                    createUser(),
+                    createProject(),
+                    attrs,
+                    List.of(new GitLabWebhookLabel(85907L, "enhancement", "#a2eeef")),
+                    null,
+                    null);
 
             Message msg = mockMessage(event);
             handler.onMessage(msg);
@@ -204,31 +201,22 @@ class GitLabIssueMessageHandlerTest extends BaseUnitTest {
         @Test
         void confidentialIssueEventType_purgesSnapshot() throws IOException {
             var attrs = new GitLabIssueEventDTO.ObjectAttributes(
-                422297L,
-                6,
-                "Security issue",
-                "desc",
-                "opened",
-                "open",
-                true,
-                18024L,
-                null,
-                null,
-                "2026-01-31 19:03:35 +0100",
-                "2026-01-31 19:03:35 +0100",
-                null,
-                "https://gitlab.lrz.de/hephaestustest/demo-repository/-/issues/6"
-            );
+                    422297L,
+                    6,
+                    "Security issue",
+                    "desc",
+                    "opened",
+                    "open",
+                    true,
+                    18024L,
+                    null,
+                    null,
+                    "2026-01-31 19:03:35 +0100",
+                    "2026-01-31 19:03:35 +0100",
+                    null,
+                    "https://gitlab.lrz.de/hephaestustest/demo-repository/-/issues/6");
             GitLabIssueEventDTO event = new GitLabIssueEventDTO(
-                "issue",
-                "confidential_issue",
-                createUser(),
-                createProject(),
-                attrs,
-                null,
-                null,
-                null
-            );
+                    "issue", "confidential_issue", createUser(), createProject(), attrs, null, null, null);
 
             Message msg = mockMessage(event);
             handler.onMessage(msg);
@@ -256,16 +244,8 @@ class GitLabIssueMessageHandlerTest extends BaseUnitTest {
 
         @Test
         void missingObjectAttributes_skipsProcessing() throws IOException {
-            GitLabIssueEventDTO event = new GitLabIssueEventDTO(
-                "issue",
-                "issue",
-                createUser(),
-                createProject(),
-                null,
-                null,
-                null,
-                null
-            );
+            GitLabIssueEventDTO event =
+                    new GitLabIssueEventDTO("issue", "issue", createUser(), createProject(), null, null, null, null);
 
             Message msg = mockMessage(event);
             handler.onMessage(msg);
@@ -276,31 +256,22 @@ class GitLabIssueMessageHandlerTest extends BaseUnitTest {
         @Test
         void missingProject_skipsProcessing() throws IOException {
             var attrs = new GitLabIssueEventDTO.ObjectAttributes(
-                422296L,
-                5,
-                "Title",
-                "desc",
-                "opened",
-                "open",
-                false,
-                18024L,
-                null,
-                null,
-                "2026-01-31 19:03:35 +0100",
-                "2026-01-31 19:03:35 +0100",
-                null,
-                "https://example.com"
-            );
-            GitLabIssueEventDTO event = new GitLabIssueEventDTO(
-                "issue",
-                "issue",
-                createUser(),
-                null,
-                attrs,
-                null,
-                null,
-                null
-            );
+                    422296L,
+                    5,
+                    "Title",
+                    "desc",
+                    "opened",
+                    "open",
+                    false,
+                    18024L,
+                    null,
+                    null,
+                    "2026-01-31 19:03:35 +0100",
+                    "2026-01-31 19:03:35 +0100",
+                    null,
+                    "https://example.com");
+            GitLabIssueEventDTO event =
+                    new GitLabIssueEventDTO("issue", "issue", createUser(), null, attrs, null, null, null);
 
             Message msg = mockMessage(event);
             handler.onMessage(msg);
@@ -346,50 +317,43 @@ class GitLabIssueMessageHandlerTest extends BaseUnitTest {
 
     private GitLabIssueEventDTO createEvent(String action, String state, boolean confidential) {
         var attrs = new GitLabIssueEventDTO.ObjectAttributes(
-            422296L,
-            5,
-            "Feature: Add user authentication",
-            "Implement OAuth2 authentication flow",
-            state,
-            action,
-            confidential,
-            18024L,
-            null,
-            null,
-            "2026-01-31 19:03:35 +0100",
-            "2026-01-31 19:03:35 +0100",
-            null,
-            "https://gitlab.lrz.de/hephaestustest/demo-repository/-/issues/5"
-        );
+                422296L,
+                5,
+                "Feature: Add user authentication",
+                "Implement OAuth2 authentication flow",
+                state,
+                action,
+                confidential,
+                18024L,
+                null,
+                null,
+                "2026-01-31 19:03:35 +0100",
+                "2026-01-31 19:03:35 +0100",
+                null,
+                "https://gitlab.lrz.de/hephaestustest/demo-repository/-/issues/5");
         return new GitLabIssueEventDTO(
-            "issue",
-            confidential ? "confidential_issue" : "issue",
-            createUser(),
-            createProject(),
-            attrs,
-            List.of(new GitLabWebhookLabel(85907L, "enhancement", "#a2eeef")),
-            null,
-            null
-        );
+                "issue",
+                confidential ? "confidential_issue" : "issue",
+                createUser(),
+                createProject(),
+                attrs,
+                List.of(new GitLabWebhookLabel(85907L, "enhancement", "#a2eeef")),
+                null,
+                null);
     }
 
     private GitLabWebhookUser createUser() {
         return new GitLabWebhookUser(
-            18024L,
-            "ga84xah",
-            "Felix Dietrich",
-            "https://gitlab.lrz.de/uploads/-/system/user/avatar/18024/avatar.png",
-            null
-        );
+                18024L,
+                "ga84xah",
+                "Felix Dietrich",
+                "https://gitlab.lrz.de/uploads/-/system/user/avatar/18024/avatar.png",
+                null);
     }
 
     private GitLabWebhookProject createProject() {
         return new GitLabWebhookProject(
-            246765L,
-            "demo-repository",
-            "https://gitlab.lrz.de/hephaestustest/demo-repository",
-            PROJECT_PATH
-        );
+                246765L, "demo-repository", "https://gitlab.lrz.de/hephaestustest/demo-repository", PROJECT_PATH);
     }
 
     private Message mockMessage(GitLabIssueEventDTO event) throws IOException {

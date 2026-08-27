@@ -37,10 +37,7 @@ public class GitHubTeamProcessor {
 
     @Transactional
     public @Nullable Team process(
-        GitHubTeamEventDTO.GitHubTeamDTO dto,
-        String orgLogin,
-        @NonNull ProcessingContext context
-    ) {
+            GitHubTeamEventDTO.GitHubTeamDTO dto, String orgLogin, @NonNull ProcessingContext context) {
         if (dto == null || dto.id() == null) {
             log.warn("Skipped team processing: reason=nullOrMissingId");
             return null;
@@ -51,18 +48,13 @@ public class GitHubTeamProcessor {
         Optional<Team> existingTeam = Optional.empty();
         if (orgLogin != null && dto.name() != null) {
             existingTeam = teamRepository.findByOrganizationIgnoreCaseAndNameAndProviderId(
-                orgLogin,
-                dto.name(),
-                Objects.requireNonNull(context.providerId())
-            );
+                    orgLogin, dto.name(), Objects.requireNonNull(context.providerId()));
         }
 
         // Fall back to nativeId lookup if natural key not found (handles renames)
         if (existingTeam.isEmpty()) {
             existingTeam = teamRepository.findByNativeIdAndProviderId(
-                Objects.requireNonNull(dto.id()),
-                Objects.requireNonNull(context.providerId())
-            );
+                    Objects.requireNonNull(dto.id()), Objects.requireNonNull(context.providerId()));
         }
 
         Team team = existingTeam.orElseGet(() -> {
@@ -134,17 +126,11 @@ public class GitHubTeamProcessor {
 
         if (isNew) {
             eventPublisher.publishEvent(
-                new ScmDomainEvent.TeamCreated(ScmEventPayload.TeamData.from(saved), EventContext.from(context))
-            );
+                    new ScmDomainEvent.TeamCreated(ScmEventPayload.TeamData.from(saved), EventContext.from(context)));
             log.debug("Created team: teamId={}, teamSlug={}", saved.getId(), saved.getName());
         } else {
-            eventPublisher.publishEvent(
-                new ScmDomainEvent.TeamUpdated(
-                    ScmEventPayload.TeamData.from(saved),
-                    Set.of("name", "description"),
-                    EventContext.from(context)
-                )
-            );
+            eventPublisher.publishEvent(new ScmDomainEvent.TeamUpdated(
+                    ScmEventPayload.TeamData.from(saved), Set.of("name", "description"), EventContext.from(context)));
             log.debug("Updated team: teamId={}, teamSlug={}", saved.getId(), saved.getName());
         }
 
@@ -169,21 +155,20 @@ public class GitHubTeamProcessor {
         }
 
         teamRepository
-            .findByNativeIdAndProviderId(nativeId, Objects.requireNonNull(context.providerId()))
-            .ifPresent(team -> {
-                Long teamId = team.getId();
-                String teamName = team.getName();
+                .findByNativeIdAndProviderId(nativeId, Objects.requireNonNull(context.providerId()))
+                .ifPresent(team -> {
+                    Long teamId = team.getId();
+                    String teamName = team.getName();
 
-                // Clear collections to avoid stale references in persistence context
-                team.getMemberships().clear();
-                team.getRepoPermissions().clear();
+                    // Clear collections to avoid stale references in persistence context
+                    team.getMemberships().clear();
+                    team.getRepoPermissions().clear();
 
-                teamRepository.delete(team);
-                eventPublisher.publishEvent(
-                    new ScmDomainEvent.TeamDeleted(teamId, teamName, EventContext.from(context))
-                );
-                log.info("Deleted team: teamId={}, teamSlug={}", teamId, teamName);
-            });
+                    teamRepository.delete(team);
+                    eventPublisher.publishEvent(
+                            new ScmDomainEvent.TeamDeleted(teamId, teamName, EventContext.from(context)));
+                    log.info("Deleted team: teamId={}, teamSlug={}", teamId, teamName);
+                });
     }
 
     /**
@@ -194,10 +179,8 @@ public class GitHubTeamProcessor {
         if (message == null) {
             return false;
         }
-        return (
-            message.contains("uk_team_provider_organization_slug") ||
-            (message.contains("team") && message.contains("slug"))
-        );
+        return (message.contains("uk_team_provider_organization_slug")
+                || (message.contains("team") && message.contains("slug")));
     }
 
     /**
@@ -211,20 +194,13 @@ public class GitHubTeamProcessor {
      * @return the saved team, or null if unable to resolve
      */
     private @Nullable Team handleSlugConflict(
-        Team team,
-        String orgLogin,
-        GitHubTeamEventDTO.GitHubTeamDTO dto,
-        ProcessingContext context
-    ) {
+            Team team, String orgLogin, GitHubTeamEventDTO.GitHubTeamDTO dto, ProcessingContext context) {
         String teamSlug = dto.slug() != null ? dto.slug() : dto.name();
 
         // Find the team that has the conflicting slug. Provider-scoped: the rename below is destructive,
         // and only a team on this provider can actually contend for the slug.
         Optional<Team> conflicting = teamRepository.findByOrganizationIgnoreCaseAndSlugAndProviderId(
-            orgLogin,
-            teamSlug,
-            Objects.requireNonNull(context.providerId())
-        );
+                orgLogin, teamSlug, Objects.requireNonNull(context.providerId()));
         if (conflicting.isEmpty()) {
             // Conflict resolved concurrently
             log.debug("Team slug conflict resolved concurrently: org={}, slug={}", orgLogin, teamSlug);
@@ -241,12 +217,11 @@ public class GitHubTeamProcessor {
         // Rename the old team to free up the slug
         String renamedSlug = "RENAMED_" + oldTeam.getId();
         log.info(
-            "Freeing up team slug for renamed team: oldTeamId={}, oldSlug={}, newSlug={}, newTeamId={}",
-            oldTeam.getId(),
-            teamSlug,
-            renamedSlug,
-            team.getId()
-        );
+                "Freeing up team slug for renamed team: oldTeamId={}, oldSlug={}, newSlug={}, newTeamId={}",
+                oldTeam.getId(),
+                teamSlug,
+                renamedSlug,
+                team.getId());
         oldTeam.setSlug(renamedSlug);
         oldTeam.setName("RENAMED_" + oldTeam.getId());
         teamRepository.save(oldTeam);

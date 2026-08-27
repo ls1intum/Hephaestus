@@ -21,27 +21,27 @@ class DevLoginDisabledIntegrationTest extends RealAuthIntegrationTest {
     @Test
     void devLoginIsRejectedAndSetsNoCookieWhenDisabled() {
         webTestClient
-            .post()
-            .uri("/auth/dev-login")
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue("{\"username\":\"alice\",\"admin\":true}")
-            .exchange()
-            .expectStatus()
-            .isForbidden()
-            .expectCookie()
-            .doesNotExist("__Host-HEPHAESTUS_AT");
+                .post()
+                .uri("/auth/dev-login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("{\"username\":\"alice\",\"admin\":true}")
+                .exchange()
+                .expectStatus()
+                .isForbidden()
+                .expectCookie()
+                .doesNotExist("__Host-HEPHAESTUS_AT");
     }
 
     @Test
     void discoveryOmitsTheDevRowWhenDisabled() {
         webTestClient
-            .get()
-            .uri("/identity-providers")
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody()
-            .jsonPath("$[?(@.registrationId == 'dev')]")
-            .doesNotExist();
+                .get()
+                .uri("/identity-providers")
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$[?(@.registrationId == 'dev')]")
+                .doesNotExist();
     }
 }

@@ -22,26 +22,23 @@ import org.jspecify.annotations.Nullable;
  *     "rw,noexec,nosuid,nodev,size=1g"})
  */
 public record SecurityProfile(
-    @Nullable String runtime,
-    @Nullable String ipcMode,
-    List<String> dropCapabilities,
-    @Nullable Map<String, String> tmpfsMounts
-) {
+        @Nullable String runtime,
+        @Nullable String ipcMode,
+        List<String> dropCapabilities,
+        @Nullable Map<String, String> tmpfsMounts) {
     /** Production defaults: maximum hardening with standard tmpfs layout. */
     public static final SecurityProfile DEFAULT = new SecurityProfile(
-        null,
-        "none",
-        List.of("ALL"),
-        Map.of(
-            "/tmp",
-            "rw,noexec,nosuid,nodev,size=1073741824",
-            "/run",
-            "rw,noexec,nosuid,nodev,size=67108864",
-            // exec (not noexec): Pi's Node.js runtime extracts native addons here at runtime.
-            // ContainerSecurityPolicy.MANDATORY_TMPFS already forces this to exec; keep the SPI
-            // default in sync so it doesn't mislead readers into re-breaking native addons.
-            "/home/agent/.local",
-            "rw,exec,nosuid,nodev,size=1073741824"
-        )
-    );
+            null,
+            "none",
+            List.of("ALL"),
+            Map.of(
+                    "/tmp",
+                    "rw,noexec,nosuid,nodev,size=1073741824",
+                    "/run",
+                    "rw,noexec,nosuid,nodev,size=67108864",
+                    // exec (not noexec): Pi's Node.js runtime extracts native addons here at runtime.
+                    // ContainerSecurityPolicy.MANDATORY_TMPFS already forces this to exec; keep the SPI
+                    // default in sync so it doesn't mislead readers into re-breaking native addons.
+                    "/home/agent/.local",
+                    "rw,exec,nosuid,nodev,size=1073741824"));
 }

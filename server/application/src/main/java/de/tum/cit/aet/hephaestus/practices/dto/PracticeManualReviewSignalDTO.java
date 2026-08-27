@@ -11,6 +11,7 @@ import org.jspecify.annotations.NonNull;
  */
 @Schema(description = "The signal a person raises by asking for a review of this work type by hand")
 public record PracticeManualReviewSignalDTO(
-    @NonNull @Schema(example = "scm.pull_request.manual_review") SignalName signal,
-    @NonNull String displayName
-) {}
+        @NonNull @Schema(example = "scm.pull_request.manual_review")
+        SignalName signal,
+
+        @NonNull String displayName) {}

@@ -36,34 +36,28 @@ class StdinWriteWatchdogTest extends BaseUnitTest {
         StdinWriteWatchdog wd = new StdinWriteWatchdog();
         AtomicInteger stalledHits = new AtomicInteger();
         AtomicInteger healthyHits = new AtomicInteger();
-        wd.register(
-            UUID.randomUUID(),
-            new StdinWriteWatchdog.StallTarget() {
-                @Override
-                public boolean writeStalled(long now) {
-                    return true;
-                }
-
-                @Override
-                public void onWriteTimeout() {
-                    stalledHits.incrementAndGet();
-                }
+        wd.register(UUID.randomUUID(), new StdinWriteWatchdog.StallTarget() {
+            @Override
+            public boolean writeStalled(long now) {
+                return true;
             }
-        );
-        wd.register(
-            UUID.randomUUID(),
-            new StdinWriteWatchdog.StallTarget() {
-                @Override
-                public boolean writeStalled(long now) {
-                    return false;
-                }
 
-                @Override
-                public void onWriteTimeout() {
-                    healthyHits.incrementAndGet();
-                }
+            @Override
+            public void onWriteTimeout() {
+                stalledHits.incrementAndGet();
             }
-        );
+        });
+        wd.register(UUID.randomUUID(), new StdinWriteWatchdog.StallTarget() {
+            @Override
+            public boolean writeStalled(long now) {
+                return false;
+            }
+
+            @Override
+            public void onWriteTimeout() {
+                healthyHits.incrementAndGet();
+            }
+        });
         wd.tick();
         assertThat(stalledHits).hasValue(1);
         assertThat(healthyHits).hasValue(0);
@@ -73,32 +67,26 @@ class StdinWriteWatchdogTest extends BaseUnitTest {
     void throwingTargetIsolated() {
         StdinWriteWatchdog wd = new StdinWriteWatchdog();
         AtomicInteger goodHits = new AtomicInteger();
-        wd.register(
-            UUID.randomUUID(),
-            new StdinWriteWatchdog.StallTarget() {
-                @Override
-                public boolean writeStalled(long now) {
-                    throw new RuntimeException("bad probe");
-                }
-
-                @Override
-                public void onWriteTimeout() {}
+        wd.register(UUID.randomUUID(), new StdinWriteWatchdog.StallTarget() {
+            @Override
+            public boolean writeStalled(long now) {
+                throw new RuntimeException("bad probe");
             }
-        );
-        wd.register(
-            UUID.randomUUID(),
-            new StdinWriteWatchdog.StallTarget() {
-                @Override
-                public boolean writeStalled(long now) {
-                    return true;
-                }
 
-                @Override
-                public void onWriteTimeout() {
-                    goodHits.incrementAndGet();
-                }
+            @Override
+            public void onWriteTimeout() {}
+        });
+        wd.register(UUID.randomUUID(), new StdinWriteWatchdog.StallTarget() {
+            @Override
+            public boolean writeStalled(long now) {
+                return true;
             }
-        );
+
+            @Override
+            public void onWriteTimeout() {
+                goodHits.incrementAndGet();
+            }
+        });
         wd.tick();
         // Exactly one — the healthy target is stalled and we registered one. Strict assertion so a
         // regression that double-fires the callback (idempotency lost) is caught.

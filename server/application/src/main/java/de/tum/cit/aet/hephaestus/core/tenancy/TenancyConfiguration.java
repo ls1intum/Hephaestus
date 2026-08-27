@@ -25,33 +25,30 @@ public class TenancyConfiguration {
     @Bean
     Counter tenancyParseFailureCounter(MeterRegistry registry) {
         return Counter.builder("tenancy.parse_failure.total")
-            .description("SQL statements WorkspaceStatementInspector could not parse — fail-open.")
-            .tag("module", "tenancy")
-            .register(registry);
+                .description("SQL statements WorkspaceStatementInspector could not parse — fail-open.")
+                .tag("module", "tenancy")
+                .register(registry);
     }
 
     @Bean
     TenancyViolationReporter tenancyViolationReporter(MeterRegistry registry) {
         return (sql, unguardedTables, mode) -> {
             for (String table : unguardedTables) {
-                registry
-                    .counter(
-                        "tenancy.violation.total",
-                        "module",
-                        "tenancy",
-                        "table",
-                        table,
-                        "mode",
-                        mode.name().toLowerCase()
-                    )
-                    .increment();
+                registry.counter(
+                                "tenancy.violation.total",
+                                "module",
+                                "tenancy",
+                                "table",
+                                table,
+                                "mode",
+                                mode.name().toLowerCase())
+                        .increment();
             }
             log.warn(
-                "Tenancy violation ({}): scoped tables {} queried without workspace_id predicate. SQL: {}",
-                mode.name().toLowerCase(),
-                unguardedTables,
-                LoggingUtils.truncate(sql, 200)
-            );
+                    "Tenancy violation ({}): scoped tables {} queried without workspace_id predicate. SQL: {}",
+                    mode.name().toLowerCase(),
+                    unguardedTables,
+                    LoggingUtils.truncate(sql, 200));
             if (mode == TenancyEnforcement.THROW) {
                 throw new TenancyViolationException(unguardedTables);
             }
@@ -60,18 +57,13 @@ public class TenancyConfiguration {
 
     @Bean
     WorkspaceStatementInspector workspaceStatementInspector(
-        WorkspaceScopedTables scopedTables,
-        TenancyEnforcementProperties properties,
-        TenancyViolationReporter reporter,
-        Counter tenancyParseFailureCounter
-    ) {
+            WorkspaceScopedTables scopedTables,
+            TenancyEnforcementProperties properties,
+            TenancyViolationReporter reporter,
+            Counter tenancyParseFailureCounter) {
         log.info("Workspace tenancy enforcement mode: {}", properties.enforcement());
         return new WorkspaceStatementInspector(
-            scopedTables,
-            properties.enforcement(),
-            reporter,
-            tenancyParseFailureCounter
-        );
+                scopedTables, properties.enforcement(), reporter, tenancyParseFailureCounter);
     }
 
     @Bean

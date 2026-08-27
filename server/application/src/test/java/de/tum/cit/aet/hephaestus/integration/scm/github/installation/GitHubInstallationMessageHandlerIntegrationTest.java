@@ -36,10 +36,9 @@ class GitHubInstallationMessageHandlerIntegrationTest extends BaseIntegrationTes
         databaseTestUtils.cleanDatabase();
         // Ensure GitHub IdentityProvider exists - required by GithubLifecycleListener
         gitProviderRepository
-            .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
-            .orElseGet(() ->
-                gitProviderRepository.save(new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com"))
-            );
+                .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
+                .orElseGet(() -> gitProviderRepository.save(
+                        new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com")));
     }
 
     @Test
@@ -103,11 +102,7 @@ class GitHubInstallationMessageHandlerIntegrationTest extends BaseIntegrationTes
         // Given - load a valid event and parse to get structure, then create with unknown action
         GitHubInstallationEventDTO baseEvent = loadPayload("installation.created");
         GitHubInstallationEventDTO event = new GitHubInstallationEventDTO(
-            "unknown_action",
-            baseEvent.installation(),
-            baseEvent.repositories(),
-            baseEvent.sender()
-        );
+                "unknown_action", baseEvent.installation(), baseEvent.repositories(), baseEvent.sender());
 
         // When - should not throw
         handler.handleEvent(event);

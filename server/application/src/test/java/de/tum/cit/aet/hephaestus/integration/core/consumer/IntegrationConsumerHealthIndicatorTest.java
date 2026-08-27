@@ -43,9 +43,9 @@ class IntegrationConsumerHealthIndicatorTest extends BaseUnitTest {
 
             assertThat(health.getStatus()).isEqualTo(Status.OUT_OF_SERVICE);
             assertThat(health.getDetails())
-                .containsEntry("handlerCount", 32)
-                .containsEntry("parserCount", 4)
-                .containsKey("reason");
+                    .containsEntry("handlerCount", 32)
+                    .containsEntry("parserCount", 4)
+                    .containsKey("reason");
         }
     }
 
@@ -67,11 +67,11 @@ class IntegrationConsumerHealthIndicatorTest extends BaseUnitTest {
 
             assertThat(health.getStatus()).isEqualTo(Status.UP);
             assertThat(health.getDetails())
-                .containsEntry("natsConnectionStatus", "CONNECTED")
-                .containsEntry("activeScopeConsumers", 7)
-                .containsEntry("installationConsumerActive", true)
-                .containsEntry("lastDispatchAt", dispatchTs.toString())
-                .doesNotContainKey("lastNakAt");
+                    .containsEntry("natsConnectionStatus", "CONNECTED")
+                    .containsEntry("activeScopeConsumers", 7)
+                    .containsEntry("installationConsumerActive", true)
+                    .containsEntry("lastDispatchAt", dispatchTs.toString())
+                    .doesNotContainKey("lastNakAt");
         }
 
         @Test
@@ -122,8 +122,8 @@ class IntegrationConsumerHealthIndicatorTest extends BaseUnitTest {
 
             assertThat(health.getStatus()).isEqualTo(Status.DOWN);
             assertThat(health.getDetails())
-                .containsEntry("natsConnectionStatus", "DISCONNECTED")
-                .containsKey("lastNakAt");
+                    .containsEntry("natsConnectionStatus", "DISCONNECTED")
+                    .containsKey("lastNakAt");
         }
     }
 }

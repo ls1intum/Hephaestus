@@ -14,10 +14,7 @@ final class TrendDirectionRule {
     private TrendDirectionRule() {}
 
     static TrendDirection classify(
-        BetaPosterior.Difference difference,
-        double ropeHalfWidth,
-        double credibilityThreshold
-    ) {
+            BetaPosterior.Difference difference, double ropeHalfWidth, double credibilityThreshold) {
         if (difference.probabilityAbove(ropeHalfWidth) >= credibilityThreshold) {
             return TrendDirection.IMPROVING;
         }

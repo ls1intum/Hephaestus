@@ -18,21 +18,18 @@ import org.springframework.stereotype.Repository;
  */
 @Repository
 @WorkspaceAgnostic(
-    "Auth audit events are account/system-scoped; workspace is an optional reference, not a tenant scope"
-)
+        "Auth audit events are account/system-scoped; workspace is an optional reference, not a tenant scope")
 public interface AuthEventRepository extends JpaRepository<AuthEvent, AuthEvent.Id> {
     /**
      * Auth events about the given account at or after {@code since}, newest first. Backs the GDPR
      * data-export's 12-month auth-event window. Uses the
      * {@code ix_auth_event_account_occurred (account_id, occurred_at DESC)} partial index.
      */
-    @Query(
-        """
+    @Query("""
             SELECT e FROM AuthEvent e
             WHERE e.accountId = :accountId AND e.id.occurredAt >= :since
             ORDER BY e.id.occurredAt DESC, e.id.id DESC
-        """
-    )
+        """)
     List<AuthEvent> findByAccountSince(@Param("accountId") Long accountId, @Param("since") Instant since);
 
     /**
@@ -44,8 +41,7 @@ public interface AuthEventRepository extends JpaRepository<AuthEvent, AuthEvent.
      * to the most recent partition(s). Switch to keyset pagination if deep paging over the full
      * 12-month window ever becomes hot.
      */
-    @Query(
-        """
+    @Query("""
             SELECT e FROM AuthEvent e
             WHERE (:accountId IS NULL OR e.accountId = :accountId)
               AND (:actingAccountId IS NULL OR e.actingAccountId = :actingAccountId)
@@ -54,15 +50,13 @@ public interface AuthEventRepository extends JpaRepository<AuthEvent, AuthEvent.
               AND (CAST(:from AS Instant) IS NULL OR e.id.occurredAt >= :from)
               AND (CAST(:to AS Instant) IS NULL OR e.id.occurredAt < :to)
             ORDER BY e.id.occurredAt DESC, e.id.id DESC
-        """
-    )
+        """)
     Page<AuthEvent> findForAdmin(
-        @Param("accountId") @Nullable Long accountId,
-        @Param("actingAccountId") @Nullable Long actingAccountId,
-        @Param("eventTypes") @Nullable List<AuthEvent.EventType> eventTypes,
-        @Param("results") @Nullable List<AuthEvent.Result> results,
-        @Param("from") @Nullable Instant from,
-        @Param("to") @Nullable Instant to,
-        Pageable pageable
-    );
+            @Param("accountId") @Nullable Long accountId,
+            @Param("actingAccountId") @Nullable Long actingAccountId,
+            @Param("eventTypes") @Nullable List<AuthEvent.EventType> eventTypes,
+            @Param("results") @Nullable List<AuthEvent.Result> results,
+            @Param("from") @Nullable Instant from,
+            @Param("to") @Nullable Instant to,
+            Pageable pageable);
 }

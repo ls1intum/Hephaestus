@@ -35,15 +35,12 @@ public interface ChatMessageVoteRepository extends JpaRepository<ChatMessageVote
      */
     @Modifying
     @Transactional
-    @Query(
-        value = """
+    @Query(value = """
         INSERT INTO chat_message_vote (message_id, is_upvoted, created_at, updated_at)
         VALUES (:messageId, :isUpvoted, now(), now())
         ON CONFLICT (message_id) DO UPDATE
           SET is_upvoted = EXCLUDED.is_upvoted,
               updated_at = now()
-        """,
-        nativeQuery = true
-    )
+        """, nativeQuery = true)
     int upsert(@Param("messageId") UUID messageId, @Param("isUpvoted") boolean isUpvoted);
 }

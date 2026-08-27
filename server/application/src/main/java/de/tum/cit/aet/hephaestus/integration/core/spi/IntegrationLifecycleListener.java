@@ -42,7 +42,11 @@ public interface IntegrationLifecycleListener {
 
     record InstanceProvisioned(IntegrationRef ref, TenantAccount account, List<ScopedResource> initialResources) {}
 
-    record TenantAccount(String externalId, String displayName, AccountKind kind, @Nullable String avatarUrl) {}
+    record TenantAccount(
+            String externalId,
+            String displayName,
+            AccountKind kind,
+            @Nullable String avatarUrl) {}
 
     enum AccountKind {
         ORGANIZATION,

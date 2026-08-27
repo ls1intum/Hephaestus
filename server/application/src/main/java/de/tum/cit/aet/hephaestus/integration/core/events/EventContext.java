@@ -15,15 +15,14 @@ import org.slf4j.LoggerFactory;
  * Immutable context for domain events - safe for async handling.
  */
 public record EventContext(
-    @NonNull UUID eventId,
-    @NonNull Instant occurredAt,
-    @Nullable Long scopeId,
-    @Nullable RepositoryRef repository,
-    @NonNull DataSource source,
-    @Nullable String webhookAction,
-    @NonNull String correlationId,
-    @Nullable IdentityProviderType providerType
-) {
+        @NonNull UUID eventId,
+        @NonNull Instant occurredAt,
+        @Nullable Long scopeId,
+        @Nullable RepositoryRef repository,
+        @NonNull DataSource source,
+        @Nullable String webhookAction,
+        @NonNull String correlationId,
+        @Nullable IdentityProviderType providerType) {
     private static final Logger log = LoggerFactory.getLogger(EventContext.class);
 
     public static EventContext from(ProcessingContext ctx) {
@@ -37,48 +36,44 @@ public record EventContext(
                 resolvedType = ctx.provider().getType();
             } catch (LazyInitializationException e) {
                 log.debug(
-                    "Could not resolve provider type from detached proxy, correlationId={}: {}",
-                    ctx.correlationId(),
-                    e.getMessage()
-                );
+                        "Could not resolve provider type from detached proxy, correlationId={}: {}",
+                        ctx.correlationId(),
+                        e.getMessage());
             }
         }
         return new EventContext(
-            UUID.randomUUID(),
-            Instant.now(),
-            ctx.scopeId(),
-            ctx.repository() != null ? RepositoryRef.from(ctx.repository()) : null,
-            ctx.source(),
-            ctx.webhookAction(),
-            ctx.correlationId(),
-            resolvedType
-        );
+                UUID.randomUUID(),
+                Instant.now(),
+                ctx.scopeId(),
+                ctx.repository() != null ? RepositoryRef.from(ctx.repository()) : null,
+                ctx.source(),
+                ctx.webhookAction(),
+                ctx.correlationId(),
+                resolvedType);
     }
 
     public static EventContext forSync(Long scopeId, RepositoryRef repository) {
         return new EventContext(
-            UUID.randomUUID(),
-            Instant.now(),
-            scopeId,
-            repository,
-            DataSource.GRAPHQL_SYNC,
-            null,
-            UUID.randomUUID().toString(),
-            null
-        );
+                UUID.randomUUID(),
+                Instant.now(),
+                scopeId,
+                repository,
+                DataSource.GRAPHQL_SYNC,
+                null,
+                UUID.randomUUID().toString(),
+                null);
     }
 
     public static EventContext forSync(Long scopeId, RepositoryRef repository, IdentityProviderType providerType) {
         return new EventContext(
-            UUID.randomUUID(),
-            Instant.now(),
-            scopeId,
-            repository,
-            DataSource.GRAPHQL_SYNC,
-            null,
-            UUID.randomUUID().toString(),
-            providerType
-        );
+                UUID.randomUUID(),
+                Instant.now(),
+                scopeId,
+                repository,
+                DataSource.GRAPHQL_SYNC,
+                null,
+                UUID.randomUUID().toString(),
+                providerType);
     }
 
     public boolean isWebhook() {

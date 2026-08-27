@@ -28,21 +28,21 @@ public class DockerHealthIndicator implements HealthIndicator {
             if (reachable) {
                 int activeContainers = containerManager.listManagedContainers().size();
                 return Health.up()
-                    .withDetail("dockerHost", properties.dockerHost())
-                    .withDetail("activeContainers", activeContainers)
-                    .withDetail("maxConcurrentContainers", properties.maxConcurrentContainers())
-                    .build();
+                        .withDetail("dockerHost", properties.dockerHost())
+                        .withDetail("activeContainers", activeContainers)
+                        .withDetail("maxConcurrentContainers", properties.maxConcurrentContainers())
+                        .build();
             } else {
                 return Health.down()
-                    .withDetail("dockerHost", properties.dockerHost())
-                    .withDetail("error", "Docker daemon not reachable")
-                    .build();
+                        .withDetail("dockerHost", properties.dockerHost())
+                        .withDetail("error", "Docker daemon not reachable")
+                        .build();
             }
         } catch (Exception e) {
             return Health.down()
-                .withDetail("dockerHost", properties.dockerHost())
-                .withDetail("error", e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage())
-                .build();
+                    .withDetail("dockerHost", properties.dockerHost())
+                    .withDetail("error", e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage())
+                    .build();
         }
     }
 }

@@ -63,7 +63,9 @@ class IssueContentSourceTest extends BaseUnitTest {
     @BeforeEach
     void setUp() {
         provider = new IssueContentSource(objectMapper, issueRepository, issueCommentRepository);
-        lenient().when(issueCommentRepository.findRecentByIssueIdWithAuthor(eq(ISSUE_ID), any())).thenReturn(List.of());
+        lenient()
+                .when(issueCommentRepository.findRecentByIssueIdWithAuthor(eq(ISSUE_ID), any()))
+                .thenReturn(List.of());
     }
 
     private ObjectNode sampleMetadata() {
@@ -109,7 +111,8 @@ class IssueContentSourceTest extends BaseUnitTest {
         int from = Math.max(0, chronological.size() - IssueContentSource.MAX_COMMENTS - 1);
         List<IssueComment> recent = new ArrayList<>(chronological.subList(from, chronological.size()));
         Collections.reverse(recent);
-        when(issueCommentRepository.findRecentByIssueIdWithAuthor(eq(ISSUE_ID), any())).thenReturn(recent);
+        when(issueCommentRepository.findRecentByIssueIdWithAuthor(eq(ISSUE_ID), any()))
+                .thenReturn(recent);
     }
 
     private Issue richIssue() {
@@ -293,15 +296,17 @@ class IssueContentSourceTest extends BaseUnitTest {
                 comments.add(comment("u" + i, "Comment " + i, base.plusSeconds(i)));
             }
             stubComments(comments);
-            assertThat(
-                provider.capture(request(sampleMetadata()), Set.of(COMMENTS)).completeness().get(COMMENTS)
-            ).isEqualTo(SourceCompleteness.COMPLETE);
+            assertThat(provider.capture(request(sampleMetadata()), Set.of(COMMENTS))
+                            .completeness()
+                            .get(COMMENTS))
+                    .isEqualTo(SourceCompleteness.COMPLETE);
 
             comments.add(comment("overflow", "Overflow", base.plusSeconds(comments.size())));
             stubComments(comments);
-            assertThat(
-                provider.capture(request(sampleMetadata()), Set.of(COMMENTS)).completeness().get(COMMENTS)
-            ).isEqualTo(SourceCompleteness.PARTIAL);
+            assertThat(provider.capture(request(sampleMetadata()), Set.of(COMMENTS))
+                            .completeness()
+                            .get(COMMENTS))
+                    .isEqualTo(SourceCompleteness.PARTIAL);
         }
 
         @Test
@@ -347,10 +352,9 @@ class IssueContentSourceTest extends BaseUnitTest {
         void throwsWhenMetadataMissing() {
             var job = new AgentJob();
             assertThatThrownBy(() ->
-                provider.contribute(new ContextRequest.IssueReviewRequest(job), new LinkedHashMap<>())
-            )
-                .isInstanceOf(JobPreparationException.class)
-                .hasMessageContaining("Job has no metadata");
+                            provider.contribute(new ContextRequest.IssueReviewRequest(job), new LinkedHashMap<>()))
+                    .isInstanceOf(JobPreparationException.class)
+                    .hasMessageContaining("Job has no metadata");
         }
 
         @Test
@@ -359,8 +363,8 @@ class IssueContentSourceTest extends BaseUnitTest {
             metadata.put("something_else", 1);
 
             assertThatThrownBy(() -> provider.contribute(request(metadata), new LinkedHashMap<>()))
-                .isInstanceOf(JobPreparationException.class)
-                .hasMessageContaining("metadata field: issue_id");
+                    .isInstanceOf(JobPreparationException.class)
+                    .hasMessageContaining("metadata field: issue_id");
         }
 
         @Test
@@ -372,8 +376,8 @@ class IssueContentSourceTest extends BaseUnitTest {
             metadata.putNull("issue_id");
 
             assertThatThrownBy(() -> provider.contribute(request(metadata), new LinkedHashMap<>()))
-                .isInstanceOf(JobPreparationException.class)
-                .hasMessageContaining("metadata field: issue_id");
+                    .isInstanceOf(JobPreparationException.class)
+                    .hasMessageContaining("metadata field: issue_id");
         }
 
         @Test
@@ -384,8 +388,8 @@ class IssueContentSourceTest extends BaseUnitTest {
             metadata.put("issue_id", "not-a-number");
 
             assertThatThrownBy(() -> provider.contribute(request(metadata), new LinkedHashMap<>()))
-                .isInstanceOf(JobPreparationException.class)
-                .hasMessageContaining("metadata field: issue_id");
+                    .isInstanceOf(JobPreparationException.class)
+                    .hasMessageContaining("metadata field: issue_id");
         }
 
         @Test
@@ -393,8 +397,8 @@ class IssueContentSourceTest extends BaseUnitTest {
             when(issueRepository.findByIdWithRepository(ISSUE_ID)).thenReturn(Optional.empty());
 
             assertThatThrownBy(() -> provider.contribute(request(sampleMetadata()), new LinkedHashMap<>()))
-                .isInstanceOf(JobPreparationException.class)
-                .hasMessageContaining("Issue not found");
+                    .isInstanceOf(JobPreparationException.class)
+                    .hasMessageContaining("Issue not found");
         }
 
         @Test

@@ -28,16 +28,15 @@ class AgentImageContractVerifierTest extends BaseUnitTest {
     }
 
     private double counter(Outcome outcome) {
-        return registry.counter("agent.image.contract", "outcome", outcome.name().toLowerCase(Locale.ROOT)).count();
+        return registry.counter(
+                        "agent.image.contract", "outcome", outcome.name().toLowerCase(Locale.ROOT))
+                .count();
     }
 
     @Test
     void shouldVerifyAnImageDeclaringTheContractThisServerStagesFor() {
-        var outcome = verifyWithLabels(
-            Optional.of(
-                Map.of(SandboxLayout.RUNTIME_CONTRACT_LABEL, Integer.toString(SandboxLayout.RUNTIME_CONTRACT_VERSION))
-            )
-        );
+        var outcome = verifyWithLabels(Optional.of(Map.of(
+                SandboxLayout.RUNTIME_CONTRACT_LABEL, Integer.toString(SandboxLayout.RUNTIME_CONTRACT_VERSION))));
 
         assertThat(outcome).isEqualTo(Outcome.VERIFIED);
         assertThat(counter(Outcome.VERIFIED)).isEqualTo(1d);
@@ -53,14 +52,8 @@ class AgentImageContractVerifierTest extends BaseUnitTest {
 
     @Test
     void shouldReportAnImageDeclaringADifferentContract() {
-        var outcome = verifyWithLabels(
-            Optional.of(
-                Map.of(
-                    SandboxLayout.RUNTIME_CONTRACT_LABEL,
-                    Integer.toString(SandboxLayout.RUNTIME_CONTRACT_VERSION + 1)
-                )
-            )
-        );
+        var outcome = verifyWithLabels(Optional.of(Map.of(
+                SandboxLayout.RUNTIME_CONTRACT_LABEL, Integer.toString(SandboxLayout.RUNTIME_CONTRACT_VERSION + 1))));
 
         assertThat(outcome).isEqualTo(Outcome.MISMATCH);
         assertThat(counter(Outcome.MISMATCH)).isEqualTo(1d);

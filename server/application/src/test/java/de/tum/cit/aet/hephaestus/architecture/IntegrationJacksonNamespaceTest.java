@@ -22,17 +22,15 @@ class IntegrationJacksonNamespaceTest extends HephaestusArchitectureTest {
     @DisplayName("integration/** does not import Jackson 2 databind classes")
     void integrationDoesNotUseJackson2Databind() {
         ArchRule rule = noClasses()
-            .that()
-            .resideInAPackage("..integration..")
-            .should()
-            .dependOnClassesThat()
-            .resideInAPackage("com.fasterxml.jackson.databind..")
-            .because(
-                "Spring Boot 4 auto-wires tools.jackson.databind.ObjectMapper (Jackson 3). " +
-                    "Jackson 2 databind types must not be reintroduced under integration/. " +
-                    "Annotation imports under com.fasterxml.jackson.annotation.* remain " +
-                    "allowed — that namespace is shared between Jackson 2 and Jackson 3."
-            );
+                .that()
+                .resideInAPackage("..integration..")
+                .should()
+                .dependOnClassesThat()
+                .resideInAPackage("com.fasterxml.jackson.databind..")
+                .because("Spring Boot 4 auto-wires tools.jackson.databind.ObjectMapper (Jackson 3). "
+                        + "Jackson 2 databind types must not be reintroduced under integration/. "
+                        + "Annotation imports under com.fasterxml.jackson.annotation.* remain "
+                        + "allowed — that namespace is shared between Jackson 2 and Jackson 3.");
         rule.check(classes);
     }
 
@@ -40,12 +38,12 @@ class IntegrationJacksonNamespaceTest extends HephaestusArchitectureTest {
     @DisplayName("integration/** does not import Jackson 2 core classes")
     void integrationDoesNotUseJackson2Core() {
         ArchRule rule = noClasses()
-            .that()
-            .resideInAPackage("..integration..")
-            .should()
-            .dependOnClassesThat()
-            .resideInAPackage("com.fasterxml.jackson.core..")
-            .because("Jackson 2 core types are replaced by tools.jackson.core.* under Jackson 3.");
+                .that()
+                .resideInAPackage("..integration..")
+                .should()
+                .dependOnClassesThat()
+                .resideInAPackage("com.fasterxml.jackson.core..")
+                .because("Jackson 2 core types are replaced by tools.jackson.core.* under Jackson 3.");
         rule.check(classes);
     }
 }

@@ -81,13 +81,12 @@ class GitDiffOperationsJGitTest extends BaseUnitTest {
         write("renamed-to.txt", "stable\n");
         git.rm().addFilepattern("renamed-from.txt").call();
         git.add().addFilepattern("renamed-to.txt").call();
-        String renameSha = git
-            .commit()
-            .setMessage("rename")
-            .setAuthor("t", "t@e")
-            .setCommitter("t", "t@e")
-            .call()
-            .getName();
+        String renameSha = git.commit()
+                .setMessage("rename")
+                .setAuthor("t", "t@e")
+                .setCommitter("t", "t@e")
+                .call()
+                .getName();
 
         String stat = ops.diffStat(repoDir, addSha, renameSha);
         assertThat(stat).isNotNull();
@@ -110,13 +109,12 @@ class GitDiffOperationsJGitTest extends BaseUnitTest {
         write("renamed-to.txt", "stable\n");
         git.rm().addFilepattern("renamed-from.txt").call();
         git.add().addFilepattern("renamed-to.txt").call();
-        String renameSha = git
-            .commit()
-            .setMessage("rename")
-            .setAuthor("t", "t@e")
-            .setCommitter("t", "t@e")
-            .call()
-            .getName();
+        String renameSha = git.commit()
+                .setMessage("rename")
+                .setAuthor("t", "t@e")
+                .setCommitter("t", "t@e")
+                .call()
+                .getName();
 
         String names = ops.diffNameOnly(repoDir, addSha, renameSha);
         assertThat(names).isNotNull();
@@ -157,9 +155,13 @@ class GitDiffOperationsJGitTest extends BaseUnitTest {
         String[] range = ops.resolveDiffRange(repoDir, "main", "feature", headSha);
 
         assertThat(range).isNotNull().containsExactly(baseSha, headSha);
-        assertThat(range[0]).as("base must be the merge-base, not the advanced target tip").isNotEqualTo(advancedMain);
+        assertThat(range[0])
+                .as("base must be the merge-base, not the advanced target tip")
+                .isNotEqualTo(advancedMain);
         // And the resulting diff must NOT contain the target-only file.
-        assertThat(ops.diffNameOnly(repoDir, range[0], range[1])).doesNotContain("target-only.txt").contains("a.txt");
+        assertThat(ops.diffNameOnly(repoDir, range[0], range[1]))
+                .doesNotContain("target-only.txt")
+                .contains("a.txt");
     }
 
     @Test
@@ -170,13 +172,12 @@ class GitDiffOperationsJGitTest extends BaseUnitTest {
         git.checkout().setName("main").call();
         write("main-only.txt", "main\n");
         commit("main only");
-        MergeResult merge = git
-            .merge()
-            .include(repo.resolve(headSha))
-            .setFastForward(MergeCommand.FastForwardMode.NO_FF)
-            .setCommit(true)
-            .setMessage("merge feature")
-            .call();
+        MergeResult merge = git.merge()
+                .include(repo.resolve(headSha))
+                .setFastForward(MergeCommand.FastForwardMode.NO_FF)
+                .setCommit(true)
+                .setMessage("merge feature")
+                .call();
         assertThat(merge.getMergeStatus().isSuccessful()).isTrue();
 
         String[] range = ops.resolveDiffRange(repoDir, "main", "nonexistent", headSha);
@@ -231,6 +232,11 @@ class GitDiffOperationsJGitTest extends BaseUnitTest {
 
     private String commit(String message) throws GitAPIException {
         git.add().addFilepattern(".").call();
-        return git.commit().setMessage(message).setAuthor("t", "t@e").setCommitter("t", "t@e").call().getName();
+        return git.commit()
+                .setMessage(message)
+                .setAuthor("t", "t@e")
+                .setCommitter("t", "t@e")
+                .call()
+                .getName();
     }
 }

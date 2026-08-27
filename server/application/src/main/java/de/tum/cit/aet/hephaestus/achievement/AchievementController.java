@@ -67,19 +67,15 @@ public class AchievementController {
      */
     @GetMapping
     @Operation(
-        summary = "Get user achievements",
-        description = "Returns all achievements with progress information for the specified user"
-    )
+            summary = "Get user achievements",
+            description = "Returns all achievements with progress information for the specified user")
     @SecurityRequirements
     public ResponseEntity<List<AchievementDTO>> getUserAchievements(
-        WorkspaceContext workspaceContext,
-        @PathVariable String login
-    ) {
+            WorkspaceContext workspaceContext, @PathVariable String login) {
         log.debug(
-            "Getting achievements for user: {} in workspace: {}",
-            LoggingUtils.sanitizeForLog(login),
-            workspaceContext.slug()
-        );
+                "Getting achievements for user: {} in workspace: {}",
+                LoggingUtils.sanitizeForLog(login),
+                workspaceContext.slug());
 
         User user = userRepository.findByLogin(login).orElseThrow(() -> new EntityNotFoundException("User", login));
 
@@ -93,14 +89,11 @@ public class AchievementController {
      */
     @GetMapping("/definitions")
     @Operation(
-        summary = "Get all achievement definitions",
-        description = "Returns the master list of all available achievements. Restricted to non-prod environments."
-    )
+            summary = "Get all achievement definitions",
+            description = "Returns the master list of all available achievements. Restricted to non-prod environments.")
     @SecurityRequirements
     public ResponseEntity<List<AchievementDTO>> getAllAchievementDefinitions(
-        WorkspaceContext workspaceContext,
-        @PathVariable String login
-    ) {
+            WorkspaceContext workspaceContext, @PathVariable String login) {
         boolean isProd = Arrays.asList(env.getActiveProfiles()).contains("prod");
         if (isProd) {
             throw new AccessForbiddenException("Designer mode endpoints are restricted to development environments.");
@@ -126,21 +119,17 @@ public class AchievementController {
      */
     @PostMapping("/recalculate")
     @Operation(
-        summary = "Recalculate user achievements",
-        description = "Wipes and historically recalculates a user's achievement timeline. Admin only."
-    )
+            summary = "Recalculate user achievements",
+            description = "Wipes and historically recalculates a user's achievement timeline. Admin only.")
     @ApiResponse(responseCode = "202", description = "Recalculation task started successfully")
     @RequireAtLeastWorkspaceAdmin
     @AuditExempt(reason = "recomputes a derived read model; stores no configuration")
     public ResponseEntity<Void> recalculateUserAchievements(
-        WorkspaceContext workspaceContext,
-        @PathVariable String login
-    ) {
+            WorkspaceContext workspaceContext, @PathVariable String login) {
         log.info(
-            "Admin requested achievement recalculation for user: {} in workspace: {}",
-            LoggingUtils.sanitizeForLog(login),
-            workspaceContext.slug()
-        );
+                "Admin requested achievement recalculation for user: {} in workspace: {}",
+                LoggingUtils.sanitizeForLog(login),
+                workspaceContext.slug());
 
         User user = userRepository.findByLogin(login).orElseThrow(() -> new EntityNotFoundException("User", login));
 
@@ -152,9 +141,8 @@ public class AchievementController {
 
     @PostMapping("/reload")
     @Operation(
-        summary = "Reload achievements configuration",
-        description = "Hot reloads the achievements.yml configuration without requiring a restart. Admin only."
-    )
+            summary = "Reload achievements configuration",
+            description = "Hot reloads the achievements.yml configuration without requiring a restart. Admin only.")
     @RequireAtLeastWorkspaceAdmin
     @AuditExempt(reason = "reloads code-declared definitions; stores no configuration")
     public ResponseEntity<Void> reloadAchievements(WorkspaceContext workspaceContext, @PathVariable String login) {

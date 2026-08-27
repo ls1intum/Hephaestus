@@ -12,7 +12,8 @@ import org.jspecify.annotations.Nullable;
  * @param accessLevel the member's access level in the group
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
-public record GitLabGroupMemberResponse(@Nullable GitLabMemberUser user, @Nullable GitLabAccessLevel accessLevel) {
+public record GitLabGroupMemberResponse(
+        @Nullable GitLabMemberUser user, @Nullable GitLabAccessLevel accessLevel) {
     /**
      * User data from a group membership node.
      *
@@ -24,12 +25,11 @@ public record GitLabGroupMemberResponse(@Nullable GitLabMemberUser user, @Nullab
      */
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record GitLabMemberUser(
-        String id,
-        String username,
-        @Nullable String name,
-        @Nullable String avatarUrl,
-        @Nullable String webUrl
-    ) {}
+            String id,
+            String username,
+            @Nullable String name,
+            @Nullable String avatarUrl,
+            @Nullable String webUrl) {}
 
     /**
      * Access level for a group member.
@@ -41,5 +41,6 @@ public record GitLabGroupMemberResponse(@Nullable GitLabMemberUser user, @Nullab
      * @param integerValue numeric access level (e.g., 30)
      */
     @JsonIgnoreProperties(ignoreUnknown = true)
-    public record GitLabAccessLevel(@Nullable String stringValue, @Nullable Integer integerValue) {}
+    public record GitLabAccessLevel(
+            @Nullable String stringValue, @Nullable Integer integerValue) {}
 }

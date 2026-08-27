@@ -69,6 +69,7 @@ public class WorkspaceRepositoryMonitorService {
      * operations" (e.g. GitLab PAT) rather than an error.
      */
     private final Map<IntegrationKind, InstallationSuspensionTracker> suspensionTrackers;
+
     private final Map<IntegrationKind, InstallationRepositoryEnumerator> installationEnumerators;
     private final Map<IntegrationKind, WorkspaceDataSyncTrigger> dataSyncTriggers;
     private final ApplicationEventPublisher eventPublisher;
@@ -76,20 +77,19 @@ public class WorkspaceRepositoryMonitorService {
     private final ConnectionService connectionService;
 
     public WorkspaceRepositoryMonitorService(
-        NatsConnectionProperties natsProperties,
-        WorkspaceRepository workspaceRepository,
-        RepositoryToMonitorRepository repositoryToMonitorRepository,
-        RepositoryRepository repositoryRepository,
-        IdentityProviderRepository gitProviderRepository,
-        ObjectProvider<IntegrationNatsConsumer> natsConsumerService,
-        WorkspaceScopeFilter workspaceScopeFilter,
-        GitRepositoryManager gitRepositoryManager,
-        ConnectionService connectionService,
-        List<InstallationSuspensionTracker> suspensionTrackerList,
-        List<InstallationRepositoryEnumerator> installationEnumeratorList,
-        List<WorkspaceDataSyncTrigger> dataSyncTriggerList,
-        ApplicationEventPublisher eventPublisher
-    ) {
+            NatsConnectionProperties natsProperties,
+            WorkspaceRepository workspaceRepository,
+            RepositoryToMonitorRepository repositoryToMonitorRepository,
+            RepositoryRepository repositoryRepository,
+            IdentityProviderRepository gitProviderRepository,
+            ObjectProvider<IntegrationNatsConsumer> natsConsumerService,
+            WorkspaceScopeFilter workspaceScopeFilter,
+            GitRepositoryManager gitRepositoryManager,
+            ConnectionService connectionService,
+            List<InstallationSuspensionTracker> suspensionTrackerList,
+            List<InstallationRepositoryEnumerator> installationEnumeratorList,
+            List<WorkspaceDataSyncTrigger> dataSyncTriggerList,
+            ApplicationEventPublisher eventPublisher) {
         this.natsProperties = natsProperties;
         this.workspaceRepository = workspaceRepository;
         this.repositoryToMonitorRepository = repositoryToMonitorRepository;
@@ -124,11 +124,12 @@ public class WorkspaceRepositoryMonitorService {
     public List<String> getMonitoredRepositories(String slug) {
         Workspace workspace = requireWorkspace(slug);
         log.debug(
-            "Retrieved monitored repositories: workspaceId={}, workspaceSlug={}",
-            workspace.getId(),
-            LoggingUtils.sanitizeForLog(slug)
-        );
-        return workspace.getRepositoriesToMonitor().stream().map(RepositoryToMonitor::getNameWithOwner).toList();
+                "Retrieved monitored repositories: workspaceId={}, workspaceSlug={}",
+                workspace.getId(),
+                LoggingUtils.sanitizeForLog(slug));
+        return workspace.getRepositoriesToMonitor().stream()
+                .map(RepositoryToMonitor::getNameWithOwner)
+                .toList();
     }
 
     @Transactional(readOnly = true)
@@ -136,57 +137,49 @@ public class WorkspaceRepositoryMonitorService {
         String slug = requireSlug(workspaceContext);
         Workspace workspace = requireWorkspace(slug);
         log.debug(
-            "Retrieved monitored repositories: workspaceId={}, workspaceSlug={}",
-            workspace.getId(),
-            LoggingUtils.sanitizeForLog(slug)
-        );
-        return workspace.getRepositoriesToMonitor().stream().map(RepositoryToMonitor::getNameWithOwner).toList();
+                "Retrieved monitored repositories: workspaceId={}, workspaceSlug={}",
+                workspace.getId(),
+                LoggingUtils.sanitizeForLog(slug));
+        return workspace.getRepositoriesToMonitor().stream()
+                .map(RepositoryToMonitor::getNameWithOwner)
+                .toList();
     }
 
     public void addRepositoryToMonitor(String slug, String nameWithOwner)
-        throws RepositoryAlreadyMonitoredException, EntityNotFoundException {
+            throws RepositoryAlreadyMonitoredException, EntityNotFoundException {
         Workspace workspace = requireWorkspace(slug);
 
         if (isGitHubAppWorkspace(workspace)) {
             throw new RepositoryManagementNotAllowedException(slug);
         }
 
-        if (
-            workspace
-                .getRepositoriesToMonitor()
-                .stream()
-                .anyMatch(r -> r.getNameWithOwner().equals(nameWithOwner))
-        ) {
+        if (workspace.getRepositoriesToMonitor().stream()
+                .anyMatch(r -> r.getNameWithOwner().equals(nameWithOwner))) {
             log.debug(
-                "Skipped repository monitor addition: reason=alreadyMonitored, nameWithOwner={}, workspaceId={}",
-                LoggingUtils.sanitizeForLog(nameWithOwner),
-                workspace.getId()
-            );
+                    "Skipped repository monitor addition: reason=alreadyMonitored, nameWithOwner={}, workspaceId={}",
+                    LoggingUtils.sanitizeForLog(nameWithOwner),
+                    workspace.getId());
             throw new RepositoryAlreadyMonitoredException(nameWithOwner);
         }
 
         // For GitLab PAT workspaces, the repo may not be synced yet — allow adding by name.
-        if (
-            connectionService
+        if (connectionService
                 .findActiveProviderKind(workspace.getId())
                 .map(kind -> kind != IntegrationKind.GITLAB)
-                .orElse(true)
-        ) {
+                .orElse(true)) {
             var repository = findRepository(nameWithOwner);
             if (repository.isEmpty()) {
                 log.debug(
-                    "Skipped repository monitor addition: reason=repositoryNotFound, nameWithOwner={}",
-                    LoggingUtils.sanitizeForLog(nameWithOwner)
-                );
+                        "Skipped repository monitor addition: reason=repositoryNotFound, nameWithOwner={}",
+                        LoggingUtils.sanitizeForLog(nameWithOwner));
                 throw new EntityNotFoundException("Repository", nameWithOwner);
             }
         }
 
         log.info(
-            "Added repository to monitor: nameWithOwner={}, workspaceId={}",
-            LoggingUtils.sanitizeForLog(nameWithOwner),
-            workspace.getId()
-        );
+                "Added repository to monitor: nameWithOwner={}, workspaceId={}",
+                LoggingUtils.sanitizeForLog(nameWithOwner),
+                workspace.getId());
 
         RepositoryToMonitor repositoryToMonitor = new RepositoryToMonitor();
         repositoryToMonitor.setNameWithOwner(nameWithOwner);
@@ -196,19 +189,19 @@ public class WorkspaceRepositoryMonitorService {
     }
 
     public void addRepositoryToMonitor(WorkspaceContext workspaceContext, String nameWithOwner)
-        throws RepositoryAlreadyMonitoredException, EntityNotFoundException {
+            throws RepositoryAlreadyMonitoredException, EntityNotFoundException {
         addRepositoryToMonitor(requireSlug(workspaceContext), nameWithOwner);
     }
 
     public void addRepositoriesToMonitor(String slug, Collection<String> namesWithOwners)
-        throws RepositoryAlreadyMonitoredException, EntityNotFoundException {
+            throws RepositoryAlreadyMonitoredException, EntityNotFoundException {
         for (String nameWithOwner : namesWithOwners) {
             addRepositoryToMonitor(slug, nameWithOwner);
         }
     }
 
     public void addRepositoriesToMonitor(WorkspaceContext workspaceContext, Collection<String> namesWithOwners)
-        throws RepositoryAlreadyMonitoredException, EntityNotFoundException {
+            throws RepositoryAlreadyMonitoredException, EntityNotFoundException {
         addRepositoriesToMonitor(requireSlug(workspaceContext), namesWithOwners);
     }
 
@@ -219,27 +212,23 @@ public class WorkspaceRepositoryMonitorService {
             throw new RepositoryManagementNotAllowedException(slug);
         }
 
-        RepositoryToMonitor repositoryToMonitor = workspace
-            .getRepositoriesToMonitor()
-            .stream()
-            .filter(r -> r.getNameWithOwner().equals(nameWithOwner))
-            .findFirst()
-            .orElse(null);
+        RepositoryToMonitor repositoryToMonitor = workspace.getRepositoriesToMonitor().stream()
+                .filter(r -> r.getNameWithOwner().equals(nameWithOwner))
+                .findFirst()
+                .orElse(null);
 
         if (repositoryToMonitor == null) {
             log.debug(
-                "Skipped repository monitor removal: reason=notMonitored, nameWithOwner={}, workspaceId={}",
-                LoggingUtils.sanitizeForLog(nameWithOwner),
-                workspace.getId()
-            );
+                    "Skipped repository monitor removal: reason=notMonitored, nameWithOwner={}, workspaceId={}",
+                    LoggingUtils.sanitizeForLog(nameWithOwner),
+                    workspace.getId());
             throw new EntityNotFoundException("Repository", nameWithOwner);
         }
 
         log.info(
-            "Removed repository from monitor: nameWithOwner={}, workspaceId={}",
-            LoggingUtils.sanitizeForLog(nameWithOwner),
-            workspace.getId()
-        );
+                "Removed repository from monitor: nameWithOwner={}, workspaceId={}",
+                LoggingUtils.sanitizeForLog(nameWithOwner),
+                workspace.getId());
 
         deleteRepositoryMonitor(workspace, repositoryToMonitor);
 
@@ -247,7 +236,7 @@ public class WorkspaceRepositoryMonitorService {
     }
 
     public void removeRepositoryFromMonitor(WorkspaceContext workspaceContext, String nameWithOwner)
-        throws EntityNotFoundException {
+            throws EntityNotFoundException {
         removeRepositoryFromMonitor(requireSlug(workspaceContext), nameWithOwner);
     }
 
@@ -267,10 +256,8 @@ public class WorkspaceRepositoryMonitorService {
             return Optional.empty();
         }
         Workspace workspace = workspaceOpt.get();
-        var monitorOpt = repositoryToMonitorRepository.findByWorkspaceIdAndNameWithOwner(
-            workspace.getId(),
-            nameWithOwner
-        );
+        var monitorOpt =
+                repositoryToMonitorRepository.findByWorkspaceIdAndNameWithOwner(workspace.getId(), nameWithOwner);
         if (monitorOpt.isEmpty()) {
             return workspaceOpt;
         }
@@ -318,9 +305,7 @@ public class WorkspaceRepositoryMonitorService {
      */
     @Transactional
     public void ensureRepositoryAndMonitorFromSnapshot(
-        long installationId,
-        ProvisioningListener.RepositorySnapshot snapshot
-    ) {
+            long installationId, ProvisioningListener.RepositorySnapshot snapshot) {
         if (snapshot == null || StringUtils.isBlank(snapshot.nameWithOwner())) {
             return;
         }
@@ -333,19 +318,12 @@ public class WorkspaceRepositoryMonitorService {
         Workspace workspace = workspaceOpt.get();
 
         IdentityProvider provider = gitProviderRepository
-            .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
-            .orElseThrow(() ->
-                new IllegalStateException("IdentityProvider not found for type=GITHUB, serverUrl=https://github.com")
-            );
+                .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
+                .orElseThrow(() -> new IllegalStateException(
+                        "IdentityProvider not found for type=GITHUB, serverUrl=https://github.com"));
 
         ensureRepositoryFromSnapshot(
-            workspace,
-            provider,
-            snapshot.id(),
-            snapshot.nameWithOwner(),
-            snapshot.name(),
-            snapshot.isPrivate()
-        );
+                workspace, provider, snapshot.id(), snapshot.nameWithOwner(), snapshot.name(), snapshot.isPrivate());
 
         ensureRepositoryMonitorInternal(workspace, snapshot.nameWithOwner(), true);
     }
@@ -361,10 +339,7 @@ public class WorkspaceRepositoryMonitorService {
      */
     @Transactional
     public void ensureAllInstallationRepositoriesCovered(
-        long installationId,
-        @Nullable Collection<String> protectedRepositories,
-        boolean deferSync
-    ) {
+            long installationId, @Nullable Collection<String> protectedRepositories, boolean deferSync) {
         // Check suspension BEFORE adding repos so NATS replay of old "created" events
         // cannot trigger hundreds of failed syncs.
         if (isInstallationSuspended(installationId)) {
@@ -385,77 +360,68 @@ public class WorkspaceRepositoryMonitorService {
         InstallationRepositoryEnumerator enumerator = installationEnumerators.get(IntegrationKind.GITHUB);
         if (enumerator == null) {
             log.debug(
-                "Skipped repository enumeration: reason=noEnumeratorForKind, installationId={}, kind={}",
-                installationId,
-                IntegrationKind.GITHUB
-            );
+                    "Skipped repository enumeration: reason=noEnumeratorForKind, installationId={}, kind={}",
+                    installationId,
+                    IntegrationKind.GITHUB);
             return;
         }
         var snapshots = enumerator.enumerate(installationId);
         if (snapshots.isEmpty()) {
             log.warn(
-                "Skipped repository enumeration: reason=noDataReturned, installationId={}, workspaceSlug={}",
-                installationId,
-                LoggingUtils.sanitizeForLog(workspace.getWorkspaceSlug())
-            );
+                    "Skipped repository enumeration: reason=noDataReturned, installationId={}, workspaceSlug={}",
+                    installationId,
+                    LoggingUtils.sanitizeForLog(workspace.getWorkspaceSlug()));
             return;
         }
 
         // Filter snapshots BEFORE processing to avoid creating Repository entities for filtered repos
-        List<InstallationRepositoryEnumerator.InstallationRepository> allowedSnapshots = snapshots
-            .stream()
-            .filter(s -> workspaceScopeFilter.isRepositoryAllowed(s.nameWithOwner()))
-            .toList();
+        List<InstallationRepositoryEnumerator.InstallationRepository> allowedSnapshots = snapshots.stream()
+                .filter(s -> workspaceScopeFilter.isRepositoryAllowed(s.nameWithOwner()))
+                .toList();
 
         if (allowedSnapshots.size() < snapshots.size()) {
             log.debug(
-                "Filtered repositories during enumeration: allowed={}, total={}, installationId={}",
-                allowedSnapshots.size(),
-                snapshots.size(),
-                installationId
-            );
+                    "Filtered repositories during enumeration: allowed={}, total={}, installationId={}",
+                    allowedSnapshots.size(),
+                    snapshots.size(),
+                    installationId);
         }
 
-        Set<String> desiredRepositories = allowedSnapshots
-            .stream()
-            .map(snapshot -> snapshot.nameWithOwner())
-            .filter(name -> !StringUtils.isBlank(name))
-            .map(name -> name.toLowerCase(Locale.ENGLISH))
-            .collect(Collectors.toSet());
+        Set<String> desiredRepositories = allowedSnapshots.stream()
+                .map(snapshot -> snapshot.nameWithOwner())
+                .filter(name -> !StringUtils.isBlank(name))
+                .map(name -> name.toLowerCase(Locale.ENGLISH))
+                .collect(Collectors.toSet());
 
         if (protectedRepositories != null) {
-            protectedRepositories
-                .stream()
-                .filter(name -> !StringUtils.isBlank(name))
-                .filter(name -> workspaceScopeFilter.isRepositoryAllowed(name))
-                .map(name -> name.toLowerCase(Locale.ENGLISH))
-                .forEach(desiredRepositories::add);
+            protectedRepositories.stream()
+                    .filter(name -> !StringUtils.isBlank(name))
+                    .filter(name -> workspaceScopeFilter.isRepositoryAllowed(name))
+                    .map(name -> name.toLowerCase(Locale.ENGLISH))
+                    .forEach(desiredRepositories::add);
         }
 
         IdentityProvider provider = gitProviderRepository
-            .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
-            .orElseThrow(() ->
-                new IllegalStateException("IdentityProvider not found for type=GITHUB, serverUrl=https://github.com")
-            );
+                .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
+                .orElseThrow(() -> new IllegalStateException(
+                        "IdentityProvider not found for type=GITHUB, serverUrl=https://github.com"));
 
         allowedSnapshots.forEach(snapshot -> {
             ensureRepositoryFromSnapshot(
-                workspace,
-                provider,
-                snapshot.id(),
-                snapshot.nameWithOwner(),
-                snapshot.name(),
-                snapshot.isPrivate()
-            );
+                    workspace,
+                    provider,
+                    snapshot.id(),
+                    snapshot.nameWithOwner(),
+                    snapshot.name(),
+                    snapshot.isPrivate());
             ensureRepositoryMonitorInternal(workspace, snapshot.nameWithOwner(), deferSync);
         });
 
-        repositoryToMonitorRepository
-            .findByWorkspaceId(workspace.getId())
-            .stream()
-            .filter(monitor -> !StringUtils.isBlank(monitor.getNameWithOwner()))
-            .filter(monitor -> !desiredRepositories.contains(monitor.getNameWithOwner().toLowerCase(Locale.ENGLISH)))
-            .forEach(monitor -> removeRepositoryMonitorInTransaction(installationId, monitor.getNameWithOwner()));
+        repositoryToMonitorRepository.findByWorkspaceId(workspace.getId()).stream()
+                .filter(monitor -> !StringUtils.isBlank(monitor.getNameWithOwner()))
+                .filter(monitor ->
+                        !desiredRepositories.contains(monitor.getNameWithOwner().toLowerCase(Locale.ENGLISH)))
+                .forEach(monitor -> removeRepositoryMonitorInTransaction(installationId, monitor.getNameWithOwner()));
     }
 
     /**
@@ -510,29 +476,26 @@ public class WorkspaceRepositoryMonitorService {
         long monitorCount = repositoryToMonitorRepository.countByNameWithOwner(nameWithOwner);
         if (monitorCount > 0) {
             log.debug(
-                "Skipped repository deletion: reason=stillMonitored, repoName={}, monitorCount={}",
-                LoggingUtils.sanitizeForLog(nameWithOwner),
-                monitorCount
-            );
+                    "Skipped repository deletion: reason=stillMonitored, repoName={}, monitorCount={}",
+                    LoggingUtils.sanitizeForLog(nameWithOwner),
+                    monitorCount);
             return;
         }
 
-        repositoryRepository
-            .findByNameWithOwner(nameWithOwner)
-            .ifPresent(repository -> {
-                Long repoId = repository.getId();
+        repositoryRepository.findByNameWithOwner(nameWithOwner).ifPresent(repository -> {
+            Long repoId = repository.getId();
 
-                // Clean up local git clone before deleting the DB entity
-                gitRepositoryManager.deleteClone(repoId);
+            // Clean up local git clone before deleting the DB entity
+            gitRepositoryManager.deleteClone(repoId);
 
-                // Synchronous publish — listeners run in this transaction so any vendor-
-                // owned dependents (GitHub Projects V2 polymorphic ownership rows) are gone
-                // before the repository delete fires.
-                eventPublisher.publishEvent(new RepositoryAboutToBeDeletedEvent(repoId));
+            // Synchronous publish — listeners run in this transaction so any vendor-
+            // owned dependents (GitHub Projects V2 polymorphic ownership rows) are gone
+            // before the repository delete fires.
+            eventPublisher.publishEvent(new RepositoryAboutToBeDeletedEvent(repoId));
 
-                repositoryRepository.delete(repository);
-                log.debug("Deleted orphaned repository: repoName={}", LoggingUtils.sanitizeForLog(nameWithOwner));
-            });
+            repositoryRepository.delete(repository);
+            log.debug("Deleted orphaned repository: repoName={}", LoggingUtils.sanitizeForLog(nameWithOwner));
+        });
     }
 
     private void persistRepositoryMonitor(Workspace workspace, RepositoryToMonitor monitor) {
@@ -557,33 +520,28 @@ public class WorkspaceRepositoryMonitorService {
         }
         if (deferSync) {
             log.debug(
-                "Persisted repository with deferred sync: repoName={}",
-                LoggingUtils.sanitizeForLog(monitor.getNameWithOwner())
-            );
+                    "Persisted repository with deferred sync: repoName={}",
+                    LoggingUtils.sanitizeForLog(monitor.getNameWithOwner()));
             return;
         }
         if (repositoryAllowed) {
             // Sync the just-persisted target through the bound kind's trigger (async, looked up
             // by monitor id). No trigger for the active kind = no sync wiring, not an error.
-            connectionService
-                .findActiveProviderKind(workspace.getId())
-                .ifPresent(kind -> {
-                    WorkspaceDataSyncTrigger trigger = dataSyncTriggers.get(kind);
-                    if (trigger != null) {
-                        trigger.syncSingleSyncTarget(monitor.getId());
-                    } else {
-                        log.debug(
+            connectionService.findActiveProviderKind(workspace.getId()).ifPresent(kind -> {
+                WorkspaceDataSyncTrigger trigger = dataSyncTriggers.get(kind);
+                if (trigger != null) {
+                    trigger.syncSingleSyncTarget(monitor.getId());
+                } else {
+                    log.debug(
                             "Skipped single-target sync: reason=noTriggerForKind, repoName={}, kind={}",
                             LoggingUtils.sanitizeForLog(monitor.getNameWithOwner()),
-                            kind
-                        );
-                    }
-                });
+                            kind);
+                }
+            });
         } else {
             log.debug(
-                "Persisted repository without sync: reason=filteredByScope, repoName={}",
-                LoggingUtils.sanitizeForLog(monitor.getNameWithOwner())
-            );
+                    "Persisted repository without sync: reason=filteredByScope, repoName={}",
+                    LoggingUtils.sanitizeForLog(monitor.getNameWithOwner()));
         }
     }
 
@@ -605,10 +563,7 @@ public class WorkspaceRepositoryMonitorService {
      * return success - that's the idempotent behavior we want.
      */
     private Optional<Workspace> ensureRepositoryMonitorInternal(
-        Workspace workspace,
-        String nameWithOwner,
-        boolean deferSync
-    ) {
+            Workspace workspace, String nameWithOwner, boolean deferSync) {
         if (workspace == null || StringUtils.isBlank(nameWithOwner)) {
             return Optional.ofNullable(workspace);
         }
@@ -626,10 +581,9 @@ public class WorkspaceRepositoryMonitorService {
             persistRepositoryMonitor(workspace, monitor, deferSync);
         } catch (DataIntegrityViolationException e) {
             log.debug(
-                "Repository monitor already exists (idempotent): repoName={}, workspaceId={}",
-                LoggingUtils.sanitizeForLog(nameWithOwner),
-                workspace.getId()
-            );
+                    "Repository monitor already exists (idempotent): repoName={}, workspaceId={}",
+                    LoggingUtils.sanitizeForLog(nameWithOwner),
+                    workspace.getId());
         }
 
         return Optional.of(workspace);
@@ -655,25 +609,25 @@ public class WorkspaceRepositoryMonitorService {
      * {@code isPrivate} and {@code nameWithOwner} respectively.
      */
     private void ensureRepositoryFromSnapshot(
-        Workspace workspace,
-        IdentityProvider provider,
-        long nativeId,
-        String nameWithOwner,
-        String name,
-        boolean isPrivate
-    ) {
+            Workspace workspace,
+            IdentityProvider provider,
+            long nativeId,
+            String nameWithOwner,
+            String name,
+            boolean isPrivate) {
         if (StringUtils.isBlank(nameWithOwner)) {
             return;
         }
 
         repositoryRepository.upsertFromSnapshot(
-            nativeId,
-            Objects.requireNonNull(provider.getId()),
-            nameWithOwner,
-            name,
-            isPrivate,
-            workspace.getOrganization() != null ? workspace.getOrganization().getId() : null
-        );
+                nativeId,
+                Objects.requireNonNull(provider.getId()),
+                nameWithOwner,
+                name,
+                isPrivate,
+                workspace.getOrganization() != null
+                        ? workspace.getOrganization().getId()
+                        : null);
     }
 
     private Workspace requireWorkspace(String slug) {
@@ -681,8 +635,8 @@ public class WorkspaceRepositoryMonitorService {
             throw new IllegalArgumentException("Workspace slug must not be blank.");
         }
         return workspaceRepository
-            .findByWorkspaceSlug(slug)
-            .orElseThrow(() -> new EntityNotFoundException("Workspace", slug));
+                .findByWorkspaceSlug(slug)
+                .orElseThrow(() -> new EntityNotFoundException("Workspace", slug));
     }
 
     private String requireSlug(WorkspaceContext workspaceContext) {
@@ -709,12 +663,12 @@ public class WorkspaceRepositoryMonitorService {
 
     /** Workspace is bound to a GitHub App installation (vs GitHub PAT or GitLab PAT). */
     private boolean isGitHubAppWorkspace(Workspace workspace) {
-        return (
-            connectionService
-                .findActiveProviderKind(workspace.getId())
-                .map(k -> k == IntegrationKind.GITHUB)
-                .orElse(false) &&
-            connectionService.findActiveGitHubAppConfig(workspace.getId()).isPresent()
-        );
+        return (connectionService
+                        .findActiveProviderKind(workspace.getId())
+                        .map(k -> k == IntegrationKind.GITHUB)
+                        .orElse(false)
+                && connectionService
+                        .findActiveGitHubAppConfig(workspace.getId())
+                        .isPresent());
     }
 }

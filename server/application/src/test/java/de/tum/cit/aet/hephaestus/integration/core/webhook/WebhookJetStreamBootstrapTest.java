@@ -52,8 +52,8 @@ class WebhookJetStreamBootstrapTest extends BaseUnitTest {
         ArgumentCaptor<StreamConfiguration> captor = ArgumentCaptor.forClass(StreamConfiguration.class);
         verify(jsm, times(4)).addStream(captor.capture());
         assertThat(captor.getAllValues())
-            .extracting(StreamConfiguration::getName)
-            .containsExactlyInAnyOrder("gitlab", "github", "slack", "outline");
+                .extracting(StreamConfiguration::getName)
+                .containsExactlyInAnyOrder("gitlab", "github", "slack", "outline");
     }
 
     @Test
@@ -67,8 +67,8 @@ class WebhookJetStreamBootstrapTest extends BaseUnitTest {
         ArgumentCaptor<StreamConfiguration> captor = ArgumentCaptor.forClass(StreamConfiguration.class);
         verify(jsm, times(4)).addStream(captor.capture());
         assertThat(captor.getAllValues())
-            .as("a stream with no byte bound grows until the broker's volume is full")
-            .allSatisfy(config -> assertThat(config.getMaxBytes()).isPositive());
+                .as("a stream with no byte bound grows until the broker's volume is full")
+                .allSatisfy(config -> assertThat(config.getMaxBytes()).isPositive());
     }
 
     @Test
@@ -82,14 +82,13 @@ class WebhookJetStreamBootstrapTest extends BaseUnitTest {
         ArgumentCaptor<StreamConfiguration> captor = ArgumentCaptor.forClass(StreamConfiguration.class);
         verify(jsm, times(4)).addStream(captor.capture());
         assertThat(captor.getAllValues())
-            .as("a count bound describes neither disk nor time, and hid the absence of one that did")
-            .allSatisfy(config -> assertThat(config.getMaxMsgs()).isEqualTo(-1L));
+                .as("a count bound describes neither disk nor time, and hid the absence of one that did")
+                .allSatisfy(config -> assertThat(config.getMaxMsgs()).isEqualTo(-1L));
     }
 
     @Test
     void perStreamOverridesReachTheStreamConfiguration() throws Exception {
-        WebhookProperties overridden = WebhookPropertiesFixture.with(
-            new WebhookProperties.Stream(
+        WebhookProperties overridden = WebhookPropertiesFixture.with(new WebhookProperties.Stream(
                 Duration.ofMinutes(10),
                 Duration.ofDays(180),
                 Map.of("slack", Duration.ofHours(72)),
@@ -98,9 +97,7 @@ class WebhookJetStreamBootstrapTest extends BaseUnitTest {
                 gibibytes(12),
                 false,
                 Duration.ofMinutes(5),
-                Duration.ofSeconds(60)
-            )
-        );
+                Duration.ofSeconds(60)));
         JetStreamManagement jsm = mock(JetStreamManagement.class);
         JetStreamApiException notFound = apiException(404);
         when(jsm.getStreamInfo(anyString())).thenThrow(notFound);
@@ -110,25 +107,24 @@ class WebhookJetStreamBootstrapTest extends BaseUnitTest {
         ArgumentCaptor<StreamConfiguration> captor = ArgumentCaptor.forClass(StreamConfiguration.class);
         verify(jsm, times(4)).addStream(captor.capture());
         assertThat(captor.getAllValues())
-            .filteredOn(config -> "slack".equals(config.getName()))
-            .singleElement()
-            .satisfies(config -> {
-                assertThat(config.getMaxAge()).isEqualTo(Duration.ofHours(72));
-                assertThat(config.getMaxBytes()).isEqualTo(GIBIBYTE);
-            });
+                .filteredOn(config -> "slack".equals(config.getName()))
+                .singleElement()
+                .satisfies(config -> {
+                    assertThat(config.getMaxAge()).isEqualTo(Duration.ofHours(72));
+                    assertThat(config.getMaxBytes()).isEqualTo(GIBIBYTE);
+                });
         assertThat(captor.getAllValues())
-            .filteredOn(config -> "github".equals(config.getName()))
-            .singleElement()
-            .satisfies(config -> {
-                assertThat(config.getMaxAge()).isEqualTo(Duration.ofDays(180));
-                assertThat(config.getMaxBytes()).isEqualTo(8 * GIBIBYTE);
-            });
+                .filteredOn(config -> "github".equals(config.getName()))
+                .singleElement()
+                .satisfies(config -> {
+                    assertThat(config.getMaxAge()).isEqualTo(Duration.ofDays(180));
+                    assertThat(config.getMaxBytes()).isEqualTo(8 * GIBIBYTE);
+                });
     }
 
     @Test
     void refusesToStartWhenStreamBoundsOvercommitTheBroker() {
-        WebhookProperties overcommitted = WebhookPropertiesFixture.with(
-            new WebhookProperties.Stream(
+        WebhookProperties overcommitted = WebhookPropertiesFixture.with(new WebhookProperties.Stream(
                 Duration.ofMinutes(10),
                 Duration.ofDays(7),
                 Map.of(),
@@ -138,21 +134,18 @@ class WebhookJetStreamBootstrapTest extends BaseUnitTest {
                 gibibytes(8),
                 false,
                 Duration.ofMinutes(5),
-                Duration.ofSeconds(60)
-            )
-        );
+                Duration.ofSeconds(60)));
         JetStreamManagement jsm = mock(JetStreamManagement.class);
 
         WebhookJetStreamBootstrap bootstrap = new WebhookJetStreamBootstrap(jsm, overcommitted);
         assertThatThrownBy(bootstrap::bootstrap)
-            .isInstanceOf(IllegalStateException.class)
-            .hasMessageContaining("over the 8589934592-byte broker storage budget");
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("over the 8589934592-byte broker storage budget");
     }
 
     @Test
     void startsWhenStreamBoundsExactlyFillTheBrokerBudget() throws Exception {
-        WebhookProperties exact = WebhookPropertiesFixture.with(
-            new WebhookProperties.Stream(
+        WebhookProperties exact = WebhookPropertiesFixture.with(new WebhookProperties.Stream(
                 Duration.ofMinutes(10),
                 Duration.ofDays(7),
                 Map.of(),
@@ -161,9 +154,7 @@ class WebhookJetStreamBootstrapTest extends BaseUnitTest {
                 gibibytes(8),
                 false,
                 Duration.ofMinutes(5),
-                Duration.ofSeconds(60)
-            )
-        );
+                Duration.ofSeconds(60)));
         JetStreamManagement jsm = mock(JetStreamManagement.class);
         JetStreamApiException notFound = apiException(404);
         when(jsm.getStreamInfo(anyString())).thenThrow(notFound);
@@ -184,7 +175,8 @@ class WebhookJetStreamBootstrapTest extends BaseUnitTest {
 
         ArgumentCaptor<StreamConfiguration> captor = ArgumentCaptor.forClass(StreamConfiguration.class);
         verify(jsm, times(4)).updateStream(captor.capture());
-        assertThat(captor.getAllValues()).allSatisfy(config -> assertThat(config.getMaxBytes()).isEqualTo(GIBIBYTE));
+        assertThat(captor.getAllValues())
+                .allSatisfy(config -> assertThat(config.getMaxBytes()).isEqualTo(GIBIBYTE));
     }
 
     @Test
@@ -209,7 +201,8 @@ class WebhookJetStreamBootstrapTest extends BaseUnitTest {
 
         ArgumentCaptor<StreamConfiguration> captor = ArgumentCaptor.forClass(StreamConfiguration.class);
         verify(jsm, times(4)).updateStream(captor.capture());
-        assertThat(captor.getAllValues()).allSatisfy(config -> assertThat(config.getMaxBytes()).isEqualTo(GIBIBYTE));
+        assertThat(captor.getAllValues())
+                .allSatisfy(config -> assertThat(config.getMaxBytes()).isEqualTo(GIBIBYTE));
     }
 
     @Test
@@ -217,9 +210,8 @@ class WebhookJetStreamBootstrapTest extends BaseUnitTest {
         // Oldest message predates the configured ceiling, so applying it expires that message the
         // moment the update lands.
         StreamInfo info = existing(
-            builder -> builder.maxAge(Duration.ofDays(365)),
-            state(GIBIBYTE / 2, 10, 1, ZonedDateTime.now().minusDays(200))
-        );
+                builder -> builder.maxAge(Duration.ofDays(365)),
+                state(GIBIBYTE / 2, 10, 1, ZonedDateTime.now().minusDays(200)));
         JetStreamManagement jsm = mock(JetStreamManagement.class);
         when(jsm.getStreamInfo(anyString())).thenReturn(info);
 
@@ -232,9 +224,8 @@ class WebhookJetStreamBootstrapTest extends BaseUnitTest {
     @Test
     void appliesARetentionCutThatReachesNothingStored() throws Exception {
         StreamInfo info = existing(
-            builder -> builder.maxAge(Duration.ofDays(365)),
-            state(GIBIBYTE / 2, 10, 1, ZonedDateTime.now().minusHours(1))
-        );
+                builder -> builder.maxAge(Duration.ofDays(365)),
+                state(GIBIBYTE / 2, 10, 1, ZonedDateTime.now().minusHours(1)));
         JetStreamManagement jsm = mock(JetStreamManagement.class);
         when(jsm.getStreamInfo(anyString())).thenReturn(info);
 
@@ -242,17 +233,15 @@ class WebhookJetStreamBootstrapTest extends BaseUnitTest {
 
         ArgumentCaptor<StreamConfiguration> captor = ArgumentCaptor.forClass(StreamConfiguration.class);
         verify(jsm, times(4)).updateStream(captor.capture());
-        assertThat(captor.getAllValues()).allSatisfy(config ->
-            assertThat(config.getMaxAge()).isEqualTo(Duration.ofDays(180))
-        );
+        assertThat(captor.getAllValues())
+                .allSatisfy(config -> assertThat(config.getMaxAge()).isEqualTo(Duration.ofDays(180)));
     }
 
     @Test
     void treatsAnEmptyStreamAsHavingNothingToExpire() throws Exception {
         StreamInfo info = existing(
-            builder -> builder.maxAge(Duration.ofDays(365)),
-            state(0, 0, 1, ZonedDateTime.now().minusDays(365))
-        );
+                builder -> builder.maxAge(Duration.ofDays(365)),
+                state(0, 0, 1, ZonedDateTime.now().minusDays(365)));
         JetStreamManagement jsm = mock(JetStreamManagement.class);
         when(jsm.getStreamInfo(anyString())).thenReturn(info);
 
@@ -277,10 +266,8 @@ class WebhookJetStreamBootstrapTest extends BaseUnitTest {
     void neverWritesLimitsOntoAStreamThatDiscardsNewMessages(CapturedOutput output) throws Exception {
         // Under DiscardPolicy.New a byte bound makes the broker REJECT publishes instead of shedding
         // old messages — total ingestion loss for every workspace, which is what ADR 0008 forbids.
-        StreamInfo info = existing(
-            builder -> builder.maxBytes(-1).discardPolicy(DiscardPolicy.New),
-            state(GIBIBYTE / 2, 10, 1)
-        );
+        StreamInfo info =
+                existing(builder -> builder.maxBytes(-1).discardPolicy(DiscardPolicy.New), state(GIBIBYTE / 2, 10, 1));
         JetStreamManagement jsm = mock(JetStreamManagement.class);
         when(jsm.getStreamInfo(anyString())).thenReturn(info);
 
@@ -293,9 +280,7 @@ class WebhookJetStreamBootstrapTest extends BaseUnitTest {
     @Test
     void neverWritesLimitsOntoAStreamWhoseRetentionPolicyHasDrifted() throws Exception {
         StreamInfo info = existing(
-            builder -> builder.maxBytes(-1).retentionPolicy(RetentionPolicy.WorkQueue),
-            state(GIBIBYTE / 2, 10, 1)
-        );
+                builder -> builder.maxBytes(-1).retentionPolicy(RetentionPolicy.WorkQueue), state(GIBIBYTE / 2, 10, 1));
         JetStreamManagement jsm = mock(JetStreamManagement.class);
         when(jsm.getStreamInfo(anyString())).thenReturn(info);
 
@@ -348,7 +333,8 @@ class WebhookJetStreamBootstrapTest extends BaseUnitTest {
 
         ArgumentCaptor<StreamConfiguration> captor = ArgumentCaptor.forClass(StreamConfiguration.class);
         verify(jsm, times(4)).updateStream(captor.capture());
-        assertThat(captor.getAllValues()).allSatisfy(config -> assertThat(config.getMaxMsgs()).isEqualTo(-1L));
+        assertThat(captor.getAllValues())
+                .allSatisfy(config -> assertThat(config.getMaxMsgs()).isEqualTo(-1L));
     }
 
     @Test
@@ -425,8 +411,8 @@ class WebhookJetStreamBootstrapTest extends BaseUnitTest {
 
         WebhookJetStreamBootstrap bootstrap = new WebhookJetStreamBootstrap(jsm, properties);
         assertThatThrownBy(bootstrap::bootstrap)
-            .isInstanceOf(IllegalStateException.class)
-            .hasMessageContaining("Failed to create JetStream stream");
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Failed to create JetStream stream");
     }
 
     @Test
@@ -437,13 +423,13 @@ class WebhookJetStreamBootstrapTest extends BaseUnitTest {
 
         WebhookJetStreamBootstrap bootstrap = new WebhookJetStreamBootstrap(jsm, properties);
         assertThatThrownBy(bootstrap::bootstrap)
-            .isInstanceOf(IllegalStateException.class)
-            .hasMessageContaining("Failed to inspect JetStream stream");
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Failed to inspect JetStream stream");
     }
 
     @Test
     void aTimedOutUpdateReportsTheLimitsTheStreamActuallyHasRatherThanAssertingItChangedNothing(CapturedOutput output)
-        throws Exception {
+            throws Exception {
         // Shedding what a new bound deletes happens before the broker replies, so a client timeout
         // and a successful update look identical from here. Staging showed exactly that: the update
         // landed, the client gave up, and the old message told the operator nothing had happened.
@@ -456,10 +442,10 @@ class WebhookJetStreamBootstrapTest extends BaseUnitTest {
         new WebhookJetStreamBootstrap(jsm, allowingDestructiveUpdates()).bootstrap();
 
         assertThat(output.getAll())
-            .as("the operator needs the broker's answer, not the client's assumption")
-            .contains("live configuration is now")
-            .contains("maxBytes=4294967296")
-            .doesNotContain("stream left at its live configuration");
+                .as("the operator needs the broker's answer, not the client's assumption")
+                .contains("live configuration is now")
+                .contains("maxBytes=4294967296")
+                .doesNotContain("stream left at its live configuration");
     }
 
     @Test
@@ -471,9 +457,9 @@ class WebhookJetStreamBootstrapTest extends BaseUnitTest {
         // Bootstrap walks every stream: the first pair of calls is the one under test — read, then the
         // re-read that fails. Later streams read normally so the loop reaches its end.
         when(jsm.getStreamInfo(anyString()))
-            .thenReturn(before)
-            .thenThrow(new IOException("broker gone"))
-            .thenReturn(before);
+                .thenReturn(before)
+                .thenThrow(new IOException("broker gone"))
+                .thenReturn(before);
         when(jsm.updateStream(any())).thenThrow(new IOException("Timeout or no response waiting for NATS"));
 
         new WebhookJetStreamBootstrap(jsm, allowingDestructiveUpdates()).bootstrap();
@@ -483,8 +469,7 @@ class WebhookJetStreamBootstrapTest extends BaseUnitTest {
 
     private WebhookProperties allowingDestructiveUpdates() {
         WebhookProperties.Stream s = properties.stream();
-        return WebhookPropertiesFixture.with(
-            new WebhookProperties.Stream(
+        return WebhookPropertiesFixture.with(new WebhookProperties.Stream(
                 s.duplicateWindow(),
                 s.maxAge(),
                 Map.of(),
@@ -493,9 +478,7 @@ class WebhookJetStreamBootstrapTest extends BaseUnitTest {
                 s.storageBudget(),
                 true,
                 s.limitUpdateTimeout(),
-                s.monitorInterval()
-            )
-        );
+                s.monitorInterval()));
     }
 
     /**
@@ -508,23 +491,18 @@ class WebhookJetStreamBootstrapTest extends BaseUnitTest {
 
     /** A live stream at the configured shape and limits, which the argument then perturbs. */
     private StreamInfo existing(
-        java.util.function.UnaryOperator<StreamConfiguration.Builder> perturb,
-        @Nullable StreamState state
-    ) {
-        StreamConfiguration config = perturb
-            .apply(
-                StreamConfiguration.builder()
-                    .name("existing")
-                    .subjects("existing.>")
-                    .retentionPolicy(RetentionPolicy.Limits)
-                    .discardPolicy(DiscardPolicy.Old)
-                    .storageType(StorageType.File)
-                    .duplicateWindow(properties.stream().duplicateWindow())
-                    .maxAge(properties.stream().maxAge())
-                    .maxMessages(-1)
-                    .maxBytes(properties.stream().maxBytes().toBytes())
-            )
-            .build();
+            java.util.function.UnaryOperator<StreamConfiguration.Builder> perturb, @Nullable StreamState state) {
+        StreamConfiguration config = perturb.apply(StreamConfiguration.builder()
+                        .name("existing")
+                        .subjects("existing.>")
+                        .retentionPolicy(RetentionPolicy.Limits)
+                        .discardPolicy(DiscardPolicy.Old)
+                        .storageType(StorageType.File)
+                        .duplicateWindow(properties.stream().duplicateWindow())
+                        .maxAge(properties.stream().maxAge())
+                        .maxMessages(-1)
+                        .maxBytes(properties.stream().maxBytes().toBytes()))
+                .build();
         StreamInfo info = mock(StreamInfo.class);
         // Lenient: a stream whose shape has drifted is refused before its state is ever read.
         lenient().when(info.getConfiguration()).thenReturn(config);

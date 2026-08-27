@@ -90,21 +90,20 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  */
 @ConfigurationProperties(prefix = "hephaestus.auth")
 public record AuthProperties(
-    @DefaultValue("http://localhost:8080") URI issuer,
-    @DefaultValue("") String apiBasePath,
-    @DefaultValue("hephaestus-spa") String audience,
-    @DefaultValue("15m") Duration accessTtl,
-    @DefaultValue(DEFAULT_COOKIE_NAME) String cookieName,
-    @DefaultValue("") String stateCookieKey,
-    @DefaultValue("48h") Duration deleteCooldown,
-    Map<String, LoginProviderSeed> loginProviders,
-    @DefaultValue List<String> bootstrapAdmins,
-    @DefaultValue("") String bootstrapToken,
-    @DefaultValue("1h") Duration impersonationMaxLifetime,
-    @DefaultValue("12h") Duration sessionMaxLifetime,
-    @DefaultValue("false") boolean devLoginEnabled,
-    @DefaultValue("true") boolean cookieSecure
-) {
+        @DefaultValue("http://localhost:8080") URI issuer,
+        @DefaultValue("") String apiBasePath,
+        @DefaultValue("hephaestus-spa") String audience,
+        @DefaultValue("15m") Duration accessTtl,
+        @DefaultValue(DEFAULT_COOKIE_NAME) String cookieName,
+        @DefaultValue("") String stateCookieKey,
+        @DefaultValue("48h") Duration deleteCooldown,
+        Map<String, LoginProviderSeed> loginProviders,
+        @DefaultValue List<String> bootstrapAdmins,
+        @DefaultValue("") String bootstrapToken,
+        @DefaultValue("1h") Duration impersonationMaxLifetime,
+        @DefaultValue("12h") Duration sessionMaxLifetime,
+        @DefaultValue("false") boolean devLoginEnabled,
+        @DefaultValue("true") boolean cookieSecure) {
     /**
      * Null-coalesce the optional provider map so a deployment with no {@code login-providers} block (and
      * direct test construction passing {@code null}) binds to an empty map rather than NPEing at seed time.
@@ -153,12 +152,11 @@ public record AuthProperties(
      * misconfigured from env.
      */
     public record LoginProviderSeed(
-        LoginProvider.ProviderType type,
-        @DefaultValue("") String baseUrl,
-        @DefaultValue("") String clientId,
-        @DefaultValue("") String clientSecret,
-        @DefaultValue("") String displayName
-    ) {
+            LoginProvider.ProviderType type,
+            @DefaultValue("") String baseUrl,
+            @DefaultValue("") String clientId,
+            @DefaultValue("") String clientSecret,
+            @DefaultValue("") String displayName) {
         /**
          * A provider slot counts as configured only when it carries BOTH halves of the OAuth client
          * credential. A half-filled slot (client id set, secret blank — e.g. {@code OUTLINE_OAUTH_CLIENT_ID}

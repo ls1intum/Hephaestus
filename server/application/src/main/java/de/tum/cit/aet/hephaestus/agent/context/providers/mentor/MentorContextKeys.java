@@ -12,17 +12,16 @@ import java.util.Set;
 public final class MentorContextKeys {
 
     public static final Set<String> ALLOWED_OUTPUT_KEYS = Set.of(
-        UserContentSource.OUTPUT_KEY,
-        WorkspaceContentSource.OUTPUT_KEY,
-        PracticeCatalogContentSource.OUTPUT_KEY,
-        ObservationHistoryContentSource.OUTPUT_KEY,
-        DeliveredFeedbackContentSource.OUTPUT_KEY,
-        RecentAuthoredWorkContentSource.OUTPUT_KEY,
-        SlackConversationContentSource.OUTPUT_KEY,
-        PreparedConversationFeedbackContentSource.OUTPUT_KEY,
-        CurrentThreadHistoryContentSource.OUTPUT_KEY,
-        OutlineDocumentContentSource.OUTPUT_KEY
-    );
+            UserContentSource.OUTPUT_KEY,
+            WorkspaceContentSource.OUTPUT_KEY,
+            PracticeCatalogContentSource.OUTPUT_KEY,
+            ObservationHistoryContentSource.OUTPUT_KEY,
+            DeliveredFeedbackContentSource.OUTPUT_KEY,
+            RecentAuthoredWorkContentSource.OUTPUT_KEY,
+            SlackConversationContentSource.OUTPUT_KEY,
+            PreparedConversationFeedbackContentSource.OUTPUT_KEY,
+            CurrentThreadHistoryContentSource.OUTPUT_KEY,
+            OutlineDocumentContentSource.OUTPUT_KEY);
 
     private MentorContextKeys() {}
 }

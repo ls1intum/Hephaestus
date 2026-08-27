@@ -44,7 +44,7 @@ import org.slf4j.LoggerFactory;
 public class WebhookJetStreamBootstrap {
 
     private static final Logger log = LoggerFactory.getLogger(WebhookJetStreamBootstrap.class);
-    static final String[] STREAMS = { "gitlab", "github", "slack", "outline" };
+    static final String[] STREAMS = {"gitlab", "github", "slack", "outline"};
 
     /**
      * {@code Old} sheds the oldest retained messages to admit the newest. {@code New} would reject
@@ -87,15 +87,12 @@ public class WebhookJetStreamBootstrap {
             total += s.maxBytesFor(name);
         }
         if (total > budget) {
-            throw new IllegalStateException(
-                "Webhook stream bounds total " +
-                    total +
-                    " bytes, over the " +
-                    budget +
-                    "-byte broker storage budget (hephaestus.webhook.stream.storage-budget). " +
-                    "Lower hephaestus.webhook.stream.max-bytes[-by-stream], or raise the budget and the " +
-                    "JetStream volume with it."
-            );
+            throw new IllegalStateException("Webhook stream bounds total " + total
+                    + " bytes, over the "
+                    + budget
+                    + "-byte broker storage budget (hephaestus.webhook.stream.storage-budget). "
+                    + "Lower hephaestus.webhook.stream.max-bytes[-by-stream], or raise the budget and the "
+                    + "JetStream volume with it.");
         }
     }
 
@@ -110,9 +107,7 @@ public class WebhookJetStreamBootstrap {
                 return;
             }
             throw new IllegalStateException(
-                "Failed to inspect JetStream stream: " + name + " (code=" + e.getErrorCode() + ")",
-                e
-            );
+                    "Failed to inspect JetStream stream: " + name + " (code=" + e.getErrorCode() + ")", e);
         } catch (IOException e) {
             throw new IllegalStateException("I/O error inspecting JetStream stream: " + name, e);
         }
@@ -121,25 +116,24 @@ public class WebhookJetStreamBootstrap {
     private void createStream(String name) {
         WebhookProperties.Stream s = properties.stream();
         StreamConfiguration config = StreamConfiguration.builder()
-            .name(name)
-            .subjects(name + ".>")
-            .retentionPolicy(RetentionPolicy.Limits)
-            .discardPolicy(DISCARD_POLICY)
-            .storageType(StorageType.File)
-            .duplicateWindow(s.duplicateWindow())
-            .maxAge(s.maxAgeFor(name))
-            .maxMessages(UNLIMITED)
-            .maxBytes(s.maxBytesFor(name))
-            .build();
+                .name(name)
+                .subjects(name + ".>")
+                .retentionPolicy(RetentionPolicy.Limits)
+                .discardPolicy(DISCARD_POLICY)
+                .storageType(StorageType.File)
+                .duplicateWindow(s.duplicateWindow())
+                .maxAge(s.maxAgeFor(name))
+                .maxMessages(UNLIMITED)
+                .maxBytes(s.maxBytesFor(name))
+                .build();
         try {
             jsm.addStream(config);
             log.info(
-                "Created JetStream stream: name={} dedupWindow={} maxAge={} maxBytes={}",
-                name,
-                s.duplicateWindow(),
-                s.maxAgeFor(name),
-                s.maxBytesFor(name)
-            );
+                    "Created JetStream stream: name={} dedupWindow={} maxAge={} maxBytes={}",
+                    name,
+                    s.duplicateWindow(),
+                    s.maxAgeFor(name),
+                    s.maxBytesFor(name));
         } catch (JetStreamApiException | IOException ex) {
             throw new IllegalStateException("Failed to create JetStream stream: " + name, ex);
         }
@@ -170,13 +164,8 @@ public class WebhookJetStreamBootstrap {
         if (plan.consider("maxAge", live.getMaxAge(), maxAge, expiryLoss(state, maxAge), allowDestructive)) {
             plan.update.maxAge(maxAge);
         }
-        boolean byteBoundApplied = plan.consider(
-            "maxBytes",
-            live.getMaxBytes(),
-            maxBytes,
-            byteLoss(state, maxBytes),
-            allowDestructive
-        );
+        boolean byteBoundApplied =
+                plan.consider("maxBytes", live.getMaxBytes(), maxBytes, byteLoss(state, maxBytes), allowDestructive);
         if (byteBoundApplied) {
             plan.update.maxBytes(maxBytes);
         }
@@ -189,26 +178,23 @@ public class WebhookJetStreamBootstrap {
 
         if (!plan.withheld.isEmpty()) {
             log.error(
-                "Stream {} limit change withheld because it would delete stored messages: {} — " +
-                    "set hephaestus.webhook.stream.allow-destructive-limit-updates=true to apply it",
-                name,
-                plan.withheld
-            );
+                    "Stream {} limit change withheld because it would delete stored messages: {} — "
+                            + "set hephaestus.webhook.stream.allow-destructive-limit-updates=true to apply it",
+                    name,
+                    plan.withheld);
         }
         if (!plan.unbounding.isEmpty()) {
             log.error(
-                "Stream {} bound removal withheld because it would leave the stream unbounded: {} — " +
-                    "get hephaestus.webhook.stream.max-bytes[-by-stream] applied first",
-                name,
-                plan.unbounding
-            );
+                    "Stream {} bound removal withheld because it would leave the stream unbounded: {} — "
+                            + "get hephaestus.webhook.stream.max-bytes[-by-stream] applied first",
+                    name,
+                    plan.unbounding);
         }
         boolean written = !plan.applied.isEmpty() && applyLimits(name, plan);
         reportRemainingBounds(
-            name,
-            byteBoundApplied && written ? maxBytes : live.getMaxBytes(),
-            plan.relaxed.contains("maxMessages") && written ? UNLIMITED : live.getMaxMsgs()
-        );
+                name,
+                byteBoundApplied && written ? maxBytes : live.getMaxBytes(),
+                plan.relaxed.contains("maxMessages") && written ? UNLIMITED : live.getMaxMsgs());
     }
 
     /** Both states are reported, because a count bound and no bound at all both end at a full volume. */
@@ -218,18 +204,16 @@ public class WebhookJetStreamBootstrap {
         }
         if (maxMessages > 0) {
             log.error(
-                "JetStream stream {} has no storage bound — a {}-message cap is all that limits its disk, " +
-                    "and a message count does not predict bytes",
-                name,
-                maxMessages
-            );
+                    "JetStream stream {} has no storage bound — a {}-message cap is all that limits its disk, "
+                            + "and a message count does not predict bytes",
+                    name,
+                    maxMessages);
             return;
         }
         log.error(
-            "JetStream stream {} has no storage bound and no message bound, so it will grow until the " +
-                "broker's volume is full, at which point NATS cannot write and every inbound webhook is dropped",
-            name
-        );
+                "JetStream stream {} has no storage bound and no message bound, so it will grow until the "
+                        + "broker's volume is full, at which point NATS cannot write and every inbound webhook is dropped",
+                name);
     }
 
     /** @return whether the update landed. */
@@ -240,11 +224,10 @@ public class WebhookJetStreamBootstrap {
                 log.info("Reconciled JetStream stream limits: name={} changed={}", name, plan.applied);
             } else {
                 log.warn(
-                    "Reconciled JetStream stream limits and DELETED stored messages: name={} changed={} deleted={}",
-                    name,
-                    plan.applied,
-                    plan.deletes
-                );
+                        "Reconciled JetStream stream limits and DELETED stored messages: name={} changed={} deleted={}",
+                        name,
+                        plan.applied,
+                        plan.deletes);
             }
             return true;
         } catch (JetStreamApiException | IOException ex) {
@@ -252,12 +235,11 @@ public class WebhookJetStreamBootstrap {
             // the excess a new bound deletes happens before the reply, so the update can land while the
             // client gives up. Report the limits the stream actually has rather than assert an outcome.
             log.error(
-                "Failed to reconcile JetStream stream limits: name={} changed={} — live configuration is now {}",
-                name,
-                plan.applied,
-                describeLiveLimits(name),
-                ex
-            );
+                    "Failed to reconcile JetStream stream limits: name={} changed={} — live configuration is now {}",
+                    name,
+                    plan.applied,
+                    describeLiveLimits(name),
+                    ex);
             return false;
         }
     }
@@ -271,11 +253,7 @@ public class WebhookJetStreamBootstrap {
         try {
             StreamConfiguration live = jsm.getStreamInfo(name).getConfiguration();
             return String.format(
-                "maxAge=%s maxBytes=%d maxMessages=%d",
-                live.getMaxAge(),
-                live.getMaxBytes(),
-                live.getMaxMsgs()
-            );
+                    "maxAge=%s maxBytes=%d maxMessages=%d", live.getMaxAge(), live.getMaxBytes(), live.getMaxMsgs());
         } catch (JetStreamApiException | IOException | RuntimeException ex) {
             return "unreadable (" + ex.getClass().getSimpleName() + ") — check the broker directly";
         }
@@ -305,13 +283,12 @@ public class WebhookJetStreamBootstrap {
             return false;
         }
         log.error(
-            "Stream {} has drifted from the shape this deployment expects: {} — limits left unreconciled, " +
-                "because a bound on a stream of unknown shape has unknown consequences. Repair it with " +
-                "`nats stream edit {}`.",
-            name,
-            drift,
-            name
-        );
+                "Stream {} has drifted from the shape this deployment expects: {} — limits left unreconciled, "
+                        + "because a bound on a stream of unknown shape has unknown consequences. Repair it with "
+                        + "`nats stream edit {}`.",
+                name,
+                drift,
+                name);
         return true;
     }
 
@@ -359,12 +336,7 @@ public class WebhookJetStreamBootstrap {
          * @return whether the caller should write the new value onto {@link #update}
          */
         private boolean consider(
-            String field,
-            @Nullable Object from,
-            Object to,
-            @Nullable String loss,
-            boolean allowDestructive
-        ) {
+                String field, @Nullable Object from, Object to, @Nullable String loss, boolean allowDestructive) {
             if (Objects.equals(from, to)) {
                 return false;
             }

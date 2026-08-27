@@ -51,14 +51,13 @@ public class GitHubDiscussionProcessor extends BaseGitHubProcessor {
     private final ApplicationEventPublisher eventPublisher;
 
     public GitHubDiscussionProcessor(
-        UserRepository userRepository,
-        LabelRepository labelRepository,
-        MilestoneRepository milestoneRepository,
-        GitHubUserProcessor gitHubUserProcessor,
-        DiscussionRepository discussionRepository,
-        DiscussionCategoryRepository categoryRepository,
-        ApplicationEventPublisher eventPublisher
-    ) {
+            UserRepository userRepository,
+            LabelRepository labelRepository,
+            MilestoneRepository milestoneRepository,
+            GitHubUserProcessor gitHubUserProcessor,
+            DiscussionRepository discussionRepository,
+            DiscussionCategoryRepository categoryRepository,
+            ApplicationEventPublisher eventPublisher) {
         super(userRepository, labelRepository, milestoneRepository, gitHubUserProcessor);
         this.discussionRepository = discussionRepository;
         this.categoryRepository = categoryRepository;
@@ -87,33 +86,26 @@ public class GitHubDiscussionProcessor extends BaseGitHubProcessor {
             return null;
         }
 
-        Repository repository = Objects.requireNonNull(
-            context.repository(),
-            "Discussion processing requires a repository"
-        );
+        Repository repository =
+                Objects.requireNonNull(context.repository(), "Discussion processing requires a repository");
         Long providerId = Objects.requireNonNull(context.providerId(), "Discussion processing requires a provider");
 
         // Check if this is an update and apply stale-data protection
-        Optional<Discussion> existingOpt = discussionRepository.findByRepositoryIdAndNumber(
-            repository.getId(),
-            dto.number()
-        );
+        Optional<Discussion> existingOpt =
+                discussionRepository.findByRepositoryIdAndNumber(repository.getId(), dto.number());
         boolean isNew = existingOpt.isEmpty();
 
         // Skip update if existing data is newer (prevents stale webhooks from overwriting)
         if (!isNew) {
             Discussion existing = existingOpt.get();
-            if (
-                existing.getUpdatedAt() != null &&
-                dto.updatedAt() != null &&
-                !dto.updatedAt().isAfter(existing.getUpdatedAt())
-            ) {
+            if (existing.getUpdatedAt() != null
+                    && dto.updatedAt() != null
+                    && !dto.updatedAt().isAfter(existing.getUpdatedAt())) {
                 log.debug(
-                    "Skipped stale discussion update: discussionId={}, existingUpdatedAt={}, dtoUpdatedAt={}",
-                    existing.getId(),
-                    existing.getUpdatedAt(),
-                    dto.updatedAt()
-                );
+                        "Skipped stale discussion update: discussionId={}, existingUpdatedAt={}, dtoUpdatedAt={}",
+                        existing.getId(),
+                        existing.getUpdatedAt(),
+                        dto.updatedAt());
                 return existing;
             }
         }
@@ -131,44 +123,37 @@ public class GitHubDiscussionProcessor extends BaseGitHubProcessor {
         Discussion.LockReason lockReason = convertLockReason(dto.activeLockReason());
 
         discussionRepository.upsertCore(
-            dbId,
-            providerId,
-            repository.getId(),
-            dto.number(),
-            Objects.requireNonNullElse(sanitize(dto.title()), ""),
-            sanitize(dto.body()),
-            dto.htmlUrl(),
-            state.name(),
-            stateReason != null ? stateReason.name() : null,
-            dto.locked(),
-            lockReason != null ? lockReason.name() : null,
-            dto.closedAt(),
-            dto.answerChosenAt(),
-            dto.commentsCount(),
-            dto.upvoteCount(),
-            now,
-            dto.createdAt(),
-            dto.updatedAt(),
-            author != null ? author.getId() : null,
-            category != null ? category.getId() : null,
-            answerChosenBy != null ? answerChosenBy.getId() : null
-        );
+                dbId,
+                providerId,
+                repository.getId(),
+                dto.number(),
+                Objects.requireNonNullElse(sanitize(dto.title()), ""),
+                sanitize(dto.body()),
+                dto.htmlUrl(),
+                state.name(),
+                stateReason != null ? stateReason.name() : null,
+                dto.locked(),
+                lockReason != null ? lockReason.name() : null,
+                dto.closedAt(),
+                dto.answerChosenAt(),
+                dto.commentsCount(),
+                dto.upvoteCount(),
+                now,
+                dto.createdAt(),
+                dto.updatedAt(),
+                author != null ? author.getId() : null,
+                category != null ? category.getId() : null,
+                answerChosenBy != null ? answerChosenBy.getId() : null);
 
         // Fetch the discussion to get a managed entity and handle relationships
         Discussion discussion = discussionRepository
-            .findByRepositoryIdAndNumber(repository.getId(), dto.number())
-            .orElseThrow(() ->
-                new IllegalStateException(
-                    "Discussion not found after upsert: repositoryId=" + repository.getId() + ", number=" + dto.number()
-                )
-            );
+                .findByRepositoryIdAndNumber(repository.getId(), dto.number())
+                .orElseThrow(() -> new IllegalStateException("Discussion not found after upsert: repositoryId="
+                        + repository.getId() + ", number=" + dto.number()));
 
         // Handle ManyToMany relationships (labels) - these can't be done in the upsert
-        boolean labelsChanged = updateLabels(
-            Objects.requireNonNullElse(dto.labels(), List.of()),
-            discussion.getLabels(),
-            repository
-        );
+        boolean labelsChanged =
+                updateLabels(Objects.requireNonNullElse(dto.labels(), List.of()), discussion.getLabels(), repository);
 
         // Save relationship changes
         if (labelsChanged) {
@@ -191,8 +176,7 @@ public class GitHubDiscussionProcessor extends BaseGitHubProcessor {
             }
             if (!changedFields.isEmpty()) {
                 eventPublisher.publishEvent(
-                    new ScmDomainEvent.DiscussionUpdated(discussionData, changedFields, eventContext)
-                );
+                        new ScmDomainEvent.DiscussionUpdated(discussionData, changedFields, eventContext));
                 log.debug("Updated discussion: discussionId={}, changedFields={}", dbId, changedFields);
             }
         }
@@ -214,16 +198,16 @@ public class GitHubDiscussionProcessor extends BaseGitHubProcessor {
         // With synthetic PKs, we cannot use deleteById(nativeId) because the PK is
         // auto-generated and differs from the native provider ID. Look up by natural key instead.
         discussionRepository
-            .findByRepositoryIdAndNumber(
-                Objects.requireNonNull(context.repository(), "Discussion deletion requires a repository").getId(),
-                dto.number()
-            )
-            .ifPresent(discussion -> {
-                Long discussionId = discussion.getId();
-                discussionRepository.delete(discussion);
-                eventPublisher.publishEvent(new ScmDomainEvent.DiscussionDeleted(discussionId, eventContext));
-                log.info("Deleted discussion: discussionId={}, discussionNumber={}", discussionId, dto.number());
-            });
+                .findByRepositoryIdAndNumber(
+                        Objects.requireNonNull(context.repository(), "Discussion deletion requires a repository")
+                                .getId(),
+                        dto.number())
+                .ifPresent(discussion -> {
+                    Long discussionId = discussion.getId();
+                    discussionRepository.delete(discussion);
+                    eventPublisher.publishEvent(new ScmDomainEvent.DiscussionDeleted(discussionId, eventContext));
+                    log.info("Deleted discussion: discussionId={}, discussionNumber={}", discussionId, dto.number());
+                });
     }
 
     /**
@@ -239,13 +223,8 @@ public class GitHubDiscussionProcessor extends BaseGitHubProcessor {
         Discussion discussion = processInternal(dto, context);
         if (discussion != null) {
             String stateReason = dto.stateReason() != null ? dto.stateReason() : null;
-            eventPublisher.publishEvent(
-                new ScmDomainEvent.DiscussionClosed(
-                    ScmEventPayload.DiscussionData.from(discussion),
-                    stateReason,
-                    EventContext.from(context)
-                )
-            );
+            eventPublisher.publishEvent(new ScmDomainEvent.DiscussionClosed(
+                    ScmEventPayload.DiscussionData.from(discussion), stateReason, EventContext.from(context)));
             log.debug("Closed discussion: discussionId={}, stateReason={}", discussion.getId(), stateReason);
         }
         return discussion;
@@ -263,12 +242,8 @@ public class GitHubDiscussionProcessor extends BaseGitHubProcessor {
     public @Nullable Discussion processReopened(GitHubDiscussionDTO dto, ProcessingContext context) {
         Discussion discussion = processInternal(dto, context);
         if (discussion != null) {
-            eventPublisher.publishEvent(
-                new ScmDomainEvent.DiscussionReopened(
-                    ScmEventPayload.DiscussionData.from(discussion),
-                    EventContext.from(context)
-                )
-            );
+            eventPublisher.publishEvent(new ScmDomainEvent.DiscussionReopened(
+                    ScmEventPayload.DiscussionData.from(discussion), EventContext.from(context)));
             log.debug("Reopened discussion: discussionId={}", discussion.getId());
         }
         return discussion;
@@ -287,14 +262,12 @@ public class GitHubDiscussionProcessor extends BaseGitHubProcessor {
         Discussion discussion = processInternal(dto, context);
         if (discussion != null) {
             // The answer comment's database ID, if available from the DTO
-            Long answerCommentId = dto.answerComment() != null ? dto.answerComment().getDatabaseId() : null;
-            eventPublisher.publishEvent(
-                new ScmDomainEvent.DiscussionAnswered(
+            Long answerCommentId =
+                    dto.answerComment() != null ? dto.answerComment().getDatabaseId() : null;
+            eventPublisher.publishEvent(new ScmDomainEvent.DiscussionAnswered(
                     ScmEventPayload.DiscussionData.from(discussion),
                     answerCommentId != null ? answerCommentId : 0L,
-                    EventContext.from(context)
-                )
-            );
+                    EventContext.from(context)));
             log.debug("Answered discussion: discussionId={}, answerCommentId={}", discussion.getId(), answerCommentId);
         }
         return discussion;
@@ -319,16 +292,15 @@ public class GitHubDiscussionProcessor extends BaseGitHubProcessor {
 
         // Use atomic upsert to handle concurrent inserts safely
         categoryRepository.upsertCategory(
-            dto.nodeId(),
-            dto.name(),
-            slug,
-            dto.emoji(),
-            dto.description(),
-            dto.isAnswerable(),
-            repository.getId(),
-            dto.createdAt(),
-            dto.updatedAt()
-        );
+                dto.nodeId(),
+                dto.name(),
+                slug,
+                dto.emoji(),
+                dto.description(),
+                dto.isAnswerable(),
+                repository.getId(),
+                dto.createdAt(),
+                dto.updatedAt());
 
         // Fetch the managed entity after upsert
         return categoryRepository.findById(dto.nodeId()).orElse(null);

@@ -19,14 +19,12 @@ public interface CommitContributorRepository extends JpaRepository<CommitContrib
     /**
      * Find all contributors for a commit, ordered by role and ordinal.
      */
-    @Query(
-        """
+    @Query("""
         SELECT cc FROM CommitContributor cc
         LEFT JOIN FETCH cc.user
         WHERE cc.commit.id = :commitId
         ORDER BY cc.role, cc.ordinal
-        """
-    )
+        """)
     List<CommitContributor> findByCommitIdWithUser(@Param("commitId") Long commitId);
 
     /**
@@ -38,25 +36,21 @@ public interface CommitContributorRepository extends JpaRepository<CommitContrib
      */
     @Modifying
     @Transactional
-    @Query(
-        value = """
+    @Query(value = """
         INSERT INTO commit_contributor (commit_id, user_id, role, name, email, ordinal)
         VALUES (:commitId, (SELECT id FROM "user" WHERE id = :userId), :role, :name, :email, :ordinal)
         ON CONFLICT ON CONSTRAINT uq_commit_contributor_commit_email_role DO UPDATE SET
             name = COALESCE(EXCLUDED.name, commit_contributor.name),
             ordinal = EXCLUDED.ordinal,
             user_id = COALESCE(EXCLUDED.user_id, commit_contributor.user_id)
-        """,
-        nativeQuery = true
-    )
+        """, nativeQuery = true)
     void upsertContributor(
-        @Param("commitId") Long commitId,
-        @Param("userId") @Nullable Long userId,
-        @Param("role") String role,
-        @Param("name") @Nullable String name,
-        @Param("email") String email,
-        @Param("ordinal") int ordinal
-    );
+            @Param("commitId") Long commitId,
+            @Param("userId") @Nullable Long userId,
+            @Param("role") String role,
+            @Param("name") @Nullable String name,
+            @Param("email") String email,
+            @Param("ordinal") int ordinal);
 
     /**
      * Delete all contributors for a commit.
@@ -87,13 +81,10 @@ public interface CommitContributorRepository extends JpaRepository<CommitContrib
      */
     @Modifying
     @Transactional
-    @Query(
-        value = """
+    @Query(value = """
         UPDATE commit_contributor
         SET user_id = :userId
         WHERE LOWER(email) = LOWER(:email) AND user_id IS NULL
-        """,
-        nativeQuery = true
-    )
+        """, nativeQuery = true)
     int backfillUserIdByEmail(@Param("email") String email, @Param("userId") @Nullable Long userId);
 }

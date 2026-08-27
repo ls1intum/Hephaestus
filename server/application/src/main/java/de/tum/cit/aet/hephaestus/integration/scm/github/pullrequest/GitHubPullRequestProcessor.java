@@ -62,16 +62,15 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
     private final ApplicationEventPublisher eventPublisher;
 
     public GitHubPullRequestProcessor(
-        PullRequestRepository pullRequestRepository,
-        IssueRepository issueRepository,
-        CommitRepository commitRepository,
-        CommitAuthorResolver commitAuthorResolver,
-        LabelRepository labelRepository,
-        MilestoneRepository milestoneRepository,
-        UserRepository userRepository,
-        GitHubUserProcessor gitHubUserProcessor,
-        ApplicationEventPublisher eventPublisher
-    ) {
+            PullRequestRepository pullRequestRepository,
+            IssueRepository issueRepository,
+            CommitRepository commitRepository,
+            CommitAuthorResolver commitAuthorResolver,
+            LabelRepository labelRepository,
+            MilestoneRepository milestoneRepository,
+            UserRepository userRepository,
+            GitHubUserProcessor gitHubUserProcessor,
+            ApplicationEventPublisher eventPublisher) {
         super(userRepository, labelRepository, milestoneRepository, gitHubUserProcessor);
         this.pullRequestRepository = pullRequestRepository;
         this.issueRepository = issueRepository;
@@ -107,10 +106,7 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
      */
     @Nullable
     private PullRequest processInternal(
-        GitHubPullRequestDTO dto,
-        ProcessingContext context,
-        boolean emitLifecycleOnCreate
-    ) {
+            GitHubPullRequestDTO dto, ProcessingContext context, boolean emitLifecycleOnCreate) {
         Repository repository = context.repository();
         if (repository == null || repository.getId() == null) {
             log.warn("Skipped pull request processing: reason=missingRepository, prNumber={}", dto.number());
@@ -125,10 +121,8 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
         }
 
         // Check if this is an update (for event publishing purposes)
-        Optional<PullRequest> existingOpt = pullRequestRepository.findByRepositoryIdAndNumber(
-            repository.getId(),
-            dto.number()
-        );
+        Optional<PullRequest> existingOpt =
+                pullRequestRepository.findByRepositoryIdAndNumber(repository.getId(), dto.number());
         boolean isNew = existingOpt.isEmpty();
 
         // Detect issue_type mismatch: entity exists as ISSUE but we're processing it as a PR.
@@ -138,10 +132,8 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
         // instead of an UPDATE, violating the (provider_id, native_id) constraint.
         boolean promotedFromIssue = false;
         if (isNew) {
-            Optional<Issue> existingIssue = issueRepository.findByRepositoryIdAndNumber(
-                repository.getId(),
-                dto.number()
-            );
+            Optional<Issue> existingIssue =
+                    issueRepository.findByRepositoryIdAndNumber(repository.getId(), dto.number());
             if (existingIssue.isPresent()) {
                 issueRepository.correctDiscriminator(repository.getId(), dto.number(), "ISSUE", "PULL_REQUEST");
                 // Don't re-fetch: the promoted row has NULL PR-specific columns (additions, etc.)
@@ -150,10 +142,9 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
                 promotedFromIssue = true;
                 isNew = false;
                 log.info(
-                    "Corrected issue_type from ISSUE to PULL_REQUEST: repositoryId={}, number={}",
-                    repository.getId(),
-                    dto.number()
-                );
+                        "Corrected issue_type from ISSUE to PULL_REQUEST: repositoryId={}, number={}",
+                        repository.getId(),
+                        dto.number());
             }
         }
 
@@ -161,17 +152,14 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
         // Skip stale check for promotions — the entity needs all PR fields populated by the upsert.
         if (!isNew && !promotedFromIssue) {
             PullRequest existing = existingOpt.get();
-            if (
-                existing.getUpdatedAt() != null &&
-                dto.updatedAt() != null &&
-                !dto.updatedAt().isAfter(existing.getUpdatedAt())
-            ) {
+            if (existing.getUpdatedAt() != null
+                    && dto.updatedAt() != null
+                    && !dto.updatedAt().isAfter(existing.getUpdatedAt())) {
                 log.debug(
-                    "Skipped stale PR update: prId={}, existingUpdatedAt={}, dtoUpdatedAt={}",
-                    existing.getId(),
-                    existing.getUpdatedAt(),
-                    dto.updatedAt()
-                );
+                        "Skipped stale PR update: prId={}, existingUpdatedAt={}, dtoUpdatedAt={}",
+                        existing.getId(),
+                        existing.getUpdatedAt(),
+                        dto.updatedAt());
                 return existing;
             }
         }
@@ -190,52 +178,48 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
         // Use atomic upsert to handle concurrent inserts
         Instant now = Instant.now();
         pullRequestRepository.upsertCore(
-            dbId,
-            providerId,
-            dto.number(),
-            Objects.requireNonNullElse(sanitize(dto.title()), ""),
-            sanitize(dto.body()),
-            convertState(dto.state()).name(),
-            null, // stateReason not used for PRs
-            dto.htmlUrl(),
-            dto.locked(),
-            dto.closedAt(),
-            dto.commentsCount(),
-            now,
-            dto.createdAt(),
-            dto.updatedAt(),
-            author != null ? author.getId() : null,
-            repository.getId(),
-            milestone != null ? milestone.getId() : null,
-            dto.mergedAt(),
-            dto.isDraft(),
-            dto.isMerged(),
-            dto.commits(),
-            dto.additions(),
-            dto.deletions(),
-            dto.changedFiles(),
-            dto.reviewDecision() != null ? dto.reviewDecision().name() : null,
-            dto.mergeStateStatus() != null ? dto.mergeStateStatus().name() : null,
-            dto.isMergeable(),
-            headRefName,
-            baseRefName,
-            headRefOid,
-            baseRefOid,
-            mergedBy != null ? mergedBy.getId() : null,
-            null // mergeCommitSha — GitHub REST/webhook DTO does not supply it; GraphQL path can be wired later
-        );
+                dbId,
+                providerId,
+                dto.number(),
+                Objects.requireNonNullElse(sanitize(dto.title()), ""),
+                sanitize(dto.body()),
+                convertState(dto.state()).name(),
+                null, // stateReason not used for PRs
+                dto.htmlUrl(),
+                dto.locked(),
+                dto.closedAt(),
+                dto.commentsCount(),
+                now,
+                dto.createdAt(),
+                dto.updatedAt(),
+                author != null ? author.getId() : null,
+                repository.getId(),
+                milestone != null ? milestone.getId() : null,
+                dto.mergedAt(),
+                dto.isDraft(),
+                dto.isMerged(),
+                dto.commits(),
+                dto.additions(),
+                dto.deletions(),
+                dto.changedFiles(),
+                dto.reviewDecision() != null ? dto.reviewDecision().name() : null,
+                dto.mergeStateStatus() != null ? dto.mergeStateStatus().name() : null,
+                dto.isMergeable(),
+                headRefName,
+                baseRefName,
+                headRefOid,
+                baseRefOid,
+                mergedBy != null ? mergedBy.getId() : null,
+                null // mergeCommitSha — GitHub REST/webhook DTO does not supply it; GraphQL path can be wired later
+                );
 
         // Fetch the PR to get a managed entity and handle relationships
         PullRequest pr = pullRequestRepository
-            .findByRepositoryIdAndNumber(repository.getId(), dto.number())
-            .orElseThrow(() ->
-                new IllegalStateException(
-                    "PullRequest not found after upsert: repositoryId=" +
-                        repository.getId() +
-                        ", number=" +
-                        dto.number()
-                )
-            );
+                .findByRepositoryIdAndNumber(repository.getId(), dto.number())
+                .orElseThrow(() -> new IllegalStateException(
+                        "PullRequest not found after upsert: repositoryId=" + repository.getId()
+                                + ", number="
+                                + dto.number()));
 
         // Handle ManyToMany relationships (labels, assignees, requestedReviewers)
         boolean relationshipsChanged = updateRelationships(dto, pr, repository, providerId);
@@ -252,12 +236,8 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
         // Promotions (ISSUE→PR) are treated as new for event purposes: existingOpt is empty
         // because the entity was an Issue, not a PullRequest, so computeChangedFields would crash.
         if (isNew || promotedFromIssue) {
-            eventPublisher.publishEvent(
-                new ScmDomainEvent.PullRequestCreated(
-                    ScmEventPayload.PullRequestData.from(pr),
-                    EventContext.from(context)
-                )
-            );
+            eventPublisher.publishEvent(new ScmDomainEvent.PullRequestCreated(
+                    ScmEventPayload.PullRequestData.from(pr), EventContext.from(context)));
             log.debug("Created pull request: prId={}, prNumber={}", pr.getId(), dto.number());
 
             // Emit lifecycle events for PRs that arrived already in a terminal state during sync.
@@ -270,10 +250,9 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
                     eventPublisher.publishEvent(new ScmDomainEvent.PullRequestMerged(prData, eventContext));
                 }
                 log.debug(
-                    "Emitted lifecycle events for already-terminal PR: prId={}, merged={}",
-                    pr.getId(),
-                    pr.isMerged()
-                );
+                        "Emitted lifecycle events for already-terminal PR: prId={}, merged={}",
+                        pr.getId(),
+                        pr.isMerged());
             }
         } else {
             Set<String> changedFields = computeChangedFields(existingOpt.get(), pr);
@@ -281,13 +260,8 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
                 if (relationshipsChanged) {
                     changedFields.add("relationships");
                 }
-                eventPublisher.publishEvent(
-                    new ScmDomainEvent.PullRequestUpdated(
-                        ScmEventPayload.PullRequestData.from(pr),
-                        changedFields,
-                        EventContext.from(context)
-                    )
-                );
+                eventPublisher.publishEvent(new ScmDomainEvent.PullRequestUpdated(
+                        ScmEventPayload.PullRequestData.from(pr), changedFields, EventContext.from(context)));
                 log.debug("Updated pull request: prId={}, changedFields={}", pr.getId(), changedFields);
             }
         }
@@ -301,26 +275,15 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
      * @return true if any relationships were changed
      */
     private boolean updateRelationships(
-        GitHubPullRequestDTO dto,
-        PullRequest pr,
-        Repository repository,
-        Long providerId
-    ) {
-        boolean assigneesChanged = updateAssignees(
-            Objects.requireNonNullElse(dto.assignees(), List.of()),
-            pr.getAssignees(),
-            providerId
-        );
-        boolean labelsChanged = updateLabels(
-            Objects.requireNonNullElse(dto.labels(), List.of()),
-            pr.getLabels(),
-            repository
-        );
+            GitHubPullRequestDTO dto, PullRequest pr, Repository repository, Long providerId) {
+        boolean assigneesChanged =
+                updateAssignees(Objects.requireNonNullElse(dto.assignees(), List.of()), pr.getAssignees(), providerId);
+        boolean labelsChanged =
+                updateLabels(Objects.requireNonNullElse(dto.labels(), List.of()), pr.getLabels(), repository);
         boolean reviewersChanged = updateRequestedReviewers(
-            Objects.requireNonNullElse(dto.requestedReviewers(), List.of()),
-            pr.getRequestedReviewers(),
-            providerId
-        );
+                Objects.requireNonNullElse(dto.requestedReviewers(), List.of()),
+                pr.getRequestedReviewers(),
+                providerId);
         return assigneesChanged || labelsChanged || reviewersChanged;
     }
 
@@ -401,9 +364,8 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
         if (pr == null) {
             return null;
         }
-        eventPublisher.publishEvent(
-            new ScmDomainEvent.PullRequestReopened(ScmEventPayload.PullRequestData.from(pr), EventContext.from(context))
-        );
+        eventPublisher.publishEvent(new ScmDomainEvent.PullRequestReopened(
+                ScmEventPayload.PullRequestData.from(pr), EventContext.from(context)));
         log.debug("Reopened pull request: prId={}", pr.getId());
         return pr;
     }
@@ -418,9 +380,8 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
         if (pr == null) {
             return null;
         }
-        eventPublisher.publishEvent(
-            new ScmDomainEvent.PullRequestReady(ScmEventPayload.PullRequestData.from(pr), EventContext.from(context))
-        );
+        eventPublisher.publishEvent(new ScmDomainEvent.PullRequestReady(
+                ScmEventPayload.PullRequestData.from(pr), EventContext.from(context)));
         log.debug("Marked pull request ready for review: prId={}", pr.getId());
         return pr;
     }
@@ -435,9 +396,8 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
         if (pr == null) {
             return null;
         }
-        eventPublisher.publishEvent(
-            new ScmDomainEvent.PullRequestDrafted(ScmEventPayload.PullRequestData.from(pr), EventContext.from(context))
-        );
+        eventPublisher.publishEvent(new ScmDomainEvent.PullRequestDrafted(
+                ScmEventPayload.PullRequestData.from(pr), EventContext.from(context)));
         log.debug("Converted pull request to draft: prId={}", pr.getId());
         return pr;
     }
@@ -452,12 +412,8 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
         if (pr == null) {
             return null;
         }
-        eventPublisher.publishEvent(
-            new ScmDomainEvent.PullRequestSynchronized(
-                ScmEventPayload.PullRequestData.from(pr),
-                EventContext.from(context)
-            )
-        );
+        eventPublisher.publishEvent(new ScmDomainEvent.PullRequestSynchronized(
+                ScmEventPayload.PullRequestData.from(pr), EventContext.from(context)));
         log.debug("Synchronized pull request: prId={}", pr.getId());
         return pr;
     }
@@ -473,17 +429,12 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
             return null;
         }
         Label label = findOrCreateLabel(
-            labelDto,
-            Objects.requireNonNull(context.repository(), "Label event requires a repository")
-        );
+                labelDto, Objects.requireNonNull(context.repository(), "Label event requires a repository"));
         if (label != null) {
-            eventPublisher.publishEvent(
-                new ScmDomainEvent.PullRequestLabeled(
+            eventPublisher.publishEvent(new ScmDomainEvent.PullRequestLabeled(
                     ScmEventPayload.PullRequestData.from(pr),
                     ScmEventPayload.LabelData.from(label),
-                    EventContext.from(context)
-                )
-            );
+                    EventContext.from(context)));
             log.debug("Labeled pull request: prId={}, labelName={}", pr.getId(), label.getName());
         }
         return pr;
@@ -500,17 +451,12 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
             return null;
         }
         Label label = findOrCreateLabel(
-            labelDto,
-            Objects.requireNonNull(context.repository(), "Label event requires a repository")
-        );
+                labelDto, Objects.requireNonNull(context.repository(), "Label event requires a repository"));
         if (label != null) {
-            eventPublisher.publishEvent(
-                new ScmDomainEvent.PullRequestUnlabeled(
+            eventPublisher.publishEvent(new ScmDomainEvent.PullRequestUnlabeled(
                     ScmEventPayload.PullRequestData.from(pr),
                     ScmEventPayload.LabelData.from(label),
-                    EventContext.from(context)
-                )
-            );
+                    EventContext.from(context)));
             log.debug("Unlabeled pull request: prId={}, labelName={}", pr.getId(), label.getName());
         }
         return pr;
@@ -519,8 +465,7 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
     private Issue.State convertState(@Nullable String state) {
         if (state == null) {
             log.warn(
-                "PR state is null, defaulting to OPEN. This may indicate missing data in webhook or GraphQL response."
-            );
+                    "PR state is null, defaulting to OPEN. This may indicate missing data in webhook or GraphQL response.");
             return Issue.State.OPEN;
         }
         return switch (state.toUpperCase()) {
@@ -560,48 +505,39 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
         String message = info.message() != null ? info.message() : "";
 
         commitRepository.upsertCommit(
-            info.sha(),
-            message,
-            info.messageBody(),
-            htmlUrl,
-            info.authoredDate(),
-            info.committedDate(),
-            info.additions(),
-            info.deletions(),
-            info.changedFiles(),
-            Instant.now(),
-            repository.getId(),
-            authorId,
-            committerId,
-            info.authorEmail(),
-            info.committerEmail()
-        );
+                info.sha(),
+                message,
+                info.messageBody(),
+                htmlUrl,
+                info.authoredDate(),
+                info.committedDate(),
+                info.additions(),
+                info.deletions(),
+                info.changedFiles(),
+                Instant.now(),
+                repository.getId(),
+                authorId,
+                committerId,
+                info.authorEmail(),
+                info.committerEmail());
 
         // R5: Link the merge commit to the PR in the join table
         var commitOpt = commitRepository.findByShaAndRepositoryId(info.sha(), repository.getId());
         if (commitOpt.isPresent()) {
             commitRepository.linkCommitToPullRequests(
-                commitOpt.get().getId(),
-                repository.getId(),
-                List.of(dto.number())
-            );
+                    commitOpt.get().getId(), repository.getId(), List.of(dto.number()));
         }
 
         // Publish CommitCreated event for newly created merge commits
         if (isNew && commitOpt.isPresent()) {
-            eventPublisher.publishEvent(
-                new ScmDomainEvent.CommitCreated(
-                    ScmEventPayload.CommitData.from(commitOpt.get()),
-                    EventContext.from(context)
-                )
-            );
+            eventPublisher.publishEvent(new ScmDomainEvent.CommitCreated(
+                    ScmEventPayload.CommitData.from(commitOpt.get()), EventContext.from(context)));
         }
 
         log.debug(
-            "Upserted merge commit: sha={}, repository={}, isNew={}",
-            info.sha(),
-            repository.getNameWithOwner(),
-            isNew
-        );
+                "Upserted merge commit: sha={}, repository={}, isNew={}",
+                info.sha(),
+                repository.getNameWithOwner(),
+                isNew);
     }
 }

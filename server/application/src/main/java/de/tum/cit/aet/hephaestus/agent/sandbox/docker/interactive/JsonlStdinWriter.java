@@ -58,19 +58,18 @@ final class JsonlStdinWriter {
     private final Runnable onTerminalFailure;
 
     JsonlStdinWriter(
-        UUID sessionId,
-        OutputStream stdin,
-        ObjectMapper mapper,
-        int queueCapacity,
-        long stdinWriteTimeoutMs,
-        Counter rejectedQueueFull,
-        Counter rejectedWriteTimeout,
-        Counter rejectedBrokenPipe,
-        Counter rejectedClosed,
-        Counter framesBytesIn,
-        Runnable onTerminalFailure,
-        Map<String, String> mdcSnapshot
-    ) {
+            UUID sessionId,
+            OutputStream stdin,
+            ObjectMapper mapper,
+            int queueCapacity,
+            long stdinWriteTimeoutMs,
+            Counter rejectedQueueFull,
+            Counter rejectedWriteTimeout,
+            Counter rejectedBrokenPipe,
+            Counter rejectedClosed,
+            Counter framesBytesIn,
+            Runnable onTerminalFailure,
+            Map<String, String> mdcSnapshot) {
         this.sessionId = sessionId;
         this.stdin = stdin;
         this.mapper = mapper;
@@ -88,9 +87,9 @@ final class JsonlStdinWriter {
 
     void start() {
         this.writerThread = Thread.ofVirtual()
-            .name("mentor-writer-" + sessionId)
-            .uncaughtExceptionHandler((t, ex) -> log.warn("Writer thread died unexpectedly: {}", sessionId, ex))
-            .start(this::writerLoop);
+                .name("mentor-writer-" + sessionId)
+                .uncaughtExceptionHandler((t, ex) -> log.warn("Writer thread died unexpectedly: {}", sessionId, ex))
+                .start(this::writerLoop);
     }
 
     void send(JsonNode frame) {

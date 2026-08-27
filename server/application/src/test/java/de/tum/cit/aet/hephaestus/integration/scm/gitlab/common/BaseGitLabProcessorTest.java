@@ -3,7 +3,6 @@ package de.tum.cit.aet.hephaestus.integration.scm.gitlab.common;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -64,22 +63,20 @@ class BaseGitLabProcessorTest extends BaseUnitTest {
     @BeforeEach
     void setUp() {
         GitLabProperties properties = new GitLabProperties(
-            "https://gitlab.lrz.de",
-            Duration.ofSeconds(30),
-            Duration.ofSeconds(60),
-            Duration.ofMillis(200),
-            Duration.ofMinutes(5)
-        );
+                "https://gitlab.lrz.de",
+                Duration.ofSeconds(30),
+                Duration.ofSeconds(60),
+                Duration.ofMillis(200),
+                Duration.ofMinutes(5));
 
         processor = new TestProcessor(
-            gitLabUserService,
-            userRepository,
-            labelRepository,
-            repositoryRepository,
-            scopeIdResolver,
-            repositoryScopeFilter,
-            properties
-        );
+                gitLabUserService,
+                userRepository,
+                labelRepository,
+                repositoryRepository,
+                scopeIdResolver,
+                repositoryScopeFilter,
+                properties);
 
         IdentityProvider gitLabProvider = new IdentityProvider();
         gitLabProvider.setId(2L);
@@ -132,7 +129,7 @@ class BaseGitLabProcessorTest extends BaseUnitTest {
 
         @ParameterizedTest
         @NullAndEmptySource
-        @ValueSource(strings = { "  ", "\t" })
+        @ValueSource(strings = {"  ", "\t"})
         void returnsNullForNullOrBlank(String input) {
             Instant result = processor.callParseGitLabTimestamp(input);
             assertThat(result).isNull();
@@ -156,13 +153,8 @@ class BaseGitLabProcessorTest extends BaseUnitTest {
             user.setId(-18024L);
             user.setLogin("ga84xah");
 
-            GitLabWebhookUser dto = new GitLabWebhookUser(
-                18024L,
-                "ga84xah",
-                "Felix Dietrich",
-                "https://avatar.url",
-                null
-            );
+            GitLabWebhookUser dto =
+                    new GitLabWebhookUser(18024L, "ga84xah", "Felix Dietrich", "https://avatar.url", null);
 
             when(gitLabUserService.findOrCreateUser(dto, 1L)).thenReturn(user);
 
@@ -203,21 +195,19 @@ class BaseGitLabProcessorTest extends BaseUnitTest {
             user.setId(-18024L);
 
             GitLabUserLookup expectedLookup = GitLabUserLookup.of(
-                "gid://gitlab/User/18024",
-                "ga84xah",
-                "Felix Dietrich",
-                "https://avatar.url",
-                "https://gitlab.lrz.de/ga84xah"
-            );
+                    "gid://gitlab/User/18024",
+                    "ga84xah",
+                    "Felix Dietrich",
+                    "https://avatar.url",
+                    "https://gitlab.lrz.de/ga84xah");
             when(gitLabUserService.findOrCreateUser(expectedLookup, 1L)).thenReturn(user);
 
             User result = processor.callFindOrCreateUser(
-                "gid://gitlab/User/18024",
-                "ga84xah",
-                "Felix Dietrich",
-                "https://avatar.url",
-                "https://gitlab.lrz.de/ga84xah"
-            );
+                    "gid://gitlab/User/18024",
+                    "ga84xah",
+                    "Felix Dietrich",
+                    "https://avatar.url",
+                    "https://gitlab.lrz.de/ga84xah");
 
             assertThat(result).isNotNull();
             assertThat(result.getId()).isEqualTo(-18024L);
@@ -247,9 +237,8 @@ class BaseGitLabProcessorTest extends BaseUnitTest {
             existing.setId(-85907L);
             existing.setName("enhancement");
 
-            when(labelRepository.findByRepositoryIdAndName(testRepo.getId(), "enhancement")).thenReturn(
-                Optional.of(existing)
-            );
+            when(labelRepository.findByRepositoryIdAndName(testRepo.getId(), "enhancement"))
+                    .thenReturn(Optional.of(existing));
 
             GitLabWebhookLabel dto = new GitLabWebhookLabel(85907L, "enhancement", "#a2eeef");
             Label result = processor.callFindOrCreateLabel(dto, testRepo);
@@ -265,9 +254,10 @@ class BaseGitLabProcessorTest extends BaseUnitTest {
             created.setName("enhancement");
 
             when(labelRepository.findByRepositoryIdAndName(testRepo.getId(), "enhancement"))
-                .thenReturn(Optional.empty())
-                .thenReturn(Optional.of(created));
-            when(labelRepository.insertIfAbsent(85907L, 2L, "enhancement", "#a2eeef", testRepo.getId())).thenReturn(1);
+                    .thenReturn(Optional.empty())
+                    .thenReturn(Optional.of(created));
+            when(labelRepository.insertIfAbsent(85907L, 2L, "enhancement", "#a2eeef", testRepo.getId()))
+                    .thenReturn(1);
 
             GitLabWebhookLabel dto = new GitLabWebhookLabel(85907L, "enhancement", "#a2eeef");
             Label result = processor.callFindOrCreateLabel(dto, testRepo);
@@ -305,14 +295,15 @@ class BaseGitLabProcessorTest extends BaseUnitTest {
         @Test
         void returnsNullWhenNotFound() {
             when(repositoryScopeFilter.isRepositoryAllowed("org/repo")).thenReturn(true);
-            when(repositoryRepository.findByNameWithOwnerWithOrganization("org/repo")).thenReturn(Optional.empty());
+            when(repositoryRepository.findByNameWithOwnerWithOrganization("org/repo"))
+                    .thenReturn(Optional.empty());
             var ctx = processor.callResolveContext("org/repo", "open");
             assertThat(ctx).isNull();
         }
 
         @ParameterizedTest
         @NullAndEmptySource
-        @ValueSource(strings = { "  " })
+        @ValueSource(strings = {"  "})
         void returnsNullForNullOrBlankPath(String path) {
             var ctx = processor.callResolveContext(path, "open");
             assertThat(ctx).isNull();
@@ -325,20 +316,18 @@ class BaseGitLabProcessorTest extends BaseUnitTest {
     class IdMapping {
 
         @ParameterizedTest(name = "toEntityId({0}) = {1}")
-        @CsvSource({ "1, 1", "42, 42", "18024, 18024", "422296, 422296" })
+        @CsvSource({"1, 1", "42, 42", "18024, 18024", "422296, 422296"})
         void returnsRawIds(long rawId, long expectedEntityId) {
             assertThat(GitLabSyncConstants.toEntityId(rawId)).isEqualTo(expectedEntityId);
         }
 
         @ParameterizedTest(name = "extractEntityId(\"{0}\") = {1}")
-        @CsvSource(
-            {
-                "gid://gitlab/User/18024, 18024",
-                "gid://gitlab/Issue/422296, 422296",
-                "gid://gitlab/Project/246765, 246765",
-                "gid://gitlab/Label/85907, 85907",
-            }
-        )
+        @CsvSource({
+            "gid://gitlab/User/18024, 18024",
+            "gid://gitlab/Issue/422296, 422296",
+            "gid://gitlab/Project/246765, 246765",
+            "gid://gitlab/Label/85907, 85907",
+        })
         void extractsNumericIds(String globalId, long expectedEntityId) {
             assertThat(GitLabSyncConstants.extractEntityId(globalId)).isEqualTo(expectedEntityId);
         }
@@ -349,23 +338,21 @@ class BaseGitLabProcessorTest extends BaseUnitTest {
     private static class TestProcessor extends BaseGitLabProcessor {
 
         TestProcessor(
-            GitLabUserService gitLabUserService,
-            UserRepository userRepository,
-            LabelRepository labelRepository,
-            RepositoryRepository repositoryRepository,
-            ScopeIdResolver scopeIdResolver,
-            RepositoryScopeFilter repositoryScopeFilter,
-            GitLabProperties gitLabProperties
-        ) {
+                GitLabUserService gitLabUserService,
+                UserRepository userRepository,
+                LabelRepository labelRepository,
+                RepositoryRepository repositoryRepository,
+                ScopeIdResolver scopeIdResolver,
+                RepositoryScopeFilter repositoryScopeFilter,
+                GitLabProperties gitLabProperties) {
             super(
-                gitLabUserService,
-                userRepository,
-                labelRepository,
-                repositoryRepository,
-                scopeIdResolver,
-                repositoryScopeFilter,
-                gitLabProperties
-            );
+                    gitLabUserService,
+                    userRepository,
+                    labelRepository,
+                    repositoryRepository,
+                    scopeIdResolver,
+                    repositoryScopeFilter,
+                    gitLabProperties);
         }
 
         @Nullable
@@ -380,12 +367,11 @@ class BaseGitLabProcessorTest extends BaseUnitTest {
 
         @Nullable
         User callFindOrCreateUser(
-            @Nullable String globalId,
-            String username,
-            String name,
-            @Nullable String avatarUrl,
-            @Nullable String webUrl
-        ) {
+                @Nullable String globalId,
+                String username,
+                String name,
+                @Nullable String avatarUrl,
+                @Nullable String webUrl) {
             return findOrCreateUser(GitLabUserLookup.of(globalId, username, name, avatarUrl, webUrl), 1L);
         }
 

@@ -10,15 +10,20 @@ import org.jspecify.annotations.Nullable;
 
 @Schema(description = "Work reviewed by an agent job")
 public record ReviewRunTargetDTO(
-    @NonNull ArtifactKind type,
-    @Schema(description = "Internal artifact entity ID, when recorded") @Nullable Long id,
-    @Nullable IntegrationKind provider,
-    @Schema(description = "Provider-visible work-item number") @Nullable Integer number,
-    @NonNull String title,
-    @Nullable String repositoryName,
-    @Nullable String channelName,
-    @Nullable String url
-) {
+        @NonNull ArtifactKind type,
+
+        @Schema(description = "Internal artifact entity ID, when recorded") @Nullable
+        Long id,
+
+        @Nullable IntegrationKind provider,
+
+        @Schema(description = "Provider-visible work-item number") @Nullable
+        Integer number,
+
+        @NonNull String title,
+        @Nullable String repositoryName,
+        @Nullable String channelName,
+        @Nullable String url) {
     static ReviewRunTargetDTO from(AgentJob job) {
         return from(ReviewRunTargetMapper.from(job));
     }
@@ -29,14 +34,13 @@ public record ReviewRunTargetDTO(
 
     private static ReviewRunTargetDTO from(Target target) {
         return new ReviewRunTargetDTO(
-            target.type(),
-            target.id(),
-            target.provider(),
-            target.number(),
-            target.title(),
-            target.repositoryName(),
-            target.channelName(),
-            target.url()
-        );
+                target.type(),
+                target.id(),
+                target.provider(),
+                target.number(),
+                target.title(),
+                target.repositoryName(),
+                target.channelName(),
+                target.url());
     }
 }

@@ -61,9 +61,8 @@ import org.hibernate.annotations.OnDeleteAction;
 @Entity
 @Immutable
 @Table(
-    name = "feedback_observation",
-    indexes = { @Index(name = "idx_feedback_observation_observation", columnList = "observation_id") }
-)
+        name = "feedback_observation",
+        indexes = {@Index(name = "idx_feedback_observation_observation", columnList = "observation_id")})
 @Getter
 @NoArgsConstructor
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
@@ -82,10 +81,9 @@ public class FeedbackObservation {
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @MapsId("feedbackId")
     @JoinColumn(
-        name = "feedback_id",
-        nullable = false,
-        foreignKey = @ForeignKey(name = "fk_feedback_observation_feedback")
-    )
+            name = "feedback_id",
+            nullable = false,
+            foreignKey = @ForeignKey(name = "fk_feedback_observation_feedback"))
     @OnDelete(action = OnDeleteAction.CASCADE)
     private Feedback feedback;
 
@@ -97,10 +95,9 @@ public class FeedbackObservation {
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @MapsId("observationId")
     @JoinColumn(
-        name = "observation_id",
-        nullable = false,
-        foreignKey = @ForeignKey(name = "fk_feedback_observation_observation")
-    )
+            name = "observation_id",
+            nullable = false,
+            foreignKey = @ForeignKey(name = "fk_feedback_observation_observation"))
     @OnDelete(action = OnDeleteAction.CASCADE)
     private Observation observation;
 

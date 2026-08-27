@@ -40,10 +40,8 @@ public class ReviewBackfillService {
     private static final Logger log = LoggerFactory.getLogger(ReviewBackfillService.class);
 
     /** Statuses that mean a campaign is already under way and a second one must not start. */
-    private static final List<ReviewBackfillStatus> UNDER_WAY = List.of(
-        ReviewBackfillStatus.RUNNING,
-        ReviewBackfillStatus.PAUSED
-    );
+    private static final List<ReviewBackfillStatus> UNDER_WAY =
+            List.of(ReviewBackfillStatus.RUNNING, ReviewBackfillStatus.PAUSED);
 
     private static final int MAX_LISTED = 20;
 
@@ -55,13 +53,12 @@ public class ReviewBackfillService {
     private final ConfigAuditPort configAudit;
 
     public ReviewBackfillService(
-        ReviewBackfillRunRepository runRepository,
-        ReviewBackfillScopeRepository scopeRepository,
-        ReviewBackfillCostEstimator costEstimator,
-        WorkspaceRepository workspaceRepository,
-        ReviewBackfillProperties properties,
-        ConfigAuditPort configAudit
-    ) {
+            ReviewBackfillRunRepository runRepository,
+            ReviewBackfillScopeRepository scopeRepository,
+            ReviewBackfillCostEstimator costEstimator,
+            WorkspaceRepository workspaceRepository,
+            ReviewBackfillProperties properties,
+            ConfigAuditPort configAudit) {
         this.runRepository = runRepository;
         this.scopeRepository = scopeRepository;
         this.costEstimator = costEstimator;
@@ -102,36 +99,29 @@ public class ReviewBackfillService {
         }
         Duration window = Duration.between(fromAt, toAt);
         if (window.compareTo(properties.maxWindow()) > 0) {
-            throw new IllegalArgumentException(
-                "The backfill window covers " +
-                    window.toDays() +
-                    " days; the limit is " +
-                    properties.maxWindow().toDays() +
-                    "."
-            );
+            throw new IllegalArgumentException("The backfill window covers " + window.toDays()
+                    + " days; the limit is "
+                    + properties.maxWindow().toDays()
+                    + ".");
         }
         if (runRepository.existsByWorkspaceIdAndStatusIn(context.id(), UNDER_WAY)) {
             throw new ReviewBackfillConflictException(
-                "A backfill is already under way for this workspace. Cancel it before starting another."
-            );
+                    "A backfill is already under way for this workspace. Cancel it before starting another.");
         }
         supersedeUnconfirmed(context.id());
 
         long inScope = countScope(context.id(), kind, fromAt, toAt);
         if (inScope > properties.maxArtifacts()) {
-            throw new IllegalArgumentException(
-                "The backfill window covers " +
-                    inScope +
-                    " artifacts; the limit is " +
-                    properties.maxArtifacts() +
-                    ". Narrow the window."
-            );
+            throw new IllegalArgumentException("The backfill window covers " + inScope
+                    + " artifacts; the limit is "
+                    + properties.maxArtifacts()
+                    + ". Narrow the window.");
         }
         BigDecimal estimate = costEstimator.estimateTotalUsd(context.id(), jobType, (int) inScope);
 
         Workspace workspace = workspaceRepository
-            .findById(context.id())
-            .orElseThrow(() -> new EntityNotFoundException("Workspace", context.slug()));
+                .findById(context.id())
+                .orElseThrow(() -> new EntityNotFoundException("Workspace", context.slug()));
 
         ReviewBackfillRun run = new ReviewBackfillRun();
         run.setWorkspace(workspace);
@@ -141,30 +131,24 @@ public class ReviewBackfillService {
         run.setStatus(ReviewBackfillStatus.AWAITING_CONFIRMATION);
         run.setEstimatedArtifacts((int) inScope);
         run.setEstimatedCostUsd(estimate);
-        run.setRequestedByAccountId(
-            SecurityUtils.getCurrentAccountId().orElseThrow(() ->
-                // Attribution is not optional on a campaign that can spend a month's budget: an
-                // unattributable run is one nobody can be asked about afterwards.
-                new IllegalStateException("A backfill must be attributable to an authenticated account.")
-            )
-        );
+        run.setRequestedByAccountId(SecurityUtils.getCurrentAccountId()
+                .orElseThrow(() ->
+                        // Attribution is not optional on a campaign that can spend a month's budget: an
+                        // unattributable run is one nobody can be asked about afterwards.
+                        new IllegalStateException("A backfill must be attributable to an authenticated account.")));
         ReviewBackfillRun saved = runRepository.save(run);
-        configAudit.record(
-            ConfigAuditEntry.created(
+        configAudit.record(ConfigAuditEntry.created(
                 ConfigAuditEntityType.REVIEW_BACKFILL_RUN,
                 saved.getId(),
                 context.id(),
-                ReviewBackfillSnapshot.of(saved)
-            )
-        );
+                ReviewBackfillSnapshot.of(saved)));
         log.info(
-            "Review backfill preflight: workspaceId={}, kind={}, artifacts={}, estimateUsd={}, runId={}",
-            context.id(),
-            kind.value(),
-            inScope,
-            estimate,
-            saved.getId()
-        );
+                "Review backfill preflight: workspaceId={}, kind={}, artifacts={}, estimateUsd={}, runId={}",
+                context.id(),
+                kind.value(),
+                inScope,
+                estimate,
+                saved.getId());
         return ReviewBackfillRunDTO.from(saved);
     }
 
@@ -179,87 +163,77 @@ public class ReviewBackfillService {
      * save mid-batch, and reporting that conflict would fail the cancel button exactly while a campaign is
      * spending — the one moment it has to work.
      */
-    @Retryable(includes = { OptimisticLockingFailureException.class }, maxRetries = 3, delay = 50)
+    @Retryable(
+            includes = {OptimisticLockingFailureException.class},
+            maxRetries = 3,
+            delay = 50)
     @Transactional
     public ReviewBackfillRunDTO updateStatus(
-        WorkspaceContext context,
-        UUID runId,
-        RequestedReviewBackfillStatus requested
-    ) {
+            WorkspaceContext context, UUID runId, RequestedReviewBackfillStatus requested) {
         ReviewBackfillRun run = runRepository
-            .findByIdAndWorkspaceId(runId, context.id())
-            .orElseThrow(() -> new EntityNotFoundException("ReviewBackfillRun", runId.toString()));
+                .findByIdAndWorkspaceId(runId, context.id())
+                .orElseThrow(() -> new EntityNotFoundException("ReviewBackfillRun", runId.toString()));
         ReviewBackfillSnapshot before = ReviewBackfillSnapshot.of(run);
 
         switch (requested) {
             case RUNNING -> {
                 if (!run.getStatus().isConfirmable()) {
                     throw new ReviewBackfillConflictException(
-                        "A backfill in state " + run.getStatus() + " cannot be started."
-                    );
+                            "A backfill in state " + run.getStatus() + " cannot be started.");
                 }
                 if (run.getStartedAt() == null) {
                     run.setStartedAt(Instant.now());
                 }
-                run.setConfirmedByAccountId(
-                    SecurityUtils.getCurrentAccountId().orElseThrow(() ->
-                        new IllegalStateException("Confirming a backfill requires an authenticated account.")
-                    )
-                );
+                run.setConfirmedByAccountId(SecurityUtils.getCurrentAccountId()
+                        .orElseThrow(() ->
+                                new IllegalStateException("Confirming a backfill requires an authenticated account.")));
                 run.transitionTo(ReviewBackfillStatus.RUNNING, null);
                 log.info(
-                    "Review backfill confirmed: runId={}, workspaceId={}, artifacts={}, estimateUsd={}",
-                    run.getId(),
-                    context.id(),
-                    run.getEstimatedArtifacts(),
-                    run.getEstimatedCostUsd()
-                );
+                        "Review backfill confirmed: runId={}, workspaceId={}, artifacts={}, estimateUsd={}",
+                        run.getId(),
+                        context.id(),
+                        run.getEstimatedArtifacts(),
+                        run.getEstimatedCostUsd());
             }
             case CANCELLED -> {
                 if (!run.getStatus().isActive() && run.getStatus() != ReviewBackfillStatus.AWAITING_CONFIRMATION) {
                     throw new ReviewBackfillConflictException(
-                        "A backfill in state " + run.getStatus() + " cannot be cancelled."
-                    );
+                            "A backfill in state " + run.getStatus() + " cannot be cancelled.");
                 }
                 run.transitionTo(ReviewBackfillStatus.CANCELLED, null);
                 log.info("Review backfill cancelled: runId={}, workspaceId={}", run.getId(), context.id());
             }
         }
         ReviewBackfillRun saved = runRepository.save(run);
-        configAudit.record(
-            ConfigAuditEntry.updated(
+        configAudit.record(ConfigAuditEntry.updated(
                 ConfigAuditEntityType.REVIEW_BACKFILL_RUN,
                 saved.getId(),
                 context.id(),
                 before,
-                ReviewBackfillSnapshot.of(saved)
-            )
-        );
+                ReviewBackfillSnapshot.of(saved)));
         return ReviewBackfillRunDTO.from(saved);
     }
 
     @Transactional(readOnly = true)
     public List<ReviewBackfillRunDTO> list(WorkspaceContext context) {
         return runRepository
-            .findByWorkspaceIdOrderByCreatedAtDesc(context.id(), PageRequest.ofSize(MAX_LISTED))
-            .stream()
-            .map(ReviewBackfillRunDTO::from)
-            .toList();
+                .findByWorkspaceIdOrderByCreatedAtDesc(context.id(), PageRequest.ofSize(MAX_LISTED))
+                .stream()
+                .map(ReviewBackfillRunDTO::from)
+                .toList();
     }
 
     @Transactional(readOnly = true)
     public ReviewBackfillRunDTO get(WorkspaceContext context, UUID runId) {
         return runRepository
-            .findByIdAndWorkspaceId(runId, context.id())
-            .map(ReviewBackfillRunDTO::from)
-            .orElseThrow(() -> new EntityNotFoundException("ReviewBackfillRun", runId.toString()));
+                .findByIdAndWorkspaceId(runId, context.id())
+                .map(ReviewBackfillRunDTO::from)
+                .orElseThrow(() -> new EntityNotFoundException("ReviewBackfillRun", runId.toString()));
     }
 
     private void supersedeUnconfirmed(Long workspaceId) {
-        for (ReviewBackfillRun previous : runRepository.findByWorkspaceIdOrderByCreatedAtDesc(
-            workspaceId,
-            PageRequest.ofSize(MAX_LISTED)
-        )) {
+        for (ReviewBackfillRun previous :
+                runRepository.findByWorkspaceIdOrderByCreatedAtDesc(workspaceId, PageRequest.ofSize(MAX_LISTED))) {
             if (previous.getStatus() == ReviewBackfillStatus.AWAITING_CONFIRMATION) {
                 previous.transitionTo(ReviewBackfillStatus.CANCELLED, null);
                 runRepository.save(previous);
@@ -269,7 +243,7 @@ public class ReviewBackfillService {
 
     private long countScope(Long workspaceId, ArtifactKind kind, Instant fromAt, Instant toAt) {
         return ArtifactKinds.PULL_REQUEST.equals(kind)
-            ? scopeRepository.countPullRequests(workspaceId, fromAt, toAt)
-            : scopeRepository.countIssues(workspaceId, fromAt, toAt);
+                ? scopeRepository.countPullRequests(workspaceId, fromAt, toAt)
+                : scopeRepository.countIssues(workspaceId, fromAt, toAt);
     }
 }

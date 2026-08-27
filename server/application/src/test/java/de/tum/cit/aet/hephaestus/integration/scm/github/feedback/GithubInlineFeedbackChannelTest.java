@@ -77,17 +77,13 @@ class GithubInlineFeedbackChannelTest extends BaseUnitTest {
         stubReviewThreads(List.of());
         // Mutation returns the two posted comment node ids keyed by path:line.
         stubAddReview(
-            "REVIEW_1",
-            List.of(comment("RC_foo", "src/Foo.java", 10), comment("RC_bar", "src/Bar.java", 20))
-        );
+                "REVIEW_1", List.of(comment("RC_foo", "src/Foo.java", 10), comment("RC_bar", "src/Bar.java", 20)));
 
         InlineResult result = channel.postInlineFeedback(
-            target,
-            List.of(
-                new InlineFeedback(new DiffAnchor("src/Foo.java", 10, null), "fix1", "marker", "ck-foo"),
-                new InlineFeedback(new DiffAnchor("src/Bar.java", 20, null), "fix2", "marker", "ck-bar")
-            )
-        );
+                target,
+                List.of(
+                        new InlineFeedback(new DiffAnchor("src/Foo.java", 10, null), "fix1", "marker", "ck-foo"),
+                        new InlineFeedback(new DiffAnchor("src/Bar.java", 20, null), "fix2", "marker", "ck-bar")));
 
         assertThat(result.posted()).isEqualTo(2);
         assertThat(result.failed()).isZero();
@@ -108,13 +104,12 @@ class GithubInlineFeedbackChannelTest extends BaseUnitTest {
         when(prNodeIdResolver.resolve(1L, "owner", "repo", 42)).thenReturn("PR_node123");
         stubReviewThreads(List.of());
         doThrow(new OutboundEgressSuppressedException("github.post-inline-feedbackItems"))
-            .when(egressGuard)
-            .requireDeliveryAllowed("github.post-inline-feedbackItems");
+                .when(egressGuard)
+                .requireDeliveryAllowed("github.post-inline-feedbackItems");
 
         InlineResult result = channel.postInlineFeedback(
-            githubTarget(),
-            List.of(new InlineFeedback(new DiffAnchor("src/Foo.java", 10, null), "fix", "marker", "ck-1"))
-        );
+                githubTarget(),
+                List.of(new InlineFeedback(new DiffAnchor("src/Foo.java", 10, null), "fix", "marker", "ck-1")));
 
         assertThat(result.suppressed()).isTrue();
         assertThat(result.posted()).isZero();
@@ -133,20 +128,16 @@ class GithubInlineFeedbackChannelTest extends BaseUnitTest {
         stubReviewThreads(List.of());
         // Both comments anchor at src/Foo.java:10 but carry distinct correlation tags in their bodies.
         stubAddReview(
-            "REVIEW_1",
-            List.of(
-                commentWithCk("RC_a", "src/Foo.java", 10, "ck-a"),
-                commentWithCk("RC_b", "src/Foo.java", 10, "ck-b")
-            )
-        );
+                "REVIEW_1",
+                List.of(
+                        commentWithCk("RC_a", "src/Foo.java", 10, "ck-a"),
+                        commentWithCk("RC_b", "src/Foo.java", 10, "ck-b")));
 
         InlineResult result = channel.postInlineFeedback(
-            target,
-            List.of(
-                new InlineFeedback(new DiffAnchor("src/Foo.java", 10, null), "fix-a", "marker", "ck-a"),
-                new InlineFeedback(new DiffAnchor("src/Foo.java", 10, null), "fix-b", "marker", "ck-b")
-            )
-        );
+                target,
+                List.of(
+                        new InlineFeedback(new DiffAnchor("src/Foo.java", 10, null), "fix-a", "marker", "ck-a"),
+                        new InlineFeedback(new DiffAnchor("src/Foo.java", 10, null), "fix-b", "marker", "ck-b")));
 
         DeliveredSignal a = signalForKey(result, "ck-a");
         DeliveredSignal b = signalForKey(result, "ck-b");
@@ -165,9 +156,8 @@ class GithubInlineFeedbackChannelTest extends BaseUnitTest {
         ThreadsCaptor captor = stubAddReviewCapturingThreads("REVIEW_1");
 
         channel.postInlineFeedback(
-            target,
-            List.of(new InlineFeedback(new DiffAnchor("src/Foo.java", 10, null), "fix1", "marker", "ck-foo"))
-        );
+                target,
+                List.of(new InlineFeedback(new DiffAnchor("src/Foo.java", 10, null), "fix1", "marker", "ck-foo")));
 
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> threads = (List<Map<String, Object>>) captor.value;
@@ -183,21 +173,16 @@ class GithubInlineFeedbackChannelTest extends BaseUnitTest {
 
         // A prior, non-outdated bot thread already carries ck-foo.
         stubReviewThreads(
-            List.of(thread("THREAD_foo", "RC_old_foo", "earlier finding\n" + ckTag("ck-foo"), false, false))
-        );
+                List.of(thread("THREAD_foo", "RC_old_foo", "earlier finding\n" + ckTag("ck-foo"), false, false)));
         // Only ck-bar is genuinely new and should be posted.
-        HttpGraphQlClient.RequestSpec addSpec = stubAddReview(
-            "REVIEW_2",
-            List.of(comment("RC_bar", "src/Bar.java", 20))
-        );
+        HttpGraphQlClient.RequestSpec addSpec =
+                stubAddReview("REVIEW_2", List.of(comment("RC_bar", "src/Bar.java", 20)));
 
         InlineResult result = channel.postInlineFeedback(
-            target,
-            List.of(
-                new InlineFeedback(new DiffAnchor("src/Foo.java", 10, null), "fix1", "marker", "ck-foo"),
-                new InlineFeedback(new DiffAnchor("src/Bar.java", 20, null), "fix2", "marker", "ck-bar")
-            )
-        );
+                target,
+                List.of(
+                        new InlineFeedback(new DiffAnchor("src/Foo.java", 10, null), "fix1", "marker", "ck-foo"),
+                        new InlineFeedback(new DiffAnchor("src/Bar.java", 20, null), "fix2", "marker", "ck-bar")));
 
         // ck-foo preserved (reused existing thread), ck-bar posted fresh.
         DeliveredSignal foo = signalForKey(result, "ck-foo");
@@ -221,9 +206,8 @@ class GithubInlineFeedbackChannelTest extends BaseUnitTest {
         stubReviewThreads(List.of(thread("THREAD_foo", "RC_old_foo", "earlier\n" + ckTag("ck-foo"), false, false)));
 
         InlineResult result = channel.postInlineFeedback(
-            target,
-            List.of(new InlineFeedback(new DiffAnchor("src/Foo.java", 10, null), "fix1", "marker", "ck-foo"))
-        );
+                target,
+                List.of(new InlineFeedback(new DiffAnchor("src/Foo.java", 10, null), "fix1", "marker", "ck-foo")));
 
         assertThat(result.posted()).isEqualTo(1);
         assertThat(signalForKey(result, "ck-foo").disposition()).isEqualTo(Disposition.PRESERVED_EXISTING);
@@ -244,9 +228,8 @@ class GithubInlineFeedbackChannelTest extends BaseUnitTest {
         stubAddReview("REVIEW_3", List.of(comment("RC_new_foo", "src/Foo.java", 10)));
 
         InlineResult result = channel.postInlineFeedback(
-            target,
-            List.of(new InlineFeedback(new DiffAnchor("src/Foo.java", 10, null), "fix1", "marker", "ck-foo"))
-        );
+                target,
+                List.of(new InlineFeedback(new DiffAnchor("src/Foo.java", 10, null), "fix1", "marker", "ck-foo")));
 
         DeliveredSignal foo = signalForKey(result, "ck-foo");
         assertThat(foo.disposition()).isEqualTo(Disposition.POSTED);
@@ -259,9 +242,7 @@ class GithubInlineFeedbackChannelTest extends BaseUnitTest {
         when(gitHubProvider.isRateLimitCritical(1L)).thenReturn(true);
 
         InlineResult result = channel.postInlineFeedback(
-            target,
-            List.of(new InlineFeedback(new DiffAnchor("src/Foo.java", 10, null), "fix", "marker", "ck"))
-        );
+                target, List.of(new InlineFeedback(new DiffAnchor("src/Foo.java", 10, null), "fix", "marker", "ck")));
 
         assertThat(result.posted()).isZero();
         assertThat(result.failed()).isEqualTo(1);
@@ -274,12 +255,9 @@ class GithubInlineFeedbackChannelTest extends BaseUnitTest {
         when(gitHubProvider.forScope(1L)).thenReturn(client);
 
         // One live bot thread and one already-outdated bot thread; clearStale must minimize only the live one.
-        stubReviewThreads(
-            List.of(
+        stubReviewThreads(List.of(
                 thread("THREAD_a", "RC_a", "finding A\n" + ckTag("ck-a"), false, false),
-                thread("THREAD_b", "RC_b", "finding B\n" + ckTag("ck-b"), true, false)
-            )
-        );
+                thread("THREAD_b", "RC_b", "finding B\n" + ckTag("ck-b"), true, false)));
         HttpGraphQlClient.RequestSpec minimizeSpec = stubMinimize();
 
         channel.clearStaleFeedback(target, "marker");
@@ -298,14 +276,13 @@ class GithubInlineFeedbackChannelTest extends BaseUnitTest {
         stubAddReview("REVIEW_1", List.of(commentWithCk("RC_new", "src/New.java", 12, "ck-new")));
         stubMinimize();
         doNothing()
-            .doThrow(new OutboundEgressSuppressedException("github.minimize-inline-finding"))
-            .when(egressGuard)
-            .requireDeliveryAllowed(any());
+                .doThrow(new OutboundEgressSuppressedException("github.minimize-inline-finding"))
+                .when(egressGuard)
+                .requireDeliveryAllowed(any());
 
         InlineResult result = channel.postInlineFeedback(
-            target,
-            List.of(new InlineFeedback(new DiffAnchor("src/New.java", 12, null), "fix", "marker", "ck-new"))
-        );
+                target,
+                List.of(new InlineFeedback(new DiffAnchor("src/New.java", 12, null), "fix", "marker", "ck-new")));
 
         assertThat(result.suppressed()).isTrue();
         assertThat(result.posted()).isEqualTo(1);
@@ -336,18 +313,13 @@ class GithubInlineFeedbackChannelTest extends BaseUnitTest {
 
         // Prior run posted ck-a and ck-b; this run only still finds ck-a. ck-b vanished and must be retired
         // even though there is nothing new to post (the common partial re-review case — toPost is empty).
-        stubReviewThreads(
-            List.of(
+        stubReviewThreads(List.of(
                 thread("THREAD_a", "RC_a", "finding A\n" + ckTag("ck-a"), false, false),
-                thread("THREAD_b", "RC_b", "finding B\n" + ckTag("ck-b"), false, false)
-            )
-        );
+                thread("THREAD_b", "RC_b", "finding B\n" + ckTag("ck-b"), false, false)));
         HttpGraphQlClient.RequestSpec minimizeSpec = stubMinimize();
 
         InlineResult result = channel.postInlineFeedback(
-            target,
-            List.of(new InlineFeedback(new DiffAnchor("src/Foo.java", 10, null), "fix", "marker", "ck-a"))
-        );
+                target, List.of(new InlineFeedback(new DiffAnchor("src/Foo.java", 10, null), "fix", "marker", "ck-a")));
 
         assertThat(signalForKey(result, "ck-a").disposition()).isEqualTo(Disposition.PRESERVED_EXISTING);
         verify(client, never()).documentName("AddPullRequestReviewWithThreads");
@@ -363,22 +335,17 @@ class GithubInlineFeedbackChannelTest extends BaseUnitTest {
         when(prNodeIdResolver.resolve(1L, "owner", "repo", 42)).thenReturn("PR_node123");
 
         // ck-a still holds (preserved), ck-c is new (posted), ck-b vanished (must be minimized on the post path).
-        stubReviewThreads(
-            List.of(
+        stubReviewThreads(List.of(
                 thread("THREAD_a", "RC_a", "finding A\n" + ckTag("ck-a"), false, false),
-                thread("THREAD_b", "RC_b", "finding B\n" + ckTag("ck-b"), false, false)
-            )
-        );
+                thread("THREAD_b", "RC_b", "finding B\n" + ckTag("ck-b"), false, false)));
         stubAddReview("REVIEW_9", List.of(comment("RC_c", "src/Baz.java", 30)));
         HttpGraphQlClient.RequestSpec minimizeSpec = stubMinimize();
 
         InlineResult result = channel.postInlineFeedback(
-            target,
-            List.of(
-                new InlineFeedback(new DiffAnchor("src/Foo.java", 10, null), "fix-a", "marker", "ck-a"),
-                new InlineFeedback(new DiffAnchor("src/Baz.java", 30, null), "fix-c", "marker", "ck-c")
-            )
-        );
+                target,
+                List.of(
+                        new InlineFeedback(new DiffAnchor("src/Foo.java", 10, null), "fix-a", "marker", "ck-a"),
+                        new InlineFeedback(new DiffAnchor("src/Baz.java", 30, null), "fix-c", "marker", "ck-c")));
 
         assertThat(signalForKey(result, "ck-a").disposition()).isEqualTo(Disposition.PRESERVED_EXISTING);
         assertThat(signalForKey(result, "ck-c").disposition()).isEqualTo(Disposition.POSTED);
@@ -401,9 +368,8 @@ class GithubInlineFeedbackChannelTest extends BaseUnitTest {
         HttpGraphQlClient.RequestSpec minimizeSpec = stubMinimize();
 
         InlineResult result = channel.postInlineFeedback(
-            target,
-            List.of(new InlineFeedback(new DiffAnchor("src/Foo.java", 10, null), "  ", "marker", "ck-foo"))
-        );
+                target,
+                List.of(new InlineFeedback(new DiffAnchor("src/Foo.java", 10, null), "  ", "marker", "ck-foo")));
 
         // Nothing posted (blank body) and — crucially — the still-current thread is NOT minimized.
         verify(client, never()).documentName("AddPullRequestReviewWithThreads");
@@ -427,12 +393,10 @@ class GithubInlineFeedbackChannelTest extends BaseUnitTest {
         stubAddReviewWithErrors();
 
         InlineResult result = channel.postInlineFeedback(
-            target,
-            List.of(
-                new InlineFeedback(new DiffAnchor("src/Foo.java", 10, null), "fix1", "marker", "ck-foo"),
-                new InlineFeedback(new DiffAnchor("src/Bar.java", 20, null), "fix2", "marker", "ck-bar")
-            )
-        );
+                target,
+                List.of(
+                        new InlineFeedback(new DiffAnchor("src/Foo.java", 10, null), "fix1", "marker", "ck-foo"),
+                        new InlineFeedback(new DiffAnchor("src/Bar.java", 20, null), "fix2", "marker", "ck-bar")));
 
         // 1 thread posted-then-failed; the 1 preserved survivor stays posted; invariant holds (1 + 1 == 2 signals).
         assertThat(result.failed()).isEqualTo(1);
@@ -458,12 +422,10 @@ class GithubInlineFeedbackChannelTest extends BaseUnitTest {
         when(spec.execute()).thenReturn(Mono.error(new RuntimeException("boom")));
 
         InlineResult result = channel.postInlineFeedback(
-            target,
-            List.of(
-                new InlineFeedback(new DiffAnchor("src/Foo.java", 10, null), "fix1", "marker", "ck-foo"),
-                new InlineFeedback(new DiffAnchor("src/Bar.java", 20, null), "fix2", "marker", "ck-bar")
-            )
-        );
+                target,
+                List.of(
+                        new InlineFeedback(new DiffAnchor("src/Foo.java", 10, null), "fix1", "marker", "ck-foo"),
+                        new InlineFeedback(new DiffAnchor("src/Bar.java", 20, null), "fix2", "marker", "ck-bar")));
 
         assertThat(result.failed()).isEqualTo(1);
         assertThat(result.posted()).isEqualTo(1);
@@ -569,12 +531,7 @@ class GithubInlineFeedbackChannelTest extends BaseUnitTest {
 
     /** Builds a reviewThreads node with a single first comment (the bot anchor). */
     private static Map<String, Object> thread(
-        String threadId,
-        String firstCommentId,
-        String firstCommentBody,
-        boolean outdated,
-        boolean resolved
-    ) {
+            String threadId, String firstCommentId, String firstCommentBody, boolean outdated, boolean resolved) {
         Map<String, Object> firstComment = new HashMap<>();
         firstComment.put("id", firstCommentId);
         firstComment.put("body", firstCommentBody);
@@ -595,20 +552,15 @@ class GithubInlineFeedbackChannelTest extends BaseUnitTest {
     }
 
     private static DeliveredSignal signalForKey(InlineResult result, String key) {
-        return result
-            .signals()
-            .stream()
-            .filter(s -> key.equals(s.recurrenceKey()))
-            .findFirst()
-            .orElseThrow(() -> new AssertionError("no signal for key " + key));
+        return result.signals().stream()
+                .filter(s -> key.equals(s.recurrenceKey()))
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("no signal for key " + key));
     }
 
     private static FeedbackTarget githubTarget() {
         return new FeedbackTarget(
-            new IntegrationRef(IntegrationKind.GITHUB, 1L, null),
-            "owner/repo#42",
-            "commit-sha-abc"
-        );
+                new IntegrationRef(IntegrationKind.GITHUB, 1L, null), "owner/repo#42", "commit-sha-abc");
     }
 
     /** Mutable holder for capturing the {@code threads} mutation variable. */

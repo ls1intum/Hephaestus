@@ -30,12 +30,11 @@ import org.jspecify.annotations.Nullable;
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record GitHubProjectEventDTO(
-    @JsonProperty("action") String action,
-    @JsonProperty("projects_v2") GitHubProjectDTO project,
-    @JsonProperty("organization") GitHubOrganizationEventDTO.GitHubOrganizationDTO organization,
-    @JsonProperty("repository") GitHubRepositoryRefDTO repository,
-    @JsonProperty("sender") GitHubUserDTO sender
-) {
+        @JsonProperty("action") String action,
+        @JsonProperty("projects_v2") GitHubProjectDTO project,
+        @JsonProperty("organization") GitHubOrganizationEventDTO.GitHubOrganizationDTO organization,
+        @JsonProperty("repository") GitHubRepositoryRefDTO repository,
+        @JsonProperty("sender") GitHubUserDTO sender) {
     /**
      * Detects the owner type from the webhook payload fields.
      * <p>

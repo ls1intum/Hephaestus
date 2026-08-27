@@ -34,11 +34,10 @@ public class OutlineWebhookSecretSource implements WebhookSecretSource {
     private final OutlineOriginPolicy originPolicy;
 
     public OutlineWebhookSecretSource(
-        ConnectionService connectionService,
-        EncryptedStringConverter secretCipher,
-        ObjectMapper objectMapper,
-        OutlineOriginPolicy originPolicy
-    ) {
+            ConnectionService connectionService,
+            EncryptedStringConverter secretCipher,
+            ObjectMapper objectMapper,
+            OutlineOriginPolicy originPolicy) {
         this.connectionService = connectionService;
         this.secretCipher = secretCipher;
         this.objectMapper = objectMapper;
@@ -62,9 +61,11 @@ public class OutlineWebhookSecretSource implements WebhookSecretSource {
             return Optional.empty();
         }
         return connectionService
-            .findOutlineSubscription(subscriptionId)
-            .filter(subscription -> originPolicy.allows(subscription.serverUrl()))
-            .map(sub -> secretCipher.convertToEntityAttribute(sub.signingSecret()).getBytes(StandardCharsets.UTF_8));
+                .findOutlineSubscription(subscriptionId)
+                .filter(subscription -> originPolicy.allows(subscription.serverUrl()))
+                .map(sub -> secretCipher
+                        .convertToEntityAttribute(sub.signingSecret())
+                        .getBytes(StandardCharsets.UTF_8));
     }
 
     private String extractSubscriptionId(byte[] body) {

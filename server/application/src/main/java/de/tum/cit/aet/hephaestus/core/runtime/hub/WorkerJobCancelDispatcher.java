@@ -32,16 +32,18 @@ public class WorkerJobCancelDispatcher {
         if (workerId == null || workerId.isBlank()) {
             return false;
         }
-        return registry
-            .findByWorkerId(workerId)
-            .map(session -> {
-                session.send(new CancelJob(jobId.toString(), reason));
-                log.info("Dispatched CancelJob for {} to worker {}", jobId, workerId);
-                return true;
-            })
-            .orElseGet(() -> {
-                log.debug("No live session for worker {} to cancel job {}; relying on DB + backstops", workerId, jobId);
-                return false;
-            });
+        return registry.findByWorkerId(workerId)
+                .map(session -> {
+                    session.send(new CancelJob(jobId.toString(), reason));
+                    log.info("Dispatched CancelJob for {} to worker {}", jobId, workerId);
+                    return true;
+                })
+                .orElseGet(() -> {
+                    log.debug(
+                            "No live session for worker {} to cancel job {}; relying on DB + backstops",
+                            workerId,
+                            jobId);
+                    return false;
+                });
     }
 }

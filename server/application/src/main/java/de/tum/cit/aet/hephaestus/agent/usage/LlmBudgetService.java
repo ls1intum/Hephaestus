@@ -37,10 +37,9 @@ public class LlmBudgetService {
     private final MeterRegistry meterRegistry;
 
     public LlmBudgetService(
-        LlmUsageEventRepository usageRepository,
-        WorkspaceRepository workspaceRepository,
-        MeterRegistry meterRegistry
-    ) {
+            LlmUsageEventRepository usageRepository,
+            WorkspaceRepository workspaceRepository,
+            MeterRegistry meterRegistry) {
         this.usageRepository = usageRepository;
         this.workspaceRepository = workspaceRepository;
         this.meterRegistry = meterRegistry;
@@ -57,13 +56,14 @@ public class LlmBudgetService {
             return false;
         }
         log.info(
-            "Skipping agent job submission — {} monthly LLM budget {}: workspaceId={}, jobType={}",
-            purseLabel(block.purse()),
-            reasonLabel(block.reason()),
-            workspace.getId(),
-            jobType
-        );
-        meterRegistry.counter("llm.budget.blocked", "surface", "agent_job", "cap", capTag(block.purse())).increment();
+                "Skipping agent job submission — {} monthly LLM budget {}: workspaceId={}, jobType={}",
+                purseLabel(block.purse()),
+                reasonLabel(block.reason()),
+                workspace.getId(),
+                jobType);
+        meterRegistry
+                .counter("llm.budget.blocked", "surface", "agent_job", "cap", capTag(block.purse()))
+                .increment();
         return true;
     }
 
@@ -102,29 +102,25 @@ public class LlmBudgetService {
     }
 
     private LlmBudgetHeadroom headroom(
-        Long workspaceId,
-        @Nullable BigDecimal instanceBudgetUsd,
-        @Nullable BigDecimal byoBudgetUsd
-    ) {
+            Long workspaceId, @Nullable BigDecimal instanceBudgetUsd, @Nullable BigDecimal byoBudgetUsd) {
         MonthWindow window = MonthWindow.of(YearMonth.now(ZoneOffset.UTC));
-        BigDecimal instanceSpent = spentIfCapped(instanceBudgetUsd, () ->
-            usageRepository.sumCost(workspaceId, window.from(), window.to())
-        );
-        BigDecimal byoSpent = spentIfCapped(byoBudgetUsd, () ->
-            usageRepository.sumByoCost(workspaceId, window.from(), window.to())
-        );
+        BigDecimal instanceSpent = spentIfCapped(
+                instanceBudgetUsd, () -> usageRepository.sumCost(workspaceId, window.from(), window.to()));
+        BigDecimal byoSpent =
+                spentIfCapped(byoBudgetUsd, () -> usageRepository.sumByoCost(workspaceId, window.from(), window.to()));
         return new LlmBudgetHeadroom(
-            instanceSpent,
-            instanceBudgetUsd,
-            probeUnpriced(instanceSpent, instanceBudgetUsd, () ->
-                usageRepository.existsUnpricedInstanceFunded(workspaceId, window.from(), window.to())
-            ),
-            byoSpent,
-            byoBudgetUsd,
-            probeUnpriced(byoSpent, byoBudgetUsd, () ->
-                usageRepository.existsUnpricedWorkspaceFunded(workspaceId, window.from(), window.to())
-            )
-        );
+                instanceSpent,
+                instanceBudgetUsd,
+                probeUnpriced(
+                        instanceSpent,
+                        instanceBudgetUsd,
+                        () -> usageRepository.existsUnpricedInstanceFunded(workspaceId, window.from(), window.to())),
+                byoSpent,
+                byoBudgetUsd,
+                probeUnpriced(
+                        byoSpent,
+                        byoBudgetUsd,
+                        () -> usageRepository.existsUnpricedWorkspaceFunded(workspaceId, window.from(), window.to())));
     }
 
     /** An uncapped purse is never blocked, so its month-window SUM is never run. */
@@ -137,10 +133,7 @@ public class LlmBudgetService {
      * UNVERIFIABLE, and adding in-flight spend can only keep it exhausted.
      */
     private static boolean probeUnpriced(
-        @Nullable BigDecimal spentUsd,
-        @Nullable BigDecimal budgetUsd,
-        BooleanSupplier hasUnpriced
-    ) {
+            @Nullable BigDecimal spentUsd, @Nullable BigDecimal budgetUsd, BooleanSupplier hasUnpriced) {
         if (spentUsd == null || budgetUsd == null || capReached(spentUsd, budgetUsd)) {
             return false;
         }
@@ -157,10 +150,7 @@ public class LlmBudgetService {
 
     /** The verdict for a purse whose spend the caller already has, rather than read here. */
     public static LlmBudgetVerdict verdictFor(
-        BigDecimal confirmedSpendUsd,
-        boolean hasUnpricedEvent,
-        @Nullable BigDecimal monthlyBudgetUsd
-    ) {
+            BigDecimal confirmedSpendUsd, boolean hasUnpricedEvent, @Nullable BigDecimal monthlyBudgetUsd) {
         if (capReached(confirmedSpendUsd, monthlyBudgetUsd)) {
             return LlmBudgetVerdict.EXHAUSTED;
         }
@@ -174,9 +164,8 @@ public class LlmBudgetService {
     public record MonthWindow(Instant from, Instant to) {
         public static MonthWindow of(YearMonth month) {
             return new MonthWindow(
-                month.atDay(1).atStartOfDay(ZoneOffset.UTC).toInstant(),
-                month.plusMonths(1).atDay(1).atStartOfDay(ZoneOffset.UTC).toInstant()
-            );
+                    month.atDay(1).atStartOfDay(ZoneOffset.UTC).toInstant(),
+                    month.plusMonths(1).atDay(1).atStartOfDay(ZoneOffset.UTC).toInstant());
         }
     }
 }

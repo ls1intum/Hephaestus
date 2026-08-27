@@ -27,21 +27,20 @@ public final class GitHubProjectEventPayload {
      *                For sync operations, this may be null.
      */
     public record ProjectData(
-        @NonNull Long id,
-        int number,
-        @NonNull String title,
-        @Nullable String shortDescription,
-        boolean closed,
-        boolean isPublic,
-        @NonNull String url,
-        Project.@NonNull OwnerType ownerType,
-        @NonNull Long ownerId,
-        @Nullable Long creatorId,
-        @Nullable Long actorId,
-        @Nullable Instant createdAt,
-        @Nullable Instant updatedAt,
-        @Nullable Instant closedAt
-    ) {
+            @NonNull Long id,
+            int number,
+            @NonNull String title,
+            @Nullable String shortDescription,
+            boolean closed,
+            boolean isPublic,
+            @NonNull String url,
+            Project.@NonNull OwnerType ownerType,
+            @NonNull Long ownerId,
+            @Nullable Long creatorId,
+            @Nullable Long actorId,
+            @Nullable Instant createdAt,
+            @Nullable Instant updatedAt,
+            @Nullable Instant closedAt) {
         /**
          * Creates ProjectData from a Project entity with no actor specified.
          * Use this for sync operations where the actor is unknown.
@@ -59,21 +58,20 @@ public final class GitHubProjectEventPayload {
          */
         public static ProjectData from(Project project, @Nullable Long actorId) {
             return new ProjectData(
-                project.getId(),
-                project.getNumber(),
-                project.getTitle() != null ? project.getTitle() : "Untitled",
-                project.getShortDescription(),
-                project.isClosed(),
-                project.isPublic(),
-                project.getUrl() != null ? project.getUrl() : "",
-                project.getOwnerType(),
-                project.getOwnerId(),
-                project.getCreator() != null ? project.getCreator().getId() : null,
-                actorId,
-                project.getCreatedAt(),
-                project.getUpdatedAt(),
-                project.getClosedAt()
-            );
+                    project.getId(),
+                    project.getNumber(),
+                    project.getTitle() != null ? project.getTitle() : "Untitled",
+                    project.getShortDescription(),
+                    project.isClosed(),
+                    project.isPublic(),
+                    project.getUrl() != null ? project.getUrl() : "",
+                    project.getOwnerType(),
+                    project.getOwnerId(),
+                    project.getCreator() != null ? project.getCreator().getId() : null,
+                    actorId,
+                    project.getCreatedAt(),
+                    project.getUpdatedAt(),
+                    project.getClosedAt());
         }
     }
 
@@ -85,16 +83,15 @@ public final class GitHubProjectEventPayload {
      *                For sync operations, this may be null.
      */
     public record ProjectItemData(
-        @NonNull Long id,
-        @NonNull String nodeId,
-        @NonNull Long projectId,
-        ProjectItem.@NonNull ContentType contentType,
-        @Nullable Long issueId,
-        boolean archived,
-        @Nullable Long actorId,
-        @Nullable Instant createdAt,
-        @Nullable Instant updatedAt
-    ) {
+            @NonNull Long id,
+            @NonNull String nodeId,
+            @NonNull Long projectId,
+            ProjectItem.@NonNull ContentType contentType,
+            @Nullable Long issueId,
+            boolean archived,
+            @Nullable Long actorId,
+            @Nullable Instant createdAt,
+            @Nullable Instant updatedAt) {
         /**
          * Creates ProjectItemData from a ProjectItem entity with no actor specified.
          * Use this for sync operations where the actor is unknown.
@@ -112,16 +109,15 @@ public final class GitHubProjectEventPayload {
          */
         public static ProjectItemData from(ProjectItem item, @Nullable Long actorId) {
             return new ProjectItemData(
-                item.getId(),
-                item.getNodeId() != null ? item.getNodeId() : "",
-                Objects.requireNonNull(item.getProject()).getId(),
-                item.getContentType(),
-                item.getIssue() != null ? item.getIssue().getId() : null,
-                item.isArchived(),
-                actorId,
-                item.getCreatedAt(),
-                item.getUpdatedAt()
-            );
+                    item.getId(),
+                    item.getNodeId() != null ? item.getNodeId() : "",
+                    Objects.requireNonNull(item.getProject()).getId(),
+                    item.getContentType(),
+                    item.getIssue() != null ? item.getIssue().getId() : null,
+                    item.isArchived(),
+                    actorId,
+                    item.getCreatedAt(),
+                    item.getUpdatedAt());
         }
     }
 
@@ -129,30 +125,28 @@ public final class GitHubProjectEventPayload {
      * Immutable snapshot of a ProjectStatusUpdate for event handling.
      */
     public record ProjectStatusUpdateData(
-        @NonNull Long id,
-        @NonNull String nodeId,
-        @NonNull Long projectId,
-        @Nullable String body,
-        @Nullable LocalDate startDate,
-        @Nullable LocalDate targetDate,
-        ProjectStatusUpdate.@Nullable Status status,
-        @Nullable Long creatorId,
-        @Nullable Instant createdAt,
-        @Nullable Instant updatedAt
-    ) {
+            @NonNull Long id,
+            @NonNull String nodeId,
+            @NonNull Long projectId,
+            @Nullable String body,
+            @Nullable LocalDate startDate,
+            @Nullable LocalDate targetDate,
+            ProjectStatusUpdate.@Nullable Status status,
+            @Nullable Long creatorId,
+            @Nullable Instant createdAt,
+            @Nullable Instant updatedAt) {
         public static ProjectStatusUpdateData from(ProjectStatusUpdate update) {
             return new ProjectStatusUpdateData(
-                update.getId(),
-                update.getNodeId() != null ? update.getNodeId() : "",
-                Objects.requireNonNull(update.getProject()).getId(),
-                update.getBody(),
-                update.getStartDate(),
-                update.getTargetDate(),
-                update.getStatus(),
-                update.getCreator() != null ? update.getCreator().getId() : null,
-                update.getCreatedAt(),
-                update.getUpdatedAt()
-            );
+                    update.getId(),
+                    update.getNodeId() != null ? update.getNodeId() : "",
+                    Objects.requireNonNull(update.getProject()).getId(),
+                    update.getBody(),
+                    update.getStartDate(),
+                    update.getTargetDate(),
+                    update.getStatus(),
+                    update.getCreator() != null ? update.getCreator().getId() : null,
+                    update.getCreatedAt(),
+                    update.getUpdatedAt());
         }
     }
 }

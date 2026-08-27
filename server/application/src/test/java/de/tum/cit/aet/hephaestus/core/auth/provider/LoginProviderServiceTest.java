@@ -38,23 +38,22 @@ import tools.jackson.databind.ObjectMapper;
 class LoginProviderServiceTest extends BaseUnitTest {
 
     private final LoginProviderRepository repository = mock(LoginProviderRepository.class);
-    private final LoginProviderClientRegistrationRepository registrationCache = mock(
-        LoginProviderClientRegistrationRepository.class
-    );
+    private final LoginProviderClientRegistrationRepository registrationCache =
+            mock(LoginProviderClientRegistrationRepository.class);
 
     /** The real logger over a mocked writer: a mocked logger would assert nothing about what reaches the ledger. */
     private final AuthEventWriter authEventWriter = mock(AuthEventWriter.class);
+
     private final AuthEventLogger authEventLogger = new AuthEventLogger(authEventWriter);
 
     private LoginProviderService service(Map<String, AuthProperties.LoginProviderSeed> providers) {
         return new LoginProviderService(
-            repository,
-            registrationCache,
-            AuthPropertiesFixture.withLoginProviders(providers),
-            authEventLogger,
-            new ObjectMapper(),
-            new OutlineOriginPolicy(Set.of("https://wiki.example.com", "https://wiki.acme.test"))
-        );
+                repository,
+                registrationCache,
+                AuthPropertiesFixture.withLoginProviders(providers),
+                authEventLogger,
+                new ObjectMapper(),
+                new OutlineOriginPolicy(Set.of("https://wiki.example.com", "https://wiki.acme.test")));
     }
 
     private LoginProviderService adminService() {
@@ -66,60 +65,38 @@ class LoginProviderServiceTest extends BaseUnitTest {
     }
 
     private static AuthProperties.LoginProviderSeed gitlabSeed(
-        String clientId,
-        String secret,
-        String baseUrl,
-        String displayName
-    ) {
+            String clientId, String secret, String baseUrl, String displayName) {
         return new AuthProperties.LoginProviderSeed(
-            LoginProvider.ProviderType.GITLAB,
-            baseUrl,
-            clientId,
-            secret,
-            displayName
-        );
+                LoginProvider.ProviderType.GITLAB, baseUrl, clientId, secret, displayName);
     }
 
     private static AuthProperties.LoginProviderSeed outlineSeed(String clientId, String secret, String baseUrl) {
         return new AuthProperties.LoginProviderSeed(
-            LoginProvider.ProviderType.OUTLINE,
-            baseUrl,
-            clientId,
-            secret,
-            "Team Wiki"
-        );
+                LoginProvider.ProviderType.OUTLINE, baseUrl, clientId, secret, "Team Wiki");
     }
 
     private static LoginProviderService.Draft gitlabDraft(
-        String registrationId,
-        String baseUrl,
-        @Nullable String scopes
-    ) {
+            String registrationId, String baseUrl, @Nullable String scopes) {
         return new LoginProviderService.Draft(
-            registrationId,
-            LoginProvider.ProviderType.GITLAB,
-            "Self-hosted GitLab",
-            baseUrl,
-            "client-id",
-            "client-secret",
-            scopes
-        );
+                registrationId,
+                LoginProvider.ProviderType.GITLAB,
+                "Self-hosted GitLab",
+                baseUrl,
+                "client-id",
+                "client-secret",
+                scopes);
     }
 
     private static LoginProviderService.Draft outlineDraft(
-        String registrationId,
-        String baseUrl,
-        @Nullable String scopes
-    ) {
+            String registrationId, String baseUrl, @Nullable String scopes) {
         return new LoginProviderService.Draft(
-            registrationId,
-            LoginProvider.ProviderType.OUTLINE,
-            "Team Wiki",
-            baseUrl,
-            "client-id",
-            "client-secret",
-            scopes
-        );
+                registrationId,
+                LoginProvider.ProviderType.OUTLINE,
+                "Team Wiki",
+                baseUrl,
+                "client-id",
+                "client-secret",
+                scopes);
     }
 
     @Test
@@ -145,9 +122,8 @@ class LoginProviderServiceTest extends BaseUnitTest {
         // The whole point of the map: a self-hosted GitLab keeps a descriptive, stable id (gitlab-lrz),
         // not a forced generic "gitlab" — so several GitLab instances can coexist on one Hephaestus.
 
-        service(
-            Map.of("gitlab-lrz", gitlabSeed("client-id", "secret", "https://gitlab.lrz.de", "GitLab LRZ"))
-        ).seedFromEnvOnStartup();
+        service(Map.of("gitlab-lrz", gitlabSeed("client-id", "secret", "https://gitlab.lrz.de", "GitLab LRZ")))
+                .seedFromEnvOnStartup();
 
         ArgumentCaptor<LoginProvider> captor = ArgumentCaptor.forClass(LoginProvider.class);
         verify(repository).save(captor.capture());
@@ -165,20 +141,18 @@ class LoginProviderServiceTest extends BaseUnitTest {
     void seedsMultipleProvidersInOneBoot() {
         when(repository.existsByRegistrationId(any())).thenReturn(false);
 
-        service(
-            Map.of(
-                "github",
-                githubSeed("gh-id", "gh-secret"),
-                "gitlab-lrz",
-                gitlabSeed("gl-id", "gl-secret", "https://gitlab.lrz.de", "GitLab LRZ")
-            )
-        ).seedFromEnvOnStartup();
+        service(Map.of(
+                        "github",
+                        githubSeed("gh-id", "gh-secret"),
+                        "gitlab-lrz",
+                        gitlabSeed("gl-id", "gl-secret", "https://gitlab.lrz.de", "GitLab LRZ")))
+                .seedFromEnvOnStartup();
 
         ArgumentCaptor<LoginProvider> captor = ArgumentCaptor.forClass(LoginProvider.class);
         verify(repository, Mockito.times(2)).save(captor.capture());
         assertThat(captor.getAllValues())
-            .extracting(LoginProvider::getRegistrationId)
-            .containsExactlyInAnyOrder("github", "gitlab-lrz");
+                .extracting(LoginProvider::getRegistrationId)
+                .containsExactlyInAnyOrder("github", "gitlab-lrz");
     }
 
     @Test
@@ -186,13 +160,11 @@ class LoginProviderServiceTest extends BaseUnitTest {
         when(repository.existsByRegistrationId(any())).thenReturn(false);
         // A row for this (type, base_url) already exists (e.g. an admin added it, or a prior id) — the
         // uniqueness guard must skip rather than crash startup on a constraint violation.
-        when(repository.existsByTypeAndBaseUrl(LoginProvider.ProviderType.GITLAB, "https://gitlab.lrz.de")).thenReturn(
-            true
-        );
+        when(repository.existsByTypeAndBaseUrl(LoginProvider.ProviderType.GITLAB, "https://gitlab.lrz.de"))
+                .thenReturn(true);
 
-        service(
-            Map.of("gitlab-lrz", gitlabSeed("client-id", "secret", "https://gitlab.lrz.de", "GitLab LRZ"))
-        ).seedFromEnvOnStartup();
+        service(Map.of("gitlab-lrz", gitlabSeed("client-id", "secret", "https://gitlab.lrz.de", "GitLab LRZ")))
+                .seedFromEnvOnStartup();
 
         verify(repository, never()).save(any());
     }
@@ -219,9 +191,8 @@ class LoginProviderServiceTest extends BaseUnitTest {
     void skipsUnconfiguredProviders() {
         when(repository.existsByRegistrationId(any())).thenReturn(false);
 
-        service(
-            Map.of("github", githubSeed("", ""), "gitlab", gitlabSeed("", "", "https://gitlab.com", "GitLab"))
-        ).seedFromEnvOnStartup();
+        service(Map.of("github", githubSeed("", ""), "gitlab", gitlabSeed("", "", "https://gitlab.com", "GitLab")))
+                .seedFromEnvOnStartup();
 
         verify(repository, never()).save(any());
     }
@@ -244,9 +215,8 @@ class LoginProviderServiceTest extends BaseUnitTest {
     void seedsOutlineFromItsBaseUrlWithTheReadScope() {
         when(repository.existsByRegistrationId(any())).thenReturn(false);
 
-        service(
-            Map.of("outline", outlineSeed("client-id", "secret", "https://wiki.acme.test/"))
-        ).seedFromEnvOnStartup();
+        service(Map.of("outline", outlineSeed("client-id", "secret", "https://wiki.acme.test/")))
+                .seedFromEnvOnStartup();
 
         ArgumentCaptor<LoginProvider> captor = ArgumentCaptor.forClass(LoginProvider.class);
         verify(repository).save(captor.capture());
@@ -279,12 +249,10 @@ class LoginProviderServiceTest extends BaseUnitTest {
     @ParameterizedTest
     @EnumSource(LoginProvider.ProviderType.class)
     void skipsSeedWithAClientIdButNoClientSecret(LoginProvider.ProviderType type) {
-        service(
-            Map.of(
-                "provider",
-                new AuthProperties.LoginProviderSeed(type, "https://host.example.com", "client-id", "", "")
-            )
-        ).seedFromEnvOnStartup();
+        service(Map.of(
+                        "provider",
+                        new AuthProperties.LoginProviderSeed(type, "https://host.example.com", "client-id", "", "")))
+                .seedFromEnvOnStartup();
 
         Mockito.verifyNoInteractions(repository);
     }
@@ -292,12 +260,10 @@ class LoginProviderServiceTest extends BaseUnitTest {
     @ParameterizedTest
     @EnumSource(LoginProvider.ProviderType.class)
     void skipsSeedWithAClientSecretButNoClientId(LoginProvider.ProviderType type) {
-        service(
-            Map.of(
-                "provider",
-                new AuthProperties.LoginProviderSeed(type, "https://host.example.com", "  ", "secret", "")
-            )
-        ).seedFromEnvOnStartup();
+        service(Map.of(
+                        "provider",
+                        new AuthProperties.LoginProviderSeed(type, "https://host.example.com", "  ", "secret", "")))
+                .seedFromEnvOnStartup();
 
         Mockito.verifyNoInteractions(repository);
     }
@@ -320,18 +286,17 @@ class LoginProviderServiceTest extends BaseUnitTest {
     void createRejectsDuplicateRegistrationId() {
         when(repository.existsByRegistrationId("gitlab-acme")).thenReturn(true);
 
-        assertThatThrownBy(() ->
-            adminService().create(gitlabDraft("gitlab-acme", "https://gitlab.acme.test", null))
-        ).isInstanceOf(ResponseStatusException.class);
+        assertThatThrownBy(() -> adminService().create(gitlabDraft("gitlab-acme", "https://gitlab.acme.test", null)))
+                .isInstanceOf(ResponseStatusException.class);
         verify(repository, never()).save(any());
     }
 
     @Test
     void createRejectsGitlabOpenidScope() {
         // openid flips Spring to the OIDC path and 500s the callback (no jwkSetUri) — must be rejected.
-        assertThatThrownBy(() ->
-            adminService().create(gitlabDraft("gitlab-x", "https://gitlab.acme.test", "openid profile read_user"))
-        ).isInstanceOf(ResponseStatusException.class);
+        assertThatThrownBy(() -> adminService()
+                        .create(gitlabDraft("gitlab-x", "https://gitlab.acme.test", "openid profile read_user")))
+                .isInstanceOf(ResponseStatusException.class);
         verify(repository, never()).save(any());
     }
 
@@ -340,12 +305,11 @@ class LoginProviderServiceTest extends BaseUnitTest {
         LoginProvider existing = gitlabProvider("gitlab", "sealed");
         when(repository.findByRegistrationId("gitlab")).thenReturn(Optional.of(existing));
 
-        assertThatThrownBy(() ->
-            adminService().update(
-                "gitlab",
-                new LoginProviderService.Patch(null, null, null, null, "openid read_user", null)
-            )
-        ).isInstanceOf(ResponseStatusException.class);
+        assertThatThrownBy(() -> adminService()
+                        .update(
+                                "gitlab",
+                                new LoginProviderService.Patch(null, null, null, null, "openid read_user", null)))
+                .isInstanceOf(ResponseStatusException.class);
         verify(repository, never()).save(any());
     }
 
@@ -368,9 +332,9 @@ class LoginProviderServiceTest extends BaseUnitTest {
     void createRejectsOutlineOpenidScope() {
         // Outline is NOT an OIDC provider: openid flips Spring to the OIDC path and 500s the callback
         // (no id_token, no jwkSetUri) — same failure mode the GitLab guard closes.
-        assertThatThrownBy(() ->
-            adminService().create(outlineDraft("outline-x", "https://wiki.acme.test", "openid read"))
-        ).isInstanceOf(ResponseStatusException.class);
+        assertThatThrownBy(
+                        () -> adminService().create(outlineDraft("outline-x", "https://wiki.acme.test", "openid read")))
+                .isInstanceOf(ResponseStatusException.class);
         verify(repository, never()).save(any());
     }
 
@@ -379,37 +343,31 @@ class LoginProviderServiceTest extends BaseUnitTest {
         LoginProvider existing = outlineProvider("outline", "sealed");
         when(repository.findByRegistrationId("outline")).thenReturn(java.util.Optional.of(existing));
 
-        assertThatThrownBy(() ->
-            adminService().update(
-                "outline",
-                new LoginProviderService.Patch(null, null, null, null, "openid read", null)
-            )
-        ).isInstanceOf(ResponseStatusException.class);
+        assertThatThrownBy(() -> adminService()
+                        .update("outline", new LoginProviderService.Patch(null, null, null, null, "openid read", null)))
+                .isInstanceOf(ResponseStatusException.class);
         verify(repository, never()).save(any());
     }
 
     @Test
     void createRejectsNonHttpsOutlineBaseUrl() {
         // SSRF / HTTPS guard: the Outline base URL takes the same ServerUrlValidator posture as GitLab.
-        assertThatThrownBy(() ->
-            adminService().create(outlineDraft("outline-x", "http://wiki.acme.test", null))
-        ).isInstanceOf(ResponseStatusException.class);
+        assertThatThrownBy(() -> adminService().create(outlineDraft("outline-x", "http://wiki.acme.test", null)))
+                .isInstanceOf(ResponseStatusException.class);
         verify(repository, never()).save(any());
     }
 
     @Test
     void createRejectsUnapprovedOutlineOrigin() {
-        assertThatThrownBy(() ->
-            adminService().create(outlineDraft("outline-x", "https://wiki.denied.test", null))
-        ).isInstanceOf(ResponseStatusException.class);
+        assertThatThrownBy(() -> adminService().create(outlineDraft("outline-x", "https://wiki.denied.test", null)))
+                .isInstanceOf(ResponseStatusException.class);
         verify(repository, never()).save(any());
     }
 
     @Test
     void createRejectsMalformedRegistrationId() {
-        assertThatThrownBy(() ->
-            adminService().create(gitlabDraft("Bad Id!", "https://gitlab.acme.test", null))
-        ).isInstanceOf(ResponseStatusException.class);
+        assertThatThrownBy(() -> adminService().create(gitlabDraft("Bad Id!", "https://gitlab.acme.test", null)))
+                .isInstanceOf(ResponseStatusException.class);
     }
 
     @Test
@@ -421,9 +379,9 @@ class LoginProviderServiceTest extends BaseUnitTest {
         when(repository.findByRegistrationId("github")).thenReturn(Optional.of(only));
         when(repository.findByEnabledTrueOrderByDisplayNameAsc()).thenReturn(List.of(only));
 
-        assertThatThrownBy(() ->
-            adminService().update("github", new LoginProviderService.Patch(null, null, null, null, null, false))
-        ).isInstanceOf(ResponseStatusException.class);
+        assertThatThrownBy(() -> adminService()
+                        .update("github", new LoginProviderService.Patch(null, null, null, null, null, false)))
+                .isInstanceOf(ResponseStatusException.class);
         verify(repository, never()).save(any());
     }
 
@@ -462,10 +420,8 @@ class LoginProviderServiceTest extends BaseUnitTest {
         when(repository.findByEnabledTrueOrderByDisplayNameAsc()).thenReturn(List.of(outline));
         when(repository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        LoginProvider saved = adminService().update(
-            "outline",
-            new LoginProviderService.Patch(null, null, null, null, null, false)
-        );
+        LoginProvider saved =
+                adminService().update("outline", new LoginProviderService.Patch(null, null, null, null, null, false));
 
         assertThat(saved.isEnabled()).isFalse();
     }
@@ -491,9 +447,8 @@ class LoginProviderServiceTest extends BaseUnitTest {
     @Test
     void createRejectsNonHttpsGitlabBaseUrl() {
         // SSRF / HTTPS guard: ServerUrlValidator rejects http:// (and loopback/internal) base URLs.
-        assertThatThrownBy(() ->
-            adminService().create(gitlabDraft("gitlab-x", "http://gitlab.acme.test", null))
-        ).isInstanceOf(ResponseStatusException.class);
+        assertThatThrownBy(() -> adminService().create(gitlabDraft("gitlab-x", "http://gitlab.acme.test", null)))
+                .isInstanceOf(ResponseStatusException.class);
         verify(repository, never()).save(any());
     }
 
@@ -540,9 +495,8 @@ class LoginProviderServiceTest extends BaseUnitTest {
         LoginProvider existing = gitlabProvider("gitlab-acme", "sealed");
         when(repository.findByRegistrationId("gitlab-acme")).thenReturn(Optional.of(existing));
         // Two enabled providers, so neither disable nor delete trips the last-provider lockout guard.
-        when(repository.findByEnabledTrueOrderByDisplayNameAsc()).thenReturn(
-            List.of(existing, gitlabProvider("gitlab-other", "sealed"))
-        );
+        when(repository.findByEnabledTrueOrderByDisplayNameAsc())
+                .thenReturn(List.of(existing, gitlabProvider("gitlab-other", "sealed")));
         LoginProviderService service = adminService();
 
         service.create(gitlabDraft("gitlab-acme", "https://gitlab.acme.test", null));
@@ -552,15 +506,14 @@ class LoginProviderServiceTest extends BaseUnitTest {
         ArgumentCaptor<AuthEventData> captor = ArgumentCaptor.forClass(AuthEventData.class);
         verify(authEventWriter, Mockito.times(3)).write(captor.capture());
         assertThat(captor.getAllValues())
-            .extracting(AuthEventData::type)
-            .containsExactly(
-                AuthEvent.EventType.LOGIN_PROVIDER_CREATED,
-                AuthEvent.EventType.LOGIN_PROVIDER_UPDATED,
-                AuthEvent.EventType.LOGIN_PROVIDER_DELETED
-            );
+                .extracting(AuthEventData::type)
+                .containsExactly(
+                        AuthEvent.EventType.LOGIN_PROVIDER_CREATED,
+                        AuthEvent.EventType.LOGIN_PROVIDER_UPDATED,
+                        AuthEvent.EventType.LOGIN_PROVIDER_DELETED);
         assertThat(captor.getAllValues())
-            .extracting(AuthEventData::details)
-            .allSatisfy(details -> assertThat(details).contains("\"registrationId\":\"gitlab-acme\""));
+                .extracting(AuthEventData::details)
+                .allSatisfy(details -> assertThat(details).contains("\"registrationId\":\"gitlab-acme\""));
     }
 
     @Test
@@ -570,10 +523,10 @@ class LoginProviderServiceTest extends BaseUnitTest {
         when(repository.findByEnabledTrueOrderByDisplayNameAsc()).thenReturn(List.of(existing));
         when(repository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        adminService().update(
-            "gitlab-acme",
-            new LoginProviderService.Patch("Renamed", null, null, "super-secret-value", null, null)
-        );
+        adminService()
+                .update(
+                        "gitlab-acme",
+                        new LoginProviderService.Patch("Renamed", null, null, "super-secret-value", null, null));
 
         ArgumentCaptor<AuthEventData> captor = ArgumentCaptor.forClass(AuthEventData.class);
         verify(authEventWriter).write(captor.capture());

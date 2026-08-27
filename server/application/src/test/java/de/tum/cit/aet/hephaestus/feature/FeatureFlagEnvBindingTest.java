@@ -32,8 +32,8 @@ class FeatureFlagEnvBindingTest extends BaseUnitTest {
         FeatureProperties properties = bindWith(Map.of("GITLAB_WORKSPACE_CREATION", "true"));
 
         assertThat(properties.isEnabled("gitlab-workspace-creation"))
-            .as("GITLAB_WORKSPACE_CREATION must reach the flag the code reads, in every deployment shape")
-            .isTrue();
+                .as("GITLAB_WORKSPACE_CREATION must reach the flag the code reads, in every deployment shape")
+                .isTrue();
     }
 
     @Test
@@ -58,34 +58,28 @@ class FeatureFlagEnvBindingTest extends BaseUnitTest {
 
     @Test
     void theLongSpellingWinsOverTheShortNamesPlaceholder() throws Exception {
-        FeatureProperties properties = bindWith(
-            Map.of("HEPHAESTUS_FEATURES_FLAGS_GITLAB_WORKSPACE_CREATION", "true", "GITLAB_WORKSPACE_CREATION", "false")
-        );
+        FeatureProperties properties = bindWith(Map.of(
+                "HEPHAESTUS_FEATURES_FLAGS_GITLAB_WORKSPACE_CREATION", "true", "GITLAB_WORKSPACE_CREATION", "false"));
 
         assertThat(properties.isEnabled("gitlab-workspace-creation"))
-            .as("an env var outranks the config file the placeholder lives in")
-            .isTrue();
+                .as("an env var outranks the config file the placeholder lives in")
+                .isTrue();
     }
 
     private static FeatureProperties bindWith(Map<String, Object> envVars) throws IOException {
         StandardEnvironment environment = new StandardEnvironment();
         environment
-            .getPropertySources()
-            .replace(
-                StandardEnvironment.SYSTEM_ENVIRONMENT_PROPERTY_SOURCE_NAME,
-                new SystemEnvironmentPropertySource(
-                    StandardEnvironment.SYSTEM_ENVIRONMENT_PROPERTY_SOURCE_NAME,
-                    envVars
-                )
-            );
-        List<PropertySource<?>> yaml = new YamlPropertySourceLoader().load(
-            "application.yml",
-            new ClassPathResource("application.yml")
-        );
+                .getPropertySources()
+                .replace(
+                        StandardEnvironment.SYSTEM_ENVIRONMENT_PROPERTY_SOURCE_NAME,
+                        new SystemEnvironmentPropertySource(
+                                StandardEnvironment.SYSTEM_ENVIRONMENT_PROPERTY_SOURCE_NAME, envVars));
+        List<PropertySource<?>> yaml =
+                new YamlPropertySourceLoader().load("application.yml", new ClassPathResource("application.yml"));
         yaml.forEach(source -> environment.getPropertySources().addLast(source));
 
         return Binder.get(environment)
-            .bind("hephaestus.features", FeatureProperties.class)
-            .orElseThrow(() -> new AssertionError("application.yml no longer defines hephaestus.features"));
+                .bind("hephaestus.features", FeatureProperties.class)
+                .orElseThrow(() -> new AssertionError("application.yml no longer defines hephaestus.features"));
     }
 }

@@ -63,11 +63,11 @@ class WorkerControlChannelIntegrationTest extends BaseIntegrationTest {
 
         CapturingListener listener = new CapturingListener();
         WebSocket ws = HttpClient.newBuilder()
-            .build()
-            .newWebSocketBuilder()
-            .header("Authorization", "Bearer " + jwt.token())
-            .buildAsync(URI.create("ws://localhost:" + port + "/api/workers/connect"), listener)
-            .get(10, TimeUnit.SECONDS);
+                .build()
+                .newWebSocketBuilder()
+                .header("Authorization", "Bearer " + jwt.token())
+                .buildAsync(URI.create("ws://localhost:" + port + "/api/workers/connect"), listener)
+                .get(10, TimeUnit.SECONDS);
 
         try {
             // Send WorkerHello.
@@ -75,37 +75,35 @@ class WorkerControlChannelIntegrationTest extends BaseIntegrationTest {
             ws.sendText(helloJson, true).get(5, TimeUnit.SECONDS);
 
             // Hub responds with WorkerWelcome and registers the session.
-            await()
-                .atMost(Duration.ofSeconds(10))
-                .pollInterval(Duration.ofMillis(100))
-                .untilAsserted(() -> {
-                    assertThat(workerSessions.findByWorkerId(workerId))
-                        .as("hub must register the worker after handshake")
-                        .isPresent();
-                });
+            await().atMost(Duration.ofSeconds(10))
+                    .pollInterval(Duration.ofMillis(100))
+                    .untilAsserted(() -> {
+                        assertThat(workerSessions.findByWorkerId(workerId))
+                                .as("hub must register the worker after handshake")
+                                .isPresent();
+                    });
 
             // Publish a CapacityReport; verify the hub records it against the session.
             CapacityReport report = new CapacityReport(4, 2, 0, 0, 4, 2);
             String reportJson = codec.encode(FrameEnvelope.of(report));
             ws.sendText(reportJson, true).get(5, TimeUnit.SECONDS);
 
-            await()
-                .atMost(Duration.ofSeconds(5))
-                .pollInterval(Duration.ofMillis(50))
-                .untilAsserted(() -> {
-                    Optional<WorkerSession> session = workerSessions.findByWorkerId(workerId);
-                    assertThat(session).isPresent();
-                    assertThat(session.get().lastCapacity()).isEqualTo(report);
-                });
+            await().atMost(Duration.ofSeconds(5))
+                    .pollInterval(Duration.ofMillis(50))
+                    .untilAsserted(() -> {
+                        Optional<WorkerSession> session = workerSessions.findByWorkerId(workerId);
+                        assertThat(session).isPresent();
+                        assertThat(session.get().lastCapacity()).isEqualTo(report);
+                    });
         } finally {
             ws.sendClose(WebSocket.NORMAL_CLOSURE, "test done").get(5, TimeUnit.SECONDS);
         }
 
         // After close, the session is gone from the registry.
-        await()
-            .atMost(Duration.ofSeconds(10))
-            .pollInterval(Duration.ofMillis(100))
-            .untilAsserted(() -> assertThat(workerSessions.findByWorkerId(workerId)).isEmpty());
+        await().atMost(Duration.ofSeconds(10))
+                .pollInterval(Duration.ofMillis(100))
+                .untilAsserted(() ->
+                        assertThat(workerSessions.findByWorkerId(workerId)).isEmpty());
     }
 
     @Test
@@ -118,15 +116,17 @@ class WorkerControlChannelIntegrationTest extends BaseIntegrationTest {
         AtomicReference<Throwable> failure = new AtomicReference<>();
         try {
             HttpClient.newBuilder()
-                .build()
-                .newWebSocketBuilder()
-                .header("Authorization", "Bearer " + jwt.token())
-                .buildAsync(URI.create("ws://localhost:" + port + "/api/workers/connect"), new CapturingListener())
-                .get(10, TimeUnit.SECONDS);
+                    .build()
+                    .newWebSocketBuilder()
+                    .header("Authorization", "Bearer " + jwt.token())
+                    .buildAsync(URI.create("ws://localhost:" + port + "/api/workers/connect"), new CapturingListener())
+                    .get(10, TimeUnit.SECONDS);
         } catch (Throwable t) {
             failure.set(t);
         }
-        assertThat(failure.get()).as("revoked-JWT upgrade must fail; 401 manifests as a build-async error").isNotNull();
+        assertThat(failure.get())
+                .as("revoked-JWT upgrade must fail; 401 manifests as a build-async error")
+                .isNotNull();
     }
 
     private static final class CapturingListener implements WebSocket.Listener {

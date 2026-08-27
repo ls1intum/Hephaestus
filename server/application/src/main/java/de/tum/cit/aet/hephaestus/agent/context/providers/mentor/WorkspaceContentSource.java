@@ -85,8 +85,8 @@ public class WorkspaceContentSource implements ContentSource {
         Cache cache = cacheManager.getCache(CACHE_NAME);
         // Atomic compute-if-absent closes the get/build/put race on invalidation events.
         ObjectNode payload = (cache != null)
-            ? cache.get(key, () -> buildPayload(req.workspaceId(), req.developerId()))
-            : buildPayload(req.workspaceId(), req.developerId());
+                ? cache.get(key, () -> buildPayload(req.workspaceId(), req.developerId()))
+                : buildPayload(req.workspaceId(), req.developerId());
         try {
             files.put(OUTPUT_KEY, objectMapper.writeValueAsBytes(payload));
         } catch (JacksonException e) {
@@ -97,11 +97,11 @@ public class WorkspaceContentSource implements ContentSource {
     /** Pure function of (workspaceId, developerId). Callers cache through {@link CacheManager}. */
     public ObjectNode buildPayload(Long workspaceId, Long developerId) {
         User user = userRepository
-            .findById(developerId)
-            .orElseThrow(() -> new EntityNotFoundException("User", developerId.toString()));
+                .findById(developerId)
+                .orElseThrow(() -> new EntityNotFoundException("User", developerId.toString()));
         Workspace workspace = workspaceRepository
-            .findById(workspaceId)
-            .orElseThrow(() -> new EntityNotFoundException("Workspace", workspaceId.toString()));
+                .findById(workspaceId)
+                .orElseThrow(() -> new EntityNotFoundException("Workspace", workspaceId.toString()));
 
         ObjectNode root = objectMapper.createObjectNode();
         root.putObject("user").put("login", user.getLogin()).put("name", user.getName());
@@ -114,27 +114,22 @@ public class WorkspaceContentSource implements ContentSource {
         // section to an empty array, never blanking the whole workspace context. The real cause is
         // logged here so it is not swallowed by the cache loader's generic wrapper.
         guarded(
-            "recentSessions",
-            () -> addRecentSessions(root, workspaceId, developerId),
-            () -> root.putArray("recentSessions")
-        );
-        List<PullRequest> reviewPrs = guardedQuery("pendingReviewRequests", () ->
-            queryRepository.findPendingReviewRequestPrs(workspaceId, developerId)
-        );
-        List<Issue> assigned = guardedQuery("assignedIssues", () ->
-            queryRepository.findAssignedOpenIssues(workspaceId, developerId)
-        );
+                "recentSessions",
+                () -> addRecentSessions(root, workspaceId, developerId),
+                () -> root.putArray("recentSessions"));
+        List<PullRequest> reviewPrs = guardedQuery(
+                "pendingReviewRequests", () -> queryRepository.findPendingReviewRequestPrs(workspaceId, developerId));
+        List<Issue> assigned =
+                guardedQuery("assignedIssues", () -> queryRepository.findAssignedOpenIssues(workspaceId, developerId));
         guarded("assignedIssues", () -> addAssignedIssues(root, assigned), () -> root.putArray("assignedIssues"));
         guarded(
-            "pendingReviewRequests",
-            () -> addPendingReviewRequests(root, reviewPrs),
-            () -> root.putArray("pendingReviewRequests")
-        );
+                "pendingReviewRequests",
+                () -> addPendingReviewRequests(root, reviewPrs),
+                () -> root.putArray("pendingReviewRequests"));
         guarded(
-            "focusSuggestions",
-            () -> addFocusSuggestions(root, assigned, reviewPrs),
-            () -> root.putArray("focusSuggestions")
-        );
+                "focusSuggestions",
+                () -> addFocusSuggestions(root, assigned, reviewPrs),
+                () -> root.putArray("focusSuggestions"));
 
         return root;
     }
@@ -166,11 +161,8 @@ public class WorkspaceContentSource implements ContentSource {
     private void addRecentSessions(ObjectNode root, Long workspaceId, Long developerId) {
         // DB-side LIMIT via Pageable: the cap ships as SQL so a power user with hundreds of threads
         // returns at most MAX_RECENT_SESSIONS rows rather than being trimmed in-memory.
-        List<ChatThread> threads = queryRepository.findRecentChatThreads(
-            workspaceId,
-            developerId,
-            PageRequest.of(0, MAX_RECENT_SESSIONS)
-        );
+        List<ChatThread> threads =
+                queryRepository.findRecentChatThreads(workspaceId, developerId, PageRequest.of(0, MAX_RECENT_SESSIONS));
         ArrayNode arr = root.putArray("recentSessions");
         if (threads.isEmpty()) {
             return;
@@ -271,7 +263,9 @@ public class WorkspaceContentSource implements ContentSource {
             if (pr.getAuthor() != null) {
                 node.put("author", pr.getAuthor().getLogin());
             }
-            long days = pr.getCreatedAt() != null ? Duration.between(pr.getCreatedAt(), now).toDays() : 0;
+            long days = pr.getCreatedAt() != null
+                    ? Duration.between(pr.getCreatedAt(), now).toDays()
+                    : 0;
             node.put("waitingDays", days);
         }
     }
@@ -289,18 +283,16 @@ public class WorkspaceContentSource implements ContentSource {
     static List<String> computeFocusSuggestions(List<Issue> issues, List<PullRequest> reviewPrs) {
         List<String> out = new ArrayList<>();
         Instant now = Instant.now();
-        long stale = reviewPrs
-            .stream()
-            .filter(p -> p.getCreatedAt() != null)
-            .filter(p -> Duration.between(p.getCreatedAt(), now).toDays() >= REVIEW_WAIT_URGENCY_DAYS)
-            .count();
+        long stale = reviewPrs.stream()
+                .filter(p -> p.getCreatedAt() != null)
+                .filter(p -> Duration.between(p.getCreatedAt(), now).toDays() >= REVIEW_WAIT_URGENCY_DAYS)
+                .count();
         if (stale > 0) {
             out.add(stale + " review request(s) waiting " + REVIEW_WAIT_URGENCY_DAYS + "+ days.");
         }
-        long withDeadlines = issues
-            .stream()
-            .filter(i -> i.getMilestone() != null && i.getMilestone().getDueOn() != null)
-            .count();
+        long withDeadlines = issues.stream()
+                .filter(i -> i.getMilestone() != null && i.getMilestone().getDueOn() != null)
+                .count();
         if (withDeadlines > 0) {
             out.add(withDeadlines + " assigned issue(s) have milestone deadlines.");
         }

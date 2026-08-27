@@ -38,10 +38,9 @@ public class WorkspaceScopeFilter {
     public WorkspaceScopeFilter(SyncSchedulerProperties properties) {
         SyncSchedulerProperties.FilterProperties filters = properties.filters();
         log.debug(
-            "Received SyncSchedulerProperties.filters: allowedOrganizations={}, allowedRepositories={}",
-            filters.allowedOrganizations(),
-            filters.allowedRepositories()
-        );
+                "Received SyncSchedulerProperties.filters: allowedOrganizations={}, allowedRepositories={}",
+                filters.allowedOrganizations(),
+                filters.allowedRepositories());
         this.allowedOrganizations = normalizeSet(filters.allowedOrganizations());
         this.allowedRepositories = normalizeSet(filters.allowedRepositories());
     }
@@ -50,10 +49,9 @@ public class WorkspaceScopeFilter {
     void logConfiguration() {
         if (isActive()) {
             log.info(
-                "Initialized workspace scope filter: status=ACTIVE, allowedOrganizations={}, allowedRepositories={}",
-                allowedOrganizations,
-                allowedRepositories
-            );
+                    "Initialized workspace scope filter: status=ACTIVE, allowedOrganizations={}, allowedRepositories={}",
+                    allowedOrganizations,
+                    allowedRepositories);
         } else {
             log.info("Initialized workspace scope filter: status=INACTIVE");
         }
@@ -128,11 +126,10 @@ public class WorkspaceScopeFilter {
         if (values == null || values.isEmpty()) {
             return Collections.emptySet();
         }
-        return values
-            .stream()
-            .map(this::normalize)
-            .filter(s -> s != null && !s.isEmpty())
-            .collect(Collectors.toSet());
+        return values.stream()
+                .map(this::normalize)
+                .filter(s -> s != null && !s.isEmpty())
+                .collect(Collectors.toSet());
     }
 
     private @Nullable String normalize(@Nullable String value) {

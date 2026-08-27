@@ -63,11 +63,11 @@ class GitlabConnectionStrategyRevokeTest extends BaseUnitTest {
     @Test
     void purge_propagatesProviderFailure() {
         doThrow(new RuntimeException("gitlab unavailable"))
-            .when(webhookService)
-            .deregisterWebhookForConnectionStrict(11L, 7L);
+                .when(webhookService)
+                .deregisterWebhookForConnectionStrict(11L, 7L);
 
-        assertThatThrownBy(() ->
-            strategy.revokeProvider(new IntegrationRef(IntegrationKind.GITLAB, 11L, "group-99", 7L))
-        ).hasMessage("gitlab unavailable");
+        assertThatThrownBy(
+                        () -> strategy.revokeProvider(new IntegrationRef(IntegrationKind.GITLAB, 11L, "group-99", 7L)))
+                .hasMessage("gitlab unavailable");
     }
 }

@@ -52,9 +52,6 @@ public interface ArtifactDescriptor {
     }
 
     default Optional<Signal> signal(SignalName name) {
-        return signals()
-            .stream()
-            .filter(signal -> signal.name().equals(name))
-            .findFirst();
+        return signals().stream().filter(signal -> signal.name().equals(name)).findFirst();
     }
 }

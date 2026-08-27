@@ -13,7 +13,6 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.IntNode;
 
 class FrameSubscriptionTest extends BaseUnitTest {
@@ -25,22 +24,16 @@ class FrameSubscriptionTest extends BaseUnitTest {
         Counter errors = reg.counter("test.err");
         CopyOnWriteArrayList<Integer> received = new CopyOnWriteArrayList<>();
 
-        FrameSubscription sub = new FrameSubscription(
-            frame -> received.add(frame.intValue()),
-            16,
-            dropped,
-            errors,
-            () -> {}
-        );
+        FrameSubscription sub =
+                new FrameSubscription(frame -> received.add(frame.intValue()), 16, dropped, errors, () -> {});
         sub.start();
 
         sub.offer(IntNode.valueOf(1));
         sub.offer(IntNode.valueOf(2));
         sub.offer(IntNode.valueOf(3));
 
-        await()
-            .atMost(Duration.ofSeconds(2))
-            .untilAsserted(() -> assertThat(received).containsExactly(1, 2, 3));
+        await().atMost(Duration.ofSeconds(2))
+                .untilAsserted(() -> assertThat(received).containsExactly(1, 2, 3));
         assertThat(dropped.count()).isZero();
         sub.dispose();
     }
@@ -54,33 +47,30 @@ class FrameSubscriptionTest extends BaseUnitTest {
         CopyOnWriteArrayList<Integer> received = new CopyOnWriteArrayList<>();
 
         FrameSubscription sub = new FrameSubscription(
-            frame -> {
-                try {
-                    gate.await();
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                }
-                received.add(frame.intValue());
-            },
-            4,
-            dropped,
-            errors,
-            () -> {}
-        );
+                frame -> {
+                    try {
+                        gate.await();
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                    }
+                    received.add(frame.intValue());
+                },
+                4,
+                dropped,
+                errors,
+                () -> {});
         sub.start();
 
         for (int i = 0; i < 10; i++) {
             sub.offer(IntNode.valueOf(i));
         }
         // capacity=4 → 5 enter (1 in-flight + 4 queued); 5 evict.
-        await()
-            .atMost(Duration.ofSeconds(2))
-            .untilAsserted(() -> assertThat(dropped.count()).isGreaterThan(0));
+        await().atMost(Duration.ofSeconds(2))
+                .untilAsserted(() -> assertThat(dropped.count()).isGreaterThan(0));
 
         gate.countDown();
-        await()
-            .atMost(Duration.ofSeconds(2))
-            .untilAsserted(() -> assertThat(received).isNotEmpty());
+        await().atMost(Duration.ofSeconds(2))
+                .untilAsserted(() -> assertThat(received).isNotEmpty());
         sub.dispose();
     }
 
@@ -93,27 +83,24 @@ class FrameSubscriptionTest extends BaseUnitTest {
         AtomicInteger called = new AtomicInteger();
 
         FrameSubscription sub = new FrameSubscription(
-            frame -> {
-                called.incrementAndGet();
-                throw new RuntimeException("boom");
-            },
-            8,
-            dropped,
-            errors,
-            () -> {}
-        );
+                frame -> {
+                    called.incrementAndGet();
+                    throw new RuntimeException("boom");
+                },
+                8,
+                dropped,
+                errors,
+                () -> {});
         sub.start();
 
         sub.offer(IntNode.valueOf(1));
         sub.offer(IntNode.valueOf(2));
         sub.offer(IntNode.valueOf(3));
 
-        await()
-            .atMost(Duration.ofSeconds(2))
-            .untilAsserted(() -> {
-                assertThat(called.get()).isEqualTo(3);
-                assertThat(errors.count()).isEqualTo(3.0);
-            });
+        await().atMost(Duration.ofSeconds(2)).untilAsserted(() -> {
+            assertThat(called.get()).isEqualTo(3);
+            assertThat(errors.count()).isEqualTo(3.0);
+        });
         sub.dispose();
     }
 
@@ -122,23 +109,16 @@ class FrameSubscriptionTest extends BaseUnitTest {
         SimpleMeterRegistry reg = new SimpleMeterRegistry();
         AtomicInteger onDisposeFires = new AtomicInteger();
         FrameSubscription sub = new FrameSubscription(
-            frame -> {},
-            4,
-            reg.counter("test.drop"),
-            reg.counter("test.err"),
-            onDisposeFires::incrementAndGet
-        );
+                frame -> {}, 4, reg.counter("test.drop"), reg.counter("test.err"), onDisposeFires::incrementAndGet);
         sub.start();
         assertThat(sub.isDisposed()).isFalse();
         sub.dispose();
         sub.dispose();
         sub.dispose();
-        await()
-            .atMost(Duration.ofSeconds(2))
-            .untilAsserted(() -> {
-                assertThat(sub.isDisposed()).isTrue();
-                assertThat(onDisposeFires).hasValue(1);
-            });
+        await().atMost(Duration.ofSeconds(2)).untilAsserted(() -> {
+            assertThat(sub.isDisposed()).isTrue();
+            assertThat(onDisposeFires).hasValue(1);
+        });
     }
 
     @Test
@@ -146,12 +126,11 @@ class FrameSubscriptionTest extends BaseUnitTest {
         SimpleMeterRegistry reg = new SimpleMeterRegistry();
         List<Integer> received = new CopyOnWriteArrayList<>();
         FrameSubscription sub = new FrameSubscription(
-            frame -> received.add(frame.intValue()),
-            4,
-            reg.counter("test.drop"),
-            reg.counter("test.err"),
-            () -> {}
-        );
+                frame -> received.add(frame.intValue()),
+                4,
+                reg.counter("test.drop"),
+                reg.counter("test.err"),
+                () -> {});
         sub.start();
         sub.dispose();
         sub.offer(IntNode.valueOf(99));

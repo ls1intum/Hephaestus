@@ -47,31 +47,28 @@ public class CommitEnrichmentEventListener {
 
         RepositoryRef repoRef = context.repository();
         if (repoRef == null) {
-            log.warn("Skipping commit enrichment: no repository in event context, commitId={}", event.commit().id());
+            log.warn(
+                    "Skipping commit enrichment: no repository in event context, commitId={}",
+                    event.commit().id());
             return;
         }
 
         Long scopeId = context.scopeId();
         if (scopeId == null) {
             log.debug(
-                "Skipping commit enrichment: no scopeId, commitId={}, repo={}",
-                event.commit().id(),
-                repoRef.nameWithOwner()
-            );
+                    "Skipping commit enrichment: no scopeId, commitId={}, repo={}",
+                    event.commit().id(),
+                    repoRef.nameWithOwner());
             return;
         }
 
         try {
             int enriched = commitMetadataEnrichmentService.enrichCommitMetadata(
-                repoRef.id(),
-                repoRef.nameWithOwner(),
-                scopeId
-            );
+                    repoRef.id(), repoRef.nameWithOwner(), scopeId);
             log.debug(
-                "Webhook commit enrichment completed: repo={}, enrichedCount={}",
-                repoRef.nameWithOwner(),
-                enriched
-            );
+                    "Webhook commit enrichment completed: repo={}, enrichedCount={}",
+                    repoRef.nameWithOwner(),
+                    enriched);
         } catch (Exception e) {
             log.warn("Webhook commit enrichment failed: repo={}, error={}", repoRef.nameWithOwner(), e.getMessage());
         }

@@ -46,12 +46,11 @@ import org.jspecify.annotations.Nullable;
 @Entity
 @Immutable
 @Table(
-    name = "feedback_placement",
-    indexes = {
-        @Index(name = "idx_feedback_placement_feedback", columnList = "feedback_id"),
-        @Index(name = "idx_feedback_placement_external_ref", columnList = "posted_comment_ref"),
-    }
-)
+        name = "feedback_placement",
+        indexes = {
+            @Index(name = "idx_feedback_placement_feedback", columnList = "feedback_id"),
+            @Index(name = "idx_feedback_placement_external_ref", columnList = "posted_comment_ref"),
+        })
 @Getter
 @Builder
 @NoArgsConstructor
@@ -69,10 +68,9 @@ public class FeedbackPlacement {
     @NotNull
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(
-        name = "feedback_id",
-        nullable = false,
-        foreignKey = @ForeignKey(name = "fk_feedback_placement_feedback")
-    )
+            name = "feedback_id",
+            nullable = false,
+            foreignKey = @ForeignKey(name = "fk_feedback_placement_feedback"))
     @OnDelete(action = OnDeleteAction.CASCADE)
     private Feedback feedback;
 

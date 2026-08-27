@@ -7,9 +7,11 @@ import org.jspecify.annotations.Nullable;
 
 @Schema(description = "Connection-level backfill rollup")
 public record BackfillSummaryDTO(
-    @NonNull @Schema(description = "Integration-defined backfill state string") String state,
-    @Schema(description = "0-100 completion estimate, if computable") @Nullable Integer percent
-) {
+        @NonNull @Schema(description = "Integration-defined backfill state string")
+        String state,
+
+        @Schema(description = "0-100 completion estimate, if computable") @Nullable
+        Integer percent) {
     public static BackfillSummaryDTO from(BackfillSummary summary) {
         return new BackfillSummaryDTO(summary.state(), summary.percent());
     }

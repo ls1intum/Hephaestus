@@ -27,12 +27,8 @@ class WorkspaceScopedTablesTest extends BaseUnitTest {
         // Sanity check that the constant is non-empty and includes the tenant root.
         // The full allowlist is asserted as identical to DataIsolationArchitectureTest's
         // GLOBAL_ENTITIES (case-converted) — see WorkspaceScopedTablesParityTest.
-        assertThat(WorkspaceScopedTables.GLOBAL_TABLES).contains(
-            "workspace",
-            "user",
-            "identity_provider",
-            "databasechangelog"
-        );
+        assertThat(WorkspaceScopedTables.GLOBAL_TABLES)
+                .contains("workspace", "user", "identity_provider", "databasechangelog");
     }
 
     @Test
@@ -54,8 +50,8 @@ class WorkspaceScopedTablesTest extends BaseUnitTest {
         EntityType<?> entity = mock(EntityType.class);
         lenient().when(metamodel.getEntities()).thenReturn(Set.of(entity));
         lenient()
-            .when(emf.unwrap(org.hibernate.SessionFactory.class))
-            .thenThrow(new IllegalStateException("simulated Hibernate API regression"));
+                .when(emf.unwrap(org.hibernate.SessionFactory.class))
+                .thenThrow(new IllegalStateException("simulated Hibernate API regression"));
 
         WorkspaceScopedTables tables = new WorkspaceScopedTables(providerOf(emf));
         assertThatThrownBy(tables::populateFromMetamodel).isInstanceOf(IllegalStateException.class);

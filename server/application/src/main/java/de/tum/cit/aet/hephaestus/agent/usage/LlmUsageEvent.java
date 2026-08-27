@@ -34,13 +34,12 @@ import org.jspecify.annotations.Nullable;
  */
 @Entity
 @Table(
-    name = "llm_usage_event",
-    indexes = { @Index(name = "idx_llm_usage_ws_time", columnList = "workspace_id, occurred_at") },
-    uniqueConstraints = @UniqueConstraint(
-        name = "ux_llm_usage_event_source_attempt",
-        columnNames = { "source_type", "source_id", "source_attempt" }
-    )
-)
+        name = "llm_usage_event",
+        indexes = {@Index(name = "idx_llm_usage_ws_time", columnList = "workspace_id, occurred_at")},
+        uniqueConstraints =
+                @UniqueConstraint(
+                        name = "ux_llm_usage_event_source_attempt",
+                        columnNames = {"source_type", "source_id", "source_attempt"}))
 @Getter
 @Setter
 @NoArgsConstructor

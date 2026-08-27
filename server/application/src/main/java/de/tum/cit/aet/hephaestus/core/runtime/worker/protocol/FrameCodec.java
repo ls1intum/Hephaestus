@@ -23,8 +23,7 @@ public final class FrameCodec {
             String json = objectMapper.writeValueAsString(envelope);
             if (json.length() > MAX_FRAME_BYTES) {
                 throw new FrameCodecException(
-                    "encoded frame exceeds " + MAX_FRAME_BYTES + " bytes (got " + json.length() + ")"
-                );
+                        "encoded frame exceeds " + MAX_FRAME_BYTES + " bytes (got " + json.length() + ")");
             }
             return json;
         } catch (JacksonException e) {
@@ -38,8 +37,7 @@ public final class FrameCodec {
         }
         if (json.length() > MAX_FRAME_BYTES) {
             throw new FrameCodecException(
-                "incoming frame exceeds " + MAX_FRAME_BYTES + " bytes (got " + json.length() + ")"
-            );
+                    "incoming frame exceeds " + MAX_FRAME_BYTES + " bytes (got " + json.length() + ")");
         }
         try {
             return objectMapper.readValue(json, FrameEnvelope.class);

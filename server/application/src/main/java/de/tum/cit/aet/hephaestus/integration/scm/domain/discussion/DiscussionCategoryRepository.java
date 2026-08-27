@@ -38,8 +38,7 @@ public interface DiscussionCategoryRepository extends JpaRepository<DiscussionCa
      */
     @Transactional
     @Modifying(flushAutomatically = true, clearAutomatically = true)
-    @Query(
-        value = """
+    @Query(value = """
         INSERT INTO discussion_category (
             id, name, slug, emoji, description, is_answerable,
             repository_id, created_at, updated_at
@@ -55,18 +54,15 @@ public interface DiscussionCategoryRepository extends JpaRepository<DiscussionCa
             description = EXCLUDED.description,
             is_answerable = EXCLUDED.is_answerable,
             updated_at = EXCLUDED.updated_at
-        """,
-        nativeQuery = true
-    )
+        """, nativeQuery = true)
     int upsertCategory(
-        @Param("id") String id,
-        @Param("name") String name,
-        @Param("slug") String slug,
-        @Nullable @Param("emoji") String emoji,
-        @Nullable @Param("description") String description,
-        @Param("isAnswerable") boolean isAnswerable,
-        @Param("repositoryId") Long repositoryId,
-        @Nullable @Param("createdAt") Instant createdAt,
-        @Nullable @Param("updatedAt") Instant updatedAt
-    );
+            @Param("id") String id,
+            @Param("name") String name,
+            @Param("slug") String slug,
+            @Nullable @Param("emoji") String emoji,
+            @Nullable @Param("description") String description,
+            @Param("isAnswerable") boolean isAnswerable,
+            @Param("repositoryId") Long repositoryId,
+            @Nullable @Param("createdAt") Instant createdAt,
+            @Nullable @Param("updatedAt") Instant updatedAt);
 }

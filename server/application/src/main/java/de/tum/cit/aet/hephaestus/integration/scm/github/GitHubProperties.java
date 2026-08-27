@@ -71,11 +71,12 @@ public record GitHubProperties(@Valid App app, @Valid Meta meta) {
      * @param installationUrl    URL where users install the GitHub App (e.g. https://github.com/apps/my-app/installations/new)
      */
     public record App(
-        @Min(value = 0, message = "GitHub App ID must be non-negative (0 means disabled)") @DefaultValue("0") long id,
-        @Nullable Resource privateKeyLocation,
-        @Nullable String privateKey,
-        @Nullable String installationUrl
-    ) {}
+            @Min(value = 0, message = "GitHub App ID must be non-negative (0 means disabled)") @DefaultValue("0")
+            long id,
+
+            @Nullable Resource privateKeyLocation,
+            @Nullable String privateKey,
+            @Nullable String installationUrl) {}
 
     /**
      * GitHub metadata API configuration.

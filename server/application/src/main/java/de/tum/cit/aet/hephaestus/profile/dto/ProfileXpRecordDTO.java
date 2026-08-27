@@ -19,11 +19,17 @@ import org.jspecify.annotations.NonNull;
 @JsonInclude(JsonInclude.Include.NON_EMPTY)
 @Schema(description = "User's XP and Level progress details")
 public record ProfileXpRecordDTO(
-    @NonNull @Schema(description = "Current calculated level", example = "5") Integer currentLevel,
-    @NonNull @Schema(description = "XP accumulated in the current level", example = "450") Long currentLevelXP,
-    @NonNull @Schema(description = "XP needed to reach the next level", example = "1000") Long xpNeeded,
-    @NonNull @Schema(description = "Overall total XP accumulated", example = "5450") Long totalXP
-) {
+        @NonNull @Schema(description = "Current calculated level", example = "5")
+        Integer currentLevel,
+
+        @NonNull @Schema(description = "XP accumulated in the current level", example = "450")
+        Long currentLevelXP,
+
+        @NonNull @Schema(description = "XP needed to reach the next level", example = "1000")
+        Long xpNeeded,
+
+        @NonNull @Schema(description = "Overall total XP accumulated", example = "5450")
+        Long totalXP) {
     /**
      * Creates a minimal XP record with zero values (Level 1).
      *

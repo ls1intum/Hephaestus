@@ -26,13 +26,12 @@ import java.util.Set;
  *                    kind never declared" is unrepresentable rather than merely validated
  */
 public record Signal(
-    SignalName name,
-    String displayName,
-    Set<EventTypeKey> producedBy,
-    RevisionScheme revision,
-    boolean recommendedForAuthoring,
-    boolean requestedByHand
-) {
+        SignalName name,
+        String displayName,
+        Set<EventTypeKey> producedBy,
+        RevisionScheme revision,
+        boolean recommendedForAuthoring,
+        boolean requestedByHand) {
     /** A signal the authoring surface offers but does not pre-select. */
     public Signal(SignalName name, String displayName, Set<EventTypeKey> producedBy, RevisionScheme revision) {
         this(name, displayName, producedBy, revision, false, false);
@@ -40,12 +39,11 @@ public record Signal(
 
     /** A signal an ingested event raises, which the authoring surface may pre-select. */
     public Signal(
-        SignalName name,
-        String displayName,
-        Set<EventTypeKey> producedBy,
-        RevisionScheme revision,
-        boolean recommendedForAuthoring
-    ) {
+            SignalName name,
+            String displayName,
+            Set<EventTypeKey> producedBy,
+            RevisionScheme revision,
+            boolean recommendedForAuthoring) {
         this(name, displayName, producedBy, revision, recommendedForAuthoring, false);
     }
 

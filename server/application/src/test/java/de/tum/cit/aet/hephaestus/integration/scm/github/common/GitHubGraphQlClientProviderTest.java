@@ -9,7 +9,6 @@ import de.tum.cit.aet.hephaestus.integration.core.egress.SilentModeGraphQlClient
 import de.tum.cit.aet.hephaestus.integration.core.spi.AuthMode;
 import de.tum.cit.aet.hephaestus.integration.core.spi.InstallationTokenProvider;
 import de.tum.cit.aet.hephaestus.integration.scm.github.app.GitHubAppTokenService;
-import de.tum.cit.aet.hephaestus.integration.scm.github.common.RateLimitTracker;
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHRateLimit;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
@@ -51,14 +50,7 @@ class GitHubGraphQlClientProviderTest extends BaseUnitTest {
     @BeforeEach
     void setUp() {
         provider = new GitHubGraphQlClientProvider(
-            baseClient,
-            tokenProvider,
-            appTokens,
-            circuitBreaker,
-            rateLimitTracker,
-            rateLimitSeeder,
-            clientFactory
-        );
+                baseClient, tokenProvider, appTokens, circuitBreaker, rateLimitTracker, rateLimitSeeder, clientFactory);
     }
 
     @Test

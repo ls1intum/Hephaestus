@@ -20,8 +20,7 @@
  * {@code integration :: events} named interfaces (now physically under {@code integration/core/}).
  */
 @org.springframework.modulith.ApplicationModule(
-    displayName = "Integration Framework",
-    type = org.springframework.modulith.ApplicationModule.Type.OPEN
-)
+        displayName = "Integration Framework",
+        type = org.springframework.modulith.ApplicationModule.Type.OPEN)
 @org.jspecify.annotations.NullMarked
 package de.tum.cit.aet.hephaestus.integration;

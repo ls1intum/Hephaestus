@@ -36,17 +36,15 @@ class GitlabSubjectKeyDeriverTest extends BaseUnitTest {
 
     @Test
     void buildsMergeRequestSubjectFromProjectPath() throws Exception {
-        JsonNode payload = json(
-            "{\"object_kind\":\"merge_request\",\"project\":{\"path_with_namespace\":\"group/web\"}}"
-        );
+        JsonNode payload =
+                json("{\"object_kind\":\"merge_request\",\"project\":{\"path_with_namespace\":\"group/web\"}}");
         assertThat(deriver.deriveSubject(payload, Map.of())).isEqualTo("gitlab.group.web.merge_request");
     }
 
     @Test
     void joinsNestedGroupsWithTilde() throws Exception {
-        JsonNode payload = json(
-            "{\"object_kind\":\"push\",\"project\":{\"path_with_namespace\":\"group/sub/project\"}}"
-        );
+        JsonNode payload =
+                json("{\"object_kind\":\"push\",\"project\":{\"path_with_namespace\":\"group/sub/project\"}}");
         assertThat(deriver.deriveSubject(payload, Map.of())).isEqualTo("gitlab.group~sub.project.push");
     }
 
@@ -59,8 +57,7 @@ class GitlabSubjectKeyDeriverTest extends BaseUnitTest {
     @Test
     void preservesPathCase() throws Exception {
         JsonNode payload = json(
-            "{\"object_kind\":\"merge_request\",\"project\":{\"path_with_namespace\":\"MyGroup/My-Project\"}}"
-        );
+                "{\"object_kind\":\"merge_request\",\"project\":{\"path_with_namespace\":\"MyGroup/My-Project\"}}");
         assertThat(deriver.deriveSubject(payload, Map.of())).isEqualTo("gitlab.MyGroup.My-Project.merge_request");
     }
 
@@ -136,28 +133,24 @@ class GitlabSubjectKeyDeriverTest extends BaseUnitTest {
     void rootGroupMemberEventRoutesToOrgScope() throws Exception {
         // Adding a member to the ROOT group carries group_path == accountLogin, so it routes cleanly.
         JsonNode payload = json(
-            "{\"event_name\":\"user_add_to_group\",\"group_path\":\"hephaestustest\",\"group_id\":1,\"user_id\":2}"
-        );
+                "{\"event_name\":\"user_add_to_group\",\"group_path\":\"hephaestustest\",\"group_id\":1,\"user_id\":2}");
         assertThat(deriver.deriveSubject(payload, Map.of())).isEqualTo("gitlab.hephaestustest.?.member");
     }
 
     @Test
     void normalizesEveryGroupTierEventVerb() throws Exception {
-        assertThat(
-            resolvedEventKey(deriver.deriveSubject(json("{\"event_name\":\"project_rename\"}"), Map.of()))
-        ).isEqualTo("project");
-        assertThat(
-            resolvedEventKey(deriver.deriveSubject(json("{\"event_name\":\"project_transfer\"}"), Map.of()))
-        ).isEqualTo("project");
-        assertThat(
-            resolvedEventKey(deriver.deriveSubject(json("{\"event_name\":\"subgroup_destroy\"}"), Map.of()))
-        ).isEqualTo("subgroup");
-        assertThat(
-            resolvedEventKey(deriver.deriveSubject(json("{\"event_name\":\"user_remove_from_group\"}"), Map.of()))
-        ).isEqualTo("member");
-        assertThat(
-            resolvedEventKey(deriver.deriveSubject(json("{\"event_name\":\"user_update_for_group\"}"), Map.of()))
-        ).isEqualTo("member");
+        assertThat(resolvedEventKey(deriver.deriveSubject(json("{\"event_name\":\"project_rename\"}"), Map.of())))
+                .isEqualTo("project");
+        assertThat(resolvedEventKey(deriver.deriveSubject(json("{\"event_name\":\"project_transfer\"}"), Map.of())))
+                .isEqualTo("project");
+        assertThat(resolvedEventKey(deriver.deriveSubject(json("{\"event_name\":\"subgroup_destroy\"}"), Map.of())))
+                .isEqualTo("subgroup");
+        assertThat(resolvedEventKey(
+                        deriver.deriveSubject(json("{\"event_name\":\"user_remove_from_group\"}"), Map.of())))
+                .isEqualTo("member");
+        assertThat(resolvedEventKey(
+                        deriver.deriveSubject(json("{\"event_name\":\"user_update_for_group\"}"), Map.of())))
+                .isEqualTo("member");
     }
 
     @Test
@@ -165,9 +158,7 @@ class GitlabSubjectKeyDeriverTest extends BaseUnitTest {
         // Project-member events (user_*_to_team) are a different handler concern; they must NOT normalize
         // to the group "member" key.
         String subject = deriver.deriveSubject(
-            json("{\"event_name\":\"user_add_to_team\",\"project\":{\"path_with_namespace\":\"g/p\"}}"),
-            Map.of()
-        );
+                json("{\"event_name\":\"user_add_to_team\",\"project\":{\"path_with_namespace\":\"g/p\"}}"), Map.of());
         assertThat(subject).isEqualTo("gitlab.g.p.user_add_to_team");
     }
 
@@ -181,10 +172,8 @@ class GitlabSubjectKeyDeriverTest extends BaseUnitTest {
     @Test
     void dedupKeyUsesEventUuidWhenNoIdempotencyKey() {
         byte[] body = "{}".getBytes(StandardCharsets.UTF_8);
-        String key = deriver.deriveDedupKey(
-            body,
-            Map.of("X-Gitlab-Event-UUID", "11111111-2222-3333-4444-555555555555")
-        );
+        String key =
+                deriver.deriveDedupKey(body, Map.of("X-Gitlab-Event-UUID", "11111111-2222-3333-4444-555555555555"));
         assertThat(key).isEqualTo("gitlab-11111111-2222-3333-4444-555555555555");
     }
 

@@ -25,10 +25,11 @@ class PracticeSignalOptionsFixtureIntegrationTest extends BaseIntegrationTest {
 
     @Test
     void theFixtureOffersExactlyTheKindsTheContainerRegisters() {
-        List<ArtifactKind> registered = registeredCatalog.all().stream().map(ArtifactDescriptor::kind).toList();
+        List<ArtifactKind> registered =
+                registeredCatalog.all().stream().map(ArtifactDescriptor::kind).toList();
 
         assertThat(PracticeSignalOptionsFixture.catalog().all())
-            .extracting(ArtifactDescriptor::kind)
-            .containsExactlyInAnyOrderElementsOf(registered);
+                .extracting(ArtifactDescriptor::kind)
+                .containsExactlyInAnyOrderElementsOf(registered);
     }
 }

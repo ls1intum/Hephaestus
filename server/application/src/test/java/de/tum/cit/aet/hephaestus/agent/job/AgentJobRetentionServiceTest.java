@@ -35,25 +35,16 @@ class AgentJobRetentionServiceTest extends BaseUnitTest {
     private AgentJobRetentionService service;
 
     private static final AgentProperties AGENT_PROPS = new AgentProperties(
-        true,
-        Duration.ofSeconds(1),
-        5,
-        5,
-        Duration.ofSeconds(25),
-        Duration.ofDays(14),
-        Duration.ofDays(90)
-    );
+            true, Duration.ofSeconds(1), 5, 5, Duration.ofSeconds(25), Duration.ofDays(14), Duration.ofDays(90));
 
     @BeforeEach
     void setUp() {
         meterRegistry = new SimpleMeterRegistry();
-        lenient()
-            .when(transactionTemplate.execute(any()))
-            .thenAnswer(inv -> {
-                @SuppressWarnings("unchecked")
-                TransactionCallback<Object> cb = inv.getArgument(0);
-                return cb.doInTransaction(mock(TransactionStatus.class));
-            });
+        lenient().when(transactionTemplate.execute(any())).thenAnswer(inv -> {
+            @SuppressWarnings("unchecked")
+            TransactionCallback<Object> cb = inv.getArgument(0);
+            return cb.doInTransaction(mock(TransactionStatus.class));
+        });
         service = new AgentJobRetentionService(jobRepository, AGENT_PROPS, transactionTemplate, meterRegistry);
     }
 
@@ -69,7 +60,8 @@ class AgentJobRetentionServiceTest extends BaseUnitTest {
             service.runRetention();
 
             verify(jobRepository, times(1)).stripTerminalPayloads(any(), org.mockito.ArgumentMatchers.eq(BATCH_SIZE));
-            assertThat(meterRegistry.counter("agent.job.retention.stripped").count()).isEqualTo(37d);
+            assertThat(meterRegistry.counter("agent.job.retention.stripped").count())
+                    .isEqualTo(37d);
         }
 
         @Test
@@ -80,9 +72,8 @@ class AgentJobRetentionServiceTest extends BaseUnitTest {
             service.runRetention();
 
             verify(jobRepository, times(3)).stripTerminalPayloads(any(), org.mockito.ArgumentMatchers.eq(BATCH_SIZE));
-            assertThat(meterRegistry.counter("agent.job.retention.stripped").count()).isEqualTo(
-                BATCH_SIZE + BATCH_SIZE + 10d
-            );
+            assertThat(meterRegistry.counter("agent.job.retention.stripped").count())
+                    .isEqualTo(BATCH_SIZE + BATCH_SIZE + 10d);
         }
 
         // An empty backlog takes the same loop exit as the partial batch above, and a counter
@@ -97,30 +88,30 @@ class AgentJobRetentionServiceTest extends BaseUnitTest {
         @DisplayName("a single partial batch deletes once and stops")
         void singlePartialBatchStopsAfterOnePass() {
             lenient().when(jobRepository.stripTerminalPayloads(any(), anyInt())).thenReturn(0);
-            when(jobRepository.deleteUnreferencedTerminalRowsOlderThan(any(), anyInt())).thenReturn(12);
+            when(jobRepository.deleteUnreferencedTerminalRowsOlderThan(any(), anyInt()))
+                    .thenReturn(12);
 
             service.runRetention();
 
-            verify(jobRepository, times(1)).deleteUnreferencedTerminalRowsOlderThan(
-                any(),
-                org.mockito.ArgumentMatchers.eq(BATCH_SIZE)
-            );
-            assertThat(meterRegistry.counter("agent.job.retention.deleted").count()).isEqualTo(12d);
+            verify(jobRepository, times(1))
+                    .deleteUnreferencedTerminalRowsOlderThan(any(), org.mockito.ArgumentMatchers.eq(BATCH_SIZE));
+            assertThat(meterRegistry.counter("agent.job.retention.deleted").count())
+                    .isEqualTo(12d);
         }
 
         @Test
         @DisplayName("a full batch loops again; stops once a batch returns fewer rows than the batch size")
         void loopsUntilBatchIsPartial() {
             lenient().when(jobRepository.stripTerminalPayloads(any(), anyInt())).thenReturn(0);
-            when(jobRepository.deleteUnreferencedTerminalRowsOlderThan(any(), anyInt())).thenReturn(BATCH_SIZE, 5);
+            when(jobRepository.deleteUnreferencedTerminalRowsOlderThan(any(), anyInt()))
+                    .thenReturn(BATCH_SIZE, 5);
 
             service.runRetention();
 
-            verify(jobRepository, times(2)).deleteUnreferencedTerminalRowsOlderThan(
-                any(),
-                org.mockito.ArgumentMatchers.eq(BATCH_SIZE)
-            );
-            assertThat(meterRegistry.counter("agent.job.retention.deleted").count()).isEqualTo(BATCH_SIZE + 5d);
+            verify(jobRepository, times(2))
+                    .deleteUnreferencedTerminalRowsOlderThan(any(), org.mockito.ArgumentMatchers.eq(BATCH_SIZE));
+            assertThat(meterRegistry.counter("agent.job.retention.deleted").count())
+                    .isEqualTo(BATCH_SIZE + 5d);
         }
     }
 }

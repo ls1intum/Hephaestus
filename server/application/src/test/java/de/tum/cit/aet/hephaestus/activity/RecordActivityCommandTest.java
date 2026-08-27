@@ -26,15 +26,15 @@ class RecordActivityCommandTest extends BaseUnitTest {
             double xp = 5.0;
 
             var command = RecordActivityCommand.builder()
-                .workspaceId(workspaceId)
-                .eventType(eventType)
-                .occurredAt(occurredAt)
-                .actor(null)
-                .repository(null)
-                .targetType(ActivityTargetType.REVIEW)
-                .targetId(targetId)
-                .xp(xp)
-                .build();
+                    .workspaceId(workspaceId)
+                    .eventType(eventType)
+                    .occurredAt(occurredAt)
+                    .actor(null)
+                    .repository(null)
+                    .targetType(ActivityTargetType.REVIEW)
+                    .targetId(targetId)
+                    .xp(xp)
+                    .build();
 
             assertThat(command.workspaceId()).isEqualTo(workspaceId);
             assertThat(command.eventType()).isEqualTo(eventType);
@@ -49,13 +49,13 @@ class RecordActivityCommandTest extends BaseUnitTest {
         @Test
         void shouldSupportZeroXp() {
             var command = RecordActivityCommand.builder()
-                .workspaceId(1L)
-                .eventType(ActivityEventType.REVIEW_DISMISSED)
-                .occurredAt(Instant.now())
-                .targetType(ActivityTargetType.REVIEW)
-                .targetId(100L)
-                .xp(0.0)
-                .build();
+                    .workspaceId(1L)
+                    .eventType(ActivityEventType.REVIEW_DISMISSED)
+                    .occurredAt(Instant.now())
+                    .targetType(ActivityTargetType.REVIEW)
+                    .targetId(100L)
+                    .xp(0.0)
+                    .build();
 
             assertThat(command.xp()).isZero();
         }
@@ -67,14 +67,13 @@ class RecordActivityCommandTest extends BaseUnitTest {
         @Test
         void shouldCreateSimpleCommand() {
             var command = RecordActivityCommand.simple(
-                1L,
-                ActivityEventType.PULL_REQUEST_OPENED,
-                Instant.now(),
-                null,
-                ActivityTargetType.PULL_REQUEST,
-                100L,
-                2.0
-            );
+                    1L,
+                    ActivityEventType.PULL_REQUEST_OPENED,
+                    Instant.now(),
+                    null,
+                    ActivityTargetType.PULL_REQUEST,
+                    100L,
+                    2.0);
 
             assertThat(command.repository()).isNull();
             assertThat(command.xp()).isEqualTo(2.0);
@@ -88,22 +87,22 @@ class RecordActivityCommandTest extends BaseUnitTest {
         void shouldBeEqualForSameValues() {
             Instant now = Instant.now();
             var command1 = RecordActivityCommand.builder()
-                .workspaceId(1L)
-                .eventType(ActivityEventType.PULL_REQUEST_OPENED)
-                .occurredAt(now)
-                .targetType(ActivityTargetType.PULL_REQUEST)
-                .targetId(100L)
-                .xp(5.0)
-                .build();
+                    .workspaceId(1L)
+                    .eventType(ActivityEventType.PULL_REQUEST_OPENED)
+                    .occurredAt(now)
+                    .targetType(ActivityTargetType.PULL_REQUEST)
+                    .targetId(100L)
+                    .xp(5.0)
+                    .build();
 
             var command2 = RecordActivityCommand.builder()
-                .workspaceId(1L)
-                .eventType(ActivityEventType.PULL_REQUEST_OPENED)
-                .occurredAt(now)
-                .targetType(ActivityTargetType.PULL_REQUEST)
-                .targetId(100L)
-                .xp(5.0)
-                .build();
+                    .workspaceId(1L)
+                    .eventType(ActivityEventType.PULL_REQUEST_OPENED)
+                    .occurredAt(now)
+                    .targetType(ActivityTargetType.PULL_REQUEST)
+                    .targetId(100L)
+                    .xp(5.0)
+                    .build();
 
             assertThat(command1).isEqualTo(command2);
             assertThat(command1.hashCode()).isEqualTo(command2.hashCode());

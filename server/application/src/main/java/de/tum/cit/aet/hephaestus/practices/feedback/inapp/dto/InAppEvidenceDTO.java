@@ -21,18 +21,23 @@ import org.jspecify.annotations.Nullable;
  */
 @Schema(description = "One piece of work the pattern was observed on")
 public record InAppEvidenceDTO(
-    @NonNull @Schema(description = "Kind of work, e.g. scm.pull_request") String artifactKind,
-    @NonNull @Schema(description = "Identifier of the work within its kind") Long artifactId,
-    @NonNull @Schema(description = "When the measurement behind this occurrence was taken") Instant observedAt,
-    @Schema(description = "What the review recorded on this piece of work") @Nullable String summary
-) {
+        @NonNull @Schema(description = "Kind of work, e.g. scm.pull_request")
+        String artifactKind,
+
+        @NonNull @Schema(description = "Identifier of the work within its kind")
+        Long artifactId,
+
+        @NonNull @Schema(description = "When the measurement behind this occurrence was taken")
+        Instant observedAt,
+
+        @Schema(description = "What the review recorded on this piece of work") @Nullable
+        String summary) {
     public static InAppEvidenceDTO from(Observation observation) {
         ArtifactKind kind = observation.getArtifactKind();
         return new InAppEvidenceDTO(
-            Objects.requireNonNull(kind).value(),
-            observation.getArtifactId(),
-            observation.getObservedAt(),
-            observation.getSummary()
-        );
+                Objects.requireNonNull(kind).value(),
+                observation.getArtifactId(),
+                observation.getObservedAt(),
+                observation.getSummary());
     }
 }

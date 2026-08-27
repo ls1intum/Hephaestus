@@ -42,16 +42,11 @@ class ReviewOutcomeLookupAdapter implements ReviewOutcomeLookup {
     }
 
     private static ReviewOutcome toOutcome(ReviewOutcomeRow row) {
-        boolean refusedEvidence =
-            row.getStatus() == AgentJobStatus.COMPLETED &&
-            row.getOutput() != null &&
-            ReviewRunOutcome.fromJobOutput(row.getOutput()) == ReviewRunOutcome.INSUFFICIENT_EVIDENCE;
+        boolean refusedEvidence = row.getStatus() == AgentJobStatus.COMPLETED
+                && row.getOutput() != null
+                && ReviewRunOutcome.fromJobOutput(row.getOutput()) == ReviewRunOutcome.INSUFFICIENT_EVIDENCE;
         return new ReviewOutcome(
-            state(row.getStatus()),
-            refusedEvidence,
-            row.getCompletedAt(),
-            readiness(row.getReviewReadiness())
-        );
+                state(row.getStatus()), refusedEvidence, row.getCompletedAt(), readiness(row.getReviewReadiness()));
     }
 
     /**
@@ -77,13 +72,9 @@ class ReviewOutcomeLookupAdapter implements ReviewOutcomeLookup {
                 continue;
             }
             bySlug.put(
-                slug,
-                new PracticeReadinessOutcome(
-                    decision.path("ready").asBoolean(false),
-                    blockers(decision),
-                    notApplicable(decision)
-                )
-            );
+                    slug,
+                    new PracticeReadinessOutcome(
+                            decision.path("ready").asBoolean(false), blockers(decision), notApplicable(decision)));
         }
         return Map.copyOf(bySlug);
     }

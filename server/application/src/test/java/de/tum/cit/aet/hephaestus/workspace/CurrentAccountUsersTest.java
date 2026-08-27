@@ -52,9 +52,8 @@ class CurrentAccountUsersTest extends BaseUnitTest {
     }
 
     private static void authenticateAccount(long accountId) {
-        SecurityContextHolder.setContext(
-            MockSecurityContextUtils.createSecurityContext("login", Long.toString(accountId), new String[0], "token")
-        );
+        SecurityContextHolder.setContext(MockSecurityContextUtils.createSecurityContext(
+                "login", Long.toString(accountId), new String[0], "token"));
     }
 
     private static IdentityLinkView link(long providerId, String login, @Nullable Long externalActorId) {
@@ -77,8 +76,8 @@ class CurrentAccountUsersTest extends BaseUnitTest {
         // A DIFFERENT person also called "alice" exists on GitLab — the cross-provider namesake. If
         // resolution ever keyed on login alone, this stranger's user (and workspaces) would be unioned in.
         lenient()
-            .when(userRepository.findByLoginAndProviderId("alice", GITLAB))
-            .thenReturn(Optional.of(user(200L, "alice")));
+                .when(userRepository.findByLoginAndProviderId("alice", GITLAB))
+                .thenReturn(Optional.of(user(200L, "alice")));
 
         List<User> resolved = currentAccountUsers.resolve();
 
@@ -104,13 +103,11 @@ class CurrentAccountUsersTest extends BaseUnitTest {
     @Test
     void unionsAcrossAllLinkedIdentitiesDedupedByUserId() {
         authenticateAccount(9L);
-        when(accountIdentityQuery.activeLinksForAccount(9L)).thenReturn(
-            List.of(link(GITHUB, "carol", null), link(GITLAB, "carol-gl", null))
-        );
+        when(accountIdentityQuery.activeLinksForAccount(9L))
+                .thenReturn(List.of(link(GITHUB, "carol", null), link(GITLAB, "carol-gl", null)));
         when(userRepository.findByLoginAndProviderId("carol", GITHUB)).thenReturn(Optional.of(user(11L, "carol")));
-        when(userRepository.findByLoginAndProviderId("carol-gl", GITLAB)).thenReturn(
-            Optional.of(user(22L, "carol-gl"))
-        );
+        when(userRepository.findByLoginAndProviderId("carol-gl", GITLAB))
+                .thenReturn(Optional.of(user(22L, "carol-gl")));
 
         assertThat(currentAccountUsers.resolve()).extracting(User::getId).containsExactly(11L, 22L);
     }

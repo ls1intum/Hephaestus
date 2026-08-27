@@ -47,11 +47,7 @@ public class ReviewBackfillCostEstimator {
         Instant to = Instant.now();
         Instant from = to.minus(properties.costHistoryWindow());
         LlmUsageEventRepository.ReviewCostAggregate row = usageRepository.aggregateCostPerReview(
-            workspaceId,
-            LlmUsageJobType.from(jobType).name(),
-            from,
-            to
-        );
+                workspaceId, LlmUsageJobType.from(jobType).name(), from, to);
         if (row == null || row.getReviews() <= 0) {
             return null;
         }

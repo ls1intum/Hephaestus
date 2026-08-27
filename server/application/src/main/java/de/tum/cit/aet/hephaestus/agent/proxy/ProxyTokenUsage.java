@@ -34,12 +34,16 @@ public record ProxyTokenUsage(int billableInputTokens, int outputTokens, int rea
             input = usage.path("input_tokens").asInt(0);
             output = usage.path("output_tokens").asInt(0);
             cacheRead = usage.path("input_tokens_details").path("cached_tokens").asInt(0);
-            reasoning = usage.path("output_tokens_details").path("reasoning_tokens").asInt(0);
+            reasoning =
+                    usage.path("output_tokens_details").path("reasoning_tokens").asInt(0);
         } else {
             input = usage.path("prompt_tokens").asInt(0);
             output = usage.path("completion_tokens").asInt(0);
-            cacheRead = usage.path("prompt_tokens_details").path("cached_tokens").asInt(0);
-            reasoning = usage.path("completion_tokens_details").path("reasoning_tokens").asInt(0);
+            cacheRead =
+                    usage.path("prompt_tokens_details").path("cached_tokens").asInt(0);
+            reasoning = usage.path("completion_tokens_details")
+                    .path("reasoning_tokens")
+                    .asInt(0);
         }
         return new ProxyTokenUsage(Math.max(0, input - cacheRead), output, reasoning, cacheRead);
     }

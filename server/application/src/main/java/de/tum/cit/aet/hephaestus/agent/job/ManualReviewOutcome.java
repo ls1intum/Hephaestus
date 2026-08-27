@@ -13,7 +13,8 @@ import org.jspecify.annotations.Nullable;
  * <p>{@link Status#FORBIDDEN} lives in this vocabulary instead of being thrown, since some callers — the
  * SCM bot command — cannot raise an HTTP status.
  */
-public record ManualReviewOutcome(Status status, @Nullable UUID jobId, @Nullable SignalStateReason reason) {
+public record ManualReviewOutcome(
+        Status status, @Nullable UUID jobId, @Nullable SignalStateReason reason) {
     public enum Status {
         /** A review is running, or an identical one already was and this ask joined it. */
         SUBMITTED,

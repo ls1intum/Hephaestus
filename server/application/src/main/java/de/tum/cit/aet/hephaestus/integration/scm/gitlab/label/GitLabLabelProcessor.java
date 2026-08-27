@@ -60,9 +60,8 @@ public class GitLabLabelProcessor {
     public Label process(@Nullable GitLabLabelDTO dto, Repository repository, ProcessingContext context) {
         if (dto == null || dto.title() == null || dto.title().isBlank()) {
             log.warn(
-                "Skipped label processing: reason=nullOrMissingTitle, repoId={}",
-                repository != null ? repository.getId() : null
-            );
+                    "Skipped label processing: reason=nullOrMissingTitle, repoId={}",
+                    repository != null ? repository.getId() : null);
             return null;
         }
 
@@ -119,16 +118,13 @@ public class GitLabLabelProcessor {
             return;
         }
 
-        labelRepository
-            .findById(labelId)
-            .ifPresent(label -> {
-                label.removeAllIssues();
-                labelRepository.delete(label);
-                eventPublisher.publishEvent(
-                    new ScmDomainEvent.LabelDeleted(labelId, label.getName(), EventContext.from(context))
-                );
-                log.info("Deleted label: labelId={}, labelName={}", labelId, label.getName());
-            });
+        labelRepository.findById(labelId).ifPresent(label -> {
+            label.removeAllIssues();
+            labelRepository.delete(label);
+            eventPublisher.publishEvent(
+                    new ScmDomainEvent.LabelDeleted(labelId, label.getName(), EventContext.from(context)));
+            log.info("Deleted label: labelId={}, labelName={}", labelId, label.getName());
+        });
     }
 
     @Nullable

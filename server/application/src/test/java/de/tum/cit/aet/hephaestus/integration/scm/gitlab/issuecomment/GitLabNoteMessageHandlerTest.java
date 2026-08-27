@@ -18,7 +18,6 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestR
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
-import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabEventType;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabWebhookContextResolver;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.dto.GitLabWebhookProject;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.dto.GitLabWebhookUser;
@@ -81,30 +80,29 @@ class GitLabNoteMessageHandlerTest extends BaseUnitTest {
     void setUp() {
         transactionTemplate = mock(TransactionTemplate.class);
         lenient()
-            .doAnswer(invocation -> {
-                @SuppressWarnings("unchecked")
-                Consumer<TransactionStatus> callback = invocation.getArgument(0);
-                callback.accept(null);
-                return null;
-            })
-            .when(transactionTemplate)
-            .executeWithoutResult(any());
+                .doAnswer(invocation -> {
+                    @SuppressWarnings("unchecked")
+                    Consumer<TransactionStatus> callback = invocation.getArgument(0);
+                    callback.accept(null);
+                    return null;
+                })
+                .when(transactionTemplate)
+                .executeWithoutResult(any());
 
         handler = new GitLabNoteMessageHandler(
-            issueCommentProcessor,
-            diffNoteProcessor,
-            mergeRequestProcessor,
-            contextResolver,
-            pullRequestRepository,
-            userRepository,
-            deserializer,
-            transactionTemplate,
-            eventPublisher
-        );
+                issueCommentProcessor,
+                diffNoteProcessor,
+                mergeRequestProcessor,
+                contextResolver,
+                pullRequestRepository,
+                userRepository,
+                deserializer,
+                transactionTemplate,
+                eventPublisher);
 
         lenient()
-            .when(contextResolver.resolve(eq(PROJECT_PATH), any(), any()))
-            .thenReturn(ProcessingContext.forWebhook(1L, setupRepository(), "create"));
+                .when(contextResolver.resolve(eq(PROJECT_PATH), any(), any()))
+                .thenReturn(ProcessingContext.forWebhook(1L, setupRepository(), "create"));
     }
 
     @Test
@@ -140,15 +138,8 @@ class GitLabNoteMessageHandlerTest extends BaseUnitTest {
         @Test
         void mrGeneralNote_withoutRepositoryStillRoutes() throws IOException {
             GitLabNoteEventDTO event = createMergeRequestNoteEvent("create", false, false, null);
-            ProcessingContext context = new ProcessingContext(
-                1L,
-                null,
-                null,
-                Instant.now(),
-                "test",
-                "create",
-                DataSource.WEBHOOK
-            );
+            ProcessingContext context =
+                    new ProcessingContext(1L, null, null, Instant.now(), "test", "create", DataSource.WEBHOOK);
             when(contextResolver.resolve(eq(PROJECT_PATH), any(), any())).thenReturn(context);
 
             handler.onMessage(mockMessage(event));
@@ -222,15 +213,8 @@ class GitLabNoteMessageHandlerTest extends BaseUnitTest {
 
         @Test
         void missingObjectAttributes_skipsProcessing() throws IOException {
-            GitLabNoteEventDTO event = new GitLabNoteEventDTO(
-                "note",
-                "note",
-                createUser(),
-                createProject(),
-                null,
-                null,
-                null
-            );
+            GitLabNoteEventDTO event =
+                    new GitLabNoteEventDTO("note", "note", createUser(), createProject(), null, null, null);
 
             Message msg = mockMessage(event);
             handler.onMessage(msg);
@@ -241,15 +225,8 @@ class GitLabNoteMessageHandlerTest extends BaseUnitTest {
         @Test
         void missingProject_skipsProcessing() throws IOException {
             NoteAttributes attrs = createNoteAttributes("Issue", "create", false, false, null);
-            GitLabNoteEventDTO event = new GitLabNoteEventDTO(
-                "note",
-                "note",
-                createUser(),
-                null,
-                attrs,
-                createEmbeddedIssue(false),
-                null
-            );
+            GitLabNoteEventDTO event =
+                    new GitLabNoteEventDTO("note", "note", createUser(), null, attrs, createEmbeddedIssue(false), null);
 
             Message msg = mockMessage(event);
             handler.onMessage(msg);
@@ -400,19 +377,18 @@ class GitLabNoteMessageHandlerTest extends BaseUnitTest {
 
         private EmbeddedMergeRequest createEmbeddedMergeRequestWithStatus(@Nullable String detailedMergeStatus) {
             return new EmbeddedMergeRequest(
-                334047L,
-                2,
-                "Test MR",
-                "Description",
-                "opened",
-                false,
-                "feature/test",
-                "main",
-                "https://gitlab.lrz.de/test/-/merge_requests/2",
-                "2026-01-31 19:03:54 +0100",
-                "2026-01-31 19:03:56 +0100",
-                detailedMergeStatus
-            );
+                    334047L,
+                    2,
+                    "Test MR",
+                    "Description",
+                    "opened",
+                    false,
+                    "feature/test",
+                    "main",
+                    "https://gitlab.lrz.de/test/-/merge_requests/2",
+                    "2026-01-31 19:03:54 +0100",
+                    "2026-01-31 19:03:56 +0100",
+                    detailedMergeStatus);
         }
     }
 
@@ -427,39 +403,23 @@ class GitLabNoteMessageHandlerTest extends BaseUnitTest {
     }
 
     private GitLabNoteEventDTO createIssueNoteEvent(
-        String action,
-        boolean system,
-        boolean internal,
-        boolean confidentialIssue
-    ) {
+            String action, boolean system, boolean internal, boolean confidentialIssue) {
         NoteAttributes attrs = createNoteAttributes("Issue", action, system, internal, null);
         return new GitLabNoteEventDTO(
-            "note",
-            internal ? "confidential_note" : "note",
-            createUser(),
-            createProject(),
-            attrs,
-            createEmbeddedIssue(confidentialIssue),
-            null
-        );
+                "note",
+                internal ? "confidential_note" : "note",
+                createUser(),
+                createProject(),
+                attrs,
+                createEmbeddedIssue(confidentialIssue),
+                null);
     }
 
     private GitLabNoteEventDTO createMergeRequestNoteEvent(
-        String action,
-        boolean system,
-        boolean internal,
-        @Nullable Object position
-    ) {
+            String action, boolean system, boolean internal, @Nullable Object position) {
         NoteAttributes attrs = createNoteAttributes("MergeRequest", action, system, internal, position);
         return new GitLabNoteEventDTO(
-            "note",
-            "note",
-            createUser(),
-            createProject(),
-            attrs,
-            null,
-            createEmbeddedMergeRequest()
-        );
+                "note", "note", createUser(), createProject(), attrs, null, createEmbeddedMergeRequest());
     }
 
     private GitLabNoteEventDTO createCommitNoteEvent() {
@@ -468,76 +428,63 @@ class GitLabNoteMessageHandlerTest extends BaseUnitTest {
     }
 
     private NoteAttributes createNoteAttributes(
-        String noteableType,
-        String action,
-        boolean system,
-        boolean internal,
-        @Nullable Object position
-    ) {
+            String noteableType, String action, boolean system, boolean internal, @Nullable Object position) {
         return new NoteAttributes(
-            4406174L,
-            "Test note body",
-            noteableType,
-            system,
-            internal,
-            position,
-            action,
-            "https://gitlab.lrz.de/hephaestustest/demo-repository/-/issues/5#note_4406174",
-            "2026-01-31 19:03:37 +0100",
-            "2026-01-31 19:03:37 +0100",
-            "abc123def456",
-            null
-        );
+                4406174L,
+                "Test note body",
+                noteableType,
+                system,
+                internal,
+                position,
+                action,
+                "https://gitlab.lrz.de/hephaestustest/demo-repository/-/issues/5#note_4406174",
+                "2026-01-31 19:03:37 +0100",
+                "2026-01-31 19:03:37 +0100",
+                "abc123def456",
+                null);
     }
 
     private EmbeddedIssue createEmbeddedIssue(boolean confidential) {
         return new EmbeddedIssue(
-            422296L,
-            5,
-            "Feature: Add user authentication",
-            "Implement OAuth2 authentication flow",
-            "opened",
-            confidential,
-            "https://gitlab.lrz.de/hephaestustest/demo-repository/-/issues/5",
-            "2026-01-31 19:03:35 +0100",
-            "2026-01-31 19:03:35 +0100"
-        );
+                422296L,
+                5,
+                "Feature: Add user authentication",
+                "Implement OAuth2 authentication flow",
+                "opened",
+                confidential,
+                "https://gitlab.lrz.de/hephaestustest/demo-repository/-/issues/5",
+                "2026-01-31 19:03:35 +0100",
+                "2026-01-31 19:03:35 +0100");
     }
 
     private EmbeddedMergeRequest createEmbeddedMergeRequest() {
         return new EmbeddedMergeRequest(
-            334047L,
-            2,
-            "Implement OAuth authentication",
-            "This MR implements OAuth2 authentication.\n\nCloses #5",
-            "opened",
-            false,
-            "feature/oauth",
-            "main",
-            "https://gitlab.lrz.de/hephaestustest/demo-repository/-/merge_requests/2",
-            "2026-01-31 19:03:54 +0100",
-            "2026-01-31 19:03:56 +0100",
-            null
-        );
+                334047L,
+                2,
+                "Implement OAuth authentication",
+                "This MR implements OAuth2 authentication.\n\nCloses #5",
+                "opened",
+                false,
+                "feature/oauth",
+                "main",
+                "https://gitlab.lrz.de/hephaestustest/demo-repository/-/merge_requests/2",
+                "2026-01-31 19:03:54 +0100",
+                "2026-01-31 19:03:56 +0100",
+                null);
     }
 
     private GitLabWebhookUser createUser() {
         return new GitLabWebhookUser(
-            18024L,
-            "ga84xah",
-            "Felix Dietrich",
-            "https://gitlab.lrz.de/uploads/-/system/user/avatar/18024/avatar.png",
-            null
-        );
+                18024L,
+                "ga84xah",
+                "Felix Dietrich",
+                "https://gitlab.lrz.de/uploads/-/system/user/avatar/18024/avatar.png",
+                null);
     }
 
     private GitLabWebhookProject createProject() {
         return new GitLabWebhookProject(
-            246765L,
-            "demo-repository",
-            "https://gitlab.lrz.de/hephaestustest/demo-repository",
-            PROJECT_PATH
-        );
+                246765L, "demo-repository", "https://gitlab.lrz.de/hephaestustest/demo-repository", PROJECT_PATH);
     }
 
     private Message mockMessage(GitLabNoteEventDTO event) throws IOException {

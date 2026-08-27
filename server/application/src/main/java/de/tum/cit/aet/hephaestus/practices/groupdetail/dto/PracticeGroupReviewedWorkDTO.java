@@ -9,26 +9,24 @@ import org.jspecify.annotations.Nullable;
 
 @Schema(description = "The work assessed in a developer-facing review run")
 public record PracticeGroupReviewedWorkDTO(
-    @NonNull ArtifactKind type,
-    @NonNull Long id,
-    @Nullable IntegrationKind provider,
-    @Nullable Integer number,
-    @Nullable String title,
-    @Nullable String repositoryName,
-    @Nullable String channelName,
-    @Nullable String url
-) {
+        @NonNull ArtifactKind type,
+        @NonNull Long id,
+        @Nullable IntegrationKind provider,
+        @Nullable Integer number,
+        @Nullable String title,
+        @Nullable String repositoryName,
+        @Nullable String channelName,
+        @Nullable String url) {
     public static PracticeGroupReviewedWorkDTO from(Target target, Long fallbackId) {
         return new PracticeGroupReviewedWorkDTO(
-            target.type(),
-            target.id() == null ? fallbackId : target.id(),
-            target.provider(),
-            target.number(),
-            target.title(),
-            target.repositoryName(),
-            target.channelName(),
-            target.url()
-        );
+                target.type(),
+                target.id() == null ? fallbackId : target.id(),
+                target.provider(),
+                target.number(),
+                target.title(),
+                target.repositoryName(),
+                target.channelName(),
+                target.url());
     }
 
     /**

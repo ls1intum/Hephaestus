@@ -22,7 +22,9 @@ public interface SlackMentorInputGuard {
      * @param action how to handle the message
      * @param responseText fixed reply text for {@link Action#REPLY}; {@code null} otherwise
      */
-    record Verdict(Action action, @org.jspecify.annotations.Nullable String responseText) {
+    record Verdict(
+            Action action,
+            @org.jspecify.annotations.Nullable String responseText) {
         public boolean allowsMentorTurn() {
             return action == Action.ALLOW;
         }

@@ -40,9 +40,8 @@ import tools.jackson.databind.ObjectMapper;
 @Tag("unit")
 @JsonTest
 @ContextConfiguration(
-    classes = JacksonAutoConfiguration.class,
-    initializers = ConfigDataApplicationContextInitializer.class
-)
+        classes = JacksonAutoConfiguration.class,
+        initializers = ConfigDataApplicationContextInitializer.class)
 class MultiVersionFixtureTest {
 
     @Autowired
@@ -60,9 +59,7 @@ class MultiVersionFixtureTest {
     @Test
     void githubPullRequestV1_extractsKnownFields() throws Exception {
         GitHubPullRequestEventDTO dto = deserialize(
-            "/integration-fixtures/github/v1/pull_request.opened.json",
-            GitHubPullRequestEventDTO.class
-        );
+                "/integration-fixtures/github/v1/pull_request.opened.json", GitHubPullRequestEventDTO.class);
         assertKnownGithubFields(dto);
     }
 
@@ -73,10 +70,12 @@ class MultiVersionFixtureTest {
         // Guard: the fixture must actually inject unknown fields the DTO does not declare,
         // otherwise the tolerance assertion below would be vacuous.
         JsonNode raw = jackson3.readTree(readBytes(classpath));
-        assertThat(raw.has("_future_top_level")).as("fixture must carry an injected unknown top-level key").isTrue();
+        assertThat(raw.has("_future_top_level"))
+                .as("fixture must carry an injected unknown top-level key")
+                .isTrue();
         assertThat(raw.path("repository").has("_visibility_v2"))
-            .as("fixture must carry an injected unknown nested key")
-            .isTrue();
+                .as("fixture must carry an injected unknown nested key")
+                .isTrue();
 
         // (1) Tolerance on the REAL mapper: deserializing the unknown-field payload must not throw.
         // This is the live regression guard — it fails if production's mapper ever flips to
@@ -92,9 +91,7 @@ class MultiVersionFixtureTest {
     @Test
     void gitlabMergeRequestV1_extractsKnownFields() throws Exception {
         GitLabMergeRequestEventDTO dto = deserialize(
-            "/integration-fixtures/gitlab/v1/merge_request.open.json",
-            GitLabMergeRequestEventDTO.class
-        );
+                "/integration-fixtures/gitlab/v1/merge_request.open.json", GitLabMergeRequestEventDTO.class);
         assertKnownGitlabFields(dto);
     }
 
@@ -104,10 +101,12 @@ class MultiVersionFixtureTest {
 
         // Guard: the fixture must actually inject unknown fields the DTO does not declare.
         JsonNode raw = jackson3.readTree(readBytes(classpath));
-        assertThat(raw.has("_event_uuid_v2")).as("fixture must carry an injected unknown top-level key").isTrue();
+        assertThat(raw.has("_event_uuid_v2"))
+                .as("fixture must carry an injected unknown top-level key")
+                .isTrue();
         assertThat(raw.path("object_attributes").has("_blocking_discussions_resolved_v2"))
-            .as("fixture must carry an injected unknown nested key")
-            .isTrue();
+                .as("fixture must carry an injected unknown nested key")
+                .isTrue();
 
         // (1) Tolerance on the REAL mapper.
         GitLabMergeRequestEventDTO dto = deserialize(classpath, GitLabMergeRequestEventDTO.class);

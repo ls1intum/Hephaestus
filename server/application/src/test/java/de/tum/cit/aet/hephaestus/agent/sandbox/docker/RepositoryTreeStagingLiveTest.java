@@ -52,10 +52,8 @@ class RepositoryTreeStagingLiveTest {
 
     /** The image under test. A release-channel tag would test some other release's image (ADR 0031);
      * point this at a locally built agent image, or export the reference a deployment would use. */
-    private static final String AGENT_IMAGE = System.getenv().getOrDefault(
-        "HEPHAESTUS_AGENT_IMAGE_REFERENCE",
-        "ghcr.io/ls1intum/hephaestus/agent-pi:dev"
-    );
+    private static final String AGENT_IMAGE = System.getenv()
+            .getOrDefault("HEPHAESTUS_AGENT_IMAGE_REFERENCE", "ghcr.io/ls1intum/hephaestus/agent-pi:dev");
 
     /** A tree large enough that any per-file ceiling would have to reject it. */
     private static final int TREE_FILE_COUNT = 25_000;
@@ -69,52 +67,33 @@ class RepositoryTreeStagingLiveTest {
     static void checkDocker() {
         assumeTrue(DockerClientFactory.instance().isDockerAvailable(), "Docker not available");
         assumeTrue(
-            DockerClientFactory.lazyClient()
-                .listImagesCmd()
-                .exec()
-                .stream()
-                .anyMatch(
-                    image ->
-                        image.getRepoTags() != null &&
-                        java.util.Arrays.asList(image.getRepoTags()).contains(AGENT_IMAGE)
-                ),
-            AGENT_IMAGE + " not present locally"
-        );
+                DockerClientFactory.lazyClient().listImagesCmd().exec().stream()
+                        .anyMatch(image -> image.getRepoTags() != null
+                                && java.util.Arrays.asList(image.getRepoTags()).contains(AGENT_IMAGE)),
+                AGENT_IMAGE + " not present locally");
     }
 
     @BeforeEach
     void setUp() {
         SandboxProperties properties = new SandboxProperties(
-            "unix:///var/run/docker.sock",
-            false,
-            null,
-            5,
-            10,
-            300,
-            null,
-            8080,
-            null,
-            209_715_200L,
-            500_000,
-            null
-        );
+                "unix:///var/run/docker.sock", false, null, 5, 10, 300, null, 8080, null, 209_715_200L, 500_000, null);
         var dockerClient = DockerClientImpl.getInstance(
-            DefaultDockerClientConfig.createDefaultConfigBuilder().build(),
-            new ApacheDockerHttpClient.Builder().dockerHost(URI.create("unix:///var/run/docker.sock")).build()
-        );
+                DefaultDockerClientConfig.createDefaultConfigBuilder().build(),
+                new ApacheDockerHttpClient.Builder()
+                        .dockerHost(URI.create("unix:///var/run/docker.sock"))
+                        .build());
         DockerClientOperations dockerOps = new DockerClientOperations(dockerClient, dockerClient);
         dockerWaitExecutor = Executors.newCachedThreadPool();
         containerManager = new SandboxContainerManager(dockerOps, image -> {}, properties, dockerWaitExecutor);
         networkManager = new SandboxNetworkManager(dockerOps, properties);
         sandboxAdapter = new DockerSandboxAdapter(
-            networkManager,
-            new SandboxWorkspaceManager(dockerOps),
-            containerManager,
-            new ContainerSecurityPolicy(properties, null),
-            properties,
-            8080,
-            new SimpleMeterRegistry()
-        );
+                networkManager,
+                new SandboxWorkspaceManager(dockerOps),
+                containerManager,
+                new ContainerSecurityPolicy(properties, null),
+                properties,
+                8080,
+                new SimpleMeterRegistry());
     }
 
     @AfterEach
@@ -123,23 +102,23 @@ class RepositoryTreeStagingLiveTest {
             dockerWaitExecutor.shutdownNow();
         }
         try {
-            containerManager
-                .listManagedContainers()
-                .forEach(c -> {
-                    try {
-                        containerManager.forceRemove(c.id());
-                    } catch (Exception ignored) {}
-                });
-        } catch (Exception ignored) {}
+            containerManager.listManagedContainers().forEach(c -> {
+                try {
+                    containerManager.forceRemove(c.id());
+                } catch (Exception ignored) {
+                }
+            });
+        } catch (Exception ignored) {
+        }
         try {
-            networkManager
-                .listOrphanedNetworks()
-                .forEach(n -> {
-                    try {
-                        networkManager.removeNetwork(n.id());
-                    } catch (Exception ignored) {}
-                });
-        } catch (Exception ignored) {}
+            networkManager.listOrphanedNetworks().forEach(n -> {
+                try {
+                    networkManager.removeNetwork(n.id());
+                } catch (Exception ignored) {
+                }
+            });
+        } catch (Exception ignored) {
+        }
     }
 
     @Test
@@ -164,40 +143,37 @@ class RepositoryTreeStagingLiveTest {
             onDisk.put(SandboxLayout.REPO_MOUNT_RELATIVE + "many/file" + i + ".txt", file);
         }
 
-        String script =
-            "set -e\n" +
-            "repo=/workspace/" +
-            SandboxLayout.REPO_MOUNT_RELATIVE +
-            "\n" +
-            "bytes=$(wc -c < ${repo}large.bin)\n" +
-            "files=$(find ${repo}many -type f | wc -l)\n" +
-            "sample=$(cat ${repo}many/file24999.txt)\n" +
-            "echo \"bytes=$bytes files=$files sample=$sample\" > /workspace/" +
-            SandboxLayout.ANALYSIS_PREFIX +
-            "seen.txt\n";
+        String script = "set -e\n" + "repo=/workspace/"
+                + SandboxLayout.REPO_MOUNT_RELATIVE
+                + "\n"
+                + "bytes=$(wc -c < ${repo}large.bin)\n"
+                + "files=$(find ${repo}many -type f | wc -l)\n"
+                + "sample=$(cat ${repo}many/file24999.txt)\n"
+                + "echo \"bytes=$bytes files=$files sample=$sample\" > /workspace/"
+                + SandboxLayout.ANALYSIS_PREFIX
+                + "seen.txt\n";
 
         SandboxSpec spec = new SandboxSpec(
-            UUID.randomUUID(),
-            AGENT_IMAGE,
-            List.of("sh", "-c", script),
-            Map.of(),
-            new NetworkPolicy(true, null, null),
-            new ResourceLimits(512L * 1024 * 1024, 1.0, 128, Duration.ofMinutes(5)),
-            new SecurityProfile(null, "private", List.of("ALL"), Map.of()),
-            // A staged work/ file makes the writable region exist as uid 1000, exactly as a real run does;
-            // /workspace itself stays root-owned, which is why the script cannot write outside work/.
-            Map.of(SandboxLayout.ANALYSIS_PREFIX + ".gitkeep", new byte[0]),
-            onDisk,
-            "/workspace/" + SandboxLayout.ANALYSIS_PREFIX,
-            null
-        );
+                UUID.randomUUID(),
+                AGENT_IMAGE,
+                List.of("sh", "-c", script),
+                Map.of(),
+                new NetworkPolicy(true, null, null),
+                new ResourceLimits(512L * 1024 * 1024, 1.0, 128, Duration.ofMinutes(5)),
+                new SecurityProfile(null, "private", List.of("ALL"), Map.of()),
+                // A staged work/ file makes the writable region exist as uid 1000, exactly as a real run does;
+                // /workspace itself stays root-owned, which is why the script cannot write outside work/.
+                Map.of(SandboxLayout.ANALYSIS_PREFIX + ".gitkeep", new byte[0]),
+                onDisk,
+                "/workspace/" + SandboxLayout.ANALYSIS_PREFIX,
+                null);
 
         SandboxResult result = sandboxAdapter.execute(spec);
 
         assertThat(result.exitCode()).as("container logs: %s", result.logs()).isZero();
         String seen = new String(result.outputFiles().get("seen.txt")).trim();
-        assertThat(seen).isEqualTo(
-            "bytes=" + (LARGE_FILE_MB * 1024L * 1024L) + " files=" + TREE_FILE_COUNT + " sample=content 24999"
-        );
+        assertThat(seen)
+                .isEqualTo("bytes=" + (LARGE_FILE_MB * 1024L * 1024L) + " files=" + TREE_FILE_COUNT
+                        + " sample=content 24999");
     }
 }
