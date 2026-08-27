@@ -175,6 +175,10 @@ jobs:
           retention-days: 14
 
       # Chromatic visual testing
+      - name: Build Storybook
+        if: steps.should_run.outputs.run == 'true' && matrix.test-type == 'webapp-storybook'
+        run: pnpm --dir webapp run build-storybook
+
       - name: "Chromatic Visual Testing"
         if: >-
           steps.should_run.outputs.run == 'true' && matrix.test-type == 'webapp-storybook' && always() &&

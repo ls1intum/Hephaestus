@@ -44,13 +44,11 @@ runs:
         restore-keys: |
           ${{ inputs.os }}-playwright-
 
-    - name: Cache Storybook build
+    - name: Cache Storybook
       if: contains(fromJSON('["webapp-visual", "webapp-storybook"]'), inputs.cache-type)
       uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
-        path: |
-          webapp/storybook-static
-          webapp/.storybook/.cache
-        key: ${{ inputs.os }}-storybook-${{ hashFiles('webapp/**/*.stories.tsx', 'webapp/.storybook/**', 'pnpm-lock.yaml') }}
+        path: webapp/.storybook/.cache
+        key: ${{ inputs.os }}-storybook-v2-${{ hashFiles('webapp/**/*.stories.tsx', 'webapp/.storybook/**', 'pnpm-lock.yaml') }}
         restore-keys: |
-          ${{ inputs.os }}-storybook-
+          ${{ inputs.os }}-storybook-v2-
