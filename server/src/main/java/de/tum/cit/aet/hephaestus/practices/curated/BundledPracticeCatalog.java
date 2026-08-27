@@ -1,15 +1,15 @@
 package de.tum.cit.aet.hephaestus.practices.curated;
 
-import de.tum.cit.aet.hephaestus.practices.AreaDefinition;
+import de.tum.cit.aet.hephaestus.practices.GroupDefinition;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
 import java.util.List;
 
 record BundledPracticeCatalog(
-    List<BundledEntry<AreaDefinition>> areas,
+    List<BundledEntry<GroupDefinition>> groups,
     List<BundledEntry<PracticeDefinition>> practices
 ) {
     BundledPracticeCatalog {
-        areas = List.copyOf(areas);
+        groups = List.copyOf(groups);
         practices = List.copyOf(practices);
     }
 

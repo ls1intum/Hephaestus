@@ -168,7 +168,7 @@ class AgentJobServiceTest extends BaseUnitTest {
 
     /**
      * One row of {@link PracticeRepository#findAutonomyRows} — a practice's raw autonomy column and its
-     * area's, ungrouped here so the chain runs practice → workspace.
+     * group's, ungrouped here so the chain runs practice → workspace.
      */
     private static PracticeRepository.PracticeAutonomyRow tierRow(
         @Nullable PracticeAutonomy practiceAutonomy,
@@ -181,12 +181,12 @@ class AgentJobServiceTest extends BaseUnitTest {
             }
 
             @Override
-            public @Nullable PracticeAutonomy getAreaAutonomy() {
+            public @Nullable PracticeAutonomy getGroupAutonomy() {
                 return null;
             }
 
             @Override
-            public @Nullable Long getAreaId() {
+            public @Nullable Long getGroupId() {
                 return null;
             }
 

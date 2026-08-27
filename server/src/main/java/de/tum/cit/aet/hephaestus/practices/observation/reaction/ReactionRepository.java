@@ -1,76 +1,86 @@
 package de.tum.cit.aet.hephaestus.practices.observation.reaction;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
+import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.jspecify.annotations.Nullable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
-/**
- * Repository for immutable feedback reaction with append-only semantics.
- *
- * <p>Workspace-agnostic: reaction is scoped through {@code Reaction.feedback → Feedback.workspaceId}.
- */
+/** Persistence for append-only feedback-response snapshots in the legacy {@code reaction} table. */
 @Repository
 @WorkspaceAgnostic("Reaction scoped through Feedback.workspaceId relationship")
 public interface ReactionRepository extends JpaRepository<Reaction, UUID> {
-    /**
-     * Returns the most recent reaction for a specific feedback unit by a specific reactor. The {@code id}
-     * tiebreak makes "latest" deterministic when two append-only submits collide on {@code created_at}.
-     */
-    Optional<Reaction> findFirstByFeedbackIdAndReactorUserIdOrderByCreatedAtDescIdDesc(
-        UUID feedbackId,
-        Long reactorUserId
-    );
-
-    /**
-     * Latest reaction per {@code recurrence_key} (stable locus) for the given keys, restricted to one
-     * reacting developer (the feedback's recipient — only the recipient may react). Used by reaction suppression to suppress
-     * re-nagging a locus the student already DISPUTED / marked NOT_APPLICABLE on an earlier run,
-     * even though the per-run feedback row (and its {@code feedback_id}) is different this run.
-     *
-     * <p>Not workspace-joined, and that is safe: the {@code recurrence_key} embeds {@code artifactKind} +
-     * {@code artifactId}, and {@code artifactId} is the GLOBAL PR/Issue primary key (one identity sequence
-     * across all workspaces), so a key resolves to exactly one artifact in exactly one workspace — two
-     * workspaces cannot share one. The reactor scope already pins the recipient.
-     *
-     * <p><b>Precondition:</b> the caller MUST pass a non-empty {@code recurrenceKeys}. This is a native
-     * query: an empty collection renders {@code IN ()}, which Postgres rejects as a syntax error at
-     * execution time (it does NOT return an empty result like a JPQL {@code IN} would). Short-circuit
-     * upstream when there are no keys (see {@code ReactionSuppressionFilter}'s empty-key guard).
-     */
     @Query(
         value = """
-        SELECT DISTINCT ON (r.recurrence_key) r.*
+        SELECT r.usefulness AS "usefulness", r.action AS "resolution",
+               r.explanation AS "comment", r.created_at AS "respondedAt"
         FROM reaction r
-        WHERE r.recurrence_key IN (:recurrenceKeys)
-          AND r.reactor_user_id = :reactorUserId
-        ORDER BY r.recurrence_key, r.created_at DESC, r.id DESC
+        WHERE r.feedback_id = :feedbackId AND r.reactor_user_id = :reactorUserId
+        ORDER BY r.created_at DESC, r.id DESC
+        LIMIT 1
         """,
         nativeQuery = true
     )
-    List<Reaction> findLatestByRecurrenceKeysAndReactor(
-        @Param("recurrenceKeys") Collection<String> recurrenceKeys,
+    Optional<CurrentResponseProjection> findCurrentResponse(
+        @Param("feedbackId") UUID feedbackId,
         @Param("reactorUserId") Long reactorUserId
     );
 
     /**
-     * Engagement statistics: count of reaction actions grouped by action type, scoped to a workspace through
-     * the feedback → workspace relationship.
-     *
-     * <p>Reaction is {@code @Immutable} and append-only: a developer changing their mind appends a NEW row, and
-     * only the LATEST row per {@code feedback_id} is the current reaction (see
-     * {@link #findFirstByFeedbackIdAndReactorUserIdOrderByCreatedAtDescIdDesc}). Counting every historical row
-     * would double-count a feedback unit the developer reacted to more than once, inflating the uptake ratio.
-     * So collapse to the latest row per {@code feedback_id} ({@code DISTINCT ON … ORDER BY created_at DESC,
-     * id DESC}) BEFORE grouping. Native because {@code DISTINCT ON} is Postgres-specific.
-     *
-     * @see ActionCountProjection
+     * The current answer to one piece of feedback. Every component is null when the recipient has said nothing
+     * that still stands, which is how the caller tells "no response" from "a response with one dimension".
      */
+    interface CurrentResponseProjection {
+        @Nullable
+        String getUsefulness();
+
+        @Nullable
+        String getResolution();
+
+        @Nullable
+        String getComment();
+
+        @Nullable
+        Instant getRespondedAt();
+    }
+
+    /** Current resolution for each requested recurrence locus. The caller passes at least one key. */
+    @Query(
+        value = """
+        SELECT DISTINCT ON (o.recurrence_key) o.recurrence_key AS "recurrenceKey", r.action AS "resolution"
+        FROM feedback fb
+        JOIN feedback_observation fo ON fo.feedback_id = fb.id
+        JOIN observation o ON o.id = fo.observation_id
+        JOIN LATERAL (
+            SELECT response.action, response.created_at, response.id
+            FROM reaction response
+            WHERE response.feedback_id = fb.id AND response.reactor_user_id = :reactorUserId
+            ORDER BY response.created_at DESC, response.id DESC LIMIT 1
+        ) r ON r.action IS NOT NULL
+        WHERE o.recurrence_key IN (:recurrenceKeys)
+          AND fb.workspace_id = :workspaceId
+        ORDER BY o.recurrence_key, r.created_at DESC, r.id DESC
+        """,
+        nativeQuery = true
+    )
+    List<LocusResolutionProjection> findCurrentResolutionByRecurrenceKeys(
+        @Param("recurrenceKeys") Collection<String> recurrenceKeys,
+        @Param("reactorUserId") Long reactorUserId,
+        @Param("workspaceId") Long workspaceId
+    );
+
+    interface LocusResolutionProjection {
+        String getRecurrenceKey();
+        String getResolution();
+    }
+
+    /** Resolution counts from each feedback unit's newest response snapshot. */
     @Query(
         value = """
         SELECT latest.action AS action, COUNT(*) AS count
@@ -82,6 +92,7 @@ public interface ReactionRepository extends JpaRepository<Reaction, UUID> {
               AND fb.workspace_id = :workspaceId
             ORDER BY r.feedback_id, r.created_at DESC, r.id DESC
         ) latest
+        WHERE latest.action IS NOT NULL
         GROUP BY latest.action
         """,
         nativeQuery = true
@@ -91,10 +102,6 @@ public interface ReactionRepository extends JpaRepository<Reaction, UUID> {
         @Param("workspaceId") Long workspaceId
     );
 
-    /**
-     * Projection for reaction action counts used in engagement statistics. {@code action} is the stored enum
-     * STRING (the native query selects the raw column); the caller maps it back via {@link ReactionAction}.
-     */
     interface ActionCountProjection {
         String getAction();
 

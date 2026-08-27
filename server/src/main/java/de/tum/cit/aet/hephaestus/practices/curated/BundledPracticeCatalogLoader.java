@@ -2,7 +2,7 @@ package de.tum.cit.aet.hephaestus.practices.curated;
 
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.integration.core.signal.SignalName;
-import de.tum.cit.aet.hephaestus.practices.AreaDefinition;
+import de.tum.cit.aet.hephaestus.practices.GroupDefinition;
 import de.tum.cit.aet.hephaestus.practices.PracticeBinding;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinitionValidator;
@@ -46,36 +46,36 @@ public class BundledPracticeCatalogLoader {
         PracticeEvidenceDefaults evidenceDefaults
     ) {
         JsonNode root = readCatalog(objectMapper);
-        List<BundledEntry<AreaDefinition>> areas = new ArrayList<>();
+        List<BundledEntry<GroupDefinition>> groups = new ArrayList<>();
         List<BundledEntry<PracticeDefinition>> practices = new ArrayList<>();
-        Set<String> areaSlugs = new HashSet<>();
+        Set<String> groupSlugs = new HashSet<>();
         Set<String> practiceSlugs = new HashSet<>();
-        JsonNode areasNode = root.path("areas");
-        if (!areasNode.isArray()) {
-            throw new IllegalStateException("default practice catalog areas must be an array");
+        JsonNode groupsNode = root.path("groups");
+        if (!groupsNode.isArray()) {
+            throw new IllegalStateException("default practice catalog groups must be an array");
         }
-        int areaPosition = 0;
-        for (JsonNode areaNode : areasNode) {
-            String areaSlug = requiredText(areaNode, "slug");
-            if (!areaSlugs.add(areaSlug)) {
-                throw new IllegalStateException("duplicate bundled practice area slug: " + areaSlug);
+        int groupPosition = 0;
+        for (JsonNode groupNode : groupsNode) {
+            String groupSlug = requiredText(groupNode, "slug");
+            if (!groupSlugs.add(groupSlug)) {
+                throw new IllegalStateException("duplicate bundled practice group slug: " + groupSlug);
             }
-            areas.add(
+            groups.add(
                 new BundledEntry<>(
-                    areaSlug,
-                    new AreaDefinition(
-                        requiredText(areaNode, "name"),
-                        text(areaNode, "description"),
-                        text(areaNode, "icon"),
-                        text(areaNode, "color")
+                    groupSlug,
+                    new GroupDefinition(
+                        requiredText(groupNode, "name"),
+                        text(groupNode, "description"),
+                        text(groupNode, "icon"),
+                        text(groupNode, "color")
                     ),
-                    areaPosition++
+                    groupPosition++
                 )
             );
 
-            JsonNode practicesNode = areaNode.path("practices");
+            JsonNode practicesNode = groupNode.path("practices");
             if (!practicesNode.isArray()) {
-                throw new IllegalStateException("bundled practice area practices must be an array: " + areaSlug);
+                throw new IllegalStateException("bundled practice group practices must be an array: " + groupSlug);
             }
             int practicePosition = 0;
             for (JsonNode practiceNode : practicesNode) {
@@ -91,7 +91,7 @@ public class BundledPracticeCatalogLoader {
                             definitionValidator,
                             evidenceDefaults,
                             root,
-                            areaSlug,
+                            groupSlug,
                             practiceNode,
                             slug
                         ),
@@ -100,10 +100,10 @@ public class BundledPracticeCatalogLoader {
                 );
             }
         }
-        if (areas.isEmpty() || practices.isEmpty()) {
-            throw new IllegalStateException("default practice catalog must contain areas and practices");
+        if (groups.isEmpty() || practices.isEmpty()) {
+            throw new IllegalStateException("default practice catalog must contain groups and practices");
         }
-        return new BundledPracticeCatalog(List.copyOf(areas), List.copyOf(practices));
+        return new BundledPracticeCatalog(List.copyOf(groups), List.copyOf(practices));
     }
 
     private static PracticeDefinition definition(
@@ -111,7 +111,7 @@ public class BundledPracticeCatalogLoader {
         PracticeDefinitionValidator definitionValidator,
         PracticeEvidenceDefaults evidenceDefaults,
         JsonNode catalog,
-        String areaSlug,
+        String groupSlug,
         JsonNode node,
         String slug
     ) {
@@ -134,7 +134,7 @@ public class BundledPracticeCatalogLoader {
             evidenceDefaults.policyFor(artifactKind),
             whyItMatters,
             whatGoodLooksLike,
-            areaSlug
+            groupSlug
         );
         definitionValidator.validate(definition);
         return definition;

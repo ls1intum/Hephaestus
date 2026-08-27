@@ -1,12 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import {
-	listAreasOptions,
+	listGroupsOptions,
 	listPracticeReviewObservationsOptions,
 	listPracticesOptions,
 } from "@/api/@tanstack/react-query.gen";
 import {
-	areaFacetOptions,
+	groupFacetOptions,
 	practiceFacetOptions,
 } from "@/components/admin/practice-reviews/ObservationFilters";
 import { ObservationsListPage } from "@/components/admin/practice-reviews/ObservationsListPage";
@@ -46,7 +46,7 @@ function ObservationsListRoute() {
 			query: observationsQuery(search, REVIEW_PAGE_SIZE),
 		}),
 	});
-	const areasQuery = useQuery({ ...listAreasOptions({ path: { workspaceSlug } }) });
+	const groupsQuery = useQuery({ ...listGroupsOptions({ path: { workspaceSlug } }) });
 	const practicesQuery = useQuery({ ...listPracticesOptions({ path: { workspaceSlug } }) });
 	const people = useReviewPeople(workspaceSlug);
 
@@ -63,13 +63,13 @@ function ObservationsListRoute() {
 			isLoading={observationsQueryResult.isLoading}
 			error={observationsQueryResult.isError ? observationsQueryResult.error : undefined}
 			onRetry={() => void observationsQueryResult.refetch()}
-			areas={{
-				options: areaFacetOptions(areasQuery.data),
-				isLoading: areasQuery.isLoading,
-				isError: areasQuery.isError,
+			groups={{
+				options: groupFacetOptions(groupsQuery.data),
+				isLoading: groupsQuery.isLoading,
+				isError: groupsQuery.isError,
 			}}
 			practices={{
-				options: practiceFacetOptions(practicesQuery.data, areasQuery.data),
+				options: practiceFacetOptions(practicesQuery.data, groupsQuery.data),
 				isLoading: practicesQuery.isLoading,
 				isError: practicesQuery.isError,
 			}}

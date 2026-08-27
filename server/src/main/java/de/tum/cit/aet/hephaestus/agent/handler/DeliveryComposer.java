@@ -7,9 +7,9 @@ import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.Dif
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.ValidatedObservation;
 import de.tum.cit.aet.hephaestus.agent.handler.composition.ComposedFeedbackUnit;
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
+import de.tum.cit.aet.hephaestus.practices.feedback.DeveloperTextSanitizer;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
-import de.tum.cit.aet.hephaestus.practices.feedback.StudentTextSanitizer;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
@@ -436,11 +436,11 @@ class DeliveryComposer {
     private static final Pattern SENTENCE_SEPARATOR = Pattern.compile("(?<=[.!?])\\s+");
 
     static String sanitizeStudentText(@Nullable String text) {
-        return StudentTextSanitizer.sanitize(text);
+        return DeveloperTextSanitizer.sanitize(text);
     }
 
     static String stripEnvelopeCorruption(String text) {
-        return StudentTextSanitizer.stripEnvelopeCorruption(text);
+        return DeveloperTextSanitizer.stripEnvelopeCorruption(text);
     }
 
     private static String truncateToFirstSentence(String text, int maxLen) {
@@ -614,7 +614,7 @@ class DeliveryComposer {
     }
 
     private static boolean containsGraderMechanics(@Nullable String text) {
-        return StudentTextSanitizer.isGradingMeta(text);
+        return DeveloperTextSanitizer.isGradingMeta(text);
     }
 
     private static void appendStudentText(StringBuilder sb, @Nullable String text) {

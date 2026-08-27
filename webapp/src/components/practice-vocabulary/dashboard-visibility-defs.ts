@@ -4,7 +4,7 @@ import type { StatusDefs } from "./status-def";
 export type DashboardVisibility = "VISIBLE" | "HIDDEN";
 
 /**
- * Whether an area's practices appear on the dashboards developers read.
+ * Whether a group's practices appear on the dashboards developers read.
  *
  * A registry rather than a bare `<Badge>` because this sits inches from `CatalogOriginBadge` on the
  * same row, and the two mean unrelated things: one is a setting an administrator chose, the other is
@@ -16,7 +16,7 @@ export const DASHBOARD_VISIBILITY_DEFS: StatusDefs<DashboardVisibility> = {
 		label: "On dashboards",
 		icon: Eye,
 		badgeVariant: "outline",
-		description: "This area's practices appear on the dashboards developers read.",
+		description: "This group's practices appear on the dashboards developers read.",
 	},
 	HIDDEN: {
 		label: "Off dashboards",

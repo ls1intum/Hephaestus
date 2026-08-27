@@ -54,7 +54,7 @@ public record CuratedPracticeRequestDTO(
     @Nullable
     String whatGoodLooksLike,
 
-    @Size(max = 64, message = "Area slug must be at most 64 characters") @Nullable String areaSlug
+    @Size(max = 64, message = "Group slug must be at most 64 characters") @Nullable String groupSlug
 ) {
     public PracticeDefinition definition(PracticeAutomatedReviewPolicy resolvedEvidence) {
         return new PracticeDefinition(
@@ -65,7 +65,7 @@ public record CuratedPracticeRequestDTO(
             resolvedEvidence,
             whyItMatters,
             whatGoodLooksLike,
-            areaSlug
+            groupSlug
         );
     }
 }

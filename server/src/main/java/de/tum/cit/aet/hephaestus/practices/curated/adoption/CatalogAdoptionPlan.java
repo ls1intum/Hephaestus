@@ -1,9 +1,9 @@
 package de.tum.cit.aet.hephaestus.practices.curated.adoption;
 
-import de.tum.cit.aet.hephaestus.practices.AreaDefinition;
 import de.tum.cit.aet.hephaestus.practices.CanonicalDigest;
+import de.tum.cit.aet.hephaestus.practices.GroupDefinition;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
-import de.tum.cit.aet.hephaestus.practices.curated.dto.CuratedAreaRequestDTO;
+import de.tum.cit.aet.hephaestus.practices.curated.dto.CuratedGroupRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.curated.dto.CuratedPracticeDefinitionDTO;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
 import org.jspecify.annotations.Nullable;
@@ -12,10 +12,10 @@ record CatalogAdoptionPlan(
     String slug,
     PracticeDefinition definition,
     CatalogAdoptionAvailability availability,
-    CatalogAreaDisposition areaDisposition,
-    @Nullable String areaSlug,
-    @Nullable AreaDefinition areaDefinition,
-    int areaDisplayOrder,
+    CatalogGroupDisposition groupDisposition,
+    @Nullable String groupSlug,
+    @Nullable GroupDefinition groupDefinition,
+    int groupDisplayOrder,
     PracticeAutonomy initialAutonomy,
     String etag
 ) {
@@ -23,10 +23,10 @@ record CatalogAdoptionPlan(
         String slug,
         PracticeDefinition definition,
         CatalogAdoptionAvailability availability,
-        CatalogAreaDisposition areaDisposition,
-        @Nullable String areaSlug,
-        @Nullable AreaDefinition areaDefinition,
-        int areaDisplayOrder
+        CatalogGroupDisposition groupDisposition,
+        @Nullable String groupSlug,
+        @Nullable GroupDefinition groupDefinition,
+        int groupDisplayOrder
     ) {
         PracticeAutonomy initialAutonomy = definition
             .automatedReviewPolicy()
@@ -39,19 +39,19 @@ record CatalogAdoptionPlan(
             .add(slug)
             .add(definition.digest(slug))
             .add(availability.name())
-            .add(areaDisposition.name())
-            .addNullable(areaSlug)
-            .addNullable(areaDefinition == null || areaSlug == null ? null : areaDefinition.digest(areaSlug))
-            .addInt(areaDisplayOrder)
+            .add(groupDisposition.name())
+            .addNullable(groupSlug)
+            .addNullable(groupDefinition == null || groupSlug == null ? null : groupDefinition.digest(groupSlug))
+            .addInt(groupDisplayOrder)
             .add(initialAutonomy.name());
         return new CatalogAdoptionPlan(
             slug,
             definition,
             availability,
-            areaDisposition,
-            areaSlug,
-            areaDefinition,
-            areaDisplayOrder,
+            groupDisposition,
+            groupSlug,
+            groupDefinition,
+            groupDisplayOrder,
             initialAutonomy,
             digest.hex()
         );
@@ -62,10 +62,10 @@ record CatalogAdoptionPlan(
             slug,
             CuratedPracticeDefinitionDTO.from(slug, definition),
             availability,
-            new CatalogAdoptionAreaDTO(
-                areaDisposition,
-                areaSlug,
-                areaDefinition == null ? null : CuratedAreaRequestDTO.of(areaDefinition)
+            new CatalogAdoptionGroupDTO(
+                groupDisposition,
+                groupSlug,
+                groupDefinition == null ? null : CuratedGroupRequestDTO.of(groupDefinition)
             ),
             initialAutonomy,
             definition.provenanceFingerprint(slug),

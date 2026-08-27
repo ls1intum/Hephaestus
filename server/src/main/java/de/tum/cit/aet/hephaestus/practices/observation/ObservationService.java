@@ -1,29 +1,20 @@
 package de.tum.cit.aet.hephaestus.practices.observation;
 
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
-import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository.ObservationFeedbackBody;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
-import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
-import de.tum.cit.aet.hephaestus.practices.model.Practice;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeArea;
-import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
 import de.tum.cit.aet.hephaestus.practices.observation.dto.DeveloperPracticeSummaryProjection;
-import de.tum.cit.aet.hephaestus.practices.observation.dto.ReflectionItemDTO;
-import de.tum.cit.aet.hephaestus.practices.observation.dto.ReflectionPracticeDTO;
-import java.time.Instant;
-import java.time.temporal.ChronoUnit;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.LinkedHashMap;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewRunTargetLookup;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -52,7 +43,13 @@ public class ObservationService {
     private final ObservationRepository observationRepository;
     private final FeedbackObservationRepository feedbackObservationRepository;
     private final UserRepository userRepository;
-    private final ObservationVisibilityPolicy visibilityPolicy;
+    private final ReviewRunTargetLookup reviewRunTargetLookup;
+
+    /** Feed ordering: by observation time or by severity (direction applies to both). */
+    public enum ObservationSort {
+        DATE,
+        SEVERITY,
+    }
 
     /**
      * Paginated observations for the current user in a workspace, with optional filters.
@@ -60,30 +57,64 @@ public class ObservationService {
      * @return empty page if user is not a synced developer
      */
     @Transactional(readOnly = true)
-    public Page<Observation> getObservations(
-        Long workspaceId,
-        String practiceSlug,
-        Presence presence,
-        Pageable pageable
-    ) {
+    public Page<Observation> getObservations(Long workspaceId, ObservationFeedQuery query, Pageable pageable) {
         Optional<User> currentUser = userRepository.getCurrentUser();
         if (currentUser.isEmpty()) {
             return Page.empty(pageable);
         }
+        // An IN () over an empty list is invalid SQL. The flags disable empty filters, while the placeholder
+        // values keep the query parseable.
+        boolean hasArtifactKinds = query.artifactKinds() != null && !query.artifactKinds().isEmpty();
+        boolean hasSeverities = query.severities() != null && !query.severities().isEmpty();
+        List<ArtifactKind> artifactKinds = hasArtifactKinds
+            ? Objects.requireNonNull(query.artifactKinds())
+            : List.of(ArtifactKinds.PULL_REQUEST);
+        List<Severity> severities = hasSeverities ? Objects.requireNonNull(query.severities()) : List.of(Severity.INFO);
+        if (query.sort() == ObservationSort.SEVERITY) {
+            return observationRepository.findByAboutUserAndWorkspaceSeverityFirst(
+                currentUser.get().getId(),
+                workspaceId,
+                query.practiceSlug(),
+                query.groupSlug(),
+                query.presence(),
+                hasArtifactKinds,
+                artifactKinds,
+                hasSeverities,
+                severities,
+                query.displayableOnly(),
+                query.mostSevereFirst() ? 1 : -1,
+                pageable
+            );
+        }
         return observationRepository.findByAboutUserAndWorkspace(
             currentUser.get().getId(),
             workspaceId,
-            practiceSlug,
-            presence,
+            query.practiceSlug(),
+            query.groupSlug(),
+            query.presence(),
+            hasArtifactKinds,
+            artifactKinds,
+            hasSeverities,
+            severities,
+            query.displayableOnly(),
             pageable
         );
     }
 
     /**
-     * Per-practice summary for the current user in a workspace.
-     *
-     * @return empty list if user is not a synced developer
+     * Link to the reviewed artifact behind an observation. Empty when the run target is unknown, for example
+     * after the artifact was deleted.
      */
+    @Transactional(readOnly = true)
+    public Optional<String> getArtifactUrl(Long workspaceId, Observation observation) {
+        return Optional.ofNullable(
+            reviewRunTargetLookup
+                .findByJobIds(workspaceId, List.of(observation.getAgentJobId()))
+                .get(observation.getAgentJobId())
+        ).map(ReviewRunTargetLookup.Target::url);
+    }
+
+    /** Per-practice observation counts for the current user in a workspace. */
     @Transactional(readOnly = true)
     public List<DeveloperPracticeSummaryProjection> getSummary(Long workspaceId) {
         Optional<User> currentUser = userRepository.getCurrentUser();
@@ -92,13 +123,6 @@ public class ObservationService {
         }
         return observationRepository.findSummaryByDeveloperAndWorkspace(currentUser.get().getId(), workspaceId);
     }
-
-    /** Look-back for the reflection read model — mirrors the mentor's observations window. */
-    private static final int REFLECTION_LOOKBACK_DAYS = 90;
-    /** Per-practice cap on "to work on" items — the highest-impact few, not an exhaustive log. */
-    private static final int MAX_ITEMS_PER_PRACTICE = 5;
-    /** Per-practice cap on acknowledged strengths — enough to affirm, bounded so affirmations don't drown signal. */
-    private static final int MAX_STRENGTHS_PER_PRACTICE = 3;
 
     /**
      * The lanes whose text this read model's {@code guidance} means: the ones that speak about the one
@@ -113,156 +137,8 @@ public class ObservationService {
     );
 
     /**
-     * The reflective-dashboard read-model for the current developer: per-practice cards they can READ —
-     * why the practice matters, what good looks like, where they stand, what to act on, and what they
-     * already do well. This is the third feedback channel (alongside in-context SCM notes and the mentor),
-     * reorganising the SAME observations by practice for self-paced reflection — not a scoreboard.
-     *
-     * <p>Sourced from each target's LATEST review run with {@code NOT_APPLICABLE} already excluded (the
-     * repository query), so the surface carries only feedback the developer can act on or be affirmed by.
-     * The problem/strength split is single-sourced through each observation's {@code assessment} ({@code BAD}
-     * = problem, {@code GOOD} = strength; ADR 0022). Criteria never appears — only the learner framing
-     * ({@code whyItMatters}/{@code whatGoodLooksLike}) does.
-     *
-     * @return empty list if the user is not a synced developer
-     */
-    @Transactional(readOnly = true)
-    public List<ReflectionPracticeDTO> getReflection(Long workspaceId) {
-        Optional<User> currentUser = userRepository.getCurrentUser();
-        if (currentUser.isEmpty()) {
-            return List.of();
-        }
-        Instant since = Instant.now().minus(REFLECTION_LOOKBACK_DAYS, ChronoUnit.DAYS);
-        // No pre-group LIMIT: a global recency cap would silently drop WHOLE practice cards whose observations fall
-        // past the cap row, making a missing card indistinguishable from "no observations". The query is already
-        // latest-run-deduped within a 90-day window (so cardinality is bounded by a developer's distinct
-        // latest-run observations, not their full history), and the per-practice caps below do the real trimming —
-        // so every practice with at least one actionable observation gets a card regardless of overall volume.
-        List<Observation> recent = observationRepository.findRecentByDeveloperAndWorkspace(
-            currentUser.get().getId(),
-            workspaceId,
-            since,
-            Pageable.unpaged()
-        );
-        Set<UUID> visible = visibilityPolicy.permitsAll(
-            workspaceId,
-            recent,
-            SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY
-        );
-        List<Observation> observations = recent
-            .stream()
-            .filter(o -> visible.contains(o.getId()))
-            .toList();
-
-        // Advice lives on the delivered Feedback (ADR 0021), not on the observation. Batch-fetch the
-        // observation-id → delivered-body map ONCE for every observation on this surface so each card's items can
-        // show what was actually delivered (null when nothing was). One query, not N+1.
-        Map<UUID, String> deliveredFeedback = deliveredFeedbackByObservation(
-            workspaceId,
-            observations.stream().map(Observation::getId).collect(Collectors.toSet())
-        );
-
-        // Group by practice, preserving first-seen (recency) order from the query.
-        Map<String, List<Observation>> byPractice = new LinkedHashMap<>();
-        for (Observation f : observations) {
-            byPractice.computeIfAbsent(f.getPractice().getSlug(), k -> new ArrayList<>()).add(f);
-        }
-
-        List<ReflectionPracticeDTO> cards = new ArrayList<>();
-        for (List<Observation> group : byPractice.values()) {
-            Practice practice = group.get(0).getPractice();
-
-            // A defect-detector practice hunts an undesirable behaviour, so it has no PRESENT, GOOD: what
-            // would be present is the defect. A persisted row of that shape predating the write-time coercion
-            // must not surface here as a false "strength" — read-time guard for the dashboard.
-            //
-            // Its ABSENT, GOOD rows are the opposite case and belong on the card. The harmful behaviour could
-            // have appeared in the corpus the practice bounds and did not, proven against the search the
-            // observation carries, and this surface is the whole reason that verdict was made reachable: a
-            // developer who writes clean error handling has to be able to read that they did, and used to be
-            // told instead that their work had no subject for the practice.
-            boolean isDefectDetector = practice.isDefectDetector();
-
-            List<Observation> bad = group
-                .stream()
-                .filter(f -> f.getAssessment() == Assessment.BAD)
-                .toList();
-            List<ReflectionItemDTO> toWorkOn = bad
-                .stream()
-                .sorted(Comparator.comparingInt(ObservationService::severityOrdinal))
-                .limit(MAX_ITEMS_PER_PRACTICE)
-                .map(f -> ReflectionItemDTO.from(f, deliveredFeedback.get(f.getId())))
-                .toList();
-            List<ReflectionItemDTO> strengths = group
-                .stream()
-                .filter(f -> f.getAssessment() == Assessment.GOOD)
-                .filter(f -> !isDefectDetector || f.getPresence() == Presence.ABSENT)
-                .limit(MAX_STRENGTHS_PER_PRACTICE)
-                .map(f -> ReflectionItemDTO.from(f, deliveredFeedback.get(f.getId())))
-                .toList();
-            if (toWorkOn.isEmpty() && strengths.isEmpty()) {
-                // This fires for a defect-detector practice whose only rows are PRESENT, GOOD: those are
-                // suppressed above (no clean-bill-of-health) and there are no BAD rows, so the card is empty
-                // and contributes nothing to the dashboard. Skip it rather than emit a contentless card.
-                continue;
-            }
-
-            ReflectionPracticeDTO.Standing standing =
-                !toWorkOn.isEmpty() && !strengths.isEmpty()
-                    ? ReflectionPracticeDTO.Standing.MIXED
-                    : !toWorkOn.isEmpty()
-                        ? ReflectionPracticeDTO.Standing.DEVELOPING
-                        : ReflectionPracticeDTO.Standing.STRENGTH;
-
-            PracticeArea area = practice.getArea();
-            cards.add(
-                new ReflectionPracticeDTO(
-                    practice.getSlug(),
-                    practice.getName(),
-                    area != null ? area.getSlug() : null,
-                    area != null ? area.getName() : null,
-                    practice.getWhyItMatters(),
-                    practice.getWhatGoodLooksLike(),
-                    standing,
-                    toWorkOn,
-                    strengths
-                )
-            );
-        }
-
-        // Lead with what needs attention (worst severity first), then mixed, then pure strengths.
-        cards.sort(
-            Comparator.<ReflectionPracticeDTO>comparingInt(c -> standingRank(c.standing())).thenComparingInt(
-                ObservationService::worstSeverityOrdinal
-            )
-        );
-        return cards;
-    }
-
-    private static int standingRank(ReflectionPracticeDTO.Standing s) {
-        return switch (s) {
-            case DEVELOPING -> 0;
-            case MIXED -> 1;
-            case STRENGTH -> 2;
-        };
-    }
-
-    private static int worstSeverityOrdinal(ReflectionPracticeDTO card) {
-        return card
-            .toWorkOn()
-            .stream()
-            .mapToInt(i -> i.severity() == null ? Severity.values().length : i.severity().ordinal())
-            .min()
-            .orElse(Severity.values().length); // strengths-only cards sort after any with problems
-    }
-
-    private static int severityOrdinal(Observation observation) {
-        return observation.getSeverity() == null ? Severity.values().length : observation.getSeverity().ordinal();
-    }
-
-    /**
      * Single observation detail. Ownership is enforced in the SQL query itself —
-     * a observation belonging to another developer simply won't be returned.
+     * an observation belonging to another developer simply won't be returned.
      *
      * @return the observation if it exists and belongs to the current user
      * @throws EntityNotFoundException if no user, or observation not found/not owned

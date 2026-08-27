@@ -12,7 +12,7 @@ import de.tum.cit.aet.hephaestus.practices.feedback.inapp.dto.InAppEvidenceDTO;
 import de.tum.cit.aet.hephaestus.practices.feedback.inapp.dto.InAppFeedbackDTO;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeArea;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeGroup;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationVisibilityPolicy;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -136,7 +136,7 @@ public class InAppFeedbackService {
 
     private static InAppFeedbackDTO toCard(Feedback unit, List<Observation> evidence) {
         Practice practice = evidence.getFirst().getPractice();
-        PracticeArea area = practice == null ? null : practice.getArea();
+        PracticeGroup group = practice == null ? null : practice.getGroup();
         String headline = InAppFeedbackBody.headlineOf(unit.getBody());
         return new InAppFeedbackDTO(
             unit.getId(),
@@ -144,8 +144,8 @@ public class InAppFeedbackService {
             InAppFeedbackBody.messageOf(unit.getBody()),
             practice == null ? "" : practice.getSlug(),
             practice == null ? "" : practice.getName(),
-            area == null ? null : area.getSlug(),
-            area == null ? null : area.getName(),
+            group == null ? null : group.getSlug(),
+            group == null ? null : group.getName(),
             practice == null ? null : practice.getWhyItMatters(),
             practice == null ? null : practice.getWhatGoodLooksLike(),
             evidence.stream().map(InAppEvidenceDTO::from).toList(),

@@ -67,7 +67,7 @@ public record UpdatePracticeRequestDTO(
     @Valid
     @Schema(description = "Catalog placement to apply with the definition update; omit to leave unchanged")
     @Nullable
-    BindPracticeAreaRequestDTO area,
+    BindPracticeGroupRequestDTO group,
 
     @Schema(description = "Optional fields to clear before applying supplied values")
     @Nullable

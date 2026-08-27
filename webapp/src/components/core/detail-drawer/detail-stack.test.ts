@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { detailStackSchema, encodeDetailStack, parseDetailStack } from "./detail-stack";
 
-const KINDS = ["area", "practice"] as const;
+const KINDS = ["group", "practice"] as const;
 const parse = (detail: unknown) => detailStackSchema(KINDS).parse({ detail }).detail;
 
 describe("detailStackSchema", () => {
 	it("coerces the single-value form a hand-written URL produces", () => {
-		expect(parse("area:code-review")).toStrictEqual(["area:code-review"]);
+		expect(parse("group:code-review")).toStrictEqual(["group:code-review"]);
 	});
 
 	it("keeps an id containing a colon, splitting only at the first one", () => {
@@ -16,7 +16,7 @@ describe("detailStackSchema", () => {
 	});
 
 	it("drops kinds the surface cannot render, rather than passing them on", () => {
-		expect(parse(["practice:a", "sabotage:b", "area:c"])).toStrictEqual(["practice:a", "area:c"]);
+		expect(parse(["practice:a", "sabotage:b", "group:c"])).toStrictEqual(["practice:a", "group:c"]);
 	});
 
 	it.each([[":x"], ["x:"], ["nocolon"], [""]])("drops the malformed entry %j", (value) => {
@@ -40,11 +40,11 @@ describe("detailStackSchema", () => {
 describe("encodeDetailStack", () => {
 	it("writes the wire form the schema reads back", () => {
 		const stack = [
-			{ kind: "area", id: "code-review" },
+			{ kind: "group", id: "code-review" },
 			{ kind: "practice", id: "describe-what-and-why" },
 		];
 		expect(encodeDetailStack(stack)).toStrictEqual([
-			"area:code-review",
+			"group:code-review",
 			"practice:describe-what-and-why",
 		]);
 		expect(parseDetailStack(parse(encodeDetailStack(stack)), KINDS)).toStrictEqual(stack);

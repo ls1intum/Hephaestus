@@ -132,10 +132,55 @@ public interface FeedbackObservationRepository extends JpaRepository<FeedbackObs
         String getBody();
     }
 
+    /** Newest delivered feedback that carried each observation to this developer. */
+    @Query(
+        value = """
+                SELECT DISTINCT ON (fo.observation_id)
+                       fo.observation_id AS "observationId",
+                       f.id AS "feedbackId",
+                       response.usefulness AS "responseUsefulness",
+                       response.action AS "responseResolution",
+                       response.explanation AS "responseComment"
+                FROM feedback_observation fo
+                JOIN feedback f ON f.id = fo.feedback_id
+                LEFT JOIN LATERAL (
+                    SELECT r.usefulness, r.action, r.explanation
+                    FROM reaction r
+                    WHERE r.feedback_id = f.id AND r.reactor_user_id = :recipientUserId
+                    ORDER BY r.created_at DESC, r.id DESC LIMIT 1
+        ) response ON TRUE
+        WHERE fo.observation_id IN (:observationIds)
+          AND f.workspace_id = :workspaceId
+          AND f.recipient_user_id = :recipientUserId
+          AND f.delivery_state = 'DELIVERED'
+        ORDER BY fo.observation_id, f.delivered_at DESC NULLS LAST, f.created_at DESC, f.id DESC
+        """,
+        nativeQuery = true
+    )
+    List<DeliveredFeedbackBinding> findDeliveredFeedbackBindings(
+        @Param("workspaceId") Long workspaceId,
+        @Param("recipientUserId") Long recipientUserId,
+        @Param("observationIds") Collection<UUID> observationIds
+    );
+
+    interface DeliveredFeedbackBinding {
+        UUID getObservationId();
+        UUID getFeedbackId();
+
+        @Nullable
+        String getResponseUsefulness();
+
+        @Nullable
+        String getResponseResolution();
+
+        @Nullable
+        String getResponseComment();
+    }
+
     // --- conversational feedback delivery loop ---
 
     /**
-     * The id(s) of the PREPARED IN_CHAT feedback unit(s) for this recipient/workspace bound (as PRIMARY) to the
+     * The id(s) of the PREPARED IN_CHAT piece of feedback(s) for this recipient/workspace bound (as PRIMARY) to the
      * given observation. Maps a mentor {@code link_observation} id back to the unit to flip to DELIVERED.
      * Ordered newest-first so a caller can take the first; the reconciler's CAS makes any duplicate flip a no-op.
      */
@@ -193,7 +238,7 @@ public interface FeedbackObservationRepository extends JpaRepository<FeedbackObs
         """
         SELECT fo.observation.id AS observationId, fo.role AS role, fo.ordinal AS ordinal,
                p.slug AS practiceSlug, p.name AS practiceName, o.summary AS summary,
-               pa.slug AS areaSlug, pa.name AS areaName, pa.icon AS areaIcon, pa.color AS areaColor,
+               pa.slug AS groupSlug, pa.name AS groupName, pa.icon AS groupIcon, pa.color AS groupColor,
                o.presence AS presence, o.assessment AS assessment, o.severity AS severity,
                evaluatedRevision.id AS practiceRevisionId,
                evaluatedRevision.reviewRuleFingerprint AS practiceRevisionFingerprint,
@@ -204,7 +249,7 @@ public interface FeedbackObservationRepository extends JpaRepository<FeedbackObs
         JOIN o.practice p
         LEFT JOIN o.practiceRevision evaluatedRevision
         LEFT JOIN p.currentRevision currentRevision
-        LEFT JOIN p.area pa
+        LEFT JOIN p.group pa
         WHERE fo.feedback.id = :feedbackId
           AND fo.feedback.workspaceId = :workspaceId
           AND p.workspace.id = :workspaceId
@@ -240,16 +285,16 @@ public interface FeedbackObservationRepository extends JpaRepository<FeedbackObs
         String getPracticeName();
 
         @Nullable
-        String getAreaSlug();
+        String getGroupSlug();
 
         @Nullable
-        String getAreaName();
+        String getGroupName();
 
         @Nullable
-        String getAreaIcon();
+        String getGroupIcon();
 
         @Nullable
-        String getAreaColor();
+        String getGroupColor();
 
         String getSummary();
         Presence getPresence();

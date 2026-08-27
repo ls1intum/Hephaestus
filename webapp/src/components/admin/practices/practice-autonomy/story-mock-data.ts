@@ -1,7 +1,7 @@
 import type {
-	AreaAutonomyRollup,
 	AutonomyAssignment,
 	AutonomyRollup,
+	GroupAutonomyRollup,
 	Practice,
 	PracticeReviewSettings,
 } from "@/api/types.gen";
@@ -13,26 +13,17 @@ import {
 	mockPullRequestPolicy,
 } from "@/mocks/fixtures/practice";
 
-/**
- * Fixtures that resolve the inheritance chain the way the server does, so a fixture is either a state
- * the server can reach or a compile error. Hand-written rows drift: a practice at Review before sending under an
- * area at Off, counted by the rollup as Send automatically, looks plausible and cannot happen.
- */
+/** Builds internally consistent settings, rollup, and practice fixtures from the inheritance inputs. */
 
 export interface PracticeSpec {
 	name: string;
-	/** The autonomy held on the practice itself; absent means it inherits. */
 	override?: PracticeAutonomy;
-	/** False for a practice that cannot be reviewed automatically — the server pins those to Off. */
 	reviewable?: boolean;
-	/** Optional on the API: a locally written practice carries none, and the row has to read without it. */
 	whyItMatters?: string;
-	/** Defaults to a pull request. */
 	artifactKind?: string;
 }
 
-export interface AreaSpec {
-	/** Null is the group of practices that belong to no area; it holds no autonomy of its own. */
+export interface GroupSpec {
 	slug: string | null;
 	name: string | null;
 	override?: PracticeAutonomy;
@@ -56,43 +47,41 @@ function assignment(
 	effective: PracticeAutonomy,
 	source: AutonomyAssignment["source"],
 ): AutonomyAssignment {
-	// `inherited` follows the override, never the source: an area that chose its own autonomy reports
-	// source AREA and inherited false.
 	return { effective, override, source, inherited: override == null };
 }
 
 export function buildAutonomyFixture({
 	workspaceDefault,
-	areas,
+	groups,
 }: {
 	/** Absent means this workspace has never chosen, so Review before sending applies. */
 	workspaceDefault?: PracticeAutonomy;
-	areas: AreaSpec[];
+	groups: GroupSpec[];
 }): AutonomyFixture {
 	const effectiveDefault: PracticeAutonomy = workspaceDefault ?? "HUMAN_APPROVAL";
 	const practices: Practice[] = [];
-	const rollupAreas: AreaAutonomyRollup[] = [];
+	const rollupGroups: GroupAutonomyRollup[] = [];
 	const workspaceCounts = emptyCounts();
 	let id = 1;
 
-	for (const area of areas) {
-		const areaEffective = area.override ?? effectiveDefault;
+	for (const group of groups) {
+		const groupEffective = group.override ?? effectiveDefault;
 		const counts = emptyCounts();
 		let overriddenCount = 0;
 
-		for (const spec of area.practices) {
+		for (const spec of group.practices) {
 			// The server writes Off onto a practice it cannot review, rather than letting it inherit.
 			const held = spec.reviewable === false ? "OFF" : spec.override;
-			const effective = held ?? areaEffective;
-			const source = held ? "PRACTICE" : area.override ? "AREA" : "WORKSPACE";
+			const effective = held ?? groupEffective;
+			const source = held ? "PRACTICE" : group.override ? "GROUP" : "WORKSPACE";
 			if (held) overriddenCount += 1;
 			counts[effective] += 1;
 			workspaceCounts[effective] += 1;
 			practices.push({
 				id: id++,
-				slug: `${area.slug ?? "unassigned"}-${slugify(spec.name)}`,
+				slug: `${group.slug ?? "unassigned"}-${slugify(spec.name)}`,
 				name: spec.name,
-				areaSlug: area.slug ?? undefined,
+				groupSlug: group.slug ?? undefined,
 				bindings: [mockPullRequestBinding],
 				criteria: `## ${spec.name}\n\nWhat a review looks for.`,
 				artifactKind: spec.artifactKind ?? "scm.pull_request",
@@ -116,16 +105,16 @@ export function buildAutonomyFixture({
 			});
 		}
 
-		rollupAreas.push({
-			areaSlug: area.slug ?? undefined,
-			areaName: area.name ?? undefined,
+		rollupGroups.push({
+			groupSlug: group.slug ?? undefined,
+			groupName: group.name ?? undefined,
 			counts,
 			overriddenCount,
-			// The no-area bucket carries the workspace's answer; it is not a row that can hold one.
+			// The no-group bucket carries the workspace's answer; it is not a row that can hold one.
 			autonomy:
-				area.slug === null
+				group.slug === null
 					? assignment(workspaceDefault, effectiveDefault, "WORKSPACE")
-					: assignment(area.override, areaEffective, area.override ? "AREA" : "WORKSPACE"),
+					: assignment(group.override, groupEffective, group.override ? "GROUP" : "WORKSPACE"),
 		});
 	}
 
@@ -136,7 +125,7 @@ export function buildAutonomyFixture({
 		}),
 		rollup: {
 			counts: workspaceCounts,
-			areas: rollupAreas,
+			groups: rollupGroups,
 			workspaceDefault: assignment(workspaceDefault, effectiveDefault, "WORKSPACE"),
 		},
 		practices,
@@ -149,7 +138,7 @@ const slugify = (name: string) =>
 		.replace(/[^a-z0-9]+/g, "-")
 		.replace(/^-|-$/g, "");
 
-const SCALE_AREA_NAMES = [
+const SCALE_GROUP_NAMES = [
 	"Pull request hygiene",
 	"Testing",
 	"Documentation",
@@ -185,14 +174,14 @@ const SCALE_PRACTICE_NAMES = [
 ];
 
 /**
- * Deliberately lopsided: most of it inherits, a handful of areas and practices were changed by hand,
+ * Deliberately lopsided: most of it inherits, a handful of groups and practices were changed by hand,
  * and one practice cannot be reviewed at all. A fixture where everything is set says nothing about
  * whether the inherited case recedes.
  */
 export function scaleFixture(): AutonomyFixture {
 	return buildAutonomyFixture({
 		workspaceDefault: "HUMAN_APPROVAL",
-		areas: SCALE_AREA_NAMES.map((name, index) => ({
+		groups: SCALE_GROUP_NAMES.map((name, index) => ({
 			slug: slugify(name),
 			name,
 			override: index === 2 ? "OFF" : index === 7 ? "AUTOMATIC" : undefined,

@@ -63,6 +63,56 @@ Before upgrading to any new `0.x.0` version:
 Entries exist only for releases that need operator action. Everything else is in the
 [release notes](https://github.com/ls1intum/Hephaestus/releases).
 
+### v0.75.0
+
+#### 🔴 Practice area API names are replaced by practice group names
+
+**Affected**: anything calling the application API directly. The generated Hephaestus web client is
+updated in this release.
+
+The product concept previously exposed as a *practice area* is now consistently named a **practice
+group**. All `/practice-areas` routes move to `/practice-groups`; request and response fields such as
+`areaSlug` and `areaName` become `groupSlug` and `groupName`; catalog collections named `areas` become `groups`. Generated schema
+names likewise use `PracticeGroup` instead of `PracticeArea`. The developer-facing practice projection
+moves from `/practices/learner` to `/practices/reviewed` and is named `ReviewedPractice`. The old routes
+and field names are removed rather than aliased. This rename does not change which practices belong together.
+
+**Action**: regenerate API clients and replace direct uses of the retired routes, schema names, and
+fields. No operator configuration changes are required; the database migration runs automatically.
+
+#### 🔴 The feedback reaction endpoint is replaced by a response endpoint
+
+**Affected**: anything calling the application API directly. The Hephaestus web app is unaffected —
+it never used these endpoints outside its generated client, which ships regenerated in this release.
+
+Removed:
+
+```
+POST /workspaces/{workspaceSlug}/practices/feedback/{feedbackId}/reactions   (submitReaction)
+GET  /workspaces/{workspaceSlug}/practices/feedback/{feedbackId}/reactions   (getLatestReaction)
+```
+
+**Before**: a developer submitted an `action` (`ADDRESSED`, `DISPUTED`, or `NOT_APPLICABLE`) and an
+optional `explanation`. Submissions were append-only and the GET returned the latest reaction.
+
+**After**: the response endpoint renames `action` to `resolution` and `explanation` to `comment`. It
+also accepts an independent, optional `usefulness` answer:
+
+```
+PUT    /workspaces/{workspaceSlug}/practices/feedback/{feedbackId}/response
+GET    /workspaces/{workspaceSlug}/practices/feedback/{feedbackId}/response
+DELETE /workspaces/{workspaceSlug}/practices/feedback/{feedbackId}/response
+GET    /workspaces/{workspaceSlug}/practices/feedback/resolution-counts
+```
+
+PUT replaces the complete response with `usefulness` (`HELPFUL` / `UNHELPFUL`), `resolution`
+(`ADDRESSED` / `DISPUTED` / `NOT_APPLICABLE`), or both, plus an optional `comment` that is required
+when disputing. Omitted fields are cleared. Repeating the same PUT has no effect. DELETE removes the
+complete response and is safe to repeat. GET returns the response that currently stands.
+
+**Action**: repoint any direct API caller at the new endpoint. Existing response history is preserved and
+participates in current-response reads; no operator data migration is required.
+
 ### v0.74.0
 
 #### 🔴 An agent image reference naming a channel tag is now refused
@@ -322,7 +372,7 @@ Update clients in the same deployment as the server and webapp. The old names ha
 | `evidenceRequirements` | `automatedReviewPolicy` |
 | `evidenceSupport` | `evidenceSufficiency` |
 | practice `active` and `/active` | `reviewTier` and `/review-tier` (see below) |
-| practice-area `active` | `visibleInPracticeDashboards` |
+| practice-group `active` | `visibleInPracticeDashboards` |
 | observation `artifactType` | `artifactKind` |
 | observation `title` | `summary` |
 | observation `reasoning` | `evidenceRationale` |
@@ -350,8 +400,8 @@ reviews becomes `DELIVER`, one that was not becomes `OFF`, and the migration run
 and every observation is still recorded, and nothing is sent to anyone. All three values are settable
 at every level; a practice only lands on `PROPOSE` because somebody put it there.
 
-Omitting `reviewTier`, or sending it as `null`, clears the setting so the practice follows its area,
-and the area follows the workspace default.
+Omitting `reviewTier`, or sending it as `null`, clears the setting so the practice follows its group,
+and the group follows the workspace default.
 
 #### 🟢 A workspace can restrict review to some branches and repositories
 

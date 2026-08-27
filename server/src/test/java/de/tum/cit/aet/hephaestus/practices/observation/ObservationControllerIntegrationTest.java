@@ -6,6 +6,7 @@ import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
+import de.tum.cit.aet.hephaestus.practices.PracticeGroupRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeRevisionRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
@@ -18,6 +19,7 @@ import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSource;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeGroup;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeRevision;
 import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
 import de.tum.cit.aet.hephaestus.testconfig.WithUser;
@@ -30,6 +32,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -56,6 +59,9 @@ class ObservationControllerIntegrationTest extends AbstractWorkspaceIntegrationT
 
     @Autowired
     private PracticeRevisionRepository practiceRevisionRepository;
+
+    @Autowired
+    private PracticeGroupRepository groupRepository;
 
     @Autowired
     private AgentJobRepository agentJobRepository;
@@ -112,7 +118,7 @@ class ObservationControllerIntegrationTest extends AbstractWorkspaceIntegrationT
         User user,
         String title,
         String presence,
-        String severity,
+        @Nullable String severity,
         float confidence,
         String artifactKind,
         Long artifactId,
@@ -141,8 +147,11 @@ class ObservationControllerIntegrationTest extends AbstractWorkspaceIntegrationT
         return id;
     }
 
-    /** Presence-derived valence: PRESENT is a strength (GOOD), ABSENT is a problem (BAD). */
-    private static String assessmentFor(String presence) {
+    /** Presence-derived valence: PRESENT is a strength (GOOD), ABSENT a problem (BAD), NOT_APPLICABLE none. */
+    private static @Nullable String assessmentFor(String presence) {
+        if ("NOT_APPLICABLE".equals(presence)) {
+            return null;
+        }
         return "PRESENT".equals(presence) ? "GOOD" : "BAD";
     }
 
@@ -240,6 +249,227 @@ class ObservationControllerIntegrationTest extends AbstractWorkspaceIntegrationT
 
         @Test
         @WithUser
+        @DisplayName("filters by the practice group the observed practice belongs to")
+        void shouldFilterByGroupSlug() {
+            PracticeGroup group = new PracticeGroup();
+            group.setWorkspace(workspace);
+            group.setSlug("review-communication");
+            group.setName("Review Communication");
+            group = groupRepository.save(group);
+            practiceA.setGroup(group);
+            practiceRepository.save(practiceA);
+
+            Instant now = Instant.now();
+            insertFinding(practiceA, developer, "In group", "PRESENT", "INFO", 0.9f, "scm.pull_request", 1L, now);
+            // practiceB has NO group — the LEFT JOIN must keep it visible when no filter is set.
+            insertFinding(practiceB, developer, "No group", "ABSENT", "MAJOR", 0.8f, "scm.pull_request", 2L, now);
+
+            webTestClient
+                .get()
+                .uri(BASE_URI + "?groupSlug={groupSlug}", workspace.getWorkspaceSlug(), "review-communication")
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$.content.length()")
+                .isEqualTo(1)
+                .jsonPath("$.content[0].summary")
+                .isEqualTo("In group");
+
+            webTestClient
+                .get()
+                .uri(BASE_URI, workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$.content.length()")
+                .isEqualTo(2);
+        }
+
+        @Test
+        @WithUser
+        @DisplayName("filters by artifact kind so a single integration's events can be shown")
+        void shouldFilterByArtifactKinds() {
+            Instant now = Instant.now();
+            insertFinding(practiceA, developer, "From a PR", "PRESENT", "INFO", 0.9f, "scm.pull_request", 1L, now);
+            insertFinding(
+                practiceA,
+                developer,
+                "From Slack",
+                "ABSENT",
+                "MINOR",
+                0.8f,
+                "chat.conversation_thread",
+                2L,
+                now
+            );
+
+            webTestClient
+                .get()
+                .uri(BASE_URI + "?artifactKinds=chat.conversation_thread", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$.content.length()")
+                .isEqualTo(1)
+                .jsonPath("$.content[0].summary")
+                .isEqualTo("From Slack");
+        }
+
+        @Test
+        @WithUser
+        @DisplayName("filters gaps by severity while keeping strengths visible")
+        void shouldFilterBySeverities() {
+            Instant now = Instant.now();
+            insertFinding(practiceA, developer, "Major gap", "ABSENT", "MAJOR", 0.9f, "scm.pull_request", 1L, now);
+            insertFinding(practiceA, developer, "Minor nit", "ABSENT", "MINOR", 0.9f, "scm.pull_request", 2L, now);
+            insertFinding(
+                practiceA,
+                developer,
+                "Recent strength",
+                "PRESENT",
+                null,
+                0.9f,
+                "scm.pull_request",
+                3L,
+                now.minus(1, ChronoUnit.DAYS)
+            );
+
+            webTestClient
+                .get()
+                .uri(BASE_URI + "?severities=MAJOR&severities=CRITICAL", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$.content.length()")
+                .isEqualTo(2)
+                .jsonPath("$.content[0].summary")
+                .isEqualTo("Major gap")
+                .jsonPath("$.content[1].summary")
+                .isEqualTo("Recent strength");
+        }
+
+        @Test
+        @WithUser
+        @DisplayName("sorts most-severe-first when sort=SEVERITY, ties broken newest-first")
+        void shouldSortBySeverity() {
+            Instant now = Instant.now();
+            insertFinding(practiceA, developer, "Newest minor", "ABSENT", "MINOR", 0.9f, "scm.pull_request", 1L, now);
+            insertFinding(
+                practiceA,
+                developer,
+                "Older critical",
+                "ABSENT",
+                "CRITICAL",
+                0.9f,
+                "scm.pull_request",
+                2L,
+                now.minus(3, ChronoUnit.DAYS)
+            );
+            insertFinding(
+                practiceA,
+                developer,
+                "Strength without severity",
+                "PRESENT",
+                null,
+                0.9f,
+                "scm.pull_request",
+                3L,
+                now.minus(1, ChronoUnit.DAYS)
+            );
+
+            webTestClient
+                .get()
+                .uri(BASE_URI + "?sort=SEVERITY", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$.content[0].summary")
+                .isEqualTo("Older critical")
+                .jsonPath("$.content[1].summary")
+                .isEqualTo("Newest minor")
+                .jsonPath("$.content[2].summary")
+                .isEqualTo("Strength without severity");
+        }
+
+        @Test
+        @WithUser
+        @DisplayName("reverses the severity order with direction=ASC (strengths lead)")
+        void shouldSortBySeverityAscending() {
+            Instant now = Instant.now();
+            insertFinding(
+                practiceA,
+                developer,
+                "Critical gap",
+                "ABSENT",
+                "CRITICAL",
+                0.9f,
+                "scm.pull_request",
+                1L,
+                now
+            );
+            insertFinding(practiceA, developer, "Minor nit", "ABSENT", "MINOR", 0.9f, "scm.pull_request", 2L, now);
+            insertFinding(practiceA, developer, "Strength", "PRESENT", null, 0.9f, "scm.pull_request", 3L, now);
+
+            webTestClient
+                .get()
+                .uri(BASE_URI + "?sort=SEVERITY&direction=ASC", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$.content[0].summary")
+                .isEqualTo("Strength")
+                .jsonPath("$.content[1].summary")
+                .isEqualTo("Minor nit")
+                .jsonPath("$.content[2].summary")
+                .isEqualTo("Critical gap");
+        }
+
+        @Test
+        @WithUser
+        @DisplayName("drops NOT_APPLICABLE rows when displayableOnly is set")
+        void shouldDropNotApplicableWhenDisplayableOnly() {
+            Instant now = Instant.now();
+            insertFinding(practiceA, developer, "Observed", "PRESENT", "INFO", 0.9f, "scm.pull_request", 1L, now);
+            insertFinding(
+                practiceA,
+                developer,
+                "Did not apply",
+                "NOT_APPLICABLE",
+                null,
+                0.9f,
+                "scm.pull_request",
+                2L,
+                now
+            );
+
+            webTestClient
+                .get()
+                .uri(BASE_URI + "?displayableOnly=true", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$.content.length()")
+                .isEqualTo(1)
+                .jsonPath("$.content[0].summary")
+                .isEqualTo("Observed");
+        }
+
+        @Test
+        @WithUser
         void shouldFilterByObservation() {
             Instant now = Instant.now();
             insertFinding(practiceA, developer, "Good", "PRESENT", "INFO", 0.9f, "scm.pull_request", 1L, now);
@@ -328,61 +558,27 @@ class ObservationControllerIntegrationTest extends AbstractWorkspaceIntegrationT
 
         @Test
         @WithUser
-        void shouldCapPageSize() {
-            insertFinding(
-                practiceA,
-                developer,
-                "Single",
-                "PRESENT",
-                "INFO",
-                0.9f,
-                "scm.pull_request",
-                1L,
-                Instant.now()
-            );
-
+        void shouldRejectPageSizeAboveLimit() {
             webTestClient
                 .get()
                 .uri(BASE_URI + "?size=999", workspace.getWorkspaceSlug())
                 .headers(TestAuthUtils.withCurrentUser())
                 .exchange()
                 .expectStatus()
-                .isOk()
-                .expectBody()
-                .jsonPath("$.size")
-                .isEqualTo(100);
+                .isBadRequest();
         }
 
         @Test
         @WithUser
-        @DisplayName("normalizes negative page to 0 and zero/negative size to 1")
-        void shouldNormalizeBoundaryPaginationValues() {
-            insertFinding(
-                practiceA,
-                developer,
-                "Boundary",
-                "PRESENT",
-                "INFO",
-                0.9f,
-                "scm.pull_request",
-                1L,
-                Instant.now()
-            );
-
+        @DisplayName("rejects a negative page and a zero page size")
+        void shouldRejectInvalidPagination() {
             webTestClient
                 .get()
                 .uri(BASE_URI + "?page=-1&size=0", workspace.getWorkspaceSlug())
                 .headers(TestAuthUtils.withCurrentUser())
                 .exchange()
                 .expectStatus()
-                .isOk()
-                .expectBody()
-                .jsonPath("$.number")
-                .isEqualTo(0)
-                .jsonPath("$.size")
-                .isEqualTo(1)
-                .jsonPath("$.content.length()")
-                .isEqualTo(1);
+                .isBadRequest();
         }
 
         @Test
@@ -1129,15 +1325,15 @@ class ObservationControllerIntegrationTest extends AbstractWorkspaceIntegrationT
         }
     }
 
-    // GET /practices/observations/reflection
+    // GET /practices/standings
 
     @Nested
-    class GetReflection {
+    class GetStandings {
 
         @Test
         @WithUser
-        @DisplayName("returns per-practice reflection cards with the standing/toWorkOn/strengths shape")
-        void shouldReturnReflectionCards() {
+        @DisplayName("returns per-practice practice standings with the standing/toWorkOn/strengths shape")
+        void shouldReturnPracticeStandings() {
             Instant now = Instant.now();
             insertFinding(
                 practiceA,
@@ -1164,7 +1360,7 @@ class ObservationControllerIntegrationTest extends AbstractWorkspaceIntegrationT
 
             webTestClient
                 .get()
-                .uri(BASE_URI + "/reflection", workspace.getWorkspaceSlug())
+                .uri("/workspaces/{workspaceSlug}/practices/standings", workspace.getWorkspaceSlug())
                 .headers(TestAuthUtils.withCurrentUser())
                 .exchange()
                 .expectStatus()
@@ -1193,10 +1389,52 @@ class ObservationControllerIntegrationTest extends AbstractWorkspaceIntegrationT
         }
 
         @Test
+        @WithUser
+        @DisplayName("a watched practice with nothing to say appears, and says which silence it is")
+        void shouldReportWhyAWatchedPracticeHasNothingToSay() {
+            insertFinding(
+                practiceA,
+                developer,
+                "Thin PR description",
+                "ABSENT",
+                "MAJOR",
+                0.9f,
+                "scm.pull_request",
+                1L,
+                Instant.now()
+            );
+
+            webTestClient
+                .get()
+                .uri("/workspaces/{workspaceSlug}/practices/standings", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$.length()")
+                .isEqualTo(2)
+                .jsonPath("$[0].slug")
+                .isEqualTo(practiceA.getSlug())
+                .jsonPath("$[0].standing")
+                .isEqualTo("DEVELOPING")
+                .jsonPath("$[1].slug")
+                .isEqualTo(practiceB.getSlug())
+                .jsonPath("$[1].standing")
+                .isEqualTo("NOT_OBSERVED")
+                .jsonPath("$[1].toWorkOn.length()")
+                .isEqualTo(0)
+                .jsonPath("$[1].strengths.length()")
+                .isEqualTo(0)
+                .jsonPath("$[1].direction")
+                .doesNotExist();
+        }
+
+        @Test
         void shouldReturn401ForUnauthenticated() {
             webTestClient
                 .get()
-                .uri(BASE_URI + "/reflection", workspace.getWorkspaceSlug())
+                .uri("/workspaces/{workspaceSlug}/practices/standings", workspace.getWorkspaceSlug())
                 .exchange()
                 .expectStatus()
                 .isUnauthorized();

@@ -10,12 +10,12 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { expectNoOverflowingElement } from "@/test/reflow";
 import {
-	type SortableCatalogArea,
 	type SortableCatalogEntry,
+	type SortableCatalogGroup,
 	SortableCatalogTree,
 } from "./SortableCatalogTree";
 
-const areas: SortableCatalogArea[] = [
+const groups: SortableCatalogGroup[] = [
 	{ slug: "delivery", name: "Delivery", displayOrder: 0 },
 	{ slug: "quality", name: "Quality", displayOrder: 1 },
 ];
@@ -24,42 +24,42 @@ const entries: SortableCatalogEntry[] = [
 	{
 		slug: "small-changes",
 		name: "Small, reviewable changes",
-		areaSlug: "delivery",
+		groupSlug: "delivery",
 		displayOrder: 0,
 	},
 	{
 		slug: "explain-why",
 		name: "Explain what changed and why",
-		areaSlug: "delivery",
+		groupSlug: "delivery",
 		displayOrder: 1,
 	},
 	{
 		slug: "no-stale-drafts",
 		name: "Drafts are not left open",
-		areaSlug: "delivery",
+		groupSlug: "delivery",
 		displayOrder: 2,
 	},
 	{
 		slug: "tests-with-changes",
 		name: "Tests ship with the change",
-		areaSlug: "quality",
+		groupSlug: "quality",
 		displayOrder: 0,
 	},
 	{ slug: "orphan", name: "Not filed anywhere yet", displayOrder: 0 },
 ];
 
 interface HarnessProps {
-	/** Areas whose own rows may not be reordered, while the areas stay valid destinations. */
+	/** Groups whose own rows may not be reordered, while the groups stay valid destinations. */
 	blockedOrderBuckets?: readonly string[];
 	blockedDestinations?: readonly string[];
-	/** Areas that may not change their own position, while everything inside them still moves. */
-	disabledAreas?: readonly string[];
-	/** Rows that may not move at all — not up, not down, and not into another area. */
+	/** Groups that may not change their own position, while everything inside them still moves. */
+	disabledGroups?: readonly string[];
+	/** Rows that may not move at all — not up, not down, and not into another group. */
 	disabledEntries?: readonly string[];
 	/** When set, only these rows are listed — the shape a search box produces. */
 	visible?: readonly string[];
-	onPlaceEntry: (entrySlug: string, areaSlug: string | null, position: number) => void;
-	onReorderAreas: (orderedSlugs: string[]) => void;
+	onPlaceEntry: (entrySlug: string, groupSlug: string | null, position: number) => void;
+	onReorderGroups: (orderedSlugs: string[]) => void;
 }
 
 /**
@@ -71,57 +71,57 @@ interface HarnessProps {
 function CatalogTreeHarness({
 	blockedOrderBuckets = [],
 	blockedDestinations = [],
-	disabledAreas = [],
+	disabledGroups = [],
 	disabledEntries = [],
 	visible,
 	onPlaceEntry,
-	onReorderAreas,
+	onReorderGroups,
 }: HarnessProps) {
 	const [rows, setRows] = useState(entries);
 
-	const place = (entrySlug: string, areaSlug: string | null, position: number) => {
-		onPlaceEntry(entrySlug, areaSlug, position);
+	const place = (entrySlug: string, groupSlug: string | null, position: number) => {
+		onPlaceEntry(entrySlug, groupSlug, position);
 		setRows((previous) => {
 			const moved = previous.find((row) => row.slug === entrySlug);
 			if (!moved) return previous;
 			const rest = previous.filter((row) => row.slug !== entrySlug);
 			const destination = rest
-				.filter((row) => (row.areaSlug ?? null) === areaSlug)
+				.filter((row) => (row.groupSlug ?? null) === groupSlug)
 				.sort((a, b) => a.displayOrder - b.displayOrder);
-			destination.splice(position, 0, { ...moved, areaSlug: areaSlug ?? undefined });
+			destination.splice(position, 0, { ...moved, groupSlug: groupSlug ?? undefined });
 			const renumbered = new Map(destination.map((row, index) => [row.slug, index]));
 			return [...rest, moved].map((row) => {
 				const order = renumbered.get(row.slug);
 				return order == null
 					? row
-					: { ...row, areaSlug: areaSlug ?? undefined, displayOrder: order };
+					: { ...row, groupSlug: groupSlug ?? undefined, displayOrder: order };
 			});
 		});
 	};
 
 	return (
 		<SortableCatalogTree
-			areas={areas}
+			groups={groups}
 			entries={rows}
 			visibleEntrySlugs={visible ? new Set(visible) : undefined}
-			areaReorderDisabled={false}
-			disabledAreaSlugs={new Set(disabledAreas)}
+			groupReorderDisabled={false}
+			disabledGroupSlugs={new Set(disabledGroups)}
 			disabledEntrySlugs={new Set(disabledEntries)}
 			blockedEntryOrderBuckets={new Set(blockedOrderBuckets)}
 			blockedMoveDestinationSlugs={new Set(blockedDestinations)}
 			showEntryReorderHandles
-			onReorderAreas={onReorderAreas}
+			onReorderGroups={onReorderGroups}
 			onPlaceEntry={place}
-			renderAreaActions={(area, move, actionTriggerRef) => (
+			renderGroupActions={(group, move, actionTriggerRef) => (
 				<Button
 					variant="outline"
 					size="sm"
 					ref={actionTriggerRef}
 					aria-disabled={!move.canMoveDown}
-					aria-label={`Move ${area.name} down`}
+					aria-label={`Move ${group.name} down`}
 					onClick={move.moveDown}
 				>
-					Area down
+					Group down
 				</Button>
 			)}
 			renderEntryContent={(entry) => <span className="min-w-0 truncate">{entry.name}</span>}
@@ -147,24 +147,24 @@ function CatalogTreeHarness({
 							Move down
 						</DropdownMenuItem>
 						<DropdownMenuItem
-							aria-disabled={move.currentAreaSlug !== null && !move.canMoveTo(null)}
+							aria-disabled={move.currentGroupSlug !== null && !move.canMoveTo(null)}
 							onClick={() => move.moveTo(null)}
 						>
 							Move to Unassigned
 						</DropdownMenuItem>
-						{areas.map((area) => (
+						{groups.map((group) => (
 							<DropdownMenuItem
-								key={area.slug}
-								aria-disabled={move.currentAreaSlug !== area.slug && !move.canMoveTo(area.slug)}
-								onClick={() => move.moveTo(area.slug)}
+								key={group.slug}
+								aria-disabled={move.currentGroupSlug !== group.slug && !move.canMoveTo(group.slug)}
+								onClick={() => move.moveTo(group.slug)}
 							>
-								Move to {area.name}
+								Move to {group.name}
 							</DropdownMenuItem>
 						))}
 					</DropdownMenuContent>
 				</DropdownMenu>
 			)}
-			getEmptyLabel={(_areaSlug, total) =>
+			getEmptyLabel={(_groupSlug, total) =>
 				total > 0 ? "No practice here matches the search." : "Nothing filed here yet."
 			}
 		/>
@@ -176,7 +176,7 @@ const meta = {
 	title: "Shared/Practice catalog/Catalog tree",
 	component: CatalogTreeHarness,
 	parameters: { layout: "padded" },
-	args: { onPlaceEntry: fn(), onReorderAreas: fn() },
+	args: { onPlaceEntry: fn(), onReorderGroups: fn() },
 } satisfies Meta<typeof CatalogTreeHarness>;
 
 export default meta;
@@ -237,7 +237,7 @@ export const Default: Story = {};
  * restoration has nothing to return to and focus falls to the document — dropping a keyboard reader
  * at the top of the page after every move (WCAG 2.2 SC 2.4.3 Focus Order).
  */
-export const MovingBetweenAreasKeepsFocusOnTheRow: Story = {
+export const MovingBetweenGroupsKeepsFocusOnTheRow: Story = {
 	play: async ({ args, canvas }) => {
 		const menu = await openActions(canvas, "Small, reviewable changes");
 
@@ -250,19 +250,19 @@ export const MovingBetweenAreasKeepsFocusOnTheRow: Story = {
 	},
 };
 
-export const AnAreaWithAMoveInFlightIsNotADestination: Story = {
+export const AnGroupWithAMoveInFlightIsNotADestination: Story = {
 	args: { blockedDestinations: ["quality"] },
 	play: async ({ args, canvas }) => {
 		const menu = await openActions(canvas, "Explain what changed and why");
 		const blocked = menu.getByRole("menuitem", { name: "Move to Quality" });
 
 		await expect(blocked).toHaveAttribute("aria-disabled", "true");
-		// One blocked area, not a row that has stopped moving.
+		// One blocked group, not a row that has stopped moving.
 		await expect(menu.getByRole("menuitem", { name: "Move to Unassigned" })).toHaveAttribute(
 			"aria-disabled",
 			"false",
 		);
-		// Blocking a destination says nothing about ordering inside the row's own area.
+		// Blocking a destination says nothing about ordering inside the row's own group.
 		await expect(menu.getByRole("menuitem", { name: "Move up" })).toHaveAttribute(
 			"aria-disabled",
 			"false",
@@ -273,7 +273,7 @@ export const AnAreaWithAMoveInFlightIsNotADestination: Story = {
 	},
 };
 
-export const AnAreaWithAReorderInFlightStillAcceptsArrivals: Story = {
+export const AnGroupWithAReorderInFlightStillAcceptsArrivals: Story = {
 	args: { blockedOrderBuckets: ["delivery"] },
 	play: async ({ args, canvas }) => {
 		const menu = await openActions(canvas, "Explain what changed and why");
@@ -297,7 +297,7 @@ export const AnAreaWithAReorderInFlightStillAcceptsArrivals: Story = {
 };
 
 /** The move itself refuses too, because the caller renders the control and may leave it reachable. */
-export const TheEndsOfAnAreaHaveNowhereToGo: Story = {
+export const TheEndsOfAnGroupHaveNowhereToGo: Story = {
 	play: async ({ args, canvas }) => {
 		const first = await openActions(canvas, "Small, reviewable changes");
 		const up = first.getByRole("menuitem", { name: "Move up" });
@@ -313,7 +313,7 @@ export const TheEndsOfAnAreaHaveNowhereToGo: Story = {
 	},
 };
 
-export const ReorderingInsideAnArea: Story = {
+export const ReorderingInsideAnGroup: Story = {
 	play: async ({ args, canvas }) => {
 		const menu = await openActions(canvas, "Explain what changed and why");
 
@@ -323,15 +323,15 @@ export const ReorderingInsideAnArea: Story = {
 	},
 };
 
-export const AnAreaWithItsOwnMoveInFlightHoldsItsPosition: Story = {
-	args: { disabledAreas: ["delivery"] },
+export const AnGroupWithItsOwnMoveInFlightHoldsItsPosition: Story = {
+	args: { disabledGroups: ["delivery"] },
 	play: async ({ args, canvas }) => {
 		await expect(canvas.getByRole("button", { name: "Move Delivery down" })).toHaveAttribute(
 			"aria-disabled",
 			"true",
 		);
 		await expect(canvas.getByRole("button", { name: "Reorder Delivery" })).toBeDisabled();
-		// Quality's own grip, not its "Area down": it is the last area, so down is refused by the
+		// Quality's own grip, not its "Group down": it is the last group, so down is refused by the
 		// ends-of-list arithmetic whatever this prop does, and asserting that would prove nothing.
 		await expect(canvas.getByRole("button", { name: "Reorder Quality" })).toBeEnabled();
 
@@ -373,7 +373,7 @@ export const FilteringHidesRowsWithoutShrinkingTheCounts: Story = {
 		await expect(canvas.getByText("Explain what changed and why")).toBeVisible();
 		await expect(canvas.queryByText("Small, reviewable changes")).toBeNull();
 
-		// Unassigned is a bucket rather than an area, and counts the same way.
+		// Unassigned is a bucket rather than a group, and counts the same way.
 		await expect(canvas.getByText("Unassigned").parentElement).toHaveTextContent("1");
 		await expect(canvas.getByText("No practice here matches the search.")).toBeVisible();
 	},

@@ -1,7 +1,7 @@
 import { GripVertical, MoreHorizontal } from "lucide-react";
-import type { CuratedArea, CuratedPracticeSummary } from "@/api/types.gen";
-import { AreaPill } from "@/components/admin/practice-catalog/AreaPill";
+import type { CuratedGroup, CuratedPracticeSummary } from "@/api/types.gen";
 import { automatedReviewLimitationLabel } from "@/components/admin/practice-catalog/evidence-presentation";
+import { GroupPill } from "@/components/admin/practice-catalog/GroupPill";
 import {
 	type ActionTriggerRef,
 	type CatalogEntryMoveActions,
@@ -28,102 +28,102 @@ import { Spinner } from "@/components/ui/spinner";
 import { Switch } from "@/components/ui/switch";
 import { artifactKindLabel } from "@/lib/artifact-kinds";
 import { CuratedEntryBadges } from "./CuratedEntryBadges";
-import { curatedAreaLevel, curatedPracticeLevel } from "./curated-catalog-search";
+import { curatedGroupLevel, curatedPracticeLevel } from "./curated-catalog-search";
 
-type TreeArea = CuratedArea & { displayOrder: number; name: string };
+type TreeGroup = CuratedGroup & { displayOrder: number; name: string };
 type TreePractice = CuratedPracticeSummary & {
 	displayOrder: number;
-	missingAreaSlug?: string;
-	moveSourceAreaSlug?: string;
+	missingGroupSlug?: string;
+	moveSourceGroupSlug?: string;
 };
 
 export interface CuratedCatalogTreeProps {
-	areas: readonly CuratedArea[];
+	groups: readonly CuratedGroup[];
 	practices: readonly CuratedPracticeSummary[];
-	visibleAreaSlugs: ReadonlySet<string>;
+	visibleGroupSlugs: ReadonlySet<string>;
 	visiblePracticeSlugs: ReadonlySet<string>;
-	forceOpenAreaSlugs?: ReadonlySet<string>;
+	forceOpenGroupSlugs?: ReadonlySet<string>;
 	canReorder: boolean;
 	writePending: boolean;
 	pendingPracticeSlugs: ReadonlySet<string>;
-	pendingAreaSlugs: ReadonlySet<string>;
+	pendingGroupSlugs: ReadonlySet<string>;
 	onPracticeStatusChange: (practice: CuratedPracticeSummary, offered: boolean) => void;
-	onAreaStatusChange: (area: CuratedArea, offered: boolean) => void;
+	onGroupStatusChange: (group: CuratedGroup, offered: boolean) => void;
 	onExcludePractice: (practice: CuratedPracticeSummary) => void;
-	onExcludeArea: (area: CuratedArea) => void;
-	onReorderAreas: (orderedSlugs: string[]) => void;
-	onPlacePractice: (practiceSlug: string, areaSlug: string | null, position: number) => void;
+	onExcludeGroup: (group: CuratedGroup) => void;
+	onReorderGroups: (orderedSlugs: string[]) => void;
+	onPlacePractice: (practiceSlug: string, groupSlug: string | null, position: number) => void;
 }
 
 export function CuratedCatalogTree({
-	areas,
+	groups,
 	practices,
-	visibleAreaSlugs,
+	visibleGroupSlugs,
 	visiblePracticeSlugs,
-	forceOpenAreaSlugs,
+	forceOpenGroupSlugs,
 	canReorder,
 	writePending,
 	pendingPracticeSlugs,
-	pendingAreaSlugs,
+	pendingGroupSlugs,
 	onPracticeStatusChange,
-	onAreaStatusChange,
+	onGroupStatusChange,
 	onExcludePractice,
-	onExcludeArea,
-	onReorderAreas,
+	onExcludeGroup,
+	onReorderGroups,
 	onPlacePractice,
 }: CuratedCatalogTreeProps) {
-	const knownAreas = new Set(areas.map((area) => area.slug));
-	const treeAreas: TreeArea[] = areas.map((area) => ({
-		...area,
-		name: area.definition.name,
-		displayOrder: area.position,
+	const knownGroups = new Set(groups.map((group) => group.slug));
+	const treeGroups: TreeGroup[] = groups.map((group) => ({
+		...group,
+		name: group.definition.name,
+		displayOrder: group.position,
 	}));
 	const treePractices: TreePractice[] = practices.map((practice) => ({
 		...practice,
-		areaSlug:
-			practice.areaSlug && knownAreas.has(practice.areaSlug) ? practice.areaSlug : undefined,
+		groupSlug:
+			practice.groupSlug && knownGroups.has(practice.groupSlug) ? practice.groupSlug : undefined,
 		displayOrder: practice.position,
-		missingAreaSlug:
-			practice.areaSlug && !knownAreas.has(practice.areaSlug) ? practice.areaSlug : undefined,
-		moveSourceAreaSlug:
-			practice.areaSlug && !knownAreas.has(practice.areaSlug) ? practice.areaSlug : undefined,
+		missingGroupSlug:
+			practice.groupSlug && !knownGroups.has(practice.groupSlug) ? practice.groupSlug : undefined,
+		moveSourceGroupSlug:
+			practice.groupSlug && !knownGroups.has(practice.groupSlug) ? practice.groupSlug : undefined,
 	}));
 	const blockedBuckets = canReorder
 		? new Set<string>()
-		: new Set([...areas.map((area) => area.slug), UNASSIGNED_CATALOG_BUCKET]);
+		: new Set([...groups.map((group) => group.slug), UNASSIGNED_CATALOG_BUCKET]);
 
 	return (
 		<SortableCatalogTree
-			areas={treeAreas.filter((area) => visibleAreaSlugs.has(area.slug))}
+			groups={treeGroups.filter((group) => visibleGroupSlugs.has(group.slug))}
 			entries={treePractices}
 			visibleEntrySlugs={visiblePracticeSlugs}
-			forceOpenAreaSlugs={forceOpenAreaSlugs}
-			areaReorderDisabled={!canReorder || writePending}
-			disabledAreaSlugs={pendingAreaSlugs}
+			forceOpenGroupSlugs={forceOpenGroupSlugs}
+			groupReorderDisabled={!canReorder || writePending}
+			disabledGroupSlugs={pendingGroupSlugs}
 			disabledEntrySlugs={pendingPracticeSlugs}
 			blockedEntryOrderBuckets={blockedBuckets}
 			blockedMoveDestinationSlugs={blockedBuckets}
 			showEntryReorderHandles={canReorder && !writePending}
-			onReorderAreas={onReorderAreas}
+			onReorderGroups={onReorderGroups}
 			onPlaceEntry={onPlacePractice}
-			renderAreaLeading={(area) => <AreaIcon area={area} />}
-			renderAreaMeta={(area) => <CuratedEntryBadges status={area.status} kind="area" />}
-			renderAreaActions={(area, move, actionTriggerRef) => (
-				<AreaActions
-					area={area}
+			renderGroupLeading={(group) => <GroupIcon group={group} />}
+			renderGroupMeta={(group) => <CuratedEntryBadges status={group.status} kind="group" />}
+			renderGroupActions={(group, move, actionTriggerRef) => (
+				<GroupActions
+					group={group}
 					move={move}
 					actionTriggerRef={actionTriggerRef}
-					pending={pendingAreaSlugs.has(area.slug)}
+					pending={pendingGroupSlugs.has(group.slug)}
 					disabled={writePending}
-					onStatusChange={onAreaStatusChange}
-					onExclude={onExcludeArea}
+					onStatusChange={onGroupStatusChange}
+					onExclude={onExcludeGroup}
 				/>
 			)}
 			renderEntryContent={(practice) => <PracticeDetails practice={practice} />}
 			renderEntryActions={(practice, move, actionTriggerRef) => (
 				<PracticeActions
 					practice={practice}
-					areas={treeAreas}
+					groups={treeGroups}
 					move={move}
 					actionTriggerRef={actionTriggerRef}
 					pending={pendingPracticeSlugs.has(practice.slug)}
@@ -133,27 +133,27 @@ export function CuratedCatalogTree({
 				/>
 			)}
 			renderEntryPreview={(practice) => <PracticeDragPreview practice={practice} />}
-			getEmptyLabel={(areaSlug, total) => {
+			getEmptyLabel={(groupSlug, total) => {
 				if (total > 0) return "No matching practices.";
-				return areaSlug === null ? "Nothing unassigned." : "No practices here.";
+				return groupSlug === null ? "Nothing unassigned." : "No practices here.";
 			}}
 		/>
 	);
 }
 
-function AreaIcon({ area }: { area: TreeArea }) {
+function GroupIcon({ group }: { group: TreeGroup }) {
 	return (
-		<AreaPill
-			slug={area.slug}
-			name={area.definition.name}
-			icon={area.definition.icon}
-			color={area.definition.color}
+		<GroupPill
+			slug={group.slug}
+			name={group.definition.name}
+			icon={group.definition.icon}
+			color={group.definition.color}
 		/>
 	);
 }
 
-function AreaActions({
-	area,
+function GroupActions({
+	group,
 	move,
 	actionTriggerRef,
 	pending,
@@ -161,13 +161,13 @@ function AreaActions({
 	onStatusChange,
 	onExclude,
 }: {
-	area: TreeArea;
+	group: TreeGroup;
 	move: CatalogMoveActions;
 	actionTriggerRef: ActionTriggerRef;
 	pending: boolean;
 	disabled: boolean;
-	onStatusChange: (area: CuratedArea, offered: boolean) => void;
-	onExclude: (area: CuratedArea) => void;
+	onStatusChange: (group: CuratedGroup, offered: boolean) => void;
+	onExclude: (group: CuratedGroup) => void;
 }) {
 	return (
 		<>
@@ -176,11 +176,11 @@ function AreaActions({
 			)}
 			<Switch
 				className="hidden sm:inline-flex"
-				checked={area.status.offered}
-				onCheckedChange={(offered) => (offered ? onStatusChange(area, true) : onExclude(area))}
+				checked={group.status.offered}
+				onCheckedChange={(offered) => (offered ? onStatusChange(group, true) : onExclude(group))}
 				disabled={disabled}
 				aria-busy={pending}
-				aria-label={`Offer ${area.definition.name} to workspaces`}
+				aria-label={`Offer ${group.definition.name} to workspaces`}
 			/>
 			<DropdownMenu>
 				<DropdownMenuTrigger
@@ -190,15 +190,15 @@ function AreaActions({
 							variant="ghost"
 							size="icon-sm"
 							disabled={disabled}
-							aria-label={`More actions for ${area.definition.name}`}
+							aria-label={`More actions for ${group.definition.name}`}
 						>
 							<MoreHorizontal className="size-4" />
 						</Button>
 					}
 				/>
 				<DropdownMenuContent align="end">
-					<DropdownMenuItem render={<DetailStackLink entry={curatedAreaLevel(area.slug)} />}>
-						Edit area
+					<DropdownMenuItem render={<DetailStackLink entry={curatedGroupLevel(group.slug)} />}>
+						Edit group
 					</DropdownMenuItem>
 					<DropdownMenuSeparator />
 					<DropdownMenuGroup>
@@ -211,12 +211,12 @@ function AreaActions({
 						</DropdownMenuItem>
 					</DropdownMenuGroup>
 					<DropdownMenuSeparator />
-					{area.status.offered ? (
-						<DropdownMenuItem variant="destructive" onClick={() => onExclude(area)}>
+					{group.status.offered ? (
+						<DropdownMenuItem variant="destructive" onClick={() => onExclude(group)}>
 							Stop offering
 						</DropdownMenuItem>
 					) : (
-						<DropdownMenuItem onClick={() => onStatusChange(area, true)}>
+						<DropdownMenuItem onClick={() => onStatusChange(group, true)}>
 							Offer to workspaces
 						</DropdownMenuItem>
 					)}
@@ -228,7 +228,7 @@ function AreaActions({
 
 function PracticeDetails({ practice }: { practice: TreePractice }) {
 	const parentUnavailable =
-		Boolean(practice.missingAreaSlug) || (practice.status.offered && !practice.effectivelyOffered);
+		Boolean(practice.missingGroupSlug) || (practice.status.offered && !practice.effectivelyOffered);
 	const reviewLimitation = automatedReviewLimitationLabel(practice.automatedReview);
 	return (
 		<ItemContent className="min-w-0">
@@ -245,7 +245,7 @@ function PracticeDetails({ practice }: { practice: TreePractice }) {
 				{reviewLimitation && <Badge variant="outline">{reviewLimitation}</Badge>}
 				{parentUnavailable && (
 					<Badge variant="outline">
-						{practice.missingAreaSlug
+						{practice.missingGroupSlug
 							? "Group no longer exists"
 							: "Excluded because its group is excluded"}
 					</Badge>
@@ -258,7 +258,7 @@ function PracticeDetails({ practice }: { practice: TreePractice }) {
 
 function PracticeActions({
 	practice,
-	areas,
+	groups,
 	move,
 	actionTriggerRef,
 	pending,
@@ -267,7 +267,7 @@ function PracticeActions({
 	onExclude,
 }: {
 	practice: TreePractice;
-	areas: readonly TreeArea[];
+	groups: readonly TreeGroup[];
 	move: CatalogEntryMoveActions;
 	actionTriggerRef: ActionTriggerRef;
 	pending: boolean;
@@ -275,24 +275,24 @@ function PracticeActions({
 	onStatusChange: (practice: CuratedPracticeSummary, offered: boolean) => void;
 	onExclude: (practice: CuratedPracticeSummary) => void;
 }) {
-	const area = practice.areaSlug
-		? areas.find((candidate) => candidate.slug === practice.areaSlug)
+	const group = practice.groupSlug
+		? groups.find((candidate) => candidate.slug === practice.groupSlug)
 		: undefined;
-	const parentUnavailable = Boolean(practice.missingAreaSlug) || area?.status.offered === false;
-	const includeLabel = practice.missingAreaSlug
+	const parentUnavailable = Boolean(practice.missingGroupSlug) || group?.status.offered === false;
+	const includeLabel = practice.missingGroupSlug
 		? "Move to Unassigned or an included group first"
 		: parentUnavailable
 			? "Include when its group is included"
 			: "Include for workspaces";
-	const switchLabel = practice.missingAreaSlug
-		? `${practice.name} cannot be included until it is moved out of the missing area`
+	const switchLabel = practice.missingGroupSlug
+		? `${practice.name} cannot be included until it is moved out of the missing group`
 		: parentUnavailable
 			? practice.status.offered
-				? `${practice.name} is excluded because its area is excluded`
+				? `${practice.name} is excluded because its group is excluded`
 				: `${practice.name} is not offered to workspaces`
 			: `Offer ${practice.name} to workspaces`;
-	const persistedPractice = practice.missingAreaSlug
-		? { ...practice, areaSlug: practice.missingAreaSlug }
+	const persistedPractice = practice.missingGroupSlug
+		? { ...practice, groupSlug: practice.missingGroupSlug }
 		: practice;
 	return (
 		<>
@@ -343,24 +343,24 @@ function PracticeActions({
 					<DropdownMenuGroup>
 						<DropdownMenuLabel>Move to</DropdownMenuLabel>
 						<DropdownMenuRadioGroup
-							value={practice.missingAreaSlug ?? practice.areaSlug ?? UNASSIGNED_CATALOG_BUCKET}
+							value={practice.missingGroupSlug ?? practice.groupSlug ?? UNASSIGNED_CATALOG_BUCKET}
 							onValueChange={(value) =>
 								move.moveTo(value === UNASSIGNED_CATALOG_BUCKET ? null : value)
 							}
 						>
 							<DropdownMenuRadioItem
 								value={UNASSIGNED_CATALOG_BUCKET}
-								disabled={move.currentAreaSlug !== null && !move.canMoveTo(null)}
+								disabled={move.currentGroupSlug !== null && !move.canMoveTo(null)}
 								closeOnClick
 							>
 								Unassigned
 							</DropdownMenuRadioItem>
-							{areas.map((destination) => (
+							{groups.map((destination) => (
 								<DropdownMenuRadioItem
 									key={destination.slug}
 									value={destination.slug}
 									disabled={
-										move.currentAreaSlug !== destination.slug && !move.canMoveTo(destination.slug)
+										move.currentGroupSlug !== destination.slug && !move.canMoveTo(destination.slug)
 									}
 									closeOnClick
 								>
@@ -377,7 +377,7 @@ function PracticeActions({
 						</DropdownMenuItem>
 					) : (
 						<DropdownMenuItem
-							disabled={Boolean(practice.missingAreaSlug)}
+							disabled={Boolean(practice.missingGroupSlug)}
 							onClick={() => onStatusChange(persistedPractice, true)}
 						>
 							{includeLabel}

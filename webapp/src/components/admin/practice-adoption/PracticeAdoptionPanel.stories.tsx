@@ -21,9 +21,9 @@ const preview: CatalogPracticePreview = {
 	etag: '"adoption-plan"',
 	initialAutonomy: "HUMAN_APPROVAL",
 	sourceReviewRuleFingerprint: mockAuthorDeclaredEvidenceValidation.reviewRuleFingerprint,
-	area: {
+	group: {
 		slug: "review-ready-work",
-		disposition: "CREATE_CATALOG_AREA",
+		disposition: "CREATE_CATALOG_GROUP",
 		definition: { name: "Review-ready work", description: "Work prepared for useful review." },
 	},
 	definition: {
@@ -36,7 +36,7 @@ const preview: CatalogPracticePreview = {
 		precomputeScript: "export default { hasDescription: pullRequest.body.length > 0 };",
 		whyItMatters: "Reviewers need intent to assess whether the change solves the right problem.",
 		whatGoodLooksLike: "A concise summary, motivation, and verification steps.",
-		areaSlug: "review-ready-work",
+		groupSlug: "review-ready-work",
 	},
 };
 
@@ -94,10 +94,10 @@ export const Available: Story = {
 	},
 };
 
-export const ReusesExistingArea: Story = {
+export const ReusesExistingGroup: Story = {
 	args: {
 		state: ready({
-			preview: { ...preview, area: { ...preview.area, disposition: "REUSE_EXISTING_AREA" } },
+			preview: { ...preview, group: { ...preview.group, disposition: "REUSE_EXISTING_GROUP" } },
 		}),
 	},
 	play: async () => {
@@ -148,7 +148,7 @@ export const PreviewWentStale: Story = {
 export const UnassignedAndOff: Story = {
 	args: {
 		state: ready({
-			preview: { ...preview, initialAutonomy: "OFF", area: { disposition: "UNASSIGNED" } },
+			preview: { ...preview, initialAutonomy: "OFF", group: { disposition: "UNASSIGNED" } },
 		}),
 	},
 	play: async () => {

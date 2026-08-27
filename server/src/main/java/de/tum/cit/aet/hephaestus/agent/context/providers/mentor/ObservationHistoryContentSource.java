@@ -8,7 +8,7 @@ import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreview.PullRequestReview;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
-import de.tum.cit.aet.hephaestus.practices.feedback.StudentTextSanitizer;
+import de.tum.cit.aet.hephaestus.practices.feedback.DeveloperTextSanitizer;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
@@ -81,6 +81,9 @@ public class ObservationHistoryContentSource implements ContentSource {
             developerId,
             workspaceId,
             since,
+            // Verdicts only: coaching on a run that declined to take a direction would invite the mentor to
+            // invent one. The totals still reach it through the presence-count summary.
+            true,
             PageRequest.of(0, MAX_RECENT_OBSERVATIONS)
         );
         List<PullRequestReview> reviews = queryRepository.findReviewsReceivedSince(
@@ -167,7 +170,7 @@ public class ObservationHistoryContentSource implements ContentSource {
             if (o.getEvidence() != null && !o.getEvidence().isNull()) {
                 node.set("evidence", o.getEvidence());
             }
-            node.put("evidenceRationale", StudentTextSanitizer.sanitize(o.getEvidenceRationale()));
+            node.put("evidenceRationale", DeveloperTextSanitizer.sanitize(o.getEvidenceRationale()));
         }
 
         ArrayNode reviewsArr = root.putArray("reviewsReceived");

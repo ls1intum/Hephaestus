@@ -2,7 +2,7 @@ package de.tum.cit.aet.hephaestus.practices.curated.adoption;
 
 import de.tum.cit.aet.hephaestus.core.EntityTagPrecondition;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
-import de.tum.cit.aet.hephaestus.practices.PracticeAreaService;
+import de.tum.cit.aet.hephaestus.practices.PracticeGroupService;
 import de.tum.cit.aet.hephaestus.practices.PracticeService;
 import de.tum.cit.aet.hephaestus.practices.PracticeSlugConflictException;
 import de.tum.cit.aet.hephaestus.practices.curated.CuratedCatalogLock;
@@ -22,7 +22,7 @@ public class CatalogAdoptionService {
     private final CatalogAdoptionPlanAssembler plans;
     private final CuratedCatalogLock catalogLock;
     private final WorkspaceRepository workspaceRepository;
-    private final PracticeAreaService areaService;
+    private final PracticeGroupService groupService;
     private final PracticeService practiceService;
 
     @Transactional(readOnly = true)
@@ -36,8 +36,8 @@ public class CatalogAdoptionService {
     }
 
     @Transactional(readOnly = true)
-    public CatalogAreaAdoptionPlan previewArea(WorkspaceContext context, String slug) {
-        return plans.areaPlan(context, slug);
+    public CatalogGroupAdoptionPlan previewGroup(WorkspaceContext context, String slug) {
+        return plans.groupPlan(context, slug);
     }
 
     @Transactional
@@ -59,33 +59,33 @@ public class CatalogAdoptionService {
                 "A practice with slug '" + slug + "' already exists in this workspace."
             );
         }
-        if (plan.areaDisposition() == CatalogAreaDisposition.CREATE_CATALOG_AREA) {
-            areaService.adoptAreaFromCatalog(
+        if (plan.groupDisposition() == CatalogGroupDisposition.CREATE_CATALOG_GROUP) {
+            groupService.adoptGroupFromCatalog(
                 context,
-                Objects.requireNonNull(plan.areaSlug()),
-                Objects.requireNonNull(plan.areaDefinition()),
-                plan.areaDisplayOrder()
+                Objects.requireNonNull(plan.groupSlug()),
+                Objects.requireNonNull(plan.groupDefinition()),
+                plan.groupDisplayOrder()
             );
         }
         return practiceService.adoptPracticeFromCatalog(context, slug, plan.definition(), plan.initialAutonomy());
     }
 
     @Transactional
-    public CatalogAreaAdoptionResult adoptArea(WorkspaceContext context, String slug, String ifMatch) {
+    public CatalogGroupAdoptionResult adoptGroup(WorkspaceContext context, String slug, String ifMatch) {
         catalogLock.acquire();
         workspaceRepository
             .findByIdForUpdate(context.id())
             .orElseThrow(() -> new EntityNotFoundException("Workspace", context.slug()));
 
-        CatalogAreaAdoptionPlan plan;
+        CatalogGroupAdoptionPlan plan;
         try {
-            plan = plans.areaPlan(context, slug);
+            plan = plans.groupPlan(context, slug);
         } catch (EntityNotFoundException exception) {
             throw new StaleCatalogAdoptionPlanException(exception);
         }
         requireCurrentPlan(ifMatch, plan.etag());
-        if (plan.disposition() == CatalogAreaDisposition.CREATE_CATALOG_AREA) {
-            areaService.adoptAreaFromCatalog(context, slug, plan.definition(), plan.displayOrder());
+        if (plan.disposition() == CatalogGroupDisposition.CREATE_CATALOG_GROUP) {
+            groupService.adoptGroupFromCatalog(context, slug, plan.definition(), plan.displayOrder());
         }
         List<Practice> added = plan
             .practices()
@@ -102,18 +102,18 @@ public class CatalogAdoptionService {
             .toList();
         List<Practice> moved = new java.util.ArrayList<>();
         int position = 0;
-        for (CatalogAreaPracticeActionDTO action : plan.actions()) {
-            if (action.action() == CatalogAreaPracticeAction.MOVE_TO_AREA) {
+        for (CatalogGroupPracticeActionDTO action : plan.actions()) {
+            if (action.action() == CatalogGroupPracticeAction.MOVE_TO_GROUP) {
                 practiceService.placePractice(context, action.slug(), slug, position++);
                 moved.add(practiceService.getPractice(context, action.slug()));
-            } else if (action.action() == CatalogAreaPracticeAction.ADD) {
+            } else if (action.action() == CatalogGroupPracticeAction.ADD) {
                 position++;
             }
         }
-        return new CatalogAreaAdoptionResult(added, List.copyOf(moved));
+        return new CatalogGroupAdoptionResult(added, List.copyOf(moved));
     }
 
-    record CatalogAreaAdoptionResult(List<Practice> added, List<Practice> moved) {}
+    record CatalogGroupAdoptionResult(List<Practice> added, List<Practice> moved) {}
 
     private static void requireCurrentPlan(String ifMatch, String currentEtag) {
         EntityTagPrecondition precondition;

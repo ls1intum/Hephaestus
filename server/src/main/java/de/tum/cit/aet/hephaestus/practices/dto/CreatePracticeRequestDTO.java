@@ -77,7 +77,7 @@ public record CreatePracticeRequestDTO(
     @Nullable
     String whatGoodLooksLike,
 
-    @Schema(description = "Practice area to add the practice to. Omit or set to null for Unassigned.", nullable = true)
+    @Schema(description = "Practice group to add the practice to. Omit or set to null for Unassigned.", nullable = true)
     @Nullable
-    String areaSlug
+    String groupSlug
 ) {}

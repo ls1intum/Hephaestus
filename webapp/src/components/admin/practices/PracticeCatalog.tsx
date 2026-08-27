@@ -4,17 +4,17 @@ import { type ReactNode, useState } from "react";
 import type {
 	CatalogPracticeSummary,
 	Practice,
-	PracticeArea,
 	PracticeDefinitionOptions,
+	PracticeGroup,
 } from "@/api/types.gen";
 import { AvailablePracticeList } from "@/components/admin/practice-adoption/AvailablePracticeList";
-import {
-	type AreaDetails,
-	AreaDetailsDialog,
-} from "@/components/admin/practice-catalog/AreaDetailsDialog";
-import { AreaVisualPicker } from "@/components/admin/practice-catalog/AreaVisualPicker";
 import { WORK_TYPE_FILTER_OPTIONS } from "@/components/admin/practice-catalog/constants";
 import { automatedReviewUnavailableLabel } from "@/components/admin/practice-catalog/evidence-presentation";
+import {
+	type GroupDetails,
+	GroupDetailsDialog,
+} from "@/components/admin/practice-catalog/GroupDetailsDialog";
+import { GroupVisualPicker } from "@/components/admin/practice-catalog/GroupVisualPicker";
 import {
 	type ActionTriggerRef,
 	type CatalogEntryMoveActions,
@@ -67,22 +67,16 @@ import { CatalogOriginBadge } from "./CatalogOriginBadge";
 export type FocusFilter = "ALL" | KnownArtifactKind;
 
 export interface PracticeCatalogPendingState {
-	areaSlugs: ReadonlySet<string>;
+	groupSlugs: ReadonlySet<string>;
 	practiceSlugs: ReadonlySet<string>;
-	areaStructure: boolean;
+	groupStructure: boolean;
 	blockedMoveDestinationSlugs: ReadonlySet<string>;
 	blockedPracticeOrderBuckets: ReadonlySet<string>;
-	creatingArea: boolean;
+	creatingGroup: boolean;
 }
 
-/** The catalog section's own state, independent of the tree beside it. */
 export type LibraryState = PanelState<{ practices: CatalogPracticeSummary[] }>;
 
-/**
- * One prop, because `open` without a `state` was representable and rendered a loading block that
- * never resolved — indistinguishable from a real fetch. Absent means the surface offers no library
- * at all, which is a third thing again.
- */
 export interface PracticeLibrary {
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
@@ -91,43 +85,42 @@ export interface PracticeLibrary {
 
 export interface PracticeCatalogProps {
 	workspaceSlug: string;
-	areas: PracticeArea[];
+	groups: PracticeGroup[];
 	practices: Practice[];
 	definitionOptions: PracticeDefinitionOptions;
 	pending: PracticeCatalogPendingState;
 	focusFilter: FocusFilter;
 	onFocusFilterChange: (f: FocusFilter) => void;
-	onCreateArea: (details: AreaDetails) => Promise<boolean>;
-	onUpdateArea: (slug: string, details: AreaDetails) => Promise<boolean>;
-	onSetAreaDashboardVisibility: (slug: string, visibleInPracticeDashboards: boolean) => void;
-	onDeleteArea: (slug: string) => void;
-	onReorderAreas: (orderedSlugs: string[]) => void;
-	onSetAreaVisual: (slug: string, patch: { icon?: string; color?: string }) => void;
+	onCreateGroup: (details: GroupDetails) => Promise<boolean>;
+	onUpdateGroup: (slug: string, details: GroupDetails) => Promise<boolean>;
+	onSetGroupDashboardVisibility: (slug: string, visibleInPracticeDashboards: boolean) => void;
+	onDeleteGroup: (slug: string) => void;
+	onReorderGroups: (orderedSlugs: string[]) => void;
+	onSetGroupVisual: (slug: string, patch: { icon?: string; color?: string }) => void;
 	onDeletePractice: (practice: Practice) => void;
-	onPlacePractice: (practiceSlug: string, areaSlug: string | null, position: number) => void;
+	onPlacePractice: (practiceSlug: string, groupSlug: string | null, position: number) => void;
 	library?: PracticeLibrary;
 }
 
 export function PracticeCatalog({
 	workspaceSlug,
-	areas,
+	groups,
 	practices,
 	definitionOptions,
 	pending,
 	focusFilter,
 	onFocusFilterChange,
-	onCreateArea,
-	onUpdateArea,
-	onSetAreaDashboardVisibility,
-	onDeleteArea,
-	onReorderAreas,
-	onSetAreaVisual,
+	onCreateGroup,
+	onUpdateGroup,
+	onSetGroupDashboardVisibility,
+	onDeleteGroup,
+	onReorderGroups,
+	onSetGroupVisual,
 	onDeletePractice,
 	onPlacePractice,
 	library,
 }: PracticeCatalogProps) {
-	// `null` while creating, an area while renaming; `namingArea !== undefined` is "open".
-	const [namingArea, setNamingArea] = useState<PracticeArea | null | undefined>(undefined);
+	const [namingGroup, setNamingGroup] = useState<PracticeGroup | null | undefined>(undefined);
 	const visiblePracticeSlugs = new Set(
 		practices
 			.filter((practice) => focusFilter === "ALL" || practice.artifactKind === focusFilter)
@@ -139,30 +132,30 @@ export function PracticeCatalog({
 					(practice) => focusFilter === "ALL" || practice.artifactKind === focusFilter,
 				)
 			: undefined;
-	const forceOpenAreaSlugs =
+	const forceOpenGroupSlugs =
 		focusFilter === "ALL"
 			? undefined
 			: new Set(
 					practices
 						.filter((practice) => visiblePracticeSlugs.has(practice.slug))
-						.map((practice) => practice.areaSlug)
+						.map((practice) => practice.groupSlug)
 						.filter((slug): slug is string => Boolean(slug)),
 				);
 	const supportedModesFor = (practice: Practice) =>
 		definitionOptions.workTypes.find((option) => option.artifactKind === practice.artifactKind)
 			?.supportedAutomatedReviewModes ?? [];
-	const areaNames = new Map(areas.map((area) => [area.slug, area.name]));
+	const groupNames = new Map(groups.map((group) => [group.slug, group.name]));
 	const inheritedFromFor = (practice: Practice) =>
-		(practice.areaSlug ? areaNames.get(practice.areaSlug) : null) ?? null;
+		(practice.groupSlug ? groupNames.get(practice.groupSlug) : null) ?? null;
 
 	return (
 		<div className="space-y-4">
 			<CatalogToolbar
 				focusFilter={focusFilter}
 				onFocusFilterChange={onFocusFilterChange}
-				onCreateArea={() => setNamingArea(null)}
-				creatingArea={pending.creatingArea}
-				areaStructurePending={pending.areaStructure}
+				onCreateGroup={() => setNamingGroup(null)}
+				creatingGroup={pending.creatingGroup}
+				groupStructurePending={pending.groupStructure}
 				library={library}
 			/>
 			{library?.open && (
@@ -184,7 +177,7 @@ export function PracticeCatalog({
 					) : visibleCatalogPractices ? (
 						<AvailablePracticeList
 							practices={visibleCatalogPractices}
-							existingAreaSlugs={new Set(areas.map((area) => area.slug))}
+							existingGroupSlugs={new Set(groups.map((group) => group.slug))}
 						/>
 					) : (
 						<PracticeListSkeleton rows={4} />
@@ -196,48 +189,45 @@ export function PracticeCatalog({
 			)}
 
 			<SortableCatalogTree
-				areas={areas}
+				groups={groups}
 				entries={practices}
 				visibleEntrySlugs={visiblePracticeSlugs}
-				forceOpenAreaSlugs={forceOpenAreaSlugs}
-				areaReorderDisabled={pending.areaStructure}
-				disabledAreaSlugs={pending.areaSlugs}
+				forceOpenGroupSlugs={forceOpenGroupSlugs}
+				groupReorderDisabled={pending.groupStructure}
+				disabledGroupSlugs={pending.groupSlugs}
 				disabledEntrySlugs={pending.practiceSlugs}
 				blockedEntryOrderBuckets={pending.blockedPracticeOrderBuckets}
 				blockedMoveDestinationSlugs={pending.blockedMoveDestinationSlugs}
 				showEntryReorderHandles={focusFilter === "ALL"}
-				onReorderAreas={onReorderAreas}
+				onReorderGroups={onReorderGroups}
 				onPlaceEntry={onPlacePractice}
-				renderAreaLeading={(area) => (
-					<AreaVisualPicker
-						slug={area.slug}
-						name={area.name}
-						icon={area.icon}
-						color={area.color}
-						onChange={(patch) => onSetAreaVisual(area.slug, patch)}
-						disabled={pending.areaSlugs.has(area.slug)}
+				renderGroupLeading={(group) => (
+					<GroupVisualPicker
+						name={group.name}
+						icon={group.icon}
+						color={group.color}
+						onChange={(patch) => onSetGroupVisual(group.slug, patch)}
+						disabled={pending.groupSlugs.has(group.slug)}
 					/>
 				)}
-				renderAreaMeta={(area) => (
+				renderGroupMeta={(group) => (
 					<>
-						{/* Only the exception is shown: a badge on every area would be noise, and "on the
-						    dashboards" is what an area does unless someone changed it. */}
-						{!area.visibleInPracticeDashboards && (
+						{!group.visibleInPracticeDashboards && (
 							<StatusBadge def={DASHBOARD_VISIBILITY_DEFS.HIDDEN} />
 						)}
-						<CatalogOriginBadge origin={area.catalogOrigin} kind="area" />
+						<CatalogOriginBadge origin={group.catalogOrigin} kind="group" />
 					</>
 				)}
-				renderAreaActions={(area, move, actionTriggerRef) => (
-					<AreaActions
-						area={area}
+				renderGroupActions={(group, move, actionTriggerRef) => (
+					<GroupActions
+						group={group}
 						move={move}
 						actionTriggerRef={actionTriggerRef}
-						pending={pending.areaSlugs.has(area.slug)}
-						structurePending={pending.areaStructure}
-						onRename={() => setNamingArea(area)}
-						onSetDashboardVisibility={onSetAreaDashboardVisibility}
-						onDelete={onDeleteArea}
+						pending={pending.groupSlugs.has(group.slug)}
+						structurePending={pending.groupStructure}
+						onRename={() => setNamingGroup(group)}
+						onSetDashboardVisibility={onSetGroupDashboardVisibility}
+						onDelete={onDeleteGroup}
 					/>
 				)}
 				renderEntryContent={(practice) => (
@@ -246,7 +236,6 @@ export function PracticeCatalog({
 						supportedModes={supportedModesFor(practice)}
 						inheritedFrom={inheritedFromFor(practice)}
 						title={
-							// Opens the practice read-only over this tree: reading is not the same act as editing.
 							<DetailStackLink
 								entry={{ kind: "practice", id: practice.slug }}
 								className="break-words rounded-sm hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
@@ -260,7 +249,7 @@ export function PracticeCatalog({
 					<PracticeActions
 						practice={practice}
 						workspaceSlug={workspaceSlug}
-						areas={areas}
+						groups={groups}
 						move={move}
 						actionTriggerRef={actionTriggerRef}
 						pending={pending.practiceSlugs.has(practice.slug)}
@@ -274,13 +263,13 @@ export function PracticeCatalog({
 						inheritedFrom={inheritedFromFor(practice)}
 					/>
 				)}
-				getEmptyLabel={(areaSlug, total) => {
+				getEmptyLabel={(groupSlug, total) => {
 					if (total > 0) return "No matching practices.";
-					return areaSlug === null ? "Nothing unassigned." : "No practices here.";
+					return groupSlug === null ? "Nothing unassigned." : "No practices here.";
 				}}
 			/>
 
-			{areas.length === 0 && practices.length === 0 ? (
+			{groups.length === 0 && practices.length === 0 ? (
 				<Empty className="min-h-56 border">
 					<EmptyHeader>
 						<EmptyMedia variant="icon">
@@ -323,15 +312,15 @@ export function PracticeCatalog({
 				)
 			)}
 
-			<AreaDetailsDialog
-				area={namingArea ?? null}
-				open={namingArea !== undefined}
-				pending={namingArea ? pending.areaSlugs.has(namingArea.slug) : pending.creatingArea}
+			<GroupDetailsDialog
+				group={namingGroup ?? null}
+				open={namingGroup !== undefined}
+				pending={namingGroup ? pending.groupSlugs.has(namingGroup.slug) : pending.creatingGroup}
 				onOpenChange={(open) => {
-					if (!open) setNamingArea(undefined);
+					if (!open) setNamingGroup(undefined);
 				}}
 				onSubmit={(details) =>
-					namingArea ? onUpdateArea(namingArea.slug, details) : onCreateArea(details)
+					namingGroup ? onUpdateGroup(namingGroup.slug, details) : onCreateGroup(details)
 				}
 			/>
 		</div>
@@ -341,16 +330,16 @@ export function PracticeCatalog({
 function CatalogToolbar({
 	focusFilter,
 	onFocusFilterChange,
-	onCreateArea,
-	creatingArea,
-	areaStructurePending,
+	onCreateGroup,
+	creatingGroup,
+	groupStructurePending,
 	library,
 }: {
 	focusFilter: FocusFilter;
 	onFocusFilterChange: (filter: FocusFilter) => void;
-	onCreateArea: () => void;
-	creatingArea: boolean;
-	areaStructurePending: boolean;
+	onCreateGroup: () => void;
+	creatingGroup: boolean;
+	groupStructurePending: boolean;
 	library?: PracticeLibrary;
 }) {
 	return (
@@ -372,11 +361,11 @@ function CatalogToolbar({
 				</Toggle>
 				<Button
 					variant="outline"
-					onClick={onCreateArea}
-					disabled={areaStructurePending && !creatingArea}
+					onClick={onCreateGroup}
+					disabled={groupStructurePending && !creatingGroup}
 				>
 					<Plus />
-					Create area
+					Create group
 				</Button>
 				<DetailStackLink
 					entry={practiceFormLevel()}
@@ -390,8 +379,8 @@ function CatalogToolbar({
 	);
 }
 
-function AreaActions({
-	area,
+function GroupActions({
+	group,
 	move,
 	actionTriggerRef,
 	pending,
@@ -400,7 +389,7 @@ function AreaActions({
 	onSetDashboardVisibility,
 	onDelete,
 }: {
-	area: PracticeArea;
+	group: PracticeGroup;
 	move: CatalogMoveActions;
 	actionTriggerRef: ActionTriggerRef;
 	pending: boolean;
@@ -413,12 +402,12 @@ function AreaActions({
 		<>
 			<Switch
 				className="hidden sm:inline-flex"
-				checked={area.visibleInPracticeDashboards}
+				checked={group.visibleInPracticeDashboards}
 				onCheckedChange={(visibleInPracticeDashboards) =>
-					onSetDashboardVisibility(area.slug, visibleInPracticeDashboards)
+					onSetDashboardVisibility(group.slug, visibleInPracticeDashboards)
 				}
 				disabled={pending}
-				aria-label={`Show ${area.name} on practice dashboards`}
+				aria-label={`Show ${group.name} on practice dashboards`}
 			/>
 			<DropdownMenu>
 				<DropdownMenuTrigger
@@ -427,7 +416,7 @@ function AreaActions({
 							ref={actionTriggerRef}
 							variant="ghost"
 							size="icon-sm"
-							aria-label={`More actions for ${area.name}`}
+							aria-label={`More actions for ${group.name}`}
 							disabled={pending}
 						>
 							<MoreHorizontal className="size-4" />
@@ -440,9 +429,9 @@ function AreaActions({
 					</DropdownMenuItem>
 					<DropdownMenuItem
 						disabled={pending}
-						onClick={() => onSetDashboardVisibility(area.slug, !area.visibleInPracticeDashboards)}
+						onClick={() => onSetDashboardVisibility(group.slug, !group.visibleInPracticeDashboards)}
 					>
-						{area.visibleInPracticeDashboards
+						{group.visibleInPracticeDashboards
 							? "Hide from practice dashboards"
 							: "Show on practice dashboards"}
 					</DropdownMenuItem>
@@ -460,9 +449,9 @@ function AreaActions({
 					<DropdownMenuItem
 						variant="destructive"
 						disabled={pending || structurePending}
-						onClick={() => onDelete(area.slug)}
+						onClick={() => onDelete(group.slug)}
 					>
-						Delete area
+						Delete group
 					</DropdownMenuItem>
 				</DropdownMenuContent>
 			</DropdownMenu>
@@ -473,7 +462,7 @@ function AreaActions({
 function PracticeActions({
 	practice,
 	workspaceSlug,
-	areas,
+	groups,
 	move,
 	actionTriggerRef,
 	pending,
@@ -481,7 +470,7 @@ function PracticeActions({
 }: {
 	practice: Practice;
 	workspaceSlug: string;
-	areas: PracticeArea[];
+	groups: PracticeGroup[];
 	move: CatalogEntryMoveActions;
 	actionTriggerRef: ActionTriggerRef;
 	pending: boolean;
@@ -531,26 +520,26 @@ function PracticeActions({
 				<DropdownMenuGroup>
 					<DropdownMenuLabel>Move to</DropdownMenuLabel>
 					<DropdownMenuRadioGroup
-						value={practice.areaSlug ?? UNASSIGNED_CATALOG_BUCKET}
+						value={practice.groupSlug ?? UNASSIGNED_CATALOG_BUCKET}
 						onValueChange={(value) =>
 							move.moveTo(value === UNASSIGNED_CATALOG_BUCKET ? null : value)
 						}
 					>
 						<DropdownMenuRadioItem
 							value={UNASSIGNED_CATALOG_BUCKET}
-							disabled={move.currentAreaSlug !== null && !move.canMoveTo(null)}
+							disabled={move.currentGroupSlug !== null && !move.canMoveTo(null)}
 							closeOnClick
 						>
 							Unassigned
 						</DropdownMenuRadioItem>
-						{areas.map((area) => (
+						{groups.map((group) => (
 							<DropdownMenuRadioItem
-								key={area.slug}
-								value={area.slug}
-								disabled={move.currentAreaSlug !== area.slug && !move.canMoveTo(area.slug)}
+								key={group.slug}
+								value={group.slug}
+								disabled={move.currentGroupSlug !== group.slug && !move.canMoveTo(group.slug)}
 								closeOnClick
 							>
-								{area.name}
+								{group.name}
 							</DropdownMenuRadioItem>
 						))}
 					</DropdownMenuRadioGroup>
@@ -577,7 +566,6 @@ function PracticeRowDetails({
 	practice: Practice;
 	title: ReactNode;
 	supportedModes: readonly Practice["automatedReviewPolicy"]["automatedReview"]["mode"][];
-	/** The area's name, never its slug; null when this list cannot name it. */
 	inheritedFrom: string | null;
 }) {
 	const unavailableLabel = automatedReviewUnavailableLabel(

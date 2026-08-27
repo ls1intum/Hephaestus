@@ -141,6 +141,8 @@ nosetests.xml
 # OpenCode builder mission files (per-worktree, ephemeral)
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 **/out/
+# Local document exports (plans, PDFs) — not part of the codebase
+output/
 parts/
 # pdm
 #pdm.lock
@@ -152,6 +154,8 @@ pip-delete-this-directory.txt
 # pipenv
 #Pipfile.lock
 pip-log.txt
+# pnpm's content-addressable store when store-dir resolves inside the repo
+.pnpm-store/
 # poetry
 #poetry.lock
 postgres-data-temp-*/

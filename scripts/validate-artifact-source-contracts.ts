@@ -545,11 +545,11 @@ interface BundledPractice {
 }
 
 const bundledPractices = (value: unknown, label: string): BundledPractice[] =>
-	asArray(asRecord(value, label).areas, `${label} areas`).flatMap((area, areaIndex) => {
-		const areaLabel = `${label} areas[${areaIndex}]`;
-		return asArray(asRecord(area, areaLabel).practices, `${areaLabel} practices`).map(
+	asArray(asRecord(value, label).groups, `${label} groups`).flatMap((group, groupIndex) => {
+		const groupLabel = `${label} groups[${groupIndex}]`;
+		return asArray(asRecord(group, groupLabel).practices, `${groupLabel} practices`).map(
 			(practice, index) => {
-				const entry = `${areaLabel} practices[${index}]`;
+				const entry = `${groupLabel} practices[${index}]`;
 				const record = asRecord(practice, entry);
 				const script = record.precomputeScript;
 				return {

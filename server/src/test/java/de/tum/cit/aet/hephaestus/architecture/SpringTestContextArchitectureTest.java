@@ -41,27 +41,17 @@ class SpringTestContextArchitectureTest extends HephaestusArchitectureTest {
         assignment("integration.slack.channel.SlackChannelAdminControllerIntegrationTest", "slack-signed")
     );
 
-    private static final Map<String, String> FULL_CONTEXT_JUSTIFICATIONS = Map.of(
-        "base",
-        "shared PostgreSQL, HTTP, security, and application acceptance context",
-        "real-auth",
-        "real OAuth and authentication wiring without test security",
-        "startup",
-        "production main-method startup instrumentation",
-        "dev-login",
-        "dev-login feature-property behavior",
-        "github-live",
-        "explicitly selected live GitHub profile and credentials",
-        "outline-enabled",
-        "enabled Outline integration wiring",
-        "slack-ingest",
-        "enabled Slack ingest wiring with its review-submission spy",
-        "slack-lifecycle",
-        "agent submission boundary override",
-        "slack-signed",
-        "enabled signed Slack HTTP wiring",
-        "sync-controller-focused",
-        "controlled sync provider and runner behavior"
+    private static final Map<String, String> FULL_CONTEXT_JUSTIFICATIONS = Map.ofEntries(
+        Map.entry("base", "shared PostgreSQL, HTTP, security, and application acceptance context"),
+        Map.entry("real-auth", "real OAuth and authentication wiring without test security"),
+        Map.entry("startup", "production main-method startup instrumentation"),
+        Map.entry("dev-login", "dev-login feature-property behavior"),
+        Map.entry("github-live", "explicitly selected live GitHub profile and credentials"),
+        Map.entry("outline-enabled", "enabled Outline integration wiring"),
+        Map.entry("slack-ingest", "enabled Slack ingest wiring with its review-submission spy"),
+        Map.entry("slack-lifecycle", "agent submission boundary override"),
+        Map.entry("slack-signed", "enabled signed Slack HTTP wiring"),
+        Map.entry("sync-controller-focused", "controlled sync provider and runner behavior")
     );
 
     private static final Set<String> SPRING_BOOT_TESTS = names(

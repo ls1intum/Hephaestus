@@ -88,13 +88,13 @@ public class CatalogAdoptionController {
             .body(plan.preview());
     }
 
-    @GetMapping("/areas/{slug}")
-    @Operation(summary = "Preview adoption of a catalog area and its practices", operationId = "previewAreaAdoption")
-    public ResponseEntity<CatalogAreaAdoptionPreviewDTO> previewArea(
+    @GetMapping("/groups/{slug}")
+    @Operation(summary = "Preview adoption of a catalog group and its practices", operationId = "previewGroupAdoption")
+    public ResponseEntity<CatalogGroupAdoptionPreviewDTO> previewGroup(
         WorkspaceContext context,
         @PathVariable String slug
     ) {
-        CatalogAreaAdoptionPlan plan = service.previewArea(context, slug);
+        CatalogGroupAdoptionPlan plan = service.previewGroup(context, slug);
         return ResponseEntity.ok()
             .cacheControl(CacheControl.noStore().cachePrivate())
             .eTag(CatalogAdoptionService.formatted(plan.etag()))
@@ -155,10 +155,10 @@ public class CatalogAdoptionController {
             .body(presenter.present(context.id(), adopted));
     }
 
-    @PostMapping("/areas/{slug}")
-    @Operation(summary = "Adopt all available practices in a catalog area", operationId = "adoptArea")
+    @PostMapping("/groups/{slug}")
+    @Operation(summary = "Adopt all available practices in a catalog group", operationId = "adoptGroup")
     @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "PRACTICE_DEFINITION")
-    public ResponseEntity<CatalogAreaAdoptionResultDTO> adoptArea(
+    public ResponseEntity<CatalogGroupAdoptionResultDTO> adoptGroup(
         WorkspaceContext context,
         @PathVariable String slug,
         @RequestHeader(value = HttpHeaders.IF_MATCH, required = false) @Nullable String ifMatch
@@ -166,8 +166,8 @@ public class CatalogAdoptionController {
         if (ifMatch == null || ifMatch.isBlank()) {
             throw new CatalogAdoptionPreconditionRequiredException();
         }
-        CatalogAdoptionService.CatalogAreaAdoptionResult result = service.adoptArea(context, slug, ifMatch);
-        CatalogAreaAdoptionResultDTO response = new CatalogAreaAdoptionResultDTO(
+        CatalogAdoptionService.CatalogGroupAdoptionResult result = service.adoptGroup(context, slug, ifMatch);
+        CatalogGroupAdoptionResultDTO response = new CatalogGroupAdoptionResultDTO(
             result
                 .added()
                 .stream()

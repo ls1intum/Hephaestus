@@ -8,6 +8,6 @@ public record CuratedCatalogDTO(
     @NonNull @Schema(description = "Strong entity tag to send in If-Match when reordering this catalog") String etag,
     @NonNull Boolean customOrder,
     @NonNull CuratedCatalogSummaryDTO summary,
-    @NonNull List<CuratedAreaDTO> areas,
+    @NonNull List<CuratedGroupDTO> groups,
     @NonNull List<CuratedPracticeSummaryDTO> practices
 ) {}

@@ -983,7 +983,7 @@ export type UpdatePracticeReviewSettingsRequest = {
      */
     cooldownMinutes?: number;
     /**
-     * How much autonomy the system has over practices and areas that hold no autonomy of their own. The one decision that moves a whole workspace at once. Null leaves it unchanged; name DEFAULT_AUTONOMY in 'reset' to clear it.
+     * How much autonomy the system has over practices and groups that hold no autonomy of their own. The one decision that moves a whole workspace at once. Null leaves it unchanged; name DEFAULT_AUTONOMY in 'reset' to clear it.
      */
     defaultAutonomy?: 'OFF' | 'HUMAN_APPROVAL' | 'AUTOMATIC';
     /**
@@ -1005,10 +1005,6 @@ export type UpdatePracticeReviewSettingsRequest = {
  */
 export type UpdatePracticeRequest = {
     /**
-     * Catalog placement to apply with the definition update; omit to leave unchanged
-     */
-    area?: BindPracticeAreaRequest;
-    /**
      * Replacement review settings; omit to preserve them, or to take the recommended ones when the bindings move the practice to a different kind of work
      */
     automatedReviewPolicy?: PracticeAutomatedReviewPolicy;
@@ -1027,6 +1023,10 @@ export type UpdatePracticeRequest = {
      */
     criteria?: string;
     /**
+     * Catalog placement to apply with the definition update; omit to leave unchanged
+     */
+    group?: BindPracticeGroupRequest;
+    /**
      * Human-readable name
      */
     name?: string;
@@ -1042,6 +1042,16 @@ export type UpdatePracticeRequest = {
      * Plain-language rationale shown to the developer
      */
     whyItMatters?: string;
+};
+
+/**
+ * Request to move a practice to a group or Unassigned
+ */
+export type BindPracticeGroupRequest = {
+    /**
+     * Destination group slug; omit or set to null for Unassigned
+     */
+    groupSlug?: string | null;
 };
 
 /**
@@ -1171,35 +1181,15 @@ export type PracticeAutomatedReviewPolicy = {
 };
 
 /**
- * Request to move a practice to an area or Unassigned
+ * Request to update an existing practice group (PATCH — only non-null fields applied)
  */
-export type BindPracticeAreaRequest = {
+export type UpdatePracticeGroupRequest = {
     /**
-     * Destination area slug; omit or set to null for Unassigned
-     */
-    areaSlug?: string | null;
-};
-
-/**
- * Set how much autonomy the system has here, or clear it back to inherit
- */
-export type UpdatePracticeAutonomyRequest = {
-    /**
-     * Local autonomy override. Null inherits from the area or workspace.
-     */
-    autonomy?: 'OFF' | 'HUMAN_APPROVAL' | 'AUTOMATIC';
-};
-
-/**
- * Request to update an existing practice area (PATCH — only non-null fields applied)
- */
-export type UpdatePracticeAreaRequest = {
-    /**
-     * Optional palette colour key for the area's chip
+     * Optional palette colour key for the group's chip
      */
     color?: string;
     /**
-     * What this area develops
+     * What this group develops
      */
     description?: string;
     /**
@@ -1207,7 +1197,7 @@ export type UpdatePracticeAreaRequest = {
      */
     displayOrder?: number;
     /**
-     * Optional lucide icon name giving the area a glanceable identity
+     * Optional lucide icon name giving the group a glanceable identity
      */
     icon?: string;
     /**
@@ -1215,9 +1205,19 @@ export type UpdatePracticeAreaRequest = {
      */
     name?: string;
     /**
-     * Whether this area is shown in practice dashboards
+     * Whether this group is shown in practice dashboards
      */
     visibleInPracticeDashboards?: boolean;
+};
+
+/**
+ * Set how much autonomy the system has here, or clear it back to inherit
+ */
+export type UpdatePracticeAutonomyRequest = {
+    /**
+     * Local autonomy override. Null inherits from the group or workspace.
+     */
+    autonomy?: 'OFF' | 'HUMAN_APPROVAL' | 'AUTOMATIC';
 };
 
 /**
@@ -1417,6 +1417,37 @@ export type TriggerSyncJobRequest = {
      * RECONCILIATION for a full re-sync, BACKFILL for historical data
      */
     type: 'INITIAL' | 'RECONCILIATION' | 'BACKFILL';
+};
+
+export type TrendSupport = {
+    bundleSize: number;
+    calendarSpanDays?: number;
+    comparablePractices?: number;
+    credibilityThreshold: number;
+    currentOpportunities: number;
+    eligiblePractices?: number;
+    firstOpportunityAt?: Date;
+    lastOpportunityAt?: Date;
+    opportunitiesUntilComparable: number;
+    previousOpportunities: number;
+    ropeHalfWidth: number;
+};
+
+export type TrendOpportunity = {
+    bundle: 'PREVIOUS' | 'CURRENT' | 'OLDER';
+    index: number;
+    occurredAt: Date;
+    outcomes: OutcomeVector;
+    reviewedWorkId: number;
+    workKind: string;
+};
+
+export type OutcomeVector = {
+    commissionProblems: number;
+    demonstratedStrengths: number;
+    notApplicable: number;
+    omissionGaps: number;
+    safeAvoidances: number;
 };
 
 /**
@@ -1893,6 +1924,32 @@ export type RevokeSessionsResult = {
 };
 
 /**
+ * Developer-facing view of a practice — criteria absent by construction
+ */
+export type ReviewedPractice = {
+    /**
+     * Slug of the practice group this belongs to, if any
+     */
+    groupSlug?: string;
+    /**
+     * Human-readable name
+     */
+    name: string;
+    /**
+     * URL-safe identifier
+     */
+    slug: string;
+    /**
+     * A concrete picture of doing this well
+     */
+    whatGoodLooksLike?: string;
+    /**
+     * Why this practice matters, in plain language
+     */
+    whyItMatters?: string;
+};
+
+/**
  * A standing instruction to review recent work on a cadence, as an admin sees it.
  */
 export type ReviewSweepSchedule = {
@@ -2013,7 +2070,7 @@ export type ReviewRequestOutcome = {
     status: 'SUBMITTED' | 'REFUSED';
 };
 
-export type ReviewPracticeArea = {
+export type ReviewPracticeGroup = {
     /**
      * Palette color key
      */
@@ -2067,10 +2124,6 @@ export type ReviewPlacement = {
  */
 export type ReviewObservationDetail = {
     agentJobId: string;
-    /**
-     * Practice area; null when the practice is Unassigned
-     */
-    area?: ReviewPracticeArea;
     artifact: ReviewArtifact;
     /**
      * Assessment: GOOD or BAD (null when NOT_APPLICABLE)
@@ -2086,6 +2139,10 @@ export type ReviewObservationDetail = {
      * Linked feedback, newest first
      */
     feedback: Array<ReviewBoundFeedback>;
+    /**
+     * Practice group; null when the practice is Unassigned
+     */
+    group?: ReviewPracticeGroup;
     id: string;
     observedAt: Date;
     practiceName: string;
@@ -2189,10 +2246,6 @@ export type ReviewArtifact = {
  */
 export type ReviewObservation = {
     agentJobId: string;
-    /**
-     * Practice area; null when the practice is Unassigned
-     */
-    area?: ReviewPracticeArea;
     artifact: ReviewArtifact;
     /**
      * Assessment: GOOD or BAD (null when NOT_APPLICABLE)
@@ -2206,6 +2259,10 @@ export type ReviewObservation = {
      * Counts of linked feedback by delivery state
      */
     feedbackDisposition: ReviewFeedbackDisposition;
+    /**
+     * Practice group; null when the practice is Unassigned
+     */
+    group?: ReviewPracticeGroup;
     id: string;
     observedAt: Date;
     /**
@@ -2312,10 +2369,6 @@ export type ReviewFeedbackDetail = {
  */
 export type ReviewBoundObservation = {
     /**
-     * Practice area; null when the practice is Unassigned
-     */
-    area?: ReviewPracticeArea;
-    /**
      * Assessment: GOOD or BAD (null when NOT_APPLICABLE)
      */
     assessment?: 'GOOD' | 'BAD';
@@ -2323,6 +2376,10 @@ export type ReviewBoundObservation = {
      * Whether an observation was produced using the current review rules
      */
     claimCurrentness: 'CURRENT' | 'STALE' | 'UNVERIFIABLE';
+    /**
+     * Practice group; null when the practice is Unassigned
+     */
+    group?: ReviewPracticeGroup;
     observationId: string;
     observedAt: Date;
     /**
@@ -2457,25 +2514,25 @@ export type ResourceCounts = {
 };
 
 /**
- * Reorder one area's practices to match the supplied list
+ * Reorder one group's practices to match the supplied list
  */
 export type ReorderPracticesRequest = {
     /**
-     * Slug of the area whose practices are being reordered; null reorders the unassigned bucket
+     * Slug of the group whose practices are being reordered; null reorders the unassigned bucket
      */
-    areaSlug?: string | null;
+    groupSlug?: string | null;
     /**
-     * Practice slugs in the desired display order — the complete set for the area
+     * Practice slugs in the desired display order — the complete set for the group
      */
     orderedSlugs: Array<string>;
 };
 
 /**
- * Reorder practice areas to match the supplied list
+ * Reorder practice groups to match the supplied list
  */
-export type ReorderPracticeAreasRequest = {
+export type ReorderPracticeGroupsRequest = {
     /**
-     * Area slugs in the desired display order
+     * Group slugs in the desired display order
      */
     orderedSlugs: Array<string>;
 };
@@ -2512,130 +2569,6 @@ export type RegisterOutlineCollectionRequest = {
      * Outline collection id (UUID)
      */
     collectionId: string;
-};
-
-/**
- * A developer's readable feedback for one practice
- */
-export type ReflectionPractice = {
-    /**
-     * Area name this practice belongs to, if any
-     */
-    areaName?: string;
-    /**
-     * Area slug this practice belongs to, if any
-     */
-    areaSlug?: string;
-    /**
-     * Practice name
-     */
-    name: string;
-    /**
-     * Practice slug
-     */
-    slug: string;
-    /**
-     * Where the developer stands on this practice
-     */
-    standing: 'DEVELOPING' | 'STRENGTH' | 'MIXED';
-    /**
-     * What the developer already does well here
-     */
-    strengths: Array<ReflectionItem>;
-    /**
-     * Specific feedback to act on (highest-impact first)
-     */
-    toWorkOn: Array<ReflectionItem>;
-    /**
-     * A concrete picture of doing this well
-     */
-    whatGoodLooksLike?: string;
-    /**
-     * Why this practice matters, in plain language
-     */
-    whyItMatters?: string;
-};
-
-/**
- * A single piece of practice feedback to read and act on
- */
-export type ReflectionItem = {
-    /**
-     * Id of the PR / issue this is about
-     */
-    artifactId: number;
-    /**
-     * The kind of work this is about (PR / issue)
-     */
-    artifactKind: string;
-    /**
-     * What to do — the delivered feedback for this observation (null if nothing was delivered)
-     */
-    deliveredFeedback?: string;
-    /**
-     * Where in the work, e.g. "FrameRecorder.swift:212", when known
-     */
-    locator?: string;
-    /**
-     * Observation id — handle to open the full detail
-     */
-    observationId: string;
-    /**
-     * What occasioned the measurement. BACKFILL means it came from a review of past work rather than from something that just happened, and nothing was posted anywhere at the time.
-     */
-    origin: 'LIVE' | 'MANUAL' | 'BACKFILL';
-    /**
-     * Impact level (null unless assessed BAD)
-     */
-    severity?: 'CRITICAL' | 'MAJOR' | 'MINOR' | 'INFO';
-    /**
-     * The headline of the feedback
-     */
-    title: string;
-};
-
-/**
- * Reaction engagement for a developer, split into the response (uptake) and validity axes
- */
-export type ReactionEngagement = {
-    /**
-     * RESPONSE: observations the developer acted on (the recipience act, not the outcome)
-     */
-    addressed: number;
-    /**
-     * RESPONSE: observations the developer rejected with a reasoned explanation
-     */
-    disputed: number;
-    /**
-     * VALIDITY: observations marked out-of-scope — a detector-scope signal, NOT an uptake count
-     */
-    notApplicable: number;
-};
-
-/**
- * Developer reaction to a delivered unit of feedback
- */
-export type Reaction = {
-    /**
-     * The reaction action taken
-     */
-    action: 'ADDRESSED' | 'DISPUTED' | 'NOT_APPLICABLE';
-    /**
-     * When the reaction was submitted
-     */
-    createdAt: Date;
-    /**
-     * Optional explanation for the reaction
-     */
-    explanation?: string;
-    /**
-     * ID of the feedback unit this reaction is about
-     */
-    feedbackId: string;
-    /**
-     * Unique reaction ID
-     */
-    id: string;
 };
 
 /**
@@ -3048,6 +2981,16 @@ export type PracticeEvidenceSourceOption = {
     supportsExhaustiveEvidence: boolean;
 };
 
+export type PracticeTrend = {
+    currentOutcomes?: OutcomeVector;
+    direction: 'IMPROVING' | 'DECLINING' | 'UNCERTAIN' | 'INSUFFICIENT_EVIDENCE';
+    opportunities: Array<TrendOpportunity>;
+    previousOutcomes?: OutcomeVector;
+    scope: 'GROUP' | 'PRACTICE';
+    slug: string;
+    support: TrendSupport;
+};
+
 /**
  * What became of one practice on this artifact, and whether anyone heard about it
  */
@@ -3098,6 +3041,98 @@ export type PracticeTraceEntry = {
 };
 
 /**
+ * A single piece of practice feedback to read and act on
+ */
+export type PracticeStandingObservation = {
+    /**
+     * What to do — the delivered feedback for this observation (null if nothing was delivered)
+     */
+    deliveredFeedback?: string;
+    /**
+     * Where in the work, e.g. "FrameRecorder.swift:212", when known
+     */
+    locator?: string;
+    /**
+     * Observation id — handle to open the full detail
+     */
+    observationId: string;
+    /**
+     * Why this observation was recorded. BACKFILL means it came from a review of past work rather than from something that just happened, and nothing was posted anywhere at the time.
+     */
+    origin: 'LIVE' | 'MANUAL' | 'BACKFILL';
+    /**
+     * What this observation says about the developer: a behaviour demonstrated, a trap avoided, something harmful done, or something needed left out. The lists only separate positive from negative, so this is what tells the two kinds of each apart.
+     */
+    outcome: 'DEMONSTRATED_STRENGTH' | 'SAFE_AVOIDANCE' | 'COMMISSION_PROBLEM' | 'OMISSION_GAP';
+    /**
+     * Identifier of the reviewed work
+     */
+    reviewedWorkId: number;
+    /**
+     * Impact level (null unless assessed BAD)
+     */
+    severity?: 'CRITICAL' | 'MAJOR' | 'MINOR' | 'INFO';
+    /**
+     * The headline of the feedback
+     */
+    title: string;
+    /**
+     * The kind of reviewed work this is about
+     */
+    workKind: string;
+};
+
+/**
+ * A developer's readable feedback for one practice
+ */
+export type PracticeStanding = {
+    /**
+     * Opportunity-indexed direction of this practice's recent evidence
+     */
+    direction?: 'IMPROVING' | 'DECLINING' | 'UNCERTAIN' | 'INSUFFICIENT_EVIDENCE';
+    /**
+     * Group name this practice belongs to, if any
+     */
+    groupName?: string;
+    /**
+     * Group slug this practice belongs to, if any
+     */
+    groupSlug?: string;
+    /**
+     * Practice name
+     */
+    name: string;
+    /**
+     * Practice slug
+     */
+    slug: string;
+    /**
+     * Where the developer stands on this practice, or why no standing could be formed
+     */
+    standing: 'DEVELOPING' | 'STRENGTH' | 'MIXED' | 'NOT_OBSERVED' | 'NO_OPPORTUNITY';
+    /**
+     * What the developer already does well here
+     */
+    strengths: Array<PracticeStandingObservation>;
+    /**
+     * Specific feedback to act on (highest-impact first)
+     */
+    toWorkOn: Array<PracticeStandingObservation>;
+    /**
+     * Evidence support and provenance for the direction
+     */
+    trendSupport?: TrendSupport;
+    /**
+     * A concrete picture of doing this well
+     */
+    whatGoodLooksLike?: string;
+    /**
+     * Why this practice matters, in plain language
+     */
+    whyItMatters?: string;
+};
+
+/**
  * A workspace's practice-review policy: effective values plus raw overrides
  */
 export type PracticeReviewSettings = {
@@ -3110,7 +3145,7 @@ export type PracticeReviewSettings = {
      */
     cooldownMinutesOverride?: number;
     /**
-     * Effective: how much autonomy the system has over practices and areas that hold no autonomy of their own — the bottom of the practice → area → workspace chain
+     * Effective: how much autonomy the system has over practices and groups that hold no autonomy of their own — the bottom of the practice → group → workspace chain
      */
     defaultAutonomy: 'OFF' | 'HUMAN_APPROVAL' | 'AUTOMATIC';
     /**
@@ -3129,6 +3164,218 @@ export type PracticeReviewSettings = {
      * Which work is reviewed at all, ANDed onto every practice binding. Empty lists mean no restriction on that axis. Exact names only — no patterns, and no path scope (changed paths are not known where the decision is made).
      */
     reviewScope: WorkspaceReviewScope;
+};
+
+export type PracticeGroupTrend = {
+    group: PracticeTrend;
+    practices: Array<PracticeTrend>;
+};
+
+/**
+ * A developer's derived qualitative standing for one Group including 1<=n<many practices
+ */
+export type PracticeGroupStanding = {
+    /**
+     * Evidence-weighted, opportunity-indexed direction across the group's practices
+     */
+    direction?: 'IMPROVING' | 'DECLINING' | 'UNCERTAIN' | 'INSUFFICIENT_EVIDENCE';
+    /**
+     * Oldest contributing observation, for provenance only (null without a verdict)
+     */
+    feedbackSince?: Date;
+    /**
+     * Calendar span covered by the feedback, for provenance only; never a trend-analysis unit
+     */
+    feedbackSpanDays?: number;
+    /**
+     * Group name
+     */
+    groupName: string;
+    /**
+     * Group slug
+     */
+    groupSlug: string;
+    /**
+     * Developer guidance aggregated from the group's feedback (null unless the standing is a verdict). The deterministic summary combines standing, next focus, and developer-facing catalog guidance.
+     */
+    guidance?: string;
+    /**
+     * How the guidance text was produced (null when there is no guidance)
+     */
+    guidanceSource?: 'RULE_BASED';
+    /**
+     * Supporting observations the standing derives from (problems first); empty without a verdict
+     */
+    observations: Array<PracticeStandingObservation>;
+    /**
+     * Distinct pieces of reviewed work the observations come from, per kind (provenance, not a score); empty without a verdict
+     */
+    sources: Array<FeedbackSourceCount>;
+    /**
+     * Derived qualitative standing across the group's practices
+     */
+    standing: 'DEVELOPING' | 'STRENGTH' | 'MIXED' | 'NOT_OBSERVED' | 'NO_OPPORTUNITY';
+    /**
+     * Evidence support and provenance for the direction
+     */
+    trendSupport?: TrendSupport;
+};
+
+/**
+ * Distinct work artifacts of one kind that contributed feedback
+ */
+export type FeedbackSourceCount = {
+    /**
+     * Distinct artifacts of this kind in the selected time period
+     */
+    count: number;
+    /**
+     * The kind of work the feedback came from
+     */
+    workKind: string;
+};
+
+/**
+ * The work assessed in a developer-facing review run
+ */
+export type PracticeGroupReviewedWork = {
+    channelName?: string;
+    id: number;
+    number?: number;
+    provider?: 'GITHUB' | 'GITLAB' | 'SLACK' | 'OUTLINE';
+    repositoryName?: string;
+    title?: string;
+    type: string;
+    url?: string;
+};
+
+/**
+ * A page of visible review runs
+ */
+export type PracticeGroupReviewRunsPage = {
+    content: Array<PracticeGroupReviewRun>;
+    hasNext?: boolean;
+    page?: number;
+    size?: number;
+};
+
+/**
+ * One concrete, evidence-backed observation from a review run
+ */
+export type PracticeGroupReviewObservation = {
+    /**
+     * Good or bad for the developer; null when the review could not decide (INCONCLUSIVE)
+     */
+    assessment?: 'GOOD' | 'BAD';
+    feedbackId?: string;
+    feedbackResolution?: 'ADDRESSED' | 'DISPUTED' | 'NOT_APPLICABLE';
+    feedbackResponseComment?: string;
+    feedbackUsefulness?: 'HELPFUL' | 'UNHELPFUL';
+    observationId: string;
+    practiceName: string;
+    practiceSlug: string;
+    presence: 'PRESENT' | 'ABSENT' | 'NOT_APPLICABLE' | 'INCONCLUSIVE';
+    recurrenceKey?: string;
+    severity?: 'CRITICAL' | 'MAJOR' | 'MINOR' | 'INFO';
+    title: string;
+};
+
+/**
+ * A complete review run in a developer's practice-group history
+ */
+export type PracticeGroupReviewRun = {
+    observations: Array<PracticeGroupReviewObservation>;
+    reviewId: string;
+    reviewedAt: Date;
+    reviewedWork: PracticeGroupReviewedWork;
+};
+
+/**
+ * A practice group grouping related practices into a learning objective
+ */
+export type PracticeGroup = {
+    /**
+     * How much autonomy the system has over every practice in this group that holds no autonomy of its own, whether that was set here or inherited from the workspace, and which level decided it
+     */
+    autonomy: AutonomyAssignment;
+    catalogOrigin?: CatalogOrigin;
+    /**
+     * Optional palette colour key for the group's chip
+     */
+    color?: string;
+    /**
+     * Timestamp when the group was created
+     */
+    createdAt: Date;
+    /**
+     * What this group develops
+     */
+    description?: string;
+    /**
+     * Sort order within the workspace
+     */
+    displayOrder: number;
+    /**
+     * Optional lucide icon name for the group's chip
+     */
+    icon?: string;
+    /**
+     * Group ID
+     */
+    id: number;
+    /**
+     * Human-readable name
+     */
+    name: string;
+    /**
+     * URL-safe identifier unique within the workspace
+     */
+    slug: string;
+    /**
+     * Timestamp when the group was last updated
+     */
+    updatedAt?: Date;
+    /**
+     * Whether this group is shown in practice dashboards
+     */
+    visibleInPracticeDashboards: boolean;
+};
+
+/**
+ * The catalog entry a workspace copy came from and whether it differs now
+ */
+export type CatalogOrigin = {
+    link: 'IN_SYNC' | 'LOCALLY_EDITED' | 'UPDATE_AVAILABLE';
+    /**
+     * Slug of the catalog entry this copy was made from
+     */
+    slug: string;
+    /**
+     * Whether new workspaces receive the source entry
+     */
+    sourceOffered: boolean;
+};
+
+/**
+ * The autonomy in force here, whether it was set here or inherited, and the level that decided it
+ */
+export type AutonomyAssignment = {
+    /**
+     * The autonomy actually in force
+     */
+    effective: 'OFF' | 'HUMAN_APPROVAL' | 'AUTOMATIC';
+    /**
+     * Whether autonomy is inherited
+     */
+    inherited: boolean;
+    /**
+     * The local override, or null when autonomy is inherited
+     */
+    override?: 'OFF' | 'HUMAN_APPROVAL' | 'AUTOMATIC';
+    /**
+     * Which level decided the effective autonomy
+     */
+    source: 'PRACTICE' | 'GROUP' | 'WORKSPACE';
 };
 
 /**
@@ -3205,101 +3452,9 @@ export type PracticeAutomatedReviewValidation = {
 };
 
 /**
- * A practice area grouping related practices into a learning objective
- */
-export type PracticeArea = {
-    /**
-     * How much autonomy the system has over every practice in this area that holds no autonomy of its own, whether that was set here or inherited from the workspace, and which level decided it
-     */
-    autonomy: AutonomyAssignment;
-    catalogOrigin?: CatalogOrigin;
-    /**
-     * Optional palette colour key for the area's chip
-     */
-    color?: string;
-    /**
-     * Timestamp when the area was created
-     */
-    createdAt: Date;
-    /**
-     * What this area develops
-     */
-    description?: string;
-    /**
-     * Sort order within the workspace
-     */
-    displayOrder: number;
-    /**
-     * Optional lucide icon name for the area's chip
-     */
-    icon?: string;
-    /**
-     * Area ID
-     */
-    id: number;
-    /**
-     * Human-readable name
-     */
-    name: string;
-    /**
-     * URL-safe identifier unique within the workspace
-     */
-    slug: string;
-    /**
-     * Timestamp when the area was last updated
-     */
-    updatedAt?: Date;
-    /**
-     * Whether this area is shown in practice dashboards
-     */
-    visibleInPracticeDashboards: boolean;
-};
-
-/**
- * The catalog entry a workspace copy came from and whether it differs now
- */
-export type CatalogOrigin = {
-    link: 'IN_SYNC' | 'LOCALLY_EDITED' | 'UPDATE_AVAILABLE';
-    /**
-     * Slug of the catalog entry this copy was made from
-     */
-    slug: string;
-    /**
-     * Whether new workspaces receive the source entry
-     */
-    sourceOffered: boolean;
-};
-
-/**
- * The autonomy in force here, whether it was set here or inherited, and the level that decided it
- */
-export type AutonomyAssignment = {
-    /**
-     * The autonomy actually in force
-     */
-    effective: 'OFF' | 'HUMAN_APPROVAL' | 'AUTOMATIC';
-    /**
-     * Whether autonomy is inherited
-     */
-    inherited: boolean;
-    /**
-     * The local override, or null when autonomy is inherited
-     */
-    override?: 'OFF' | 'HUMAN_APPROVAL' | 'AUTOMATIC';
-    /**
-     * Which level decided the effective autonomy
-     */
-    source: 'PRACTICE' | 'AREA' | 'WORKSPACE';
-};
-
-/**
  * Practice definition for evaluating developer contributions
  */
 export type Practice = {
-    /**
-     * Slug of the practice area this practice is bound to, if any
-     */
-    areaSlug?: string;
     /**
      * Kind of work this practice reviews, read off its bindings
      */
@@ -3307,7 +3462,7 @@ export type Practice = {
     automatedReviewPolicy: PracticeAutomatedReviewPolicy;
     automatedReviewValidation: PracticeAutomatedReviewValidation;
     /**
-     * How much autonomy the system has over this practice, whether that was set here or inherited from its area or workspace, and which level decided it
+     * How much autonomy the system has over this practice, whether that was set here or inherited from its group or workspace, and which level decided it
      */
     autonomy: AutonomyAssignment;
     /**
@@ -3324,9 +3479,13 @@ export type Practice = {
      */
     criteria: string;
     /**
-     * Position within its area (lowest first); ties broken by name
+     * Position within its group (lowest first); ties broken by name
      */
     displayOrder: number;
+    /**
+     * Slug of the practice group this practice is bound to, if any
+     */
+    groupSlug?: string;
     /**
      * Practice ID
      */
@@ -3348,11 +3507,11 @@ export type Practice = {
      */
     updatedAt: Date;
     /**
-     * Developer-facing exemplar (learner layer)
+     * Developer-facing exemplar (developer layer)
      */
     whatGoodLooksLike?: string;
     /**
-     * Developer-facing rationale (learner layer)
+     * Developer-facing rationale (developer layer)
      */
     whyItMatters?: string;
 };
@@ -3362,9 +3521,9 @@ export type Practice = {
  */
 export type PlacePracticeRequest = {
     /**
-     * Destination area slug; omit to place the practice in Unassigned
+     * Destination group slug; omit to place the practice in Unassigned
      */
-    areaSlug?: string;
+    groupSlug?: string;
     /**
      * Zero-based position in the destination
      */
@@ -3541,7 +3700,7 @@ export type ConfigAuditEntryView = {
      */
     changedKeys?: Array<string>;
     entityId?: string;
-    entityType?: 'PRACTICE_REVIEW_SETTINGS' | 'AGENT_BINDING' | 'AGENT_CONFIG' | 'AI_CONFIG_BINDING' | 'WORKSPACE_ROLE' | 'WORKSPACE_FEATURES' | 'WORKSPACE_STATUS' | 'WORKSPACE_TOKEN' | 'WORKSPACE_VISIBILITY' | 'PRACTICE_ACTIVE' | 'PRACTICE_USAGE' | 'PRACTICE_DEFINITION' | 'PRACTICE_AREA' | 'CURATED_PRACTICE' | 'CURATED_PRACTICE_AREA' | 'WORKSPACE_INSTANCE_LLM_BUDGET' | 'WORKSPACE_OWN_PROVIDER_LLM_BUDGET' | 'WORKSPACE_LLM_BUDGET' | 'WORKSPACE_BYO_LLM_BUDGET' | 'REVIEW_BACKFILL_RUN' | 'REVIEW_SWEEP_SCHEDULE' | 'WORKSPACE_LLM_CONNECTION' | 'WORKSPACE_LLM_MODEL';
+    entityType?: 'PRACTICE_REVIEW_SETTINGS' | 'AGENT_BINDING' | 'AGENT_CONFIG' | 'AI_CONFIG_BINDING' | 'WORKSPACE_ROLE' | 'WORKSPACE_FEATURES' | 'WORKSPACE_STATUS' | 'WORKSPACE_TOKEN' | 'WORKSPACE_VISIBILITY' | 'PRACTICE_ACTIVE' | 'PRACTICE_USAGE' | 'PRACTICE_DEFINITION' | 'PRACTICE_GROUP' | 'CURATED_PRACTICE' | 'CURATED_PRACTICE_GROUP' | 'WORKSPACE_INSTANCE_LLM_BUDGET' | 'WORKSPACE_OWN_PROVIDER_LLM_BUDGET' | 'WORKSPACE_LLM_BUDGET' | 'WORKSPACE_BYO_LLM_BUDGET' | 'REVIEW_BACKFILL_RUN' | 'REVIEW_SWEEP_SCHEDULE' | 'WORKSPACE_LLM_CONNECTION' | 'WORKSPACE_LLM_MODEL';
     id?: number;
     newValue?: string;
     occurredAt?: Date;
@@ -3858,6 +4017,10 @@ export type ObservationDetail = {
      */
     artifactKind: string;
     /**
+     * Link to the reviewed artifact on its platform (null when it cannot be resolved)
+     */
+    artifactUrl?: string;
+    /**
      * Assessment: GOOD or BAD; null when the presence carries no direction (NOT_APPLICABLE, INCONCLUSIVE)
      */
     assessment?: 'GOOD' | 'BAD';
@@ -4135,32 +4298,6 @@ export type AchievementProgress = {
     type: string;
 };
 
-/**
- * Learner-facing view of a practice — criteria absent by construction
- */
-export type LearnerPractice = {
-    /**
-     * Slug of the practice area this belongs to, if any
-     */
-    areaSlug?: string;
-    /**
-     * Human-readable name
-     */
-    name: string;
-    /**
-     * URL-safe identifier
-     */
-    slug: string;
-    /**
-     * A concrete picture of doing this well
-     */
-    whatGoodLooksLike?: string;
-    /**
-     * Why this practice matters, in plain language
-     */
-    whyItMatters?: string;
-};
-
 export type LeagueChange = {
     leaguePointsChange: number;
     login: string;
@@ -4330,14 +4467,6 @@ export type InitiateConnectionRequest = {
  */
 export type InAppFeedback = {
     /**
-     * Area display name; null when the practice has none
-     */
-    areaName?: string;
-    /**
-     * Area the practice sits in; null when the practice has none
-     */
-    areaSlug?: string;
-    /**
      * The message, as Markdown; ends with the habit to try next
      */
     body: string;
@@ -4345,6 +4474,14 @@ export type InAppFeedback = {
      * The pieces of work the habit was observed on, newest first
      */
     evidence: Array<InAppEvidence>;
+    /**
+     * Group display name; null when the practice has none
+     */
+    groupName?: string;
+    /**
+     * Group the practice sits in; null when the practice has none
+     */
+    groupSlug?: string;
     /**
      * Short headline naming the habit, never the person
      */
@@ -4368,11 +4505,11 @@ export type InAppFeedback = {
      */
     readAt?: Date;
     /**
-     * What good looks like, in the learner's framing
+     * What good looks like, in the developer's framing
      */
     whatGoodLooksLike?: string;
     /**
-     * Why this practice matters, in the learner's framing
+     * Why this practice matters, in the developer's framing
      */
     whyItMatters?: string;
 };
@@ -4430,6 +4567,34 @@ export type IdentityProviderView = {
     displayName?: string;
     providerType?: string;
     registrationId?: string;
+};
+
+/**
+ * One group's practice counts per effective autonomy state
+ */
+export type GroupAutonomyRollup = {
+    /**
+     * The autonomy in force for this group, and where it came from
+     */
+    autonomy: AutonomyAssignment;
+    /**
+     * Practice count per effective autonomy in this group
+     */
+    counts: {
+        [key: string]: number;
+    };
+    /**
+     * Group name; null for the no-group group
+     */
+    groupName?: string;
+    /**
+     * Group slug; null groups the practices that belong to no group
+     */
+    groupSlug?: string;
+    /**
+     * Number of practices with an explicit autonomy override
+     */
+    overriddenCount: number;
 };
 
 /**
@@ -4500,6 +4665,44 @@ export type GitLabGroup = {
      * Group web URL
      */
     webUrl?: string;
+};
+
+/**
+ * The complete response to delivered feedback
+ */
+export type FeedbackResponseRequest = {
+    /**
+     * Optional explanation; required when resolution is DISPUTED.
+     */
+    comment?: string;
+    /**
+     * What the recipient decided to do with the feedback
+     */
+    resolution?: 'ADDRESSED' | 'DISPUTED' | 'NOT_APPLICABLE';
+    /**
+     * How useful the feedback was
+     */
+    usefulness?: 'HELPFUL' | 'UNHELPFUL';
+};
+
+/**
+ * The recipient's current assessment and resolution of delivered feedback
+ */
+export type FeedbackResponse = {
+    comment?: string;
+    feedbackId: string;
+    resolution?: 'ADDRESSED' | 'DISPUTED' | 'NOT_APPLICABLE';
+    respondedAt?: Date;
+    usefulness?: 'HELPFUL' | 'UNHELPFUL';
+};
+
+/**
+ * Feedback resolution counts for the current developer
+ */
+export type FeedbackResolutionCounts = {
+    addressed?: number;
+    disputed?: number;
+    notApplicable?: number;
 };
 
 export type FeedbackApproval = {
@@ -4608,10 +4811,10 @@ export type CurrentUserView = {
 };
 
 export type CuratedPracticeSummary = {
-    areaSlug?: string;
     artifactKind: string;
     automatedReview: PracticeAutomatedReview;
     effectivelyOffered: boolean;
+    groupSlug?: string;
     name: string;
     position: number;
     slug: string;
@@ -4632,7 +4835,6 @@ export type CatalogEntryStatus = {
  * A complete curated practice definition
  */
 export type CuratedPracticeRequest = {
-    areaSlug?: string;
     /**
      * Evidence requirements; omit to use the recommended requirements for the selected work type
      */
@@ -4644,6 +4846,7 @@ export type CuratedPracticeRequest = {
         PracticeBinding
     ];
     criteria: string;
+    groupSlug?: string;
     name: string;
     precomputeScript?: string;
     whatGoodLooksLike?: string;
@@ -4654,12 +4857,12 @@ export type CuratedPracticeRequest = {
  * A resolved curated practice definition
  */
 export type CuratedPracticeDefinition = {
-    areaSlug?: string;
     artifactKind: string;
     automatedReviewPolicy: PracticeAutomatedReviewPolicy;
     automatedReviewValidation: PracticeAutomatedReviewValidation;
     bindings: Array<PracticeBinding>;
     criteria: string;
+    groupSlug?: string;
     name: string;
     precomputeScript?: string;
     whatGoodLooksLike?: string;
@@ -4670,6 +4873,24 @@ export type CuratedPractice = {
     definition: CuratedPracticeDefinition;
     position: number;
     shipped?: CuratedPracticeDefinition;
+    slug: string;
+    status: CatalogEntryStatus;
+};
+
+/**
+ * A complete curated practice group definition
+ */
+export type CuratedGroupRequest = {
+    color?: string;
+    description?: string;
+    icon?: string;
+    name: string;
+};
+
+export type CuratedGroup = {
+    definition: CuratedGroupRequest;
+    position: number;
+    shipped?: CuratedGroupRequest;
     slug: string;
     status: CatalogEntryStatus;
 };
@@ -4686,32 +4907,14 @@ export type CuratedCatalogSummary = {
 };
 
 export type CuratedCatalog = {
-    areas: Array<CuratedArea>;
     customOrder: boolean;
     /**
      * Strong entity tag to send in If-Match when reordering this catalog
      */
     etag: string;
+    groups: Array<CuratedGroup>;
     practices: Array<CuratedPracticeSummary>;
     summary: CuratedCatalogSummary;
-};
-
-/**
- * A complete curated practice area definition
- */
-export type CuratedAreaRequest = {
-    color?: string;
-    description?: string;
-    icon?: string;
-    name: string;
-};
-
-export type CuratedArea = {
-    definition: CuratedAreaRequest;
-    position: number;
-    shipped?: CuratedAreaRequest;
-    slug: string;
-    status: CatalogEntryStatus;
 };
 
 /**
@@ -4905,27 +5108,9 @@ export type CreateReviewBackfillRunRequest = {
 };
 
 /**
- * Submit a reaction to a delivered feedback unit
- */
-export type CreateReaction = {
-    /**
-     * The reaction action to record
-     */
-    action: 'ADDRESSED' | 'DISPUTED' | 'NOT_APPLICABLE';
-    /**
-     * Explanation for the reaction. Required when action is DISPUTED.
-     */
-    explanation?: string;
-};
-
-/**
  * Request to create a new practice definition
  */
 export type CreatePracticeRequest = {
-    /**
-     * Practice area to add the practice to. Omit or set to null for Unassigned.
-     */
-    areaSlug?: string | null;
     /**
      * Versioned review settings; omit to use the recommended ones for the work type the bindings name
      */
@@ -4940,6 +5125,10 @@ export type CreatePracticeRequest = {
      * Practice review criteria
      */
     criteria: string;
+    /**
+     * Practice group to add the practice to. Omit or set to null for Unassigned.
+     */
+    groupSlug?: string | null;
     /**
      * Human-readable name
      */
@@ -4963,15 +5152,15 @@ export type CreatePracticeRequest = {
 };
 
 /**
- * Request to create a new practice area
+ * Request to create a new practice group
  */
-export type CreatePracticeAreaRequest = {
+export type CreatePracticeGroupRequest = {
     /**
-     * Optional palette colour key for the area's chip
+     * Optional palette colour key for the group's chip
      */
     color?: string;
     /**
-     * What this area develops
+     * What this group develops
      */
     description?: string;
     /**
@@ -4979,7 +5168,7 @@ export type CreatePracticeAreaRequest = {
      */
     displayOrder?: number;
     /**
-     * Optional lucide icon name giving the area a glanceable identity
+     * Optional lucide icon name giving the group a glanceable identity
      */
     icon?: string;
     /**
@@ -5094,10 +5283,10 @@ export type CreateCuratedPracticeRequest = {
 };
 
 /**
- * Request to add an area to the instance catalog
+ * Request to add a group to the instance catalog
  */
-export type CreateCuratedAreaRequest = {
-    definition: CuratedAreaRequest;
+export type CreateCuratedGroupRequest = {
+    definition: CuratedGroupRequest;
     slug: string;
 };
 
@@ -5337,46 +5526,46 @@ export type ChatMessageVote = {
 };
 
 export type CatalogPracticeSummary = {
-    areaName?: string;
-    areaSlug?: string;
     artifactKind: string;
     automatedReviewValidation: PracticeAutomatedReviewValidation;
     availability: 'AVAILABLE' | 'ADOPTED' | 'SLUG_CONFLICT';
+    groupName?: string;
+    groupSlug?: string;
     name: string;
     slug: string;
     whyItMatters?: string;
 };
 
 export type CatalogPracticePreview = {
-    area: CatalogAdoptionArea;
     availability: 'AVAILABLE' | 'ADOPTED' | 'SLUG_CONFLICT';
     definition: CuratedPracticeDefinition;
     etag: string;
+    group: CatalogAdoptionGroup;
     initialAutonomy: 'OFF' | 'HUMAN_APPROVAL' | 'AUTOMATIC';
     slug: string;
     sourceReviewRuleFingerprint: string;
 };
 
-export type CatalogAdoptionArea = {
-    definition?: CuratedAreaRequest;
-    disposition: 'UNASSIGNED' | 'REUSE_EXISTING_AREA' | 'CREATE_CATALOG_AREA';
+export type CatalogAdoptionGroup = {
+    definition?: CuratedGroupRequest;
+    disposition: 'UNASSIGNED' | 'REUSE_EXISTING_GROUP' | 'CREATE_CATALOG_GROUP';
     slug?: string;
 };
 
-export type CatalogAreaPracticeAction = {
-    action: 'ADD' | 'MOVE_TO_AREA' | 'KEEP' | 'BLOCKED';
+export type CatalogGroupPracticeAction = {
+    action: 'ADD' | 'MOVE_TO_GROUP' | 'KEEP' | 'BLOCKED';
     slug: string;
 };
 
-export type CatalogAreaAdoptionResult = {
+export type CatalogGroupAdoptionResult = {
     added: Array<Practice>;
     moved: Array<Practice>;
 };
 
-export type CatalogAreaAdoptionPreview = {
-    actions: Array<CatalogAreaPracticeAction>;
-    definition: CuratedAreaRequest;
-    disposition: 'UNASSIGNED' | 'REUSE_EXISTING_AREA' | 'CREATE_CATALOG_AREA';
+export type CatalogGroupAdoptionPreview = {
+    actions: Array<CatalogGroupPracticeAction>;
+    definition: CuratedGroupRequest;
+    disposition: 'UNASSIGNED' | 'REUSE_EXISTING_GROUP' | 'CREATE_CATALOG_GROUP';
     etag: string;
     practices: Array<CatalogPracticePreview>;
     slug: string;
@@ -5437,13 +5626,9 @@ export type AvailableLlmModel = {
 };
 
 /**
- * Practice counts per autonomy state, for the workspace and each area
+ * Practice counts per autonomy state, for the workspace and each group
  */
 export type AutonomyRollup = {
-    /**
-     * The same counts per area, in catalogue order
-     */
-    areas: Array<AreaAutonomyRollup>;
     /**
      * Practice count per effective autonomy across the workspace
      */
@@ -5451,37 +5636,13 @@ export type AutonomyRollup = {
         [key: string]: number;
     };
     /**
-     * The workspace-level decision every area and practice falls back to
+     * The same counts per group, in catalogue order
+     */
+    groups: Array<GroupAutonomyRollup>;
+    /**
+     * The workspace-level decision every group and practice falls back to
      */
     workspaceDefault: AutonomyAssignment;
-};
-
-/**
- * One area's practice counts per effective autonomy state
- */
-export type AreaAutonomyRollup = {
-    /**
-     * Area name; null for the no-area group
-     */
-    areaName?: string;
-    /**
-     * Area slug; null groups the practices that belong to no area
-     */
-    areaSlug?: string;
-    /**
-     * The autonomy in force for this area, and where it came from
-     */
-    autonomy: AutonomyAssignment;
-    /**
-     * Practice count per effective autonomy in this area
-     */
-    counts: {
-        [key: string]: number;
-    };
-    /**
-     * Number of practices with an explicit autonomy override
-     */
-    overriddenCount: number;
 };
 
 /**
@@ -5779,7 +5940,7 @@ export type AdminListConfigAuditEventsData = {
         workspaceId?: number;
         page?: number;
         size?: number;
-        entityType?: Array<'PRACTICE_REVIEW_SETTINGS' | 'AGENT_BINDING' | 'AGENT_CONFIG' | 'AI_CONFIG_BINDING' | 'WORKSPACE_ROLE' | 'WORKSPACE_FEATURES' | 'WORKSPACE_STATUS' | 'WORKSPACE_TOKEN' | 'WORKSPACE_VISIBILITY' | 'PRACTICE_ACTIVE' | 'PRACTICE_USAGE' | 'PRACTICE_DEFINITION' | 'PRACTICE_AREA' | 'CURATED_PRACTICE' | 'CURATED_PRACTICE_AREA' | 'WORKSPACE_INSTANCE_LLM_BUDGET' | 'WORKSPACE_OWN_PROVIDER_LLM_BUDGET' | 'WORKSPACE_LLM_BUDGET' | 'WORKSPACE_BYO_LLM_BUDGET' | 'REVIEW_BACKFILL_RUN' | 'REVIEW_SWEEP_SCHEDULE' | 'WORKSPACE_LLM_CONNECTION' | 'WORKSPACE_LLM_MODEL'>;
+        entityType?: Array<'PRACTICE_REVIEW_SETTINGS' | 'AGENT_BINDING' | 'AGENT_CONFIG' | 'AI_CONFIG_BINDING' | 'WORKSPACE_ROLE' | 'WORKSPACE_FEATURES' | 'WORKSPACE_STATUS' | 'WORKSPACE_TOKEN' | 'WORKSPACE_VISIBILITY' | 'PRACTICE_ACTIVE' | 'PRACTICE_USAGE' | 'PRACTICE_DEFINITION' | 'PRACTICE_GROUP' | 'CURATED_PRACTICE' | 'CURATED_PRACTICE_GROUP' | 'WORKSPACE_INSTANCE_LLM_BUDGET' | 'WORKSPACE_OWN_PROVIDER_LLM_BUDGET' | 'WORKSPACE_LLM_BUDGET' | 'WORKSPACE_BYO_LLM_BUDGET' | 'REVIEW_BACKFILL_RUN' | 'REVIEW_SWEEP_SCHEDULE' | 'WORKSPACE_LLM_CONNECTION' | 'WORKSPACE_LLM_MODEL'>;
         entityId?: string;
         changedKey?: string;
         action?: Array<'CREATED' | 'UPDATED' | 'DELETED'>;
@@ -6261,208 +6422,6 @@ export type AdminGetCuratedCatalogResponses = {
 
 export type AdminGetCuratedCatalogResponse = AdminGetCuratedCatalogResponses[keyof AdminGetCuratedCatalogResponses];
 
-export type AdminCreateCuratedAreaData = {
-    body: CreateCuratedAreaRequest;
-    path?: never;
-    query?: never;
-    url: '/admin/practice-catalog/areas';
-};
-
-export type AdminCreateCuratedAreaErrors = {
-    /**
-     * Slug already exists
-     */
-    409: ProblemDetail;
-};
-
-export type AdminCreateCuratedAreaError = AdminCreateCuratedAreaErrors[keyof AdminCreateCuratedAreaErrors];
-
-export type AdminCreateCuratedAreaResponses = {
-    /**
-     * Area added
-     */
-    201: CuratedArea;
-};
-
-export type AdminCreateCuratedAreaResponse = AdminCreateCuratedAreaResponses[keyof AdminCreateCuratedAreaResponses];
-
-export type AdminReorderCuratedAreasData = {
-    body: ReorderPracticeAreasRequest;
-    headers: {
-        'If-Match': string;
-    };
-    path?: never;
-    query?: never;
-    url: '/admin/practice-catalog/areas/reorder';
-};
-
-export type AdminReorderCuratedAreasResponses = {
-    /**
-     * OK
-     */
-    200: CuratedCatalog;
-};
-
-export type AdminReorderCuratedAreasResponse = AdminReorderCuratedAreasResponses[keyof AdminReorderCuratedAreasResponses];
-
-export type AdminGetCuratedAreaData = {
-    body?: never;
-    path: {
-        slug: string;
-    };
-    query?: never;
-    url: '/admin/practice-catalog/areas/{slug}';
-};
-
-export type AdminGetCuratedAreaResponses = {
-    /**
-     * The area
-     */
-    200: CuratedArea;
-};
-
-export type AdminGetCuratedAreaResponse = AdminGetCuratedAreaResponses[keyof AdminGetCuratedAreaResponses];
-
-export type AdminUpdateCuratedAreaData = {
-    body: CuratedAreaRequest;
-    headers: {
-        'If-Match': string;
-    };
-    path: {
-        slug: string;
-    };
-    query?: never;
-    url: '/admin/practice-catalog/areas/{slug}';
-};
-
-export type AdminUpdateCuratedAreaErrors = {
-    /**
-     * The supplied ETag is stale
-     */
-    412: ProblemDetail;
-    /**
-     * If-Match is required
-     */
-    428: ProblemDetail;
-};
-
-export type AdminUpdateCuratedAreaError = AdminUpdateCuratedAreaErrors[keyof AdminUpdateCuratedAreaErrors];
-
-export type AdminUpdateCuratedAreaResponses = {
-    /**
-     * The area
-     */
-    200: CuratedArea;
-};
-
-export type AdminUpdateCuratedAreaResponse = AdminUpdateCuratedAreaResponses[keyof AdminUpdateCuratedAreaResponses];
-
-export type AdminDeleteCuratedAreaOverrideData = {
-    body?: never;
-    headers: {
-        'If-Match': string;
-    };
-    path: {
-        slug: string;
-    };
-    query?: never;
-    url: '/admin/practice-catalog/areas/{slug}/override';
-};
-
-export type AdminDeleteCuratedAreaOverrideErrors = {
-    /**
-     * Hephaestus ships no definition for this slug
-     */
-    409: ProblemDetail;
-    /**
-     * The supplied ETag is stale
-     */
-    412: ProblemDetail;
-    /**
-     * If-Match is required
-     */
-    428: ProblemDetail;
-};
-
-export type AdminDeleteCuratedAreaOverrideError = AdminDeleteCuratedAreaOverrideErrors[keyof AdminDeleteCuratedAreaOverrideErrors];
-
-export type AdminDeleteCuratedAreaOverrideResponses = {
-    /**
-     * The area
-     */
-    200: CuratedArea;
-};
-
-export type AdminDeleteCuratedAreaOverrideResponse = AdminDeleteCuratedAreaOverrideResponses[keyof AdminDeleteCuratedAreaOverrideResponses];
-
-export type AdminKeepCuratedAreaData = {
-    body?: never;
-    headers: {
-        'If-Match': string;
-    };
-    path: {
-        slug: string;
-    };
-    query?: never;
-    url: '/admin/practice-catalog/areas/{slug}/override/acknowledgement';
-};
-
-export type AdminKeepCuratedAreaErrors = {
-    /**
-     * The supplied ETag is stale
-     */
-    412: ProblemDetail;
-    /**
-     * If-Match is required
-     */
-    428: ProblemDetail;
-};
-
-export type AdminKeepCuratedAreaError = AdminKeepCuratedAreaErrors[keyof AdminKeepCuratedAreaErrors];
-
-export type AdminKeepCuratedAreaResponses = {
-    /**
-     * The area
-     */
-    200: CuratedArea;
-};
-
-export type AdminKeepCuratedAreaResponse = AdminKeepCuratedAreaResponses[keyof AdminKeepCuratedAreaResponses];
-
-export type AdminUpdateCuratedAreaStatusData = {
-    body: UpdateCuratedStatusRequest;
-    headers: {
-        'If-Match': string;
-    };
-    path: {
-        slug: string;
-    };
-    query?: never;
-    url: '/admin/practice-catalog/areas/{slug}/status';
-};
-
-export type AdminUpdateCuratedAreaStatusErrors = {
-    /**
-     * The supplied ETag is stale
-     */
-    412: ProblemDetail;
-    /**
-     * If-Match is required
-     */
-    428: ProblemDetail;
-};
-
-export type AdminUpdateCuratedAreaStatusError = AdminUpdateCuratedAreaStatusErrors[keyof AdminUpdateCuratedAreaStatusErrors];
-
-export type AdminUpdateCuratedAreaStatusResponses = {
-    /**
-     * The updated catalog
-     */
-    200: CuratedCatalog;
-};
-
-export type AdminUpdateCuratedAreaStatusResponse = AdminUpdateCuratedAreaStatusResponses[keyof AdminUpdateCuratedAreaStatusResponses];
-
 export type AdminGetPracticeDefinitionOptionsData = {
     body?: never;
     path?: never;
@@ -6478,6 +6437,208 @@ export type AdminGetPracticeDefinitionOptionsResponses = {
 };
 
 export type AdminGetPracticeDefinitionOptionsResponse = AdminGetPracticeDefinitionOptionsResponses[keyof AdminGetPracticeDefinitionOptionsResponses];
+
+export type AdminCreateCuratedGroupData = {
+    body: CreateCuratedGroupRequest;
+    path?: never;
+    query?: never;
+    url: '/admin/practice-catalog/groups';
+};
+
+export type AdminCreateCuratedGroupErrors = {
+    /**
+     * Slug already exists
+     */
+    409: ProblemDetail;
+};
+
+export type AdminCreateCuratedGroupError = AdminCreateCuratedGroupErrors[keyof AdminCreateCuratedGroupErrors];
+
+export type AdminCreateCuratedGroupResponses = {
+    /**
+     * Group added
+     */
+    201: CuratedGroup;
+};
+
+export type AdminCreateCuratedGroupResponse = AdminCreateCuratedGroupResponses[keyof AdminCreateCuratedGroupResponses];
+
+export type AdminReorderCuratedGroupsData = {
+    body: ReorderPracticeGroupsRequest;
+    headers: {
+        'If-Match': string;
+    };
+    path?: never;
+    query?: never;
+    url: '/admin/practice-catalog/groups/reorder';
+};
+
+export type AdminReorderCuratedGroupsResponses = {
+    /**
+     * OK
+     */
+    200: CuratedCatalog;
+};
+
+export type AdminReorderCuratedGroupsResponse = AdminReorderCuratedGroupsResponses[keyof AdminReorderCuratedGroupsResponses];
+
+export type AdminGetCuratedGroupData = {
+    body?: never;
+    path: {
+        slug: string;
+    };
+    query?: never;
+    url: '/admin/practice-catalog/groups/{slug}';
+};
+
+export type AdminGetCuratedGroupResponses = {
+    /**
+     * The group
+     */
+    200: CuratedGroup;
+};
+
+export type AdminGetCuratedGroupResponse = AdminGetCuratedGroupResponses[keyof AdminGetCuratedGroupResponses];
+
+export type AdminUpdateCuratedGroupData = {
+    body: CuratedGroupRequest;
+    headers: {
+        'If-Match': string;
+    };
+    path: {
+        slug: string;
+    };
+    query?: never;
+    url: '/admin/practice-catalog/groups/{slug}';
+};
+
+export type AdminUpdateCuratedGroupErrors = {
+    /**
+     * The supplied ETag is stale
+     */
+    412: ProblemDetail;
+    /**
+     * If-Match is required
+     */
+    428: ProblemDetail;
+};
+
+export type AdminUpdateCuratedGroupError = AdminUpdateCuratedGroupErrors[keyof AdminUpdateCuratedGroupErrors];
+
+export type AdminUpdateCuratedGroupResponses = {
+    /**
+     * The group
+     */
+    200: CuratedGroup;
+};
+
+export type AdminUpdateCuratedGroupResponse = AdminUpdateCuratedGroupResponses[keyof AdminUpdateCuratedGroupResponses];
+
+export type AdminDeleteCuratedGroupOverrideData = {
+    body?: never;
+    headers: {
+        'If-Match': string;
+    };
+    path: {
+        slug: string;
+    };
+    query?: never;
+    url: '/admin/practice-catalog/groups/{slug}/override';
+};
+
+export type AdminDeleteCuratedGroupOverrideErrors = {
+    /**
+     * Hephaestus ships no definition for this slug
+     */
+    409: ProblemDetail;
+    /**
+     * The supplied ETag is stale
+     */
+    412: ProblemDetail;
+    /**
+     * If-Match is required
+     */
+    428: ProblemDetail;
+};
+
+export type AdminDeleteCuratedGroupOverrideError = AdminDeleteCuratedGroupOverrideErrors[keyof AdminDeleteCuratedGroupOverrideErrors];
+
+export type AdminDeleteCuratedGroupOverrideResponses = {
+    /**
+     * The group
+     */
+    200: CuratedGroup;
+};
+
+export type AdminDeleteCuratedGroupOverrideResponse = AdminDeleteCuratedGroupOverrideResponses[keyof AdminDeleteCuratedGroupOverrideResponses];
+
+export type AdminKeepCuratedGroupData = {
+    body?: never;
+    headers: {
+        'If-Match': string;
+    };
+    path: {
+        slug: string;
+    };
+    query?: never;
+    url: '/admin/practice-catalog/groups/{slug}/override/acknowledgement';
+};
+
+export type AdminKeepCuratedGroupErrors = {
+    /**
+     * The supplied ETag is stale
+     */
+    412: ProblemDetail;
+    /**
+     * If-Match is required
+     */
+    428: ProblemDetail;
+};
+
+export type AdminKeepCuratedGroupError = AdminKeepCuratedGroupErrors[keyof AdminKeepCuratedGroupErrors];
+
+export type AdminKeepCuratedGroupResponses = {
+    /**
+     * The group
+     */
+    200: CuratedGroup;
+};
+
+export type AdminKeepCuratedGroupResponse = AdminKeepCuratedGroupResponses[keyof AdminKeepCuratedGroupResponses];
+
+export type AdminUpdateCuratedGroupStatusData = {
+    body: UpdateCuratedStatusRequest;
+    headers: {
+        'If-Match': string;
+    };
+    path: {
+        slug: string;
+    };
+    query?: never;
+    url: '/admin/practice-catalog/groups/{slug}/status';
+};
+
+export type AdminUpdateCuratedGroupStatusErrors = {
+    /**
+     * The supplied ETag is stale
+     */
+    412: ProblemDetail;
+    /**
+     * If-Match is required
+     */
+    428: ProblemDetail;
+};
+
+export type AdminUpdateCuratedGroupStatusError = AdminUpdateCuratedGroupStatusErrors[keyof AdminUpdateCuratedGroupStatusErrors];
+
+export type AdminUpdateCuratedGroupStatusResponses = {
+    /**
+     * The updated catalog
+     */
+    200: CuratedCatalog;
+};
+
+export type AdminUpdateCuratedGroupStatusResponse = AdminUpdateCuratedGroupStatusResponses[keyof AdminUpdateCuratedGroupStatusResponses];
 
 export type AdminResetCuratedCatalogOrderData = {
     body?: never;
@@ -7571,7 +7732,7 @@ export type ListWorkspaceConfigAuditEventsData = {
     query?: {
         page?: number;
         size?: number;
-        entityType?: Array<'PRACTICE_REVIEW_SETTINGS' | 'AGENT_BINDING' | 'AGENT_CONFIG' | 'AI_CONFIG_BINDING' | 'WORKSPACE_ROLE' | 'WORKSPACE_FEATURES' | 'WORKSPACE_STATUS' | 'WORKSPACE_TOKEN' | 'WORKSPACE_VISIBILITY' | 'PRACTICE_ACTIVE' | 'PRACTICE_USAGE' | 'PRACTICE_DEFINITION' | 'PRACTICE_AREA' | 'CURATED_PRACTICE' | 'CURATED_PRACTICE_AREA' | 'WORKSPACE_INSTANCE_LLM_BUDGET' | 'WORKSPACE_OWN_PROVIDER_LLM_BUDGET' | 'WORKSPACE_LLM_BUDGET' | 'WORKSPACE_BYO_LLM_BUDGET' | 'REVIEW_BACKFILL_RUN' | 'REVIEW_SWEEP_SCHEDULE' | 'WORKSPACE_LLM_CONNECTION' | 'WORKSPACE_LLM_MODEL'>;
+        entityType?: Array<'PRACTICE_REVIEW_SETTINGS' | 'AGENT_BINDING' | 'AGENT_CONFIG' | 'AI_CONFIG_BINDING' | 'WORKSPACE_ROLE' | 'WORKSPACE_FEATURES' | 'WORKSPACE_STATUS' | 'WORKSPACE_TOKEN' | 'WORKSPACE_VISIBILITY' | 'PRACTICE_ACTIVE' | 'PRACTICE_USAGE' | 'PRACTICE_DEFINITION' | 'PRACTICE_GROUP' | 'CURATED_PRACTICE' | 'CURATED_PRACTICE_GROUP' | 'WORKSPACE_INSTANCE_LLM_BUDGET' | 'WORKSPACE_OWN_PROVIDER_LLM_BUDGET' | 'WORKSPACE_LLM_BUDGET' | 'WORKSPACE_BYO_LLM_BUDGET' | 'REVIEW_BACKFILL_RUN' | 'REVIEW_SWEEP_SCHEDULE' | 'WORKSPACE_LLM_CONNECTION' | 'WORKSPACE_LLM_MODEL'>;
         entityId?: string;
         changedKey?: string;
         action?: Array<'CREATED' | 'UPDATED' | 'DELETED'>;
@@ -8966,210 +9127,6 @@ export type UpdateOutlineCollectionStateResponses = {
 
 export type UpdateOutlineCollectionStateResponse = UpdateOutlineCollectionStateResponses[keyof UpdateOutlineCollectionStateResponses];
 
-export type ListAreasData = {
-    body?: never;
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-    };
-    query?: {
-        /**
-         * Return only areas shown in practice dashboards
-         */
-        visibleInPracticeDashboardsOnly?: boolean;
-    };
-    url: '/workspaces/{workspaceSlug}/practice-areas';
-};
-
-export type ListAreasResponses = {
-    /**
-     * Areas returned
-     */
-    200: Array<PracticeArea>;
-};
-
-export type ListAreasResponse = ListAreasResponses[keyof ListAreasResponses];
-
-export type CreateAreaData = {
-    body: CreatePracticeAreaRequest;
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-    };
-    query?: never;
-    url: '/workspaces/{workspaceSlug}/practice-areas';
-};
-
-export type CreateAreaErrors = {
-    /**
-     * Area slug already exists in this workspace
-     */
-    409: unknown;
-};
-
-export type CreateAreaResponses = {
-    /**
-     * Area created
-     */
-    201: PracticeArea;
-};
-
-export type CreateAreaResponse = CreateAreaResponses[keyof CreateAreaResponses];
-
-export type ReorderAreasData = {
-    body: ReorderPracticeAreasRequest;
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-    };
-    query?: never;
-    url: '/workspaces/{workspaceSlug}/practice-areas/reorder';
-};
-
-export type ReorderAreasErrors = {
-    /**
-     * orderedSlugs is empty or contains duplicates
-     */
-    400: unknown;
-    /**
-     * A slug is unknown
-     */
-    404: unknown;
-};
-
-export type ReorderAreasResponses = {
-    /**
-     * Areas reordered; the full ordered list is returned
-     */
-    200: Array<PracticeArea>;
-};
-
-export type ReorderAreasResponse = ReorderAreasResponses[keyof ReorderAreasResponses];
-
-export type DeleteAreaData = {
-    body?: never;
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-        areaSlug: string;
-    };
-    query?: {
-        deletePractices?: boolean;
-    };
-    url: '/workspaces/{workspaceSlug}/practice-areas/{areaSlug}';
-};
-
-export type DeleteAreaErrors = {
-    /**
-     * Area not found
-     */
-    404: unknown;
-};
-
-export type DeleteAreaResponses = {
-    /**
-     * Area deleted
-     */
-    204: void;
-};
-
-export type DeleteAreaResponse = DeleteAreaResponses[keyof DeleteAreaResponses];
-
-export type GetAreaData = {
-    body?: never;
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-        areaSlug: string;
-    };
-    query?: never;
-    url: '/workspaces/{workspaceSlug}/practice-areas/{areaSlug}';
-};
-
-export type GetAreaErrors = {
-    /**
-     * Area not found
-     */
-    404: unknown;
-};
-
-export type GetAreaResponses = {
-    /**
-     * Area returned
-     */
-    200: PracticeArea;
-};
-
-export type GetAreaResponse = GetAreaResponses[keyof GetAreaResponses];
-
-export type UpdateAreaData = {
-    body: UpdatePracticeAreaRequest;
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-        areaSlug: string;
-    };
-    query?: never;
-    url: '/workspaces/{workspaceSlug}/practice-areas/{areaSlug}';
-};
-
-export type UpdateAreaErrors = {
-    /**
-     * Area not found
-     */
-    404: unknown;
-};
-
-export type UpdateAreaResponses = {
-    /**
-     * Area updated
-     */
-    200: PracticeArea;
-};
-
-export type UpdateAreaResponse = UpdateAreaResponses[keyof UpdateAreaResponses];
-
-export type SetAreaAutonomyData = {
-    body: UpdatePracticeAutonomyRequest;
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-        areaSlug: string;
-    };
-    query?: never;
-    url: '/workspaces/{workspaceSlug}/practice-areas/{areaSlug}/autonomy';
-};
-
-export type SetAreaAutonomyErrors = {
-    /**
-     * Area not found
-     */
-    404: unknown;
-};
-
-export type SetAreaAutonomyResponses = {
-    /**
-     * Autonomy updated; the response carries the autonomy now in force and where it came from
-     */
-    200: PracticeArea;
-};
-
-export type SetAreaAutonomyResponse = SetAreaAutonomyResponses[keyof SetAreaAutonomyResponses];
-
 export type ListAdoptablePracticesData = {
     body?: never;
     path: {
@@ -9200,7 +9157,7 @@ export type ListAdoptablePracticesResponses = {
 
 export type ListAdoptablePracticesResponse = ListAdoptablePracticesResponses[keyof ListAdoptablePracticesResponses];
 
-export type PreviewAreaAdoptionData = {
+export type PreviewGroupAdoptionData = {
     body?: never;
     path: {
         /**
@@ -9210,19 +9167,19 @@ export type PreviewAreaAdoptionData = {
         slug: string;
     };
     query?: never;
-    url: '/workspaces/{workspaceSlug}/practice-catalog/adoption/areas/{slug}';
+    url: '/workspaces/{workspaceSlug}/practice-catalog/adoption/groups/{slug}';
 };
 
-export type PreviewAreaAdoptionResponses = {
+export type PreviewGroupAdoptionResponses = {
     /**
      * OK
      */
-    200: CatalogAreaAdoptionPreview;
+    200: CatalogGroupAdoptionPreview;
 };
 
-export type PreviewAreaAdoptionResponse = PreviewAreaAdoptionResponses[keyof PreviewAreaAdoptionResponses];
+export type PreviewGroupAdoptionResponse = PreviewGroupAdoptionResponses[keyof PreviewGroupAdoptionResponses];
 
-export type AdoptAreaData = {
+export type AdoptGroupData = {
     body?: never;
     headers?: {
         'If-Match'?: string;
@@ -9235,17 +9192,17 @@ export type AdoptAreaData = {
         slug: string;
     };
     query?: never;
-    url: '/workspaces/{workspaceSlug}/practice-catalog/adoption/areas/{slug}';
+    url: '/workspaces/{workspaceSlug}/practice-catalog/adoption/groups/{slug}';
 };
 
-export type AdoptAreaResponses = {
+export type AdoptGroupResponses = {
     /**
      * OK
      */
-    200: CatalogAreaAdoptionResult;
+    200: CatalogGroupAdoptionResult;
 };
 
-export type AdoptAreaResponse = AdoptAreaResponses[keyof AdoptAreaResponses];
+export type AdoptGroupResponse = AdoptGroupResponses[keyof AdoptGroupResponses];
 
 export type PreviewPracticeAdoptionData = {
     body?: never;
@@ -9350,6 +9307,310 @@ export type GetCuratedPracticeCatalogEntryResponses = {
 
 export type GetCuratedPracticeCatalogEntryResponse = GetCuratedPracticeCatalogEntryResponses[keyof GetCuratedPracticeCatalogEntryResponses];
 
+export type ListGroupsData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: {
+        /**
+         * Return only groups shown in practice dashboards
+         */
+        visibleInPracticeDashboardsOnly?: boolean;
+    };
+    url: '/workspaces/{workspaceSlug}/practice-groups';
+};
+
+export type ListGroupsResponses = {
+    /**
+     * Groups returned
+     */
+    200: Array<PracticeGroup>;
+};
+
+export type ListGroupsResponse = ListGroupsResponses[keyof ListGroupsResponses];
+
+export type CreateGroupData = {
+    body: CreatePracticeGroupRequest;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practice-groups';
+};
+
+export type CreateGroupErrors = {
+    /**
+     * Group slug already exists in this workspace
+     */
+    409: unknown;
+};
+
+export type CreateGroupResponses = {
+    /**
+     * Group created
+     */
+    201: PracticeGroup;
+};
+
+export type CreateGroupResponse = CreateGroupResponses[keyof CreateGroupResponses];
+
+export type ReorderGroupsData = {
+    body: ReorderPracticeGroupsRequest;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practice-groups/reorder';
+};
+
+export type ReorderGroupsErrors = {
+    /**
+     * orderedSlugs is empty or contains duplicates
+     */
+    400: unknown;
+    /**
+     * A slug is unknown
+     */
+    404: unknown;
+};
+
+export type ReorderGroupsResponses = {
+    /**
+     * Groups reordered; the full ordered list is returned
+     */
+    200: Array<PracticeGroup>;
+};
+
+export type ReorderGroupsResponse = ReorderGroupsResponses[keyof ReorderGroupsResponses];
+
+export type ListPracticeGroupStandingsData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practice-groups/standings';
+};
+
+export type ListPracticeGroupStandingsResponses = {
+    /**
+     * Practice group standings returned
+     */
+    200: Array<PracticeGroupStanding>;
+};
+
+export type ListPracticeGroupStandingsResponse = ListPracticeGroupStandingsResponses[keyof ListPracticeGroupStandingsResponses];
+
+export type DeleteGroupData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        groupSlug: string;
+    };
+    query?: {
+        deletePractices?: boolean;
+    };
+    url: '/workspaces/{workspaceSlug}/practice-groups/{groupSlug}';
+};
+
+export type DeleteGroupErrors = {
+    /**
+     * Group not found
+     */
+    404: unknown;
+};
+
+export type DeleteGroupResponses = {
+    /**
+     * Group deleted
+     */
+    204: void;
+};
+
+export type DeleteGroupResponse = DeleteGroupResponses[keyof DeleteGroupResponses];
+
+export type GetGroupData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        groupSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practice-groups/{groupSlug}';
+};
+
+export type GetGroupErrors = {
+    /**
+     * Group not found
+     */
+    404: unknown;
+};
+
+export type GetGroupResponses = {
+    /**
+     * Group returned
+     */
+    200: PracticeGroup;
+};
+
+export type GetGroupResponse = GetGroupResponses[keyof GetGroupResponses];
+
+export type UpdateGroupData = {
+    body: UpdatePracticeGroupRequest;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        groupSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practice-groups/{groupSlug}';
+};
+
+export type UpdateGroupErrors = {
+    /**
+     * Group not found
+     */
+    404: unknown;
+};
+
+export type UpdateGroupResponses = {
+    /**
+     * Group updated
+     */
+    200: PracticeGroup;
+};
+
+export type UpdateGroupResponse = UpdateGroupResponses[keyof UpdateGroupResponses];
+
+export type SetGroupAutonomyData = {
+    body: UpdatePracticeAutonomyRequest;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        groupSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practice-groups/{groupSlug}/autonomy';
+};
+
+export type SetGroupAutonomyErrors = {
+    /**
+     * Group not found
+     */
+    404: unknown;
+};
+
+export type SetGroupAutonomyResponses = {
+    /**
+     * Autonomy updated; the response carries the autonomy now in force and where it came from
+     */
+    200: PracticeGroup;
+};
+
+export type SetGroupAutonomyResponse = SetGroupAutonomyResponses[keyof SetGroupAutonomyResponses];
+
+export type ListPracticeGroupReviewRunsData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        groupSlug: string;
+    };
+    query?: {
+        practiceSlug?: string;
+        /**
+         * Only reviews of these artifact kinds, e.g. scm.pull_request (repeatable)
+         */
+        artifactKinds?: Array<string>;
+        severities?: Array<'CRITICAL' | 'MAJOR' | 'MINOR' | 'INFO'>;
+        /**
+         * Zero-based page, at most 100
+         */
+        page?: number;
+        /**
+         * Page size from 1 to 50
+         */
+        size?: number;
+    };
+    url: '/workspaces/{workspaceSlug}/practice-groups/{groupSlug}/review-runs';
+};
+
+export type ListPracticeGroupReviewRunsErrors = {
+    /**
+     * Invalid filter or pagination
+     */
+    400: ProblemDetail;
+    /**
+     * Practice group not found
+     */
+    404: unknown;
+};
+
+export type ListPracticeGroupReviewRunsError = ListPracticeGroupReviewRunsErrors[keyof ListPracticeGroupReviewRunsErrors];
+
+export type ListPracticeGroupReviewRunsResponses = {
+    /**
+     * Paginated review runs returned
+     */
+    200: PracticeGroupReviewRunsPage;
+};
+
+export type ListPracticeGroupReviewRunsResponse = ListPracticeGroupReviewRunsResponses[keyof ListPracticeGroupReviewRunsResponses];
+
+export type GetPracticeGroupTrendData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        groupSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practice-groups/{groupSlug}/trend';
+};
+
+export type GetPracticeGroupTrendErrors = {
+    /**
+     * Practice group not found
+     */
+    404: unknown;
+};
+
+export type GetPracticeGroupTrendResponses = {
+    /**
+     * Practice-group trend returned
+     */
+    200: PracticeGroupTrend;
+};
+
+export type GetPracticeGroupTrendResponse = GetPracticeGroupTrendResponses[keyof GetPracticeGroupTrendResponses];
+
 export type ListPracticesData = {
     body?: never;
     path: {
@@ -9390,7 +9651,7 @@ export type CreatePracticeData = {
 
 export type CreatePracticeErrors = {
     /**
-     * Practice area not found
+     * Practice group not found
      */
     404: ProblemDetail;
     /**
@@ -9569,27 +9830,6 @@ export type GetPracticeDefinitionOptionsResponses = {
 
 export type GetPracticeDefinitionOptionsResponse = GetPracticeDefinitionOptionsResponses[keyof GetPracticeDefinitionOptionsResponses];
 
-export type GetEngagementData = {
-    body?: never;
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-    };
-    query?: never;
-    url: '/workspaces/{workspaceSlug}/practices/feedback/engagement';
-};
-
-export type GetEngagementResponses = {
-    /**
-     * Engagement statistics returned
-     */
-    200: ReactionEngagement;
-};
-
-export type GetEngagementResponse = GetEngagementResponses[keyof GetEngagementResponses];
-
 export type GetInAppFeedbackData = {
     body?: never;
     path: {
@@ -9611,7 +9851,28 @@ export type GetInAppFeedbackResponses = {
 
 export type GetInAppFeedbackResponse = GetInAppFeedbackResponses[keyof GetInAppFeedbackResponses];
 
-export type GetLatestReactionData = {
+export type GetFeedbackResolutionCountsData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/feedback/resolution-counts';
+};
+
+export type GetFeedbackResolutionCountsResponses = {
+    /**
+     * OK
+     */
+    200: FeedbackResolutionCounts;
+};
+
+export type GetFeedbackResolutionCountsResponse = GetFeedbackResolutionCountsResponses[keyof GetFeedbackResolutionCountsResponses];
+
+export type DeleteFeedbackResponseData = {
     body?: never;
     path: {
         /**
@@ -9621,31 +9882,27 @@ export type GetLatestReactionData = {
         feedbackId: string;
     };
     query?: never;
-    url: '/workspaces/{workspaceSlug}/practices/feedback/{feedbackId}/reactions';
+    url: '/workspaces/{workspaceSlug}/practices/feedback/{feedbackId}/response';
 };
 
-export type GetLatestReactionErrors = {
+export type DeleteFeedbackResponseErrors = {
     /**
-     * Feedback not found in this workspace
+     * Delivered feedback not found for the current recipient
      */
     404: unknown;
 };
 
-export type GetLatestReactionResponses = {
+export type DeleteFeedbackResponseResponses = {
     /**
-     * Latest reaction returned
-     */
-    200: Reaction;
-    /**
-     * No reaction exists for this feedback unit
+     * Response deleted or no response was recorded
      */
     204: void;
 };
 
-export type GetLatestReactionResponse = GetLatestReactionResponses[keyof GetLatestReactionResponses];
+export type DeleteFeedbackResponseResponse = DeleteFeedbackResponseResponses[keyof DeleteFeedbackResponseResponses];
 
-export type SubmitReactionData = {
-    body: CreateReaction;
+export type GetFeedbackResponseData = {
+    body?: never;
     path: {
         /**
          * Workspace slug
@@ -9654,53 +9911,61 @@ export type SubmitReactionData = {
         feedbackId: string;
     };
     query?: never;
-    url: '/workspaces/{workspaceSlug}/practices/feedback/{feedbackId}/reactions';
+    url: '/workspaces/{workspaceSlug}/practices/feedback/{feedbackId}/response';
 };
 
-export type SubmitReactionErrors = {
+export type GetFeedbackResponseErrors = {
     /**
-     * Invalid request (e.g., DISPUTED without explanation)
-     */
-    400: unknown;
-    /**
-     * Current user is not the feedback's recipient
-     */
-    403: unknown;
-    /**
-     * Feedback not found in this workspace
+     * Delivered feedback not found for the current recipient
      */
     404: unknown;
 };
 
-export type SubmitReactionResponses = {
+export type GetFeedbackResponseResponses = {
     /**
-     * Reaction recorded
+     * Current response returned
      */
-    201: Reaction;
+    200: FeedbackResponse;
+    /**
+     * No response is currently recorded
+     */
+    204: void;
 };
 
-export type SubmitReactionResponse = SubmitReactionResponses[keyof SubmitReactionResponses];
+export type GetFeedbackResponseResponse = GetFeedbackResponseResponses[keyof GetFeedbackResponseResponses];
 
-export type ListLearnerPracticesData = {
-    body?: never;
+export type ReplaceFeedbackResponseData = {
+    body: FeedbackResponseRequest;
     path: {
         /**
          * Workspace slug
          */
         workspaceSlug: string;
+        feedbackId: string;
     };
     query?: never;
-    url: '/workspaces/{workspaceSlug}/practices/learner';
+    url: '/workspaces/{workspaceSlug}/practices/feedback/{feedbackId}/response';
 };
 
-export type ListLearnerPracticesResponses = {
+export type ReplaceFeedbackResponseErrors = {
     /**
-     * Learner practices returned
+     * Invalid response
      */
-    200: Array<LearnerPractice>;
+    400: unknown;
+    /**
+     * Delivered feedback not found for the current recipient
+     */
+    404: unknown;
 };
 
-export type ListLearnerPracticesResponse = ListLearnerPracticesResponses[keyof ListLearnerPracticesResponses];
+export type ReplaceFeedbackResponseResponses = {
+    /**
+     * Response replaced
+     */
+    200: FeedbackResponse;
+};
+
+export type ReplaceFeedbackResponseResponse = ReplaceFeedbackResponseResponses[keyof ReplaceFeedbackResponseResponses];
 
 export type ListObservationsData = {
     body?: never;
@@ -9716,10 +9981,40 @@ export type ListObservationsData = {
          */
         practiceSlug?: string;
         /**
+         * Filter by the practice group the observed practice belongs to
+         */
+        groupSlug?: string;
+        /**
          * Filter by presence
          */
         presence?: 'PRESENT' | 'ABSENT' | 'NOT_APPLICABLE' | 'INCONCLUSIVE';
+        /**
+         * Only observations on these kinds of reviewed work, e.g. scm.pull_request (repeatable)
+         */
+        artifactKinds?: Array<string>;
+        /**
+         * Only observations with these severities (repeatable); omit for all
+         */
+        severities?: Array<'CRITICAL' | 'MAJOR' | 'MINOR' | 'INFO'>;
+        /**
+         * Drop NOT_APPLICABLE rows — only observations where the practice actually applied
+         */
+        displayableOnly?: boolean;
+        /**
+         * Feed ordering: DATE (default) or SEVERITY (most severe first, ties newest-first)
+         */
+        sort?: 'DATE' | 'SEVERITY';
+        /**
+         * Ordering direction: for DATE newest/oldest first, for SEVERITY most/least severe first
+         */
+        direction?: 'ASC' | 'DESC';
+        /**
+         * Zero-based page
+         */
         page?: number;
+        /**
+         * Page size from 1 to 100
+         */
         size?: number;
     };
     url: '/workspaces/{workspaceSlug}/practices/observations';
@@ -9755,27 +10050,6 @@ export type GetObservationsForPullRequestResponses = {
 };
 
 export type GetObservationsForPullRequestResponse = GetObservationsForPullRequestResponses[keyof GetObservationsForPullRequestResponses];
-
-export type GetReflectionData = {
-    body?: never;
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-    };
-    query?: never;
-    url: '/workspaces/{workspaceSlug}/practices/observations/reflection';
-};
-
-export type GetReflectionResponses = {
-    /**
-     * Per-practice reflection cards returned
-     */
-    200: Array<ReflectionPractice>;
-};
-
-export type GetReflectionResponse = GetReflectionResponses[keyof GetReflectionResponses];
 
 export type GetSummaryData = {
     body?: never;
@@ -9841,7 +10115,7 @@ export type ReorderPracticesData = {
 
 export type ReorderPracticesErrors = {
     /**
-     * orderedSlugs is empty, has duplicates, or is not the area's complete set
+     * orderedSlugs is empty, has duplicates, or is not the group's complete set
      */
     400: ProblemDetail;
 };
@@ -9936,6 +10210,27 @@ export type UpdatePracticeReviewSettingsResponses = {
 };
 
 export type UpdatePracticeReviewSettingsResponse = UpdatePracticeReviewSettingsResponses[keyof UpdatePracticeReviewSettingsResponses];
+
+export type ListReviewedPracticesData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/reviewed';
+};
+
+export type ListReviewedPracticesResponses = {
+    /**
+     * Developer practices returned
+     */
+    200: Array<ReviewedPractice>;
+};
+
+export type ListReviewedPracticesResponse = ListReviewedPracticesResponses[keyof ListReviewedPracticesResponses];
 
 export type ListPracticeReviewsData = {
     body?: never;
@@ -10145,7 +10440,7 @@ export type ListPracticeReviewObservationsData = {
          */
         sort?: 'NEWEST' | 'ACTIONABILITY';
         practiceSlug?: Array<string>;
-        areaSlug?: Array<string>;
+        groupSlug?: Array<string>;
         presence?: Array<'PRESENT' | 'ABSENT' | 'NOT_APPLICABLE' | 'INCONCLUSIVE'>;
         assessment?: Array<'GOOD' | 'BAD'>;
         severity?: Array<'CRITICAL' | 'MAJOR' | 'MINOR' | 'INFO'>;
@@ -10223,6 +10518,27 @@ export type GetPracticeReviewObservationResponses = {
 };
 
 export type GetPracticeReviewObservationResponse = GetPracticeReviewObservationResponses[keyof GetPracticeReviewObservationResponses];
+
+export type ListPracticeStandingsData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/standings';
+};
+
+export type ListPracticeStandingsResponses = {
+    /**
+     * Practice standings returned
+     */
+    200: Array<PracticeStanding>;
+};
+
+export type ListPracticeStandingsResponse = ListPracticeStandingsResponses[keyof ListPracticeStandingsResponses];
 
 export type ListSweepSchedulesData = {
     body?: never;
@@ -10493,7 +10809,7 @@ export type UpdatePracticeData = {
 
 export type UpdatePracticeErrors = {
     /**
-     * Practice or practice area not found
+     * Practice or practice group not found
      */
     404: ProblemDetail;
 };
@@ -10508,37 +10824,6 @@ export type UpdatePracticeResponses = {
 };
 
 export type UpdatePracticeResponse = UpdatePracticeResponses[keyof UpdatePracticeResponses];
-
-export type BindAreaData = {
-    body: BindPracticeAreaRequest;
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-        practiceSlug: string;
-    };
-    query?: never;
-    url: '/workspaces/{workspaceSlug}/practices/{practiceSlug}/area';
-};
-
-export type BindAreaErrors = {
-    /**
-     * Practice or area not found
-     */
-    404: ProblemDetail;
-};
-
-export type BindAreaError = BindAreaErrors[keyof BindAreaErrors];
-
-export type BindAreaResponses = {
-    /**
-     * Practice moved
-     */
-    200: Practice;
-};
-
-export type BindAreaResponse = BindAreaResponses[keyof BindAreaResponses];
 
 export type SetAutonomyData = {
     body: UpdatePracticeAutonomyRequest;
@@ -10575,6 +10860,37 @@ export type SetAutonomyResponses = {
 
 export type SetAutonomyResponse = SetAutonomyResponses[keyof SetAutonomyResponses];
 
+export type BindGroupData = {
+    body: BindPracticeGroupRequest;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        practiceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/{practiceSlug}/group';
+};
+
+export type BindGroupErrors = {
+    /**
+     * Practice or group not found
+     */
+    404: ProblemDetail;
+};
+
+export type BindGroupError = BindGroupErrors[keyof BindGroupErrors];
+
+export type BindGroupResponses = {
+    /**
+     * Practice moved
+     */
+    200: Practice;
+};
+
+export type BindGroupResponse = BindGroupResponses[keyof BindGroupResponses];
+
 export type PlacePracticeData = {
     body: PlacePracticeRequest;
     path: {
@@ -10594,7 +10910,7 @@ export type PlacePracticeErrors = {
      */
     400: ProblemDetail;
     /**
-     * Practice or area not found
+     * Practice or group not found
      */
     404: ProblemDetail;
 };

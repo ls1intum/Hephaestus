@@ -4,7 +4,7 @@ import static de.tum.cit.aet.hephaestus.practices.curated.CuratedCatalogFixtures
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
-import de.tum.cit.aet.hephaestus.practices.AreaDefinition;
+import de.tum.cit.aet.hephaestus.practices.GroupDefinition;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import org.jspecify.annotations.Nullable;
@@ -102,9 +102,9 @@ class CatalogEntryTest extends BaseUnitTest {
     }
 
     @Test
-    void anAreaUpdateIsPresentationNotDetection() {
-        var mine = new AreaDefinition("Maintainability", "Our description", "Wrench", "sky");
-        var shipped = new AreaDefinition("Maintainability", "New description", "Wrench", "sky");
+    void anGroupUpdateIsPresentationNotDetection() {
+        var mine = new GroupDefinition("Maintainability", "Our description", "Wrench", "sky");
+        var shipped = new GroupDefinition("Maintainability", "New description", "Wrench", "sky");
         var entry = new CatalogEntry<>("maintainability", mine, shipped, mine, "0".repeat(64), false, 0, null);
 
         assertThat(entry.changeKind()).isEqualTo(CatalogChangeKind.PRESENTATION);

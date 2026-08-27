@@ -29,7 +29,7 @@ class BundledPracticeCatalogLoaderTest extends BaseUnitTest {
     void shouldLoadComposedDefinitionsAndScripts() {
         BundledPracticeCatalog catalog = loader.catalog();
 
-        assertThat(catalog.areas()).allSatisfy(area -> assertThat(area.definition().name()).isNotBlank());
+        assertThat(catalog.groups()).allSatisfy(group -> assertThat(group.definition().name()).isNotBlank());
         assertThat(catalog.practices()).allSatisfy(practice ->
             assertThat(practice.definition().criteria()).contains("\n\n---\n\n")
         );
@@ -94,7 +94,7 @@ class BundledPracticeCatalogLoaderTest extends BaseUnitTest {
     }
 
     @Test
-    void shouldKeepDetectorVocabularyOutOfLearnerCopy() {
+    void shouldKeepDetectorVocabularyOutOfDeveloperCopy() {
         Pattern detectorVocabulary = Pattern.compile("\\b(?:PRESENT|ABSENT|GOOD|BAD|NOT_APPLICABLE)\\b");
 
         assertThat(loader.catalog().practices()).allSatisfy(practice -> {

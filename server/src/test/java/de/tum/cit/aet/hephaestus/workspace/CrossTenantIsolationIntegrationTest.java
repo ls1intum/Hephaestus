@@ -397,8 +397,8 @@ class CrossTenantIsolationIntegrationTest extends AbstractWorkspaceIntegrationTe
         @WithMentorUser
         void reactionsAreScopedToWorkspace() {
             // 204 = own feedback found, no reaction yet; 404 = foreign feedback not in this workspace.
-            expectDetailStatus("/practices/feedback/{key}/reactions", tenantA.feedbackId()).isNoContent();
-            expectDetailStatus("/practices/feedback/{key}/reactions", tenantB.feedbackId()).isNotFound();
+            expectDetailStatus("/practices/feedback/{key}/response", tenantA.feedbackId()).isNoContent();
+            expectDetailStatus("/practices/feedback/{key}/response", tenantB.feedbackId()).isNotFound();
         }
     }
 

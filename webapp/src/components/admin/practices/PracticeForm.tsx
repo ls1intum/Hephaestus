@@ -2,9 +2,9 @@ import { Link } from "@tanstack/react-router";
 import type {
 	CreatePracticeRequest,
 	Practice,
-	PracticeArea,
 	PracticeDefinitionOptions,
 	PracticeEvidenceOutcome,
+	PracticeGroup,
 	UpdatePracticeRequest,
 } from "@/api/types.gen";
 import { soleBinding } from "@/components/admin/practice-catalog/bindings";
@@ -20,9 +20,9 @@ import { cn } from "@/lib/utils";
 interface PracticeFormCreateProps {
 	mode: "create";
 	workspaceSlug: string;
-	areas: PracticeArea[];
+	groups: PracticeGroup[];
 	/** Rejects when the save failed, which is what keeps the unsaved-changes guard honest. */
-	onSubmit: (data: CreatePracticeRequest, areaSlug: string | null) => void | Promise<void>;
+	onSubmit: (data: CreatePracticeRequest, groupSlug: string | null) => void | Promise<void>;
 	isPending: boolean;
 	definitionOptions: PracticeDefinitionOptions;
 	initialData?: never;
@@ -32,12 +32,12 @@ interface PracticeFormEditProps {
 	mode: "edit";
 	workspaceSlug: string;
 	initialData: Practice;
-	areas: PracticeArea[];
+	groups: PracticeGroup[];
 	/** Rejects when the save failed, which is what keeps the unsaved-changes guard honest. */
 	onSubmit: (
 		slug: string,
 		data: UpdatePracticeRequest,
-		areaSlug: string | null,
+		groupSlug: string | null,
 	) => void | Promise<void>;
 	isPending: boolean;
 	definitionOptions: PracticeDefinitionOptions;
@@ -59,7 +59,7 @@ function asDefinitionValue(practice: Practice): PracticeDefinitionValue {
 		name: practice.name,
 		bindings: [soleBinding(practice.bindings)],
 		criteria: practice.criteria,
-		...(practice.areaSlug ? { areaSlug: practice.areaSlug } : {}),
+		...(practice.groupSlug ? { groupSlug: practice.groupSlug } : {}),
 		...(practice.whyItMatters ? { whyItMatters: practice.whyItMatters } : {}),
 		...(practice.whatGoodLooksLike ? { whatGoodLooksLike: practice.whatGoodLooksLike } : {}),
 		...(practice.precomputeScript ? { precomputeScript: practice.precomputeScript } : {}),
@@ -68,11 +68,11 @@ function asDefinitionValue(practice: Practice): PracticeDefinitionValue {
 }
 
 export function PracticeForm(props: PracticeFormProps) {
-	const { mode, workspaceSlug, areas, isPending, initialData, definitionOptions, cancel } = props;
+	const { mode, workspaceSlug, groups, isPending, initialData, definitionOptions, cancel } = props;
 	const submit = (value: PracticeDefinitionValue) => {
-		const { areaSlug, ...definition } = value;
+		const { groupSlug, ...definition } = value;
 		if (props.mode === "create") {
-			return props.onSubmit(definition, areaSlug ?? null);
+			return props.onSubmit(definition, groupSlug ?? null);
 		}
 
 		const clear: NonNullable<UpdatePracticeRequest["clear"]> = [];
@@ -91,7 +91,7 @@ export function PracticeForm(props: PracticeFormProps) {
 				automatedReviewPolicy: definition.automatedReviewPolicy,
 				clear: clear.length > 0 ? clear : undefined,
 			},
-			areaSlug ?? null,
+			groupSlug ?? null,
 		);
 	};
 	const reviewResults =
@@ -135,7 +135,7 @@ export function PracticeForm(props: PracticeFormProps) {
 	return mode === "create" ? (
 		<PracticeDefinitionForm
 			mode="create"
-			areas={areas}
+			groups={groups}
 			isPending={isPending}
 			definitionOptions={definitionOptions}
 			cancelAction={cancel}
@@ -145,7 +145,7 @@ export function PracticeForm(props: PracticeFormProps) {
 		<PracticeDefinitionForm
 			mode="edit"
 			initialData={asDefinitionValue(initialData)}
-			areas={areas}
+			groups={groups}
 			isPending={isPending}
 			definitionOptions={definitionOptions}
 			cancelAction={cancel}

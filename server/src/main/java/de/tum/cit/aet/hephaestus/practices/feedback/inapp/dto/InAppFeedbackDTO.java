@@ -15,8 +15,8 @@ import org.jspecify.annotations.Nullable;
  * operator surfaces are closed to the body.
  *
  * <p>{@code criteria} is deliberately absent, as it is on the reflective read model: the criteria text
- * is instruction for the detector, and a learner reading it would be reading the rubric they were
- * measured with rather than the practice they are learning. Only the learner framing travels —
+ * is instruction for the detector, and a developer reading it would be reading the rubric they were
+ * measured with rather than the practice they are learning. Only the developer framing travels —
  * {@code whyItMatters} and {@code whatGoodLooksLike}.
  *
  * <p>No counts either. "Three of your last five" is evidence for a claim about a strategy and belongs
@@ -31,10 +31,10 @@ public record InAppFeedbackDTO(
     @NonNull @Schema(description = "The message, as Markdown; ends with the habit to try next") String body,
     @NonNull @Schema(description = "Practice this habit belongs to") String practiceSlug,
     @NonNull String practiceName,
-    @Schema(description = "Area the practice sits in; null when the practice has none") @Nullable String areaSlug,
-    @Schema(description = "Area display name; null when the practice has none") @Nullable String areaName,
-    @Schema(description = "Why this practice matters, in the learner's framing") @Nullable String whyItMatters,
-    @Schema(description = "What good looks like, in the learner's framing") @Nullable String whatGoodLooksLike,
+    @Schema(description = "Group the practice sits in; null when the practice has none") @Nullable String groupSlug,
+    @Schema(description = "Group display name; null when the practice has none") @Nullable String groupName,
+    @Schema(description = "Why this practice matters, in the developer's framing") @Nullable String whyItMatters,
+    @Schema(description = "What good looks like, in the developer's framing") @Nullable String whatGoodLooksLike,
     @NonNull
     @Schema(description = "The pieces of work the habit was observed on, newest first")
     List<InAppEvidenceDTO> evidence,

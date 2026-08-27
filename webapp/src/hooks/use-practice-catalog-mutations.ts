@@ -2,31 +2,31 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
 	autonomyRollupQueryKey,
-	createAreaMutation,
-	deleteAreaMutation,
+	createGroupMutation,
+	deleteGroupMutation,
 	deletePracticeMutation,
 	getPracticeQueryKey,
 	listAdoptablePracticesQueryKey,
-	listAreasQueryKey,
+	listGroupsQueryKey,
 	listPracticesOptions,
 	listPracticesQueryKey,
 	placePracticeMutation,
-	previewAreaAdoptionQueryKey,
-	reorderAreasMutation,
-	updateAreaMutation,
+	previewGroupAdoptionQueryKey,
+	reorderGroupsMutation,
+	updateGroupMutation,
 } from "@/api/@tanstack/react-query.gen";
-import type { Practice, PracticeArea } from "@/api/types.gen";
+import type { Practice, PracticeGroup } from "@/api/types.gen";
 import {
 	applyDisplayOrder,
 	applyPracticePlacements,
-	patchArea,
+	patchGroup,
 	placePractice,
 	practiceCatalogStructureScope,
 	practicePlacementSnapshot,
-	removeArea,
-	selectAreaPatch,
+	removeGroup,
+	selectGroupPatch,
 	unassignPractices,
-	upsertArea,
+	upsertGroup,
 } from "@/hooks/practice-catalog-cache";
 import { filedUnder, pathString, usePendingMutationIds } from "@/hooks/use-pending-mutation-ids";
 import { problemStatusOf } from "@/lib/problem-detail";
@@ -35,14 +35,14 @@ const UNASSIGNED = "__unassigned__";
 
 export function usePracticeCatalogMutations(workspaceSlug: string) {
 	const queryClient = useQueryClient();
-	const areasQueryKey = listAreasQueryKey({ path: { workspaceSlug } });
+	const groupsQueryKey = listGroupsQueryKey({ path: { workspaceSlug } });
 	const practicesQueryKey = listPracticesQueryKey({ path: { workspaceSlug } });
 	const adoptionCatalogQueryKey = listAdoptablePracticesQueryKey({ path: { workspaceSlug } });
-	const areaMutationKey = ["practice-catalog", workspaceSlug, "areas"] as const;
+	const groupMutationKey = ["practice-catalog", workspaceSlug, "groups"] as const;
 	const practiceMutationKey = ["practice-catalog", workspaceSlug, "practices"] as const;
 	const structuralScope = practiceCatalogStructureScope(workspaceSlug);
 	const applyPlacementCaches = (
-		placements: Array<Pick<Practice, "areaSlug" | "displayOrder" | "slug">>,
+		placements: Array<Pick<Practice, "groupSlug" | "displayOrder" | "slug">>,
 	) => {
 		queryClient.setQueryData<Practice[]>(practicesQueryKey, (practices = []) =>
 			applyPracticePlacements(practices, placements),
@@ -56,7 +56,7 @@ export function usePracticeCatalogMutations(workspaceSlug: string) {
 					practice
 						? {
 								...practice,
-								areaSlug: placement.areaSlug,
+								groupSlug: placement.groupSlug,
 								displayOrder: placement.displayOrder,
 							}
 						: practice,
@@ -69,9 +69,9 @@ export function usePracticeCatalogMutations(workspaceSlug: string) {
 			queryKey: autonomyRollupQueryKey({ path: { workspaceSlug } }),
 		});
 	};
-	const invalidateAreasAfterLastWrite = () => {
-		if (queryClient.isMutating({ mutationKey: areaMutationKey }) === 1) {
-			void queryClient.invalidateQueries({ queryKey: areasQueryKey });
+	const invalidateGroupsAfterLastWrite = () => {
+		if (queryClient.isMutating({ mutationKey: groupMutationKey }) === 1) {
+			void queryClient.invalidateQueries({ queryKey: groupsQueryKey });
 			invalidateAutonomyRollup();
 		}
 	};
@@ -82,77 +82,77 @@ export function usePracticeCatalogMutations(workspaceSlug: string) {
 		}
 	};
 
-	const createArea = useMutation({
-		...filedUnder(areaMutationKey, createAreaMutation()),
+	const createGroup = useMutation({
+		...filedUnder(groupMutationKey, createGroupMutation()),
 		scope: structuralScope,
 		onMutate: async () => {
-			await queryClient.cancelQueries({ queryKey: areasQueryKey });
+			await queryClient.cancelQueries({ queryKey: groupsQueryKey });
 		},
 		onSuccess: (created) => {
-			queryClient.setQueryData<PracticeArea[]>(areasQueryKey, (areas) =>
-				areas ? upsertArea(areas, created) : areas,
+			queryClient.setQueryData<PracticeGroup[]>(groupsQueryKey, (groups) =>
+				groups ? upsertGroup(groups, created) : groups,
 			);
 			toast.success("Group created");
 		},
 		onError: (error) => {
 			const status = problemStatusOf(error);
 			toast.error(
-				status === 409 ? "An area with that name already exists" : "Couldn't create the group",
+				status === 409 ? "A group with that name already exists" : "Couldn't create the group",
 			);
 		},
-		onSettled: invalidateAreasAfterLastWrite,
+		onSettled: invalidateGroupsAfterLastWrite,
 	});
 
-	const updateArea = useMutation({
-		...filedUnder(areaMutationKey, updateAreaMutation()),
+	const updateGroup = useMutation({
+		...filedUnder(groupMutationKey, updateGroupMutation()),
 		scope: structuralScope,
 		onMutate: async (variables) => {
-			await queryClient.cancelQueries({ queryKey: areasQueryKey });
+			await queryClient.cancelQueries({ queryKey: groupsQueryKey });
 			const previous = queryClient
-				.getQueryData<PracticeArea[]>(areasQueryKey)
-				?.find((area) => area.slug === variables.path.areaSlug);
-			queryClient.setQueryData<PracticeArea[]>(areasQueryKey, (areas = []) =>
-				patchArea(areas, variables.path.areaSlug, variables.body),
+				.getQueryData<PracticeGroup[]>(groupsQueryKey)
+				?.find((group) => group.slug === variables.path.groupSlug);
+			queryClient.setQueryData<PracticeGroup[]>(groupsQueryKey, (groups = []) =>
+				patchGroup(groups, variables.path.groupSlug, variables.body),
 			);
 			return { previous };
 		},
 		onError: (_error, variables, context) => {
 			const previous = context?.previous;
 			if (previous) {
-				queryClient.setQueryData<PracticeArea[]>(areasQueryKey, (areas = []) =>
-					patchArea(areas, previous.slug, selectAreaPatch(previous, variables.body)),
+				queryClient.setQueryData<PracticeGroup[]>(groupsQueryKey, (groups = []) =>
+					patchGroup(groups, previous.slug, selectGroupPatch(previous, variables.body)),
 				);
 			}
 			toast.error("Couldn't update the group");
 		},
 		onSuccess: (updated, variables) => {
-			queryClient.setQueryData<PracticeArea[]>(areasQueryKey, (areas = []) =>
-				patchArea(areas, updated.slug, selectAreaPatch(updated, variables.body)),
+			queryClient.setQueryData<PracticeGroup[]>(groupsQueryKey, (groups = []) =>
+				patchGroup(groups, updated.slug, selectGroupPatch(updated, variables.body)),
 			);
 		},
-		onSettled: invalidateAreasAfterLastWrite,
+		onSettled: invalidateGroupsAfterLastWrite,
 	});
 
-	const deleteArea = useMutation({
-		...filedUnder(areaMutationKey, deleteAreaMutation()),
+	const deleteGroup = useMutation({
+		...filedUnder(groupMutationKey, deleteGroupMutation()),
 		scope: structuralScope,
 		onMutate: async () => {
 			await Promise.all([
-				queryClient.cancelQueries({ queryKey: areasQueryKey }),
+				queryClient.cancelQueries({ queryKey: groupsQueryKey }),
 				queryClient.cancelQueries({ queryKey: practicesQueryKey }),
 			]);
 		},
 		onSuccess: (_data, variables) => {
-			const slug = variables.path.areaSlug;
-			queryClient.setQueryData<PracticeArea[]>(areasQueryKey, (areas = []) =>
-				removeArea(areas, slug),
+			const slug = variables.path.groupSlug;
+			queryClient.setQueryData<PracticeGroup[]>(groupsQueryKey, (groups = []) =>
+				removeGroup(groups, slug),
 			);
 			const practices = queryClient.getQueryData<Practice[]>(practicesQueryKey) ?? [];
 			if (variables.query?.deletePractices) {
-				const deleted = practices.filter((practice) => practice.areaSlug === slug);
+				const deleted = practices.filter((practice) => practice.groupSlug === slug);
 				queryClient.setQueryData<Practice[]>(
 					practicesQueryKey,
-					practices.filter((practice) => practice.areaSlug !== slug),
+					practices.filter((practice) => practice.groupSlug !== slug),
 				);
 				for (const practice of deleted) {
 					queryClient.removeQueries({
@@ -166,60 +166,60 @@ export function usePracticeCatalogMutations(workspaceSlug: string) {
 			} else {
 				const updated = unassignPractices(practices, slug);
 				applyPlacementCaches(
-					updated.map(({ areaSlug, displayOrder, slug: practiceSlug }) => ({
-						areaSlug,
+					updated.map(({ groupSlug, displayOrder, slug: practiceSlug }) => ({
+						groupSlug,
 						displayOrder,
 						slug: practiceSlug,
 					})),
 				);
 			}
 			void queryClient.invalidateQueries({
-				queryKey: previewAreaAdoptionQueryKey({ path: { workspaceSlug, slug } }),
+				queryKey: previewGroupAdoptionQueryKey({ path: { workspaceSlug, slug } }),
 			});
-			toast.success("Area deleted");
+			toast.success("Group deleted");
 		},
-		onError: () => toast.error("Couldn't delete the area"),
+		onError: () => toast.error("Couldn't delete the group"),
 		onSettled: () => {
-			invalidateAreasAfterLastWrite();
+			invalidateGroupsAfterLastWrite();
 			if (queryClient.isMutating({ mutationKey: practiceMutationKey }) === 0) {
 				void queryClient.invalidateQueries({ queryKey: practicesQueryKey });
 			}
 		},
 	});
 
-	const reorderAreas = useMutation({
-		...filedUnder(areaMutationKey, reorderAreasMutation()),
+	const reorderGroups = useMutation({
+		...filedUnder(groupMutationKey, reorderGroupsMutation()),
 		scope: structuralScope,
 		onMutate: async (variables) => {
-			await queryClient.cancelQueries({ queryKey: areasQueryKey });
+			await queryClient.cancelQueries({ queryKey: groupsQueryKey });
 			const previousOrder = queryClient
-				.getQueryData<PracticeArea[]>(areasQueryKey)
+				.getQueryData<PracticeGroup[]>(groupsQueryKey)
 				?.slice()
 				.sort((a, b) => a.displayOrder - b.displayOrder)
-				.map((area) => area.slug);
-			queryClient.setQueryData<PracticeArea[]>(areasQueryKey, (areas = []) =>
-				applyDisplayOrder(areas, variables.body.orderedSlugs),
+				.map((group) => group.slug);
+			queryClient.setQueryData<PracticeGroup[]>(groupsQueryKey, (groups = []) =>
+				applyDisplayOrder(groups, variables.body.orderedSlugs),
 			);
 			return { previousOrder };
 		},
 		onError: (_error, _variables, context) => {
 			const previousOrder = context?.previousOrder;
 			if (previousOrder) {
-				queryClient.setQueryData<PracticeArea[]>(areasQueryKey, (areas = []) =>
-					applyDisplayOrder(areas, previousOrder),
+				queryClient.setQueryData<PracticeGroup[]>(groupsQueryKey, (groups = []) =>
+					applyDisplayOrder(groups, previousOrder),
 				);
 			}
-			toast.error("Couldn't reorder the areas");
+			toast.error("Couldn't reorder the groups");
 		},
 		onSuccess: (updated) => {
 			const order = [...updated]
 				.sort((a, b) => a.displayOrder - b.displayOrder)
-				.map((area) => area.slug);
-			queryClient.setQueryData<PracticeArea[]>(areasQueryKey, (areas = []) =>
-				applyDisplayOrder(areas, order),
+				.map((group) => group.slug);
+			queryClient.setQueryData<PracticeGroup[]>(groupsQueryKey, (groups = []) =>
+				applyDisplayOrder(groups, order),
 			);
 		},
-		onSettled: invalidateAreasAfterLastWrite,
+		onSettled: invalidateGroupsAfterLastWrite,
 	});
 
 	const place = useMutation({
@@ -228,16 +228,16 @@ export function usePracticeCatalogMutations(workspaceSlug: string) {
 		onMutate: async (variables) => {
 			await queryClient.cancelQueries({ queryKey: practicesQueryKey });
 			const practices = queryClient.getQueryData<Practice[]>(practicesQueryKey) ?? [];
-			const destinationAreaSlug = variables.body.areaSlug ?? null;
+			const destinationGroupSlug = variables.body.groupSlug ?? null;
 			const previous = practicePlacementSnapshot(
 				practices,
 				variables.path.practiceSlug,
-				destinationAreaSlug,
+				destinationGroupSlug,
 			);
 			const optimistic = placePractice(
 				practices,
 				variables.path.practiceSlug,
-				destinationAreaSlug,
+				destinationGroupSlug,
 				variables.body.position,
 			);
 			queryClient.setQueryData(practicesQueryKey, optimistic);
@@ -245,7 +245,7 @@ export function usePracticeCatalogMutations(workspaceSlug: string) {
 			applyPlacementCaches(
 				optimistic
 					.filter(({ slug }) => affectedSlugs.has(slug))
-					.map(({ slug, areaSlug, displayOrder }) => ({ slug, areaSlug, displayOrder })),
+					.map(({ slug, groupSlug, displayOrder }) => ({ slug, groupSlug, displayOrder })),
 			);
 			return { previous };
 		},
@@ -258,7 +258,7 @@ export function usePracticeCatalogMutations(workspaceSlug: string) {
 		},
 		onSuccess: (updated) => {
 			applyPlacementCaches(
-				updated.map(({ slug, areaSlug, displayOrder }) => ({ slug, areaSlug, displayOrder })),
+				updated.map(({ slug, groupSlug, displayOrder }) => ({ slug, groupSlug, displayOrder })),
 			);
 		},
 		onSettled: invalidatePracticesAfterLastWrite,
@@ -303,10 +303,10 @@ export function usePracticeCatalogMutations(workspaceSlug: string) {
 
 	const { data: practices = [] } = useQuery({
 		...listPracticesOptions({ path: { workspaceSlug } }),
-		select: (all) => all.map(({ slug, areaSlug }) => ({ slug, areaSlug })),
+		select: (all) => all.map(({ slug, groupSlug }) => ({ slug, groupSlug })),
 	});
-	const pendingAreaSlugs = usePendingMutationIds(areaMutationKey, (variables) =>
-		pathString(variables, "areaSlug"),
+	const pendingGroupSlugs = usePendingMutationIds(groupMutationKey, (variables) =>
+		pathString(variables, "groupSlug"),
 	);
 	const pendingPracticeSlugs = usePendingMutationIds(practiceMutationKey, (variables) =>
 		pathString(variables, "practiceSlug"),
@@ -317,39 +317,39 @@ export function usePracticeCatalogMutations(workspaceSlug: string) {
 		blockedPracticeOrderBuckets.add(UNASSIGNED);
 		blockedMoveDestinationSlugs.add(UNASSIGNED);
 		for (const practice of practices) {
-			if (practice.areaSlug) {
-				blockedPracticeOrderBuckets.add(practice.areaSlug);
-				blockedMoveDestinationSlugs.add(practice.areaSlug);
+			if (practice.groupSlug) {
+				blockedPracticeOrderBuckets.add(practice.groupSlug);
+				blockedMoveDestinationSlugs.add(practice.groupSlug);
 			}
 		}
 	}
-	if (deleteArea.isPending) {
-		const deletingAreaSlug = deleteArea.variables.path.areaSlug;
-		blockedPracticeOrderBuckets.add(deletingAreaSlug);
+	if (deleteGroup.isPending) {
+		const deletingGroupSlug = deleteGroup.variables.path.groupSlug;
+		blockedPracticeOrderBuckets.add(deletingGroupSlug);
 		blockedPracticeOrderBuckets.add(UNASSIGNED);
-		blockedMoveDestinationSlugs.add(deletingAreaSlug);
+		blockedMoveDestinationSlugs.add(deletingGroupSlug);
 		blockedMoveDestinationSlugs.add(UNASSIGNED);
 	}
 	if (deletePractice.isPending) {
 		const practice = practices.find(
 			({ slug }) => slug === deletePractice.variables.path.practiceSlug,
 		);
-		const bucket = practice?.areaSlug ?? UNASSIGNED;
+		const bucket = practice?.groupSlug ?? UNASSIGNED;
 		blockedPracticeOrderBuckets.add(bucket);
 		blockedMoveDestinationSlugs.add(bucket);
 	}
 	return {
-		areaStructurePending:
-			createArea.isPending || deleteArea.isPending || reorderAreas.isPending || place.isPending,
-		createArea,
-		deleteArea,
+		groupStructurePending:
+			createGroup.isPending || deleteGroup.isPending || reorderGroups.isPending || place.isPending,
+		createGroup,
+		deleteGroup,
 		deletePractice,
 		placePractice: place,
-		pendingAreaSlugs,
+		pendingGroupSlugs,
 		pendingPracticeSlugs,
 		blockedMoveDestinationSlugs,
 		blockedPracticeOrderBuckets,
-		reorderAreas,
-		updateArea,
+		reorderGroups,
+		updateGroup,
 	};
 }

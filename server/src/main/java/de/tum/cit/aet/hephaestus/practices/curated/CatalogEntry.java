@@ -1,8 +1,8 @@
 package de.tum.cit.aet.hephaestus.practices.curated;
 
-import de.tum.cit.aet.hephaestus.practices.AreaDefinition;
 import de.tum.cit.aet.hephaestus.practices.CanonicalDigest;
 import de.tum.cit.aet.hephaestus.practices.CatalogDefinition;
+import de.tum.cit.aet.hephaestus.practices.GroupDefinition;
 import java.time.Instant;
 import java.util.Objects;
 import org.jspecify.annotations.Nullable;
@@ -49,7 +49,7 @@ public record CatalogEntry<D extends CatalogDefinition>(
         if (CuratedDefinitionDigest.of(slug, shipped).equals(CuratedDefinitionDigest.of(slug, overridden))) {
             return CatalogChangeKind.NONE;
         }
-        if (overridden instanceof AreaDefinition) {
+        if (overridden instanceof GroupDefinition) {
             return CatalogChangeKind.PRESENTATION;
         }
         return shipped.provenanceFingerprint(slug).equals(overridden.provenanceFingerprint(slug))

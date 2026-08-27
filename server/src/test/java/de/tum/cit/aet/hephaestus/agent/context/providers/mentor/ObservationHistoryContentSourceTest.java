@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.agent.context.providers.mentor;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
@@ -86,6 +87,7 @@ class ObservationHistoryContentSourceTest extends BaseUnitTest {
                 eq(2L),
                 eq(1L),
                 any(Instant.class),
+                anyBoolean(),
                 any(Pageable.class)
             )
         ).thenReturn(List.of());
@@ -123,6 +125,7 @@ class ObservationHistoryContentSourceTest extends BaseUnitTest {
                 eq(2L),
                 eq(1L),
                 any(Instant.class),
+                anyBoolean(),
                 any(Pageable.class)
             )
         ).thenReturn(List.of(observation));
@@ -167,6 +170,7 @@ class ObservationHistoryContentSourceTest extends BaseUnitTest {
                 eq(2L),
                 eq(1L),
                 any(Instant.class),
+                anyBoolean(),
                 any(Pageable.class)
             )
         ).thenReturn(List.of(observation));
@@ -234,6 +238,7 @@ class ObservationHistoryContentSourceTest extends BaseUnitTest {
                 eq(2L),
                 eq(1L),
                 any(Instant.class),
+                anyBoolean(),
                 any(Pageable.class)
             )
         ).thenReturn(List.of(badObservation, naObservation));

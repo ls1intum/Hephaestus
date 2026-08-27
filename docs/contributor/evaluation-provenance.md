@@ -59,9 +59,10 @@ silently dropping it.
   suppression reason. A link to delivered or superseded feedback proves placement. Links only to
   prepared, suppressed, or failed feedback do not. No link means no feedback was composed from that
   observation.
-- **Reaction to delivered evidence:** join `reaction.feedback_id` to feedback, then through
-  `feedback_observation` to its observations. Reactions are accepted only for delivered feedback; a later
-  review may supersede that feedback.
+- **Response to delivered evidence:** join `reaction.feedback_id` to feedback, then through
+  `feedback_observation` to its observations. The latest append-only row carries perceived usefulness,
+  resolution, or both. Responses are accepted only for delivered feedback; a later review may supersede
+  that feedback.
 - **Feedback to posted location:** join `feedback_placement` and inspect `posted_comment_ref` or
   `chat_message_id`.
 

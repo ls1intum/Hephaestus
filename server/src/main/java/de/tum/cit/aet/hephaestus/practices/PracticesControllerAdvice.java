@@ -32,11 +32,11 @@ public class PracticesControllerAdvice {
         );
     }
 
-    @ExceptionHandler(PracticeAreaSlugConflictException.class)
-    ProblemDetail handleAreaSlugConflict(PracticeAreaSlugConflictException exception) {
+    @ExceptionHandler(PracticeGroupSlugConflictException.class)
+    ProblemDetail handleGroupSlugConflict(PracticeGroupSlugConflictException exception) {
         return problem(
             HttpStatus.CONFLICT,
-            "Practice area slug conflict",
+            "Practice group slug conflict",
             Objects.toString(exception.getMessage(), "Request failed")
         );
     }

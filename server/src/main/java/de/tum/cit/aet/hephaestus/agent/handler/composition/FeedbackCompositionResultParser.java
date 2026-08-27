@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.agent.handler.composition;
 
+import de.tum.cit.aet.hephaestus.practices.feedback.DeveloperTextSanitizer;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
-import de.tum.cit.aet.hephaestus.practices.feedback.StudentTextSanitizer;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -168,7 +168,7 @@ public class FeedbackCompositionResultParser {
                   );
         }
 
-        String nextStep = StudentTextSanitizer.sanitize(
+        String nextStep = DeveloperTextSanitizer.sanitize(
             text(unit, "nextStep", ComposedFeedbackUnit.MAX_NEXT_STEP_LENGTH)
         );
         if (nextStep == null) return null;
@@ -187,7 +187,7 @@ public class FeedbackCompositionResultParser {
             return null;
         }
         if (channel == FeedbackChannel.IN_APP) {
-            body = StudentTextSanitizer.sanitize(text(unit, "body", ComposedFeedbackUnit.MAX_BODY_LENGTH));
+            body = DeveloperTextSanitizer.sanitize(text(unit, "body", ComposedFeedbackUnit.MAX_BODY_LENGTH));
             if (body == null) return null;
         }
 
@@ -368,7 +368,7 @@ public class FeedbackCompositionResultParser {
     }
 
     private static @Nullable String note(JsonNode notes, String field, int maxLength) {
-        String sanitized = StudentTextSanitizer.sanitize(text(notes, field, maxLength));
+        String sanitized = DeveloperTextSanitizer.sanitize(text(notes, field, maxLength));
         return sanitized.isBlank() ? null : sanitized;
     }
 

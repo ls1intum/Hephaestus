@@ -19,7 +19,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.team.Team;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.team.TeamRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
-import de.tum.cit.aet.hephaestus.practices.PracticeAreaRepository;
+import de.tum.cit.aet.hephaestus.practices.PracticeGroupRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
@@ -27,7 +27,7 @@ import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.ObservationOrigin;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeArea;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeGroup;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository.PresenceCount;
@@ -64,7 +64,7 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
     private PracticeRepository practiceRepository;
 
     @Autowired
-    private PracticeAreaRepository practiceAreaRepository;
+    private PracticeGroupRepository practiceGroupRepository;
 
     @Autowired
     private AgentJobRepository agentJobRepository;
@@ -541,6 +541,7 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
                 aboutUser.getId(),
                 workspace.getId(),
                 Instant.parse("2026-01-01T00:00:00Z"),
+                true,
                 PageRequest.of(0, 50)
             );
 
@@ -630,11 +631,11 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
         @Test
         @DisplayName("equal observed_at timestamps tiebreak on agent_job_id, deterministically")
         void tiebreaksEqualTimestampsByAgentJobId() {
-            PracticeArea area = new PracticeArea();
-            area.setWorkspace(workspace);
-            area.setSlug("tie-area");
-            area.setName("Tie area");
-            practice.setArea(practiceAreaRepository.save(area));
+            PracticeGroup group = new PracticeGroup();
+            group.setWorkspace(workspace);
+            group.setSlug("tie-group");
+            group.setName("Tie group");
+            practice.setGroup(practiceGroupRepository.save(group));
             practice = practiceRepository.save(practice);
 
             AgentJob jobA = anotherJob();
@@ -659,6 +660,7 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
                 aboutUser.getId(),
                 workspace.getId(),
                 Instant.parse("2026-01-01T00:00:00Z"),
+                true,
                 PageRequest.of(0, 10)
             );
             assertThat(recent).extracting(Observation::getPresence).containsExactly(Presence.PRESENT);
@@ -728,12 +730,12 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
         @Test
         @DisplayName("observations on hidden-repository artifacts are excluded from all aggregate serving queries")
         void excludesHiddenRepositoryObservationsOnAggregateServingQueries() {
-            PracticeArea area = new PracticeArea();
-            area.setWorkspace(workspace);
-            area.setSlug("robust-error-handling");
-            area.setName("Handling failure robustly");
-            area = practiceAreaRepository.save(area);
-            practice.setArea(area);
+            PracticeGroup group = new PracticeGroup();
+            group.setWorkspace(workspace);
+            group.setSlug("robust-error-handling");
+            group.setName("Handling failure robustly");
+            group = practiceGroupRepository.save(group);
+            practice.setGroup(group);
             practice = practiceRepository.save(practice);
 
             PullRequest visiblePr = persistPullRequest("test-org/visible-repo", 201L, false);
@@ -755,6 +757,7 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
                 aboutUser.getId(),
                 workspace.getId(),
                 since,
+                true,
                 PageRequest.of(0, 50)
             );
             assertThat(recent).extracting(Observation::getArtifactId).containsExactly(visiblePr.getId());
@@ -889,6 +892,7 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
                 aboutUser.getId(),
                 workspace.getId(),
                 Instant.parse("2026-01-01T00:00:00Z"),
+                true,
                 PageRequest.of(0, 50)
             );
 
@@ -912,6 +916,7 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
                 aboutUser.getId(),
                 workspace.getId(),
                 Instant.parse("2026-01-01T00:00:00Z"),
+                true,
                 PageRequest.of(0, 50)
             );
 
@@ -931,6 +936,7 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
                 aboutUser.getId(),
                 workspace.getId(),
                 Instant.parse("2026-01-01T00:00:00Z"),
+                true,
                 PageRequest.of(0, 50)
             );
 

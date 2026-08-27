@@ -16,7 +16,7 @@ import { CuratedFormLevel } from "./CuratedFormLevel";
 import { CuratedPracticeForm, type CuratedPracticeFormInitialValue } from "./CuratedPracticeForm";
 import { curatedPracticeLevel, GUARDED_CURATED_LEVEL_KINDS } from "./curated-catalog-search";
 
-const areas = [
+const groups = [
 	{ slug: "communication", name: "Communication" },
 	{ slug: "version-control", name: "Version control" },
 ];
@@ -24,7 +24,7 @@ const areas = [
 const initialData: CuratedPracticeFormInitialValue = {
 	slug: "clear-pr-description",
 	name: "Write a clear pull request description",
-	areaSlug: "communication",
+	groupSlug: "communication",
 	bindings: [mockPullRequestBinding],
 	criteria: "Review whether the description explains the purpose, approach, and testing.",
 	whyItMatters: "Reviewers should not need to reconstruct the author's intent.",
@@ -78,7 +78,7 @@ type Story = StoryObj<typeof meta>;
 export const Create: Story = {
 	args: {
 		mode: "create",
-		areas,
+		groups,
 		isPending: false,
 		onSubmit: fn(),
 	},
@@ -95,7 +95,7 @@ export const Edit: Story = {
 	args: {
 		mode: "edit",
 		initialData,
-		areas,
+		groups,
 		isPending: false,
 		onSubmit: fn(),
 	},
@@ -105,7 +105,7 @@ export const StaleEdit: Story = {
 	args: {
 		mode: "edit",
 		initialData,
-		areas,
+		groups,
 		isPending: false,
 		conflict: true,
 		onContinueWithDraft: fn(),
@@ -138,7 +138,7 @@ export const HephaestusUpdateAvailable: Story = {
 				whyItMatters: "So a reviewer can start from intent rather than diff archaeology.",
 			},
 		},
-		areas,
+		groups,
 		isPending: false,
 		onUseHephaestusVersion: fn(),
 		onKeepCurrentDefinition: fn(),
@@ -164,7 +164,7 @@ export const HephaestusUpdateAvailable: Story = {
 export const ValidationErrors: Story = {
 	args: {
 		mode: "create",
-		areas,
+		groups,
 		isPending: false,
 		onSubmit: fn(),
 	},
@@ -185,7 +185,7 @@ export const Submitting: Story = {
 	args: {
 		mode: "edit",
 		initialData,
-		areas,
+		groups,
 		isPending: true,
 		onSubmit: fn(),
 	},

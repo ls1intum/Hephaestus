@@ -17,7 +17,7 @@ record PracticeDefinitionSnapshot(
     String automatedReviewPolicySha256,
     @Nullable String whyItMatters,
     @Nullable String whatGoodLooksLike,
-    @Nullable String areaSlug,
+    @Nullable String groupSlug,
     @Nullable String sourceCuratedSlug,
     @Nullable String sourceCuratedFingerprint
 ) implements ConfigAuditSnapshot {
@@ -33,7 +33,7 @@ record PracticeDefinitionSnapshot(
             PracticeAutomatedReviewPolicyDigest.digest(practice.getAutomatedReviewPolicy()),
             practice.getWhyItMatters(),
             practice.getWhatGoodLooksLike(),
-            practice.getArea() == null ? null : practice.getArea().getSlug(),
+            practice.getGroup() == null ? null : practice.getGroup().getSlug(),
             practice.getSourceCuratedSlug(),
             practice.getSourceCuratedFingerprint()
         );

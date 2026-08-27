@@ -110,7 +110,7 @@ public class ObservationTrendService {
             } else if (curr == null) {
                 // present prior, absent now. Only a vanished PROBLEM is RESOLVED ("you fixed X"). A GOOD strength
                 // that simply was not re-observed this run is NOT a fix — emitting RESOLVED would credit the
-                // student with fixing something that was already right (C10). Drop it: no transition.
+                // developer with fixing something that was already right (C10). Drop it: no transition.
                 if (prior.getAssessment() == Assessment.BAD) {
                     transitions.add(transition(key, TransitionStatus.RESOLVED, prior, prior.getAssessment(), null));
                 }

@@ -115,7 +115,7 @@ export function ObservationRow({
 								workspaceSlug={workspaceSlug}
 								practiceSlug={observation.practiceSlug}
 								practiceName={observation.practiceName}
-								area={observation.area}
+								group={observation.group}
 								practice={practice}
 							/>,
 							<ReviewArtifactLabel key="work" artifact={observation.artifact} />,

@@ -5,7 +5,7 @@ import de.tum.cit.aet.hephaestus.practices.curated.EffectiveCatalog;
 import de.tum.cit.aet.hephaestus.practices.dto.CatalogLink;
 import de.tum.cit.aet.hephaestus.practices.dto.CatalogOriginDTO;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeArea;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeGroup;
 import org.jspecify.annotations.Nullable;
 
 /** Derives workspace drift from current, source, and effective catalog fingerprints. */
@@ -28,15 +28,15 @@ public final class CatalogOrigin {
         );
     }
 
-    public static @Nullable CatalogOriginDTO of(PracticeArea area, EffectiveCatalog catalog) {
-        if (area.getSourceCuratedSlug() == null) {
+    public static @Nullable CatalogOriginDTO of(PracticeGroup group, EffectiveCatalog catalog) {
+        if (group.getSourceCuratedSlug() == null) {
             return null;
         }
-        CatalogEntry<AreaDefinition> entry = catalog.area(area.getSourceCuratedSlug()).orElse(null);
+        CatalogEntry<GroupDefinition> entry = catalog.group(group.getSourceCuratedSlug()).orElse(null);
         return describe(
-            area.getSourceCuratedSlug(),
-            AreaDefinition.from(area).provenanceFingerprint(area.getSlug()),
-            area.getSourceCuratedFingerprint(),
+            group.getSourceCuratedSlug(),
+            GroupDefinition.from(group).provenanceFingerprint(group.getSlug()),
+            group.getSourceCuratedFingerprint(),
             entry == null ? null : entry.effective().provenanceFingerprint(entry.slug()),
             entry != null && entry.offered()
         );

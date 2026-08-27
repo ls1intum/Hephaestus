@@ -166,11 +166,11 @@ class ActivityModuleBoundaryTest extends HephaestusArchitectureTest {
                 .should()
                 .haveSimpleName("PracticeCatalogController")
                 .orShould()
-                .haveSimpleName("PracticeAreaController")
+                .haveSimpleName("PracticeGroupController")
                 .orShould()
                 .haveSimpleName("ObservationController")
                 .orShould()
-                .haveSimpleName("ReactionController")
+                .haveSimpleName("FeedbackResponseController")
                 .orShould()
                 .haveSimpleName("PracticeReviewSettingsController")
                 .orShould()
@@ -185,11 +185,18 @@ class ActivityModuleBoundaryTest extends HephaestusArchitectureTest {
                 .haveSimpleName("ArtifactTraceController")
                 .orShould()
                 .haveSimpleName("InAppFeedbackController")
+                .orShould()
+                .haveSimpleName("PracticeGroupDetailController")
+                .orShould()
+                .haveSimpleName("PracticeGroupStandingController")
+                .orShould()
+                .haveSimpleName("PracticeStandingController")
                 .because(
-                    "Only PracticeCatalogController, PracticeAreaController, ObservationController, " +
-                        "ReactionController, PracticeReviewSettingsController, PracticeReviewOutputController, " +
+                    "Only PracticeCatalogController, PracticeGroupController, ObservationController, " +
+                        "FeedbackResponseController, PracticeReviewSettingsController, PracticeReviewOutputController, " +
                         "CuratedCatalogAdminController, CuratedPracticeCatalogController, CatalogAdoptionController, " +
-                        "ArtifactTraceController and InAppFeedbackController are allowed REST entry points"
+                        "ArtifactTraceController, InAppFeedbackController, PracticeGroupDetailController, " +
+                        "PracticeGroupStandingController and PracticeStandingController are allowed REST entry points"
                 );
             rule.check(classes);
         }

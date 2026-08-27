@@ -423,7 +423,7 @@ public class AgentJobService {
             .stream()
             .filter(row -> artifactKind.equals(row.getArtifactKind()))
             .anyMatch(row ->
-                AutonomyResolver.resolvePractice(row.getPracticeAutonomy(), row.getAreaAutonomy(), workspaceDefault)
+                AutonomyResolver.resolvePractice(row.getPracticeAutonomy(), row.getGroupAutonomy(), workspaceDefault)
                     .autonomy()
                     .admitsReview()
             );

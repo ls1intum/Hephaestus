@@ -12,7 +12,8 @@ import de.tum.cit.aet.hephaestus.practices.curated.CuratedCatalogService;
 import de.tum.cit.aet.hephaestus.practices.curated.EffectiveCatalog;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeArea;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeGroup;
+import de.tum.cit.aet.hephaestus.practices.observation.PracticeGroupStandingService;
 import de.tum.cit.aet.hephaestus.practices.review.WorkspaceReviewDefaults;
 import de.tum.cit.aet.hephaestus.practices.review.WorkspaceReviewDefaultsProvider;
 import de.tum.cit.aet.hephaestus.practices.review.autonomy.AutonomyRollupService;
@@ -89,12 +90,12 @@ class CatalogOriginPresentationTest extends BaseUnitTest {
     }
 
     @Test
-    void areaBatchReadsTheCatalogOnce() {
+    void groupBatchReadsTheCatalogOnce() {
         CuratedCatalogService service = mock(CuratedCatalogService.class);
         when(service.catalog()).thenReturn(new EffectiveCatalog(List.of(), List.of()));
         CatalogOriginPresenter presenter = new CatalogOriginPresenter(service, workspaceDefaults());
 
-        presenter.presentAreas(WORKSPACE_ID, List.of(mock(PracticeArea.class), mock(PracticeArea.class)));
+        presenter.presentGroups(WORKSPACE_ID, List.of(mock(PracticeGroup.class), mock(PracticeGroup.class)));
 
         verify(service).catalog();
     }
@@ -109,7 +110,7 @@ class CatalogOriginPresentationTest extends BaseUnitTest {
             service,
             presenter,
             mock(AutonomyRollupService.class),
-            mock(PracticeAreaService.class),
+            mock(PracticeGroupService.class),
             mock(PracticeDefinitionOptionsService.class)
         );
 
@@ -120,16 +121,16 @@ class CatalogOriginPresentationTest extends BaseUnitTest {
     }
 
     @Test
-    void areaListUsesOneCatalogSnapshotForTheWholeResponse() {
-        PracticeAreaService service = mock(PracticeAreaService.class);
+    void groupListUsesOneCatalogSnapshotForTheWholeResponse() {
+        PracticeGroupService service = mock(PracticeGroupService.class);
         CatalogOriginPresenter presenter = mock(CatalogOriginPresenter.class);
-        List<PracticeArea> areas = List.of(mock(PracticeArea.class), mock(PracticeArea.class));
-        when(service.listAreas(CTX, null)).thenReturn(areas);
-        PracticeAreaController controller = new PracticeAreaController(service, presenter);
+        List<PracticeGroup> groups = List.of(mock(PracticeGroup.class), mock(PracticeGroup.class));
+        when(service.listGroups(CTX, null)).thenReturn(groups);
+        PracticeGroupController controller = new PracticeGroupController(service, presenter);
 
-        controller.listAreas(CTX, null);
+        controller.listGroups(CTX, null);
 
-        verify(presenter).presentAreas(WORKSPACE_ID, areas);
-        verify(presenter, never()).present(anyLong(), any(PracticeArea.class));
+        verify(presenter).presentGroups(WORKSPACE_ID, groups);
+        verify(presenter, never()).present(anyLong(), any(PracticeGroup.class));
     }
 }

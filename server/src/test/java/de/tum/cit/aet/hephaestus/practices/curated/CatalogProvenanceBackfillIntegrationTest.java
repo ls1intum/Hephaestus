@@ -190,13 +190,13 @@ class CatalogProvenanceBackfillIntegrationTest extends AbstractWorkspaceIntegrat
                 """
                 INSERT INTO practice_revision (
                     practice_id, revision_number, slug, name, applies_to, bindings, criteria,
-                    automated_review_policy, why_it_matters, area_slug, review_rule_fingerprint, created_at
+                    automated_review_policy, why_it_matters, group_slug, review_rule_fingerprint, created_at
                 )
                 SELECT id, 0, slug, name, applies_to, bindings, criteria,
                        NULL, 'Reviewers need context', ?, NULL, now()
                 FROM practice WHERE workspace_id = ?
                 """,
-                shipped().areaSlug(),
+                shipped().groupSlug(),
                 matching.getId()
             )
         );
@@ -229,22 +229,22 @@ class CatalogProvenanceBackfillIntegrationTest extends AbstractWorkspaceIntegrat
     ) {
         PracticeDefinition shipped = shipped();
         transactionOperations.executeWithoutResult(ignored -> {
-            Long areaId = jdbcTemplate.queryForObject(
+            Long groupId = jdbcTemplate.queryForObject(
                 """
-                INSERT INTO practice_area (
+                INSERT INTO practice_group (
                     workspace_id, slug, name, visible_in_practice_dashboards, display_order, created_at
                 )
-                VALUES (?, ?, 'Area', true, 0, now())
+                VALUES (?, ?, 'Group', true, 0, now())
                 RETURNING id
                 """,
                 Long.class,
                 workspace.getId(),
-                shipped.areaSlug()
+                shipped.groupSlug()
             );
             Long practiceId = jdbcTemplate.queryForObject(
                 """
                 INSERT INTO practice (
-                    workspace_id, practice_area_id, slug, name, applies_to, display_order, bindings,
+                    workspace_id, practice_group_id, slug, name, applies_to, display_order, bindings,
                     criteria, automated_review_policy, why_it_matters, source_curated_slug,
                     source_curated_fingerprint, autonomy, created_at
                 ) VALUES (?, ?, ?, ?, ?, 0, ?::jsonb, ?, ?::jsonb, 'Reviewers need context', ?, ?, 'AUTOMATIC', now())
@@ -252,7 +252,7 @@ class CatalogProvenanceBackfillIntegrationTest extends AbstractWorkspaceIntegrat
                 """,
                 Long.class,
                 workspace.getId(),
-                areaId,
+                groupId,
                 SHIPPED_SLUG,
                 shipped.name(),
                 shipped.artifactKind().value(),
@@ -266,7 +266,7 @@ class CatalogProvenanceBackfillIntegrationTest extends AbstractWorkspaceIntegrat
                 """
                 INSERT INTO practice_revision (
                     practice_id, revision_number, slug, name, applies_to, bindings, criteria,
-                    automated_review_policy, why_it_matters, area_slug, review_rule_fingerprint, created_at
+                    automated_review_policy, why_it_matters, group_slug, review_rule_fingerprint, created_at
                 ) VALUES (?, 1, ?, ?, ?, ?::jsonb, ?, ?::jsonb, 'Reviewers need context', ?, ?, now())
                 RETURNING id
                 """,
@@ -278,7 +278,7 @@ class CatalogProvenanceBackfillIntegrationTest extends AbstractWorkspaceIntegrat
                 bindingsJson(shipped),
                 criteria,
                 evidenceJson(evidence),
-                shipped.areaSlug(),
+                shipped.groupSlug(),
                 fingerprint
             );
             if (fingerprint != null) {
@@ -286,7 +286,7 @@ class CatalogProvenanceBackfillIntegrationTest extends AbstractWorkspaceIntegrat
                     """
                     INSERT INTO practice_revision (
                         practice_id, revision_number, slug, name, applies_to, bindings, criteria,
-                        automated_review_policy, why_it_matters, area_slug, review_rule_fingerprint, created_at
+                        automated_review_policy, why_it_matters, group_slug, review_rule_fingerprint, created_at
                     ) VALUES (?, 2, ?, ?, ?, ?::jsonb, ?, ?::jsonb, 'Reviewers need context', ?, NULL, now())
                     RETURNING id
                     """,
@@ -298,7 +298,7 @@ class CatalogProvenanceBackfillIntegrationTest extends AbstractWorkspaceIntegrat
                     bindingsJson(shipped),
                     criteria,
                     evidenceJson(evidence),
-                    shipped.areaSlug()
+                    shipped.groupSlug()
                 );
             }
             jdbcTemplate.update("UPDATE practice SET current_revision_id = ? WHERE id = ?", revisionId, practiceId);

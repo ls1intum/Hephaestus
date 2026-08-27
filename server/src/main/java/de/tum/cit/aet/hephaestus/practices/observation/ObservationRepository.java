@@ -18,6 +18,7 @@ import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Slice;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
@@ -35,6 +36,31 @@ import org.springframework.transaction.annotation.Transactional;
 @Repository
 @WorkspaceAgnostic("Findings scoped through Practice.workspace relationship")
 public interface ObservationRepository extends JpaRepository<Observation, UUID> {
+    /**
+     * Excludes observations about an artifact in a repository a workspace team has hidden from contributions.
+     *
+     * <p>One text, concatenated into every native query that needs it, because five hand-kept copies is five
+     * chances for one of them to be forgotten — which is exactly what happened to the review-runs queries.
+     * Adding a surface now means adding this constant to it, and a surface that omits it omits it visibly.
+     *
+     * <p>Binds to the aliases {@code f} (the observation) and {@code p} (its practice), so every query using
+     * it must name those two the same way. Native rather than JPQL: it reaches the integration module's
+     * {@code issue} table and the workspace module's team settings, neither of which the practices module may
+     * hold an entity reference to.
+     */
+    String HIDDEN_REPOSITORY_GUARD = """
+                  AND NOT EXISTS (
+                      SELECT 1
+                      FROM issue target_artifact
+                      JOIN workspace_team_repository_settings wtrs
+                        ON wtrs.workspace_id = p.workspace_id
+                       AND wtrs.repository_id = target_artifact.repository_id
+                       AND wtrs.hidden_from_contributions = true
+                      WHERE f.artifact_kind IN ('scm.pull_request', 'scm.issue')
+                        AND target_artifact.id = f.artifact_id
+                  )
+        """;
+
     @EntityGraph(attributePaths = { "practice.currentRevision", "practiceRevision" })
     @Query("SELECT f FROM Observation f JOIN f.practice p WHERE f.id = :id AND p.workspace.id = :workspaceId")
     Optional<Observation> findByIdAndWorkspaceId(@Param("id") UUID id, @Param("workspaceId") Long workspaceId);
@@ -284,33 +310,195 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
      * {@code about_user_id} subject the observation is filed against (ADR 0022).
      * Uses a separate {@code countQuery} because {@code JOIN FETCH} is incompatible
      * with count projections in Hibernate.
+     *
+     * <p>The group join is a LEFT JOIN on purpose: an implicit {@code p.group.slug} path would
+     * inner-join and silently drop observations of group-less practices even when no group filter
+     * is set. {@code displayableOnly} drops NOT_APPLICABLE rows — the activity-feed surface shows
+     * what the reviewer actually observed, not the practices that did not apply to an artifact.
+     *
+     * <p>{@code hasArtifactKinds} guards the artifact-kind filter separately because JPQL cannot
+     * test a collection parameter for null, and {@code IN} over an empty list is invalid SQL —
+     * callers pass {@code false} plus any non-empty placeholder collection to disable the filter.
      */
     @EntityGraph(attributePaths = { "practice.currentRevision", "practiceRevision" })
     @Query(
         value = """
         SELECT f FROM Observation f
         JOIN FETCH f.practice p
+        LEFT JOIN p.group a
         WHERE f.aboutUserId = :aboutUserId
         AND p.workspace.id = :workspaceId
         AND (:practiceSlug IS NULL OR p.slug = :practiceSlug)
+        AND (:groupSlug IS NULL OR a.slug = :groupSlug)
         AND (:presence IS NULL OR f.presence = :presence)
+        AND (:hasArtifactKinds = FALSE OR f.artifactKind IN :artifactKinds)
+        AND (:hasSeverities = FALSE OR f.severity IS NULL OR f.severity IN :severities)
+        AND (:displayableOnly = FALSE OR f.presence <> de.tum.cit.aet.hephaestus.practices.model.Presence.NOT_APPLICABLE)
         """,
         countQuery = """
         SELECT COUNT(f) FROM Observation f
         JOIN f.practice p
+        LEFT JOIN p.group a
         WHERE f.aboutUserId = :aboutUserId
         AND p.workspace.id = :workspaceId
         AND (:practiceSlug IS NULL OR p.slug = :practiceSlug)
+        AND (:groupSlug IS NULL OR a.slug = :groupSlug)
         AND (:presence IS NULL OR f.presence = :presence)
+        AND (:hasArtifactKinds = FALSE OR f.artifactKind IN :artifactKinds)
+        AND (:hasSeverities = FALSE OR f.severity IS NULL OR f.severity IN :severities)
+        AND (:displayableOnly = FALSE OR f.presence <> de.tum.cit.aet.hephaestus.practices.model.Presence.NOT_APPLICABLE)
         """
     )
     Page<Observation> findByAboutUserAndWorkspace(
         @Param("aboutUserId") Long aboutUserId,
         @Param("workspaceId") Long workspaceId,
         @Param("practiceSlug") @Nullable String practiceSlug,
+        @Param("groupSlug") @Nullable String groupSlug,
         @Param("presence") @Nullable Presence presence,
+        @Param("hasArtifactKinds") boolean hasArtifactKinds,
+        @Param("artifactKinds") Collection<ArtifactKind> artifactKinds,
+        @Param("hasSeverities") boolean hasSeverities,
+        @Param("severities") Collection<Severity> severities,
+        @Param("displayableOnly") boolean displayableOnly,
         Pageable pageable
     );
+
+    /**
+     * Same filter set as {@link #findByAboutUserAndWorkspace}, ordered by severity. The severity rank
+     * is a fixed CASE (CRITICAL &gt; MAJOR &gt; MINOR &gt; INFO, severity-less strengths last, ties
+     * broken newest-first) because a {@code Pageable} sort on the enum column would order
+     * alphabetically; {@code severitySign} {@code +1} puts the most severe first, {@code -1} the
+     * least severe (then strengths lead). Callers pass an UNSORTED pageable.
+     *
+     * <p>Same entity graph as the date-ordered form, and for the same reason: the row's DTO reports whether
+     * the claim was measured against the practice's current rules, which reads both revisions. Without the
+     * graph that read happens after the session closed and the whole page fails.
+     */
+    @EntityGraph(attributePaths = { "practice.currentRevision", "practiceRevision" })
+    @Query(
+        value = """
+        SELECT f FROM Observation f
+        JOIN FETCH f.practice p
+        LEFT JOIN p.group a
+        WHERE f.aboutUserId = :aboutUserId
+        AND p.workspace.id = :workspaceId
+        AND (:practiceSlug IS NULL OR p.slug = :practiceSlug)
+        AND (:groupSlug IS NULL OR a.slug = :groupSlug)
+        AND (:presence IS NULL OR f.presence = :presence)
+        AND (:hasArtifactKinds = FALSE OR f.artifactKind IN :artifactKinds)
+        AND (:hasSeverities = FALSE OR f.severity IS NULL OR f.severity IN :severities)
+        AND (:displayableOnly = FALSE OR f.presence <> de.tum.cit.aet.hephaestus.practices.model.Presence.NOT_APPLICABLE)
+        ORDER BY (CASE
+            WHEN f.severity = de.tum.cit.aet.hephaestus.practices.model.Severity.CRITICAL THEN 0
+            WHEN f.severity = de.tum.cit.aet.hephaestus.practices.model.Severity.MAJOR THEN 1
+            WHEN f.severity = de.tum.cit.aet.hephaestus.practices.model.Severity.MINOR THEN 2
+            WHEN f.severity = de.tum.cit.aet.hephaestus.practices.model.Severity.INFO THEN 3
+            ELSE 4
+        END) * :severitySign, f.observedAt DESC
+        """,
+        countQuery = """
+        SELECT COUNT(f) FROM Observation f
+        JOIN f.practice p
+        LEFT JOIN p.group a
+        WHERE f.aboutUserId = :aboutUserId
+        AND p.workspace.id = :workspaceId
+        AND (:practiceSlug IS NULL OR p.slug = :practiceSlug)
+        AND (:groupSlug IS NULL OR a.slug = :groupSlug)
+        AND (:presence IS NULL OR f.presence = :presence)
+        AND (:hasArtifactKinds = FALSE OR f.artifactKind IN :artifactKinds)
+        AND (:hasSeverities = FALSE OR f.severity IS NULL OR f.severity IN :severities)
+        AND (:displayableOnly = FALSE OR f.presence <> de.tum.cit.aet.hephaestus.practices.model.Presence.NOT_APPLICABLE)
+        """
+    )
+    Page<Observation> findByAboutUserAndWorkspaceSeverityFirst(
+        @Param("aboutUserId") Long aboutUserId,
+        @Param("workspaceId") Long workspaceId,
+        @Param("practiceSlug") @Nullable String practiceSlug,
+        @Param("groupSlug") @Nullable String groupSlug,
+        @Param("presence") @Nullable Presence presence,
+        @Param("hasArtifactKinds") boolean hasArtifactKinds,
+        @Param("artifactKinds") Collection<ArtifactKind> artifactKinds,
+        @Param("hasSeverities") boolean hasSeverities,
+        @Param("severities") Collection<Severity> severities,
+        @Param("displayableOnly") boolean displayableOnly,
+        @Param("severitySign") int severitySign,
+        Pageable pageable
+    );
+
+    /**
+     * Review-history page at the run grain. Paging observations directly can split one review across pages,
+     * which leaves the developer with an incomplete explanation of what the reviewer saw. This projection first
+     * selects complete agent-job runs; {@link #findPracticeGroupReviewRunObservations} loads their observations next.
+     *
+     * <p>Carries {@link #HIDDEN_REPOSITORY_GUARD}, which is what keeps a hidden repository out of the whole
+     * surface: the second query reads only the job ids this one returns, and an agent job reviews one
+     * artifact, so a run dropped here takes its observations with it.
+     */
+    @Query(
+        value = """
+                    SELECT f.agent_job_id AS "jobId",
+                           MAX(f.observed_at) AS "reviewedAt"
+                    FROM observation f
+                    JOIN practice p ON p.id = f.practice_id
+                    JOIN practice_group a ON a.id = p.practice_group_id
+                    WHERE f.about_user_id = :aboutUserId
+                      AND p.workspace_id = :workspaceId
+                      AND a.slug = :groupSlug
+                      AND (:practiceSlug IS NULL OR p.slug = :practiceSlug)
+                      AND (:artifactKinds IS NULL OR f.artifact_kind = ANY(string_to_array(:artifactKinds, ',')))
+                      AND (:severities IS NULL OR f.severity = ANY(string_to_array(:severities, ',')))
+                      AND f.presence <> 'NOT_APPLICABLE'
+            """ +
+            HIDDEN_REPOSITORY_GUARD +
+            """
+            GROUP BY f.agent_job_id
+            ORDER BY MAX(f.observed_at) DESC, f.agent_job_id DESC
+            """,
+        nativeQuery = true
+    )
+    Slice<ReviewRunRow> findPracticeGroupReviewRuns(
+        @Param("aboutUserId") Long aboutUserId,
+        @Param("workspaceId") Long workspaceId,
+        @Param("groupSlug") @Nullable String groupSlug,
+        @Param("practiceSlug") @Nullable String practiceSlug,
+        @Param("artifactKinds") @Nullable String artifactKinds,
+        @Param("severities") @Nullable String severities,
+        Pageable pageable
+    );
+
+    /**
+     * Every observation in the group for the runs {@link #findPracticeGroupReviewRuns} returned. Filters select
+     * matching runs; they do not truncate a selected review run.
+     *
+     * <p>Fetches both revisions because every row is handed straight to {@code ObservationVisibilityPolicy},
+     * which reads the evaluated revision and the practice's current one to decide whether the claim still
+     * speaks for the practice — lazily, that is one round trip per practice and revision on the page.
+     */
+    @EntityGraph(attributePaths = { "practice.currentRevision", "practiceRevision" })
+    @Query(
+        """
+        SELECT o FROM Observation o
+        JOIN FETCH o.practice p
+        JOIN p.group a
+        WHERE o.agentJobId IN :jobIds
+          AND o.aboutUserId = :aboutUserId
+          AND p.workspace.id = :workspaceId
+          AND a.slug = :groupSlug
+          AND o.presence <> de.tum.cit.aet.hephaestus.practices.model.Presence.NOT_APPLICABLE
+        ORDER BY o.observedAt DESC, o.id ASC
+        """
+    )
+    List<Observation> findPracticeGroupReviewRunObservations(
+        @Param("jobIds") Collection<UUID> jobIds,
+        @Param("aboutUserId") Long aboutUserId,
+        @Param("workspaceId") Long workspaceId,
+        @Param("groupSlug") @Nullable String groupSlug
+    );
+
+    interface ReviewRunRow {
+        UUID getJobId();
+        Instant getReviewedAt();
+    }
 
     /**
      * Per-practice aggregation for the developer dashboard: present/good and bad counts, and last observation date.
@@ -329,40 +517,35 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
      */
     @Query(
         value = """
-        SELECT p.slug AS "practiceSlug",
-               p.name AS "practiceName",
-               COUNT(f.id) AS "totalObservations",
-               SUM(CASE WHEN f.assessment = 'GOOD' THEN 1 ELSE 0 END) AS "goodCount",
-               SUM(CASE WHEN f.assessment = 'BAD' THEN 1 ELSE 0 END) AS "badCount",
-               MAX(f.observed_at) AS "lastObservedAt"
-        FROM observation f
-        JOIN practice p ON p.id = f.practice_id
-        WHERE f.about_user_id = :aboutUserId
-          AND p.workspace_id = :workspaceId
-          AND NOT EXISTS (
-              SELECT 1
-              FROM issue target_artifact
-              JOIN workspace_team_repository_settings wtrs
-                ON wtrs.workspace_id = p.workspace_id
-               AND wtrs.repository_id = target_artifact.repository_id
-               AND wtrs.hidden_from_contributions = true
-              WHERE f.artifact_kind IN ('scm.pull_request', 'scm.issue')
-                AND target_artifact.id = f.artifact_id
-          )
-          AND f.origin <> 'BACKFILL'
-          AND f.agent_job_id = (
-              SELECT f2.agent_job_id FROM observation f2
-              JOIN practice p2 ON p2.id = f2.practice_id
-              WHERE p2.workspace_id = p.workspace_id
-                AND f2.artifact_kind = f.artifact_kind
-                AND f2.artifact_id = f.artifact_id
-                AND f2.origin <> 'BACKFILL'
-              ORDER BY f2.observed_at DESC, f2.agent_job_id DESC
-              LIMIT 1
-          )
-        GROUP BY p.slug, p.name
-        ORDER BY p.name ASC
-        """,
+                    SELECT p.slug AS "practiceSlug",
+                           p.name AS "practiceName",
+                           COUNT(f.id) AS "totalObservations",
+                           SUM(CASE WHEN f.assessment = 'GOOD' THEN 1 ELSE 0 END) AS "goodCount",
+                           SUM(CASE WHEN f.assessment = 'BAD' THEN 1 ELSE 0 END) AS "badCount",
+                           MAX(f.observed_at) AS "lastObservedAt"
+                    FROM observation f
+                    JOIN practice p ON p.id = f.practice_id
+                    WHERE f.about_user_id = :aboutUserId
+                      AND p.workspace_id = :workspaceId
+            """ +
+            HIDDEN_REPOSITORY_GUARD +
+            """
+              AND f.origin <> 'BACKFILL'
+              AND f.agent_job_id = (
+                  SELECT f2.agent_job_id FROM observation f2
+                  JOIN practice p2 ON p2.id = f2.practice_id
+                  WHERE p2.workspace_id = p.workspace_id
+                    AND f2.practice_id = f.practice_id
+                    AND f2.about_user_id = f.about_user_id
+                    AND f2.artifact_kind = f.artifact_kind
+                    AND f2.artifact_id = f.artifact_id
+                    AND f2.origin <> 'BACKFILL'
+                  ORDER BY f2.observed_at DESC, f2.agent_job_id DESC
+                  LIMIT 1
+              )
+            GROUP BY p.slug, p.name
+            ORDER BY p.name ASC
+            """,
         nativeQuery = true
     )
     List<DeveloperPracticeSummaryProjection> findSummaryByDeveloperAndWorkspace(
@@ -418,58 +601,64 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
      * needs {@code ORDER BY ... LIMIT 1} in a correlated subquery; the practice is loaded lazily per observation
      * rather than JOIN-fetched.
      *
-     * <p>Only a presence that {@link Presence#carriesValence() carries valence} is listed: {@code NOT_APPLICABLE}
-     * would bury the actionable {@code BAD}/{@code GOOD} rows within the page budget, and coaching on
-     * {@code INCONCLUSIVE} would invite the mentor to invent a direction the measurement declined to take. Both
-     * totals still reach the mentor via the presence-count summary; this list stays recency-ordered, not
-     * re-ordered by severity, to preserve its "what happened lately" purpose.
+     * <p>{@code verdictsOnly} decides whether a presence that does not {@link Presence#carriesValence() carry
+     * valence} is listed, because the two kinds of caller need opposite answers. The context providers pass
+     * {@code true}: {@code NOT_APPLICABLE} would bury the actionable {@code BAD}/{@code GOOD} rows within their
+     * page budget, and coaching on {@code INCONCLUSIVE} would invite the mentor to invent a direction the
+     * measurement declined to take — both totals still reach it via the presence-count summary. The practice standing
+     * surface passes {@code false}: it does not render those rows either, but it must COUNT them, because "the
+     * practice ran and found nothing to judge" and "the practice was never looked at" are different answers and
+     * only the rows themselves can tell them apart. It filters them out one layer up, where the same pass that
+     * classifies every other row can also count these.
+     *
+     * <p>Either way the list stays recency-ordered, not re-ordered by severity, to preserve its "what happened
+     * lately" purpose.
+     *
+     * <p><strong>"Latest run" means the latest run that actually said something about THIS claim</strong> —
+     * the subquery correlates on practice, subject, artifact and origin class together. Correlating on the
+     * artifact alone would let any later run supersede a verdict it never re-examined, and a run covers only
+     * the practices it got to: {@code PracticeTraceOutcome} lists seven ways one drops out of a run —
+     * {@code SKIPPED}, {@code NOT_ASSESSABLE}, {@code TURNED_OFF}, {@code NOT_OCCASIONED}, {@code DORMANT},
+     * {@code LAPSED}, {@code FAILED} — none of which writes a row. A partial capture, a refusal, an exhausted
+     * budget or a timeout would then read exactly like a fixed habit, which is the conflation that enum exists
+     * to prevent: telemetry about our instrument is not a measurement of anybody's behaviour.
      *
      * <p><strong>Backfilled observations are included, partitioned by origin class</strong> — a campaign's
      * {@code BAD} observation on a developer's own work is exactly what "what should I work on" is asking for,
      * and excluding it made a campaign produce nothing any developer could see. The latest-run correlation is
      * evaluated <em>within</em> each origin class ({@code (f2.origin = 'BACKFILL') = (f.origin = 'BACKFILL')})
      * rather than over the union: origin-blind, a campaign's job could become "the latest run" and erase
-     * already-delivered live feedback from the list. {@code ReflectionItemDTO.origin()} carries the class
+     * already-delivered live feedback from the list. {@code PracticeStandingObservationDTO.origin()} carries the class
      * through so the surface can label a backfilled item rather than pass it off as live.
-     *
-     * <p>Aggregate policy deliberately DIVERGES from {@link #findSummaryByDeveloperAndWorkspace} here: the
-     * summary is a per-practice good/bad ratio read as a trend, and a hindsight campaign is not a point on a
-     * trend line.
      */
     @Query(
         value = """
-        SELECT f.* FROM observation f
-        JOIN practice p ON p.id = f.practice_id
-        WHERE f.about_user_id = :aboutUserId
-          AND p.workspace_id = :workspaceId
-          AND NOT EXISTS (
-              SELECT 1
-              FROM issue target_artifact
-              JOIN workspace_team_repository_settings wtrs
-                ON wtrs.workspace_id = p.workspace_id
-               AND wtrs.repository_id = target_artifact.repository_id
-               AND wtrs.hidden_from_contributions = true
-              WHERE f.artifact_kind IN ('scm.pull_request', 'scm.issue')
-                AND target_artifact.id = f.artifact_id
-          )
-          AND f.observed_at >= :since
-          AND f.presence IN ('PRESENT', 'ABSENT')
-          AND f.agent_job_id = (
-              SELECT f2.agent_job_id FROM observation f2
-              JOIN practice p2 ON p2.id = f2.practice_id
-              WHERE p2.workspace_id = p.workspace_id
-                AND f2.artifact_kind = f.artifact_kind AND f2.artifact_id = f.artifact_id
-                AND (f2.origin = 'BACKFILL') = (f.origin = 'BACKFILL')
-              ORDER BY f2.observed_at DESC, f2.agent_job_id DESC LIMIT 1
-          )
-        ORDER BY f.observed_at DESC
-        """,
+                    SELECT f.* FROM observation f
+                    JOIN practice p ON p.id = f.practice_id
+                    WHERE f.about_user_id = :aboutUserId
+                      AND p.workspace_id = :workspaceId
+            """ +
+            HIDDEN_REPOSITORY_GUARD +
+            """
+              AND f.observed_at >= :since
+              AND (:verdictsOnly = FALSE OR f.presence IN ('PRESENT', 'ABSENT'))
+              AND f.agent_job_id = (
+                  SELECT f2.agent_job_id FROM observation f2
+                  WHERE f2.practice_id = f.practice_id
+                    AND f2.about_user_id = f.about_user_id
+                    AND f2.artifact_kind = f.artifact_kind AND f2.artifact_id = f.artifact_id
+                    AND (f2.origin = 'BACKFILL') = (f.origin = 'BACKFILL')
+                  ORDER BY f2.observed_at DESC, f2.agent_job_id DESC LIMIT 1
+              )
+            ORDER BY f.observed_at DESC
+            """,
         nativeQuery = true
     )
     List<Observation> findRecentByDeveloperAndWorkspace(
         @Param("aboutUserId") Long aboutUserId,
         @Param("workspaceId") Long workspaceId,
         @Param("since") Instant since,
+        @Param("verdictsOnly") boolean verdictsOnly,
         Pageable pageable
     );
 
@@ -483,34 +672,29 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
      */
     @Query(
         value = """
-        SELECT f.severity AS severity, COUNT(f.id) AS count
-        FROM observation f
-        JOIN practice p ON p.id = f.practice_id
-        WHERE f.about_user_id = :aboutUserId
-          AND p.workspace_id = :workspaceId
-          AND NOT EXISTS (
-              SELECT 1
-              FROM issue target_artifact
-              JOIN workspace_team_repository_settings wtrs
-                ON wtrs.workspace_id = p.workspace_id
-               AND wtrs.repository_id = target_artifact.repository_id
-               AND wtrs.hidden_from_contributions = true
-              WHERE f.artifact_kind IN ('scm.pull_request', 'scm.issue')
-                AND target_artifact.id = f.artifact_id
-          )
-          AND f.observed_at >= :since
-          AND f.severity IS NOT NULL
-          AND f.origin <> 'BACKFILL'
-          AND f.agent_job_id = (
-              SELECT f2.agent_job_id FROM observation f2
-              JOIN practice p2 ON p2.id = f2.practice_id
-              WHERE p2.workspace_id = p.workspace_id
-                AND f2.artifact_kind = f.artifact_kind AND f2.artifact_id = f.artifact_id
-                AND f2.origin <> 'BACKFILL'
-              ORDER BY f2.observed_at DESC, f2.agent_job_id DESC LIMIT 1
-          )
-        GROUP BY f.severity
-        """,
+                    SELECT f.severity AS severity, COUNT(f.id) AS count
+                    FROM observation f
+                    JOIN practice p ON p.id = f.practice_id
+                    WHERE f.about_user_id = :aboutUserId
+                      AND p.workspace_id = :workspaceId
+            """ +
+            HIDDEN_REPOSITORY_GUARD +
+            """
+              AND f.observed_at >= :since
+              AND f.severity IS NOT NULL
+              AND f.origin <> 'BACKFILL'
+              AND f.agent_job_id = (
+                  SELECT f2.agent_job_id FROM observation f2
+                  JOIN practice p2 ON p2.id = f2.practice_id
+                  WHERE p2.workspace_id = p.workspace_id
+                    AND f2.practice_id = f.practice_id
+                    AND f2.about_user_id = f.about_user_id
+                    AND f2.artifact_kind = f.artifact_kind AND f2.artifact_id = f.artifact_id
+                    AND f2.origin <> 'BACKFILL'
+                  ORDER BY f2.observed_at DESC, f2.agent_job_id DESC LIMIT 1
+              )
+            GROUP BY f.severity
+            """,
         nativeQuery = true
     )
     List<SeverityCount> countBySeverityForDeveloper(
@@ -526,33 +710,28 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
      */
     @Query(
         value = """
-        SELECT f.presence AS presence, COUNT(f.id) AS count
-        FROM observation f
-        JOIN practice p ON p.id = f.practice_id
-        WHERE f.about_user_id = :aboutUserId
-          AND p.workspace_id = :workspaceId
-          AND NOT EXISTS (
-              SELECT 1
-              FROM issue target_artifact
-              JOIN workspace_team_repository_settings wtrs
-                ON wtrs.workspace_id = p.workspace_id
-               AND wtrs.repository_id = target_artifact.repository_id
-               AND wtrs.hidden_from_contributions = true
-              WHERE f.artifact_kind IN ('scm.pull_request', 'scm.issue')
-                AND target_artifact.id = f.artifact_id
-          )
-          AND f.observed_at >= :since
-          AND f.origin <> 'BACKFILL'
-          AND f.agent_job_id = (
-              SELECT f2.agent_job_id FROM observation f2
-              JOIN practice p2 ON p2.id = f2.practice_id
-              WHERE p2.workspace_id = p.workspace_id
-                AND f2.artifact_kind = f.artifact_kind AND f2.artifact_id = f.artifact_id
-                AND f2.origin <> 'BACKFILL'
-              ORDER BY f2.observed_at DESC, f2.agent_job_id DESC LIMIT 1
-          )
-        GROUP BY f.presence
-        """,
+                    SELECT f.presence AS presence, COUNT(f.id) AS count
+                    FROM observation f
+                    JOIN practice p ON p.id = f.practice_id
+                    WHERE f.about_user_id = :aboutUserId
+                      AND p.workspace_id = :workspaceId
+            """ +
+            HIDDEN_REPOSITORY_GUARD +
+            """
+              AND f.observed_at >= :since
+              AND f.origin <> 'BACKFILL'
+              AND f.agent_job_id = (
+                  SELECT f2.agent_job_id FROM observation f2
+                  JOIN practice p2 ON p2.id = f2.practice_id
+                  WHERE p2.workspace_id = p.workspace_id
+                    AND f2.practice_id = f.practice_id
+                    AND f2.about_user_id = f.about_user_id
+                    AND f2.artifact_kind = f.artifact_kind AND f2.artifact_id = f.artifact_id
+                    AND f2.origin <> 'BACKFILL'
+                  ORDER BY f2.observed_at DESC, f2.agent_job_id DESC LIMIT 1
+              )
+            GROUP BY f.presence
+            """,
         nativeQuery = true
     )
     List<PresenceCount> countByPresenceForDeveloper(
@@ -652,7 +831,7 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
 
     String OPERATOR_PREDICATES = """
           AND (CAST(:#{#f.practiceSlugArray()} AS text[]) IS NULL OR p.slug = ANY(CAST(:#{#f.practiceSlugArray()} AS text[])))
-          AND (CAST(:#{#f.areaSlugArray()} AS text[]) IS NULL OR pa.slug = ANY(CAST(:#{#f.areaSlugArray()} AS text[])))
+          AND (CAST(:#{#f.groupSlugArray()} AS text[]) IS NULL OR pa.slug = ANY(CAST(:#{#f.groupSlugArray()} AS text[])))
           AND (CAST(:#{#f.presenceNames()} AS text[]) IS NULL OR o.presence = ANY(CAST(:#{#f.presenceNames()} AS text[])))
           AND (CAST(:#{#f.assessmentNames()} AS text[]) IS NULL OR o.assessment = ANY(CAST(:#{#f.assessmentNames()} AS text[])))
           AND (CAST(:#{#f.severityNames()} AS text[]) IS NULL OR o.severity = ANY(CAST(:#{#f.severityNames()} AS text[])))
@@ -671,10 +850,10 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
                    o.agent_job_id AS "agentJobId",
                    p.slug AS "practiceSlug",
                    p.name AS "practiceName",
-                   pa.slug AS "areaSlug",
-                   pa.name AS "areaName",
-                   pa.icon AS "areaIcon",
-                   pa.color AS "areaColor",
+                   pa.slug AS "groupSlug",
+                   pa.name AS "groupName",
+                   pa.icon AS "groupIcon",
+                   pa.color AS "groupColor",
                    o.artifact_kind AS "artifactKind",
                    o.artifact_id AS "artifactId",
                    o.about_user_id AS "aboutUserId",
@@ -692,7 +871,7 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
             JOIN practice p ON p.id = o.practice_id
             LEFT JOIN practice_revision evaluated_revision ON evaluated_revision.id = o.practice_revision_id
             LEFT JOIN practice_revision current_revision ON current_revision.id = p.current_revision_id
-            LEFT JOIN practice_area pa ON pa.id = p.practice_area_id
+            LEFT JOIN practice_group pa ON pa.id = p.practice_group_id
             WHERE p.workspace_id = :workspaceId
             """ +
             OPERATOR_PREDICATES +
@@ -717,7 +896,7 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
             SELECT count(*)
             FROM observation o
             JOIN practice p ON p.id = o.practice_id
-            LEFT JOIN practice_area pa ON pa.id = p.practice_area_id
+            LEFT JOIN practice_group pa ON pa.id = p.practice_group_id
             WHERE p.workspace_id = :workspaceId
             """ +
             OPERATOR_PREDICATES,
@@ -737,16 +916,16 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
         String getPracticeName();
 
         @Nullable
-        String getAreaSlug();
+        String getGroupSlug();
 
         @Nullable
-        String getAreaName();
+        String getGroupName();
 
         @Nullable
-        String getAreaIcon();
+        String getGroupIcon();
 
         @Nullable
-        String getAreaColor();
+        String getGroupColor();
 
         /** The raw column: a native-query projection is mapped from JDBC types, with no converter run. */
         String getArtifactKind();
@@ -818,10 +997,10 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
 
     @Query(
         """
-        SELECT o.id AS observationId, p.autonomy AS practiceAutonomy, a.autonomy AS areaAutonomy
+        SELECT o.id AS observationId, p.autonomy AS practiceAutonomy, a.autonomy AS groupAutonomy
         FROM Observation o
         JOIN o.practice p
-        LEFT JOIN p.area a
+        LEFT JOIN p.group a
         WHERE o.id IN :observationIds
         """
     )
@@ -861,7 +1040,7 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
         PracticeAutonomy getPracticeAutonomy();
 
         @Nullable
-        PracticeAutonomy getAreaAutonomy();
+        PracticeAutonomy getGroupAutonomy();
     }
 
     /**
@@ -919,7 +1098,7 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
     List<Observation> findRecentForSubjectAndPractice(
         @Param("workspaceId") Long workspaceId,
         @Param("aboutUserId") Long aboutUserId,
-        @Param("practiceSlug") String practiceSlug,
+        @Param("practiceSlug") @Nullable String practiceSlug,
         @Param("since") Instant since,
         Pageable pageable
     );

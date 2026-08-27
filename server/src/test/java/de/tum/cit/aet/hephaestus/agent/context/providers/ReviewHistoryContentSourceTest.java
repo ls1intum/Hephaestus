@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.agent.context.providers;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doReturn;
@@ -97,7 +98,9 @@ class ReviewHistoryContentSourceTest {
             new StagedArtifactNames(ReviewHistoryContentSourceTest::identitiesOf),
             objectMapper
         );
-        when(observationRepository.findRecentByDeveloperAndWorkspace(any(), any(), any(), any())).thenReturn(List.of());
+        when(
+            observationRepository.findRecentByDeveloperAndWorkspace(any(), any(), any(), anyBoolean(), any())
+        ).thenReturn(List.of());
         when(feedbackRepository.findRecentDeliveredForRecipient(any(), any(), any(), any())).thenReturn(List.of());
         when(feedbackRepository.findPreparedForRecipient(any(), any(), any())).thenReturn(List.of());
         when(visibilityPolicy.permitsAll(anyLong(), any(), any())).thenAnswer(invocation -> {
@@ -173,9 +176,9 @@ class ReviewHistoryContentSourceTest {
 
     @Test
     void stagesEarlierObservationsWithTheRecurrenceKeyThatLinksThem() {
-        when(observationRepository.findRecentByDeveloperAndWorkspace(any(), any(), any(), any())).thenReturn(
-            List.of(observation("swallows-errors", "rec-1", "Caught and ignored"))
-        );
+        when(
+            observationRepository.findRecentByDeveloperAndWorkspace(any(), any(), any(), anyBoolean(), any())
+        ).thenReturn(List.of(observation("swallows-errors", "rec-1", "Caught and ignored")));
 
         var captured = captureObservationHistory();
 
@@ -236,9 +239,9 @@ class ReviewHistoryContentSourceTest {
 
     @Test
     void stagesHowEachLocusMovedWithoutStagingTheKeyItMovedAt() {
-        when(observationRepository.findRecentByDeveloperAndWorkspace(any(), any(), any(), any())).thenReturn(
-            List.of(observation("swallows-errors", "rec-1", "Caught and ignored"))
-        );
+        when(
+            observationRepository.findRecentByDeveloperAndWorkspace(any(), any(), any(), anyBoolean(), any())
+        ).thenReturn(List.of(observation("swallows-errors", "rec-1", "Caught and ignored")));
 
         JsonNode delta = read(captureObservationHistory().files().get("inputs/history/delta.json"));
 
@@ -251,9 +254,9 @@ class ReviewHistoryContentSourceTest {
 
     @Test
     void theDeltaHoldsNothingTheVisibilityPolicyRefused() {
-        when(observationRepository.findRecentByDeveloperAndWorkspace(any(), any(), any(), any())).thenReturn(
-            List.of(observation("swallows-errors", "rec-1", "Caught and ignored"))
-        );
+        when(
+            observationRepository.findRecentByDeveloperAndWorkspace(any(), any(), any(), anyBoolean(), any())
+        ).thenReturn(List.of(observation("swallows-errors", "rec-1", "Caught and ignored")));
         doReturn(Set.of()).when(visibilityPolicy).permitsAll(anyLong(), any(), any());
 
         assertThat(read(captureObservationHistory().files().get("inputs/history/delta.json")).get("loci")).isEmpty();
@@ -267,9 +270,9 @@ class ReviewHistoryContentSourceTest {
 
     @Test
     void withholdsAnObservationTheVisibilityPolicyRefuses() {
-        when(observationRepository.findRecentByDeveloperAndWorkspace(any(), any(), any(), any())).thenReturn(
-            List.of(observation("swallows-errors", "rec-1", "Caught and ignored"))
-        );
+        when(
+            observationRepository.findRecentByDeveloperAndWorkspace(any(), any(), any(), anyBoolean(), any())
+        ).thenReturn(List.of(observation("swallows-errors", "rec-1", "Caught and ignored")));
         doReturn(Set.of()).when(visibilityPolicy).permitsAll(anyLong(), any(), any());
 
         var captured = captureObservationHistory();
@@ -305,9 +308,9 @@ class ReviewHistoryContentSourceTest {
 
         @Test
         void anObservationCarriesTheHandleOfTheWorkItWasFiledAgainst() {
-            when(observationRepository.findRecentByDeveloperAndWorkspace(any(), any(), any(), any())).thenReturn(
-                List.of(observationAgainst(ArtifactKinds.PULL_REQUEST, OBSERVED_ARTIFACT_ROW_ID))
-            );
+            when(
+                observationRepository.findRecentByDeveloperAndWorkspace(any(), any(), any(), anyBoolean(), any())
+            ).thenReturn(List.of(observationAgainst(ArtifactKinds.PULL_REQUEST, OBSERVED_ARTIFACT_ROW_ID)));
 
             JsonNode artifact = read(captureObservationHistory().files().get("inputs/history/observations.json"))
                 .get("observations")
@@ -338,9 +341,9 @@ class ReviewHistoryContentSourceTest {
 
         @Test
         void workNoResolverCanNameIsStagedAsItsKindWithoutANumber() {
-            when(observationRepository.findRecentByDeveloperAndWorkspace(any(), any(), any(), any())).thenReturn(
-                List.of(observationAgainst(ArtifactKinds.CONVERSATION_THREAD, UNNAMEABLE_ARTIFACT_ROW_ID))
-            );
+            when(
+                observationRepository.findRecentByDeveloperAndWorkspace(any(), any(), any(), anyBoolean(), any())
+            ).thenReturn(List.of(observationAgainst(ArtifactKinds.CONVERSATION_THREAD, UNNAMEABLE_ARTIFACT_ROW_ID)));
 
             JsonNode artifact = read(captureObservationHistory().files().get("inputs/history/observations.json"))
                 .get("observations")
@@ -355,7 +358,9 @@ class ReviewHistoryContentSourceTest {
 
         @Test
         void noHistoryFileCarriesARowIdAnywhere() {
-            when(observationRepository.findRecentByDeveloperAndWorkspace(any(), any(), any(), any())).thenReturn(
+            when(
+                observationRepository.findRecentByDeveloperAndWorkspace(any(), any(), any(), anyBoolean(), any())
+            ).thenReturn(
                 List.of(
                     observationAgainst(ArtifactKinds.PULL_REQUEST, OBSERVED_ARTIFACT_ROW_ID),
                     observationAgainst(ArtifactKinds.CONVERSATION_THREAD, UNNAMEABLE_ARTIFACT_ROW_ID)

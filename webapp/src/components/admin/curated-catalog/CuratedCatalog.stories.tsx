@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { type ComponentProps, useState } from "react";
 import { expect, fn, screen, userEvent, waitFor, within } from "storybook/test";
-import type { CatalogEntryStatus, CuratedArea, CuratedPracticeSummary } from "@/api/types.gen";
+import type { CatalogEntryStatus, CuratedGroup, CuratedPracticeSummary } from "@/api/types.gen";
 import { withStandardPage } from "@/stories/decorators";
 import { expectNoPageOverflow } from "@/test/reflow";
 import { CuratedCatalog } from "./CuratedCatalog";
@@ -20,7 +20,7 @@ const automatedReview: CuratedPracticeSummary["automatedReview"] = {
 	evidenceSufficiency: "SUFFICIENT_WHEN_REQUIREMENTS_MET",
 };
 
-const reviewReadyArea: CuratedArea = {
+const reviewReadyGroup: CuratedGroup = {
 	slug: "review-ready-work",
 	position: 0,
 	definition: {
@@ -32,7 +32,7 @@ const reviewReadyArea: CuratedArea = {
 	status: status(),
 };
 
-const excludedArea: CuratedArea = {
+const excludedGroup: CuratedGroup = {
 	slug: "not-offered",
 	position: 2,
 	definition: { name: "Legacy conventions" },
@@ -45,7 +45,7 @@ const smallFocusedPrs: CuratedPracticeSummary = {
 	name: "Keep a change to one concern",
 	artifactKind: "scm.pull_request",
 	automatedReview,
-	areaSlug: "review-ready-work",
+	groupSlug: "review-ready-work",
 	effectivelyOffered: true,
 	status: status(),
 };
@@ -56,20 +56,20 @@ const explainsTheChange: CuratedPracticeSummary = {
 	name: "Say what changed and why",
 	artifactKind: "scm.pull_request",
 	automatedReview,
-	areaSlug: "review-ready-work",
+	groupSlug: "review-ready-work",
 	effectivelyOffered: true,
 	status: status({ state: "UPDATE_WAITING", changeKind: "DETECTION" }),
 };
 
-const areas: CuratedArea[] = [
-	reviewReadyArea,
+const groups: CuratedGroup[] = [
+	reviewReadyGroup,
 	{
 		slug: "house-rules",
 		position: 1,
 		definition: { name: "Team conventions", icon: "Scale", color: "amber" },
 		status: status({ state: "YOURS" }),
 	},
-	excludedArea,
+	excludedGroup,
 ];
 
 const practices: CuratedPracticeSummary[] = [
@@ -81,7 +81,7 @@ const practices: CuratedPracticeSummary[] = [
 		name: "Respond to each review comment",
 		artifactKind: "scm.pull_request",
 		automatedReview,
-		areaSlug: "review-ready-work",
+		groupSlug: "review-ready-work",
 		effectivelyOffered: true,
 		status: status({ state: "UPDATE_WAITING", changeKind: "WORDING" }),
 	},
@@ -91,7 +91,7 @@ const practices: CuratedPracticeSummary[] = [
 		name: "Write the release note with the change",
 		artifactKind: "scm.pull_request",
 		automatedReview: { mode: "NONE", evidenceSufficiency: "NONE" },
-		areaSlug: "house-rules",
+		groupSlug: "house-rules",
 		effectivelyOffered: true,
 		status: status({ state: "YOURS" }),
 	},
@@ -110,10 +110,10 @@ const practices: CuratedPracticeSummary[] = [
 	{
 		slug: "orphaned-practice",
 		position: 0,
-		name: "Outlived the area it was filed under",
+		name: "Outlived the group it was filed under",
 		artifactKind: "scm.pull_request",
 		automatedReview,
-		areaSlug: "an-area-hephaestus-stopped-shipping",
+		groupSlug: "an-group-hephaestus-stopped-shipping",
 		effectivelyOffered: false,
 		status: status({ state: "NO_LONGER_SHIPPED", offered: false }),
 	},
@@ -125,10 +125,10 @@ const meta = {
 	parameters: { layout: "fullscreen", chromatic: { viewports: [1440] } },
 	decorators: [withStandardPage],
 	args: {
-		areas,
+		groups,
 		practices,
 		summary: {
-			total: areas.length + practices.length,
+			total: groups.length + practices.length,
 			updatesChangingDetection: 1,
 			updatesChangingWordingOnly: 1,
 			updatesChangingPresentation: 0,
@@ -141,8 +141,8 @@ const meta = {
 		customOrder: false,
 		onSearchChange: fn(),
 		onPracticeStatusChange: fn(),
-		onAreaStatusChange: fn(),
-		onReorderAreas: fn(),
+		onGroupStatusChange: fn(),
+		onReorderGroups: fn(),
 		onPlacePractice: fn(),
 		onResetOrder: fn(),
 	},
@@ -174,18 +174,18 @@ export const CustomOrder: Story = {
 
 export const OnlyIncluded: Story = { args: { search: { status: "OFFERED" } } };
 
-export const APracticeWhoseAreaIsGone: Story = {
+export const APracticeWhoseGroupIsGone: Story = {
 	play: async ({ args, canvas }) => {
-		await canvas.findByText("Outlived the area it was filed under");
+		await canvas.findByText("Outlived the group it was filed under");
 		await canvas.findByText("Group no longer exists");
 		await expect(
 			canvas.getByRole("switch", {
-				name: "Outlived the area it was filed under cannot be included until it is moved out of the missing area",
+				name: "Outlived the group it was filed under cannot be included until it is moved out of the missing group",
 			}),
 		).toHaveAttribute("aria-disabled", "true");
 		await userEvent.click(
 			canvas.getByRole("button", {
-				name: "More actions for Outlived the area it was filed under",
+				name: "More actions for Outlived the group it was filed under",
 			}),
 		);
 		const disabledMove = await screen.findByRole("menuitem", {
@@ -196,7 +196,7 @@ export const APracticeWhoseAreaIsGone: Story = {
 		await waitFor(() => expect(disabledMove).not.toBeInTheDocument());
 		await userEvent.click(
 			canvas.getByRole("button", {
-				name: "More actions for Outlived the area it was filed under",
+				name: "More actions for Outlived the group it was filed under",
 			}),
 		);
 		await userEvent.click(await screen.findByRole("menuitemradio", { name: "Unassigned" }));
@@ -222,21 +222,21 @@ function FilterTransition(props: ComponentProps<typeof CuratedCatalog>) {
 	return <CuratedCatalog {...props} search={search} onSearchChange={setSearch} />;
 }
 
-export const FilteringOpensMatchingAreas: Story = {
+export const FilteringOpensMatchingGroups: Story = {
 	render: (args) => <FilterTransition {...args} />,
 	parameters: { chromatic: { disableSnapshot: true } },
 	play: async ({ canvas }) => {
-		const area = canvas.getByRole("button", { name: /^Packaging work for review 3$/ });
-		await userEvent.click(area);
+		const group = canvas.getByRole("button", { name: /^Packaging work for review 3$/ });
+		await userEvent.click(group);
 		await userEvent.click(canvas.getByRole("combobox", { name: "Filter by work type" }));
 		await userEvent.click(await screen.findByRole("option", { name: "Pull or merge requests" }));
 		await canvas.findByText("Keep a change to one concern");
-		await expect(area).toHaveAttribute("aria-expanded", "true");
-		await expect(area).toHaveAttribute("aria-disabled", "true");
+		await expect(group).toHaveAttribute("aria-expanded", "true");
+		await expect(group).toHaveAttribute("aria-disabled", "true");
 	},
 };
 
-export const SearchOpensTheAreaHoldingTheMatch: Story = {
+export const SearchOpensTheGroupHoldingTheMatch: Story = {
 	args: { search: { q: "release note" } },
 	play: async ({ canvas }) => {
 		await canvas.findByText("Write the release note with the change");
@@ -246,9 +246,9 @@ export const SearchOpensTheAreaHoldingTheMatch: Story = {
 export const NothingHasBeenChanged: Story = {
 	args: {
 		practices: practices.map((practice) => ({ ...practice, status: status() })),
-		areas: areas.map((area) => ({ ...area, status: status() })),
+		groups: groups.map((group) => ({ ...group, status: status() })),
 		summary: {
-			total: areas.length + practices.length,
+			total: groups.length + practices.length,
 			updatesChangingDetection: 0,
 			updatesChangingWordingOnly: 0,
 			updatesChangingPresentation: 0,
@@ -260,7 +260,7 @@ export const NothingHasBeenChanged: Story = {
 	},
 };
 
-export const ExcludingAnAreaListsItsPractices: Story = {
+export const ExcludingAGroupListsItsPractices: Story = {
 	parameters: { chromatic: { disableSnapshot: true } },
 	play: async ({ canvas }) => {
 		await userEvent.click(
@@ -274,18 +274,18 @@ export const ExcludingAnAreaListsItsPractices: Story = {
 	},
 };
 
-export const PracticeInsideExcludedArea: Story = {
+export const PracticeInsideExcludedGroup: Story = {
 	args: {
-		areas: [excludedArea],
+		groups: [excludedGroup],
 		practices: [
 			{
 				...smallFocusedPrs,
-				areaSlug: excludedArea.slug,
+				groupSlug: excludedGroup.slug,
 				effectivelyOffered: false,
 			},
 			{
 				...explainsTheChange,
-				areaSlug: excludedArea.slug,
+				groupSlug: excludedGroup.slug,
 				effectivelyOffered: false,
 				status: status({ offered: false }),
 			},
@@ -293,7 +293,7 @@ export const PracticeInsideExcludedArea: Story = {
 	},
 	play: async ({ canvas }) => {
 		const inheritedSwitch = await canvas.findByRole("switch", {
-			name: "Keep a change to one concern is excluded because its area is excluded",
+			name: "Keep a change to one concern is excluded because its group is excluded",
 		});
 		await expect(inheritedSwitch).not.toBeChecked();
 		await expect(inheritedSwitch).toHaveAttribute("aria-disabled", "true");
@@ -305,9 +305,9 @@ export const PracticeInsideExcludedArea: Story = {
 	},
 };
 
-export const ExcludingAnAreaCountsOnlyIncludedPractices: Story = {
+export const ExcludingAGroupCountsOnlyIncludedPractices: Story = {
 	args: {
-		areas: [reviewReadyArea],
+		groups: [reviewReadyGroup],
 		practices: [
 			smallFocusedPrs,
 			{
@@ -331,13 +331,13 @@ export const ExcludingAnAreaCountsOnlyIncludedPractices: Story = {
 	},
 };
 
-export const ExcludingAnAreaDoesNotRecountExcludedPractices: Story = {
+export const ExcludingAGroupDoesNotRecountExcludedPractices: Story = {
 	args: {
-		areas: [reviewReadyArea],
+		groups: [reviewReadyGroup],
 		practices: [
 			{
 				...smallFocusedPrs,
-				areaSlug: reviewReadyArea.slug,
+				groupSlug: reviewReadyGroup.slug,
 				effectivelyOffered: false,
 				status: status({ offered: false }),
 			},
@@ -371,7 +371,7 @@ export const MobileReflow: Story = {
 
 export const Empty: Story = {
 	args: {
-		areas: [],
+		groups: [],
 		practices: [],
 		summary: {
 			total: 0,

@@ -12,7 +12,7 @@ import de.tum.cit.aet.hephaestus.integration.core.signal.SignalName;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.practices.PracticeBinding;
-import de.tum.cit.aet.hephaestus.practices.dto.BindPracticeAreaRequestDTO;
+import de.tum.cit.aet.hephaestus.practices.dto.BindPracticeGroupRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.CreatePracticeRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.PlacePracticeRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.PracticeDTO;
@@ -20,8 +20,8 @@ import de.tum.cit.aet.hephaestus.practices.dto.UpdatePracticeAutonomyRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.UpdatePracticeRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeArea;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeGroup;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeRevision;
 import de.tum.cit.aet.hephaestus.practices.review.autonomy.AutonomySource;
 import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
@@ -73,7 +73,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
     private PracticeRevisionRepository practiceRevisionRepository;
 
     @Autowired
-    private PracticeAreaRepository practiceAreaRepository;
+    private PracticeGroupRepository practiceGroupRepository;
 
     @Autowired
     private PracticeService practiceService;
@@ -101,17 +101,17 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
         return practiceRepository.save(practice);
     }
 
-    private PracticeArea persistArea(String slug) {
-        PracticeArea area = new PracticeArea();
-        area.setWorkspace(workspace);
-        area.setSlug(slug);
-        area.setName("Area " + slug);
-        return practiceAreaRepository.save(area);
+    private PracticeGroup persistGroup(String slug) {
+        PracticeGroup group = new PracticeGroup();
+        group.setWorkspace(workspace);
+        group.setSlug(slug);
+        group.setName("Group " + slug);
+        return practiceGroupRepository.save(group);
     }
 
-    private Practice persistPractice(String slug, @Nullable PracticeArea area, int displayOrder) {
+    private Practice persistPractice(String slug, @Nullable PracticeGroup group, int displayOrder) {
         Practice practice = persistPractice(slug, slug, true);
-        practice.setArea(area);
+        practice.setGroup(group);
         practice.setDisplayOrder(displayOrder);
         return practiceRepository.save(practice);
     }
@@ -130,7 +130,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
         );
     }
 
-    private CreatePracticeRequestDTO inArea(CreatePracticeRequestDTO request, String areaSlug) {
+    private CreatePracticeRequestDTO inGroup(CreatePracticeRequestDTO request, String groupSlug) {
         return new CreatePracticeRequestDTO(
             request.slug(),
             request.name(),
@@ -140,7 +140,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
             request.automatedReviewPolicy(),
             request.whyItMatters(),
             request.whatGoodLooksLike(),
-            areaSlug
+            groupSlug
         );
     }
 
@@ -163,7 +163,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
             evidence,
             request.whyItMatters(),
             request.whatGoodLooksLike(),
-            request.areaSlug()
+            request.groupSlug()
         );
     }
 
@@ -519,17 +519,17 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
             assertThat(result).isNotNull();
             // Held on the practice, not inherited: a practice that cannot run a review must stay off
-            // whatever its area or its workspace later decides.
+            // whatever its group or its workspace later decides.
             assertThat(result.autonomy().effective()).isEqualTo(PracticeAutonomy.OFF);
             assertThat(result.autonomy().override()).isEqualTo(PracticeAutonomy.OFF);
         }
 
         @Test
         @WithAdminUser
-        void shouldCreatePracticeInArea() {
+        void shouldCreatePracticeInGroup() {
             ensureAdminMembership(workspace);
-            persistArea("review-quality");
-            CreatePracticeRequestDTO request = inArea(validCreateRequest("scoped-practice"), "review-quality");
+            persistGroup("review-quality");
+            CreatePracticeRequestDTO request = inGroup(validCreateRequest("scoped-practice"), "review-quality");
 
             webTestClient
                 .post()
@@ -541,20 +541,20 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 .expectStatus()
                 .isCreated()
                 .expectBody()
-                .jsonPath("$.areaSlug")
+                .jsonPath("$.groupSlug")
                 .isEqualTo("review-quality");
 
-            PracticeArea area = practiceRepository
+            PracticeGroup group = practiceRepository
                 .findByWorkspaceIdAndSlug(workspace.getId(), "scoped-practice")
                 .orElseThrow()
-                .getArea();
-            assertNotNull(area);
-            assertThat(area.getSlug()).isEqualTo("review-quality");
+                .getGroup();
+            assertNotNull(group);
+            assertThat(group.getSlug()).isEqualTo("review-quality");
         }
 
         @Test
         @WithAdminUser
-        void shouldReturn404ForAreaFromAnotherWorkspace() {
+        void shouldReturn404ForGroupFromAnotherWorkspace() {
             ensureAdminMembership(workspace);
             User otherOwner = persistUser("other-catalog-owner");
             Workspace otherWorkspace = createWorkspace(
@@ -564,18 +564,18 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 AccountType.ORG,
                 otherOwner
             );
-            PracticeArea foreignArea = new PracticeArea();
-            foreignArea.setWorkspace(otherWorkspace);
-            foreignArea.setSlug("foreign-area");
-            foreignArea.setName("Foreign area");
-            practiceAreaRepository.save(foreignArea);
+            PracticeGroup foreignGroup = new PracticeGroup();
+            foreignGroup.setWorkspace(otherWorkspace);
+            foreignGroup.setSlug("foreign-group");
+            foreignGroup.setName("Foreign group");
+            practiceGroupRepository.save(foreignGroup);
 
             webTestClient
                 .post()
                 .uri(BASE_URI, workspace.getWorkspaceSlug())
                 .headers(TestAuthUtils.withCurrentUser())
                 .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(inArea(validCreateRequest("scoped-practice"), "foreign-area"))
+                .bodyValue(inGroup(validCreateRequest("scoped-practice"), "foreign-group"))
                 .exchange()
                 .expectStatus()
                 .isNotFound();
@@ -963,7 +963,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
         void shouldPartiallyUpdate() {
             ensureAdminMembership(workspace);
             Practice practice = persistPractice("update-me", "Original Name", true);
-            practice.setArea(persistArea("existing-area"));
+            practice.setGroup(persistGroup("existing-group"));
             practiceRepository.save(practice);
 
             var request = new UpdatePracticeRequestDTO("Updated Name", null, null, null, null, null, null, null, null);
@@ -986,7 +986,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
             assertThat(signalsOf(result)).containsExactly(ScmSignals.PULL_REQUEST_OPENED);
             assertThat(result.criteria()).isEqualTo("Detect prompt for update-me");
             assertThat(result.autonomy().effective()).isEqualTo(PracticeAutonomy.AUTOMATIC);
-            assertThat(result.areaSlug()).isEqualTo("existing-area");
+            assertThat(result.groupSlug()).isEqualTo("existing-group");
         }
 
         @Test
@@ -1066,7 +1066,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
         void updatesDefinitionAndPlacementAtomically() {
             ensureAdminMembership(workspace);
             persistPractice("full-update", "Old Name", true);
-            persistArea("target-area");
+            persistGroup("target-group");
 
             var request = new UpdatePracticeRequestDTO(
                 "New Name",
@@ -1076,7 +1076,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 null,
                 null,
                 null,
-                new BindPracticeAreaRequestDTO("target-area"),
+                new BindPracticeGroupRequestDTO("target-group"),
                 null
             );
 
@@ -1097,7 +1097,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
             assertThat(result.name()).isEqualTo("New Name");
             assertThat(signalsOf(result)).containsExactly(ScmSignals.PULL_REQUEST_REVIEWED);
             assertThat(result.criteria()).isEqualTo("New prompt");
-            assertThat(result.areaSlug()).isEqualTo("target-area");
+            assertThat(result.groupSlug()).isEqualTo("target-group");
 
             Optional<Practice> persisted = practiceRepository.findByWorkspaceIdAndSlug(
                 workspace.getId(),
@@ -1106,21 +1106,21 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
             assertThat(persisted).isPresent();
             assertThat(persisted.get().getName()).isEqualTo("New Name");
             assertThat(persisted.get().getCriteria()).isEqualTo("New prompt");
-            PracticeArea area = persisted.get().getArea();
-            assertNotNull(area);
-            assertThat(area.getSlug()).isEqualTo("target-area");
+            PracticeGroup group = persisted.get().getGroup();
+            assertNotNull(group);
+            assertThat(group.getSlug()).isEqualTo("target-group");
             PracticeRevision revision = practiceRevisionRepository
                 .findFirstByPracticeIdOrderByRevisionNumberDesc(persisted.get().getId())
                 .orElseThrow();
             assertThat(revision.getName()).isEqualTo("New Name");
             assertThat(revision.getCriteria()).isEqualTo("New prompt");
-            assertThat(revision.getAreaSlug()).isEqualTo("target-area");
-            assertThat(revision.getAreaName()).isEqualTo("Area target-area");
+            assertThat(revision.getGroupSlug()).isEqualTo("target-group");
+            assertThat(revision.getGroupName()).isEqualTo("Group target-group");
         }
 
         @Test
         @WithAdminUser
-        void rejectsMissingAreaWithoutChangingDefinition() {
+        void rejectsMissingGroupWithoutChangingDefinition() {
             ensureAdminMembership(workspace);
             persistPractice("atomic-update", "Original Name", true);
 
@@ -1132,7 +1132,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 null,
                 null,
                 null,
-                new BindPracticeAreaRequestDTO("missing-area"),
+                new BindPracticeGroupRequestDTO("missing-group"),
                 null
             );
 
@@ -1150,7 +1150,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 .findByWorkspaceIdAndSlug(workspace.getId(), "atomic-update")
                 .orElseThrow();
             assertThat(persisted.getName()).isEqualTo("Original Name");
-            assertThat(persisted.getArea()).isNull();
+            assertThat(persisted.getGroup()).isNull();
         }
 
         @Test
@@ -1158,7 +1158,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
         void explicitlyUnassignsPractice() {
             ensureAdminMembership(workspace);
             Practice practice = persistPractice("unassign-in-patch", "Unassign", true);
-            practice.setArea(persistArea("current-area"));
+            practice.setGroup(persistGroup("current-group"));
             practiceRepository.save(practice);
 
             webTestClient
@@ -1166,34 +1166,34 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 .uri(BASE_URI + "/{slug}", workspace.getWorkspaceSlug(), "unassign-in-patch")
                 .headers(TestAuthUtils.withCurrentUser())
                 .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue("{\"area\":{\"areaSlug\":null}}")
+                .bodyValue("{\"group\":{\"groupSlug\":null}}")
                 .exchange()
                 .expectStatus()
                 .isOk()
                 .expectBody()
-                .jsonPath("$.areaSlug")
+                .jsonPath("$.groupSlug")
                 .doesNotExist();
         }
 
         @Test
         @WithAdminUser
-        void unassignsWhenNestedAreaSlugIsOmitted() {
+        void unassignsWhenNestedGroupSlugIsOmitted() {
             ensureAdminMembership(workspace);
-            Practice practice = persistPractice("omitted-area-patch", "Omitted area", true);
-            practice.setArea(persistArea("current-area"));
+            Practice practice = persistPractice("omitted-group-patch", "Omitted group", true);
+            practice.setGroup(persistGroup("current-group"));
             practiceRepository.save(practice);
 
             webTestClient
                 .patch()
-                .uri(BASE_URI + "/{slug}", workspace.getWorkspaceSlug(), "omitted-area-patch")
+                .uri(BASE_URI + "/{slug}", workspace.getWorkspaceSlug(), "omitted-group-patch")
                 .headers(TestAuthUtils.withCurrentUser())
                 .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue("{\"area\":{}}")
+                .bodyValue("{\"group\":{}}")
                 .exchange()
                 .expectStatus()
                 .isOk()
                 .expectBody()
-                .jsonPath("$.areaSlug")
+                .jsonPath("$.groupSlug")
                 .doesNotExist();
         }
 
@@ -1408,46 +1408,46 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
     }
 
     @Nested
-    @DisplayName("PUT /practices/{practiceSlug}/area")
-    class BindArea {
+    @DisplayName("PUT /practices/{practiceSlug}/group")
+    class BindGroup {
 
         @Test
         @WithAdminUser
         void shouldUnassignWithExplicitNull() {
             ensureAdminMembership(workspace);
             Practice practice = persistPractice("unassign-me", "Unassign me", true);
-            practice.setArea(persistArea("current-area"));
+            practice.setGroup(persistGroup("current-group"));
             practiceRepository.save(practice);
 
             webTestClient
                 .put()
-                .uri(BASE_URI + "/{slug}/area", workspace.getWorkspaceSlug(), "unassign-me")
+                .uri(BASE_URI + "/{slug}/group", workspace.getWorkspaceSlug(), "unassign-me")
                 .headers(TestAuthUtils.withCurrentUser())
                 .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue("{\"areaSlug\":null}")
+                .bodyValue("{\"groupSlug\":null}")
                 .exchange()
                 .expectStatus()
                 .isOk()
                 .expectBody()
-                .jsonPath("$.areaSlug")
+                .jsonPath("$.groupSlug")
                 .doesNotExist();
 
             assertThat(
-                practiceRepository.findByWorkspaceIdAndSlug(workspace.getId(), "unassign-me").orElseThrow().getArea()
+                practiceRepository.findByWorkspaceIdAndSlug(workspace.getId(), "unassign-me").orElseThrow().getGroup()
             ).isNull();
         }
 
         @Test
         @WithAdminUser
-        void shouldUnassignWhenAreaSlugIsOmitted() {
+        void shouldUnassignWhenGroupSlugIsOmitted() {
             ensureAdminMembership(workspace);
-            Practice practice = persistPractice("omitted-area", "Omitted area", true);
-            practice.setArea(persistArea("current-area"));
+            Practice practice = persistPractice("omitted-group", "Omitted group", true);
+            practice.setGroup(persistGroup("current-group"));
             practiceRepository.save(practice);
 
             webTestClient
                 .put()
-                .uri(BASE_URI + "/{slug}/area", workspace.getWorkspaceSlug(), "omitted-area")
+                .uri(BASE_URI + "/{slug}/group", workspace.getWorkspaceSlug(), "omitted-group")
                 .headers(TestAuthUtils.withCurrentUser())
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue("{}")
@@ -1455,7 +1455,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 .expectStatus()
                 .isOk()
                 .expectBody()
-                .jsonPath("$.areaSlug")
+                .jsonPath("$.groupSlug")
                 .doesNotExist();
         }
     }
@@ -1466,10 +1466,10 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
         @Test
         @WithAdminUser
-        void movesBetweenAreasAtTheRequestedPosition() {
+        void movesBetweenGroupsAtTheRequestedPosition() {
             ensureAdminMembership(workspace);
-            PracticeArea source = persistArea("source");
-            PracticeArea destination = persistArea("destination");
+            PracticeGroup source = persistGroup("source");
+            PracticeGroup destination = persistGroup("destination");
             persistPractice("alpha", source, 0);
             persistPractice("bravo", source, 1);
             persistPractice("charlie", source, 2);
@@ -1495,23 +1495,23 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
             PracticeRevision revision = practiceRevisionRepository
                 .findFirstByPracticeIdOrderByRevisionNumberDesc(moved.getId())
                 .orElseThrow();
-            assertThat(revision.getAreaSlug()).isEqualTo("destination");
-            assertThat(revision.getAreaName()).isEqualTo("Area destination");
+            assertThat(revision.getGroupSlug()).isEqualTo("destination");
+            assertThat(revision.getGroupName()).isEqualTo("Group destination");
         }
 
         @Test
         @WithAdminUser
-        void supportsEmptyAreasAndUnassigned() {
+        void supportsEmptyGroupsAndUnassigned() {
             ensureAdminMembership(workspace);
-            PracticeArea source = persistArea("source");
-            persistArea("empty");
+            PracticeGroup source = persistGroup("source");
+            persistGroup("empty");
             persistPractice("movable", source, 0);
 
             place("movable", new PlacePracticeRequestDTO("empty", 0))
                 .expectStatus()
                 .isOk()
                 .expectBody()
-                .jsonPath("$[0].areaSlug")
+                .jsonPath("$[0].groupSlug")
                 .isEqualTo("empty")
                 .jsonPath("$[0].displayOrder")
                 .isEqualTo(0);
@@ -1520,7 +1520,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 .expectStatus()
                 .isOk()
                 .expectBody()
-                .jsonPath("$[0].areaSlug")
+                .jsonPath("$[0].groupSlug")
                 .doesNotExist()
                 .jsonPath("$[0].displayOrder")
                 .isEqualTo(0);
@@ -1528,21 +1528,21 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
         @Test
         @WithAdminUser
-        void reordersWithinAnArea() {
+        void reordersWithinAnGroup() {
             ensureAdminMembership(workspace);
-            PracticeArea area = persistArea("area");
-            persistPractice("alpha", area, 0);
-            persistPractice("bravo", area, 1);
-            persistPractice("charlie", area, 2);
+            PracticeGroup group = persistGroup("group");
+            persistPractice("alpha", group, 0);
+            persistPractice("bravo", group, 1);
+            persistPractice("charlie", group, 2);
 
-            List<PracticeDTO> result = place("charlie", new PlacePracticeRequestDTO("area", 0))
+            List<PracticeDTO> result = place("charlie", new PlacePracticeRequestDTO("group", 0))
                 .expectStatus()
                 .isOk()
                 .expectBodyList(PracticeDTO.class)
                 .returnResult()
                 .getResponseBody();
 
-            assertThat(slugsIn(result, "area")).containsExactly("charlie", "alpha", "bravo");
+            assertThat(slugsIn(result, "group")).containsExactly("charlie", "alpha", "bravo");
         }
 
         @Test
@@ -1559,17 +1559,17 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
         @WithAdminUser
         void rejectsInvalidOrIncompletePlacementWithoutChangingTheCatalog() {
             ensureAdminMembership(workspace);
-            PracticeArea area = persistArea("area");
-            persistPractice("alpha", area, 0);
-            persistPractice("bravo", area, 1);
+            PracticeGroup group = persistGroup("group");
+            persistPractice("alpha", group, 0);
+            persistPractice("bravo", group, 1);
 
-            place("alpha", new PlacePracticeRequestDTO("area", 2)).expectStatus().isBadRequest();
+            place("alpha", new PlacePracticeRequestDTO("group", 2)).expectStatus().isBadRequest();
             place("alpha", new PlacePracticeRequestDTO("missing", 0)).expectStatus().isNotFound();
-            place("alpha", "{\"areaSlug\":\"area\"}").expectStatus().isBadRequest();
+            place("alpha", "{\"groupSlug\":\"group\"}").expectStatus().isBadRequest();
 
-            List<Practice> persisted = practiceRepository.findByWorkspaceIdAndAreaIdOrderByDisplayOrderAscNameAsc(
+            List<Practice> persisted = practiceRepository.findByWorkspaceIdAndGroupIdOrderByDisplayOrderAscNameAsc(
                 workspace.getId(),
-                area.getId()
+                group.getId()
             );
             assertThat(persisted).extracting(Practice::getSlug).containsExactly("alpha", "bravo");
         }
@@ -1584,11 +1584,11 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 .exchange();
         }
 
-        private List<String> slugsIn(@Nullable List<PracticeDTO> practices, String areaSlug) {
+        private List<String> slugsIn(@Nullable List<PracticeDTO> practices, String groupSlug) {
             assertNotNull(practices);
             return practices
                 .stream()
-                .filter(practice -> areaSlug.equals(practice.areaSlug()))
+                .filter(practice -> groupSlug.equals(practice.groupSlug()))
                 .sorted(java.util.Comparator.comparing(PracticeDTO::displayOrder))
                 .map(PracticeDTO::slug)
                 .toList();
@@ -1717,18 +1717,18 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
         /**
          * A null autonomy is the only way back out of an override. Without it the chain would be write-once:
-         * an administrator who set one practice explicitly could never return it to its area's decision.
+         * an administrator who set one practice explicitly could never return it to its group's decision.
          */
         @Test
         @WithAdminUser
         @DisplayName("a null autonomy clears the practice's own setting and it inherits again")
         void shouldClearTheOverrideOnNullTier() {
             ensureAdminMembership(workspace);
-            PracticeArea area = persistArea("area-with-a-autonomy");
-            area.setAutonomy(PracticeAutonomy.HUMAN_APPROVAL);
-            practiceAreaRepository.save(area);
+            PracticeGroup group = persistGroup("group-with-a-autonomy");
+            group.setAutonomy(PracticeAutonomy.HUMAN_APPROVAL);
+            practiceGroupRepository.save(group);
             Practice practice = persistPractice("null-active", "Name", true);
-            practice.setArea(area);
+            practice.setGroup(group);
             practiceRepository.save(practice);
 
             PracticeDTO result = webTestClient
@@ -1747,7 +1747,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
             assertThat(result).isNotNull();
             assertThat(result.autonomy().override()).isNull();
             assertThat(result.autonomy().effective()).isEqualTo(PracticeAutonomy.HUMAN_APPROVAL);
-            assertThat(result.autonomy().source()).isEqualTo(AutonomySource.AREA);
+            assertThat(result.autonomy().source()).isEqualTo(AutonomySource.GROUP);
             assertThat(result.autonomy().inherited()).isTrue();
             assertThat(
                 practiceRepository
@@ -2328,20 +2328,20 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
     }
 
     @Nested
-    @DisplayName("GET /practices/learner — anti-leak projection")
-    class LearnerProjection {
+    @DisplayName("GET /practices/developer — anti-leak projection")
+    class ReviewedPracticeProjection {
 
         @Test
         @WithAdminUser
         @DisplayName("raw JSON omits criteria but carries why-it-matters and what-good-looks-like")
-        void learnerViewHidesCriteriaExposesRationale() {
+        void developerViewHidesCriteriaExposesRationale() {
             ensureAdminMembership(workspace);
 
             var request = new CreatePracticeRequestDTO(
-                "learner-practice",
-                "Learner Practice",
+                "developer-practice",
+                "Developer Practice",
                 PracticeTestEvidence.bindings(ScmSignals.PULL_REQUEST_OPENED),
-                "INTERNAL detection rubric — must never reach a learner",
+                "INTERNAL detection rubric — must never reach a developer",
                 null,
                 PracticeTestEvidence.forArtifact(ArtifactKinds.PULL_REQUEST),
                 "Small, focused PRs are easier to review.",
@@ -2361,7 +2361,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
             String rawJson = webTestClient
                 .get()
-                .uri(BASE_URI + "/learner", workspace.getWorkspaceSlug())
+                .uri(BASE_URI + "/reviewed", workspace.getWorkspaceSlug())
                 .headers(TestAuthUtils.withCurrentUser())
                 .exchange()
                 .expectStatus()
@@ -2442,7 +2442,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
         @Test
         @WithAdminUser
-        @DisplayName("create with detector vocab in whyItMatters → 400 (whyItMatters is also learner-facing)")
+        @DisplayName("create with detector vocab in whyItMatters → 400 (whyItMatters is also developer-facing)")
         void rejectsVocabInWhyItMatters() {
             ensureAdminMembership(workspace);
 

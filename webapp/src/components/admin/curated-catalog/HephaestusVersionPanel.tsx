@@ -2,7 +2,7 @@ import { RotateCcw } from "lucide-react";
 import { useId } from "react";
 import type {
 	CatalogEntryStatus,
-	CuratedAreaRequest,
+	CuratedGroupRequest,
 	CuratedPracticeDefinition,
 	PracticeDefinitionOptions,
 } from "@/api/types.gen";
@@ -23,7 +23,7 @@ type ShippedDefinition = Readonly<Record<string, unknown>>;
 
 interface HephaestusVersionPanelBaseProps {
 	status: CatalogEntryStatus;
-	areaNames?: Readonly<Record<string, string>>;
+	groupNames?: Readonly<Record<string, string>>;
 	isResetPending: boolean;
 	isKeepPending?: boolean;
 	disabled: boolean;
@@ -38,20 +38,20 @@ export type HephaestusVersionPanelProps = HephaestusVersionPanelBaseProps &
 				shipped?: CuratedPracticeDefinition;
 				definitionOptions: PracticeDefinitionOptions;
 		  }
-		| { kind: "area"; shipped?: CuratedAreaRequest }
+		| { kind: "group"; shipped?: CuratedGroupRequest }
 	);
 
-const AREA_FIELDS = {
+const GROUP_FIELDS = {
 	name: "Name",
 	description: "Description",
 	icon: "Icon",
 	color: "Color",
-} satisfies Record<keyof CuratedAreaRequest, string>;
+} satisfies Record<keyof CuratedGroupRequest, string>;
 
 const PRACTICE_FIELDS = {
 	name: "Name",
 	artifactKind: "Work reviewed",
-	areaSlug: "Area",
+	groupSlug: "Group",
 	criteria: "What to look for",
 	whyItMatters: "Why it matters",
 	whatGoodLooksLike: "What good looks like",
@@ -66,16 +66,16 @@ const PRACTICE_FIELDS = {
 function displayValue(
 	field: string,
 	value: unknown,
-	areaNames: Readonly<Record<string, string>>,
+	groupNames: Readonly<Record<string, string>>,
 ): string {
 	if (value === null || value === undefined || value === "") {
-		return field === "areaSlug" ? "Unassigned" : "Not set";
+		return field === "groupSlug" ? "Unassigned" : "Not set";
 	}
 	if (field === "artifactKind") {
 		return artifactKindLabel(typeof value === "string" ? value : JSON.stringify(value));
 	}
-	if (field === "areaSlug" && typeof value === "string") {
-		return areaNames[value] ?? "Group no longer exists";
+	if (field === "groupSlug" && typeof value === "string") {
+		return groupNames[value] ?? "Group no longer exists";
 	}
 	if ((field === "icon" || field === "color") && typeof value === "string")
 		return humanizeToken(value);
@@ -91,7 +91,7 @@ export function HephaestusVersionPanel(props: HephaestusVersionPanelProps) {
 		status,
 		kind,
 		shipped,
-		areaNames = {},
+		groupNames = {},
 		isResetPending,
 		isKeepPending = false,
 		disabled,
@@ -146,7 +146,7 @@ export function HephaestusVersionPanel(props: HephaestusVersionPanelProps) {
 								render={<dl />}
 								className="mt-2 space-y-3 rounded-md border bg-muted/40 p-3"
 							>
-								{Object.entries(kind === "area" ? AREA_FIELDS : PRACTICE_FIELDS).map(
+								{Object.entries(kind === "group" ? GROUP_FIELDS : PRACTICE_FIELDS).map(
 									([field, label]) => (
 										<div key={field} className="space-y-1">
 											<dt className="font-medium text-xs">{label}</dt>
@@ -170,7 +170,7 @@ export function HephaestusVersionPanel(props: HephaestusVersionPanelProps) {
 														"Evidence details are unavailable for this work type."
 													)
 												) : (
-													displayValue(field, shippedDefinition[field], areaNames)
+													displayValue(field, shippedDefinition[field], groupNames)
 												)}
 											</dd>
 										</div>

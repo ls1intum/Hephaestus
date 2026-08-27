@@ -36,7 +36,7 @@ import tools.jackson.databind.node.ObjectNode;
  * <p><b>Freshness is TTL-bounded only.</b> The {@code mentor_practice_context} cache has no
  * event-driven invalidation: there is no Practice-change domain event to hang an eviction off,
  * and {@link MentorContextInvalidator} only evicts per-user SCM/detection-driven caches. So an
- * admin edit to a practice (criteria text, activate/deactivate, rename, area reassignment) is
+ * admin edit to a practice (criteria text, activate/deactivate, rename, group reassignment) is
  * picked up only after the entry expires (MENTOR_CONTEXT_TTL, see {@code CacheConfig}). This is an
  * accepted limit — the catalog is low-churn admin data and a few minutes of staleness in mentor
  * chat is harmless — not an oversight; wire a Practice-change event into the invalidator if that
@@ -93,7 +93,7 @@ public class PracticeCatalogContentSource implements ContentSource {
         // Only the practices this workspace may actually raise in a conversation. A HUMAN_APPROVAL practice is
         // deliberately silent everywhere, so putting it in the mentor's catalogue would hand the mentor a
         // subject it is not allowed to raise, and an OFF practice is not reviewed at all. Autonomy is the
-        // effective one, resolved through the practice -> area -> workspace chain.
+        // effective one, resolved through the practice -> group -> workspace chain.
         WorkspaceReviewDefaults defaults = WorkspaceReviewDefaults.of(workspace);
         List<Practice> practices = practiceRepository
             .findByWorkspaceId(workspaceId)

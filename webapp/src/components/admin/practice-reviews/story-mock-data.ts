@@ -126,7 +126,7 @@ const invoiceBackfillMergeRequest: ReviewArtifact = {
 // The catalogue
 // ---------------------------------------------------------------------------------------------
 
-const areaNames = {
+const groupNames = {
 	"code-quality": "Code quality",
 	architecture: "Architecture",
 	testing: "Testing",
@@ -134,11 +134,11 @@ const areaNames = {
 	collaboration: "Collaboration",
 } as const;
 
-type AreaSlug = keyof typeof areaNames;
+type GroupSlug = keyof typeof groupNames;
 
-const area = (slug: AreaSlug) => ({ slug, name: areaNames[slug] });
+const group = (slug: GroupSlug) => ({ slug, name: groupNames[slug] });
 
-export const practiceAreas = Object.entries(areaNames).map(([slug, name], index) => ({
+export const practiceGroups = Object.entries(groupNames).map(([slug, name], index) => ({
 	id: index + 1,
 	slug,
 	name,
@@ -155,7 +155,7 @@ export const practiceAreas = Object.entries(areaNames).map(([slug, name], index)
 function practiceFixture(
 	practice: Pick<
 		Practice,
-		"id" | "slug" | "name" | "areaSlug" | "criteria" | "whyItMatters" | "whatGoodLooksLike"
+		"id" | "slug" | "name" | "groupSlug" | "criteria" | "whyItMatters" | "whatGoodLooksLike"
 	> & { displayOrder: number; autonomy: AutonomyAssignment["effective"] },
 ): Practice {
 	const { autonomy, ...rest } = practice;
@@ -189,7 +189,7 @@ export const workspacePractices: Practice[] = [
 		id: 1,
 		slug: "thin-controllers",
 		name: "Thin controllers",
-		areaSlug: "code-quality",
+		groupSlug: "code-quality",
 		criteria: "A controller validates its input, delegates, and maps the result. Nothing else.",
 		whyItMatters:
 			"Logic that lives in a controller can only be tested through HTTP, so it tends not to be tested at all.",
@@ -202,7 +202,7 @@ export const workspacePractices: Practice[] = [
 		id: 2,
 		slug: "product-language",
 		name: "Product language",
-		areaSlug: "architecture",
+		groupSlug: "architecture",
 		criteria: "Names in the code are the names the people using it would use.",
 		whyItMatters:
 			"A boundary named after its storage stops matching the product the day the storage changes, and every reader after that has to translate.",
@@ -215,7 +215,7 @@ export const workspacePractices: Practice[] = [
 		id: 3,
 		slug: "errors-carry-context",
 		name: "Errors carry their context",
-		areaSlug: "code-quality",
+		groupSlug: "code-quality",
 		criteria:
 			"A failure reports which operation failed and on what, not only that something went wrong.",
 		whyItMatters:
@@ -229,7 +229,7 @@ export const workspacePractices: Practice[] = [
 		id: 4,
 		slug: "tests-name-the-behaviour",
 		name: "Tests name the behaviour",
-		areaSlug: "testing",
+		groupSlug: "testing",
 		criteria: "A test's name states the behaviour it pins down, not the method it calls.",
 		whyItMatters:
 			"A red build should say what broke before anyone opens the file; a name like testCache2 makes the reader run the test to find out.",
@@ -241,7 +241,7 @@ export const workspacePractices: Practice[] = [
 		id: 5,
 		slug: "the-change-explains-itself",
 		name: "The change explains itself",
-		areaSlug: "documentation",
+		groupSlug: "documentation",
 		criteria: "The description says why the change was made, not only what it does.",
 		whyItMatters:
 			"Six months later the diff still says what changed. Nothing else records why, so the next person reverses the decision without knowing there was one.",
@@ -254,7 +254,7 @@ export const workspacePractices: Practice[] = [
 		id: 6,
 		slug: "decisions-are-written-down",
 		name: "Decisions are written down",
-		areaSlug: "collaboration",
+		groupSlug: "collaboration",
 		criteria:
 			"A decision reached in a discussion ends up somewhere durable before the thread ends.",
 		whyItMatters:
@@ -294,7 +294,7 @@ interface ObservationSpec {
 	summary: string;
 	evidenceRationale: string;
 	practiceSlug: string;
-	area: AreaSlug;
+	group: GroupSlug;
 	presence: ReviewObservation["presence"];
 	assessment?: ReviewObservation["assessment"];
 	severity?: ReviewObservation["severity"];
@@ -406,7 +406,7 @@ export const REVIEW_FIXTURE: RunSpec[] = [
 				evidenceRationale:
 					"The handler is three statements long: it binds the request, calls ReviewQueryService and maps the result. The caching decision that arrived with this change sits entirely inside the service, so it can be exercised without standing up HTTP.",
 				practiceSlug: "thin-controllers",
-				area: "code-quality",
+				group: "code-quality",
 				presence: "PRESENT",
 				assessment: "GOOD",
 				observedAt: "2026-07-28T13:40:00Z",
@@ -425,7 +425,7 @@ export const REVIEW_FIXTURE: RunSpec[] = [
 				evidenceRationale:
 					"findVisible returns an empty Optional both when the row does not exist and when the caller has no grant on the workspace, and the only caller turns either into a NotFoundException. Two situations that need different answers — retry the link, or ask for access — arrive as one.",
 				practiceSlug: "errors-carry-context",
-				area: "code-quality",
+				group: "code-quality",
 				presence: "PRESENT",
 				assessment: "BAD",
 				severity: "MAJOR",
@@ -456,7 +456,7 @@ export const REVIEW_FIXTURE: RunSpec[] = [
 				evidenceRationale:
 					"testCache1, testCache2 and testCache3 pin down a cold read, a warm read and an eviction after a membership change. The names carry none of that, so a red build names a file and a number rather than the behaviour that broke.",
 				practiceSlug: "tests-name-the-behaviour",
-				area: "testing",
+				group: "testing",
 				presence: "PRESENT",
 				assessment: "BAD",
 				severity: "MINOR",
@@ -476,7 +476,7 @@ export const REVIEW_FIXTURE: RunSpec[] = [
 				evidenceRationale:
 					"The body of the pull request is a bullet per changed file. Nothing in it says what was slow, how slow, or why a cache was the answer rather than a narrower query — the questions a reviewer who was not in that conversation has to ask before they can agree.",
 				practiceSlug: "the-change-explains-itself",
-				area: "documentation",
+				group: "documentation",
 				presence: "ABSENT",
 				assessment: "BAD",
 				severity: "INFO",
@@ -549,7 +549,7 @@ export const REVIEW_FIXTURE: RunSpec[] = [
 				evidenceRationale:
 					"The response field is called ledgerSeqNo, which is the column the number is stored in. Callers outside billing have to learn the storage layout to read an invoice, and the day the ledger is replaced the field is either wrong or frozen.",
 				practiceSlug: "product-language",
-				area: "architecture",
+				group: "architecture",
 				presence: "PRESENT",
 				assessment: "BAD",
 				severity: "CRITICAL",
@@ -576,7 +576,7 @@ export const REVIEW_FIXTURE: RunSpec[] = [
 				evidenceRationale:
 					"Everything in the merge request sits under the billing domain package. There is no request handler in the diff, so this practice has nothing to look at here.",
 				practiceSlug: "thin-controllers",
-				area: "code-quality",
+				group: "code-quality",
 				presence: "NOT_APPLICABLE",
 				observedAt: "2026-07-27T09:14:00Z",
 				evidence: [
@@ -616,7 +616,7 @@ export const REVIEW_FIXTURE: RunSpec[] = [
 				evidenceRationale:
 					"Four people weighed two rollback strategies over eleven messages and the last one is a thumbs-up. Nothing in the thread states which strategy won, so a reader arriving tomorrow cannot tell agreement from the end of the working day.",
 				practiceSlug: "decisions-are-written-down",
-				area: "collaboration",
+				group: "collaboration",
 				presence: "INCONCLUSIVE",
 				claimCurrentness: "UNVERIFIABLE",
 				observedAt: "2026-07-26T16:02:00Z",
@@ -640,7 +640,7 @@ export const REVIEW_FIXTURE: RunSpec[] = [
 				evidenceRationale:
 					"Every message names the customer-visible effect — prices reverting, invoices reissuing — rather than the tables involved. Somebody paged at two in the morning could act on this thread without opening the schema.",
 				practiceSlug: "product-language",
-				area: "architecture",
+				group: "architecture",
 				presence: "PRESENT",
 				assessment: "GOOD",
 				observedAt: "2026-07-26T16:01:00Z",
@@ -689,7 +689,7 @@ export const REVIEW_FIXTURE: RunSpec[] = [
 				evidenceRationale:
 					"Step one puts the workspace into maintenance before anything is restored, and the page says so in the first line rather than in a note at the bottom. A reader following the page top to bottom does the irreversible thing at the point where it is still safe.",
 				practiceSlug: "the-change-explains-itself",
-				area: "documentation",
+				group: "documentation",
 				presence: "PRESENT",
 				assessment: "GOOD",
 				observedAt: "2026-07-25T11:30:00Z",
@@ -728,7 +728,7 @@ export const REVIEW_FIXTURE: RunSpec[] = [
 				evidenceRationale:
 					"When the backoff gives up, the handler writes a debug line and returns. Nothing increments a counter and nothing reaches the dead-letter subject, so a provider outage looks identical to a quiet afternoon on every dashboard the team has.",
 				practiceSlug: "errors-carry-context",
-				area: "code-quality",
+				group: "code-quality",
 				presence: "PRESENT",
 				assessment: "BAD",
 				severity: "MAJOR",
@@ -753,7 +753,7 @@ export const REVIEW_FIXTURE: RunSpec[] = [
 				evidenceRationale:
 					"Each of the four new tests is named for the behaviour it fixes in place — that the delay doubles, that it stops at the ceiling, that a success resets it, that a 4xx is not retried. A red build points straight at which of the four rules broke.",
 				practiceSlug: "tests-name-the-behaviour",
-				area: "testing",
+				group: "testing",
 				presence: "PRESENT",
 				assessment: "GOOD",
 				observedAt: "2026-07-29T08:11:00Z",
@@ -772,7 +772,7 @@ export const REVIEW_FIXTURE: RunSpec[] = [
 				evidenceRationale:
 					"The class, the metric and the log lines all say outbox. The property is hephaestus.webhook.retry-buffer.*, so an operator reading a dashboard and an operator editing configuration are looking for two different words for one thing.",
 				practiceSlug: "product-language",
-				area: "architecture",
+				group: "architecture",
 				presence: "PRESENT",
 				assessment: "BAD",
 				severity: "MINOR",
@@ -906,7 +906,7 @@ function toObservation(run: RunSpec, spec: ObservationSpec): ReviewObservation {
 		id: spec.id,
 		agentJobId: run.id,
 		artifact: run.work,
-		area: area(spec.area),
+		group: group(spec.group),
 		assessment: spec.assessment,
 		claimCurrentness: spec.claimCurrentness ?? "CURRENT",
 		feedbackDisposition: disposition(spec.id),
@@ -1060,7 +1060,7 @@ export function feedbackDetail(feedbackId: string): ReviewFeedbackDetail {
 			const source = observationDetail(observationId);
 			return {
 				observationId,
-				area: source.area,
+				group: source.group,
 				assessment: source.assessment,
 				claimCurrentness: source.claimCurrentness,
 				observedAt: source.observedAt,

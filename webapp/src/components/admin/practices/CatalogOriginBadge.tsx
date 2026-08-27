@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 
 export interface CatalogOriginBadgeProps {
 	origin?: CatalogOrigin | null;
-	kind: "practice" | "area";
+	kind: "practice" | "group";
 	className?: string;
 }
 

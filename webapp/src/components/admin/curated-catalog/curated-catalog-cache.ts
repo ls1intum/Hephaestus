@@ -1,15 +1,15 @@
 import type { CuratedCatalog } from "@/api/types.gen";
 
-export function reorderCuratedAreas(
+export function reorderCuratedGroups(
 	catalog: CuratedCatalog,
 	orderedSlugs: readonly string[],
 ): CuratedCatalog {
 	const positions = new Map(orderedSlugs.map((slug, position) => [slug, position]));
 	return {
 		...catalog,
-		areas: catalog.areas.map((area) => ({
-			...area,
-			position: positions.get(area.slug) ?? area.position,
+		groups: catalog.groups.map((group) => ({
+			...group,
+			position: positions.get(group.slug) ?? group.position,
 		})),
 	};
 }
@@ -17,31 +17,31 @@ export function reorderCuratedAreas(
 export function placeCuratedPractice(
 	catalog: CuratedCatalog,
 	practiceSlug: string,
-	areaSlug: string | null,
+	groupSlug: string | null,
 	position: number,
 ): CuratedCatalog {
 	const moved = catalog.practices.find((practice) => practice.slug === practiceSlug);
 	if (!moved) return catalog;
-	const sourceAreaSlug = moved.areaSlug ?? null;
-	const source = orderedPractices(catalog, sourceAreaSlug).filter(
+	const sourceGroupSlug = moved.groupSlug ?? null;
+	const source = orderedPractices(catalog, sourceGroupSlug).filter(
 		(practice) => practice.slug !== practiceSlug,
 	);
 	const destination =
-		sourceAreaSlug === areaSlug
+		sourceGroupSlug === groupSlug
 			? source
-			: orderedPractices(catalog, areaSlug).filter((practice) => practice.slug !== practiceSlug);
+			: orderedPractices(catalog, groupSlug).filter((practice) => practice.slug !== practiceSlug);
 	destination.splice(Math.max(0, Math.min(position, destination.length)), 0, moved);
 
-	const placements = new Map<string, { areaSlug: string | null; position: number }>();
+	const placements = new Map<string, { groupSlug: string | null; position: number }>();
 	source.forEach((practice, index) =>
-		placements.set(practice.slug, { areaSlug: sourceAreaSlug, position: index }),
+		placements.set(practice.slug, { groupSlug: sourceGroupSlug, position: index }),
 	);
 	destination.forEach((practice, index) =>
-		placements.set(practice.slug, { areaSlug, position: index }),
+		placements.set(practice.slug, { groupSlug, position: index }),
 	);
-	const destinationAreaOffered =
-		areaSlug === null ||
-		catalog.areas.find((area) => area.slug === areaSlug)?.status.offered === true;
+	const destinationGroupOffered =
+		groupSlug === null ||
+		catalog.groups.find((group) => group.slug === groupSlug)?.status.offered === true;
 
 	return {
 		...catalog,
@@ -50,10 +50,10 @@ export function placeCuratedPractice(
 			if (!placement) return practice;
 			return {
 				...practice,
-				areaSlug: placement.areaSlug ?? undefined,
+				groupSlug: placement.groupSlug ?? undefined,
 				position: placement.position,
 				...(practice.slug === practiceSlug
-					? { effectivelyOffered: practice.status.offered && destinationAreaOffered }
+					? { effectivelyOffered: practice.status.offered && destinationGroupOffered }
 					: {}),
 			};
 		}),
@@ -62,27 +62,27 @@ export function placeCuratedPractice(
 
 export function reorderCuratedPractices(
 	catalog: CuratedCatalog,
-	areaSlug: string | null,
+	groupSlug: string | null,
 	orderedSlugs: readonly string[],
 ): CuratedCatalog {
 	const positions = new Map(orderedSlugs.map((slug, position) => [slug, position]));
 	return {
 		...catalog,
 		practices: catalog.practices.map((practice) =>
-			(practice.areaSlug ?? null) === areaSlug && positions.has(practice.slug)
+			(practice.groupSlug ?? null) === groupSlug && positions.has(practice.slug)
 				? { ...practice, position: positions.get(practice.slug) ?? practice.position }
 				: practice,
 		),
 	};
 }
 
-export function orderedPracticeSlugs(catalog: CuratedCatalog, areaSlug: string | null): string[] {
-	return orderedPractices(catalog, areaSlug).map((practice) => practice.slug);
+export function orderedPracticeSlugs(catalog: CuratedCatalog, groupSlug: string | null): string[] {
+	return orderedPractices(catalog, groupSlug).map((practice) => practice.slug);
 }
 
-function orderedPractices(catalog: CuratedCatalog, areaSlug: string | null) {
+function orderedPractices(catalog: CuratedCatalog, groupSlug: string | null) {
 	return catalog.practices
-		.filter((practice) => (practice.areaSlug ?? null) === areaSlug)
+		.filter((practice) => (practice.groupSlug ?? null) === groupSlug)
 		.slice()
 		.sort((a, b) => a.position - b.position || a.name.localeCompare(b.name));
 }

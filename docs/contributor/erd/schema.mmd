@@ -248,7 +248,7 @@ erDiagram
         TIMESTAMPTZ occurred_at "NOT NULL"
     }
 
-    CuratedAreaOverride {
+    CuratedGroupOverride {
         VARCHAR(64) slug PK
         VARCHAR(128) name
         TEXT description
@@ -271,7 +271,7 @@ erDiagram
         TEXT precompute_script
         TEXT why_it_matters
         TEXT what_good_looks_like
-        VARCHAR(64) area_slug
+        VARCHAR(64) group_slug
         INTEGER position
         VARCHAR(128) based_on_digest
         TIMESTAMPTZ retired_at
@@ -832,7 +832,7 @@ erDiagram
         TIMESTAMPTZ created_at "NOT NULL"
         TIMESTAMPTZ updated_at
         TEXT precompute_script
-        BIGINT practice_area_id FK
+        BIGINT practice_group_id FK
         VARCHAR(64) applies_to "NOT NULL"
         TEXT why_it_matters
         TEXT what_good_looks_like
@@ -844,7 +844,13 @@ erDiagram
         VARCHAR(16) autonomy
     }
 
-    PracticeArea {
+    PracticeCatalogInstallation {
+        BIGINT workspace_id PK,FK
+        TIMESTAMPTZ installed_at "NOT NULL"
+        TIMESTAMPTZ provenance_linked_at
+    }
+
+    PracticeGroup {
         BIGINT id PK
         BIGINT workspace_id FK,UK "NOT NULL"
         VARCHAR(64) slug UK "NOT NULL"
@@ -861,12 +867,6 @@ erDiagram
         VARCHAR(16) autonomy
     }
 
-    PracticeCatalogInstallation {
-        BIGINT workspace_id PK,FK
-        TIMESTAMPTZ installed_at "NOT NULL"
-        TIMESTAMPTZ provenance_linked_at
-    }
-
     PracticeRevision {
         BIGINT id PK
         BIGINT practice_id FK,UK "NOT NULL"
@@ -880,11 +880,11 @@ erDiagram
         TEXT precompute_script
         TEXT why_it_matters
         TEXT what_good_looks_like
-        VARCHAR(64) area_slug
-        VARCHAR(128) area_name
-        TEXT area_description
-        VARCHAR(64) area_icon
-        VARCHAR(32) area_color
+        VARCHAR(64) group_slug
+        VARCHAR(128) group_name
+        TEXT group_description
+        VARCHAR(64) group_icon
+        VARCHAR(32) group_color
         VARCHAR(96) review_rule_fingerprint
         JSONB automated_review_policy
     }
@@ -1046,11 +1046,12 @@ erDiagram
     Reaction {
         UUID id PK
         BIGINT reactor_user_id FK "NOT NULL"
-        VARCHAR(16) action "NOT NULL"
+        VARCHAR(16) action
         TEXT explanation
         TIMESTAMPTZ created_at "NOT NULL"
         UUID feedback_id FK "NOT NULL"
         VARCHAR(64) recurrence_key
+        VARCHAR(16) usefulness
     }
 
     Repository {
@@ -1517,9 +1518,9 @@ erDiagram
     Workspace ||--o{ OutlineDocument : has
     Connection ||--o{ OutlineDocumentEvent : has
     Workspace ||--o{ OutlineDocumentEvent : has
-    PracticeArea ||--o{ Practice : has
+    PracticeGroup ||--o{ Practice : has
     Workspace ||--o{ Practice : has
-    Workspace ||--o{ PracticeArea : has
+    Workspace ||--o{ PracticeGroup : has
     Practice ||--o{ PracticeRevision : has
     User ||--o{ Project : created_by
     IdentityProvider ||--o{ Project : references

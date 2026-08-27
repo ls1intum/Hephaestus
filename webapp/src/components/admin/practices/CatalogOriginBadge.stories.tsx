@@ -75,9 +75,9 @@ export const NoLongerIncluded: Story = {
 	},
 };
 
-export const AreaChanged: Story = {
+export const GroupChanged: Story = {
 	args: {
-		kind: "area",
+		kind: "group",
 		origin: {
 			slug: "communication",
 			link: "UPDATE_AVAILABLE",

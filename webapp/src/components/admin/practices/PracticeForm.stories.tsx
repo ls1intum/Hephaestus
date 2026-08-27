@@ -14,7 +14,7 @@ import { expectNoPanelOverflow } from "@/test/reflow";
 import { PracticeForm } from "./PracticeForm";
 import { PracticeFormLevel } from "./PracticeFormLevel";
 import { GUARDED_LEVEL_KINDS, practiceFormLevel } from "./practice-search";
-import { mockAreas, mockPracticeWithAllTriggers } from "./story-mock-data";
+import { mockGroups, mockPracticeWithAllTriggers } from "./story-mock-data";
 
 const createSubmit = fn();
 const editSubmit = fn();
@@ -36,7 +36,7 @@ const meta = {
 	args: {
 		mode: "create",
 		workspaceSlug: "demo",
-		areas: mockAreas,
+		groups: mockGroups,
 		definitionOptions: mockPracticeDefinitionOptions,
 		onSubmit: createSubmit,
 		isPending: false,
