@@ -9,7 +9,7 @@
  *       {@code DeliveryComposer}, {@code FeedbackDeliveryService}, {@code PracticeDetectionDeliveryService},
  *       {@code DiffNotePoster}, {@code PullRequestCommentPoster}, {@code ProgressFooterRenderer}, plus the
  *       {@code FeedbackLedgerRecorder} (the sole write-orchestrator of the {@code practices.feedback} ledger —
- *       see {@code FeedbackLedgerOwnershipTest}) and {@code ReactionSuppressionFilter}. This is the layer the
+ *       see {@code FeedbackLedgerOwnershipTest}) and {@code FeedbackResponseSuppressionFilter}. This is the layer the
  *       detection-context firewall ({@code DetectionReactionFirewallTest}) deliberately EXCLUDES:
  *       reaction-aware delivery is intended here, while reaction-blind detection lives in
  *       {@code agent.context.providers}.</li>

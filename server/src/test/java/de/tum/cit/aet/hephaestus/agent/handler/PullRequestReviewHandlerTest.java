@@ -107,7 +107,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
             deliveryService,
             feedbackService,
             new SecretDiffScanner(),
-            new ReactionSuppressionFilter(
+            new FeedbackResponseSuppressionFilter(
                 org.mockito.Mockito.mock(de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository.class),
                 org.mockito.Mockito.mock(
                     de.tum.cit.aet.hephaestus.practices.observation.reaction.ReactionRepository.class

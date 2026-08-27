@@ -15,7 +15,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Assembles the caller-scoped detail trend from the same developer-scoped snapshot as the group standings. */
 @Service
 @RequiredArgsConstructor
 public class PracticeGroupTrendQueryService {

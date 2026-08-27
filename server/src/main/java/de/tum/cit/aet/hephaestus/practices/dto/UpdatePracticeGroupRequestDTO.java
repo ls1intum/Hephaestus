@@ -6,11 +6,6 @@ import jakarta.validation.constraints.PositiveOrZero;
 import jakarta.validation.constraints.Size;
 import org.jspecify.annotations.Nullable;
 
-/**
- * Request DTO for updating an existing practice group.
- *
- * <p>Uses PATCH semantics: only non-null fields are applied.
- */
 @Schema(description = "Request to update an existing practice group (PATCH — only non-null fields applied)")
 public record UpdatePracticeGroupRequestDTO(
     @Size(min = 3, max = 128, message = "Name must be between 3 and 128 characters")

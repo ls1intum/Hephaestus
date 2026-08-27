@@ -11,10 +11,6 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * Repository for workspace-scoped practice groups (the configurable learning-objective grouping over
- * practices).
- */
 @Repository
 @WorkspaceAgnostic(
     "Workspace-scoped via custom queries that all include workspaceId; PK-only DML allowed for delete/save"

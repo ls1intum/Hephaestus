@@ -36,7 +36,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
-/** Workspace-scoped practice-group administration. */
 @WorkspaceScopedController
 @RequestMapping("/practice-groups")
 @Tag(name = "Practice Groups", description = "Manage practice groups")

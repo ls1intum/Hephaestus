@@ -35,7 +35,6 @@ import org.springframework.data.domain.Slice;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Builds the developer-facing history at review-run grain instead of leaking raw observation pagination. */
 @Service
 @RequiredArgsConstructor
 public class PracticeGroupReviewRunService {

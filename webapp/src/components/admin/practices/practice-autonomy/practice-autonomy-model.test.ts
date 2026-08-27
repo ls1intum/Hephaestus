@@ -89,7 +89,6 @@ describe("the overrides-only filter", () => {
 		const testing = groups.find((group) => group.groupSlug === "testing");
 		expect(testing).toBeDefined();
 		expect(testing?.practices).toStrictEqual([]);
-		// It still knows how many rows it is hiding, so the group can say so rather than look broken.
 		expect(testing?.totalPractices).toBe(1);
 	});
 
@@ -104,8 +103,6 @@ describe("the overrides-only filter", () => {
 
 describe("isOverridden", () => {
 	it("reads the override, not the level that decided the autonomy", () => {
-		// A group that chose its own autonomy reports source GROUP and inherited false; deriving it from
-		// `source` instead would call it inherited and hide it from the filter above.
 		const [hygiene, testing] = fixture.rollup.groups;
 		assert(hygiene);
 		assert(testing);
@@ -139,7 +136,6 @@ describe("reviewableByHephaestus", () => {
 
 describe("the workspace summary", () => {
 	it("drops the autonomies the rollup sends at zero, and keeps ladder order", () => {
-		// The rollup sends every autonomy as a key even at zero, so a caller never has to gap-fill.
 		expect(
 			autonomyDistribution({ OFF: 3, HUMAN_APPROVAL: 0, AUTOMATIC: 1 }).map(
 				({ autonomy }) => autonomy,

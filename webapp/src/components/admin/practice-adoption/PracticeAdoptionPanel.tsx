@@ -36,7 +36,6 @@ import { cn } from "@/lib/utils";
 export type PracticeAdoptionState = PanelState<{
 	preview: CatalogPracticePreview;
 	definitionOptions: PracticeDefinitionOptions;
-	/** `stale` means a conditional add lost its race and the refreshed preview needs re-reading. */
 	action: "idle" | "adding" | "stale";
 }>;
 
@@ -46,10 +45,6 @@ export interface PracticeAdoptionPanelProps {
 	nested?: boolean;
 }
 
-/**
- * The outcome leads: "what will this change" is the question, and the definition below it is the
- * evidence for the answer.
- */
 export function PracticeAdoptionPanel({ state, onAdopt, nested }: PracticeAdoptionPanelProps) {
 	if (state.status !== "ready") {
 		return <PracticeAdoptionPlaceholder state={state} nested={nested} />;
@@ -73,8 +68,6 @@ export function PracticeAdoptionPanel({ state, onAdopt, nested }: PracticeAdopti
 					<DrawerDescription>
 						<WorkTypeLabel artifactKind={preview.definition.artifactKind} />
 					</DrawerDescription>
-					{/* Under the title, not beside it: the badge is a sentence of its own, and a second text
-					    column would take the width the title needs to stay on one or two lines. */}
 					{availability.badged && <StatusBadge def={availability} className="mt-1.5" />}
 				</div>
 			</DetailDrawerHeader>

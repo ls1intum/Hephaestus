@@ -51,54 +51,29 @@ public class Reaction {
     @Column(columnDefinition = "UUID")
     private UUID id;
 
-    /**
-     * The delivered {@link Feedback} unit this reaction responds to. DB FK {@code fk_reaction_feedback} with
-     * {@code ON DELETE CASCADE}: a reaction has no meaning without the unit it reacts to, so deleting the unit
-     * removes its immutable reaction rows rather than orphaning them.
-     */
     @NotNull
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "feedback_id", nullable = false, foreignKey = @ForeignKey(name = "fk_reaction_feedback"))
     @OnDelete(action = OnDeleteAction.CASCADE)
     private Feedback feedback;
 
-    /** Read-only scalar view of the {@link #feedback} foreign key. */
     @Column(name = "feedback_id", nullable = false, insertable = false, updatable = false, columnDefinition = "UUID")
     private UUID feedbackId;
 
-    /**
-     * The user who submitted this reaction — always the feedback's recipient, since only the recipient may
-     * react. Scalar {@code Long} FK to {@code user} with no {@code @ManyToOne}, matching the identity columns
-     * elsewhere (e.g. {@code Observation.aboutUserId}): the relationship is declared in Liquibase as the
-     * Hibernate-invisible {@code sfk_reaction_reactor}, keeping the cross-module user reference out of the JPA
-     * graph and off the schema-drift gate. {@code ON DELETE RESTRICT} (the default, no cascade) — a reaction is
-     * research evidence and must not vanish with a user-row deletion.
-     */
     @NotNull
     @Column(name = "reactor_user_id", nullable = false)
     private Long reactorUserId;
 
-    /** How useful the recipient found the unit. */
     @Enumerated(EnumType.STRING)
     @Column(name = "usefulness", length = 16)
     private @Nullable FeedbackUsefulness usefulness;
 
-    /**
-     * What the recipient decided to do.
-     *
-     * <p>Column {@code action} rather than {@code resolution}: the column shipped under that name and a
-     * released one is renamed only across two releases. The field says what the value means.
-     */
+    /** What the recipient decided to do. The legacy column name is mapped at the persistence boundary. */
     @Enumerated(EnumType.STRING)
     @Column(name = "action", length = 16)
     private @Nullable FeedbackResolution resolution;
 
-    /**
-     * The recipient's free-text rationale. NULL means none was given. Coupled to {@link #resolution} by the DB
-     * CHECK {@code chk_reaction_disputed_explanation}: a {@link FeedbackResolution#DISPUTED} row must carry a
-     * non-blank explanation (the reasoned rejection IS the evaluative judgement), while {@code ADDRESSED} and
-     * {@code NOT_APPLICABLE} may leave it NULL.
-     */
+    /** Optional explanation; the database requires one for {@link FeedbackResolution#DISPUTED}. */
     @Column(name = "explanation", columnDefinition = "TEXT")
     private String explanation;
 

@@ -60,7 +60,7 @@ class JobTypeHandlerRegistryTest extends BaseUnitTest {
             deliveryService,
             feedbackService,
             new SecretDiffScanner(),
-            org.mockito.Mockito.mock(ReactionSuppressionFilter.class),
+            org.mockito.Mockito.mock(FeedbackResponseSuppressionFilter.class),
             new InContextDeliveryGate(
                 practiceRepository,
                 org.mockito.Mockito.mock(de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository.class),

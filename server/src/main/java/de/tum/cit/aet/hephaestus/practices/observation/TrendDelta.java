@@ -49,7 +49,7 @@ public record TrendDelta(
      * One locus's movement. {@code summary}/{@code currentSeverity} come from the
      * CURRENT run for {@link TransitionStatus#NEW}/{@link TransitionStatus#PERSISTED}/{@link TransitionStatus#REGRESSED},
      * and from the PRIOR run for {@link TransitionStatus#RESOLVED} (the locus is absent now, so the prior
-     * prose is what the student last saw). {@code currentAssessment} is null for RESOLVED; {@code priorAssessment}
+     * prose is what the developer last saw). {@code currentAssessment} is null for RESOLVED; {@code priorAssessment}
      * is null for NEW.
      */
     public record LocusTransition(

@@ -100,7 +100,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
     private final PracticeDetectionDeliveryService deliveryService;
     private final FeedbackDeliveryService feedbackService;
     private final SecretDiffScanner secretDiffScanner;
-    private final ReactionSuppressionFilter reactionSuppressionFilter;
+    private final FeedbackResponseSuppressionFilter feedbackResponseSuppressionFilter;
     private final InContextDeliveryGate inContextDeliveryGate;
     private final ObservationRepository observationRepository;
 
@@ -115,7 +115,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         PracticeDetectionDeliveryService deliveryService,
         FeedbackDeliveryService feedbackService,
         SecretDiffScanner secretDiffScanner,
-        ReactionSuppressionFilter reactionSuppressionFilter,
+        FeedbackResponseSuppressionFilter feedbackResponseSuppressionFilter,
         InContextDeliveryGate inContextDeliveryGate,
         ObservationRepository observationRepository
     ) {
@@ -129,7 +129,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         this.deliveryService = deliveryService;
         this.feedbackService = feedbackService;
         this.secretDiffScanner = secretDiffScanner;
-        this.reactionSuppressionFilter = reactionSuppressionFilter;
+        this.feedbackResponseSuppressionFilter = feedbackResponseSuppressionFilter;
         this.inContextDeliveryGate = inContextDeliveryGate;
         this.observationRepository = observationRepository;
     }
@@ -340,7 +340,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
             job,
             scopedObservations
         );
-        List<PracticeDetectionResultParser.ValidatedObservation> deliverable = reactionSuppressionFilter
+        List<PracticeDetectionResultParser.ValidatedObservation> deliverable = feedbackResponseSuppressionFilter
             .evaluate(job, loudEnough)
             .deliverable();
         List<ComposedFeedbackUnit> units = compositionResultParser.parse(job.getOutput(), FeedbackChannel.IN_CONTEXT);
@@ -524,11 +524,11 @@ public class PullRequestReviewHandler implements JobTypeHandler {
             return;
         }
 
-        ReactionSuppressionFilter.ReactionDecision reactions = reactionSuppressionFilter.evaluate(
+        FeedbackResponseSuppressionFilter.SuppressionDecision suppression = feedbackResponseSuppressionFilter.evaluate(
             job,
             admittedInContext
         );
-        List<PracticeDetectionResultParser.ValidatedObservation> deliverable = reactions.deliverable();
+        List<PracticeDetectionResultParser.ValidatedObservation> deliverable = suppression.deliverable();
         if (deliverable.isEmpty() && !scopedObservations.isEmpty()) {
             // A SUCCESS (the student told us to stop nagging), not a delivery failure: the SUPPRESSED
             // ledger rows are written, and the prior edit-in-place summary stays as-is.

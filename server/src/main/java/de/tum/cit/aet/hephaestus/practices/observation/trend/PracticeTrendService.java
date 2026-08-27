@@ -11,7 +11,6 @@ import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
-/** The application's only producer of longitudinal practice and group trend results. */
 @Service
 @RequiredArgsConstructor
 public class PracticeTrendService {

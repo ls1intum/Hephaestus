@@ -16,7 +16,6 @@ import org.springframework.stereotype.Repository;
 @Repository
 @WorkspaceAgnostic("Reaction scoped through Feedback.workspaceId relationship")
 public interface ReactionRepository extends JpaRepository<Reaction, UUID> {
-    /** The newest complete response snapshot, including an all-null deletion marker. */
     @Query(
         value = """
         SELECT r.usefulness AS "usefulness", r.action AS "resolution",
@@ -76,7 +75,6 @@ public interface ReactionRepository extends JpaRepository<Reaction, UUID> {
         @Param("workspaceId") Long workspaceId
     );
 
-    /** The resolution that currently stands at one recurrence locus. */
     interface LocusResolutionProjection {
         String getRecurrenceKey();
         String getResolution();
@@ -104,7 +102,6 @@ public interface ReactionRepository extends JpaRepository<Reaction, UUID> {
         @Param("workspaceId") Long workspaceId
     );
 
-    /** The legacy {@code action} column contains the response resolution enum name. */
     interface ActionCountProjection {
         String getAction();
 

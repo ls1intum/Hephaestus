@@ -6,7 +6,6 @@ import java.util.List;
 import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
-/** Builds the compact developer-facing group summary used until an aggregated guidance snapshot exists. */
 final class DeterministicGroupGuidanceComposer {
 
     /** Keeps catalog prose from turning the compact group card into a full practice description. */

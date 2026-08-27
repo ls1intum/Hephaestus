@@ -20,22 +20,11 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * Reaction-aware re-nag suppression (ADR 0021). Runs AFTER the observations are persisted (so each carries
- * its stable {@code recurrence_key}) and BEFORE the summary/inline notes are composed: a locus the student
- * already DISPUTED / marked NOT_APPLICABLE on an EARLIER run is dropped from this run's delivery (and a
- * SUPPRESSED ledger row is written so an eval sees it was deliberately withheld, not missed). A locus the
- * student marked ADDRESSED ("I fixed it") but that is STILL assessed BAD this run is kept, with stiffer wording.
- *
- * <p>The reaction is captured against the EPHEMERAL per-run observation id, which differs every run; matching is
- * therefore by {@code recurrence_key} (A2 denormalized it onto the reaction). Flag-gated
- * ({@code hephaestus.practice-review.reaction-suppression}); a no-op when off, when no observations were persisted,
- * or when no reaction matches.
- */
+/** Suppresses repeat delivery when the developer has already rejected the same feedback locus. */
 @Component
-class ReactionSuppressionFilter {
+class FeedbackResponseSuppressionFilter {
 
-    private static final Logger log = LoggerFactory.getLogger(ReactionSuppressionFilter.class);
+    private static final Logger log = LoggerFactory.getLogger(FeedbackResponseSuppressionFilter.class);
 
     private static final Set<FeedbackResolution> SUPPRESS_ACTIONS = Set.of(
         FeedbackResolution.DISPUTED,
@@ -49,7 +38,7 @@ class ReactionSuppressionFilter {
     private final FeedbackLedgerRecorder feedbackLedgerRecorder;
     private final PracticeReviewProperties reviewProperties;
 
-    ReactionSuppressionFilter(
+    FeedbackResponseSuppressionFilter(
         ObservationRepository observationRepository,
         ReactionRepository reactionRepository,
         FeedbackLedgerRecorder feedbackLedgerRecorder,
@@ -61,31 +50,24 @@ class ReactionSuppressionFilter {
         this.reviewProperties = reviewProperties;
     }
 
-    /** Which observations to still deliver (escalated ones already rewritten) and how many were suppressed. */
-    record ReactionDecision(List<ValidatedObservation> deliverable, int suppressedCount) {}
+    record SuppressionDecision(List<ValidatedObservation> deliverable, int suppressedCount) {}
 
     // Read-only tx: we run outside the handler's transaction and read scalar identity columns off the
     // persisted observations. recordSuppressed writes in its own REQUIRES_NEW tx, so readOnly does not bind it.
     @Transactional(readOnly = true)
-    public ReactionDecision evaluate(AgentJob job, List<ValidatedObservation> scopedObservations) {
+    public SuppressionDecision evaluate(AgentJob job, List<ValidatedObservation> scopedObservations) {
         if (!reviewProperties.reactionSuppression()) {
-            return new ReactionDecision(scopedObservations, 0);
+            return new SuppressionDecision(scopedObservations, 0);
         }
         List<Observation> persisted = observationRepository.findByAgentJobId(job.getId());
         if (persisted.isEmpty()) {
-            return new ReactionDecision(scopedObservations, 0);
+            return new SuppressionDecision(scopedObservations, 0);
         }
 
-        // All observations of one job share the recipient + target. The reacting party is the subject
-        // (== the developer for the author-side catalogue today) — the same aboutUserId deliver() folded
-        // into each recurrence_key. about_user_id is always populated, so no fallback is needed.
         Observation any = persisted.get(0);
         long aboutUserId = any.getAboutUserId();
 
-        // A reaction targets a LOCUS, so the lookup is keyed on recurrence_key — but the row a suppression is
-        // recorded against is ONE observation, so the observation index is keyed on occurrence_key. Indexing
-        // observations by locus would collapse same-locus siblings onto whichever arrived first: the sibling
-        // would be withheld with no row of its own, and then read as delivered.
+        // Keep occurrences distinct when several observations share a recurrence locus.
         Map<String, Observation> persistedByOccurrence = new HashMap<>();
         Set<String> recurrenceKeys = new HashSet<>();
         for (Observation f : persisted) {
@@ -94,15 +76,9 @@ class ReactionSuppressionFilter {
                 recurrenceKeys.add(f.getRecurrenceKey());
             }
         }
-        // Every persisted observation may carry a null recurrence_key (a detector that emitted
-        // no locatable observations). The reaction lookup is a native query whose `IN (:recurrenceKeys)` would
-        // render as `IN ()` and crash on Postgres — short-circuit with no suppression when there are no keys.
         if (recurrenceKeys.isEmpty()) {
-            return new ReactionDecision(scopedObservations, 0);
+            return new SuppressionDecision(scopedObservations, 0);
         }
-        // The repository answers with the resolution that CURRENTLY stands at each locus, not with whatever
-        // the newest row happens to hold: a recipient who rated a unit helpful after disputing it did not
-        // un-dispute it. Only a withdrawal clears the locus, and then it simply returns no row for it.
         Map<String, FeedbackResolution> actionByKey = new HashMap<>();
         for (var row : reactionRepository.findCurrentResolutionByRecurrenceKeys(
             recurrenceKeys,
@@ -112,17 +88,13 @@ class ReactionSuppressionFilter {
             actionByKey.put(row.getRecurrenceKey(), FeedbackResolution.valueOf(row.getResolution()));
         }
         if (actionByKey.isEmpty()) {
-            return new ReactionDecision(scopedObservations, 0);
+            return new SuppressionDecision(scopedObservations, 0);
         }
 
         List<ValidatedObservation> deliverable = new ArrayList<>(scopedObservations.size());
         int suppressed = 0;
         int suppressedIndex = 0;
         for (ValidatedObservation vf : scopedObservations) {
-            // Use the recurrence_key the handler already stamped from the value deliver() persisted (it runs
-            // strictly after that stamp loop), so the match is provably identical to the persisted row a
-            // reaction is keyed to — not a parallel recompute that could drift. An observation with no stamped key
-            // was never persisted (unknown slug / no locatable observations), so no reaction can target it.
             String key = vf.recurrenceKey();
             if (key == null) {
                 deliverable.add(vf);
@@ -146,32 +118,29 @@ class ReactionSuppressionFilter {
                 continue;
             }
             if (action == FeedbackResolution.ADDRESSED && vf.assessment() == Assessment.BAD) {
-                deliverable.add(withEscalatedReasoning(vf)); // student said "fixed", but it recurs
+                deliverable.add(withEscalatedReasoning(vf));
                 continue;
             }
             deliverable.add(vf);
         }
         if (suppressed > 0) {
             log.info(
-                "Reaction-aware filter: jobId={}, suppressed={}, delivered={}/{}",
+                "Feedback-response filter: jobId={}, suppressed={}, delivered={}/{}",
                 job.getId(),
                 suppressed,
                 deliverable.size(),
                 scopedObservations.size()
             );
         }
-        return new ReactionDecision(deliverable, suppressed);
+        return new SuppressionDecision(deliverable, suppressed);
     }
 
-    /** A copy of the observation with a stiffer opener, for a locus the student said was fixed but that recurs. */
     private static ValidatedObservation withEscalatedReasoning(ValidatedObservation vf) {
         String prefix = "You previously marked this as fixed, but it is still present. ";
         String reasoning =
             vf.evidenceRationale() == null || vf.evidenceRationale().isBlank()
                 ? prefix.trim()
                 : prefix + vf.evidenceRationale();
-        // Preserve the correlation key the handler stamped on the input so the escalated copy keeps the same
-        // cross-run identity as the locus it re-nags.
         return new ValidatedObservation(
             vf.practiceSlug(),
             vf.summary(),

@@ -28,19 +28,9 @@ export interface GroupDetailsDialogProps {
 	open: boolean;
 	pending: boolean;
 	onOpenChange: (open: boolean) => void;
-	/** Resolve `true` to close; `false` leaves the dialog open with the typed details intact. */
 	onSubmit: (details: GroupDetails) => Promise<boolean>;
 }
 
-/**
- * Naming a practice group and giving it its chip, whether it exists yet or not.
- *
- * Which of the two it is comes from `group` rather than a second `mode` prop, so the title, the
- * button and the request cannot disagree.
- *
- * Unguarded, unlike the practice editors: a name, an icon and a colour are seconds to retype, so a
- * confirmation on dismissal would cost more than it saves.
- */
 export function GroupDetailsDialog({
 	group,
 	open,
@@ -51,8 +41,6 @@ export function GroupDetailsDialog({
 	return (
 		<Dialog open={open} onOpenChange={onOpenChange}>
 			<DialogContent className="sm:max-w-sm">
-				{/* Reopening inside the close animation reuses the still-mounted child, so the key is
-				    what actually resets the fields to this group's values. */}
 				<GroupDetailsForm
 					key={group?.slug ?? "new"}
 					group={group}

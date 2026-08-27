@@ -69,7 +69,6 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
     /** Idempotency guard for the ledger recorder: has this job already recorded this unit? */
     boolean existsByAgentJobIdAndPosition(UUID agentJobId, Integer position);
 
-    /** Workspace-scoped lookup of a single piece of feedback (reaction authorization + tenancy isolation). */
     Optional<Feedback> findByIdAndWorkspaceId(UUID id, Long workspaceId);
 
     Optional<Feedback> findByIdAndWorkspaceIdAndRecipientUserIdAndDeliveryState(

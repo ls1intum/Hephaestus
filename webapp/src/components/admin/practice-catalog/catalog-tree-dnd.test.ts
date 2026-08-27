@@ -16,8 +16,6 @@ const entry = (slug: string, groupSlug: string | undefined, displayOrder: number
 });
 
 describe("catalog tree drop target", () => {
-	// Deliberately not in `displayOrder` order: a fixture whose array order already agrees with
-	// `displayOrder` cannot tell a sorted destination apart from an unsorted one.
 	const entries = [
 		entry("after", "delivery", 1),
 		entry("source", "quality", 0),
@@ -35,10 +33,6 @@ describe("catalog tree drop target", () => {
 		});
 	});
 
-	/**
-	 * The row being dragged is not in its own destination. Counting itself would put the drop off the
-	 * end of the group, and the row would come back where it started.
-	 */
 	it("does not count the moving row when it stays in its own group", () => {
 		expect(getCatalogDropTarget(entries, "before", "delivery", "after", true)).toStrictEqual({
 			groupSlug: "delivery",
@@ -50,7 +44,6 @@ describe("catalog tree drop target", () => {
 		});
 	});
 
-	/** Ties are broken the way the tree renders them, so the index means the same thing on both. */
 	it("orders a displayOrder tie by name", () => {
 		const tied = [entry("beta", "delivery", 0), entry("alpha", "delivery", 0)];
 
@@ -75,10 +68,6 @@ describe("catalog tree drop target", () => {
 		expect(getCatalogDropTarget(entries, "source", "quality", "source")).toBeNull();
 	});
 
-	/**
-	 * An anchor from a stale render, or from a group the row is not in. Refusing the drop leaves the
-	 * order alone; guessing an end of the list would move the practice somewhere nobody aimed at.
-	 */
 	it("refuses a drop onto an anchor the destination does not hold", () => {
 		expect(
 			getCatalogDropTarget(entries, "source", "delivery", "gone-in-a-later-render"),

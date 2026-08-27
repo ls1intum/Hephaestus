@@ -9,12 +9,6 @@ import java.util.UUID;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
-/**
- * The recipient's response to one delivered piece of feedback, as it currently stands.
- *
- * <p>Not one stored row: usefulness, resolution, and comment may have been submitted at different times.
- * {@code respondedAt} is the time of the newest active response event.
- */
 @Schema(description = "The recipient's current assessment and resolution of delivered feedback")
 public record FeedbackResponseDTO(
     @NonNull UUID feedbackId,

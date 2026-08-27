@@ -37,7 +37,7 @@ import org.mockito.Mock;
 
 /** Unit tests for reaction-aware re-nag suppression (ADR 0021). */
 @org.mockito.junit.jupiter.MockitoSettings(strictness = org.mockito.quality.Strictness.LENIENT)
-class ReactionSuppressionFilterTest extends BaseUnitTest {
+class FeedbackResponseSuppressionFilterTest extends BaseUnitTest {
 
     @Mock
     private ObservationRepository observationRepository;
@@ -60,8 +60,8 @@ class ReactionSuppressionFilterTest extends BaseUnitTest {
         null
     );
 
-    private ReactionSuppressionFilter filter(boolean enabled) {
-        return new ReactionSuppressionFilter(
+    private FeedbackResponseSuppressionFilter filter(boolean enabled) {
+        return new FeedbackResponseSuppressionFilter(
             observationRepository,
             reactionRepository,
             feedbackLedgerRecorder,

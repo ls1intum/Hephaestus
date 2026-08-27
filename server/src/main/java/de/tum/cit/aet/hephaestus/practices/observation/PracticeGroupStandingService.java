@@ -31,7 +31,6 @@ import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Builds the current developer's qualitative standing for every active practice group. */
 @Service
 @RequiredArgsConstructor
 public class PracticeGroupStandingService {

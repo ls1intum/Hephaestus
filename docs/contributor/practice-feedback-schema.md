@@ -29,7 +29,7 @@ Use the executable sources for exact details:
 | `FeedbackApproval`    | Immutable decision to approve or reject one exact feedback proposal        | Stores the feedback ID, workspace, actor, decision context, content digest, and time |
 | `FeedbackObservation` | Ordered evidence binding between one piece of feedback and one observation | Joins feedback to observations with a primary or supporting role                |
 | `FeedbackPlacement`   | Where a piece of feedback was placed                                       | Belongs to one `Feedback`; records a summary, inline, or conversation placement |
-| `Reaction`            | An immutable event in a developer's response to delivered feedback          | Belongs to one `Feedback`; stores usefulness, resolution, or both               |
+| `Reaction`            | Legacy persistence name for an immutable feedback-response snapshot         | Belongs to one `Feedback`; stores usefulness, resolution, or both               |
 
 ## Invariants
 

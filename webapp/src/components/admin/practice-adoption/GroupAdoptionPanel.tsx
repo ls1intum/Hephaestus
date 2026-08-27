@@ -25,7 +25,6 @@ import {
 
 export type GroupAdoptionState = PanelState<{
 	preview: CatalogGroupAdoptionPreview;
-	/** `stale` means a conditional add lost its race and the refreshed preview needs re-reading. */
 	action: "idle" | "adding" | "stale";
 }>;
 
@@ -36,18 +35,12 @@ export interface GroupAdoptionPanelProps {
 	nested?: boolean;
 }
 
-/**
- * A whole catalog group, with every practice it would touch. Each practice opens *on top of* this
- * panel rather than expanding inside it, so one definition looks the same whether it was reached
- * from the catalog list or from its group.
- */
 export function GroupAdoptionPanel({
 	state,
 	onConfirm,
 	onOpenPractice,
 	nested,
 }: GroupAdoptionPanelProps) {
-	// No group colour before the preview loads: an invented one is indistinguishable from the real one.
 	const preview = state.status === "ready" ? state.preview : undefined;
 	const changes =
 		preview?.actions.filter(({ action }) => CATALOG_GROUP_CHANGE_ACTIONS.includes(action)) ?? [];

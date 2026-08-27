@@ -75,14 +75,8 @@ export interface PracticeCatalogPendingState {
 	creatingGroup: boolean;
 }
 
-/** The catalog section's own state, independent of the tree beside it. */
 export type LibraryState = PanelState<{ practices: CatalogPracticeSummary[] }>;
 
-/**
- * One prop, because `open` without a `state` was representable and rendered a loading block that
- * never resolved — indistinguishable from a real fetch. Absent means the surface offers no library
- * at all, which is a third thing again.
- */
 export interface PracticeLibrary {
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
@@ -126,7 +120,6 @@ export function PracticeCatalog({
 	onPlacePractice,
 	library,
 }: PracticeCatalogProps) {
-	// `null` while creating, a group while renaming; `namingGroup !== undefined` is "open".
 	const [namingGroup, setNamingGroup] = useState<PracticeGroup | null | undefined>(undefined);
 	const visiblePracticeSlugs = new Set(
 		practices
@@ -220,8 +213,6 @@ export function PracticeCatalog({
 				)}
 				renderGroupMeta={(group) => (
 					<>
-						{/* Only the exception is shown: a badge on every group would be noise, and "on the
-						    dashboards" is what a group does unless someone changed it. */}
 						{!group.visibleInPracticeDashboards && (
 							<StatusBadge def={DASHBOARD_VISIBILITY_DEFS.HIDDEN} />
 						)}
@@ -246,7 +237,6 @@ export function PracticeCatalog({
 						supportedModes={supportedModesFor(practice)}
 						inheritedFrom={inheritedFromFor(practice)}
 						title={
-							// Opens the practice read-only over this tree: reading is not the same act as editing.
 							<DetailStackLink
 								entry={{ kind: "practice", id: practice.slug }}
 								className="break-words rounded-sm hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"

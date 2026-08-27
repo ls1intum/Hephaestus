@@ -26,18 +26,9 @@ import {
 
 export interface AvailablePracticeListProps {
 	practices: CatalogPracticeSummary[];
-	/**
-	 * The groups the workspace already has. A group missing from this set is one the catalog can
-	 * put back, which is why its practices stay listed even after they have been added.
-	 */
 	existingGroupSlugs: ReadonlySet<string>;
 }
 
-/**
- * What the instance catalog still has to offer this workspace, grouped by the group each entry would
- * land in. A practice already added into a group the workspace still has is not offered again; one
- * whose group was deleted stays, because the group is what the catalog can put back.
- */
 export function AvailablePracticeList({
 	practices,
 	existingGroupSlugs,
@@ -76,8 +67,6 @@ export function AvailablePracticeList({
 	return (
 		<div className="space-y-5">
 			{Array.from(groups, ([key, entries]) => {
-				// A group exists because something was filed under it, so the first entry is what names
-				// it — an empty one would be a group nothing put anything in.
 				const [first] = entries;
 				if (!first) return null;
 				const groupSlug = first.groupSlug;

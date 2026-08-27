@@ -13,8 +13,8 @@
  * and {@code observation.reaction}. {@code review.autonomy} carries the practice → group → workspace resolution
  * the agent module needs at both delivery gates; note that a nested package is a boundary of its own to
  * Modulith rather than part of its parent's grant. The latter two let the {@code agent} delivery layer write the
- * delivered-feedback ledger and read reactions for re-nag suppression; the {@code observation.reaction}
- * boundary is also pinned reaction-blind for the detection context by {@code DetectionReactionFirewallTest}
+ * delivered-feedback ledger and read response snapshots for re-nag suppression. The persistence package keeps
+ * its historical name; {@code DetectionReactionFirewallTest} pins it outside the detection context
  * (ADR 0021 F-9). Internal types (controllers, adapters, request DTOs) remain module-private.
  *
  * <p>Distinct bounded context from {@link de.tum.cit.aet.hephaestus.activity} (which

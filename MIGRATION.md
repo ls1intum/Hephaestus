@@ -102,7 +102,7 @@ also accepts an independent, optional `usefulness` answer:
 PUT    /workspaces/{workspaceSlug}/practices/feedback/{feedbackId}/response
 GET    /workspaces/{workspaceSlug}/practices/feedback/{feedbackId}/response
 DELETE /workspaces/{workspaceSlug}/practices/feedback/{feedbackId}/response
-GET  /workspaces/{workspaceSlug}/practices/feedback/resolution-counts
+GET    /workspaces/{workspaceSlug}/practices/feedback/resolution-counts
 ```
 
 PUT replaces the complete response with `usefulness` (`HELPFUL` / `UNHELPFUL`), `resolution`

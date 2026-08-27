@@ -39,7 +39,6 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Builds the current developer's per-practice standing read model. */
 @Service
 @RequiredArgsConstructor
 public class PracticeStandingService {
