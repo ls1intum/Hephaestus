@@ -17,7 +17,7 @@ public record PracticeGroupReviewRunFilterParams(
     @Parameter(description = "Only reviews of these artifact kinds, e.g. scm.pull_request (repeatable)")
     @RequestParam(required = false)
     @Nullable
-    List<String> workKinds,
+    List<String> artifactKinds,
     @RequestParam(required = false) @Nullable List<Severity> severities,
     @Parameter(description = "Zero-based page, at most 100")
     @RequestParam(required = false)
@@ -40,6 +40,6 @@ public record PracticeGroupReviewRunFilterParams(
     }
 
     public @Nullable List<ArtifactKind> kinds() {
-        return QueryFilterSupport.artifactKinds(workKinds);
+        return QueryFilterSupport.artifactKinds(artifactKinds);
     }
 }

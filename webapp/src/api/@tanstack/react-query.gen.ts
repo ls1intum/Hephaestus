@@ -3031,7 +3031,7 @@ export const listPracticeGroupReviewRunsQueryKey = (options: Options<ListPractic
 /**
  * List complete review runs for a practice group
  *
- * Returns complete review runs newest first. Each review run contains the concrete positive and negative observations that explain what the review observed.
+ * Returns complete review runs newest first, including visible undecided observations.
  */
 export const listPracticeGroupReviewRunsOptions = (options: Options<ListPracticeGroupReviewRunsData>) => queryOptions<ListPracticeGroupReviewRunsResponse, ListPracticeGroupReviewRunsError, ListPracticeGroupReviewRunsResponse, ReturnType<typeof listPracticeGroupReviewRunsQueryKey>>({
     queryFn: async ({ queryKey, signal }) => {
@@ -3051,7 +3051,7 @@ export const listPracticeGroupReviewRunsInfiniteQueryKey = (options: Options<Lis
 /**
  * List complete review runs for a practice group
  *
- * Returns complete review runs newest first. Each review run contains the concrete positive and negative observations that explain what the review observed.
+ * Returns complete review runs newest first, including visible undecided observations.
  */
 export const listPracticeGroupReviewRunsInfiniteOptions = (options: Options<ListPracticeGroupReviewRunsData>) => infiniteQueryOptions<ListPracticeGroupReviewRunsResponse, ListPracticeGroupReviewRunsError, InfiniteData<ListPracticeGroupReviewRunsResponse>, QueryKey<Options<ListPracticeGroupReviewRunsData>>, number | Pick<QueryKey<Options<ListPracticeGroupReviewRunsData>>[0], 'body' | 'headers' | 'path' | 'query'>>(
 // @ts-ignore

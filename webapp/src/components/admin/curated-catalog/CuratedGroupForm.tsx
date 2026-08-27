@@ -315,7 +315,6 @@ export function CuratedGroupForm(props: CuratedGroupFormProps) {
 										<GroupVisualPicker
 											id="group-appearance"
 											describedBy="group-appearance-help"
-											slug={form.slug}
 											name={form.name}
 											icon={form.icon}
 											color={form.color}

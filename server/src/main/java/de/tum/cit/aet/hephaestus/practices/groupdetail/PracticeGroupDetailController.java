@@ -55,8 +55,7 @@ public class PracticeGroupDetailController {
     @Operation(
         operationId = "listPracticeGroupReviewRuns",
         summary = "List complete review runs for a practice group",
-        description = "Returns complete review runs newest first. Each review run contains the concrete positive and " +
-            "negative observations that explain what the review observed."
+        description = "Returns complete review runs newest first, including visible undecided observations."
     )
     @ApiResponse(responseCode = "200", description = "Paginated review runs returned")
     @ApiResponse(

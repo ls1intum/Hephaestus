@@ -1701,7 +1701,7 @@ export const setGroupAutonomy = <ThrowOnError extends boolean = false>(options: 
 /**
  * List complete review runs for a practice group
  *
- * Returns complete review runs newest first. Each review run contains the concrete positive and negative observations that explain what the review observed.
+ * Returns complete review runs newest first, including visible undecided observations.
  */
 export const listPracticeGroupReviewRuns = <ThrowOnError extends boolean = false>(options: Options<ListPracticeGroupReviewRunsData, ThrowOnError>) => (options.client ?? client).get<ListPracticeGroupReviewRunsResponses, ListPracticeGroupReviewRunsErrors, ThrowOnError>({
     responseTransformer: listPracticeGroupReviewRunsResponseTransformer,

@@ -154,7 +154,7 @@ class FeedbackResponseControllerIntegrationTest extends AbstractWorkspaceIntegra
 
         @Test
         @WithAdminUser
-        void usefulnessWithoutResolutionReturns201() {
+        void usefulnessWithoutResolutionReturns200() {
             var request = new FeedbackResponseRequestDTO(FeedbackUsefulness.HELPFUL, null, null);
 
             FeedbackResponseDTO response = webTestClient
@@ -177,7 +177,7 @@ class FeedbackResponseControllerIntegrationTest extends AbstractWorkspaceIntegra
 
         @Test
         @WithAdminUser
-        void combinedResponseReturns201() {
+        void combinedResponseReturns200() {
             var request = new FeedbackResponseRequestDTO(
                 FeedbackUsefulness.HELPFUL,
                 FeedbackResolution.ADDRESSED,
@@ -214,7 +214,7 @@ class FeedbackResponseControllerIntegrationTest extends AbstractWorkspaceIntegra
 
         @Test
         @WithAdminUser
-        void disputedWithExplanationReturns201() {
+        void disputedWithExplanationReturns200() {
             var request = new FeedbackResponseRequestDTO(
                 null,
                 FeedbackResolution.DISPUTED,
@@ -403,7 +403,7 @@ class FeedbackResponseControllerIntegrationTest extends AbstractWorkspaceIntegra
 
         @Test
         @WithAdminUser
-        @DisplayName("returns 204 when no reaction has been submitted yet")
+        @DisplayName("returns 204 when no response has been submitted yet")
         void returns204WhenEmpty() {
             webTestClient
                 .get()

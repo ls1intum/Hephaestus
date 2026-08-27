@@ -15,7 +15,6 @@ const meta = {
 	},
 	tags: ["autodocs"],
 	args: {
-		slug: "code-quality",
 		name: "Code quality",
 		onChange: fn(),
 	},

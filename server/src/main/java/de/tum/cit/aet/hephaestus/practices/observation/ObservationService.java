@@ -138,7 +138,7 @@ public class ObservationService {
 
     /**
      * Single observation detail. Ownership is enforced in the SQL query itself —
-     * a observation belonging to another developer simply won't be returned.
+     * an observation belonging to another developer simply won't be returned.
      *
      * @return the observation if it exists and belongs to the current user
      * @throws EntityNotFoundException if no user, or observation not found/not owned

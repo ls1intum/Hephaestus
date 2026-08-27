@@ -4477,9 +4477,8 @@ paths:
       - Practice Groups
   /workspaces/{workspaceSlug}/practice-groups/{groupSlug}/review-runs:
     get:
-      description: Returns complete review runs newest first. Each review run contains
-        the concrete positive and negative observations that explain what the review
-        observed.
+      description: "Returns complete review runs newest first, including visible undecided\
+        \ observations."
       operationId: listPracticeGroupReviewRuns
       parameters:
       - description: Workspace slug
@@ -4502,7 +4501,7 @@ paths:
       - description: "Only reviews of these artifact kinds, e.g. scm.pull_request\
           \ (repeatable)"
         in: query
-        name: workKinds
+        name: artifactKinds
         required: false
         schema:
           type: array
@@ -5029,7 +5028,7 @@ paths:
       - description: "Only observations on these kinds of reviewed work, e.g. scm.pull_request\
           \ (repeatable)"
         in: query
-        name: workKinds
+        name: artifactKinds
         required: false
         schema:
           type: array

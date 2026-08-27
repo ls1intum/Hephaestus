@@ -260,54 +260,11 @@ export function pillClasses(color?: string | null): string {
 	return pillFor(color) ?? SLATE_PILL;
 }
 
-type Seed = { icon: string; color: string };
+export const DEFAULT_GROUP_ICON = "Folder";
+export const DEFAULT_GROUP_COLOR = "slate";
 
-const GROUP_SEEDS: Record<string, Seed> = {
-	"robust-error-handling": { icon: "ShieldAlert", color: "rose" },
-	"secure-by-default-changes": { icon: "ShieldCheck", color: "red" },
-	"testing-discipline": { icon: "TestTube", color: "amber" },
-	"review-ready-work": { icon: "Package", color: "sky" },
-	"acting-on-review-feedback": { icon: "MessageSquareReply", color: "cyan" },
-	"constructive-code-review": { icon: "Eye", color: "teal" },
-	"code-craftsmanship": { icon: "Wrench", color: "emerald" },
-	"actionable-issue-authoring": { icon: "FileText", color: "violet" },
-	"issue-traceability-and-lifecycle": { icon: "ListChecks", color: "indigo" },
-	"decisions-and-documentation": { icon: "BookText", color: "slate" },
-	"delivery-and-version-control-discipline": {
-		icon: "GitBranch",
-		color: "fuchsia",
-	},
-	communication: { icon: "MessageCircle", color: "violet" },
-};
-
-const FALLBACK: Seed = { icon: "Folder", color: "slate" };
-
-export function groupSeed(slug: string, name = ""): { icon: string; color: string } {
-	return seedFor(slug, name);
-}
-
-function seedFor(slug: string, name: string): Seed {
-	const known = GROUP_SEEDS[slug];
-	if (known) return known;
-	const h = `${slug} ${name}`.toLowerCase();
-	if (/secur|shield|auth|permission|escap/.test(h)) return { icon: "ShieldCheck", color: "red" };
-	if (/error|fail|crash|exception|panic/.test(h)) return { icon: "ShieldAlert", color: "rose" };
-	if (/test/.test(h)) return { icon: "TestTube", color: "amber" };
-	if (/issue|triage|plan|track|backlog/.test(h)) return { icon: "ListChecks", color: "indigo" };
-	if (/review|comment|feedback/.test(h)) return { icon: "MessageSquareReply", color: "cyan" };
-	if (/doc|decision|rationale|record/.test(h)) return { icon: "BookText", color: "slate" };
-	if (/commit|branch|deliver|version|merge/.test(h)) return { icon: "GitBranch", color: "fuchsia" };
-	return FALLBACK;
-}
-
-export function getGroupVisual(
-	slug: string,
-	name = "",
-	icon?: string | null,
-	color?: string | null,
-): GroupVisual {
-	const seed = seedFor(slug, name);
-	const Icon = resolveIcon(icon) ?? iconComponent(seed.icon);
-	const pill = pillFor(color) ?? pillClasses(seed.color);
+export function getGroupVisual(icon?: string | null, color?: string | null): GroupVisual {
+	const Icon = resolveIcon(icon) ?? Folder;
+	const pill = pillFor(color) ?? SLATE_PILL;
 	return { Icon, pill };
 }

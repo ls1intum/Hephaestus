@@ -33,7 +33,7 @@ export function GroupPill({
 	className,
 }: GroupPillProps) {
 	const visual = slug
-		? getGroupVisual(slug, name ?? slug, icon, color)
+		? getGroupVisual(icon, color)
 		: { Icon: CircleDashed, pill: "bg-muted text-muted-foreground" };
 	const { Icon, pill } = visual;
 	const label = name ?? "Unassigned";

@@ -432,7 +432,7 @@ class FeedbackResponseServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("returns all zeros when no reaction exists")
+        @DisplayName("returns all zeros when no response exists")
         void returnsZerosWhenEmpty() {
             when(reactionRepository.countByReactorAndWorkspaceGroupByAction(CONTRIBUTOR_ID, WORKSPACE_ID)).thenReturn(
                 List.of()

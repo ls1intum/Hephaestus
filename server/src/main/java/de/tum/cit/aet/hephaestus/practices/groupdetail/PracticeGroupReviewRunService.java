@@ -14,7 +14,7 @@ import de.tum.cit.aet.hephaestus.practices.groupdetail.dto.PracticeGroupReviewed
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository.ReviewHistoryRunRow;
+import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository.ReviewRunRow;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationVisibilityPolicy;
 import de.tum.cit.aet.hephaestus.practices.spi.CurrentDeveloperLookup;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewRunTargetLookup;
@@ -81,7 +81,7 @@ public class PracticeGroupReviewRunService {
         int candidatePage = 0;
         boolean moreCandidates;
         do {
-            Slice<ReviewHistoryRunRow> runs = observationRepository.findPracticeGroupReviewRuns(
+            Slice<ReviewRunRow> runs = observationRepository.findPracticeGroupReviewRuns(
                 currentDeveloperId.get(),
                 workspaceContext.id(),
                 groupSlug,
@@ -110,23 +110,21 @@ public class PracticeGroupReviewRunService {
     private List<PracticeGroupReviewRunDTO> toVisibleRuns(
         long workspaceId,
         long developerId,
-        List<ReviewHistoryRunRow> runs,
+        List<ReviewRunRow> runs,
         String groupSlug
     ) {
         if (runs.isEmpty()) {
             return List.of();
         }
 
-        List<UUID> jobIds = runs.stream().map(ReviewHistoryRunRow::getJobId).toList();
+        List<UUID> jobIds = runs.stream().map(ReviewRunRow::getJobId).toList();
         List<Observation> found = observationRepository.findPracticeGroupReviewRunObservations(
             jobIds,
             developerId,
             workspaceId,
             groupSlug
         );
-        // The same gate the practice standing surface applies, for the same reason and with the same purpose: a
-        // observation may cite a source this caller is not cleared to be shown, and a claim measured against
-        // superseded review rules no longer speaks for the practice. Asked once for the whole page.
+        // Use the same delivery-visibility policy as practice standings.
         Set<UUID> visible = visibilityPolicy.permitsAll(
             workspaceId,
             found,
@@ -147,7 +145,7 @@ public class PracticeGroupReviewRunService {
         Map<UUID, ReviewRunTargetLookup.Target> targets = reviewRunTargetLookup.findByJobIds(workspaceId, jobIds);
 
         List<PracticeGroupReviewRunDTO> reviewRuns = new ArrayList<>();
-        for (ReviewHistoryRunRow run : runs) {
+        for (ReviewRunRow run : runs) {
             List<Observation> visibleObservations = observationsByJob.getOrDefault(run.getJobId(), List.of());
             if (!visibleObservations.isEmpty()) {
                 reviewRuns.add(toReviewRun(run, visibleObservations, feedbackByObservation, targets));
@@ -175,7 +173,7 @@ public class PracticeGroupReviewRunService {
     }
 
     private PracticeGroupReviewRunDTO toReviewRun(
-        ReviewHistoryRunRow run,
+        ReviewRunRow run,
         List<Observation> observations,
         Map<UUID, DeliveredFeedbackBinding> feedbackByObservation,
         Map<UUID, ReviewRunTargetLookup.Target> targets

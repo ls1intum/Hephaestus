@@ -1,39 +1,18 @@
-import { Folder, Package, Rocket, ShieldCheck } from "lucide-react";
+import { Folder, Rocket } from "lucide-react";
 import { describe, expect, it } from "vitest";
 import { getGroupVisual, ICON_NAMES, iconLabel, iconSearchText, PILL } from "./group-visuals";
 
 describe("groupVisuals", () => {
-	it("lets an admin-set icon and color override the seeded default", () => {
-		const visual = getGroupVisual(
-			"review-ready-work",
-			"Packaging work for review",
-			"Rocket",
-			"fuchsia",
-		);
+	it("uses an admin-set icon and color", () => {
+		const visual = getGroupVisual("Rocket", "fuchsia");
 		expect(visual.Icon).toBe(Rocket);
 		expect(visual.pill).toBe(PILL.fuchsia);
 	});
 
-	it("ignores an unknown icon name or color key and falls back to the seed", () => {
-		const visual = getGroupVisual(
-			"review-ready-work",
-			"Packaging work for review",
-			"NotAnIcon",
-			"chartreuse",
-		);
-		expect(visual.Icon).toBe(Package);
-		expect(visual.pill).toBe(PILL.sky);
-	});
-
-	it("derives an icon from keywords for an unknown admin-created slug", () => {
-		const security = getGroupVisual("security-hardening", "Security hardening");
-		expect(security.Icon).toBe(ShieldCheck);
-		expect(security.pill).toBe(PILL.red);
-	});
-
-	it("falls back to a neutral folder for a slug with no keyword match", () => {
-		const visual = getGroupVisual("custom-team-group", "Custom team group");
+	it("uses a neutral fallback for missing or unknown values", () => {
+		const visual = getGroupVisual("NotAnIcon", "chartreuse");
 		expect(visual.Icon).toBe(Folder);
+		expect(visual.pill).toBe(PILL.slate);
 	});
 
 	it.each([

@@ -9546,7 +9546,7 @@ export type ListPracticeGroupReviewRunsData = {
         /**
          * Only reviews of these artifact kinds, e.g. scm.pull_request (repeatable)
          */
-        workKinds?: Array<string>;
+        artifactKinds?: Array<string>;
         severities?: Array<'CRITICAL' | 'MAJOR' | 'MINOR' | 'INFO'>;
         /**
          * Zero-based page, at most 100
@@ -9991,7 +9991,7 @@ export type ListObservationsData = {
         /**
          * Only observations on these kinds of reviewed work, e.g. scm.pull_request (repeatable)
          */
-        workKinds?: Array<string>;
+        artifactKinds?: Array<string>;
         /**
          * Only observations with these severities (repeatable); omit for all
          */

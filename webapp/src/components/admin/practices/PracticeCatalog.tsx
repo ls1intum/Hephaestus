@@ -203,7 +203,6 @@ export function PracticeCatalog({
 				onPlaceEntry={onPlacePractice}
 				renderGroupLeading={(group) => (
 					<GroupVisualPicker
-						slug={group.slug}
 						name={group.name}
 						icon={group.icon}
 						color={group.color}

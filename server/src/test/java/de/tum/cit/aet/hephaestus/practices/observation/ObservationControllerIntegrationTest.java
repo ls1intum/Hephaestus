@@ -309,7 +309,7 @@ class ObservationControllerIntegrationTest extends AbstractWorkspaceIntegrationT
 
             webTestClient
                 .get()
-                .uri(BASE_URI + "?workKinds=chat.conversation_thread", workspace.getWorkspaceSlug())
+                .uri(BASE_URI + "?artifactKinds=chat.conversation_thread", workspace.getWorkspaceSlug())
                 .headers(TestAuthUtils.withCurrentUser())
                 .exchange()
                 .expectStatus()

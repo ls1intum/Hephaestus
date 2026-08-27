@@ -38,7 +38,7 @@ public record ObservationFeedFilterParams(
     @Parameter(description = "Only observations on these kinds of reviewed work, e.g. scm.pull_request (repeatable)")
     @RequestParam(required = false)
     @Nullable
-    List<String> workKinds,
+    List<String> artifactKinds,
     @Parameter(description = "Only observations with these severities (repeatable); omit for all")
     @RequestParam(required = false)
     @Nullable
@@ -93,7 +93,7 @@ public record ObservationFeedFilterParams(
             practiceSlug,
             groupSlug,
             presence,
-            QueryFilterSupport.artifactKinds(workKinds),
+            QueryFilterSupport.artifactKinds(artifactKinds),
             severities,
             Objects.requireNonNull(displayableOnly),
             Objects.requireNonNull(sort),

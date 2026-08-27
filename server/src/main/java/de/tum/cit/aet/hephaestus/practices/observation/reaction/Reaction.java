@@ -18,6 +18,7 @@ import jakarta.persistence.Table;
 import jakarta.validation.constraints.NotNull;
 import java.time.Instant;
 import java.util.UUID;
+import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -76,6 +77,12 @@ public class Reaction {
     /** Optional explanation; the database requires one for {@link FeedbackResolution#DISPUTED}. */
     @Column(name = "explanation", columnDefinition = "TEXT")
     private String explanation;
+
+    /** Compatibility mapping for a deprecated column; recurrence is derived from bound observations. */
+    @Deprecated(forRemoval = true)
+    @Getter(AccessLevel.NONE)
+    @Column(name = "recurrence_key", length = 64, insertable = false, updatable = false)
+    private String recurrenceKey;
 
     @NotNull
     @Column(name = "created_at", nullable = false, updatable = false)

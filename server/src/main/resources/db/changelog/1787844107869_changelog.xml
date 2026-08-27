@@ -6,11 +6,12 @@
         http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
 
     <changeSet author="practice-feedback-response" id="1787844107869-1">
-        <preConditions onFail="MARK_RAN" onFailMessage="feedback response snapshot constraints already applied">
-            <indexExists tableName="reaction" indexName="idx_reaction_correlation"/>
+        <preConditions onFail="MARK_RAN" onFailMessage="feedback response snapshot constraint already applied">
+            <sqlCheck expectedResult="0">
+                SELECT COUNT(*) FROM pg_constraint WHERE conname = 'chk_reaction_response_shape'
+            </sqlCheck>
         </preConditions>
-        <comment>Store each feedback response as a complete snapshot and retire the unused recurrence-key index.</comment>
-        <dropIndex tableName="reaction" indexName="idx_reaction_correlation"/>
+        <comment>Store each feedback response as a complete snapshot.</comment>
         <sql>
             ALTER TABLE reaction
             ADD CONSTRAINT chk_reaction_response_shape CHECK (
@@ -19,9 +20,6 @@
         </sql>
         <rollback>
             <sql>ALTER TABLE reaction DROP CONSTRAINT chk_reaction_response_shape;</sql>
-            <createIndex tableName="reaction" indexName="idx_reaction_correlation">
-                <column name="recurrence_key"/>
-            </createIndex>
         </rollback>
     </changeSet>
     <changeSet author="practice-group-vocabulary" id="1787844107869-2">
@@ -186,15 +184,15 @@
         </rollback>
     </changeSet>
     <changeSet author="practice-feedback-response" id="1787844107869-4">
-        <preConditions onFail="MARK_RAN" onFailMessage="reaction.recurrence_key already removed">
-            <columnExists tableName="reaction" columnName="recurrence_key"/>
+        <preConditions onFail="MARK_RAN" onFailMessage="legacy response recurrence index already removed">
+            <indexExists tableName="reaction" indexName="idx_reaction_correlation"/>
         </preConditions>
-        <comment>Remove the unused response recurrence-key copy.</comment>
-        <dropColumn tableName="reaction" columnName="recurrence_key"/>
+        <comment>Retire the unused response recurrence-key index.</comment>
+        <dropIndex tableName="reaction" indexName="idx_reaction_correlation"/>
         <rollback>
-            <addColumn tableName="reaction">
-                <column name="recurrence_key" type="VARCHAR(64)"/>
-            </addColumn>
+            <createIndex tableName="reaction" indexName="idx_reaction_correlation">
+                <column name="recurrence_key"/>
+            </createIndex>
         </rollback>
     </changeSet>
 </databaseChangeLog>

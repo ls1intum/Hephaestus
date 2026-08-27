@@ -1,4 +1,4 @@
-import { useMutation, useQueries, useQuery } from "@tanstack/react-query";
+import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link, retainSearchParams } from "@tanstack/react-router";
 import { ListChecks } from "lucide-react";
 import { useState } from "react";
@@ -9,9 +9,12 @@ import {
 	getPracticeDefinitionOptionsOptions,
 	getPracticeOptions,
 	listAdoptablePracticesOptions,
+	listAdoptablePracticesQueryKey,
 	listGroupsOptions,
+	listGroupsQueryKey,
 	listPracticeEvidenceOutcomesOptions,
 	listPracticesOptions,
+	listPracticesQueryKey,
 	previewGroupAdoptionOptions,
 	previewPracticeAdoptionOptions,
 } from "@/api/@tanstack/react-query.gen";
@@ -59,8 +62,10 @@ import { DrawerBody } from "@/components/ui/drawer";
 import { practiceCatalogStructureScope } from "@/hooks/practice-catalog-cache";
 import { usePracticeCatalogMutations } from "@/hooks/use-practice-catalog-mutations";
 import { usePracticeEditor } from "@/hooks/use-practice-editor";
+import { isRecord } from "@/lib/is-record";
 import { workspaceAdminHead } from "@/lib/page-title";
 import { problemStatusOf } from "@/lib/problem-detail";
+import { queryOperationId } from "@/lib/query-operation-id";
 import { useSearchState } from "@/lib/search-params";
 
 export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/practices/")({
@@ -80,6 +85,7 @@ function PracticeCatalogRoute() {
 	const [staleLevelKey, setStaleLevelKey] = useState<string | null>(null);
 	const catalog = usePracticeCatalogMutations(workspaceSlug);
 	const editor = usePracticeEditor(workspaceSlug);
+	const queryClient = useQueryClient();
 
 	// Every open level owns its own preview query, keyed by that level's slug. Sharing one query per
 	// kind would let `?detail=practice:a&detail=practice:b` show a's definition while adding b.
@@ -153,21 +159,30 @@ function PracticeCatalogRoute() {
 		return tagged?.kind === "practice" ? tagged.data : undefined;
 	};
 
-	const refreshCatalog = () =>
+	const invalidateCatalogQueries = () =>
 		Promise.all([
-			groupsQuery.refetch(),
-			practicesQuery.refetch(),
-			catalogQuery.refetch(),
-			// A practice added from inside a group drawer changes what the group behind it would do.
-			...levelQueries
-				.filter((_query, index) => detailStack[index]?.kind === "catalog-group")
-				.map((q) => q.refetch()),
+			queryClient.invalidateQueries({
+				queryKey: listGroupsQueryKey({ path: { workspaceSlug } }),
+			}),
+			queryClient.invalidateQueries({
+				queryKey: listPracticesQueryKey({ path: { workspaceSlug } }),
+			}),
+			queryClient.invalidateQueries({
+				queryKey: listAdoptablePracticesQueryKey({ path: { workspaceSlug } }),
+			}),
+			queryClient.invalidateQueries({
+				predicate: ({ queryKey }) => {
+					if (queryOperationId(queryKey) !== "previewGroupAdoption") return false;
+					const [key] = queryKey;
+					return isRecord(key) && isRecord(key.path) && key.path.workspaceSlug === workspaceSlug;
+				},
+			}),
 		]);
 	const adoptCatalogGroup = useMutation({
 		...adoptGroupMutation(),
 		onSuccess: async (result) => {
 			stackControls.close(0);
-			await refreshCatalog();
+			await invalidateCatalogQueries();
 			const changes = [
 				result.added.length > 0 && `${result.added.length} added`,
 				result.moved.length > 0 && `${result.moved.length} moved`,
@@ -194,12 +209,12 @@ function PracticeCatalogRoute() {
 				headers: { "If-Match": preview.etag },
 			});
 			stackControls.close(depth);
-			await refreshCatalog();
+			await invalidateCatalogQueries();
 			toast.success("Practice added", { description: preview.definition.name });
 		} catch (error) {
 			const status = problemStatusOf(error);
 			if (status === 409) {
-				await refreshCatalog();
+				await invalidateCatalogQueries();
 				toast.info("This practice is already in the workspace");
 				stackControls.close(depth);
 				return;

@@ -69,7 +69,6 @@ export const UnchangedDetailsJustClose: Story = {
 export const EmptyNameCannotBeSubmitted: Story = {
 	play: async () => {
 		await expectSettledVisible(await screen.findByLabelText("Name"));
-		// Refusing up front, rather than closing on submit and discarding a create in progress.
 		await expectGenuinelyDisabled(screen.getByRole("button", { name: "Create" }));
 	},
 };
@@ -81,7 +80,6 @@ export const Pending: Story = {
 	},
 };
 
-/** The verb differs from creating, so the label is not one string with a spinner in front of it. */
 export const SavingAnEdit: Story = {
 	args: { group: reviewReadyGroup, pending: true },
 	play: async () => {
@@ -93,7 +91,6 @@ export const ChoosingAnIcon: Story = {
 	play: async ({ args }) => {
 		await expectSettledVisible(await screen.findByLabelText("Name"));
 		await userEvent.type(screen.getByLabelText("Name"), "Documentation");
-		// The trigger names the group it belongs to, so it stays unambiguous beside the field.
 		await userEvent.click(
 			screen.getByRole("button", { name: "Edit the icon and color for Documentation" }),
 		);

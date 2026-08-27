@@ -14,7 +14,6 @@ import {
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
-import { generateSlug } from "./constants";
 import { GroupVisualPicker } from "./GroupVisualPicker";
 
 export interface GroupDetails {
@@ -100,7 +99,6 @@ function GroupDetailsForm({
 							/>
 							<GroupVisualPicker
 								describedBy={helpId}
-								slug={group?.slug ?? generateSlug(trimmed)}
 								name={trimmed}
 								icon={icon}
 								color={color}
@@ -112,7 +110,8 @@ function GroupDetailsForm({
 							/>
 						</div>
 						<FieldDescription id={helpId}>
-							The icon and color appear on this group's chip. Left alone, both follow the name.
+							The icon and color appear on this group's chip. Groups use a neutral appearance until
+							you choose one.
 						</FieldDescription>
 					</Field>
 				</FieldGroup>

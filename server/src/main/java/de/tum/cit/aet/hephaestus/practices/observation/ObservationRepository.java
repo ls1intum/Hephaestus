@@ -456,7 +456,7 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
             """,
         nativeQuery = true
     )
-    Slice<ReviewHistoryRunRow> findPracticeGroupReviewRuns(
+    Slice<ReviewRunRow> findPracticeGroupReviewRuns(
         @Param("aboutUserId") Long aboutUserId,
         @Param("workspaceId") Long workspaceId,
         @Param("groupSlug") @Nullable String groupSlug,
@@ -495,7 +495,7 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
         @Param("groupSlug") @Nullable String groupSlug
     );
 
-    interface ReviewHistoryRunRow {
+    interface ReviewRunRow {
         UUID getJobId();
         Instant getReviewedAt();
     }

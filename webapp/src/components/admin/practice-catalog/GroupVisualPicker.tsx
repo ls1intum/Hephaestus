@@ -7,8 +7,9 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { cn } from "@/lib/utils";
 import {
 	COLOR_KEYS,
+	DEFAULT_GROUP_COLOR,
+	DEFAULT_GROUP_ICON,
 	getGroupVisual,
-	groupSeed,
 	ICON_NAMES,
 	iconComponent,
 	iconLabel,
@@ -19,7 +20,6 @@ import {
 export interface GroupVisualPickerProps {
 	id?: string;
 	describedBy?: string;
-	slug: string;
 	name: string;
 	icon?: string | null;
 	color?: string | null;
@@ -30,17 +30,15 @@ export interface GroupVisualPickerProps {
 export function GroupVisualPicker({
 	id,
 	describedBy,
-	slug,
 	name,
 	icon,
 	color,
 	onChange,
 	disabled,
 }: GroupVisualPickerProps) {
-	const seed = groupSeed(slug, name);
-	const activeIcon = icon ?? seed.icon;
-	const activeColor = color ?? seed.color;
-	const { Icon: EffectiveIcon, pill } = getGroupVisual(slug, name, icon, color);
+	const activeIcon = icon ?? DEFAULT_GROUP_ICON;
+	const activeColor = color ?? DEFAULT_GROUP_COLOR;
+	const { Icon: EffectiveIcon, pill } = getGroupVisual(icon, color);
 	const [query, setQuery] = useState("");
 	const [open, setOpen] = useState(false);
 	const colorLabelId = useId();
@@ -59,7 +57,7 @@ export function GroupVisualPicker({
 						size="icon-sm"
 						disabled={disabled}
 						aria-describedby={describedBy}
-						aria-label={id ? undefined : `Edit the icon and color for ${name}`}
+						aria-label={id ? undefined : `Edit the icon and color for ${name || "practice group"}`}
 					>
 						<span className={cn("flex size-6 items-center justify-center rounded-md", pill)}>
 							<EffectiveIcon className="size-4" aria-hidden="true" />
