@@ -309,6 +309,73 @@ void test("second concurrent prompt returns -32001 turn_already_in_flight", asyn
 	}
 });
 
+void test("prompt on an unopened thread returns -32000", async () => {
+	const runner = spawnRunner();
+	try {
+		await readReady(runner.reader);
+		runner.send({
+			jsonrpc: "2.0",
+			id: "p",
+			method: "prompt",
+			params: { threadId: "66666666-6666-6666-6666-666666666666", text: "hello" },
+		});
+		const error = await readError(runner.reader, "p");
+		assert.equal(error.code, -32000);
+	} finally {
+		await shutdown(runner);
+	}
+});
+
+void test("abort cancels delayed events and permits the next turn", async () => {
+	const runner = spawnRunner({ MENTOR_RUNNER_STUB_DELAY_MS: "100" });
+	const threadId = "77777777-7777-7777-7777-777777777777";
+	try {
+		await readReady(runner.reader);
+		runner.send({ jsonrpc: "2.0", id: "o", method: "open_thread", params: { threadId } });
+		await readResult(runner.reader, "o");
+		runner.send({
+			jsonrpc: "2.0",
+			id: "p1",
+			method: "prompt",
+			params: { threadId, text: "cancel me" },
+		});
+		await readResult(runner.reader, "p1");
+
+		runner.send({ jsonrpc: "2.0", id: "a", method: "abort", params: { threadId } });
+		let abortAcknowledged = false;
+		let terminalSeen = false;
+		while (!abortAcknowledged || !terminalSeen) {
+			const frame = parseFrame(await runner.reader.next());
+			if (frameId(frame) === "a") {
+				assert.ok(isSuccess(frame));
+				assert.ok("aborted" in frame.result);
+				assert.equal(frame.result.aborted, true);
+				abortAcknowledged = true;
+			}
+			if (eventType(frame) === "agent_end") terminalSeen = true;
+		}
+		await assert.rejects(
+			runner.reader.next(250),
+			/timeout/,
+			"cancelled prompt emitted stale events",
+		);
+
+		runner.send({
+			jsonrpc: "2.0",
+			id: "p2",
+			method: "prompt",
+			params: { threadId, text: "continue" },
+		});
+		const accepted = await readResult(runner.reader, "p2");
+		assert.ok("accepted" in accepted);
+		assert.equal(accepted.accepted, true);
+		await readUntil(runner.reader, (frame) => eventType(frame) === "message_update");
+		await readUntil(runner.reader, (frame) => eventType(frame) === "agent_end");
+	} finally {
+		await shutdown(runner);
+	}
+});
+
 void test("forwards only the final attempt after Pi settles", async () => {
 	const runner = spawnRunner({ MENTOR_RUNNER_STUB_RETRY_DELAY_MS: "150" });
 	const threadId = "55555555-5555-5555-5555-555555555555";
