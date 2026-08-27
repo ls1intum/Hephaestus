@@ -43,18 +43,12 @@ interface ComparisonBarProps {
 	label: string;
 	opportunities: number;
 	outcomes: OutcomeVector;
-	muted?: boolean;
 }
 
-function ComparisonBar({ label, opportunities, outcomes, muted }: ComparisonBarProps) {
+function ComparisonBar({ label, opportunities, outcomes }: ComparisonBarProps) {
 	const total = applicable(outcomes);
 	return (
-		<div
-			className={cn(
-				"grid gap-2 sm:grid-cols-[8rem_1fr_auto] sm:items-center",
-				muted && "opacity-65",
-			)}
-		>
+		<div className="grid gap-2 sm:grid-cols-[8rem_1fr_auto] sm:items-center">
 			<p className="text-sm font-medium">{label}</p>
 			<div className="flex h-3 min-w-0 overflow-hidden rounded-full bg-muted" aria-hidden>
 				{total > 0 &&
@@ -142,7 +136,6 @@ export interface PracticeTrendPanelProps {
 	className?: string;
 }
 
-/** Inspectable comparison behind a practice or group direction. */
 export function PracticeTrendPanel({ trend, className }: PracticeTrendPanelProps) {
 	const headingId = useId();
 	const presentation = PRACTICE_TREND_PRESENTATION[trend.direction];
@@ -202,13 +195,11 @@ export function PracticeTrendPanel({ trend, className }: PracticeTrendPanelProps
 								label="Earlier"
 								opportunities={trend.support.previousOpportunities}
 								outcomes={trend.previousOutcomes}
-								muted={trend.direction === "UNCERTAIN"}
 							/>
 							<ComparisonBar
 								label="Latest"
 								opportunities={trend.support.currentOpportunities}
 								outcomes={trend.currentOutcomes}
-								muted={trend.direction === "UNCERTAIN"}
 							/>
 						</div>
 					)}

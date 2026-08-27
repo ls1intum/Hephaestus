@@ -5,22 +5,9 @@ import { type EvidenceLocation, evidenceLineRangeLabel, splitPath } from "./evid
 
 interface EvidenceFileBlockProps {
 	location: EvidenceLocation;
-	/** Collapsed blocks render the header only; the first block of a finding starts open. */
 	defaultOpen?: boolean;
 }
 
-/**
- * One quoted file: its path as a header, its lines below.
- *
- * <p>A citation binds its quote to the exact lines it came from, so the header and the body always describe
- * the same place. A quote that was withheld says so instead of rendering an empty block — a reader can tell
- * a redacted quote from a citation that never carried one.
- *
- * <p>The path truncates in the MIDDLE, never at the end: the file name is the identity a reader scans for,
- * so `src/main/java/…/ReadyAndTraceableHandoff.java` stays readable where a trailing ellipsis would cut the
- * name off. Long code lines scroll inside the block; the line gutter stays pinned so a scrolled line keeps
- * its number.
- */
 export function EvidenceFileBlock({ location, defaultOpen = true }: EvidenceFileBlockProps) {
 	const [isOpen, setIsOpen] = useState(defaultOpen);
 	const { directory, fileName } = splitPath(location.path);
@@ -39,8 +26,6 @@ export function EvidenceFileBlock({ location, defaultOpen = true }: EvidenceFile
 				)}
 			>
 				<FileCodeIcon className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
-				{/* Two spans, not one truncating span: the directory absorbs the overflow so the file name
-				    can never be the part that disappears. */}
 				<span className="flex min-w-0 flex-1 font-mono text-xs" title={location.path}>
 					{directory && <span className="truncate text-muted-foreground">{directory}</span>}
 					<span className="shrink-0 font-medium">{fileName}</span>
@@ -67,17 +52,15 @@ export function EvidenceFileBlock({ location, defaultOpen = true }: EvidenceFile
 			{hasSnippet && isOpen && (
 				<pre
 					id={bodyId}
+					// oxlint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- Keyboard users must be able to scroll this region.
+					tabIndex={0}
 					className="max-h-72 overflow-auto bg-code py-2 font-mono text-xs leading-relaxed"
 				>
 					<code>
 						{lines.map((line, index) => {
 							const lineNumber = firstLineNumber + index;
 							return (
-								<span
-									// Line position IS the identity here; a repeated blank line is not a duplicate row.
-									key={`${bodyId}-${lineNumber}`}
-									className="grid grid-cols-[auto_1fr]"
-								>
+								<span key={`${bodyId}-${lineNumber}`} className="grid grid-cols-[auto_1fr]">
 									<span className="sticky left-0 select-none bg-inherit pe-3 ps-2.5 text-end tabular-nums text-muted-foreground">
 										{lineNumber}
 									</span>

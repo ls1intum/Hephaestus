@@ -7,7 +7,7 @@ const TONE_CLASS = {
 	positive: "text-success",
 	negative: "text-destructive",
 	neutral: "text-muted-foreground",
-	muted: "text-muted-foreground/80",
+	muted: "text-muted-foreground",
 } as const;
 
 export interface PracticeTrendChipProps {
