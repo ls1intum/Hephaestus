@@ -1,9 +1,7 @@
 name: Verify Changesets
 
 on:
-  pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
-    branches: [main]
+  workflow_call:
 
 permissions:
   contents: read
@@ -12,13 +10,12 @@ jobs:
   verify-changesets:
     name: "Verify changesets"
     runs-on: ubuntu-latest
-    # Bots (renovate, dependabot) can't author changesets; maintainers add one
-    # when a dependency bump is user-facing.
-    if: ${{ !github.event.pull_request.draft && github.event.pull_request.user.type != 'Bot' }}
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Setup pnpm + Node.js
         uses: ./.github/actions/setup-pnpm-node
@@ -26,7 +23,11 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile --ignore-scripts
 
-      - name: Check for a changeset
+      - name: Test changeset and version-sync policies
+        run: pnpm run check:changesets
+
+      - name: Check release-note presence
+        if: ${{ !github.event.pull_request.draft && github.event.pull_request.user.type != 'Bot' }}
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |

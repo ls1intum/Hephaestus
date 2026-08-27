@@ -45,11 +45,12 @@ pnpm run check:agents          # Biome format, then oxlint, then both typechecks
 pnpm run check:agents:fix      # Apply every safe fix
 pnpm run check:webapp          # The SPA: Biome format check, then oxlint
 pnpm run typecheck:webapp      # The SPA's typecheck — a separate leg, not part of check:webapp
-pnpm run check                 # Complete local quality gate; every leg also runs in CI
+pnpm run check                 # Complete local quality gate
 ```
 
-Every `pnpm run check` leg also runs in CI. Run it locally before pushing because it fails faster and
-reports the complete local gate in one command.
+Run `pnpm run check` before pushing for the complete local gate. CI distributes those checks across
+required jobs, using path filters where appropriate, and adds builds, generated-file checks, broader
+tests, image checks, and security scans.
 
 IntelliJ and WebStorm are also supported.
 

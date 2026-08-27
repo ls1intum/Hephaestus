@@ -57,6 +57,8 @@ Before any release, code must pass:
 | OpenAPI sync    | Diff check  | Client ↔ Server sync |
 | Java formatting | Spotless + Palantir Java Format | Code style |
 | Java lint       | PMD         | Static analysis      |
+| Java nullness policy | NullAway policy scanner | Rejects suppressed analysis and empty source discovery |
+| Changeset policy | Node test runner + Changesets | Tests release-note and version synchronization rules |
 | Webapp TypeScript | oxlint + Biome (`webapp/biome.jsonc`) + tsc | Lint + format + typecheck |
 | Everything else TypeScript | oxlint (`.oxlintrc.json`) + Biome (`biome.jsonc`) + tsc | oxlint reaches the Bun runtime, its specs, both precompute trees, `scripts/**`, `docs/` and the repo-root config files; Biome formats all of those except `docs/`, which has its own config (`docs/.oxlintrc.json`) and no formatter |
 | Agent runtime   | Bun         | Runner and precompute specs, on the Bun the sandbox ships — CI reads `ARG BUN_VERSION` out of `docker/agents/pi/Dockerfile` rather than hard-coding it, and fails closed if that line is missing |
@@ -118,7 +120,7 @@ Coolify handles PR previews:
 | `ci-security-scan.yml` | Called by cicd.yml    | Dependency scanning (Trivy), secret detection      |
 | `ci-profile.yml` | Weekly, manual | Profiles server integration tests and Spring contexts |
 | `ci-server-clean-reference.yml` | Weekly, manual | Records cold server phases and compares generated JARs |
-| `verify-changesets.yml`| PRs                   | Fails shipped-code PRs that carry no changeset     |
+| `verify-changesets.yml`| Called by cicd.yml    | Tests changeset/version-sync policy and enforces release-note presence |
 | `ci-compose-validate.yml` | PRs, push to main  | Renders the reference and self-host compose stacks so an interpolation or merge break is a red check, not a stranger's bad first boot |
 | `version-pr.yml`       | Push to main          | Maintains the accumulating Version PR (changesets) |
 | `release.yml`          | On CI/CD Success      | Cuts a release when the Version PR merged: tag + GitHub Release, gates production |
@@ -131,18 +133,20 @@ Coolify handles PR previews:
 ```mermaid
 flowchart LR
     accTitle: Continuous integration job dependencies
-    accDescr: Change detection selects quality and test jobs, whose results feed the final continuous integration status gate.
+    accDescr: Required quality, test, changeset, image, and security jobs feed the final continuous integration status gate.
     subgraph cicd.yml
         DC[Detect Changes] --> QG[Quality Gates]
         DC --> TS[Test Suite]
         DC --> DB[Docker Build]
         DC --> SS[Security Scan]
+        CS[Changesets]
     end
 
     QG --> Gate[CI Status Gate]
     TS --> Gate
     DB --> Gate
     SS --> Gate
+    CS --> Gate
 
     Gate -->|All Pass| Release[release.yml]
 ```
@@ -150,7 +154,7 @@ flowchart LR
 The `cicd.yml` workflow:
 
 1. **Detects changes** using `dorny/paths-filter`
-2. **Dispatches sub-workflows** with component-specific flags
+2. **Dispatches required sub-workflows**, using component-specific flags where applicable
 3. **Aggregates results** in the CI Status Gate job
 
 ## 🎯 Performance Optimizations

@@ -13,6 +13,35 @@ export interface JavaSource {
 	readonly content: string;
 }
 
+export function isHandwrittenJavaSource(path: string): boolean {
+	return JAVA_SOURCE.test(path);
+}
+
+export async function discoverJavaSourcePaths(
+	root: string = REPO_ROOT,
+): Promise<readonly string[]> {
+	const { stdout } = await execFileAsync(
+		"git",
+		["ls-files", "-z", "--cached", "--others", "--exclude-standard"],
+		{
+			cwd: root,
+			env: {
+				...process.env,
+				GIT_DIR: undefined,
+				GIT_INDEX_FILE: undefined,
+				GIT_WORK_TREE: undefined,
+			},
+		},
+	);
+	const paths = stdout.split("\0").filter(isHandwrittenJavaSource);
+	if (paths.length === 0) {
+		throw new Error(
+			"No handwritten Java sources found under server/application/src/{main,test}/java; refusing to pass without checking anything.",
+		);
+	}
+	return paths;
+}
+
 function unicodeEscapes(source: string): string {
 	return source.replace(/\\u+([0-9a-fA-F]{4})/g, (_, hex: string) =>
 		String.fromCharCode(Number.parseInt(hex, 16)),
@@ -67,20 +96,11 @@ export function nullnessPolicyViolations(sources: readonly JavaSource[]): readon
 }
 
 async function main(): Promise<void> {
-	const { stdout } = await execFileAsync(
-		"git",
-		["ls-files", "--cached", "--others", "--exclude-standard"],
-		{
-			cwd: REPO_ROOT,
-		},
-	);
-	const paths = stdout.split("\n").filter((path) => JAVA_SOURCE.test(path));
-	const sources = await Promise.all(
-		paths.map(async (path) => ({
-			path,
-			content: await readFile(resolve(REPO_ROOT, path), "utf8"),
-		})),
-	);
+	const paths = await discoverJavaSourcePaths();
+	const sources: JavaSource[] = [];
+	for (const path of paths) {
+		sources.push({ path, content: await readFile(resolve(REPO_ROOT, path), "utf8") });
+	}
 	const suppressed = nullnessPolicyViolations(sources);
 	if (suppressed.length > 0) {
 		throw new Error(
