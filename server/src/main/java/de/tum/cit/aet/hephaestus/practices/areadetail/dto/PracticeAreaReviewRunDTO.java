@@ -7,7 +7,7 @@ import java.util.UUID;
 import org.jspecify.annotations.NonNull;
 
 @Schema(description = "A complete review run in a developer's practice-area history")
-public record PracticeAreaReviewMomentDTO(
+public record PracticeAreaReviewRunDTO(
     @NonNull UUID reviewId,
     @NonNull Instant reviewedAt,
     @NonNull PracticeAreaReviewedWorkDTO reviewedWork,

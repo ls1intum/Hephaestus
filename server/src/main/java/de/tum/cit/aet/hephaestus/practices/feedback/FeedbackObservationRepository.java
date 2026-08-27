@@ -133,7 +133,7 @@ public interface FeedbackObservationRepository extends JpaRepository<FeedbackObs
         String getBody();
     }
 
-    /** Newest delivered piece of feedback that actually carried each observation to this learner. */
+    /** Newest delivered feedback that carried each observation to this developer. */
     @Query(
         value = """
                     SELECT DISTINCT ON (fo.observation_id)
@@ -145,28 +145,33 @@ public interface FeedbackObservationRepository extends JpaRepository<FeedbackObs
                     FROM feedback_observation fo
                     JOIN feedback f ON f.id = fo.feedback_id
                     LEFT JOIN LATERAL (
-                        SELECT
-                            (SELECT r.usefulness FROM reaction r
+                        SELECT u.usefulness,
+                               a.action,
+                               CASE
+                                 WHEN u.explanation IS NULL THEN a.explanation
+                                 WHEN a.explanation IS NULL THEN u.explanation
+                                 WHEN (u.created_at, u.id) > (a.created_at, a.id) THEN u.explanation
+                                 ELSE a.explanation
+                               END AS explanation
+                        FROM (SELECT 1) seed
+                        LEFT JOIN LATERAL (
+                            SELECT r.usefulness, r.explanation, r.created_at, r.id FROM reaction r
                               WHERE r.feedback_id = f.id AND r.reactor_user_id = :recipientUserId
                                 AND r.usefulness IS NOT NULL
             """ +
             ReactionRepository.STILL_SPEAKS +
             """
-                              ORDER BY r.created_at DESC, r.id DESC LIMIT 1) AS usefulness,
-                            (SELECT r.action FROM reaction r
+                              ORDER BY r.created_at DESC, r.id DESC LIMIT 1
+                        ) u ON TRUE
+                        LEFT JOIN LATERAL (
+                            SELECT r.action, r.explanation, r.created_at, r.id FROM reaction r
                               WHERE r.feedback_id = f.id AND r.reactor_user_id = :recipientUserId
                                 AND r.action IS NOT NULL
             """ +
             ReactionRepository.STILL_SPEAKS +
             """
-                              ORDER BY r.created_at DESC, r.id DESC LIMIT 1) AS action,
-                            (SELECT r.explanation FROM reaction r
-                              WHERE r.feedback_id = f.id AND r.reactor_user_id = :recipientUserId
-                                AND r.explanation IS NOT NULL
-            """ +
-            ReactionRepository.STILL_SPEAKS +
-            """
-                      ORDER BY r.created_at DESC, r.id DESC LIMIT 1) AS explanation
+                              ORDER BY r.created_at DESC, r.id DESC LIMIT 1
+                        ) a ON TRUE
             ) response ON TRUE
             WHERE fo.observation_id IN (:observationIds)
               AND f.workspace_id = :workspaceId

@@ -4,8 +4,8 @@ import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.practices.PracticeAreaService;
 import de.tum.cit.aet.hephaestus.practices.areadetail.dto.PracticeAreaReviewHistoryPageDTO;
-import de.tum.cit.aet.hephaestus.practices.areadetail.dto.PracticeAreaReviewMomentDTO;
 import de.tum.cit.aet.hephaestus.practices.areadetail.dto.PracticeAreaReviewObservationDTO;
+import de.tum.cit.aet.hephaestus.practices.areadetail.dto.PracticeAreaReviewRunDTO;
 import de.tum.cit.aet.hephaestus.practices.areadetail.dto.PracticeAreaReviewedWorkDTO;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository.DeliveredFeedbackBinding;
@@ -78,7 +78,7 @@ public class PracticeAreaReviewHistoryService {
 
         int first = Math.multiplyExact(pageable.getPageNumber(), pageable.getPageSize());
         int required = Math.addExact(first, pageable.getPageSize() + 1);
-        List<PracticeAreaReviewMomentDTO> visibleMoments = new ArrayList<>(required);
+        List<PracticeAreaReviewRunDTO> visibleMoments = new ArrayList<>(required);
         int candidatePage = 0;
         boolean moreCandidates;
         do {
@@ -98,7 +98,7 @@ public class PracticeAreaReviewHistoryService {
         } while (visibleMoments.size() < required && moreCandidates);
 
         int end = Math.min(first + pageable.getPageSize(), visibleMoments.size());
-        List<PracticeAreaReviewMomentDTO> content =
+        List<PracticeAreaReviewRunDTO> content =
             first >= visibleMoments.size() ? List.of() : List.copyOf(visibleMoments.subList(first, end));
         return new PracticeAreaReviewHistoryPageDTO(
             content,
@@ -108,7 +108,7 @@ public class PracticeAreaReviewHistoryService {
         );
     }
 
-    private List<PracticeAreaReviewMomentDTO> toVisibleMoments(
+    private List<PracticeAreaReviewRunDTO> toVisibleMoments(
         long workspaceId,
         long developerId,
         List<ReviewHistoryRunRow> runs,
@@ -147,7 +147,7 @@ public class PracticeAreaReviewHistoryService {
         );
         Map<UUID, ReviewRunTargetLookup.Target> targets = reviewRunTargetLookup.findByJobIds(workspaceId, jobIds);
 
-        List<PracticeAreaReviewMomentDTO> moments = new ArrayList<>();
+        List<PracticeAreaReviewRunDTO> moments = new ArrayList<>();
         for (ReviewHistoryRunRow run : runs) {
             List<Observation> visibleObservations = observationsByJob.getOrDefault(run.getJobId(), List.of());
             if (!visibleObservations.isEmpty()) {
@@ -175,7 +175,7 @@ public class PracticeAreaReviewHistoryService {
             .collect(Collectors.toMap(DeliveredFeedbackBinding::getObservationId, Function.identity()));
     }
 
-    private PracticeAreaReviewMomentDTO toMoment(
+    private PracticeAreaReviewRunDTO toMoment(
         ReviewHistoryRunRow run,
         List<Observation> observations,
         Map<UUID, DeliveredFeedbackBinding> feedbackByObservation,
@@ -200,7 +200,7 @@ public class PracticeAreaReviewHistoryService {
                 );
             })
             .toList();
-        return new PracticeAreaReviewMomentDTO(run.getJobId(), run.getReviewedAt(), reviewedWork, reviewObservations);
+        return new PracticeAreaReviewRunDTO(run.getJobId(), run.getReviewedAt(), reviewedWork, reviewObservations);
     }
 
     private @Nullable FeedbackUsefulness usefulness(@Nullable DeliveredFeedbackBinding binding) {

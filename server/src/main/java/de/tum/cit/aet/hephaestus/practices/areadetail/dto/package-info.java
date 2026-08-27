@@ -1,5 +1,5 @@
 /**
- * Projections for one practice area's detail page — the review moments behind its feedback,
+ * Projections for one practice area's detail page — the review runs behind its feedback,
  * flattened to what a screen renders. Nothing outside {@code practices.areadetail} reads them.
  */
 @org.jspecify.annotations.NullMarked

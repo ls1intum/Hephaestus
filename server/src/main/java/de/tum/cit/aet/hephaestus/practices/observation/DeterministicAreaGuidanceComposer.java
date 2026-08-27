@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.practices.observation;
 
-import de.tum.cit.aet.hephaestus.practices.dto.PracticeAreaStatusDTO;
+import de.tum.cit.aet.hephaestus.practices.dto.PracticeAreaStandingDTO;
 import de.tum.cit.aet.hephaestus.practices.observation.dto.ReflectionPracticeDTO;
 import java.util.List;
 import java.util.Objects;
@@ -19,10 +19,10 @@ final class DeterministicAreaGuidanceComposer {
      * Detection criteria never enters this method: {@code whatGoodLooksLike}/{@code whyItMatters} are the
      * catalog's dedicated developer-facing layer.
      */
-    static @Nullable String compose(PracticeAreaStatusDTO.AreaStatus status, List<ReflectionPracticeDTO> cards) {
+    static @Nullable String compose(PracticeAreaStandingDTO.Standing status, List<ReflectionPracticeDTO> cards) {
         // Without a verdict there is nothing to summarise, and inventing encouragement here would state
         // more than the evidence supports. The surface renders its own reason-specific empty copy.
-        if (!PracticeAreaStatusDTO.isVerdict(status)) {
+        if (!PracticeAreaStandingDTO.isVerdict(status)) {
             return null;
         }
 

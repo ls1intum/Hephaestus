@@ -4,9 +4,9 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.List;
 import org.jspecify.annotations.NonNull;
 
-@Schema(description = "A page of visible review moments")
+@Schema(description = "A page of visible review runs")
 public record PracticeAreaReviewHistoryPageDTO(
-    @NonNull List<PracticeAreaReviewMomentDTO> content,
+    @NonNull List<PracticeAreaReviewRunDTO> content,
     int page,
     int size,
     boolean hasNext

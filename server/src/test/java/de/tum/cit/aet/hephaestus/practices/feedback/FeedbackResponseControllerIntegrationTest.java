@@ -19,7 +19,7 @@ import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackResolution;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSource;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackUsefulness;
-import de.tum.cit.aet.hephaestus.practices.feedback.dto.FeedbackEngagementDTO;
+import de.tum.cit.aet.hephaestus.practices.feedback.dto.FeedbackResolutionCountsDTO;
 import de.tum.cit.aet.hephaestus.practices.feedback.dto.FeedbackResponseDTO;
 import de.tum.cit.aet.hephaestus.practices.feedback.dto.FeedbackResponseRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
@@ -57,7 +57,8 @@ class FeedbackResponseControllerIntegrationTest extends AbstractWorkspaceIntegra
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
     private static final String RECURRENCE_KEY = "ck-integration-observation";
     private static final String FEEDBACK_URI = "/workspaces/{workspaceSlug}/practices/feedback/{feedbackId}/response";
-    private static final String ENGAGEMENT_URI = "/workspaces/{workspaceSlug}/practices/feedback/engagement";
+    private static final String RESOLUTION_COUNTS_URI =
+        "/workspaces/{workspaceSlug}/practices/feedback/resolution-counts";
 
     @Autowired
     private WebTestClient webTestClient;
@@ -500,6 +501,19 @@ class FeedbackResponseControllerIntegrationTest extends AbstractWorkspaceIntegra
 
         @Test
         @WithAdminUser
+        void replacingAnAnswerDoesNotKeepItsComment() {
+            submit(new FeedbackResponseRequestDTO(null, FeedbackResolution.DISPUTED, "Actually wrong", null));
+            submit(new FeedbackResponseRequestDTO(null, FeedbackResolution.ADDRESSED, null, null));
+
+            FeedbackResponseDTO response = current();
+
+            assertThat(response).isNotNull();
+            assertThat(response.resolution()).isEqualTo(FeedbackResolution.ADDRESSED);
+            assertThat(response.comment()).isNull();
+        }
+
+        @Test
+        @WithAdminUser
         @DisplayName("withdrawing leaves no answer, and a later one starts clean")
         void withdrawalEndsEverythingBeforeIt() {
             submit(
@@ -569,8 +583,8 @@ class FeedbackResponseControllerIntegrationTest extends AbstractWorkspaceIntegra
 
         @Test
         @WithAdminUser
-        @DisplayName("engagement does not count feedback from other workspaces")
-        void engagementIsScopedToWorkspace() {
+        @DisplayName("resolution counts exclude feedback from other workspaces")
+        void resolutionCountsAreScopedToWorkspace() {
             webTestClient
                 .post()
                 .uri(FEEDBACK_URI, workspace.getWorkspaceSlug(), feedbackUnit.getId())
@@ -585,14 +599,14 @@ class FeedbackResponseControllerIntegrationTest extends AbstractWorkspaceIntegra
             Workspace otherWorkspace = createWorkspace("other-ws", "Other WS", "other-org", AccountType.ORG, owner2);
             ensureWorkspaceMembership(otherWorkspace, adminUser, WorkspaceMembership.WorkspaceRole.ADMIN);
 
-            FeedbackEngagementDTO response = webTestClient
+            FeedbackResolutionCountsDTO response = webTestClient
                 .get()
-                .uri(ENGAGEMENT_URI, otherWorkspace.getWorkspaceSlug())
+                .uri(RESOLUTION_COUNTS_URI, otherWorkspace.getWorkspaceSlug())
                 .headers(TestAuthUtils.withCurrentUser())
                 .exchange()
                 .expectStatus()
                 .isOk()
-                .expectBody(FeedbackEngagementDTO.class)
+                .expectBody(FeedbackResolutionCountsDTO.class)
                 .returnResult()
                 .getResponseBody();
 
@@ -604,19 +618,19 @@ class FeedbackResponseControllerIntegrationTest extends AbstractWorkspaceIntegra
     }
 
     @Nested
-    class GetEngagement {
+    class GetResolutionCounts {
 
         @Test
         @WithAdminUser
         void returnsZerosWhenNoFeedback() {
-            FeedbackEngagementDTO response = webTestClient
+            FeedbackResolutionCountsDTO response = webTestClient
                 .get()
-                .uri(ENGAGEMENT_URI, workspace.getWorkspaceSlug())
+                .uri(RESOLUTION_COUNTS_URI, workspace.getWorkspaceSlug())
                 .headers(TestAuthUtils.withCurrentUser())
                 .exchange()
                 .expectStatus()
                 .isOk()
-                .expectBody(FeedbackEngagementDTO.class)
+                .expectBody(FeedbackResolutionCountsDTO.class)
                 .returnResult()
                 .getResponseBody();
 
@@ -649,14 +663,14 @@ class FeedbackResponseControllerIntegrationTest extends AbstractWorkspaceIntegra
                 .expectStatus()
                 .isCreated();
 
-            FeedbackEngagementDTO response = webTestClient
+            FeedbackResolutionCountsDTO response = webTestClient
                 .get()
-                .uri(ENGAGEMENT_URI, workspace.getWorkspaceSlug())
+                .uri(RESOLUTION_COUNTS_URI, workspace.getWorkspaceSlug())
                 .headers(TestAuthUtils.withCurrentUser())
                 .exchange()
                 .expectStatus()
                 .isOk()
-                .expectBody(FeedbackEngagementDTO.class)
+                .expectBody(FeedbackResolutionCountsDTO.class)
                 .returnResult()
                 .getResponseBody();
 
@@ -705,14 +719,14 @@ class FeedbackResponseControllerIntegrationTest extends AbstractWorkspaceIntegra
                 .expectStatus()
                 .isCreated();
 
-            FeedbackEngagementDTO response = webTestClient
+            FeedbackResolutionCountsDTO response = webTestClient
                 .get()
-                .uri(ENGAGEMENT_URI, workspace.getWorkspaceSlug())
+                .uri(RESOLUTION_COUNTS_URI, workspace.getWorkspaceSlug())
                 .headers(TestAuthUtils.withCurrentUser())
                 .exchange()
                 .expectStatus()
                 .isOk()
-                .expectBody(FeedbackEngagementDTO.class)
+                .expectBody(FeedbackResolutionCountsDTO.class)
                 .returnResult()
                 .getResponseBody();
 

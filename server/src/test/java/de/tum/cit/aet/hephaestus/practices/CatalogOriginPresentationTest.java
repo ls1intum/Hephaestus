@@ -13,7 +13,7 @@ import de.tum.cit.aet.hephaestus.practices.curated.EffectiveCatalog;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeArea;
-import de.tum.cit.aet.hephaestus.practices.observation.PracticeAreaStatusService;
+import de.tum.cit.aet.hephaestus.practices.observation.PracticeAreaStandingService;
 import de.tum.cit.aet.hephaestus.practices.review.WorkspaceReviewDefaults;
 import de.tum.cit.aet.hephaestus.practices.review.WorkspaceReviewDefaultsProvider;
 import de.tum.cit.aet.hephaestus.practices.review.autonomy.AutonomyRollupService;
@@ -128,7 +128,7 @@ class CatalogOriginPresentationTest extends BaseUnitTest {
         when(service.listAreas(CTX, null)).thenReturn(areas);
         PracticeAreaController controller = new PracticeAreaController(
             service,
-            mock(PracticeAreaStatusService.class),
+            mock(PracticeAreaStandingService.class),
             presenter
         );
 

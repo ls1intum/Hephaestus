@@ -5,7 +5,7 @@ import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
-import de.tum.cit.aet.hephaestus.practices.dto.PracticeAreaStatusDTO;
+import de.tum.cit.aet.hephaestus.practices.dto.PracticeAreaStandingDTO;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState;
@@ -37,10 +37,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.web.reactive.server.WebTestClient;
 import tools.jackson.databind.ObjectMapper;
 
-class PracticeAreaStatusIntegrationTest extends AbstractWorkspaceIntegrationTest {
+class PracticeAreaStandingIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
-    private static final String STATUS_URI = "/workspaces/{workspaceSlug}/practice-areas/status";
+    private static final String STANDINGS_URI = "/workspaces/{workspaceSlug}/practice-areas/standings";
 
     private static final String DIFF_EVIDENCE_JSON =
         "{\"citations\":[{\"sourceKind\":\"scm.pull-request.diff\",\"artifactPath\":\"inputs/context/diff.patch\"," +
@@ -79,8 +79,14 @@ class PracticeAreaStatusIntegrationTest extends AbstractWorkspaceIntegrationTest
 
     @BeforeEach
     void setUpWorkspace() {
-        User owner = persistUser("area-status-owner");
-        workspace = createWorkspace("area-status-ws", "Area Status WS", "area-status-org", AccountType.ORG, owner);
+        User owner = persistUser("area-standing-owner");
+        workspace = createWorkspace(
+            "area-standing-ws",
+            "Area Standing WS",
+            "area-standing-org",
+            AccountType.ORG,
+            owner
+        );
 
         developer = persistUser("testuser");
         ensureWorkspaceMembership(workspace, developer, WorkspaceMembership.WorkspaceRole.MEMBER);
@@ -249,7 +255,7 @@ class PracticeAreaStatusIntegrationTest extends AbstractWorkspaceIntegrationTest
     }
 
     @Nested
-    @DisplayName("GET /practice-areas/status")
+    @DisplayName("GET /practice-areas/standings")
     class DerivedStatus {
 
         @Test
@@ -269,7 +275,7 @@ class PracticeAreaStatusIntegrationTest extends AbstractWorkspaceIntegrationTest
 
             webTestClient
                 .get()
-                .uri(STATUS_URI, workspace.getWorkspaceSlug())
+                .uri(STANDINGS_URI, workspace.getWorkspaceSlug())
                 .headers(TestAuthUtils.withCurrentUser())
                 .exchange()
                 .expectStatus()
@@ -279,7 +285,7 @@ class PracticeAreaStatusIntegrationTest extends AbstractWorkspaceIntegrationTest
                 .isEqualTo("code-quality")
                 .jsonPath("$[0].areaName")
                 .isEqualTo("Code Quality")
-                .jsonPath("$[0].status")
+                .jsonPath("$[0].standing")
                 .isEqualTo("DEVELOPING")
                 .jsonPath("$[0].guidance")
                 .isEqualTo("Your recent feedback points to “PR Description Quality” as the next practice to focus on.")
@@ -328,7 +334,7 @@ class PracticeAreaStatusIntegrationTest extends AbstractWorkspaceIntegrationTest
 
             webTestClient
                 .get()
-                .uri(STATUS_URI, workspace.getWorkspaceSlug())
+                .uri(STANDINGS_URI, workspace.getWorkspaceSlug())
                 .headers(TestAuthUtils.withCurrentUser())
                 .exchange()
                 .expectStatus()
@@ -354,13 +360,13 @@ class PracticeAreaStatusIntegrationTest extends AbstractWorkspaceIntegrationTest
 
             webTestClient
                 .get()
-                .uri(STATUS_URI, workspace.getWorkspaceSlug())
+                .uri(STANDINGS_URI, workspace.getWorkspaceSlug())
                 .headers(TestAuthUtils.withCurrentUser())
                 .exchange()
                 .expectStatus()
                 .isOk()
                 .expectBody()
-                .jsonPath("$[0].status")
+                .jsonPath("$[0].standing")
                 .isEqualTo("STRENGTH")
                 .jsonPath("$[0].guidance")
                 .isEqualTo("Your recent feedback shows a strength in “PR Description Quality”. Keep building on it.")
@@ -378,7 +384,7 @@ class PracticeAreaStatusIntegrationTest extends AbstractWorkspaceIntegrationTest
         void shouldReturnNotObservedWithoutObservations() {
             webTestClient
                 .get()
-                .uri(STATUS_URI, workspace.getWorkspaceSlug())
+                .uri(STANDINGS_URI, workspace.getWorkspaceSlug())
                 .headers(TestAuthUtils.withCurrentUser())
                 .exchange()
                 .expectStatus()
@@ -388,7 +394,7 @@ class PracticeAreaStatusIntegrationTest extends AbstractWorkspaceIntegrationTest
                 .isEqualTo("code-quality")
                 .jsonPath("$[0].areaName")
                 .isEqualTo("Code Quality")
-                .jsonPath("$[0].status")
+                .jsonPath("$[0].standing")
                 .isEqualTo("NOT_OBSERVED")
                 .jsonPath("$[0].guidance")
                 .doesNotExist()
@@ -412,7 +418,7 @@ class PracticeAreaStatusIntegrationTest extends AbstractWorkspaceIntegrationTest
 
             webTestClient
                 .get()
-                .uri(STATUS_URI, workspace.getWorkspaceSlug())
+                .uri(STANDINGS_URI, workspace.getWorkspaceSlug())
                 .headers(TestAuthUtils.withCurrentUser())
                 .exchange()
                 .expectStatus()
@@ -420,7 +426,7 @@ class PracticeAreaStatusIntegrationTest extends AbstractWorkspaceIntegrationTest
                 .expectBody()
                 .jsonPath("$[0].areaSlug")
                 .isEqualTo("code-quality")
-                .jsonPath("$[0].status")
+                .jsonPath("$[0].standing")
                 .isEqualTo("NO_OPPORTUNITY")
                 .jsonPath("$[0].guidance")
                 .doesNotExist()
@@ -436,13 +442,13 @@ class PracticeAreaStatusIntegrationTest extends AbstractWorkspaceIntegrationTest
 
             webTestClient
                 .get()
-                .uri(STATUS_URI, workspace.getWorkspaceSlug())
+                .uri(STANDINGS_URI, workspace.getWorkspaceSlug())
                 .headers(TestAuthUtils.withCurrentUser())
                 .exchange()
                 .expectStatus()
                 .isOk()
                 .expectBody()
-                .jsonPath("$[0].status")
+                .jsonPath("$[0].standing")
                 .isEqualTo("NO_OPPORTUNITY");
         }
 
@@ -455,13 +461,13 @@ class PracticeAreaStatusIntegrationTest extends AbstractWorkspaceIntegrationTest
 
             webTestClient
                 .get()
-                .uri(STATUS_URI, workspace.getWorkspaceSlug())
+                .uri(STANDINGS_URI, workspace.getWorkspaceSlug())
                 .headers(TestAuthUtils.withCurrentUser())
                 .exchange()
                 .expectStatus()
                 .isOk()
                 .expectBody()
-                .jsonPath("$[0].status")
+                .jsonPath("$[0].standing")
                 .isEqualTo("DEVELOPING")
                 .jsonPath("$[0].items.length()")
                 .isEqualTo(1);
@@ -475,13 +481,13 @@ class PracticeAreaStatusIntegrationTest extends AbstractWorkspaceIntegrationTest
 
             webTestClient
                 .get()
-                .uri(STATUS_URI, workspace.getWorkspaceSlug())
+                .uri(STANDINGS_URI, workspace.getWorkspaceSlug())
                 .headers(TestAuthUtils.withCurrentUser())
                 .exchange()
                 .expectStatus()
                 .isOk()
                 .expectBody()
-                .jsonPath("$[0].status")
+                .jsonPath("$[0].standing")
                 .isEqualTo("DEVELOPING")
                 .jsonPath("$[0].items.length()")
                 .isEqualTo(1);
@@ -497,13 +503,13 @@ class PracticeAreaStatusIntegrationTest extends AbstractWorkspaceIntegrationTest
 
             webTestClient
                 .get()
-                .uri(STATUS_URI, workspace.getWorkspaceSlug())
+                .uri(STANDINGS_URI, workspace.getWorkspaceSlug())
                 .headers(TestAuthUtils.withCurrentUser())
                 .exchange()
                 .expectStatus()
                 .isOk()
                 .expectBody()
-                .jsonPath("$[0].status")
+                .jsonPath("$[0].standing")
                 .isEqualTo("MIXED")
                 .jsonPath("$[0].guidance")
                 .isEqualTo(
@@ -530,13 +536,13 @@ class PracticeAreaStatusIntegrationTest extends AbstractWorkspaceIntegrationTest
 
             webTestClient
                 .get()
-                .uri(STATUS_URI, workspace.getWorkspaceSlug())
+                .uri(STANDINGS_URI, workspace.getWorkspaceSlug())
                 .headers(TestAuthUtils.withCurrentUser())
                 .exchange()
                 .expectStatus()
                 .isOk()
                 .expectBody()
-                .jsonPath("$[0].status")
+                .jsonPath("$[0].standing")
                 .isEqualTo("STRENGTH");
         }
 
@@ -552,13 +558,13 @@ class PracticeAreaStatusIntegrationTest extends AbstractWorkspaceIntegrationTest
 
             webTestClient
                 .get()
-                .uri(STATUS_URI, workspace.getWorkspaceSlug())
+                .uri(STANDINGS_URI, workspace.getWorkspaceSlug())
                 .headers(TestAuthUtils.withCurrentUser())
                 .exchange()
                 .expectStatus()
                 .isOk()
                 .expectBody()
-                .jsonPath("$[0].status")
+                .jsonPath("$[0].standing")
                 .isEqualTo("MIXED");
         }
 
@@ -571,13 +577,13 @@ class PracticeAreaStatusIntegrationTest extends AbstractWorkspaceIntegrationTest
 
             webTestClient
                 .get()
-                .uri(STATUS_URI, workspace.getWorkspaceSlug())
+                .uri(STANDINGS_URI, workspace.getWorkspaceSlug())
                 .headers(TestAuthUtils.withCurrentUser())
                 .exchange()
                 .expectStatus()
                 .isOk()
                 .expectBody()
-                .jsonPath("$[0].status")
+                .jsonPath("$[0].standing")
                 .isEqualTo("MIXED")
                 .jsonPath("$[0].guidance")
                 .value(String.class, org.hamcrest.Matchers.startsWith("Your recent feedback is mixed in "))
@@ -597,13 +603,13 @@ class PracticeAreaStatusIntegrationTest extends AbstractWorkspaceIntegrationTest
 
             webTestClient
                 .get()
-                .uri(STATUS_URI, workspace.getWorkspaceSlug())
+                .uri(STANDINGS_URI, workspace.getWorkspaceSlug())
                 .headers(TestAuthUtils.withCurrentUser())
                 .exchange()
                 .expectStatus()
                 .isOk()
                 .expectBody()
-                .jsonPath("$[0].status")
+                .jsonPath("$[0].standing")
                 .isEqualTo("MIXED");
         }
 
@@ -619,13 +625,13 @@ class PracticeAreaStatusIntegrationTest extends AbstractWorkspaceIntegrationTest
 
             webTestClient
                 .get()
-                .uri(STATUS_URI, workspace.getWorkspaceSlug())
+                .uri(STANDINGS_URI, workspace.getWorkspaceSlug())
                 .headers(TestAuthUtils.withCurrentUser())
                 .exchange()
                 .expectStatus()
                 .isOk()
                 .expectBody()
-                .jsonPath("$[0].status")
+                .jsonPath("$[0].standing")
                 .isEqualTo("DEVELOPING");
         }
 
@@ -641,7 +647,7 @@ class PracticeAreaStatusIntegrationTest extends AbstractWorkspaceIntegrationTest
 
             webTestClient
                 .get()
-                .uri(STATUS_URI, workspace.getWorkspaceSlug())
+                .uri(STANDINGS_URI, workspace.getWorkspaceSlug())
                 .headers(TestAuthUtils.withCurrentUser())
                 .exchange()
                 .expectStatus()
@@ -665,13 +671,13 @@ class PracticeAreaStatusIntegrationTest extends AbstractWorkspaceIntegrationTest
 
             webTestClient
                 .get()
-                .uri(STATUS_URI, workspace.getWorkspaceSlug())
+                .uri(STANDINGS_URI, workspace.getWorkspaceSlug())
                 .headers(TestAuthUtils.withCurrentUser())
                 .exchange()
                 .expectStatus()
                 .isOk()
                 .expectBody()
-                .jsonPath("$[0].status")
+                .jsonPath("$[0].standing")
                 .isEqualTo("MIXED")
                 .jsonPath("$[0].items.length()")
                 .isEqualTo(5)
@@ -689,13 +695,13 @@ class PracticeAreaStatusIntegrationTest extends AbstractWorkspaceIntegrationTest
 
             webTestClient
                 .get()
-                .uri(STATUS_URI, workspace.getWorkspaceSlug())
+                .uri(STANDINGS_URI, workspace.getWorkspaceSlug())
                 .headers(TestAuthUtils.withCurrentUser())
                 .exchange()
                 .expectStatus()
                 .isOk()
                 .expectBody()
-                .jsonPath("$[0].status")
+                .jsonPath("$[0].standing")
                 .isEqualTo("MIXED")
                 .jsonPath("$[0].direction")
                 .isEqualTo("INSUFFICIENT_EVIDENCE")
@@ -736,13 +742,13 @@ class PracticeAreaStatusIntegrationTest extends AbstractWorkspaceIntegrationTest
 
             webTestClient
                 .get()
-                .uri(STATUS_URI, workspace.getWorkspaceSlug())
+                .uri(STANDINGS_URI, workspace.getWorkspaceSlug())
                 .headers(TestAuthUtils.withCurrentUser())
                 .exchange()
                 .expectStatus()
                 .isOk()
                 .expectBody()
-                .jsonPath("$[0].status")
+                .jsonPath("$[0].standing")
                 .isEqualTo("STRENGTH")
                 .jsonPath("$[0].direction")
                 .isEqualTo("IMPROVING")
@@ -781,13 +787,13 @@ class PracticeAreaStatusIntegrationTest extends AbstractWorkspaceIntegrationTest
 
             webTestClient
                 .get()
-                .uri(STATUS_URI, workspace.getWorkspaceSlug())
+                .uri(STANDINGS_URI, workspace.getWorkspaceSlug())
                 .headers(TestAuthUtils.withCurrentUser())
                 .exchange()
                 .expectStatus()
                 .isOk()
                 .expectBody()
-                .jsonPath("$[0].status")
+                .jsonPath("$[0].standing")
                 .isEqualTo("DEVELOPING")
                 .jsonPath("$[0].direction")
                 .isEqualTo("DECLINING");
@@ -815,13 +821,13 @@ class PracticeAreaStatusIntegrationTest extends AbstractWorkspaceIntegrationTest
 
             webTestClient
                 .get()
-                .uri(STATUS_URI, workspace.getWorkspaceSlug())
+                .uri(STANDINGS_URI, workspace.getWorkspaceSlug())
                 .headers(TestAuthUtils.withCurrentUser())
                 .exchange()
                 .expectStatus()
                 .isOk()
                 .expectBody()
-                .jsonPath("$[0].status")
+                .jsonPath("$[0].standing")
                 .isEqualTo("MIXED")
                 .jsonPath("$[0].items.length()")
                 .isEqualTo(2)
@@ -840,13 +846,13 @@ class PracticeAreaStatusIntegrationTest extends AbstractWorkspaceIntegrationTest
 
             webTestClient
                 .get()
-                .uri(STATUS_URI, workspace.getWorkspaceSlug())
+                .uri(STANDINGS_URI, workspace.getWorkspaceSlug())
                 .headers(TestAuthUtils.withCurrentUser())
                 .exchange()
                 .expectStatus()
                 .isOk()
                 .expectBody()
-                .jsonPath("$[0].status")
+                .jsonPath("$[0].standing")
                 .isEqualTo("STRENGTH")
                 .jsonPath("$[0].items.length()")
                 .isEqualTo(1)
@@ -866,13 +872,13 @@ class PracticeAreaStatusIntegrationTest extends AbstractWorkspaceIntegrationTest
 
             webTestClient
                 .get()
-                .uri(STATUS_URI, workspace.getWorkspaceSlug())
+                .uri(STANDINGS_URI, workspace.getWorkspaceSlug())
                 .headers(TestAuthUtils.withCurrentUser())
                 .exchange()
                 .expectStatus()
                 .isOk()
                 .expectBody()
-                .jsonPath("$[0].status")
+                .jsonPath("$[0].standing")
                 .isEqualTo("DEVELOPING")
                 .jsonPath("$[0].items.length()")
                 .isEqualTo(1)
@@ -889,9 +895,9 @@ class PracticeAreaStatusIntegrationTest extends AbstractWorkspaceIntegrationTest
 
             User otherOwner = persistUser("other-ws-owner");
             Workspace otherWorkspace = createWorkspace(
-                "other-status-ws",
+                "other-standing-ws",
                 "Other WS",
-                "other-status-org",
+                "other-standing-org",
                 AccountType.ORG,
                 otherOwner
             );
@@ -902,13 +908,13 @@ class PracticeAreaStatusIntegrationTest extends AbstractWorkspaceIntegrationTest
 
             webTestClient
                 .get()
-                .uri(STATUS_URI, workspace.getWorkspaceSlug())
+                .uri(STANDINGS_URI, workspace.getWorkspaceSlug())
                 .headers(TestAuthUtils.withCurrentUser())
                 .exchange()
                 .expectStatus()
                 .isOk()
                 .expectBody()
-                .jsonPath("$[0].status")
+                .jsonPath("$[0].standing")
                 .isEqualTo("NOT_OBSERVED")
                 .jsonPath("$[0].items.length()")
                 .isEqualTo(0);
@@ -923,7 +929,7 @@ class PracticeAreaStatusIntegrationTest extends AbstractWorkspaceIntegrationTest
 
             webTestClient
                 .get()
-                .uri(STATUS_URI, workspace.getWorkspaceSlug())
+                .uri(STANDINGS_URI, workspace.getWorkspaceSlug())
                 .headers(TestAuthUtils.withCurrentUser())
                 .exchange()
                 .expectStatus()
@@ -938,7 +944,7 @@ class PracticeAreaStatusIntegrationTest extends AbstractWorkspaceIntegrationTest
         void shouldReturnUnauthorized() {
             webTestClient
                 .get()
-                .uri(STATUS_URI, workspace.getWorkspaceSlug())
+                .uri(STANDINGS_URI, workspace.getWorkspaceSlug())
                 .exchange()
                 .expectStatus()
                 .isUnauthorized();

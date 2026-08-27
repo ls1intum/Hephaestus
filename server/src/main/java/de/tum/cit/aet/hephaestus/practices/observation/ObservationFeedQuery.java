@@ -12,7 +12,7 @@ import org.jspecify.annotations.Nullable;
  *
  * <p>Distinct from {@link ObservationQueryFilter}, which is the admin/cross-developer query shape with
  * multi-valued facets. This record is the single-developer feed: at most one practice, one area, one
- * presence, plus the repeatable artifact-kind and severity facets the learner surfaces expose.
+ * presence, plus the repeatable artifact-kind and severity facets the developer surfaces expose.
  *
  * @param mostSevereFirst only meaningful when {@code sort} is {@code SEVERITY}; the date sort carries its
  *     direction on the {@code Pageable} instead

@@ -3,7 +3,7 @@ package de.tum.cit.aet.hephaestus.practices.observation;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
-import de.tum.cit.aet.hephaestus.practices.dto.PracticeAreaStatusDTO;
+import de.tum.cit.aet.hephaestus.practices.dto.PracticeAreaStandingDTO;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.ObservationOrigin;
 import de.tum.cit.aet.hephaestus.practices.model.ObservationOutcome;
@@ -32,7 +32,7 @@ class DeterministicAreaGuidanceComposerTest {
         );
 
         String guidance = DeterministicAreaGuidanceComposer.compose(
-            PracticeAreaStatusDTO.AreaStatus.DEVELOPING,
+            PracticeAreaStandingDTO.Standing.DEVELOPING,
             List.of(gap)
         );
 
@@ -48,7 +48,7 @@ class DeterministicAreaGuidanceComposerTest {
         ReflectionPracticeDTO gap = card("tests", "Test Coverage", null, null, List.of(item()), List.of());
 
         String guidance = DeterministicAreaGuidanceComposer.compose(
-            PracticeAreaStatusDTO.AreaStatus.MIXED,
+            PracticeAreaStandingDTO.Standing.MIXED,
             List.of(gap, strength)
         );
 
@@ -76,7 +76,7 @@ class DeterministicAreaGuidanceComposerTest {
         );
 
         String guidance = DeterministicAreaGuidanceComposer.compose(
-            PracticeAreaStatusDTO.AreaStatus.STRENGTH,
+            PracticeAreaStandingDTO.Standing.STRENGTH,
             List.of(fixed)
         );
 
@@ -86,8 +86,8 @@ class DeterministicAreaGuidanceComposerTest {
     }
 
     @ParameterizedTest
-    @EnumSource(value = PracticeAreaStatusDTO.AreaStatus.class, names = { "NOT_OBSERVED", "NO_OPPORTUNITY" })
-    void shouldReturnNoGuidanceForEveryNonVerdictStatus(PracticeAreaStatusDTO.AreaStatus status) {
+    @EnumSource(value = PracticeAreaStandingDTO.Standing.class, names = { "NOT_OBSERVED", "NO_OPPORTUNITY" })
+    void shouldReturnNoGuidanceForEveryNonVerdictStatus(PracticeAreaStandingDTO.Standing status) {
         assertThat(DeterministicAreaGuidanceComposer.compose(status, List.of())).isNull();
     }
 
@@ -107,7 +107,7 @@ class DeterministicAreaGuidanceComposerTest {
         );
 
         String guidance = DeterministicAreaGuidanceComposer.compose(
-            PracticeAreaStatusDTO.AreaStatus.DEVELOPING,
+            PracticeAreaStandingDTO.Standing.DEVELOPING,
             List.of(gap)
         );
 

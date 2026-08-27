@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.practices.feedback;
 
-import de.tum.cit.aet.hephaestus.practices.feedback.dto.FeedbackEngagementDTO;
+import de.tum.cit.aet.hephaestus.practices.feedback.dto.FeedbackResolutionCountsDTO;
 import de.tum.cit.aet.hephaestus.practices.feedback.dto.FeedbackResponseDTO;
 import de.tum.cit.aet.hephaestus.practices.feedback.dto.FeedbackResponseRequestDTO;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
@@ -70,9 +70,9 @@ public class FeedbackResponseController {
             .orElseGet(() -> ResponseEntity.noContent().build());
     }
 
-    @GetMapping("/engagement")
-    @Operation(operationId = "getFeedbackEngagement", summary = "Get feedback resolution counts")
-    public ResponseEntity<FeedbackEngagementDTO> engagement(WorkspaceContext workspaceContext) {
-        return ResponseEntity.ok(responseService.getEngagement(workspaceContext));
+    @GetMapping("/resolution-counts")
+    @Operation(operationId = "getFeedbackResolutionCounts", summary = "Get feedback resolution counts")
+    public ResponseEntity<FeedbackResolutionCountsDTO> resolutionCounts(WorkspaceContext workspaceContext) {
+        return ResponseEntity.ok(responseService.getResolutionCounts(workspaceContext));
     }
 }

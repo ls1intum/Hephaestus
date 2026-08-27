@@ -54,38 +54,39 @@ public interface ReactionRepository extends JpaRepository<Reaction, UUID> {
      * <p>Two independent lookups rather than one row: someone who rated a unit helpful and later disputed it
      * said both things, and the newest row alone would report only the second. Returns no row at all when
      * they have said nothing, or nothing since their last withdrawal.
+     * A comment survives only with a dimension whose current value came from the same row; replacing that
+     * value also replaces its comment.
      */
     @Query(
         value = """
-            SELECT
-                (SELECT r.usefulness FROM reaction r
+            SELECT u.usefulness AS "usefulness",
+                   a.action AS "resolution",
+                   CASE
+                     WHEN u.explanation IS NULL THEN a.explanation
+                     WHEN a.explanation IS NULL THEN u.explanation
+                     WHEN (u.created_at, u.id) > (a.created_at, a.id) THEN u.explanation
+                     ELSE a.explanation
+                   END AS "comment",
+                   GREATEST(u.created_at, a.created_at) AS "respondedAt"
+            FROM (SELECT 1) seed
+            LEFT JOIN LATERAL (
+                SELECT r.usefulness, r.explanation, r.created_at, r.id FROM reaction r
                   WHERE r.feedback_id = :feedbackId AND r.reactor_user_id = :reactorUserId
                     AND r.usefulness IS NOT NULL
             """ +
             STILL_SPEAKS +
             """
-                  ORDER BY r.created_at DESC, r.id DESC LIMIT 1) AS "usefulness",
-                (SELECT r.action FROM reaction r
+                  ORDER BY r.created_at DESC, r.id DESC LIMIT 1
+            ) u ON TRUE
+            LEFT JOIN LATERAL (
+                SELECT r.action, r.explanation, r.created_at, r.id FROM reaction r
                   WHERE r.feedback_id = :feedbackId AND r.reactor_user_id = :reactorUserId
                     AND r.action IS NOT NULL
             """ +
             STILL_SPEAKS +
             """
-                  ORDER BY r.created_at DESC, r.id DESC LIMIT 1) AS "resolution",
-                (SELECT r.explanation FROM reaction r
-                  WHERE r.feedback_id = :feedbackId AND r.reactor_user_id = :reactorUserId
-                    AND r.explanation IS NOT NULL
-            """ +
-            STILL_SPEAKS +
-            """
-                  ORDER BY r.created_at DESC, r.id DESC LIMIT 1) AS "comment",
-                (SELECT MAX(r.created_at) FROM reaction r
-                  WHERE r.feedback_id = :feedbackId AND r.reactor_user_id = :reactorUserId
-                    AND (r.usefulness IS NOT NULL OR r.action IS NOT NULL)
-            """ +
-            STILL_SPEAKS +
-            """
-                ) AS "respondedAt"
+                  ORDER BY r.created_at DESC, r.id DESC LIMIT 1
+            ) a ON TRUE
             """,
         nativeQuery = true
     )
@@ -157,7 +158,7 @@ public interface ReactionRepository extends JpaRepository<Reaction, UUID> {
     }
 
     /**
-     * Engagement statistics: how many pieces of feedback the developer currently resolves each way, scoped to a
+     * Resolution counts: how many pieces of feedback the developer currently resolves each way, scoped to a
      * workspace through the feedback → workspace relationship.
      *
      * <p>Counts units, not rows. A developer who changed their mind appended a second row, and counting both
@@ -191,7 +192,7 @@ public interface ReactionRepository extends JpaRepository<Reaction, UUID> {
     );
 
     /**
-     * Projection for reaction action counts used in engagement statistics. {@code action} is the stored enum
+     * Projection for reaction action counts used in resolution counts. {@code action} is the stored enum
      * STRING (the native query selects the raw column); the caller maps it back via {@code FeedbackResolution}.
      */
     interface ActionCountProjection {

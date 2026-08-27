@@ -4105,13 +4105,13 @@ paths:
       summary: Reorder practice areas
       tags:
       - Practice Areas
-  /workspaces/{workspaceSlug}/practice-areas/status:
+  /workspaces/{workspaceSlug}/practice-areas/standings:
     get:
       description: "Aggregates the authenticated developer's latest-run observations\
-        \ across every active practice area into qualitative statuses, with supporting\
-        \ feedback attached so each status stays traceable to real feedback. Without\
-        \ a displayable observation the status reports why: NOT_OBSERVED or NO_OPPORTUNITY."
-      operationId: getPracticeAreaStatuses
+        \ across every active practice area into qualitative standings, with supporting\
+        \ feedback attached so each standing stays traceable to real feedback. Without\
+        \ a displayable observation the standing reports why: NOT_OBSERVED or NO_OPPORTUNITY."
+      operationId: getPracticeAreaStandings
       parameters:
       - description: Workspace slug
         in: path
@@ -4127,10 +4127,10 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: "#/components/schemas/PracticeAreaStatus"
-          description: Active-area statuses returned
+                  $ref: "#/components/schemas/PracticeAreaStanding"
+          description: Active-area standings returned
       security: []
-      summary: Derived practice-area statuses for the current developer
+      summary: Derived practice-area standings for the current developer
       tags:
       - Practice Areas
   /workspaces/{workspaceSlug}/practice-areas/{areaSlug}:
@@ -4332,7 +4332,7 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/PracticeAreaReviewHistoryPage"
-          description: Paginated review moments returned
+          description: Paginated review runs returned
         "400":
           content:
             application/problem+json:
@@ -4342,14 +4342,14 @@ paths:
         "404":
           description: Practice area not found
       security: []
-      summary: List complete review moments for a practice area
+      summary: List complete review runs for a practice area
       tags:
       - Practice Area Detail
   /workspaces/{workspaceSlug}/practice-areas/{areaSlug}/trend:
     get:
       description: Returns the area direction and every eligible practice direction
         with inspectable support.
-      operationId: listPracticeAreaTrend
+      operationId: getPracticeAreaTrend
       parameters:
       - description: Workspace slug
         in: path
@@ -4846,27 +4846,6 @@ paths:
       summary: Read practice definition options
       tags:
       - Practice Catalog
-  /workspaces/{workspaceSlug}/practices/feedback/engagement:
-    get:
-      operationId: getFeedbackEngagement
-      parameters:
-      - description: Workspace slug
-        in: path
-        name: workspaceSlug
-        required: true
-        schema:
-          type: string
-          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/FeedbackEngagement"
-          description: OK
-      summary: Get feedback resolution counts
-      tags:
-      - Feedback Response
   /workspaces/{workspaceSlug}/practices/feedback/in-app:
     get:
       description: "Process-level messages prepared for the authenticated developer:\
@@ -4897,6 +4876,27 @@ paths:
       summary: The current developer's in-app feedback
       tags:
       - In-App Feedback
+  /workspaces/{workspaceSlug}/practices/feedback/resolution-counts:
+    get:
+      operationId: getFeedbackResolutionCounts
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FeedbackResolutionCounts"
+          description: OK
+      summary: Get feedback resolution counts
+      tags:
+      - Feedback Response
   /workspaces/{workspaceSlug}/practices/feedback/{feedbackId}/response:
     get:
       operationId: getFeedbackResponse
@@ -9689,7 +9689,7 @@ components:
           - DUPLICATE
           - INAPPROPRIATE_PLACEMENT
           - OTHER
-    FeedbackEngagement:
+    FeedbackResolutionCounts:
       type: object
       description: Feedback resolution counts for the current developer
       properties:
@@ -11364,12 +11364,12 @@ components:
       - visibleInPracticeDashboards
     PracticeAreaReviewHistoryPage:
       type: object
-      description: A page of visible review moments
+      description: A page of visible review runs
       properties:
         content:
           type: array
           items:
-            $ref: "#/components/schemas/PracticeAreaReviewMoment"
+            $ref: "#/components/schemas/PracticeAreaReviewRun"
         hasNext:
           type: boolean
         page:
@@ -11380,30 +11380,9 @@ components:
           format: int32
       required:
       - content
-    PracticeAreaReviewMoment:
-      type: object
-      description: A complete review run in a developer's practice-area history
-      properties:
-        observations:
-          type: array
-          items:
-            $ref: "#/components/schemas/PracticeAreaReviewObservation"
-        reviewId:
-          type: string
-          format: uuid
-        reviewedAt:
-          type: string
-          format: date-time
-        reviewedWork:
-          $ref: "#/components/schemas/PracticeAreaReviewedWork"
-      required:
-      - observations
-      - reviewId
-      - reviewedAt
-      - reviewedWork
     PracticeAreaReviewObservation:
       type: object
-      description: "One concrete, evidence-backed result inside a review moment"
+      description: "One concrete, evidence-backed observation from a review run"
       properties:
         assessment:
           type: string
@@ -11459,9 +11438,30 @@ components:
       - practiceSlug
       - presence
       - title
+    PracticeAreaReviewRun:
+      type: object
+      description: A complete review run in a developer's practice-area history
+      properties:
+        observations:
+          type: array
+          items:
+            $ref: "#/components/schemas/PracticeAreaReviewObservation"
+        reviewId:
+          type: string
+          format: uuid
+        reviewedAt:
+          type: string
+          format: date-time
+        reviewedWork:
+          $ref: "#/components/schemas/PracticeAreaReviewedWork"
+      required:
+      - observations
+      - reviewId
+      - reviewedAt
+      - reviewedWork
     PracticeAreaReviewedWork:
       type: object
-      description: The work assessed in a developer-facing review moment
+      description: The work assessed in a developer-facing review run
       properties:
         channelName:
           type: string
@@ -11489,7 +11489,7 @@ components:
       required:
       - id
       - type
-    PracticeAreaStatus:
+    PracticeAreaStanding:
       type: object
       description: A developer's derived qualitative standing for one Area including
         1<=n<many practices
@@ -11522,9 +11522,8 @@ components:
         guidance:
           type: string
           description: "Developer guidance aggregated from the area's feedback (null\
-            \ unless the status is a verdict). The deterministic summary combines\
-            \ standing, next focus, and developer-facing catalog guidance; the same\
-            \ field carries AI-aggregated guidance when a provider supplies it."
+            \ unless the standing is a verdict). The deterministic summary combines\
+            \ standing, next focus, and developer-facing catalog guidance."
         guidanceSource:
           type: string
           description: How the guidance text was produced (null when there is no guidance)
@@ -11542,9 +11541,9 @@ components:
             \ (provenance, not a score); empty without a verdict"
           items:
             $ref: "#/components/schemas/FeedbackSourceCount"
-        status:
+        standing:
           type: string
-          description: Derived qualitative status across the area's practices
+          description: Derived qualitative standing across the area's practices
           enum:
           - DEVELOPING
           - STRENGTH
@@ -11559,7 +11558,7 @@ components:
       - areaSlug
       - items
       - sources
-      - status
+      - standing
     PracticeAreaTrend:
       type: object
       properties:

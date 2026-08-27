@@ -7,7 +7,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
-import de.tum.cit.aet.hephaestus.practices.feedback.dto.FeedbackEngagementDTO;
+import de.tum.cit.aet.hephaestus.practices.feedback.dto.FeedbackResolutionCountsDTO;
 import de.tum.cit.aet.hephaestus.practices.feedback.dto.FeedbackResponseDTO;
 import de.tum.cit.aet.hephaestus.practices.feedback.dto.FeedbackResponseRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.observation.reaction.Reaction;
@@ -369,14 +369,14 @@ class FeedbackResponseServiceTest extends BaseUnitTest {
     }
 
     @Nested
-    class GetEngagement {
+    class GetResolutionCounts {
 
         @Test
         @DisplayName("counts zero for a signed-in non-developer instead of failing")
         void returnsZeroesForACallerWhoIsNotASyncedDeveloper() {
             when(currentDeveloperLookup.currentDeveloperId()).thenReturn(Optional.empty());
 
-            FeedbackEngagementDTO result = service.getEngagement(workspaceContext);
+            FeedbackResolutionCountsDTO result = service.getResolutionCounts(workspaceContext);
 
             assertThat(result.addressed()).isZero();
             assertThat(result.disputed()).isZero();
@@ -412,7 +412,7 @@ class FeedbackResponseServiceTest extends BaseUnitTest {
                 List.of(addressedProjection, disputedProjection)
             );
 
-            FeedbackEngagementDTO result = service.getEngagement(workspaceContext);
+            FeedbackResolutionCountsDTO result = service.getResolutionCounts(workspaceContext);
 
             assertThat(result.addressed()).isEqualTo(3L);
             assertThat(result.disputed()).isEqualTo(1L);
@@ -426,7 +426,7 @@ class FeedbackResponseServiceTest extends BaseUnitTest {
                 List.of()
             );
 
-            FeedbackEngagementDTO result = service.getEngagement(workspaceContext);
+            FeedbackResolutionCountsDTO result = service.getResolutionCounts(workspaceContext);
 
             assertThat(result.addressed()).isZero();
             assertThat(result.disputed()).isZero();

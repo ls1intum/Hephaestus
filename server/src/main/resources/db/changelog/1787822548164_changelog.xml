@@ -18,12 +18,17 @@
         <sql>
             ALTER TABLE reaction
             ADD CONSTRAINT chk_reaction_usefulness CHECK (usefulness IN ('HELPFUL', 'UNHELPFUL'));
+            ALTER TABLE reaction
+            ADD CONSTRAINT chk_reaction_response_shape CHECK (
+                usefulness IS NOT NULL OR action IS NOT NULL OR explanation IS NULL
+            );
         </sql>
         <rollback>
             <sql>
                 DELETE FROM reaction WHERE action IS NULL;
             </sql>
             <sql>ALTER TABLE reaction DROP CONSTRAINT chk_reaction_usefulness;</sql>
+            <sql>ALTER TABLE reaction DROP CONSTRAINT chk_reaction_response_shape;</sql>
             <createIndex tableName="reaction" indexName="idx_reaction_correlation">
                 <column name="recurrence_key"/>
             </createIndex>

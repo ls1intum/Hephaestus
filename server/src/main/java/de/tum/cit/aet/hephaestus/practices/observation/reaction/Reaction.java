@@ -63,7 +63,7 @@ import org.jspecify.annotations.Nullable;
 @Table(
     name = "reaction",
     indexes = {
-        // Per-developer engagement timeline (most-recent first).
+        // Per-developer response timeline (most-recent first).
         @Index(name = "idx_reaction_reactor_created", columnList = "reactor_user_id, created_at DESC"),
         // Resolve the latest reaction for a given (feedback, reactor) — the "current state" lookup.
         @Index(name = "idx_reaction_feedback_reactor", columnList = "feedback_id, reactor_user_id, created_at DESC"),

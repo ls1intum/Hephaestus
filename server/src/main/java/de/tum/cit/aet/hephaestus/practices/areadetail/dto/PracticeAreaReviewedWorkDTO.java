@@ -7,7 +7,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
-@Schema(description = "The work assessed in a developer-facing review moment")
+@Schema(description = "The work assessed in a developer-facing review run")
 public record PracticeAreaReviewedWorkDTO(
     @NonNull ArtifactKind type,
     @NonNull Long id,

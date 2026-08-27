@@ -86,7 +86,7 @@ also accepts an independent, optional `usefulness` answer:
 ```
 POST /workspaces/{workspaceSlug}/practices/feedback/{feedbackId}/response
 GET  /workspaces/{workspaceSlug}/practices/feedback/{feedbackId}/response
-GET  /workspaces/{workspaceSlug}/practices/feedback/engagement
+GET  /workspaces/{workspaceSlug}/practices/feedback/resolution-counts
 ```
 
 The request body carries `usefulness` (`HELPFUL` / `UNHELPFUL`), `resolution` (`ADDRESSED` /

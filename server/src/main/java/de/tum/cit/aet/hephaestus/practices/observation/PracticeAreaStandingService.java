@@ -2,7 +2,7 @@ package de.tum.cit.aet.hephaestus.practices.observation;
 
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.practices.dto.FeedbackSourceCountDTO;
-import de.tum.cit.aet.hephaestus.practices.dto.PracticeAreaStatusDTO;
+import de.tum.cit.aet.hephaestus.practices.dto.PracticeAreaStandingDTO;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeArea;
 import de.tum.cit.aet.hephaestus.practices.observation.dto.ReflectionItemDTO;
@@ -34,7 +34,7 @@ import org.springframework.transaction.annotation.Transactional;
 /** Builds the current developer's qualitative standing for every active practice area. */
 @Service
 @RequiredArgsConstructor
-public class PracticeAreaStatusService {
+public class PracticeAreaStandingService {
 
     /** Evidence cap: enough to make a status inspectable, not an exhaustive log. */
     private static final int MAX_AREA_EVIDENCE_ITEMS = 5;
@@ -44,15 +44,15 @@ public class PracticeAreaStatusService {
     private final Clock clock;
 
     /**
-     * One status per requested group, rolled up from the practice standings of the same developer snapshot
+     * One standing per requested area, rolled up from the practice standings of the same developer snapshot
      * the per-practice surface renders. Observations are loaded once and partitioned in memory rather than
      * queried per card.
      *
-     * <p>With nothing displayable the status reports WHY, as {@code NO_OPPORTUNITY} or {@code NOT_OBSERVED},
+     * <p>With nothing displayable the standing reports why, as {@code NO_OPPORTUNITY} or {@code NOT_OBSERVED},
      * instead of one undifferentiated empty state.
      */
     @Transactional(readOnly = true)
-    public List<PracticeAreaStatusDTO> getAreaStatuses(Long workspaceId, List<PracticeArea> areas) {
+    public List<PracticeAreaStandingDTO> getAreaStandings(Long workspaceId, List<PracticeArea> areas) {
         PracticeReflectionService.ReflectionSnapshot snapshot = practiceReflectionService.getReflectionSnapshot(
             workspaceId
         );
@@ -68,7 +68,7 @@ public class PracticeAreaStatusService {
         return areas
             .stream()
             .map(area ->
-                toAreaStatus(
+                toAreaStanding(
                     area,
                     cardsByArea.getOrDefault(area.getSlug(), List.of()),
                     snapshot.standingShareByPractice(),
@@ -89,7 +89,7 @@ public class PracticeAreaStatusService {
         return cardsByArea;
     }
 
-    private static PracticeAreaStatusDTO toAreaStatus(
+    private static PracticeAreaStandingDTO toAreaStanding(
         PracticeArea area,
         List<ReflectionPracticeDTO> cards,
         Map<String, Double> standingShareByPractice,
@@ -97,22 +97,22 @@ public class PracticeAreaStatusService {
         AreaSignal signal
     ) {
         List<ReflectionPracticeDTO> verdicts = votingVerdicts(cards, eligiblePracticeSlugs);
-        PracticeAreaStatusDTO.AreaStatus status = areaStatus(cards, verdicts, standingShareByPractice);
-        boolean hasDisplayableData = PracticeAreaStatusDTO.isVerdict(status);
-        // Item-level, unlike the status: the question here is which KINDS of evidence exist to show, which a
+        PracticeAreaStandingDTO.Standing standing = areaStanding(cards, verdicts, standingShareByPractice);
+        boolean hasDisplayableData = PracticeAreaStandingDTO.isVerdict(standing);
+        // Item-level, unlike the standing: the question here is which KINDS of evidence exist to show, which a
         // practice standing has already abstracted away.
         boolean hasProblems = cards.stream().anyMatch(card -> !card.toWorkOn().isEmpty());
         boolean hasStrengths = cards.stream().anyMatch(card -> !card.strengths().isEmpty());
 
-        String guidance = hasDisplayableData ? DeterministicAreaGuidanceComposer.compose(status, verdicts) : null;
-        PracticeAreaStatusDTO.GuidanceSource guidanceSource = hasDisplayableData
-            ? PracticeAreaStatusDTO.GuidanceSource.RULE_BASED
+        String guidance = hasDisplayableData ? DeterministicAreaGuidanceComposer.compose(standing, verdicts) : null;
+        PracticeAreaStandingDTO.GuidanceSource guidanceSource = hasDisplayableData
+            ? PracticeAreaStandingDTO.GuidanceSource.RULE_BASED
             : null;
 
-        return new PracticeAreaStatusDTO(
+        return new PracticeAreaStandingDTO(
             area.getSlug(),
             area.getName(),
-            status,
+            standing,
             guidance,
             guidanceSource,
             signal.direction(),
@@ -135,15 +135,15 @@ public class PracticeAreaStatusService {
             .toList();
     }
 
-    private static PracticeAreaStatusDTO.AreaStatus areaStatus(
+    private static PracticeAreaStandingDTO.Standing areaStanding(
         List<ReflectionPracticeDTO> cards,
         List<ReflectionPracticeDTO> verdicts,
         Map<String, Double> standingShareByPractice
     ) {
         if (verdicts.isEmpty()) {
             return cards.stream().anyMatch(card -> card.standing() == ReflectionPracticeDTO.Standing.NO_OPPORTUNITY)
-                ? PracticeAreaStatusDTO.AreaStatus.NO_OPPORTUNITY
-                : PracticeAreaStatusDTO.AreaStatus.NOT_OBSERVED;
+                ? PracticeAreaStandingDTO.Standing.NO_OPPORTUNITY
+                : PracticeAreaStandingDTO.Standing.NOT_OBSERVED;
         }
         double areaShare = verdicts
             .stream()
@@ -151,9 +151,9 @@ public class PracticeAreaStatusService {
             .average()
             .orElseThrow();
         return switch (StandingScale.classify(areaShare)) {
-            case STRENGTH -> PracticeAreaStatusDTO.AreaStatus.STRENGTH;
-            case MIXED -> PracticeAreaStatusDTO.AreaStatus.MIXED;
-            case DEVELOPING -> PracticeAreaStatusDTO.AreaStatus.DEVELOPING;
+            case STRENGTH -> PracticeAreaStandingDTO.Standing.STRENGTH;
+            case MIXED -> PracticeAreaStandingDTO.Standing.MIXED;
+            case DEVELOPING -> PracticeAreaStandingDTO.Standing.DEVELOPING;
             case NOT_OBSERVED, NO_OPPORTUNITY -> throw new IllegalStateException(
                 "StandingScale only classifies verdicts"
             );

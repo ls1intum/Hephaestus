@@ -35,7 +35,7 @@ public class PracticeAreaDetailController {
 
     @GetMapping("/trend")
     @Operation(
-        operationId = "listPracticeAreaTrend",
+        operationId = "getPracticeAreaTrend",
         summary = "Get the evidence-supported trend for a practice area",
         description = "Returns the area direction and every eligible practice direction with inspectable support."
     )
@@ -46,7 +46,7 @@ public class PracticeAreaDetailController {
         content = @Content(schema = @Schema(hidden = true))
     )
     @SecurityRequirements
-    public ResponseEntity<PracticeAreaTrendDTO> listTrend(
+    public ResponseEntity<PracticeAreaTrendDTO> getTrend(
         WorkspaceContext workspaceContext,
         @PathVariable String areaSlug
     ) {
@@ -56,11 +56,11 @@ public class PracticeAreaDetailController {
     @GetMapping("/review-history")
     @Operation(
         operationId = "listPracticeAreaReviewHistory",
-        summary = "List complete review moments for a practice area",
+        summary = "List complete review runs for a practice area",
         description = "Returns complete review runs newest first. Each moment contains the concrete positive and " +
             "negative observations that explain what the review observed."
     )
-    @ApiResponse(responseCode = "200", description = "Paginated review moments returned")
+    @ApiResponse(responseCode = "200", description = "Paginated review runs returned")
     @ApiResponse(
         responseCode = "400",
         description = "Invalid filter or pagination",

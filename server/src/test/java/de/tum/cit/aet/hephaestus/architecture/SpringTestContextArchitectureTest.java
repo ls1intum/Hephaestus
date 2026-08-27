@@ -39,7 +39,7 @@ class SpringTestContextArchitectureTest extends HephaestusArchitectureTest {
         assignment("integration.slack.detection.ConversationThreadDetectionIntegrationTest", "slack-ingest"),
         assignment("integration.slack.SlackConsentLifecycleE2EIntegrationTest", "slack-lifecycle"),
         assignment("integration.slack.channel.SlackChannelAdminControllerIntegrationTest", "slack-signed"),
-        assignment("practices.PracticeAreaStatusIntegrationTest", "area-guidance-provider")
+        assignment("practices.PracticeAreaStandingIntegrationTest", "area-guidance-provider")
     );
 
     private static final Map<String, String> FULL_CONTEXT_JUSTIFICATIONS = Map.ofEntries(

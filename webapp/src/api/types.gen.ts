@@ -3221,7 +3221,7 @@ export type PracticeAreaTrend = {
 /**
  * A developer's derived qualitative standing for one Area including 1<=n<many practices
  */
-export type PracticeAreaStatus = {
+export type PracticeAreaStanding = {
     /**
      * Area name
      */
@@ -3243,7 +3243,7 @@ export type PracticeAreaStatus = {
      */
     feedbackSpanDays?: number;
     /**
-     * Developer guidance aggregated from the area's feedback (null unless the status is a verdict). The deterministic summary combines standing, next focus, and developer-facing catalog guidance; the same field carries AI-aggregated guidance when a provider supplies it.
+     * Developer guidance aggregated from the area's feedback (null unless the standing is a verdict). The deterministic summary combines standing, next focus, and developer-facing catalog guidance.
      */
     guidance?: string;
     /**
@@ -3259,9 +3259,9 @@ export type PracticeAreaStatus = {
      */
     sources: Array<FeedbackSourceCount>;
     /**
-     * Derived qualitative status across the area's practices
+     * Derived qualitative standing across the area's practices
      */
-    status: 'DEVELOPING' | 'STRENGTH' | 'MIXED' | 'NOT_OBSERVED' | 'NO_OPPORTUNITY';
+    standing: 'DEVELOPING' | 'STRENGTH' | 'MIXED' | 'NOT_OBSERVED' | 'NO_OPPORTUNITY';
     /**
      * Evidence support and provenance for the direction
      */
@@ -3283,7 +3283,7 @@ export type FeedbackSourceCount = {
 };
 
 /**
- * The work assessed in a developer-facing review moment
+ * The work assessed in a developer-facing review run
  */
 export type PracticeAreaReviewedWork = {
     channelName?: string;
@@ -3297,7 +3297,17 @@ export type PracticeAreaReviewedWork = {
 };
 
 /**
- * One concrete, evidence-backed result inside a review moment
+ * A complete review run in a developer's practice-area history
+ */
+export type PracticeAreaReviewRun = {
+    observations: Array<PracticeAreaReviewObservation>;
+    reviewId: string;
+    reviewedAt: Date;
+    reviewedWork: PracticeAreaReviewedWork;
+};
+
+/**
+ * One concrete, evidence-backed observation from a review run
  */
 export type PracticeAreaReviewObservation = {
     /**
@@ -3318,20 +3328,10 @@ export type PracticeAreaReviewObservation = {
 };
 
 /**
- * A complete review run in a developer's practice-area history
- */
-export type PracticeAreaReviewMoment = {
-    observations: Array<PracticeAreaReviewObservation>;
-    reviewId: string;
-    reviewedAt: Date;
-    reviewedWork: PracticeAreaReviewedWork;
-};
-
-/**
- * A page of visible review moments
+ * A page of visible review runs
  */
 export type PracticeAreaReviewHistoryPage = {
-    content: Array<PracticeAreaReviewMoment>;
+    content: Array<PracticeAreaReviewRun>;
     hasNext?: boolean;
     page?: number;
     size?: number;
@@ -4644,7 +4644,7 @@ export type GitLabGroup = {
  */
 export type FeedbackResponseRequest = {
     /**
-     * Optional explanation; required when resolution is DISPUTED
+     * Optional explanation; required when resolution is DISPUTED. Omit it to retain the current comment.
      */
     comment?: string;
     /**
@@ -4675,7 +4675,7 @@ export type FeedbackResponse = {
 /**
  * Feedback resolution counts for the current developer
  */
-export type FeedbackEngagement = {
+export type FeedbackResolutionCounts = {
     addressed?: number;
     disputed?: number;
     notApplicable?: number;
@@ -9217,7 +9217,7 @@ export type ReorderAreasResponses = {
 
 export type ReorderAreasResponse = ReorderAreasResponses[keyof ReorderAreasResponses];
 
-export type GetPracticeAreaStatusesData = {
+export type GetPracticeAreaStandingsData = {
     body?: never;
     path: {
         /**
@@ -9226,17 +9226,17 @@ export type GetPracticeAreaStatusesData = {
         workspaceSlug: string;
     };
     query?: never;
-    url: '/workspaces/{workspaceSlug}/practice-areas/status';
+    url: '/workspaces/{workspaceSlug}/practice-areas/standings';
 };
 
-export type GetPracticeAreaStatusesResponses = {
+export type GetPracticeAreaStandingsResponses = {
     /**
-     * Active-area statuses returned
+     * Active-area standings returned
      */
-    200: Array<PracticeAreaStatus>;
+    200: Array<PracticeAreaStanding>;
 };
 
-export type GetPracticeAreaStatusesResponse = GetPracticeAreaStatusesResponses[keyof GetPracticeAreaStatusesResponses];
+export type GetPracticeAreaStandingsResponse = GetPracticeAreaStandingsResponses[keyof GetPracticeAreaStandingsResponses];
 
 export type DeleteAreaData = {
     body?: never;
@@ -9399,14 +9399,14 @@ export type ListPracticeAreaReviewHistoryError = ListPracticeAreaReviewHistoryEr
 
 export type ListPracticeAreaReviewHistoryResponses = {
     /**
-     * Paginated review moments returned
+     * Paginated review runs returned
      */
     200: PracticeAreaReviewHistoryPage;
 };
 
 export type ListPracticeAreaReviewHistoryResponse = ListPracticeAreaReviewHistoryResponses[keyof ListPracticeAreaReviewHistoryResponses];
 
-export type ListPracticeAreaTrendData = {
+export type GetPracticeAreaTrendData = {
     body?: never;
     path: {
         /**
@@ -9419,21 +9419,21 @@ export type ListPracticeAreaTrendData = {
     url: '/workspaces/{workspaceSlug}/practice-areas/{areaSlug}/trend';
 };
 
-export type ListPracticeAreaTrendErrors = {
+export type GetPracticeAreaTrendErrors = {
     /**
      * Practice area not found
      */
     404: unknown;
 };
 
-export type ListPracticeAreaTrendResponses = {
+export type GetPracticeAreaTrendResponses = {
     /**
      * Practice-area trend returned
      */
     200: PracticeAreaTrend;
 };
 
-export type ListPracticeAreaTrendResponse = ListPracticeAreaTrendResponses[keyof ListPracticeAreaTrendResponses];
+export type GetPracticeAreaTrendResponse = GetPracticeAreaTrendResponses[keyof GetPracticeAreaTrendResponses];
 
 export type ListAdoptablePracticesData = {
     body?: never;
@@ -9834,27 +9834,6 @@ export type GetPracticeDefinitionOptionsResponses = {
 
 export type GetPracticeDefinitionOptionsResponse = GetPracticeDefinitionOptionsResponses[keyof GetPracticeDefinitionOptionsResponses];
 
-export type GetFeedbackEngagementData = {
-    body?: never;
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-    };
-    query?: never;
-    url: '/workspaces/{workspaceSlug}/practices/feedback/engagement';
-};
-
-export type GetFeedbackEngagementResponses = {
-    /**
-     * OK
-     */
-    200: FeedbackEngagement;
-};
-
-export type GetFeedbackEngagementResponse = GetFeedbackEngagementResponses[keyof GetFeedbackEngagementResponses];
-
 export type GetInAppFeedbackData = {
     body?: never;
     path: {
@@ -9875,6 +9854,27 @@ export type GetInAppFeedbackResponses = {
 };
 
 export type GetInAppFeedbackResponse = GetInAppFeedbackResponses[keyof GetInAppFeedbackResponses];
+
+export type GetFeedbackResolutionCountsData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/feedback/resolution-counts';
+};
+
+export type GetFeedbackResolutionCountsResponses = {
+    /**
+     * OK
+     */
+    200: FeedbackResolutionCounts;
+};
+
+export type GetFeedbackResolutionCountsResponse = GetFeedbackResolutionCountsResponses[keyof GetFeedbackResolutionCountsResponses];
 
 export type GetFeedbackResponseData = {
     body?: never;
