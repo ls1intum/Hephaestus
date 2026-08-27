@@ -55,7 +55,7 @@ Before any release, code must pass:
 | Migration chain + drift (`Database`) | Liquibase | Full chain applies empty → head, then schema is diffed against JPA entities |
 | Changelog immutability (`Migrations`) | git diff | Released changesets + `master.xml` are append-only |
 | OpenAPI sync    | Diff check  | Client ↔ Server sync |
-| Java formatting | Prettier (`prettier-plugin-java`) | Code style |
+| Java formatting | Spotless + Palantir Java Format | Code style |
 | Java lint       | PMD         | Static analysis      |
 | Webapp TypeScript | oxlint + Biome (`webapp/biome.jsonc`) + tsc | Lint + format + typecheck |
 | Everything else TypeScript | oxlint (`.oxlintrc.json`) + Biome (`biome.jsonc`) + tsc | oxlint reaches the Bun runtime, its specs, both precompute trees, `scripts/**`, `docs/` and the repo-root config files; Biome formats all of those except `docs/`, which has its own config (`docs/.oxlintrc.json`) and no formatter |

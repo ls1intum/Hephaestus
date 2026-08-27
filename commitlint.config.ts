@@ -39,7 +39,7 @@ const SCOPES = [
 
   // === INFRASTRUCTURE SCOPES (tooling and process) ===
   "ci", // GitHub Actions, CI workflows only
-  "config", // TOOLING ONLY: .prettierrc, renovate.json, eslint, vscode
+  "config", // Developer tooling configuration
   //          NOT for: application.yml (use 'server'), Dockerfiles (use service scope)
   "deps-dev", // Dev dependencies only (test libs, linters)
   "scripts", // Build/dev helper scripts
@@ -97,7 +97,7 @@ const helpfulErrorsPlugin = {
             `  Services:  webapp, server, docs\n` +
             `  Infra:     deps, security, db, docker, ci, config, deps-dev, scripts, release\n` +
             `  Features:  auth, integration, scm, leaderboard, mentor, notifications, profile, teams, workspace\n\n` +
-            `⚠️  'config' is for TOOLING only (.prettierrc, renovate.json)\n` +
+            `⚠️  'config' is for developer tooling\n` +
             `    For runtime config use 'server', for Dockerfiles use service scope\n\n` +
             `Format: <type>(<scope>): <description>\n` +
             `Example: fix(server): resolve null pointer exception\n` +
