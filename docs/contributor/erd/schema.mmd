@@ -842,7 +842,6 @@ erDiagram
         VARCHAR(96) source_curated_fingerprint
         JSONB automated_review_policy "NOT NULL"
         VARCHAR(16) autonomy
-        DOUBLE area_weight "NOT NULL"
     }
 
     PracticeCatalogInstallation {
@@ -1051,7 +1050,6 @@ erDiagram
         TEXT explanation
         TIMESTAMPTZ created_at "NOT NULL"
         UUID feedback_id FK "NOT NULL"
-        VARCHAR(64) recurrence_key
         VARCHAR(16) usefulness
     }
 

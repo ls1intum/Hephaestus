@@ -167,4 +167,34 @@
             ]]></sql>
         </rollback>
     </changeSet>
+    <changeSet author="practice-group-vocabulary" id="1787844107869-3">
+        <preConditions onFail="MARK_RAN" onFailMessage="practice.area_weight already removed">
+            <columnExists tableName="practice" columnName="area_weight"/>
+        </preConditions>
+        <comment>Remove the unused practice-group weighting experiment.</comment>
+        <dropColumn tableName="practice" columnName="area_weight"/>
+        <rollback>
+            <addColumn tableName="practice">
+                <column name="area_weight" type="DOUBLE PRECISION" defaultValueNumeric="1.0">
+                    <constraints nullable="false"/>
+                </column>
+            </addColumn>
+            <sql>
+                ALTER TABLE practice
+                ADD CONSTRAINT chk_practice_area_weight CHECK (area_weight &gt;= 0);
+            </sql>
+        </rollback>
+    </changeSet>
+    <changeSet author="practice-feedback-response" id="1787844107869-4">
+        <preConditions onFail="MARK_RAN" onFailMessage="reaction.recurrence_key already removed">
+            <columnExists tableName="reaction" columnName="recurrence_key"/>
+        </preConditions>
+        <comment>Remove the unused response recurrence-key copy.</comment>
+        <dropColumn tableName="reaction" columnName="recurrence_key"/>
+        <rollback>
+            <addColumn tableName="reaction">
+                <column name="recurrence_key" type="VARCHAR(64)"/>
+            </addColumn>
+        </rollback>
+    </changeSet>
 </databaseChangeLog>
