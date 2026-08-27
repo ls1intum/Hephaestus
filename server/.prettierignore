@@ -1,4 +1,0 @@
-# Ignore artifacts:
-.mvn
-target
-postgres-data
