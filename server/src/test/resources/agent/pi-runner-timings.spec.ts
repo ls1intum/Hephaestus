@@ -3,6 +3,7 @@ import test from "node:test";
 import {
 	deriveTimeouts,
 	deriveTurnTiming,
+	deriveWorkstreamBudget,
 } from "../../../main/resources/agent/pi-runner-timings.ts";
 
 // `void`: node:test's own runner owns the promise each test hands back, and awaiting one here
@@ -55,3 +56,16 @@ for (const invalid of [0, -1, 1.5, Number.NaN]) {
 		assert.throws(() => deriveTurnTiming(1_000, invalid), /positive integer/);
 	});
 }
+
+void test("a workstream receives its share of all concurrently available time", () => {
+	assert.equal(deriveWorkstreamBudget(7_200_000, 7, 27), 1_866_666);
+});
+
+void test("a workstream budget is not capped below its fair share", () => {
+	assert.equal(deriveWorkstreamBudget(10_800_000, 1, 1), 10_800_000);
+});
+
+void test("rejects invalid workstream capacity", () => {
+	assert.throws(() => deriveWorkstreamBudget(1_000, 0, 1), /activeSlots/);
+	assert.throws(() => deriveWorkstreamBudget(1_000, 1, 0), /remainingWorkstreams/);
+});

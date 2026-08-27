@@ -35,7 +35,7 @@ import {
 	type PreparedFeedbackTarget,
 	undeliverableUnits,
 } from "./pi-runner-composition.ts";
-import { deriveTimeouts, deriveTurnTiming } from "./pi-runner-timings.ts";
+import { deriveTimeouts, deriveTurnTiming, deriveWorkstreamBudget } from "./pi-runner-timings.ts";
 import {
 	addAssistantUsage,
 	extractUsageFromSession,
@@ -1689,6 +1689,7 @@ async function main() {
 		groupId: string;
 		sessionFile?: string;
 	}
+	const observerSessionFiles = new Map<string, string>();
 
 	try {
 		const groupedTasks = await mapConcurrent(
@@ -1753,6 +1754,9 @@ async function main() {
 			},
 		);
 		const observerTasks = groupedTasks.flat();
+		for (const task of observerTasks) {
+			if (task.sessionFile) observerSessionFiles.set(task.practiceSlug, task.sessionFile);
+		}
 		let remainingObservers = observerTasks.length;
 		await mapConcurrent(observerTasks, concurrency, async (task, index) => {
 			if (hardAborted) return;
@@ -1777,10 +1781,7 @@ async function main() {
 			activeSessions.add(observerSession);
 			const remainingMs = Math.max(1, reviewDeadline - Date.now());
 			const activeSlots = Math.min(concurrency, remainingObservers);
-			const leafBudgetMs = Math.max(
-				1,
-				Math.min(360_000, Math.floor((remainingMs * activeSlots) / remainingObservers)),
-			);
+			const leafBudgetMs = deriveWorkstreamBudget(remainingMs, activeSlots, remainingObservers);
 			const timing = deriveTurnTiming(leafBudgetMs, 1);
 			const timers = scheduleTurnTimers(
 				observerSession,
@@ -1874,12 +1875,15 @@ async function main() {
 		await mapConcurrent(missingAfterInitial, concurrency, async (practiceSlug) => {
 			if (retryAborted) return;
 			const retryTool = buildReportObservationTool(practiceSlug);
+			const priorSessionFile = observerSessionFiles.get(practiceSlug);
 			const { session: retrySession } = await createAgentSession({
 				cwd: CWD,
 				agentDir: AGENT_DIR,
 				tools: [...EVIDENCE_TOOLS, "report_observation"],
 				customTools: [retryTool],
-				sessionManager: SessionManager.inMemory(),
+				sessionManager: priorSessionFile
+					? SessionManager.open(priorSessionFile, sessionDir)
+					: SessionManager.inMemory(),
 				settingsManager,
 				modelRuntime,
 				model,
@@ -1887,10 +1891,7 @@ async function main() {
 			const unsubscribeRetry = subscribeSession(retrySession, `retry:${practiceSlug}`);
 			activeSessions.add(retrySession);
 			const activeSlots = Math.min(concurrency, retriesRemaining);
-			const retryBudgetMs = Math.max(
-				1,
-				Math.floor((RETRY_TIMEOUT_MS * activeSlots) / retriesRemaining),
-			);
+			const retryBudgetMs = deriveWorkstreamBudget(RETRY_TIMEOUT_MS, activeSlots, retriesRemaining);
 			const retryDeadline = scheduleDeadline(retryBudgetMs, () => {
 				retrySession.dispose();
 			});
@@ -1898,8 +1899,9 @@ async function main() {
 				await Promise.race([
 					retrySession.prompt(
 						`${prompt}\n\n## Recovery practice branch\nThe earlier observer did not persist '${practiceSlug}'. ` +
-							`Read inputs/practices/${practiceSlug}.md and the staged evidence needed to evaluate ONLY this practice. ` +
-							`Persist exactly one justified outcome with report_observation. ${PERSIST_DISCIPLINE}`,
+							`Continue from its evidence and tool feedback when they are available. Persist the best justified ` +
+							`outcome now; read more only to resolve a specific validation failure or genuinely open evidence question. ` +
+							`Evaluate no other practice. ${PERSIST_DISCIPLINE}`,
 					),
 					retryDeadline.elapsed,
 				]);
