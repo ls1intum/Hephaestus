@@ -60,12 +60,12 @@ const PURPOSES: PurposeMeta[] = [
 ];
 
 const MIN_TIMEOUT_SECONDS = 30;
-const MAX_TIMEOUT_SECONDS = 3600;
+const MAX_TIMEOUT_SECONDS = 10800;
 const MIN_CONCURRENT_JOBS = 1;
 
 const TIMEOUT_CEILING = {
 	max: MAX_TIMEOUT_SECONDS,
-	error: `Runs stop after an hour, so enter ${MAX_TIMEOUT_SECONDS} seconds or less.`,
+	error: `Runs stop after three hours, so enter ${MAX_TIMEOUT_SECONDS} seconds or less.`,
 };
 
 function bindingToSelection(binding?: AgentBinding): ModelSelection | null {

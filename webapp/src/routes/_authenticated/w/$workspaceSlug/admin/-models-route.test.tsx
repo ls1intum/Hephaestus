@@ -234,7 +234,7 @@ describe("workspace AI models route", () => {
 		);
 		const reset = card("Practice reviews model");
 		fireEvent.click(within(reset).getByRole("button", { name: "Advanced" }));
-		expect(within(reset).getByLabelText<HTMLInputElement>("Timeout (seconds)").value).toBe("3600");
+		expect(within(reset).getByLabelText<HTMLInputElement>("Timeout (seconds)").value).toBe("10800");
 		await act(async () => {
 			await queryClient.cancelQueries({ queryKey: AGENTS_QUERY_KEY });
 			refetch.release();

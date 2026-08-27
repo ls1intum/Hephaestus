@@ -7,12 +7,12 @@
         <preConditions onFail="MARK_RAN">
             <columnExists tableName="workspace_agent_binding" columnName="timeout_seconds"/>
         </preConditions>
-        <comment>Give comprehensive practice reviews a one-hour database default.</comment>
+        <comment>Give comprehensive practice reviews a three-hour database default.</comment>
         <addDefaultValue
             tableName="workspace_agent_binding"
             columnName="timeout_seconds"
             columnDataType="INTEGER"
-            defaultValueNumeric="3600"/>
+            defaultValueNumeric="10800"/>
         <rollback>
             <addDefaultValue
                 tableName="workspace_agent_binding"

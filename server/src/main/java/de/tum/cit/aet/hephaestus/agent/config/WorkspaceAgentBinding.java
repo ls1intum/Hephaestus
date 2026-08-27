@@ -73,7 +73,7 @@ public class WorkspaceAgentBinding implements ModelBindingSource {
     @Column(name = "enabled", nullable = false)
     private boolean enabled = true;
 
-    @ColumnDefault("3600")
+    @ColumnDefault("10800")
     @Column(name = "timeout_seconds", nullable = false)
     private int timeoutSeconds = AgentBindingLimits.MAX_TIMEOUT_SECONDS;
 
