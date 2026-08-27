@@ -509,14 +509,24 @@ export function validateEvidenceSources(
 	for (const citation of observation.evidence.citations) {
 		const sourceKind = citation.sourceKind;
 		if (!availableSourceKinds.has(sourceKind)) {
-			throw new Error(`evidence source '${sourceKind}' was not available to this invocation`);
-		}
-		if (artifactSources.get(citation.artifactPath) !== sourceKind) {
 			throw new Error(
-				`artifact '${citation.artifactPath}' does not belong to evidence source '${sourceKind}'`,
+				`evidence source '${sourceKind}' was not available; copy one of these source kinds from ` +
+					`inputs/manifest.json: ${describeAvailableSources(availableSourceKinds)}`,
+			);
+		}
+		const artifactSource = artifactSources.get(citation.artifactPath);
+		if (artifactSource !== sourceKind) {
+			throw new Error(
+				artifactSource === undefined
+					? `artifact '${citation.artifactPath}' was not staged; copy an artifact path from inputs/manifest.json`
+					: `artifact '${citation.artifactPath}' belongs to evidence source '${artifactSource}', not '${sourceKind}'`,
 			);
 		}
 	}
+}
+
+function describeAvailableSources(sourceKinds: ReadonlySet<string>): string {
+	return sourceKinds.size === 0 ? "(none)" : [...sourceKinds].toSorted().join(", ");
 }
 
 /**
@@ -557,7 +567,10 @@ export function validateSearchScope(
 	const consulted = new Set(search.consulted);
 	for (const sourceKind of consulted) {
 		if (!availableSourceKinds.has(sourceKind)) {
-			throw new Error(`searched source '${sourceKind}' was not available to this invocation`);
+			throw new Error(
+				`searched source '${sourceKind}' was not available; copy one of these source kinds from ` +
+					`inputs/manifest.json: ${describeAvailableSources(availableSourceKinds)}`,
+			);
 		}
 	}
 	const unsearched = [...exhaustiveSourceKinds]
@@ -588,7 +601,10 @@ export function validateInapplicabilityScope(
 		throw new Error("a NOT_APPLICABLE observation must say why the practice does not apply");
 	for (const sourceKind of inapplicability.consulted) {
 		if (!availableSourceKinds.has(sourceKind)) {
-			throw new Error(`consulted source '${sourceKind}' was not available to this invocation`);
+			throw new Error(
+				`consulted source '${sourceKind}' was not available; copy one of these source kinds from ` +
+					`inputs/manifest.json: ${describeAvailableSources(availableSourceKinds)}`,
+			);
 		}
 	}
 }

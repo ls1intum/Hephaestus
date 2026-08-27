@@ -280,8 +280,13 @@ void test("a citation must name a source this run staged, and the artifact that 
 		),
 	);
 	assert.throws(
-		() => validateEvidenceSources(observation, new Set(), new Map()),
-		/was not available/,
+		() =>
+			validateEvidenceSources(
+				observation,
+				new Set(["scm.pull-request.core", "scm.review-threads"]),
+				new Map(),
+			),
+		/was not available.*scm\.pull-request\.core, scm\.review-threads/,
 	);
 	assert.throws(
 		() =>
@@ -290,7 +295,11 @@ void test("a citation must name a source this run staged, and the artifact that 
 				new Set(["scm.pull-request.diff"]),
 				new Map([["inputs/context/diff.patch", "scm.pull-request.core"]]),
 			),
-		/does not belong/,
+		/belongs to evidence source 'scm\.pull-request\.core', not 'scm\.pull-request\.diff'/,
+	);
+	assert.throws(
+		() => validateEvidenceSources(observation, new Set(["scm.pull-request.diff"]), new Map()),
+		/was not staged.*inputs\/manifest\.json/,
 	);
 });
 
@@ -438,7 +447,10 @@ void test("ABSENT is refused unless the search covered every source the practice
 		/without searching scm.linked-work-items/,
 	);
 	// Claiming to have searched something this run never staged.
-	assert.throws(() => validateSearchScope(observation, new Set(), new Set()), /was not available/);
+	assert.throws(
+		() => validateSearchScope(observation, new Set(), new Set(["scm.pull-request.diff"])),
+		/was not available.*scm\.pull-request\.diff/,
+	);
 });
 
 // ── ABSENT + GOOD: a clean surface, over a corpus the practice bounded ───────
@@ -637,7 +649,7 @@ void test("a NOT_APPLICABLE claim may only rest on sources this run staged", () 
 	);
 	assert.throws(
 		() => validateInapplicabilityScope(observation, new Set(["scm.review-threads"])),
-		/was not available/,
+		/was not available.*scm\.review-threads/,
 	);
 
 	// Every other presence is none of this validator's business.

@@ -632,7 +632,11 @@ function normalizeAndValidateObservation(rawObservation: unknown): NormalizedObs
 	for (const citation of observation.evidence.citations) {
 		const content = readFileSync(`${CWD}/${citation.artifactPath}`, "utf8");
 		if (!citationMatchesArtifact(citation, content)) {
-			throw new Error(`citation does not match artifact location '${citation.artifactPath}'`);
+			throw new Error(
+				`citation does not match ${citation.path}:${citation.startLine}-${citation.endLine} ` +
+					`(${citation.side ?? "text"}) in '${citation.artifactPath}'; copy the exact artifact text ` +
+					`and, for a diff, use its [L<n>] coordinates and OLD/NEW side`,
+			);
 		}
 	}
 	return observation;
