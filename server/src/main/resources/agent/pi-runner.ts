@@ -701,7 +701,6 @@ function accumulateUsage(prev: UsageReport | null, curr: UsageReport): void {
 	usageTotals.totalCalls += Math.max(0, curr.totalCalls - (prev?.totalCalls ?? 0));
 }
 
-
 function loadPracticeSlugs(): string[] {
 	return practiceIndex.map((practice) => practice.slug).filter(Boolean);
 }
