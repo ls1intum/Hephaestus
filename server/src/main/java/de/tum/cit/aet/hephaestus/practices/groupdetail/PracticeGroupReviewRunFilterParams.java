@@ -19,7 +19,12 @@ public record PracticeGroupReviewRunFilterParams(
     @Nullable
     List<String> workKinds,
     @RequestParam(required = false) @Nullable List<Severity> severities,
-    @Parameter(description = "Zero-based page") @RequestParam(required = false) @PositiveOrZero @Nullable Integer page,
+    @Parameter(description = "Zero-based page, at most 100")
+    @RequestParam(required = false)
+    @PositiveOrZero
+    @Max(100)
+    @Nullable
+    Integer page,
     @Parameter(description = "Page size from 1 to 50")
     @RequestParam(required = false)
     @Min(1)

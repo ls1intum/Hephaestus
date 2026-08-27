@@ -9,7 +9,7 @@ import {
 	groupPracticesByGroup,
 	isOverridden,
 	reviewableByHephaestus,
-	UNASSIGNED_AREA_KEY,
+	UNASSIGNED_GROUP_KEY,
 } from "./practice-autonomy-model";
 import { buildAutonomyFixture, scaleFixture } from "./story-mock-data";
 
@@ -42,7 +42,7 @@ describe("groupPracticesByGroup", () => {
 		const groups = groupPracticesByGroup(fixture.rollup, fixture.practices);
 		const unassigned = groups.at(-1);
 
-		expect(unassigned?.key).toBe(UNASSIGNED_AREA_KEY);
+		expect(unassigned?.key).toBe(UNASSIGNED_GROUP_KEY);
 		expect(unassigned?.groupSlug).toBeNull();
 		expect(unassigned?.practices.map((practice) => practice.name)).toStrictEqual(["Four"]);
 	});

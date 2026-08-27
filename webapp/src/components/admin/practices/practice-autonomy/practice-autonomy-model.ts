@@ -5,7 +5,7 @@ import type {
 	PracticeAutomatedReviewPolicy,
 } from "@/api/types.gen";
 
-export const UNASSIGNED_AREA_KEY = "__unassigned__";
+export const UNASSIGNED_GROUP_KEY = "__unassigned__";
 
 export interface AutonomyGroup {
 	key: string;
@@ -40,7 +40,7 @@ export function groupPracticesByGroup(
 ): AutonomyGroup[] {
 	const byGroup = new Map<string, Practice[]>();
 	for (const practice of practices) {
-		const key = practice.groupSlug ?? UNASSIGNED_AREA_KEY;
+		const key = practice.groupSlug ?? UNASSIGNED_GROUP_KEY;
 		const bucket = byGroup.get(key);
 		if (bucket) bucket.push(practice);
 		else byGroup.set(key, [practice]);
@@ -48,7 +48,7 @@ export function groupPracticesByGroup(
 
 	const groups: AutonomyGroup[] = [];
 	for (const group of rollup.groups) {
-		const key = group.groupSlug ?? UNASSIGNED_AREA_KEY;
+		const key = group.groupSlug ?? UNASSIGNED_GROUP_KEY;
 		const owned = byGroup.get(key) ?? [];
 		byGroup.delete(key);
 		groups.push({
@@ -66,8 +66,8 @@ export function groupPracticesByGroup(
 	for (const [key, owned] of byGroup) {
 		groups.push({
 			key,
-			groupSlug: key === UNASSIGNED_AREA_KEY ? null : key,
-			name: key === UNASSIGNED_AREA_KEY ? "Unassigned" : key,
+			groupSlug: key === UNASSIGNED_GROUP_KEY ? null : key,
+			name: key === UNASSIGNED_GROUP_KEY ? "Unassigned" : key,
 			autonomy: rollup.workspaceDefault,
 			counts: countByAutonomy(owned),
 			overriddenCount: owned.filter((practice) => isOverridden(practice.autonomy)).length,

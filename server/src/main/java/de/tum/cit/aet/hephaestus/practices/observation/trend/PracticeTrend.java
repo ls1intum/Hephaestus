@@ -61,7 +61,7 @@ public final class PracticeTrend {
      * or empty when none of them produced a verdict.
      *
      * <p>Opportunity-indexed like the trend itself, so a single busy day cannot manufacture a standing and a
-     * quiet week cannot erode one — the unit is a reviewed piece of reviewed work, never a calendar bin. Opportunities that
+     * quiet week cannot erode one — the unit is a reviewed work item, never a calendar bin. Opportunities that
      * carry no applicable outcome are skipped rather than counted as either side, so a review that had no
      * chance to exercise the practice neither helps nor hurts, and it does not push genuine evidence out of
      * the window either.

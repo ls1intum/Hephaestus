@@ -66,7 +66,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useUnsavedChanges } from "@/hooks/use-unsaved-changes";
 import { artifactKindLabel } from "@/lib/artifact-kinds";
 
-const NO_AREA = "__none__";
+const NO_GROUP = "__none__";
 
 export interface PracticeDefinitionGroupOption {
 	slug: string;
@@ -155,7 +155,7 @@ function initialState(
 	return {
 		name: initialData?.name ?? "",
 		slug: initialData?.slug ?? "",
-		groupSlug: initialData?.groupSlug ?? NO_AREA,
+		groupSlug: initialData?.groupSlug ?? NO_GROUP,
 		artifactKind:
 			artifactKindOfBindings(initialData?.bindings ?? []) ?? fallback?.artifactKind ?? "",
 		bindings: [
@@ -233,7 +233,7 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 	const [showAdvanced, setShowAdvanced] = useState(() => Boolean(initialData?.precomputeScript));
 	const workTypes = orderedWorkTypes(definitionOptions);
 	const groupItems = [
-		{ value: NO_AREA, label: "Unassigned" },
+		{ value: NO_GROUP, label: "Unassigned" },
 		...groups.map((group) => ({ value: group.slug, label: group.name })),
 	];
 	const artifactKind = form.artifactKind;
@@ -398,7 +398,7 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 			name: form.name.trim(),
 			bindings: [normalizeBinding(form.bindings[0])],
 			criteria: form.criteria.trim(),
-			...(form.groupSlug === NO_AREA ? {} : { groupSlug: form.groupSlug }),
+			...(form.groupSlug === NO_GROUP ? {} : { groupSlug: form.groupSlug }),
 			...(form.whyItMatters.trim() ? { whyItMatters: form.whyItMatters.trim() } : {}),
 			...(form.whatGoodLooksLike.trim()
 				? { whatGoodLooksLike: form.whatGoodLooksLike.trim() }
@@ -464,7 +464,7 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 										items={groupItems}
 										value={form.groupSlug}
 										onValueChange={(value) =>
-											setForm((previous) => ({ ...previous, groupSlug: value ?? NO_AREA }))
+											setForm((previous) => ({ ...previous, groupSlug: value ?? NO_GROUP }))
 										}
 									>
 										<SelectTrigger

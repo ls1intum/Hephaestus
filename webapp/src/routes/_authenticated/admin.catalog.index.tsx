@@ -61,7 +61,7 @@ export const Route = createFileRoute("/_authenticated/admin/catalog/")({
 });
 
 const PRACTICE_STATUS_KEY = ["adminWriteCuratedPracticeStatus"];
-const AREA_STATUS_KEY = ["adminWriteCuratedGroupStatus"];
+const GROUP_STATUS_KEY = ["adminWriteCuratedGroupStatus"];
 const STRUCTURE_SCOPE = { id: "admin-curated-catalog-structure" };
 
 function AdminCuratedCatalogPage() {
@@ -122,7 +122,7 @@ function AdminCuratedCatalogPage() {
 		filedUnder(PRACTICE_STATUS_KEY, adminUpdateCuratedPracticeStatusMutation()),
 	);
 	const updateGroupStatus = useMutation(
-		filedUnder(AREA_STATUS_KEY, adminUpdateCuratedGroupStatusMutation()),
+		filedUnder(GROUP_STATUS_KEY, adminUpdateCuratedGroupStatusMutation()),
 	);
 	const invalidateStructure = invalidateCatalog;
 	const structureError = (error: unknown) => {
@@ -227,7 +227,7 @@ function AdminCuratedCatalogPage() {
 	const pendingPracticeSlugs = usePendingMutationIds(PRACTICE_STATUS_KEY, (variables) =>
 		pathString(variables, "slug"),
 	);
-	const pendingGroupSlugs = usePendingMutationIds(AREA_STATUS_KEY, (variables) =>
+	const pendingGroupSlugs = usePendingMutationIds(GROUP_STATUS_KEY, (variables) =>
 		pathString(variables, "slug"),
 	);
 	const structurePending =

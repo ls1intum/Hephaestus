@@ -45,7 +45,6 @@ public class FeedbackResponseService {
 
         Reaction response = Reaction.builder()
             .feedback(feedback)
-            .feedbackId(feedbackId)
             .reactorUserId(recipientId)
             .usefulness(request.usefulness())
             .resolution(request.resolution())
@@ -69,9 +68,7 @@ public class FeedbackResponseService {
         if (currentResponse(feedbackId, recipientId).isEmpty()) {
             return;
         }
-        reactionRepository.save(
-            Reaction.builder().feedback(feedback).feedbackId(feedbackId).reactorUserId(recipientId).build()
-        );
+        reactionRepository.save(Reaction.builder().feedback(feedback).reactorUserId(recipientId).build());
         log.info("Deleted feedback response: feedbackId={}, recipientUserId={}", feedbackId, recipientId);
     }
 

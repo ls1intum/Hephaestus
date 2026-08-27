@@ -9549,7 +9549,7 @@ export type ListPracticeGroupReviewRunsData = {
         workKinds?: Array<string>;
         severities?: Array<'CRITICAL' | 'MAJOR' | 'MINOR' | 'INFO'>;
         /**
-         * Zero-based page
+         * Zero-based page, at most 100
          */
         page?: number;
         /**

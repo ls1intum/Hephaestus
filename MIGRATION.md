@@ -110,8 +110,8 @@ PUT replaces the complete response with `usefulness` (`HELPFUL` / `UNHELPFUL`), 
 when disputing. Omitted fields are cleared. Repeating the same PUT has no effect. DELETE removes the
 complete response and is safe to repeat. GET returns the response that currently stands.
 
-**Action**: repoint any direct API caller at the new endpoint. Stored reactions are untouched and
-keep answering; nothing needs migrating and no data is lost.
+**Action**: repoint any direct API caller at the new endpoint. Existing response history is preserved and
+participates in current-response reads; no operator data migration is required.
 
 ### v0.74.0
 

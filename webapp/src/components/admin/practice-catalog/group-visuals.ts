@@ -262,7 +262,7 @@ export function pillClasses(color?: string | null): string {
 
 type Seed = { icon: string; color: string };
 
-const AREA_SEEDS: Record<string, Seed> = {
+const GROUP_SEEDS: Record<string, Seed> = {
 	"robust-error-handling": { icon: "ShieldAlert", color: "rose" },
 	"secure-by-default-changes": { icon: "ShieldCheck", color: "red" },
 	"testing-discipline": { icon: "TestTube", color: "amber" },
@@ -287,7 +287,7 @@ export function groupSeed(slug: string, name = ""): { icon: string; color: strin
 }
 
 function seedFor(slug: string, name: string): Seed {
-	const known = AREA_SEEDS[slug];
+	const known = GROUP_SEEDS[slug];
 	if (known) return known;
 	const h = `${slug} ${name}`.toLowerCase();
 	if (/secur|shield|auth|permission|escap/.test(h)) return { icon: "ShieldCheck", color: "red" };

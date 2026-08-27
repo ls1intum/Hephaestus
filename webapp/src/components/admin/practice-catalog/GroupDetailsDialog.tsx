@@ -78,12 +78,10 @@ function GroupDetailsForm({
 	const [icon, setIcon] = useState<string | null>(group?.icon ?? null);
 	const [color, setColor] = useState<string | null>(group?.color ?? null);
 	const trimmed = name.trim();
-	// Matching the name proves there is a group to compare the rest against.
 	const unchanged =
 		trimmed === group?.name && icon === (group.icon ?? null) && color === (group.color ?? null);
 
 	const saveDetails = async () => {
-		// Re-submitting untouched details is a deliberate "never mind".
 		if (unchanged) return onOpenChange(false);
 		if (await onSubmit({ name: trimmed, icon, color })) onOpenChange(false);
 	};
@@ -103,8 +101,15 @@ function GroupDetailsForm({
 					<Field>
 						<FieldLabel htmlFor={fieldId}>Name</FieldLabel>
 						<div className="flex items-center gap-2">
-							{/* The picker seeds from the slug, which a new group does not have until the name
-							    is typed — deriving it here is what makes the default chip track what you type. */}
+							<Input
+								id={fieldId}
+								value={name}
+								onChange={(event) => setName(event.target.value)}
+								placeholder={editing ? undefined : "New group name…"}
+								autoComplete="off"
+								disabled={pending}
+								aria-describedby={helpId}
+							/>
 							<GroupVisualPicker
 								describedBy={helpId}
 								slug={group?.slug ?? generateSlug(trimmed)}
@@ -117,20 +122,9 @@ function GroupDetailsForm({
 								}}
 								disabled={pending}
 							/>
-							<Input
-								id={fieldId}
-								value={name}
-								onChange={(event) => setName(event.target.value)}
-								placeholder={editing ? undefined : "New group name…"}
-								autoComplete="off"
-								disabled={pending}
-								aria-describedby={helpId}
-								// oxlint-disable-next-line jsx-a11y/no-autofocus -- The picker above comes first in the DOM but seeds itself from the name, so a dialog that opened onto it would put focus on the one control with nothing to do yet. The name is also the only required field.
-								autoFocus
-							/>
 						</div>
 						<FieldDescription id={helpId}>
-							The icon and colour appear on this group's chip. Left alone, both follow the name.
+							The icon and color appear on this group's chip. Left alone, both follow the name.
 						</FieldDescription>
 					</Field>
 				</FieldGroup>
@@ -139,7 +133,6 @@ function GroupDetailsForm({
 				<DialogClose render={<Button type="button" variant="outline" disabled={pending} />}>
 					Cancel
 				</DialogClose>
-				{/* Disabled rather than validated on submit: one required field needs no error message. */}
 				<Button type="submit" className="min-w-20" disabled={pending || trimmed.length === 0}>
 					{pending && <Spinner className="size-4" aria-hidden />}
 					{pending ? (editing ? "Saving…" : "Creating…") : editing ? "Save" : "Create"}

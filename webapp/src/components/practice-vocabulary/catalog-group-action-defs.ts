@@ -8,7 +8,7 @@ export type CatalogGroupAction = CatalogGroupPracticeAction["action"];
  * What adding a group does to each practice in it. Every row states its own outcome from here, so
  * the panel needs no prose explaining which of four lists a name ended up in.
  */
-export const CATALOG_AREA_ACTION_DEFS: StatusDefs<CatalogGroupAction> = {
+export const CATALOG_GROUP_ACTION_DEFS: StatusDefs<CatalogGroupAction> = {
 	ADD: {
 		label: "Adds",
 		icon: Plus,
@@ -36,4 +36,4 @@ export const CATALOG_AREA_ACTION_DEFS: StatusDefs<CatalogGroupAction> = {
 };
 
 /** The actions that change the workspace, so a preview can count them without re-listing them. */
-export const CATALOG_AREA_CHANGE_ACTIONS: readonly CatalogGroupAction[] = ["ADD", "MOVE_TO_GROUP"];
+export const CATALOG_GROUP_CHANGE_ACTIONS: readonly CatalogGroupAction[] = ["ADD", "MOVE_TO_GROUP"];

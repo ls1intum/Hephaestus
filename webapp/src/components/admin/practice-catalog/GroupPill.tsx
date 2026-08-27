@@ -57,7 +57,7 @@ export function GroupPill({
 			title={srLabel ? label : undefined}
 		>
 			<Icon aria-hidden />
-			{srLabel && <span className="sr-only">{label}: </span>}
+			{srLabel && <span className="sr-only">{label}</span>}
 		</span>
 	);
 }

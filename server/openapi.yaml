@@ -4520,13 +4520,14 @@ paths:
             - MAJOR
             - MINOR
             - INFO
-      - description: Zero-based page
+      - description: "Zero-based page, at most 100"
         in: query
         name: page
         required: false
         schema:
           type: integer
           format: int32
+          maximum: 100
           minimum: 0
       - description: Page size from 1 to 50
         in: query

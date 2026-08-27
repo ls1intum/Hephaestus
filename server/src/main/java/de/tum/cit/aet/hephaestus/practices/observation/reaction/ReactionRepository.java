@@ -12,82 +12,20 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
-/**
- * Repository for immutable feedback reaction with append-only semantics.
- *
- * <p>Workspace-agnostic: reaction is scoped through {@code Reaction.feedback → Feedback.workspaceId}.
- *
- * <p>Every read here answers "what does this recipient currently say", and none of them does it by taking the
- * newest row. A row is a delta over two independent optional dimensions ({@link Reaction}), so the current
- * usefulness and the current resolution can come from different rows, and a withdrawal row ends everything
- * before it. That rule is written once as {@link #STILL_SPEAKS} and reused; a query that forgets it reports
- * an answer the recipient has already taken back.
- */
+/** Persistence for append-only feedback-response snapshots in the legacy {@code reaction} table. */
 @Repository
 @WorkspaceAgnostic("Reaction scoped through Feedback.workspaceId relationship")
 public interface ReactionRepository extends JpaRepository<Reaction, UUID> {
-    /**
-     * Restricts {@code r} to the rows that still speak for its reactor: those newer than their most recent
-     * withdrawal of that same piece of feedback, or all of them when they never withdrew.
-     *
-     * <p>A withdrawal is a row with neither dimension set, so the condition reads "no withdrawal is newer than
-     * this row". Ordering on {@code (created_at, id)} rather than {@code created_at} alone matters because two
-     * appends can share a timestamp, and the tie has to break the same way here as in the {@code ORDER BY}
-     * that picks the winner — otherwise a withdrawal written in the same instant as the answer it retracts
-     * could fail to retract it.
-     *
-     * <p>Binds to the alias {@code r}, so every query using it must name the reaction row that way.
-     */
-    String STILL_SPEAKS = """
-              AND NOT EXISTS (
-                  SELECT 1 FROM reaction w
-                   WHERE w.feedback_id = r.feedback_id
-                     AND w.reactor_user_id = r.reactor_user_id
-                     AND w.usefulness IS NULL
-                     AND w.action IS NULL
-                     AND (w.created_at, w.id) > (r.created_at, r.id))
-        """;
-
-    /**
-     * The recipient's current answer to one piece of feedback, folded across rows.
-     *
-     * <p>Two independent lookups rather than one row: someone who rated a unit helpful and later disputed it
-     * said both things, and the newest row alone would report only the second. Returns no row at all when
-     * they have said nothing, or nothing since their last withdrawal.
-     * A comment survives only with a dimension whose current value came from the same row; replacing that
-     * value also replaces its comment.
-     */
+    /** The newest complete response snapshot, including an all-null deletion marker. */
     @Query(
         value = """
-            SELECT u.usefulness AS "usefulness",
-                   a.action AS "resolution",
-                   CASE
-                     WHEN u.explanation IS NULL THEN a.explanation
-                     WHEN a.explanation IS NULL THEN u.explanation
-                     WHEN (u.created_at, u.id) > (a.created_at, a.id) THEN u.explanation
-                     ELSE a.explanation
-                   END AS "comment",
-                   GREATEST(u.created_at, a.created_at) AS "respondedAt"
-            FROM (SELECT 1) seed
-            LEFT JOIN LATERAL (
-                SELECT r.usefulness, r.explanation, r.created_at, r.id FROM reaction r
-                  WHERE r.feedback_id = :feedbackId AND r.reactor_user_id = :reactorUserId
-                    AND r.usefulness IS NOT NULL
-            """ +
-            STILL_SPEAKS +
-            """
-                  ORDER BY r.created_at DESC, r.id DESC LIMIT 1
-            ) u ON TRUE
-            LEFT JOIN LATERAL (
-                SELECT r.action, r.explanation, r.created_at, r.id FROM reaction r
-                  WHERE r.feedback_id = :feedbackId AND r.reactor_user_id = :reactorUserId
-                    AND r.action IS NOT NULL
-            """ +
-            STILL_SPEAKS +
-            """
-                  ORDER BY r.created_at DESC, r.id DESC LIMIT 1
-            ) a ON TRUE
-            """,
+        SELECT r.usefulness AS "usefulness", r.action AS "resolution",
+               r.explanation AS "comment", r.created_at AS "respondedAt"
+        FROM reaction r
+        WHERE r.feedback_id = :feedbackId AND r.reactor_user_id = :reactorUserId
+        ORDER BY r.created_at DESC, r.id DESC
+        LIMIT 1
+        """,
         nativeQuery = true
     )
     Optional<CurrentResponseProjection> findCurrentResponse(
@@ -113,36 +51,23 @@ public interface ReactionRepository extends JpaRepository<Reaction, UUID> {
         Instant getRespondedAt();
     }
 
-    /**
-     * Current resolution for each requested observation locus and recipient. Joining through
-     * {@code feedback_observation} applies a response to every observation in the delivered feedback.
-     *
-     * <p>Rows carrying no resolution are skipped rather than ending the search: a recipient who rated a unit
-     * helpful after disputing it did not un-dispute it, and a suppression that read the newest row would
-     * start re-nagging on the strength of a thumbs-up. Taking the answer back — a withdrawal row — does end
-     * it, which is the point of {@link #STILL_SPEAKS}.
-     *
-     * <p><b>Precondition:</b> the caller MUST pass a non-empty {@code recurrenceKeys}. This is a native
-     * query: an empty collection renders {@code IN ()}, which Postgres rejects as a syntax error at
-     * execution time (it does NOT return an empty result like a JPQL {@code IN} would). Short-circuit
-     * upstream when there are no keys (see {@code ReactionSuppressionFilter}'s empty-key guard).
-     */
+    /** Current resolution for each requested recurrence locus. The caller passes at least one key. */
     @Query(
         value = """
-            SELECT DISTINCT ON (o.recurrence_key) o.recurrence_key AS "recurrenceKey", r.action AS "resolution"
-            FROM reaction r
-            JOIN feedback fb ON fb.id = r.feedback_id
-            JOIN feedback_observation fo ON fo.feedback_id = r.feedback_id
-            JOIN observation o ON o.id = fo.observation_id
-            WHERE o.recurrence_key IN (:recurrenceKeys)
-              AND r.reactor_user_id = :reactorUserId
-              AND fb.workspace_id = :workspaceId
-              AND r.action IS NOT NULL
-            """ +
-            STILL_SPEAKS +
-            """
-            ORDER BY o.recurrence_key, r.created_at DESC, r.id DESC
-            """,
+        SELECT DISTINCT ON (o.recurrence_key) o.recurrence_key AS "recurrenceKey", r.action AS "resolution"
+        FROM feedback fb
+        JOIN feedback_observation fo ON fo.feedback_id = fb.id
+        JOIN observation o ON o.id = fo.observation_id
+        JOIN LATERAL (
+            SELECT response.action, response.created_at, response.id
+            FROM reaction response
+            WHERE response.feedback_id = fb.id AND response.reactor_user_id = :reactorUserId
+            ORDER BY response.created_at DESC, response.id DESC LIMIT 1
+        ) r ON r.action IS NOT NULL
+        WHERE o.recurrence_key IN (:recurrenceKeys)
+          AND fb.workspace_id = :workspaceId
+        ORDER BY o.recurrence_key, r.created_at DESC, r.id DESC
+        """,
         nativeQuery = true
     )
     List<LocusResolutionProjection> findCurrentResolutionByRecurrenceKeys(
@@ -157,33 +82,21 @@ public interface ReactionRepository extends JpaRepository<Reaction, UUID> {
         String getResolution();
     }
 
-    /**
-     * Resolution counts: how many pieces of feedback the developer currently resolves each way, scoped to a
-     * workspace through the feedback → workspace relationship.
-     *
-     * <p>Counts units, not rows. A developer who changed their mind appended a second row, and counting both
-     * would inflate the uptake ratio — so collapse to the current resolution per {@code feedback_id} before
-     * grouping. Native because {@code DISTINCT ON} is Postgres-specific.
-     *
-     * @see ActionCountProjection
-     */
+    /** Resolution counts from each feedback unit's newest response snapshot. */
     @Query(
         value = """
-            SELECT latest.action AS action, COUNT(*) AS count
-            FROM (
-                SELECT DISTINCT ON (r.feedback_id) r.action AS action
-                FROM reaction r
-                JOIN feedback fb ON fb.id = r.feedback_id
-                WHERE r.reactor_user_id = :reactorUserId
-                  AND fb.workspace_id = :workspaceId
-                  AND r.action IS NOT NULL
-            """ +
-            STILL_SPEAKS +
-            """
-                ORDER BY r.feedback_id, r.created_at DESC, r.id DESC
-            ) latest
-            GROUP BY latest.action
-            """,
+        SELECT latest.action AS action, COUNT(*) AS count
+        FROM (
+            SELECT DISTINCT ON (r.feedback_id) r.action AS action
+            FROM reaction r
+            JOIN feedback fb ON fb.id = r.feedback_id
+            WHERE r.reactor_user_id = :reactorUserId
+              AND fb.workspace_id = :workspaceId
+            ORDER BY r.feedback_id, r.created_at DESC, r.id DESC
+        ) latest
+        WHERE latest.action IS NOT NULL
+        GROUP BY latest.action
+        """,
         nativeQuery = true
     )
     List<ActionCountProjection> countByReactorAndWorkspaceGroupByAction(
@@ -191,10 +104,7 @@ public interface ReactionRepository extends JpaRepository<Reaction, UUID> {
         @Param("workspaceId") Long workspaceId
     );
 
-    /**
-     * Projection for reaction action counts used in resolution counts. {@code action} is the stored enum
-     * STRING (the native query selects the raw column); the caller maps it back via {@code FeedbackResolution}.
-     */
+    /** The legacy {@code action} column contains the response resolution enum name. */
     interface ActionCountProjection {
         String getAction();
 

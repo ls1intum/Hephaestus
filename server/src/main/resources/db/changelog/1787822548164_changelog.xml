@@ -9,178 +9,61 @@
         <preConditions onFail="MARK_RAN" onFailMessage="reaction.usefulness already exists">
             <not><columnExists tableName="reaction" columnName="usefulness"/></not>
         </preConditions>
-        <comment>Add perceived usefulness to the append-only feedback response timeline.</comment>
+        <comment>Combine perceived usefulness and recipient resolution in the append-only reaction timeline.</comment>
         <addColumn tableName="reaction">
             <column name="usefulness" type="VARCHAR(16)"/>
         </addColumn>
         <dropNotNullConstraint tableName="reaction" columnName="action" columnDataType="VARCHAR(16)"/>
-        <dropIndex tableName="reaction" indexName="idx_reaction_correlation"/>
-        <sql>
+        <sql splitStatements="true" endDelimiter=";">
             ALTER TABLE reaction
             ADD CONSTRAINT chk_reaction_usefulness CHECK (usefulness IN ('HELPFUL', 'UNHELPFUL'));
             ALTER TABLE reaction
-            ADD CONSTRAINT chk_reaction_response_shape CHECK (
-                usefulness IS NOT NULL OR action IS NOT NULL OR explanation IS NULL
-            );
+            ADD CONSTRAINT chk_reaction_response_present CHECK (usefulness IS NOT NULL OR action IS NOT NULL);
         </sql>
         <rollback>
-            <sql>
+            <sql splitStatements="true" endDelimiter=";">
                 DELETE FROM reaction WHERE action IS NULL;
+                ALTER TABLE reaction DROP CONSTRAINT IF EXISTS chk_reaction_response_present;
+                ALTER TABLE reaction DROP CONSTRAINT IF EXISTS chk_reaction_usefulness;
             </sql>
-            <sql>ALTER TABLE reaction DROP CONSTRAINT chk_reaction_usefulness;</sql>
-            <sql>ALTER TABLE reaction DROP CONSTRAINT chk_reaction_response_shape;</sql>
-            <createIndex tableName="reaction" indexName="idx_reaction_correlation">
-                <column name="recurrence_key"/>
-            </createIndex>
             <addNotNullConstraint tableName="reaction" columnName="action" columnDataType="VARCHAR(16)"/>
             <dropColumn tableName="reaction" columnName="usefulness"/>
         </rollback>
     </changeSet>
-
-    <changeSet author="practice-group-vocabulary" id="1787822548164-2">
-        <preConditions onFail="MARK_RAN" onFailMessage="practice_group schema already uses the current vocabulary">
-            <tableExists tableName="practice_area"/>
+    <changeSet author="practice-area-weight" id="1787822548164-2">
+        <preConditions onFail="MARK_RAN" onFailMessage="practice.area_weight already exists">
+            <not><columnExists tableName="practice" columnName="area_weight"/></not>
         </preConditions>
-        <comment>Rename the practice grouping schema to the product's practice-group vocabulary.</comment>
-        <sql splitStatements="false"><![CDATA[
-        ALTER TABLE practice_area RENAME TO practice_group;
-        ALTER TABLE practice RENAME COLUMN practice_area_id TO practice_group_id;
-        ALTER TABLE practice_revision RENAME COLUMN area_slug TO group_slug;
-        ALTER TABLE practice_revision RENAME COLUMN area_name TO group_name;
-        ALTER TABLE practice_revision RENAME COLUMN area_description TO group_description;
-        ALTER TABLE practice_revision RENAME COLUMN area_icon TO group_icon;
-        ALTER TABLE practice_revision RENAME COLUMN area_color TO group_color;
-        ALTER TABLE curated_practice_override RENAME COLUMN area_slug TO group_slug;
-        ALTER TABLE curated_area_override RENAME TO curated_group_override;
-
-        ALTER TABLE practice_group RENAME CONSTRAINT uk_practice_area_workspace_slug TO uk_practice_group_workspace_slug;
-        ALTER TABLE practice_group RENAME CONSTRAINT fk_practice_area_workspace TO fk_practice_group_workspace;
-        ALTER TABLE practice_group RENAME CONSTRAINT "practice_areaPK" TO "practice_groupPK";
-        ALTER TABLE practice_group RENAME CONSTRAINT ck_practice_area_curated_origin TO ck_practice_group_curated_origin;
-        ALTER TABLE practice_group RENAME CONSTRAINT ck_practice_area_curated_fingerprint TO ck_practice_group_curated_fingerprint;
-        ALTER TABLE practice_group RENAME CONSTRAINT chk_practice_area_autonomy TO chk_practice_group_autonomy;
-        ALTER TABLE practice RENAME CONSTRAINT fk_practice_area TO fk_practice_group;
-        ALTER TABLE curated_group_override RENAME CONSTRAINT ck_curated_area_override_says_something TO ck_curated_group_override_says_something;
-        ALTER TABLE curated_group_override RENAME CONSTRAINT ck_curated_area_override_shape TO ck_curated_group_override_shape;
-        ALTER TABLE curated_group_override RENAME CONSTRAINT ck_curated_area_override_position TO ck_curated_group_override_position;
-        ALTER TABLE curated_group_override RENAME CONSTRAINT ck_curated_area_override_based_on TO ck_curated_group_override_based_on;
-        ALTER INDEX idx_practice_practice_area RENAME TO idx_practice_practice_group;
-        ALTER INDEX idx_practice_area_order RENAME TO idx_practice_group_order;
-        ALTER INDEX idx_practice_area_workspace_dashboard_visibility RENAME TO idx_practice_group_workspace_dashboard_visibility;
-        ALTER INDEX idx_practice_area_source_curated_slug RENAME TO idx_practice_group_source_curated_slug;
-
-        ALTER TABLE config_audit_event DROP CONSTRAINT ck_config_audit_event_entity_type;
-        ALTER TABLE config_audit_event ADD CONSTRAINT ck_config_audit_event_entity_type
-            CHECK (entity_type IN (
-                'PRACTICE_REVIEW_SETTINGS', 'AGENT_BINDING', 'AGENT_CONFIG', 'AI_CONFIG_BINDING',
-                'WORKSPACE_ROLE', 'WORKSPACE_FEATURES', 'WORKSPACE_STATUS',
-                'WORKSPACE_TOKEN', 'WORKSPACE_VISIBILITY', 'PRACTICE_ACTIVE', 'PRACTICE_USAGE',
-                'PRACTICE_DEFINITION', 'PRACTICE_GROUP', 'PRACTICE_AREA', 'CURATED_PRACTICE',
-                'CURATED_PRACTICE_GROUP', 'CURATED_PRACTICE_AREA',
-                'WORKSPACE_INSTANCE_LLM_BUDGET', 'WORKSPACE_OWN_PROVIDER_LLM_BUDGET',
-                'WORKSPACE_LLM_BUDGET', 'WORKSPACE_BYO_LLM_BUDGET', 'REVIEW_BACKFILL_RUN',
-                'REVIEW_SWEEP_SCHEDULE', 'WORKSPACE_LLM_CONNECTION', 'WORKSPACE_LLM_MODEL'
-            ));
-
-        DO $functions$
-        DECLARE definition text;
-        BEGIN
-            SELECT pg_get_functiondef('enforce_practice_revision_immutability()'::regprocedure)
-              INTO definition;
-            definition := replace(definition, 'area_slug', 'group_slug');
-            definition := replace(definition, 'area_name', 'group_name');
-            definition := replace(definition, 'area_description', 'group_description');
-            definition := replace(definition, 'area_icon', 'group_icon');
-            definition := replace(definition, 'area_color', 'group_color');
-            definition := replace(definition, 'practice_area_id', 'practice_group_id');
-            definition := replace(definition, 'practice_area area', 'practice_group practice_group');
-            definition := replace(definition, 'area.slug', 'practice_group.slug');
-            EXECUTE definition;
-            SELECT pg_get_functiondef('enforce_practice_current_revision_projection()'::regprocedure)
-              INTO definition;
-            definition := replace(definition, 'area_slug', 'group_slug');
-            definition := replace(definition, 'area_name', 'group_name');
-            definition := replace(definition, 'area_description', 'group_description');
-            definition := replace(definition, 'area_icon', 'group_icon');
-            definition := replace(definition, 'area_color', 'group_color');
-            definition := replace(definition, 'practice_area_id', 'practice_group_id');
-            definition := replace(definition, 'practice_area area', 'practice_group practice_group');
-            definition := replace(definition, 'area.slug', 'practice_group.slug');
-            EXECUTE definition;
-        END
-        $functions$;
-        ]]></sql>
+        <comment>How much a practice counts when its area is summarised; 1.0 keeps a plain average.</comment>
+        <addColumn tableName="practice">
+            <column name="area_weight" type="DOUBLE PRECISION" defaultValueNumeric="1.0">
+                <constraints nullable="false"/>
+            </column>
+        </addColumn>
+        <sql>
+            ALTER TABLE practice
+            ADD CONSTRAINT chk_practice_area_weight CHECK (area_weight &gt;= 0);
+        </sql>
         <rollback>
-            <sql splitStatements="false"><![CDATA[
-            ALTER TABLE config_audit_event DROP CONSTRAINT ck_config_audit_event_entity_type;
-            ALTER TABLE config_audit_event DISABLE TRIGGER trg_config_audit_event_block_mutation;
-            ALTER TABLE config_audit_event ENABLE TRIGGER trg_config_audit_event_block_mutation;
-            ALTER TABLE config_audit_event ADD CONSTRAINT ck_config_audit_event_entity_type
-                CHECK (entity_type IN (
-                    'PRACTICE_REVIEW_SETTINGS', 'AGENT_BINDING', 'AGENT_CONFIG', 'AI_CONFIG_BINDING',
-                    'WORKSPACE_ROLE', 'WORKSPACE_FEATURES', 'WORKSPACE_STATUS',
-                    'WORKSPACE_TOKEN', 'WORKSPACE_VISIBILITY', 'PRACTICE_ACTIVE', 'PRACTICE_USAGE',
-                    'PRACTICE_DEFINITION', 'PRACTICE_GROUP', 'PRACTICE_AREA', 'CURATED_PRACTICE',
-                    'CURATED_PRACTICE_GROUP', 'CURATED_PRACTICE_AREA',
-                    'WORKSPACE_INSTANCE_LLM_BUDGET', 'WORKSPACE_OWN_PROVIDER_LLM_BUDGET',
-                    'WORKSPACE_LLM_BUDGET', 'WORKSPACE_BYO_LLM_BUDGET', 'REVIEW_BACKFILL_RUN',
-                    'REVIEW_SWEEP_SCHEDULE', 'WORKSPACE_LLM_CONNECTION', 'WORKSPACE_LLM_MODEL'
-                ));
-
-            ALTER INDEX idx_practice_group_source_curated_slug RENAME TO idx_practice_area_source_curated_slug;
-            ALTER INDEX idx_practice_group_workspace_dashboard_visibility RENAME TO idx_practice_area_workspace_dashboard_visibility;
-            ALTER INDEX idx_practice_group_order RENAME TO idx_practice_area_order;
-            ALTER INDEX idx_practice_practice_group RENAME TO idx_practice_practice_area;
-            ALTER TABLE curated_group_override RENAME CONSTRAINT ck_curated_group_override_based_on TO ck_curated_area_override_based_on;
-            ALTER TABLE curated_group_override RENAME CONSTRAINT ck_curated_group_override_position TO ck_curated_area_override_position;
-            ALTER TABLE curated_group_override RENAME CONSTRAINT ck_curated_group_override_shape TO ck_curated_area_override_shape;
-            ALTER TABLE curated_group_override RENAME CONSTRAINT ck_curated_group_override_says_something TO ck_curated_area_override_says_something;
-            ALTER TABLE practice RENAME CONSTRAINT fk_practice_group TO fk_practice_area;
-            ALTER TABLE practice_group RENAME CONSTRAINT chk_practice_group_autonomy TO chk_practice_area_autonomy;
-            ALTER TABLE practice_group RENAME CONSTRAINT ck_practice_group_curated_fingerprint TO ck_practice_area_curated_fingerprint;
-            ALTER TABLE practice_group RENAME CONSTRAINT ck_practice_group_curated_origin TO ck_practice_area_curated_origin;
-            ALTER TABLE practice_group RENAME CONSTRAINT "practice_groupPK" TO "practice_areaPK";
-            ALTER TABLE practice_group RENAME CONSTRAINT fk_practice_group_workspace TO fk_practice_area_workspace;
-            ALTER TABLE practice_group RENAME CONSTRAINT uk_practice_group_workspace_slug TO uk_practice_area_workspace_slug;
-            ALTER TABLE curated_group_override RENAME TO curated_area_override;
-            ALTER TABLE curated_practice_override RENAME COLUMN group_slug TO area_slug;
-            ALTER TABLE practice_revision RENAME COLUMN group_color TO area_color;
-            ALTER TABLE practice_revision RENAME COLUMN group_icon TO area_icon;
-            ALTER TABLE practice_revision RENAME COLUMN group_description TO area_description;
-            ALTER TABLE practice_revision RENAME COLUMN group_name TO area_name;
-            ALTER TABLE practice_revision RENAME COLUMN group_slug TO area_slug;
-            ALTER TABLE practice RENAME COLUMN practice_group_id TO practice_area_id;
-            ALTER TABLE practice_group RENAME TO practice_area;
-
-            DO $functions$
-            DECLARE definition text;
-            BEGIN
-                SELECT pg_get_functiondef('enforce_practice_revision_immutability()'::regprocedure)
-                  INTO definition;
-                definition := replace(definition, 'group_slug', 'area_slug');
-                definition := replace(definition, 'group_name', 'area_name');
-                definition := replace(definition, 'group_description', 'area_description');
-                definition := replace(definition, 'group_icon', 'area_icon');
-                definition := replace(definition, 'group_color', 'area_color');
-                definition := replace(definition, 'practice_group_id', 'practice_area_id');
-                definition := replace(definition, 'practice_group practice_group', 'practice_area area');
-                definition := replace(definition, 'practice_group.slug', 'area.slug');
-                EXECUTE definition;
-                SELECT pg_get_functiondef('enforce_practice_current_revision_projection()'::regprocedure)
-                  INTO definition;
-                definition := replace(definition, 'group_slug', 'area_slug');
-                definition := replace(definition, 'group_name', 'area_name');
-                definition := replace(definition, 'group_description', 'area_description');
-                definition := replace(definition, 'group_icon', 'area_icon');
-                definition := replace(definition, 'group_color', 'area_color');
-                definition := replace(definition, 'practice_group_id', 'practice_area_id');
-                definition := replace(definition, 'practice_group practice_group', 'practice_area area');
-                definition := replace(definition, 'practice_group.slug', 'area.slug');
-                EXECUTE definition;
-            END
-            $functions$;
-            ]]></sql>
+            <dropColumn tableName="practice" columnName="area_weight"/>
         </rollback>
     </changeSet>
-
+    <changeSet author="practice-feedback-response" id="1787822548164-3">
+        <preConditions onFail="MARK_RAN" onFailMessage="chk_reaction_response_present already dropped">
+            <sqlCheck expectedResult="1">
+                SELECT COUNT(*) FROM pg_constraint WHERE conname = 'chk_reaction_response_present'
+            </sqlCheck>
+        </preConditions>
+        <comment>Let a response row carry neither dimension, which is how a recipient takes their response back.</comment>
+        <sql>
+            ALTER TABLE reaction DROP CONSTRAINT chk_reaction_response_present;
+        </sql>
+        <rollback>
+            <sql splitStatements="true" endDelimiter=";">
+                DELETE FROM reaction WHERE usefulness IS NULL AND action IS NULL;
+                ALTER TABLE reaction
+                ADD CONSTRAINT chk_reaction_response_present CHECK (usefulness IS NOT NULL OR action IS NOT NULL);
+            </sql>
+        </rollback>
+    </changeSet>
 </databaseChangeLog>

@@ -149,7 +149,7 @@ const slugify = (name: string) =>
 		.replace(/[^a-z0-9]+/g, "-")
 		.replace(/^-|-$/g, "");
 
-const SCALE_AREA_NAMES = [
+const SCALE_GROUP_NAMES = [
 	"Pull request hygiene",
 	"Testing",
 	"Documentation",
@@ -192,7 +192,7 @@ const SCALE_PRACTICE_NAMES = [
 export function scaleFixture(): AutonomyFixture {
 	return buildAutonomyFixture({
 		workspaceDefault: "HUMAN_APPROVAL",
-		groups: SCALE_AREA_NAMES.map((name, index) => ({
+		groups: SCALE_GROUP_NAMES.map((name, index) => ({
 			slug: slugify(name),
 			name,
 			override: index === 2 ? "OFF" : index === 7 ? "AUTOMATIC" : undefined,

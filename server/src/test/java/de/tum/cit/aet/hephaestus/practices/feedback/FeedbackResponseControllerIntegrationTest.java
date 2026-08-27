@@ -470,8 +470,8 @@ class FeedbackResponseControllerIntegrationTest extends AbstractWorkspaceIntegra
 
         @Test
         @WithAdminUser
-        @DisplayName("rating a unit helpful afterwards does not erase the dispute")
-        void keepsEachDimensionFromTheRowThatLastAnsweredIt() {
+        @DisplayName("PUT clears response dimensions omitted from the replacement")
+        void replacesTheCompleteResponse() {
             submit(new FeedbackResponseRequestDTO(null, FeedbackResolution.DISPUTED, "Actually wrong"));
             submit(new FeedbackResponseRequestDTO(FeedbackUsefulness.HELPFUL, null, null));
 
@@ -479,8 +479,22 @@ class FeedbackResponseControllerIntegrationTest extends AbstractWorkspaceIntegra
 
             assertThat(response).isNotNull();
             assertThat(response.usefulness()).isEqualTo(FeedbackUsefulness.HELPFUL);
+            assertThat(response.resolution()).isNull();
+            assertThat(response.comment()).isNull();
+        }
+
+        @Test
+        @WithAdminUser
+        void resolutionOnlyReplacementClearsUsefulness() {
+            submit(new FeedbackResponseRequestDTO(FeedbackUsefulness.HELPFUL, FeedbackResolution.ADDRESSED, null));
+            submit(new FeedbackResponseRequestDTO(null, FeedbackResolution.DISPUTED, "Incorrect"));
+
+            FeedbackResponseDTO response = current();
+
+            assertThat(response).isNotNull();
+            assertThat(response.usefulness()).isNull();
             assertThat(response.resolution()).isEqualTo(FeedbackResolution.DISPUTED);
-            assertThat(response.comment()).isEqualTo("Actually wrong");
+            assertThat(response.comment()).isEqualTo("Incorrect");
         }
 
         @Test

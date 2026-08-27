@@ -148,9 +148,9 @@ class SlackConnectionStrategyTest extends BaseUnitTest {
         assertThat(url).startsWith("https://slack.com/oauth/v2/authorize?");
         assertThat(url).contains("chat%3Awrite");
         assertThat(url).doesNotContain("chat%3Awrite.public");
-        assertThat(url).doesNotContain("team%3Groupd");
-        assertThat(url).contains("users%3Groupd");
-        assertThat(url).doesNotContain("users%3Groupd.email");
+        assertThat(url).doesNotContain("team%3Aread");
+        assertThat(url).contains("users%3Aread");
+        assertThat(url).doesNotContain("users%3Aread.email");
         assertThat(url).contains("state=state-abc");
         assertThat(url).contains("client_id=client-id");
         assertThat(url).contains("redirect_uri=https%3A%2F%2Fapp.test%2Foauth%2Fcallback%2Fslack");

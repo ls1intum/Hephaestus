@@ -57,7 +57,7 @@ import {
 
 const DECISION_COLUMN = "sm:w-80";
 
-const AREA_GRID = "sm:grid-cols-[minmax(0,1fr)_20rem]";
+const GROUP_GRID = "sm:grid-cols-[minmax(0,1fr)_20rem]";
 
 const ROW_GRID = "grid-cols-[auto_minmax(0,1fr)] sm:grid-cols-[auto_minmax(0,1fr)_20rem]";
 
@@ -384,7 +384,7 @@ function GroupGroup({
 
 	return (
 		<AccordionItem value={group.key} className="scroll-mt-24 rounded-lg border bg-card px-3">
-			<div className={cn("grid gap-2 py-1 sm:items-center sm:gap-4", AREA_GRID)}>
+			<div className={cn("grid gap-2 py-1 sm:items-center sm:gap-4", GROUP_GRID)}>
 				<AccordionTrigger>
 					<span className="flex min-w-0 flex-col gap-1">
 						<span className="flex flex-wrap items-center gap-2">

@@ -6,7 +6,6 @@ import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
-import de.tum.cit.aet.hephaestus.practices.observation.reaction.ReactionRepository;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
@@ -136,49 +135,26 @@ public interface FeedbackObservationRepository extends JpaRepository<FeedbackObs
     /** Newest delivered feedback that carried each observation to this developer. */
     @Query(
         value = """
-                    SELECT DISTINCT ON (fo.observation_id)
-                           fo.observation_id AS "observationId",
-                           f.id AS "feedbackId",
-                           response.usefulness AS "responseUsefulness",
-                           response.action AS "responseResolution",
-                           response.explanation AS "responseComment"
-                    FROM feedback_observation fo
-                    JOIN feedback f ON f.id = fo.feedback_id
-                    LEFT JOIN LATERAL (
-                        SELECT u.usefulness,
-                               a.action,
-                               CASE
-                                 WHEN u.explanation IS NULL THEN a.explanation
-                                 WHEN a.explanation IS NULL THEN u.explanation
-                                 WHEN (u.created_at, u.id) > (a.created_at, a.id) THEN u.explanation
-                                 ELSE a.explanation
-                               END AS explanation
-                        FROM (SELECT 1) seed
-                        LEFT JOIN LATERAL (
-                            SELECT r.usefulness, r.explanation, r.created_at, r.id FROM reaction r
-                              WHERE r.feedback_id = f.id AND r.reactor_user_id = :recipientUserId
-                                AND r.usefulness IS NOT NULL
-            """ +
-            ReactionRepository.STILL_SPEAKS +
-            """
-                              ORDER BY r.created_at DESC, r.id DESC LIMIT 1
-                        ) u ON TRUE
-                        LEFT JOIN LATERAL (
-                            SELECT r.action, r.explanation, r.created_at, r.id FROM reaction r
-                              WHERE r.feedback_id = f.id AND r.reactor_user_id = :recipientUserId
-                                AND r.action IS NOT NULL
-            """ +
-            ReactionRepository.STILL_SPEAKS +
-            """
-                              ORDER BY r.created_at DESC, r.id DESC LIMIT 1
-                        ) a ON TRUE
-            ) response ON TRUE
-            WHERE fo.observation_id IN (:observationIds)
-              AND f.workspace_id = :workspaceId
-              AND f.recipient_user_id = :recipientUserId
-              AND f.delivery_state = 'DELIVERED'
-            ORDER BY fo.observation_id, f.delivered_at DESC NULLS LAST, f.created_at DESC, f.id DESC
-            """,
+                SELECT DISTINCT ON (fo.observation_id)
+                       fo.observation_id AS "observationId",
+                       f.id AS "feedbackId",
+                       response.usefulness AS "responseUsefulness",
+                       response.action AS "responseResolution",
+                       response.explanation AS "responseComment"
+                FROM feedback_observation fo
+                JOIN feedback f ON f.id = fo.feedback_id
+                LEFT JOIN LATERAL (
+                    SELECT r.usefulness, r.action, r.explanation
+                    FROM reaction r
+                    WHERE r.feedback_id = f.id AND r.reactor_user_id = :recipientUserId
+                    ORDER BY r.created_at DESC, r.id DESC LIMIT 1
+        ) response ON TRUE
+        WHERE fo.observation_id IN (:observationIds)
+          AND f.workspace_id = :workspaceId
+          AND f.recipient_user_id = :recipientUserId
+          AND f.delivery_state = 'DELIVERED'
+        ORDER BY fo.observation_id, f.delivered_at DESC NULLS LAST, f.created_at DESC, f.id DESC
+        """,
         nativeQuery = true
     )
     List<DeliveredFeedbackBinding> findDeliveredFeedbackBindings(
@@ -190,8 +166,14 @@ public interface FeedbackObservationRepository extends JpaRepository<FeedbackObs
     interface DeliveredFeedbackBinding {
         UUID getObservationId();
         UUID getFeedbackId();
+
+        @Nullable
         String getResponseUsefulness();
+
+        @Nullable
         String getResponseResolution();
+
+        @Nullable
         String getResponseComment();
     }
 

@@ -174,7 +174,7 @@ public class PracticeStandingService {
      * <p>The UNION of two sets, both needed. The eligible practices are what the workspace currently watches;
      * they belong here even with nothing to report, because "no observation reached this" and "the reviews ran
      * and found nothing" are different answers a developer cannot otherwise tell apart.
-     * The practices that has a standing are added even when review is no longer admitted for them: that
+     * Practices with a standing are included even when review is no longer admitted for them: that
      * feedback was raised and delivered, and switching a practice off does not un-say it.
      */
     private static List<PracticeStandingDTO> practices(

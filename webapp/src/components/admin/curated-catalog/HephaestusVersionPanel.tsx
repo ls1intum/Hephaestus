@@ -41,7 +41,7 @@ export type HephaestusVersionPanelProps = HephaestusVersionPanelBaseProps &
 		| { kind: "group"; shipped?: CuratedGroupRequest }
 	);
 
-const AREA_FIELDS = {
+const GROUP_FIELDS = {
 	name: "Name",
 	description: "Description",
 	icon: "Icon",
@@ -146,7 +146,7 @@ export function HephaestusVersionPanel(props: HephaestusVersionPanelProps) {
 								render={<dl />}
 								className="mt-2 space-y-3 rounded-md border bg-muted/40 p-3"
 							>
-								{Object.entries(kind === "group" ? AREA_FIELDS : PRACTICE_FIELDS).map(
+								{Object.entries(kind === "group" ? GROUP_FIELDS : PRACTICE_FIELDS).map(
 									([field, label]) => (
 										<div key={field} className="space-y-1">
 											<dt className="font-medium text-xs">{label}</dt>

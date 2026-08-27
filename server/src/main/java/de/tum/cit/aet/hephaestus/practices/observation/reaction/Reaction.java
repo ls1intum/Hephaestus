@@ -28,44 +28,16 @@ import org.hibernate.annotations.OnDeleteAction;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Immutable record of a developer's combined response to a delivered unit of {@link Feedback}.
- *
- * <p>A developer reacts to the feedback they were shown — not to an internal {@code Observation} — so the row
- * anchors on the {@link Feedback} unit (ADR 0022). {@code @Immutable} + append-only: a second reaction to the
- * same unit inserts a new row rather than mutating the first, so the temporal record of an initial response
- * and a later change of mind is preserved for research.
- *
- * <p><b>A row is a delta, not a snapshot.</b> It carries exactly what the recipient said at that moment, and
- * each of the two dimensions is null where they said nothing. That is deliberate: the research record must be
- * able to show that someone rated a unit helpful on Monday and disputed it on Thursday without inventing a
- * Monday dispute. The consequence is that the CURRENT state is not the newest row — it is the newest non-null
- * value of each dimension independently, which {@code ReactionRepository} computes and is the only correct way
- * to read this table.
- *
- * <p><b>A row with neither dimension is a withdrawal.</b> It is how a recipient takes an answer back, and it
- * ends the run of rows before it: nothing older than the newest withdrawal speaks for them any more. Without
- * it an append-only table could only ever accumulate, and a mis-click would be permanent.
- *
- * <p>Anchoring on the delivered unit is the reviewer-side firewall: a reaction is always about, and submitted
- * by, the unit's recipient, so this table never holds a judgement about a third party. The about-vs-recipient
- * distinction lives on {@link Feedback}, not here.
- *
- * <p>Excluded from agent context — the detector must not learn whether a developer disputed earlier feedback,
- * which would contaminate accuracy measurement. The only sanctioned reader is {@code ReactionSuppressionFilter}
- * (cross-run re-nag suppression), which reads DISPUTED / NOT_APPLICABLE reactions but never feeds reaction
- * content into the detector prompt.
- *
- * @see Feedback for the delivered piece of feedback being reacted to
- * @see FeedbackResolution for the resolution taxonomy
+ * Immutable snapshot of a developer's response to delivered {@link Feedback}. The newest row is the current
+ * response; a row with neither optional dimension is a deletion marker. The legacy table name is retained for
+ * migration compatibility.
  */
 @Entity
 @Immutable
 @Table(
     name = "reaction",
     indexes = {
-        // Per-developer response timeline (most-recent first).
         @Index(name = "idx_reaction_reactor_created", columnList = "reactor_user_id, created_at DESC"),
-        // Resolve the latest reaction for a given (feedback, reactor) — the "current state" lookup.
         @Index(name = "idx_reaction_feedback_reactor", columnList = "feedback_id, reactor_user_id, created_at DESC"),
     }
 )
@@ -90,16 +62,7 @@ public class Reaction {
     @OnDelete(action = OnDeleteAction.CASCADE)
     private Feedback feedback;
 
-    /**
-     * Direct access to the feedback ID without triggering a lazy load on the {@link #feedback} proxy.
-     * Read-only: mapped to the same column as the {@code @ManyToOne} relationship.
-     *
-     * @implNote Because this column is {@code insertable=false/updatable=false}, a builder-set
-     *     {@code .feedbackId(...)} is NOT persisted and is NOT repopulated from the association after
-     *     {@code save()}. Callers MUST set {@link #feedback}; the in-memory {@code feedbackId} is only
-     *     reliable when it was set in sync with {@code feedback} (as {@code FeedbackResponseService.submitResponse}
-     *     does). Never rely on a builder-set {@code feedbackId} alone post-persist.
-     */
+    /** Read-only scalar view of the {@link #feedback} foreign key. */
     @Column(name = "feedback_id", nullable = false, insertable = false, updatable = false, columnDefinition = "UUID")
     private UUID feedbackId;
 
@@ -115,13 +78,13 @@ public class Reaction {
     @Column(name = "reactor_user_id", nullable = false)
     private Long reactorUserId;
 
-    /** How useful the recipient found the unit; null when this row did not answer that question. */
+    /** How useful the recipient found the unit. */
     @Enumerated(EnumType.STRING)
     @Column(name = "usefulness", length = 16)
     private @Nullable FeedbackUsefulness usefulness;
 
     /**
-     * What the recipient decided to do; null when this row did not answer that question.
+     * What the recipient decided to do.
      *
      * <p>Column {@code action} rather than {@code resolution}: the column shipped under that name and a
      * released one is renamed only across two releases. The field says what the value means.
@@ -131,7 +94,7 @@ public class Reaction {
     private @Nullable FeedbackResolution resolution;
 
     /**
-     * The recipient's free-text rationale. NULL means none was given. Coupled to {@link #action} by the DB
+     * The recipient's free-text rationale. NULL means none was given. Coupled to {@link #resolution} by the DB
      * CHECK {@code chk_reaction_disputed_explanation}: a {@link FeedbackResolution#DISPUTED} row must carry a
      * non-blank explanation (the reasoned rejection IS the evaluative judgement), while {@code ADDRESSED} and
      * {@code NOT_APPLICABLE} may leave it NULL.

@@ -26,6 +26,7 @@ import de.tum.cit.aet.hephaestus.testconfig.TestCacheConfiguration;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
@@ -379,7 +380,11 @@ class ProductionSchemaContractIntegrationTest {
             .filter(part -> part.matches("[A-Z_]{2,}"))
             .distinct()
             .toList();
-        assertThat(accepted).containsExactlyInAnyOrderElementsOf(Arrays.stream(values).map(Enum::name).toList());
+        List<String> expected = new ArrayList<>(Arrays.stream(values).map(Enum::name).toList());
+        if (constraintName.equals("ck_config_audit_event_entity_type")) {
+            expected.addAll(List.of("PRACTICE_AREA", "CURATED_PRACTICE_AREA"));
+        }
+        assertThat(accepted).containsExactlyInAnyOrderElementsOf(expected);
     }
 
     private long auditWorkspaceId() {

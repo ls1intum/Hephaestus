@@ -260,7 +260,7 @@ export const NothingHasBeenChanged: Story = {
 	},
 };
 
-export const ExcludingAnGroupListsItsPractices: Story = {
+export const ExcludingAGroupListsItsPractices: Story = {
 	parameters: { chromatic: { disableSnapshot: true } },
 	play: async ({ canvas }) => {
 		await userEvent.click(
@@ -305,7 +305,7 @@ export const PracticeInsideExcludedGroup: Story = {
 	},
 };
 
-export const ExcludingAnGroupCountsOnlyIncludedPractices: Story = {
+export const ExcludingAGroupCountsOnlyIncludedPractices: Story = {
 	args: {
 		groups: [reviewReadyGroup],
 		practices: [
@@ -331,7 +331,7 @@ export const ExcludingAnGroupCountsOnlyIncludedPractices: Story = {
 	},
 };
 
-export const ExcludingAnGroupDoesNotRecountExcludedPractices: Story = {
+export const ExcludingAGroupDoesNotRecountExcludedPractices: Story = {
 	args: {
 		groups: [reviewReadyGroup],
 		practices: [

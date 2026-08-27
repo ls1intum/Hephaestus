@@ -6,8 +6,8 @@ import type { PanelState } from "@/components/common/panel-state";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { DetailDrawerHeader } from "@/components/core/detail-drawer/DetailDrawerHeader";
 import {
-	CATALOG_AREA_ACTION_DEFS,
-	CATALOG_AREA_CHANGE_ACTIONS,
+	CATALOG_GROUP_ACTION_DEFS,
+	CATALOG_GROUP_CHANGE_ACTIONS,
 } from "@/components/practice-vocabulary/catalog-group-action-defs";
 import { StatusBadge } from "@/components/practice-vocabulary/StatusBadge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -50,7 +50,7 @@ export function GroupAdoptionPanel({
 	// No group colour before the preview loads: an invented one is indistinguishable from the real one.
 	const preview = state.status === "ready" ? state.preview : undefined;
 	const changes =
-		preview?.actions.filter(({ action }) => CATALOG_AREA_CHANGE_ACTIONS.includes(action)) ?? [];
+		preview?.actions.filter(({ action }) => CATALOG_GROUP_CHANGE_ACTIONS.includes(action)) ?? [];
 	const restoring = changes.length > 0 && changes.every(({ action }) => action === "MOVE_TO_GROUP");
 
 	return (
@@ -109,7 +109,7 @@ export function GroupAdoptionPanel({
 								const action =
 									state.preview.actions.find(({ slug }) => slug === practice.slug)?.action ??
 									"KEEP";
-								const def = CATALOG_AREA_ACTION_DEFS[action];
+								const def = CATALOG_GROUP_ACTION_DEFS[action];
 								return (
 									<div key={practice.slug} role="listitem">
 										<Item
