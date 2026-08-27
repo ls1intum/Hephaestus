@@ -57,7 +57,7 @@ public class PracticeAreaDetailController {
     @Operation(
         operationId = "listPracticeAreaReviewHistory",
         summary = "List complete review runs for a practice area",
-        description = "Returns complete review runs newest first. Each moment contains the concrete positive and " +
+        description = "Returns complete review runs newest first. Each review run contains the concrete positive and " +
             "negative observations that explain what the review observed."
     )
     @ApiResponse(responseCode = "200", description = "Paginated review runs returned")

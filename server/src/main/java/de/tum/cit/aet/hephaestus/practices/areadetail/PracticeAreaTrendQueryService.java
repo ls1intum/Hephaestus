@@ -15,7 +15,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Assembles the caller-scoped detail trend from the same developer-safe snapshot as the profile cards. */
+/** Assembles the caller-scoped detail trend from the same developer-scoped snapshot as the area standings. */
 @Service
 @RequiredArgsConstructor
 public class PracticeAreaTrendQueryService {
@@ -27,7 +27,7 @@ public class PracticeAreaTrendQueryService {
     @Transactional(readOnly = true)
     public PracticeAreaTrendDTO get(WorkspaceContext context, String areaSlug) {
         practiceAreaService.getArea(context, areaSlug);
-        // Eligibility comes from the snapshot rather than a second query: the profile cards and this detail
+        // Eligibility comes from the snapshot rather than a second query: the area standings and this detail
         // trend must agree on which practices count toward an area, and two derivations would drift.
         PracticeReflectionService.ReflectionSnapshot snapshot = reflectionService.getReflectionSnapshot(context.id());
         List<String> eligible = snapshot.eligiblePracticesByArea().getOrDefault(areaSlug, List.of());

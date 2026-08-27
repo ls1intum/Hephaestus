@@ -78,7 +78,7 @@ public class PracticeAreaReviewHistoryService {
 
         int first = Math.multiplyExact(pageable.getPageNumber(), pageable.getPageSize());
         int required = Math.addExact(first, pageable.getPageSize() + 1);
-        List<PracticeAreaReviewRunDTO> visibleMoments = new ArrayList<>(required);
+        List<PracticeAreaReviewRunDTO> visibleRuns = new ArrayList<>(required);
         int candidatePage = 0;
         boolean moreCandidates;
         do {
@@ -91,24 +91,24 @@ public class PracticeAreaReviewHistoryService {
                 severityFilter,
                 PageRequest.of(candidatePage++, Math.max(pageable.getPageSize(), 50))
             );
-            visibleMoments.addAll(
-                toVisibleMoments(workspaceContext.id(), currentDeveloperId.get(), runs.getContent(), areaSlug)
+            visibleRuns.addAll(
+                toVisibleRuns(workspaceContext.id(), currentDeveloperId.get(), runs.getContent(), areaSlug)
             );
             moreCandidates = runs.hasNext();
-        } while (visibleMoments.size() < required && moreCandidates);
+        } while (visibleRuns.size() < required && moreCandidates);
 
-        int end = Math.min(first + pageable.getPageSize(), visibleMoments.size());
+        int end = Math.min(first + pageable.getPageSize(), visibleRuns.size());
         List<PracticeAreaReviewRunDTO> content =
-            first >= visibleMoments.size() ? List.of() : List.copyOf(visibleMoments.subList(first, end));
+            first >= visibleRuns.size() ? List.of() : List.copyOf(visibleRuns.subList(first, end));
         return new PracticeAreaReviewHistoryPageDTO(
             content,
             pageable.getPageNumber(),
             pageable.getPageSize(),
-            visibleMoments.size() > end
+            visibleRuns.size() > end
         );
     }
 
-    private List<PracticeAreaReviewRunDTO> toVisibleMoments(
+    private List<PracticeAreaReviewRunDTO> toVisibleRuns(
         long workspaceId,
         long developerId,
         List<ReviewHistoryRunRow> runs,
@@ -125,7 +125,7 @@ public class PracticeAreaReviewHistoryService {
             workspaceId,
             areaSlug
         );
-        // The same gate the reflection surface applies, for the same reason and with the same purpose: a
+        // The same gate the practice standing surface applies, for the same reason and with the same purpose: a
         // observation may cite a source this caller is not cleared to be shown, and a claim measured against
         // superseded review rules no longer speaks for the practice. Asked once for the whole page.
         Set<UUID> visible = visibilityPolicy.permitsAll(
@@ -147,14 +147,14 @@ public class PracticeAreaReviewHistoryService {
         );
         Map<UUID, ReviewRunTargetLookup.Target> targets = reviewRunTargetLookup.findByJobIds(workspaceId, jobIds);
 
-        List<PracticeAreaReviewRunDTO> moments = new ArrayList<>();
+        List<PracticeAreaReviewRunDTO> reviewRuns = new ArrayList<>();
         for (ReviewHistoryRunRow run : runs) {
             List<Observation> visibleObservations = observationsByJob.getOrDefault(run.getJobId(), List.of());
             if (!visibleObservations.isEmpty()) {
-                moments.add(toMoment(run, visibleObservations, feedbackByObservation, targets));
+                reviewRuns.add(toReviewRun(run, visibleObservations, feedbackByObservation, targets));
             }
         }
-        return moments;
+        return reviewRuns;
     }
 
     private Map<UUID, DeliveredFeedbackBinding> feedbackByObservation(
@@ -175,7 +175,7 @@ public class PracticeAreaReviewHistoryService {
             .collect(Collectors.toMap(DeliveredFeedbackBinding::getObservationId, Function.identity()));
     }
 
-    private PracticeAreaReviewRunDTO toMoment(
+    private PracticeAreaReviewRunDTO toReviewRun(
         ReviewHistoryRunRow run,
         List<Observation> observations,
         Map<UUID, DeliveredFeedbackBinding> feedbackByObservation,

@@ -1640,7 +1640,7 @@ export const setAreaAutonomy = <ThrowOnError extends boolean = false>(options: O
 /**
  * List complete review runs for a practice area
  *
- * Returns complete review runs newest first. Each moment contains the concrete positive and negative observations that explain what the review observed.
+ * Returns complete review runs newest first. Each review run contains the concrete positive and negative observations that explain what the review observed.
  */
 export const listPracticeAreaReviewHistory = <ThrowOnError extends boolean = false>(options: Options<ListPracticeAreaReviewHistoryData, ThrowOnError>) => (options.client ?? client).get<ListPracticeAreaReviewHistoryResponses, ListPracticeAreaReviewHistoryErrors, ThrowOnError>({
     responseTransformer: listPracticeAreaReviewHistoryResponseTransformer,

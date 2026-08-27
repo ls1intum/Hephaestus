@@ -4269,7 +4269,7 @@ paths:
       - Practice Areas
   /workspaces/{workspaceSlug}/practice-areas/{areaSlug}/review-history:
     get:
-      description: Returns complete review runs newest first. Each moment contains
+      description: Returns complete review runs newest first. Each review run contains
         the concrete positive and negative observations that explain what the review
         observed.
       operationId: listPracticeAreaReviewHistory
