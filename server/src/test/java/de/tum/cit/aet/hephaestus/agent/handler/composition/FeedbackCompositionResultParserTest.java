@@ -89,6 +89,26 @@ class FeedbackCompositionResultParserTest extends BaseUnitTest {
     }
 
     @Test
+    void readsAUnitGroundedInPrimaryAndRelatedPracticeEvidence() {
+        List<ComposedFeedbackUnit> units = parser.parse(
+            output(
+                """
+                { "channel": "IN_APP", "practiceSlug": "ships-tests-with-the-change",
+                  "basedOn": ["obs-0", "obs-1"], "action": "NEW",
+                  "title": "Review readiness breaks across the workflow",
+                  "body": "The change enters review without tests and leaves follow-up work unresolved.",
+                  "nextStep": "Add the test and resolve the linked review thread before requesting review." }
+                """,
+                "[]"
+            )
+        );
+
+        assertThat(units)
+            .singleElement()
+            .satisfies(unit -> assertThat(unit.basedOn()).containsExactly("obs-0", "obs-1"));
+    }
+
+    @Test
     void rejectsCoordinatesOnAnArtifactPlacement() {
         assertThat(
             parser.parse(

@@ -8,6 +8,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
@@ -93,15 +94,15 @@ public class FeedbackCompositionResultParser {
             return null;
         }
         String normalizedPracticeSlug = normalizeSlug(practiceSlug);
-        boolean grounded = basedOn
+        boolean grounded = basedOn.stream().allMatch(observations::containsKey);
+        boolean ownsEvidence = basedOn
             .stream()
-            .allMatch(reference -> {
-                StagedObservation observation = observations.get(reference);
-                return observation != null && normalizedPracticeSlug.equals(observation.practiceSlug());
-            });
-        if (!grounded) {
+            .map(observations::get)
+            .filter(Objects::nonNull)
+            .anyMatch(observation -> normalizedPracticeSlug.equals(observation.practiceSlug()));
+        if (!grounded || !ownsEvidence) {
             log.warn(
-                "Composed unit names evidence outside its practice: channel={}, practice={}",
+                "Composed unit is not grounded in admitted evidence for its practice: channel={}, practice={}",
                 channel,
                 practiceSlug
             );

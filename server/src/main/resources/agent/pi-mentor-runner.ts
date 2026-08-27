@@ -663,7 +663,7 @@ function forwardEvent(state: ThreadState, event: AgentSessionEvent) {
 		const detail = event.type === "message_update" ? `/${event.assistantMessageEvent.type}` : "";
 		log(`event: ${event.type}${detail}`);
 		if (event.type === "message_end" && event.message.role === "assistant") {
-			log(`assistant end: ${event.message.stopReason}: ${event.message.errorMessage ?? ""}`);
+			log(`assistant end: ${event.message.stopReason}`);
 		}
 	}
 	// Pi ends each attempt with agent_end; release only the last attempt after agent_settled.

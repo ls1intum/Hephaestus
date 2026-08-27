@@ -4,14 +4,12 @@ export function deriveTimeouts(agentBudgetMs: number, compositionEnabled = false
 		throw new Error(`agentBudgetMs must be a positive number, got: ${agentBudgetMs}`);
 	}
 
-	const reconciliationMs = compositionEnabled ? Math.floor(agentBudgetMs * 0.05) : 0;
 	const compositionMs = compositionEnabled ? Math.floor(agentBudgetMs * 0.15) : 0;
-	const reviewBudgetMs = agentBudgetMs - reconciliationMs - compositionMs;
+	const reviewBudgetMs = agentBudgetMs - compositionMs;
 	const initialMs = Math.floor(reviewBudgetMs * 0.85);
 	return {
 		initialMs,
 		retryMs: reviewBudgetMs - initialMs,
-		reconciliationMs,
 		compositionMs,
 	};
 }

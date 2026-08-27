@@ -58,7 +58,7 @@ class SandboxWorkspaceManagerTest extends BaseUnitTest {
 
         @Test
         @DisplayName("applies workspace region permissions")
-        void shouldApplyDirectoryPermissions() throws IOException {
+        void shouldApplyWorkspaceRegionPermissionsWhenFilesAreInjected() throws IOException {
             Map<String, byte[]> files = new HashMap<>();
             files.put("inputs/context/diff.patch", "d".getBytes());
             files.put(".pi/settings.json", "{}".getBytes());

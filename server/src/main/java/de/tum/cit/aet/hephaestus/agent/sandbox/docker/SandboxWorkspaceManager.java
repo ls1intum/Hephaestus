@@ -403,8 +403,9 @@ public class SandboxWorkspaceManager {
             tar.setLongFileMode(TarArchiveOutputStream.LONGFILE_POSIX);
             tar.setBigNumberMode(TarArchiveOutputStream.BIGNUMBER_POSIX);
 
-            Set<String> allPaths = new LinkedHashSet<>(files.keySet());
-            allPaths.addAll(filesOnDisk.keySet());
+            Set<String> allPaths = new LinkedHashSet<>();
+            files.keySet().stream().map(SandboxWorkspaceManager::validatePath).forEach(allPaths::add);
+            filesOnDisk.keySet().stream().map(SandboxWorkspaceManager::validatePath).forEach(allPaths::add);
             for (String dir : ancestorDirs(allPaths)) {
                 TarArchiveEntry dirEntry = new TarArchiveEntry(dir + "/");
                 dirEntry.setModTime(System.currentTimeMillis());

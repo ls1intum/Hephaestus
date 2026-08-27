@@ -16,25 +16,12 @@ import {
 	type Presence,
 	type RecordedInapplicability,
 	type RecordedSearch,
-	replacePracticeObservations,
 	SEVERITY_DESCRIPTIONS,
 	SEVERITY_VALUES,
 	validateEvidenceSources,
 	validateInapplicabilityScope,
 	validateSearchScope,
 } from "../../../main/resources/agent/pi-observation-normalize.ts";
-
-void test("reconciliation replaces every earlier disposition for the practice", () => {
-	const original = normalizeFinalObservation(baseObservation());
-	const other = normalizeFinalObservation(baseObservation({ practiceSlug: "another-practice" }));
-	const replacement = normalizeFinalObservation(
-		baseObservation({ assessment: "bad", severity: "minor", title: "Corrected outcome" }),
-	);
-	assert.deepEqual(replacePracticeObservations([original, other, original], replacement), [
-		other,
-		replacement,
-	]);
-});
 
 /**
  * What a test may override. The fixture speaks in the normalized field names these tests were written
